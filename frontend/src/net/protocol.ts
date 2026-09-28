@@ -121,12 +121,23 @@ export function playerText(code: ErrorCode): string {
 
 /**
  * A language: what the server compiles and runs (SPEC §5.1), what the editor
- * colours, what a scratchpad or an attempt is *in*. Six of them, and every
+ * colours, what a scratchpad or an attempt is *in*. Eight of them, and every
  * table keyed on grammar — the syntax mode, the file name, the tips, the
- * completions — is a `Record<Lang, …>`.
+ * completions — is a `Record<Lang, …>`. ZIG LAND and LUA LAND are the two
+ * that came after the split: each a toolchain of its own (`zig build-exe`,
+ * `luajit`), so each is a language first and a land because of it.
  */
-export type Lang = "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript";
-export const LANGS: readonly Lang[] = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
+export type Lang = "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua";
+export const LANGS: readonly Lang[] = [
+  "rust",
+  "go",
+  "cpp",
+  "python",
+  "pytorch",
+  "typescript",
+  "zig",
+  "lua",
+];
 export function isLang(v: unknown): v is Lang {
   return typeof v === "string" && (LANGS as readonly string[]).includes(v);
 }
@@ -144,7 +155,9 @@ export type Land = Lang | "remix";
  * ternary that used to spell out "rust or go". The fifth was one edit here and
  * a type error at every `Record<Land, …>` that had not been told, which is
  * exactly what this list is for. The seventh was the same edit and then the
- * split above, because it is the first land whose name is not a grammar.
+ * split above, because it is the first land whose name is not a grammar. The
+ * eighth and ninth, ZIG and LUA, are languages again, so they went into
+ * `LANGS` and REMIX stays last: the café is where the languages meet.
  */
 export const LANDS: readonly Land[] = [...LANGS, "remix"];
 export function isLand(v: unknown): v is Land {

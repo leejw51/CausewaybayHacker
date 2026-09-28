@@ -1,0 +1,5427 @@
+# LUA LAND — ADVANCED. The walk through Tai Hang turns into the dragon's
+# run. First the language's own machinery — one name rebound, loops, tables
+# as lists, strings as bytes, tables as maps and sets, defaults, pcall,
+# functions that build tables, sorting with a comparator, metatables as
+# classes, a dispatch table, coroutines as generators, a function that wraps
+# a function, methods as the only contract, and NIL on the price board — and
+# then 21:00 on Wun Sha Street, where everything happens in turn: coroutines
+# for the runners, a shared drawer with a yield in the wrong place, a hatch
+# with a sentinel, a pool of porters, a hand-written scheduler, a queue that
+# must be told it is done, a shutter that closes on every path, iterator
+# pipelines, a toolbox built from coroutines, memoisation, protocols by
+# method name, frozen tables, error objects, the iterator protocol, the
+# right container, cancellation by resume, and THE COROUTINE. The grammar
+# drills live on the BASIC road now.
+#
+# The land is about tables and what a table does when nothing is at a key:
+# a missing value is nil and is not an error until it is followed, and the
+# stack trace points at the place it was followed, never at the place it
+# was lost. Several starters here run to the end and print `nil`, and that
+# is the lesson, not an accident.
+#
+# Every quest here has a deterministic answer on purpose: results are joined
+# in order, collected and sorted, or piped, and the coroutine quests use a
+# round-robin scheduler written in the program, so the order is the
+# program's and never the runtime's. A quest whose output depends on
+# `pairs` order is a quest that fails CI at random, and that is not a lesson.
+#
+# Toolchain: one `main.lua`, syntax-checked with `luajit -b main.lua
+# main.luac`, run as `luajit main.lua` with the case on stdin. LuaJIT 2.1 is
+# Lua 5.1: `unpack`, not `table.unpack`; `math.floor(a / b)`, no `//`; no
+# integer subtype, so `6 / 2` prints `3` and anything past 2^53 needs limbs;
+# `bit.band` and friends for bits; `io.read("*a")` reads all of stdin.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "lua.advanced"
+land = "lua"
+category = "advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "lua.advanced.01.conversions"
+node        = 1
+title       = "THREE SHAPES, ONE NAME"
+difficulty  = 2
+story       = "The incense stall on Wun Sha Street keeps the price as text, as a number and as dollars, in one notebook, under one name."
+concepts    = ["bindings", "types", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Read one line: an amount in cents, as digits.
+
+Print three lines:
+
+1. how many characters the stripped text has
+2. the amount as a number
+3. the amount as dollars with exactly two decimals
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+The amount is non-negative. Do it with **one name**, rebound three times —
+a string, then a number, then a string again. A Lua local holds anything
+and changes its mind on assignment; the price is that nothing tells you
+what `cents` is right now except reading the line above.
+
+Do not go through division for the dollars. `1234 / 100` is `12.34` today
+and `0.1 + 0.2` is `0.3` when printed and not when compared. `math.floor`
+and `%` give you the two halves exactly, and `string.format("%02d", ...)`
+pads the second one. `tonumber` is the conversion; `#cents` is the length
+of the string while it is still a string.
+'''
+starter     = '''
+local function main()
+  local cents = io.read("*l"):match("^%s*(.-)%s*$")
+
+  -- 1. the character count of `cents`
+  -- 2. rebind `cents` to its number value, and print it
+  -- 3. rebind `cents` to the formatted dollars, and print it
+  print(cents)
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  local cents = io.read("*l"):match("^%s*(.-)%s*$")
+  print(#cents)
+
+  cents = tonumber(cents)
+  print(cents)
+
+  cents = string.format("%d.%02d", math.floor(cents / 100), cents % 100)
+  print(cents)
+end
+
+main()
+'''
+hints = [
+  "#cents while cents is still a string is the first line.",
+  "cents = tonumber(cents) is not a conversion in place; it is a new value bound to the old name. The string is gone after it.",
+  "%02d inside string.format is width two, zero padded, decimal. 5 cents is 0.05, not 0.5.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dollars",    stdin = "1234\n", expect = "4\n1234\n12.34\n", visible = true },
+  { name = "five-cents", stdin = "5\n",    expect = "1\n5\n0.05\n",     visible = false },
+  { name = "round",      stdin = "100\n",  expect = "3\n100\n1.00\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "lua.advanced.02.control-flow"
+node        = 2
+title       = "WHICH LANE"
+difficulty  = 2
+story       = "The lane numbers are chalked on the road for the dragon's route, and the marshal's board at Lin Fa Kung is supposed to say what each lane holds. It says the number, every time, and starts from zero."
+concepts    = ["control-flow", "io", "functions"]
+requires    = ["lua.advanced.01.conversions"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+Read one integer `n`. For every `i` from `1` to `n`, print one line:
+
+* `FISHVEG` if `i` divides by both 3 and 5
+* `FISH` if `i` divides by 3
+* `VEG` if `i` divides by 5
+* otherwise `i` itself
+
+Then keep reading integers, one per line, until you read `0`, and print
+`SKIPPED <k>`, how many non-zero lines you read on the way.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+Two loops, two kinds. The first knows how many times it runs before it
+starts: `for i = 1, n do`. The second does not: `while true do` with a
+`break`, because the count is decided by what you read. Lua's numeric `for`
+is **inclusive** at both ends — `for i = 1, n` runs `n` times — and the
+starter begins at `0`, which is the off-by-one this land is named for.
+'''
+starter     = '''
+local function label(i)
+  -- FISHVEG / FISH / VEG / i
+  return i
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for i = 0, n - 1 do
+    print(label(i))
+  end
+
+  local skipped = 0
+  -- read lines until a 0, counting the non-zero ones
+  print("SKIPPED " .. skipped)
+end
+
+main()
+'''
+solution    = '''
+local function label(i)
+  if i % 15 == 0 then
+    return "FISHVEG"
+  end
+  if i % 3 == 0 then
+    return "FISH"
+  end
+  if i % 5 == 0 then
+    return "VEG"
+  end
+  return i
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for i = 1, n do
+    print(label(i))
+  end
+
+  local skipped = 0
+  while true do
+    local value = tonumber(io.read("*l"))
+    if value == 0 then
+      break
+    end
+    skipped = skipped + 1
+  end
+  print("SKIPPED " .. skipped)
+end
+
+main()
+'''
+hints = [
+  "Check the both-case first, or it never fires. Divisible by 3 and 5 is divisible by 15.",
+  "for i = 0, n - 1 starts one early and stops one early. The starter has that bug; the first line of its output is FISHVEG, because 0 divides by everything.",
+  "while true do ... break is how Lua spells a loop whose exit is in the middle. There is also repeat ... until, which tests at the bottom.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",    stdin = "5\n7\n8\n0\n",  expect = "1\n2\nFISH\n4\nVEG\nSKIPPED 2\n", visible = true },
+  { name = "fifteen", stdin = "15\n0\n",      expect = "1\n2\nFISH\n4\nVEG\nFISH\n7\n8\nFISH\nVEG\n11\nFISH\n13\n14\nFISHVEG\nSKIPPED 0\n", visible = false },
+  { name = "one",     stdin = "1\n5\n5\n5\n0\n", expect = "1\nSKIPPED 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "lua.advanced.03.lists"
+node        = 3
+title       = "THE MIDDLE OF THE DRAGON"
+difficulty  = 2
+story       = "Sixty-seven metres of straw on the shoulders of a line of carriers, and the marshal at the head can see the first carrier and the last and nothing in between."
+concepts    = ["slices", "iteration", "control-flow"]
+requires    = ["lua.advanced.02.control-flow"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Standard input is a count `n` on the first line and then `n` integers on the
+second, separated by spaces. `n` is at least `1`, so there is always a first
+value and a last value to print.
+
+Print three lines: the first value, the last value, and the sum of everything
+strictly between them. With fewer than three values that sum is `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+A Lua list is a table with the keys `1..n`, and `#nums` is `n`. The first
+element is `nums[1]`; the last is `nums[#nums]`. There is no `nums[-1]` —
+a negative key is just a key nothing was stored at, and reading it gives
+`nil` without complaint — and there is no slice: the middle is a loop from
+`2` to `#nums - 1`, which runs zero times when there is no middle, so the
+guard other languages need is free here.
+
+The starter prints `nums[0]`. That is not an error in Lua. It is `nil`, and
+`print` writes the word `nil`, and the program exits 0. The land is named
+for this.
+'''
+starter     = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  -- print nums[1], the last element, then the sum of the middle
+  print(nums[0])
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  print(nums[1])
+  print(nums[#nums])
+
+  local middle = 0
+  for i = 2, #nums - 1 do
+    middle = middle + nums[i]
+  end
+  print(middle)
+end
+
+main()
+'''
+hints = [
+  "nums[#nums] is the last element; nums[#nums - 1] is the one before it. Nothing negative works.",
+  "for i = 2, #nums - 1 is everything except the first and last, and with one value it is for i = 2, 0, which runs zero times on its own.",
+  "io.read(\"*a\") reads everything at once and gmatch(\"%S+\") walks the tokens, so the line breaks stop mattering. The first token is the count; skip it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",   stdin = "5\n4 8 15 16 23\n", expect = "4\n23\n39\n", visible = true },
+  { name = "single", stdin = "1\n7\n",            expect = "7\n7\n0\n",   visible = false },
+  { name = "pair",   stdin = "2\n3 9\n",          expect = "3\n9\n0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "lua.advanced.04.strings"
+node        = 4
+title       = "BYTES ARE NOT LETTERS"
+difficulty  = 2
+story       = "The lantern order form at the Victoria Park stall cuts 銅鑼灣 at three bytes and prints one character and a question mark."
+concepts    = ["strings", "types", "slices"]
+requires    = ["lua.advanced.03.lists"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+Read one line. Print three lines:
+
+1. its length in **bytes**, encoded as UTF-8
+2. its length in **characters**
+3. the line with its characters reversed
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+The line may contain characters outside ASCII, and then the first two numbers
+are not the same. A Lua string is a sequence of **bytes** and knows nothing
+else: `#s` is the byte count and `s:reverse()` reverses bytes, which cuts
+every multi-byte character in half. Characters are something you define.
+In UTF-8 a character is one lead byte followed by any number of
+continuation bytes — `[^\128-\191][\128-\191]*` as a pattern — so counting
+the lead bytes is the character count, and walking the characters with
+`gmatch` and stacking them is the reversal.
+
+The starter prints the byte count twice and the line as it came. Do not
+reach for `line:reverse()` to fix the third line: on `causeway` it is
+right, and on the sample everyone actually types it prints bytes that are
+not a string in any encoding.
+'''
+starter     = '''
+local function main()
+  local line = io.read("*l")
+
+  -- 1. bytes, 2. characters, 3. the characters reversed
+  print(#line)
+  print(#line)
+  print(line)
+end
+
+main()
+'''
+solution    = '''
+local CHAR = "[^\128-\191][\128-\191]*"
+
+local function main()
+  local line = io.read("*l")
+
+  print(#line)
+
+  local _, chars = line:gsub(CHAR, "")
+  print(chars)
+
+  local reversed = {}
+  for ch in line:gmatch(CHAR) do
+    table.insert(reversed, 1, ch)
+  end
+  print(table.concat(reversed))
+end
+
+main()
+'''
+hints = [
+  "#line is bytes. The characters have to be counted: gsub returns the number of matches as its second result, and a match per character is a count of characters.",
+  "A continuation byte is 128..191 (10xxxxxx). A character is one byte that is not that, followed by zero or more that are: \"[^\\128-\\191][\\128-\\191]*\".",
+  "table.insert(reversed, 1, ch) pushes at the front, so the last character ends up first. table.concat joins with no separator.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ascii",     stdin = "causeway\n",  expect = "8\n8\nyawesuac\n",  visible = true },
+  { name = "cantonese", stdin = "銅鑼灣\n",    expect = "9\n3\n灣鑼銅\n",    visible = false },
+  { name = "spaced",    stdin = "Lucky Mac\n", expect = "9\n9\ncaM ykcuL\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "lua.advanced.05.dicts"
+node        = 5
+title       = "WHAT THE LANE SHOUTS"
+difficulty  = 3
+story       = "Wun Sha Street at nine: every stall calling something, and the board at the School Street end wants the ranking."
+concepts    = ["collections", "sorting", "iteration"]
+requires    = ["lua.advanced.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+Read the whole of standard input and split it on whitespace.
+
+Print each distinct word once, as `<word> <count>`, ordered by count
+descending, and ties broken by the word ascending.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+A table keyed by word is the counter, and `counts[word] + 1` is an error
+the first time — `attempt to perform arithmetic on a nil value` — because a
+key nobody wrote is `nil`. `(counts[word] or 0) + 1` supplies the zero.
+
+`pairs` walks the keys in **no order at all**, and the order changes from
+run to run. Copy the keys into a list, `table.sort` it with a comparator
+that says count descending and then word ascending, and print from the
+list. The comparator returns `true` when its first argument goes first.
+'''
+starter     = '''
+local function main()
+  local counts = {}
+  for word in io.read("*a"):gmatch("%S+") do
+    counts[word] = counts[word] + 1
+  end
+
+  for word, count in pairs(counts) do
+    print(word .. " " .. count)
+  end
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  local counts = {}
+  for word in io.read("*a"):gmatch("%S+") do
+    counts[word] = (counts[word] or 0) + 1
+  end
+
+  local words = {}
+  for word in pairs(counts) do
+    words[#words + 1] = word
+  end
+  table.sort(words, function(a, b)
+    if counts[a] ~= counts[b] then
+      return counts[a] > counts[b]
+    end
+    return a < b
+  end)
+
+  for _, word in ipairs(words) do
+    print(word .. " " .. counts[word])
+  end
+end
+
+main()
+'''
+hints = [
+  "The starter dies on the first word: counts[word] + 1 reads before it writes, and there is nothing to read. (counts[word] or 0) supplies the zero.",
+  "Collect the keys with pairs into a list, then table.sort the list. The table itself has no order to fix.",
+  "function(a, b) if counts[a] ~= counts[b] then return counts[a] > counts[b] end return a < b end — count descending, then word ascending, and never true for equal arguments.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tram",   stdin = "tram tram bus\n", expect = "tram 2\nbus 1\n", visible = true },
+  { name = "ties",   stdin = "a b a c b a\n",   expect = "a 3\nb 2\nc 1\n", visible = false },
+  { name = "single", stdin = "one\n",           expect = "one 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "lua.advanced.06.sets"
+node        = 6
+title       = "WHAT BOTH STALLS HAVE"
+difficulty  = 2
+story       = "Two lantern stalls, one on each side of Ormsby Street, and a customer who wants to know what she can get from either without crossing the dragon's route twice."
+concepts    = ["collections", "iteration", "strings"]
+requires    = ["lua.advanced.05.dicts"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+Two lines of standard input, each a stall's goods separated by spaces. A
+stall may list the same thing twice; that counts once.
+
+Print three lines:
+
+1. `BOTH` followed by everything on both lists, sorted, space separated — or
+   `BOTH -` if there is nothing
+2. `ONLY_A <k>`: how many things are on the first list and not the second
+3. `ALL <k>`: how many distinct things are on either list
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+Lua has no set type. A set is a table whose **keys** are the members and
+whose values are `true`: writing `tofu` twice writes the same key twice,
+and the duplicate disappears on the way in. Membership is `a[x]`, which is
+`true` or `nil`. Intersection, difference and union are three loops over
+the keys of one set asking the other — write them as functions and the
+three lines are three calls.
+
+`#` does not count a set's keys; it counts the list part, which is empty.
+Count with a loop over `pairs`, and sort the members into a list before
+printing, because `pairs` has no order.
+'''
+starter     = '''
+local function to_set(line)
+  local set = {}
+  for word in line:gmatch("%S+") do
+    set[word] = true
+  end
+  return set
+end
+
+local function main()
+  local a = to_set(io.read("*l"))
+  local b = to_set(io.read("*l"))
+
+  -- both: the keys in a that are in b, sorted; only_a: in a and not b; all: in either
+  print("BOTH -")
+  print("ONLY_A " .. #a)
+  print("ALL " .. (#a + #b))
+end
+
+main()
+'''
+solution    = '''
+local function to_set(line)
+  local set = {}
+  for word in line:gmatch("%S+") do
+    set[word] = true
+  end
+  return set
+end
+
+local function keys(set)
+  local list = {}
+  for key in pairs(set) do
+    list[#list + 1] = key
+  end
+  table.sort(list)
+  return list
+end
+
+local function intersection(a, b)
+  local out = {}
+  for key in pairs(a) do
+    if b[key] then
+      out[key] = true
+    end
+  end
+  return out
+end
+
+local function difference(a, b)
+  local out = {}
+  for key in pairs(a) do
+    if not b[key] then
+      out[key] = true
+    end
+  end
+  return out
+end
+
+local function union(a, b)
+  local out = {}
+  for key in pairs(a) do
+    out[key] = true
+  end
+  for key in pairs(b) do
+    out[key] = true
+  end
+  return out
+end
+
+local function main()
+  local a = to_set(io.read("*l"))
+  local b = to_set(io.read("*l"))
+
+  local both = keys(intersection(a, b))
+  print("BOTH " .. (#both > 0 and table.concat(both, " ") or "-"))
+  print("ONLY_A " .. #keys(difference(a, b)))
+  print("ALL " .. #keys(union(a, b)))
+end
+
+main()
+'''
+hints = [
+  "set[word] = true for every token builds the set; the duplicate tofu is the same key written twice.",
+  "Intersection is a loop over pairs(a) keeping the keys where b[key] is true. Difference keeps the keys where it is nil. Union writes both sets' keys into one table.",
+  "#set is 0 for a table with only string keys. Copy the keys into a list with pairs, table.sort it, and #list is the count and table.concat(list, \" \") is the line.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "choisum tofu gailan tofu\ngailan egg\n", expect = "BOTH gailan\nONLY_A 2\nALL 4\n",  visible = true },
+  { name = "disjoint", stdin = "fish\ntofu\n",                          expect = "BOTH -\nONLY_A 1\nALL 2\n",       visible = false },
+  { name = "same",     stdin = "egg egg egg\negg\n",                    expect = "BOTH egg\nONLY_A 0\nALL 1\n",     visible = false },
+  { name = "many",     stdin = "d c b a\na b c d e\n",                  expect = "BOTH a b c d\nONLY_A 0\nALL 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "lua.advanced.07.functions"
+node        = 7
+title       = "PER CATTY"
+difficulty  = 2
+story       = "Every price tag on Wun Sha Street is per catty unless it says otherwise, and the tag printer at the incense stall insists on being told every time."
+concepts    = ["functions", "strings", "types"]
+requires    = ["lua.advanced.06.sets"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>` or
+`<NAME> <CENTS> <UNIT>`.
+
+Write `tag(name, cents, unit)` returning `<NAME> $<dollars>/<unit>` with two
+decimals, where a missing `unit` means `catty`, and print one tag per line.
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+Lua has no default arguments. A parameter the caller left out is `nil`, and
+the starter's `tag` concatenates it: `attempt to concatenate local 'unit'
+(a nil value)`. The idiom is the first line of the function —
+`unit = unit or "catty"` — because `or` returns its left side unless that
+is `nil` or `false`. It is the whole of Lua's default-argument mechanism,
+and it is part of the function's contract as much as a `def` line would be.
+
+Split the line into a list of tokens and hand the pieces over with
+`tag(unpack(parts))` after converting the cents. `unpack` spreads a list
+into arguments, so a two-element list and a three-element list both fit
+the one signature.
+'''
+starter     = '''
+local function tag(name, cents, unit)
+  return string.format("%s $%d.%02d/%s", name, math.floor(cents / 100), cents % 100, unit)
+end
+
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for _ = 1, n do
+    local parts = split(io.read("*l"))
+    parts[2] = tonumber(parts[2])
+    print(tag(unpack(parts)))
+  end
+end
+
+main()
+'''
+solution    = '''
+local function tag(name, cents, unit)
+  unit = unit or "catty"
+  return string.format("%s $%d.%02d/%s", name, math.floor(cents / 100), cents % 100, unit)
+end
+
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for _ = 1, n do
+    local parts = split(io.read("*l"))
+    parts[2] = tonumber(parts[2])
+    print(tag(unpack(parts)))
+  end
+end
+
+main()
+'''
+hints = [
+  "unit = unit or \"catty\" as the first line of tag. That is the whole fix.",
+  "`x or default` is Lua's default argument. It fails for one value: if the caller passes false on purpose, or replaces it too, which is the follow-up question.",
+  "tag(unpack(parts)) spreads the list; with two parts the third parameter is nil and the or fills it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "3\nCHOISUM 1200\nEGG 250 each\nGARLIC 800\n", expect = "CHOISUM $12.00/catty\nEGG $2.50/each\nGARLIC $8.00/catty\n", visible = true },
+  { name = "units",   stdin = "2\nRICE 4500 bag\nFISH 6805 catty\n",         expect = "RICE $45.00/bag\nFISH $68.05/catty\n",                     visible = false },
+  { name = "cheap",   stdin = "1\nSPRINGONION 5\n",                          expect = "SPRINGONION $0.05/catty\n",                              visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "lua.advanced.08.exceptions"
+node        = 8
+title       = "THE LINE THAT IS NOT A NUMBER"
+difficulty  = 3
+story       = "The scale at the pomelo stall prints a column of weights with somebody's phone number in the middle of it."
+concepts    = ["error-handling", "control-flow", "types"]
+requires    = ["lua.advanced.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines. Each line is supposed to be an
+integer.
+
+For each line print either the value doubled, or `BAD <line>` if it does not
+parse. Finally print `SUM <total>`, where the total is the sum of the values
+you printed.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`tonumber("xx")` is `nil`, quietly; `tonumber("1.5")` is `1.5`, which is
+not an integer; and the starter's `double` raises for both with `error`.
+`error` is how a Lua function refuses — there is no `Result`, no
+`(value, ok)` from the function itself — and the caller that expected a
+number has to say what it does about it with `pcall`: it calls the function
+for you and returns `true, result` or `false, message` instead of letting
+the error climb.
+
+Keep the `pcall` around the one call that can fail. Wrapping the whole loop
+body would swallow a typo in your own `print` too, which is how programs
+learn to fail silently.
+'''
+starter     = '''
+local function double(text)
+  if not text:match("^%-?%d+$") then
+    error("not an integer: " .. text)
+  end
+  return tonumber(text) * 2
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local total = 0
+  for _ = 1, n do
+    local line = io.read("*l"):match("^%s*(.-)%s*$")
+    local value = double(line)
+    print(value)
+    total = total + value
+  end
+  print("SUM " .. total)
+end
+
+main()
+'''
+solution    = '''
+local function double(text)
+  if not text:match("^%-?%d+$") then
+    error("not an integer: " .. text)
+  end
+  return tonumber(text) * 2
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local total = 0
+  for _ = 1, n do
+    local line = io.read("*l"):match("^%s*(.-)%s*$")
+    local ok, value = pcall(double, line)
+    if ok then
+      print(value)
+      total = total + value
+    else
+      print("BAD " .. line)
+    end
+  end
+  print("SUM " .. total)
+end
+
+main()
+'''
+hints = [
+  "The starter dies on xx with main.lua:3: not an integer: xx. That message is what pcall hands you as its second result instead of crashing.",
+  "local ok, value = pcall(double, line) — pcall takes the function and its arguments separately; pcall(double(line)) would call double first and crash before pcall ever ran.",
+  "When ok is false, value is the message. Print BAD and move on; the bad line adds nothing to the total.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\n21\nxx\n-4\n",     expect = "42\nBAD xx\n-8\nSUM 34\n",     visible = true },
+  { name = "zero",    stdin = "1\n0\n",              expect = "0\nSUM 0\n",                   visible = false },
+  { name = "all-bad", stdin = "2\nhello\nworld\n",   expect = "BAD hello\nBAD world\nSUM 0\n", visible = false },
+  { name = "float",   stdin = "2\n1.5\n3\n",         expect = "BAD 1.5\n6\nSUM 6\n",          visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "lua.advanced.09.comprehensions"
+node        = 9
+title       = "ONE PASS DOWN WUN SHA STREET"
+difficulty  = 3
+story       = "Alex says you can do it with three for loops. The lane is one dragon wide and the incense is lit; you get one pass."
+concepts    = ["comprehensions", "iteration", "collections"]
+requires    = ["lua.advanced.08.exceptions"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+Standard input is one line of integers separated by spaces.
+
+Print three lines:
+
+1. the sum of the even values (`0` if there are none)
+2. every value greater than `10`, doubled, in order, joined by single spaces —
+   or `-` if there are none
+3. how many distinct values there are
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Lua has no comprehensions; the nearest thing is a function that builds a
+table from a table, and this node teaches those. Write `filter(list, keep)`
+and `map(list, f)` once — each is a loop that fills a new table — and the
+three lines become calls: `sum(filter(nums, even))`, `map(filter(nums,
+big), double)`, and a set built from the values, counted. The predicate and
+the transform are functions passed as arguments, which is what the `if` and
+the expression of a comprehension are.
+
+`table.concat` takes numbers as well as strings, so the second line does not
+need a conversion; it does need the `-` when the list is empty, because
+`table.concat({}, " ")` is the empty string.
+'''
+starter     = '''
+local function main()
+  local nums = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    nums[#nums + 1] = tonumber(token)
+  end
+
+  -- 1. sum of the even ones
+  -- 2. the ones over 10, doubled, joined by spaces, or "-"
+  -- 3. how many distinct values
+  print(0)
+  print("-")
+  print(#nums)
+end
+
+main()
+'''
+solution    = '''
+local function filter(list, keep)
+  local out = {}
+  for _, value in ipairs(list) do
+    if keep(value) then
+      out[#out + 1] = value
+    end
+  end
+  return out
+end
+
+local function map(list, f)
+  local out = {}
+  for i, value in ipairs(list) do
+    out[i] = f(value)
+  end
+  return out
+end
+
+local function sum(list)
+  local total = 0
+  for _, value in ipairs(list) do
+    total = total + value
+  end
+  return total
+end
+
+local function main()
+  local nums = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    nums[#nums + 1] = tonumber(token)
+  end
+
+  print(sum(filter(nums, function(v) return v % 2 == 0 end)))
+
+  local big = map(filter(nums, function(v) return v > 10 end), function(v) return v * 2 end)
+  print(#big > 0 and table.concat(big, " ") or "-")
+
+  local distinct = {}
+  for _, v in ipairs(nums) do
+    distinct[v] = true
+  end
+  local count = 0
+  for _ in pairs(distinct) do
+    count = count + 1
+  end
+  print(count)
+end
+
+main()
+'''
+hints = [
+  "filter(nums, function(v) return v % 2 == 0 end) keeps the evens; sum of that is line one.",
+  "map(filter(nums, big), double) — filter first, transform second, same as the if at the back and the expression at the front of a comprehension.",
+  "A set is a table keyed by the values; #set does not count keys, a pairs loop does.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",     stdin = "1 2 3 4 12 12 30\n", expect = "60\n24 24 60\n6\n", visible = true },
+  { name = "no-big",    stdin = "1 3 5\n",            expect = "0\n-\n3\n",         visible = false },
+  { name = "negatives", stdin = "-4 -2 0 11\n",       expect = "-6\n22\n4\n",       visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "lua.advanced.10.dict-comprehensions"
+node        = 10
+title       = "THE SAME PASS, KEYED"
+difficulty  = 2
+story       = "The incense stall's prices are on scraps of red paper in the order they were written. Auntie wants them as one board, and she wants it twice."
+concepts    = ["comprehensions", "collections", "sorting"]
+requires    = ["lua.advanced.09.comprehensions"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <PRICE>`. `PRICE` is
+a whole number of cents. An item appears at most once, and `n` is at least
+`1` — there is always a cheapest item to name.
+
+Print three lines:
+
+1. every item priced **strictly over 100**, as `ITEM=PRICE`, sorted by item,
+   joined by single spaces — or `-` if there are none
+2. every item with its price **halved by integer division**, same format,
+   sorted by item
+3. `CHEAPEST <item>` — the lowest price, ties broken by the item ascending
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+The keyed version of the last node. Lua has no dict comprehension; the
+nearest thing is `filter_pairs(t, keep)` and `map_values(t, f)`, each a
+`pairs` loop that fills a new table by the same keys. The first line keeps
+the pairs where the value is over 100; the second transforms every value
+with `math.floor(v / 2)` and keeps every key. Neither is a comprehension,
+and both are one function each, written once.
+
+`pairs` has no order, so `sorted_keys(t)` — the keys in a list, sorted — is
+the third helper, and every printed line goes through it. For the cheapest,
+walk the sorted keys and keep the first strictly lower price: because the
+keys come in alphabetical order, the first of equal prices is the tie-break.
+'''
+starter     = '''
+local function main()
+  local n = tonumber(io.read("*l"))
+  local prices = {}
+  for _ = 1, n do
+    local item, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    prices[item] = tonumber(cents)
+  end
+
+  -- 1. the ones over 100, as ITEM=PRICE, sorted, or "-"
+  -- 2. every price halved, same format, sorted
+  -- 3. CHEAPEST <item>, ties alphabetical
+  print("-")
+  print("-")
+  print("CHEAPEST")
+end
+
+main()
+'''
+solution    = '''
+local function sorted_keys(t)
+  local keys = {}
+  for key in pairs(t) do
+    keys[#keys + 1] = key
+  end
+  table.sort(keys)
+  return keys
+end
+
+local function filter_pairs(t, keep)
+  local out = {}
+  for key, value in pairs(t) do
+    if keep(key, value) then
+      out[key] = value
+    end
+  end
+  return out
+end
+
+local function map_values(t, f)
+  local out = {}
+  for key, value in pairs(t) do
+    out[key] = f(value)
+  end
+  return out
+end
+
+local function board(t)
+  local parts = {}
+  for _, key in ipairs(sorted_keys(t)) do
+    parts[#parts + 1] = key .. "=" .. t[key]
+  end
+  return #parts > 0 and table.concat(parts, " ") or "-"
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local prices = {}
+  for _ = 1, n do
+    local item, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    prices[item] = tonumber(cents)
+  end
+
+  local dear = filter_pairs(prices, function(_, price) return price > 100 end)
+  print(board(dear))
+
+  local half = map_values(prices, function(price) return math.floor(price / 2) end)
+  print(board(half))
+
+  local cheapest
+  for _, item in ipairs(sorted_keys(prices)) do
+    if cheapest == nil or prices[item] < prices[cheapest] then
+      cheapest = item
+    end
+  end
+  print("CHEAPEST " .. cheapest)
+end
+
+main()
+'''
+hints = [
+  "filter_pairs keeps a key when keep(key, value) is true; map_values writes f(value) at every key. Both fill a fresh table — never write into the one you are walking.",
+  "sorted_keys(t) is the only way to print a keyed table in a fixed order. Every line here goes through it, including the cheapest.",
+  "Walk the sorted keys and replace the best only on a strictly lower price: the first of equal prices is alphabetically first, so the tie settles itself.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "board",    stdin = "3\nLAI-SEE 120\nCHOY 80\nBOK-CHOY 250\n",      expect = "BOK-CHOY=250 LAI-SEE=120\nBOK-CHOY=125 CHOY=40 LAI-SEE=60\nCHEAPEST CHOY\n", visible = true },
+  { name = "nothing-dear", stdin = "2\nGAI-LAN 40\nCHOY 60\n",                  expect = "-\nCHOY=30 GAI-LAN=20\nCHEAPEST GAI-LAN\n",                                visible = true },
+  { name = "exactly-100",  stdin = "1\nEDGE 100\n",                              expect = "-\nEDGE=50\nCHEAPEST EDGE\n",                                              visible = false },
+  { name = "tie",      stdin = "3\nZUCCHINI 30\nAUBERGINE 30\nMELON 90\n",     expect = "-\nAUBERGINE=15 MELON=45 ZUCCHINI=15\nCHEAPEST AUBERGINE\n",               visible = false },
+  { name = "odd",      stdin = "2\nODD 101\nONE 1\n",                           expect = "ODD=101\nODD=50 ONE=0\nCHEAPEST ONE\n",                                    visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "lua.advanced.11.sorting"
+node        = 11
+title       = "THE RANKING BOARD"
+difficulty  = 3
+story       = "The dragon committee pins up the cheapest incense every evening, and the clerk at Lin Fa Kung ranks the stalls by hand with two lists and a pencil."
+concepts    = ["sorting", "iteration", "closures"]
+requires    = ["lua.advanced.10.dict-comprehensions"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+Two lines of standard input: stall names on the first, their prices in cents
+on the second, in the same order. There is at least one stall.
+
+Print the stalls ranked cheapest first as `<rank>. <NAME> <cents>`, with the
+rank starting at `1`, ties broken by name ascending. Then print
+`CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+Zip the two lists into one list of records — `{ name = ..., price = ... }`
+— then `table.sort` it with a comparator that orders by price and breaks
+the tie by name, and `ipairs` numbers the result. The comparator is a
+closure; it must return `false` for two equal records, or `table.sort`
+raises `invalid order function for sorting`. The version with a bare index
+loop and no sort is the one that gets the tie-break wrong at the third
+stall.
+'''
+starter     = '''
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function main()
+  local names = split(io.read("*l"))
+  local prices = split(io.read("*l"))
+
+  for i = 1, #names do
+    print(i .. ". " .. names[i] .. " " .. prices[i])
+  end
+  print("CHEAPEST " .. names[1])
+end
+
+main()
+'''
+solution    = '''
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function main()
+  local names = split(io.read("*l"))
+  local prices = split(io.read("*l"))
+
+  local stalls = {}
+  for i = 1, #names do
+    stalls[i] = { name = names[i], price = tonumber(prices[i]) }
+  end
+  table.sort(stalls, function(a, b)
+    if a.price ~= b.price then
+      return a.price < b.price
+    end
+    return a.name < b.name
+  end)
+
+  for rank, stall in ipairs(stalls) do
+    print(rank .. ". " .. stall.name .. " " .. stall.price)
+  end
+  print("CHEAPEST " .. stalls[1].name)
+end
+
+main()
+'''
+hints = [
+  "One record per stall, built by walking the two lists with the same index. tonumber the price, or 1200 sorts before 900 as a string.",
+  "function(a, b) if a.price ~= b.price then return a.price < b.price end return a.name < b.name end — price, then name, and false for equal records.",
+  "for rank, stall in ipairs(stalls) hands you the rank for free, starting at 1.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "LAM WONG CHAN\n1200 900 1200\n", expect = "1. WONG 900\n2. CHAN 1200\n3. LAM 1200\nCHEAPEST WONG\n", visible = true },
+  { name = "one",    stdin = "AH-KEUNG\n5\n",                 expect = "1. AH-KEUNG 5\nCHEAPEST AH-KEUNG\n",                      visible = false },
+  { name = "sorted", stdin = "B A\n1 2\n",                    expect = "1. B 1\n2. A 2\nCHEAPEST B\n",                            visible = false },
+  { name = "ties",   stdin = "Z Y X\n7 7 7\n",                expect = "1. X 7\n2. Y 7\n3. Z 7\nCHEAPEST X\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "lua.advanced.12.classes"
+node        = 12
+title       = "THE STALL'S NOTEBOOK"
+difficulty  = 3
+story       = "Every stall on Wun Sha Street keeps its own notebook of the night's sales, and the incense stall's has every line written in the shared one on the committee's desk."
+concepts    = ["structs", "functions", "mutability"]
+requires    = ["lua.advanced.11.sorting"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<ITEM> <CENTS>`.
+
+Build a `Notebook` class that collects the items, then print each item back
+as `<ITEM> <CENTS>`, in the order it arrived, then `TOTAL <sum>`, and
+finally the notebook itself through `print(book)` — its `__tostring`
+metamethod must produce `Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` may be `0`, and then the lines are `TOTAL 0` and
+`Notebook(items=0, total=0)`.
+
+A Lua class is a table of methods set as the metatable of every instance,
+with `__index` pointing back at itself: a key the instance does not have is
+looked up in the class. That lookup is the bug this quest is named for. The
+starter puts `items = {}` in the **class table**, so `self.items` on any
+notebook falls through to the one list every notebook shares, and the
+scratch notebook's `PENCIL` turns up in the real one. Anything created in
+`new` and stored on the instance belongs to the instance; anything on the
+class belongs to every instance there will ever be.
+
+`print(book)` calls `tostring`, and `tostring` looks for `__tostring` in the
+metatable. Without it you get `table: 0x...`, which is the starter's last
+line.
+'''
+starter     = '''
+local Notebook = {}
+Notebook.__index = Notebook
+Notebook.items = {}
+
+function Notebook.new()
+  return setmetatable({}, Notebook)
+end
+
+function Notebook:add(name, cents)
+  self.items[#self.items + 1] = { name = name, cents = cents }
+end
+
+function Notebook:total()
+  local sum = 0
+  for _, entry in ipairs(self.items) do
+    sum = sum + entry.cents
+  end
+  return sum
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local book = Notebook.new()
+  local scratch = Notebook.new()
+  scratch:add("PENCIL", 0)
+  for _ = 1, n do
+    local name, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    book:add(name, tonumber(cents))
+  end
+
+  for _, entry in ipairs(book.items) do
+    print(entry.name .. " " .. entry.cents)
+  end
+  print("TOTAL " .. book:total())
+  print(book)
+end
+
+main()
+'''
+solution    = '''
+local Notebook = {}
+Notebook.__index = Notebook
+
+function Notebook.new()
+  -- one list per notebook; a list on the class table would be shared
+  return setmetatable({ items = {} }, Notebook)
+end
+
+function Notebook:add(name, cents)
+  self.items[#self.items + 1] = { name = name, cents = cents }
+end
+
+function Notebook:total()
+  local sum = 0
+  for _, entry in ipairs(self.items) do
+    sum = sum + entry.cents
+  end
+  return sum
+end
+
+function Notebook:__tostring()
+  return string.format("Notebook(items=%d, total=%d)", #self.items, self:total())
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local book = Notebook.new()
+  local scratch = Notebook.new()
+  scratch:add("PENCIL", 0)
+  for _ = 1, n do
+    local name, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    book:add(name, tonumber(cents))
+  end
+
+  for _, entry in ipairs(book.items) do
+    print(entry.name .. " " .. entry.cents)
+  end
+  print("TOTAL " .. book:total())
+  print(book)
+end
+
+main()
+'''
+hints = [
+  "Run the starter and look at the first line of output: PENCIL 0, from a notebook nobody wrote it in. That is the shared list, found through __index.",
+  "setmetatable({ items = {} }, Notebook) — the list is created per instance, in new, on the table that becomes self.",
+  "print(book) calls tostring(book), which uses the metatable's __tostring. Notebook is the metatable, so function Notebook:__tostring() is the one method to write. Make it look like the constructor call that would rebuild it; that is the convention.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-items", stdin = "2\nTOFU 600\nSET 2800\n",         expect = "TOFU 600\nSET 2800\nTOTAL 3400\nNotebook(items=2, total=3400)\n",         visible = true },
+  { name = "empty",     stdin = "0\n",                             expect = "TOTAL 0\nNotebook(items=0, total=0)\n",                                   visible = false },
+  { name = "repeats",   stdin = "3\nTEA 1200\nTEA 1200\nPIE 900\n", expect = "TEA 1200\nTEA 1200\nPIE 900\nTOTAL 3300\nNotebook(items=3, total=3300)\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "lua.advanced.13.dataclasses"
+node        = 13
+title       = "WHO IS BUYING"
+difficulty  = 3
+story       = "The rice counter by Lin Fa Kung charges every ticket the full price, including the ones that are not adults and the one that is not a ticket."
+concepts    = ["types", "pattern-matching", "structs"]
+requires    = ["lua.advanced.12.classes"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<TYPE> <KG>`.
+
+The base price is `500 + 100 * KG` cents. For each line print one of:
+
+* `ADULT` — the base price
+* `STUDENT` — half the base price, integer division
+* `SENIOR` — always `200`
+* anything else — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Model the line as a record — `Order.new(kind, kg)` — and decide the price
+with **one dispatch table**: a table keyed by the kind whose values are
+functions, looked up once, with a fallthrough when the key is not there.
+Lua has no `match`; a table of arms keyed by the tag is the nearest thing
+it has, and `arms[order.kind]` being `nil` is the wildcard case.
+
+The starter's table has one arm, and every other kind — the three it is
+supposed to know included — falls through to `UNKNOWN`. Each arm is a
+function of the order; each returns a string, because `450` and `"450"`
+print the same and the `UNKNOWN` line is text either way.
+'''
+starter     = '''
+local Order = {}
+Order.__index = Order
+
+function Order.new(kind, kg)
+  return setmetatable({ kind = kind, kg = kg }, Order)
+end
+
+function Order:base()
+  return 500 + 100 * self.kg
+end
+
+local ARMS = {
+  ADULT = function(order) return tostring(order:base()) end,
+}
+
+local function price(order)
+  local arm = ARMS[order.kind]
+  if arm then
+    return arm(order)
+  end
+  return "UNKNOWN " .. order.kind
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for _ = 1, n do
+    local kind, kg = io.read("*l"):match("(%S+)%s+(%S+)")
+    print(price(Order.new(kind, tonumber(kg))))
+  end
+end
+
+main()
+'''
+solution    = '''
+local Order = {}
+Order.__index = Order
+
+function Order.new(kind, kg)
+  return setmetatable({ kind = kind, kg = kg }, Order)
+end
+
+function Order:base()
+  return 500 + 100 * self.kg
+end
+
+-- one arm per kind, keyed by the tag; a kind with no arm is the wildcard
+local ARMS = {
+  ADULT = function(order) return tostring(order:base()) end,
+  STUDENT = function(order) return tostring(math.floor(order:base() / 2)) end,
+  SENIOR = function() return "200" end,
+}
+
+local function price(order)
+  local arm = ARMS[order.kind]
+  if arm then
+    return arm(order)
+  end
+  return "UNKNOWN " .. order.kind
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  for _ = 1, n do
+    local kind, kg = io.read("*l"):match("(%S+)%s+(%S+)")
+    print(price(Order.new(kind, tonumber(kg))))
+  end
+end
+
+main()
+'''
+hints = [
+  "One entry per kind in ARMS: STUDENT = function(order) ... end, and so on. The key is the tag and the value is the arm.",
+  "math.floor(x / 2) is integer division; x / 2 would give 450 for 900 but 250.5 for 501, and the test wants whole cents.",
+  "ARMS[order.kind] is nil for a kind with no arm, and the if falls through to UNKNOWN — the same job as the last arm of a match, done by the table.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-kinds", stdin = "3\nADULT 4\nSTUDENT 4\nSENIOR 4\n", expect = "900\n450\n200\n",         visible = true },
+  { name = "tourist",     stdin = "2\nSTUDENT 0\nTOURIST 9\n",         expect = "250\nUNKNOWN TOURIST\n",  visible = false },
+  { name = "heavy",       stdin = "1\nADULT 12\n",                     expect = "1700\n",                  visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "lua.advanced.14.generators"
+node        = 14
+title       = "YOUR OWN FOR LOOP"
+difficulty  = 3
+story       = "The incense stall's ticker lists every price from the opening one up in fixed steps, and keeps no list of them anywhere."
+concepts    = ["generators", "iteration", "functions"]
+requires    = ["lua.advanced.13.dataclasses"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write `ticker(start, step, count)` as a **coroutine** — `coroutine.wrap`
+around a function that yields `count` values beginning at `start` and
+advancing by `step`. Print each on its own line, then `SUM <total>`
+computed by handing a second ticker to `sum`.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+The last line is what `main` calls the thing `ticker` returns — `list` for
+a table, `generator` for the function `coroutine.wrap` gives back — printed
+by the starter's `main` as it stands. Right now it says `list`, one line
+after `for value in ticker(...)` has already failed with `attempt to call a
+table value`: the generic `for` calls its first operand, and a list is not
+callable.
+
+`coroutine.wrap(f)` does not run `f`. It returns a function, and each call
+of that function runs `f` until its next `coroutine.yield(value)`, and hands
+that value back. When `f` returns, the function returns nothing, and the
+`for` sees `nil` and stops. That is why `for` works on it, why `sum` works
+on it, and why it can produce a million values without a list of a million
+values ever existing.
+
+The starter builds the list and returns it. Turn the append into a `yield`
+and delete the list.
+'''
+starter     = '''
+local function ticker(start, step, count)
+  local values = {}
+  for i = 0, count - 1 do
+    values[#values + 1] = start + i * step
+  end
+  return values
+end
+
+local function sum(iter)
+  local total = 0
+  for value in iter do
+    total = total + value
+  end
+  return total
+end
+
+local KIND = { table = "list", ["function"] = "generator" }
+
+local function main()
+  local start, step, count = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  start, step, count = tonumber(start), tonumber(step), tonumber(count)
+
+  for value in ticker(start, step, count) do
+    print(value)
+  end
+  print("SUM " .. sum(ticker(start, step, count)))
+  print(KIND[type(ticker(start, step, count))])
+end
+
+main()
+'''
+solution    = '''
+local function ticker(start, step, count)
+  return coroutine.wrap(function()
+    local value = start
+    for _ = 1, count do
+      coroutine.yield(value)
+      value = value + step
+    end
+  end)
+end
+
+local function sum(iter)
+  local total = 0
+  for value in iter do
+    total = total + value
+  end
+  return total
+end
+
+local KIND = { table = "list", ["function"] = "generator" }
+
+local function main()
+  local start, step, count = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  start, step, count = tonumber(start), tonumber(step), tonumber(count)
+
+  for value in ticker(start, step, count) do
+    print(value)
+  end
+  print("SUM " .. sum(ticker(start, step, count)))
+  print(KIND[type(ticker(start, step, count))])
+end
+
+main()
+'''
+hints = [
+  "return coroutine.wrap(function() ... end) — the body yields; the wrap turns it into a function the for can call.",
+  "coroutine.yield(value), then advance. The body pauses at the yield and resumes after it on the next call.",
+  "A wrapped coroutine can be consumed once, and calling it after it is dead is an error. That is why main builds a fresh ticker for the sum instead of reusing the one the loop drained.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",     stdin = "5 2 4\n",    expect = "5\n7\n9\n11\nSUM 32\ngenerator\n",       visible = true },
+  { name = "flat",     stdin = "0 0 3\n",    expect = "0\n0\n0\nSUM 0\ngenerator\n",            visible = false },
+  { name = "backward", stdin = "10 -4 4\n",  expect = "10\n6\n2\n-2\nSUM 16\ngenerator\n",      visible = false },
+  { name = "none",     stdin = "7 1 0\n",    expect = "SUM 0\ngenerator\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "lua.advanced.15.decorators"
+node        = 15
+title       = "WRAPPED"
+difficulty  = 3
+story       = "The dragon committee wants to know how many times the price function was called tonight, and the function does not want to know it is being watched."
+concepts    = ["decorators", "functions", "closures"]
+requires    = ["lua.advanced.14.generators"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` weights in kg.
+
+`price(kg)` is `500 + 100 * kg`. Wrap it with `counted` so that every call
+is counted without `price` knowing. Print one price per weight, then
+`CALLS <n>`, then `NAME <price.name>` — which must say `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+Lua has no decorators; the nearest thing is a function that takes a
+function and returns something callable in its place, and this node
+teaches that. `price = counted(price, "price")` rebinds the name to what
+`counted` returned — exactly what `@counted` above a `def` does.
+
+Where does the count live? A Lua function cannot carry a field, so the
+wrapper is a **table** — `{ calls = 0 }` — made callable with a `__call`
+metamethod that bumps the count and calls the original. `price(kg)` then
+goes through `__call`, and `price.calls` is a plain field read.
+
+A Lua function has no name of its own either. The wrapper has to be told
+the one it is standing in for; the starter never tells it, and the last
+line says `NAME wrapper`. That is `functools.wraps`, done by hand: the
+identity of the thing wrapped, copied onto the thing that replaced it.
+'''
+starter     = '''
+local function counted(func, name)
+  local wrapper = { calls = 0, name = name or "wrapper" }
+  return setmetatable(wrapper, {
+    __call = function(self, ...)
+      self.calls = self.calls + 1
+      return func(...)
+    end,
+  })
+end
+
+local function price(kg)
+  return 500 + 100 * kg
+end
+price = counted(price)
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local weights = {}
+  for token in (io.read("*l") or ""):gmatch("%S+") do
+    weights[#weights + 1] = tonumber(token)
+  end
+  for i = 1, n do
+    print(price(weights[i]))
+  end
+  print("CALLS " .. price.calls)
+  print("NAME " .. price.name)
+end
+
+main()
+'''
+solution    = '''
+local function counted(func, name)
+  local wrapper = { calls = 0, name = name or "wrapper" }
+  return setmetatable(wrapper, {
+    __call = function(self, ...)
+      self.calls = self.calls + 1
+      return func(...)
+    end,
+  })
+end
+
+local function price(kg)
+  return 500 + 100 * kg
+end
+-- the name is rebound to the wrapper, and the wrapper is told whose name it wears
+price = counted(price, "price")
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local weights = {}
+  for token in (io.read("*l") or ""):gmatch("%S+") do
+    weights[#weights + 1] = tonumber(token)
+  end
+  for i = 1, n do
+    print(price(weights[i]))
+  end
+  print("CALLS " .. price.calls)
+  print("NAME " .. price.name)
+end
+
+main()
+'''
+hints = [
+  "price = counted(price, \"price\") — the second argument is the name the wrapper carries. That is the whole fix.",
+  "price = counted(price) after the function is the same as a decorator above it: the name is rebound to whatever counted returned, and the original survives only as the upvalue func inside the closure.",
+  "... in the __call forwards any arguments at all without knowing them, which is what makes the wrapper reusable for any function.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",  expect = "600\n700\n800\nCALLS 3\nNAME price\n", visible = true },
+  { name = "one",   stdin = "1\n0\n",      expect = "500\nCALLS 1\nNAME price\n",           visible = false },
+  { name = "none",  stdin = "0\n\n",       expect = "CALLS 0\nNAME price\n",                visible = false },
+  { name = "heavy", stdin = "2\n10 20\n",  expect = "1500\n2500\nCALLS 2\nNAME price\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "lua.advanced.16.duck-typing"
+node        = 16
+title       = "IF IT QUACKS"
+difficulty  = 3
+story       = "A red plastic bag from the egg stall on School Street. Nobody asked what it is; they asked how many are in it, whether the duck eggs are, and to go through it one at a time."
+concepts    = ["duck-typing", "structs", "iteration"]
+requires    = ["lua.advanced.15.decorators"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+Standard input is one line of goods separated by spaces, then one line with
+a single word to look for.
+
+Put the goods in a `Bag` and print:
+
+1. `LEN <k>` — from `bag:len()`
+2. the goods, one per line — from `for item in bag:iter()`
+3. `HAS <WORD> YES` or `HAS <WORD> NO` — from `bag:has(word)`
+4. `LONGEST <item>` — from `longest(bag)`, the first one on a tie
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` does not wrap a list type and does not need to. `bag:len()` is a
+lookup of the key `len` at the moment of the call, through the metatable,
+and whatever is there is called. Lua never asks what a thing *is*; it asks
+whether the key is there, when it needs it. The starter has none of the
+three methods, and the first error is `attempt to call method 'len' (a nil
+value)`.
+
+`longest` is a free function that takes anything with an `iter()` — it
+never mentions `Bag`. That is the whole of the contract: a name and a
+call. (LuaJIT does not honour a `__len` metamethod on tables, so the
+length is a method here and not `#bag`; `__index` is the one metamethod
+doing the work.)
+'''
+starter     = '''
+local Bag = {}
+Bag.__index = Bag
+
+function Bag.new(goods)
+  return setmetatable({ goods = goods }, Bag)
+end
+
+-- Bag:len(), Bag:iter(), Bag:has(item)
+
+local function longest(container)
+  local best
+  for item in container:iter() do
+    if best == nil or #item > #best then
+      best = item
+    end
+  end
+  return best
+end
+
+local function main()
+  local goods = {}
+  for token in io.read("*l"):gmatch("%S+") do
+    goods[#goods + 1] = token
+  end
+  local bag = Bag.new(goods)
+  local word = io.read("*l"):match("^%s*(.-)%s*$")
+
+  print("LEN " .. bag:len())
+  for item in bag:iter() do
+    print(item)
+  end
+  print("HAS " .. word .. " " .. (bag:has(word) and "YES" or "NO"))
+  print("LONGEST " .. longest(bag))
+end
+
+main()
+'''
+solution    = '''
+local Bag = {}
+Bag.__index = Bag
+
+function Bag.new(goods)
+  return setmetatable({ goods = goods }, Bag)
+end
+
+function Bag:len()
+  return #self.goods
+end
+
+function Bag:iter()
+  local i = 0
+  return function()
+    i = i + 1
+    return self.goods[i]
+  end
+end
+
+function Bag:has(item)
+  for _, good in ipairs(self.goods) do
+    if good == item then
+      return true
+    end
+  end
+  return false
+end
+
+local function longest(container)
+  local best
+  for item in container:iter() do
+    if best == nil or #item > #best then
+      best = item
+    end
+  end
+  return best
+end
+
+local function main()
+  local goods = {}
+  for token in io.read("*l"):gmatch("%S+") do
+    goods[#goods + 1] = token
+  end
+  local bag = Bag.new(goods)
+  local word = io.read("*l"):match("^%s*(.-)%s*$")
+
+  print("LEN " .. bag:len())
+  for item in bag:iter() do
+    print(item)
+  end
+  print("HAS " .. word .. " " .. (bag:has(word) and "YES" or "NO"))
+  print("LONGEST " .. longest(bag))
+end
+
+main()
+'''
+hints = [
+  "function Bag:len() return #self.goods end — three methods, and none of them is long.",
+  "iter returns a closure over a counter: each call bumps it and returns self.goods[i], which is nil past the end, and nil is what stops a generic for.",
+  "longest keeps the first of equal-length items because it only replaces on strictly greater, which is why the sample says duckegg and not something later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",   stdin = "egg duckegg tofu\nduckegg\n", expect = "LEN 3\negg\nduckegg\ntofu\nHAS duckegg YES\nLONGEST duckegg\n", visible = true },
+  { name = "missing", stdin = "fish\nchicken\n",             expect = "LEN 1\nfish\nHAS chicken NO\nLONGEST fish\n",                 visible = false },
+  { name = "tie",     stdin = "ab cd e\ne\n",                expect = "LEN 3\nab\ncd\ne\nHAS e YES\nLONGEST ab\n",                  visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "lua.advanced.17.none"
+node        = 17
+title       = "THE 20:59 BOARD"
+difficulty  = 4
+story       = "20:59 on Wun Sha Street, the drums not yet started. The price board asks the notebook for a stall that has not opened, the notebook answers with nothing, and the board prints the nothing's price."
+concepts    = ["zero-values", "error-handling", "structs", "duck-typing"]
+requires    = ["lua.advanced.16.duck-typing", "lua.advanced.08.exceptions"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <CENTS>` — the
+stalls that have opened — then a count `q` and `q` stall names to look up.
+
+For each query print `<STALL> <cents>`, or `<STALL> NONE` if that stall is
+not open. Then print `MISSING <k>` and `CHEAPEST <STALL>` — the open stall
+with the lowest price, ties by name — or `CHEAPEST NONE` if nothing is open.
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+The starter crashes on `CHAN`:
+
+```
+attempt to index local 'stall' (a nil value)
+```
+
+That line is the boss of this stretch of road. It never points at the bug.
+It points at the place where a `nil` was finally *followed*, which can be
+any distance from the place it was *made* — and in the starter it was made
+in two different places. `lookup` returns `board[name]`, which is `nil` for
+a stall that is not there, by design, and the caller reads `.cents` off it
+without asking. And `cheapest` has no `return` on its way out, so it
+returns nothing, which the caller receives as `nil` and does the same thing
+to.
+
+A key nobody wrote is `nil`. A function that falls off the end returns
+`nil`. Neither is an error at the time; both become one later. The fix is
+the same both times: the code that can receive a `nil` checks for it, with
+`== nil`, before it indexes. (In Lua only `nil` and `false` are false, so
+`if not stall` would also be right here — a stall with a price of `0` is
+still a table — but `== nil` says what you mean.)
+
+Make `lookup` and `cheapest` return a stall **or nil** on purpose, say so
+in a comment, and handle the `nil` where it lands.
+'''
+starter     = '''
+local function lookup(board, name)
+  return board[name]
+end
+
+local function cheapest(board)
+  local best
+  for _, stall in pairs(board) do
+    if best == nil or stall.cents < best.cents
+        or (stall.cents == best.cents and stall.name < best.name) then
+      best = stall
+    end
+  end
+  -- the return is missing
+end
+
+local function main()
+  local tokens = io.read("*a"):gmatch("%S+")
+  local n = tonumber(tokens())
+  local board = {}
+  for _ = 1, n do
+    local name, cents = tokens(), tonumber(tokens())
+    board[name] = { name = name, cents = cents }
+  end
+
+  local q = tonumber(tokens())
+  local missing = 0
+  for _ = 1, q do
+    local name = tokens()
+    local stall = lookup(board, name)
+    print(name .. " " .. stall.cents)
+  end
+
+  print("MISSING " .. missing)
+  print("CHEAPEST " .. cheapest(board).name)
+end
+
+main()
+'''
+solution    = '''
+local function lookup(board, name)
+  -- board[name] is nil for a missing key; that nil is the contract,
+  -- and the comment says so out loud
+  return board[name]
+end
+
+local function cheapest(board)
+  -- a stall, or nil when the board is empty
+  local best
+  for _, stall in pairs(board) do
+    if best == nil or stall.cents < best.cents
+        or (stall.cents == best.cents and stall.name < best.name) then
+      best = stall
+    end
+  end
+  return best
+end
+
+local function main()
+  local tokens = io.read("*a"):gmatch("%S+")
+  local n = tonumber(tokens())
+  local board = {}
+  for _ = 1, n do
+    local name, cents = tokens(), tonumber(tokens())
+    board[name] = { name = name, cents = cents }
+  end
+
+  local q = tonumber(tokens())
+  local missing = 0
+  for _ = 1, q do
+    local name = tokens()
+    local stall = lookup(board, name)
+    if stall == nil then
+      missing = missing + 1
+      print(name .. " NONE")
+    else
+      print(name .. " " .. stall.cents)
+    end
+  end
+
+  print("MISSING " .. missing)
+  local best = cheapest(board)
+  print("CHEAPEST " .. (best ~= nil and best.name or "NONE"))
+end
+
+main()
+'''
+hints = [
+  "Read the traceback: the error is on the print, but the nil came out of lookup one line earlier, and out of board[name] before that.",
+  "if stall == nil then is the check. A table with cents = 0 is not nil and not false; only nil and false are false in Lua.",
+  "cheapest walks the board and then ends without a return. Lua does not warn about that; the caller gets nil and finds out later. Return best, and the empty board returns nil because best was never set.",
+  "pairs walks the board in no order, which is why the comparison has to settle the tie itself: lower cents, then lower name, and never trust which stall came first.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "2\nLAM 1200\nWONG 900\n3\nWONG\nCHAN\nLAM\n", expect = "WONG 900\nCHAN NONE\nLAM 1200\nMISSING 1\nCHEAPEST WONG\n", visible = true },
+  { name = "nothing", stdin = "0\n2\nA\nB\n",                                expect = "A NONE\nB NONE\nMISSING 2\nCHEAPEST NONE\n",               visible = false },
+  { name = "free",    stdin = "2\nFREE 0\nCHEAP 1\n1\nFREE\n",               expect = "FREE 0\nMISSING 0\nCHEAPEST FREE\n",                       visible = false },
+  { name = "tie",     stdin = "3\nC 5\nA 5\nB 5\n2\nB\nZ\n",                 expect = "B 5\nZ NONE\nMISSING 1\nCHEAPEST A\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "lua.advanced.01.threads"
+node        = 18
+title       = "TWELVE RUNNERS, ONE LANE"
+difficulty  = 3
+story       = "21:00 on Wun Sha Street. Twelve incense runners take their segments at once, and the marshal who collects the counts reads the board before any of them has written on it."
+concepts    = ["concurrency", "closures", "functions"]
+requires    = ["lua.advanced.17.none"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Create one **coroutine** per value that computes its square and stores it
+in `results[i]` — its own slot, so no two runners write the same place.
+Resume every one of them, then print the results **in index order**, one
+per line, then `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Lua has no threads; it has coroutines, and `type(co)` for one of them is
+the string `thread`, which is the count on the last line. `coroutine.create(f)`
+does not run `f`. `coroutine.resume(co, ...)` runs it, with the arguments
+becoming `f`'s parameters on the **first** resume, until it yields or
+returns — and `square` never yields, so one resume is the whole job. The
+result has to be written somewhere `main` can read afterwards; the
+slot-per-runner table is the simplest such place.
+
+The starter's runners all crash the moment they start, and the program
+still finishes and prints. `coroutine.resume(co)` with no arguments calls
+`square(nil, nil)`, the arithmetic on `nil` lands inside the coroutine, and
+`resume` reports it as a return value — `false` and the message — that the
+starter throws away. `results` stays empty and every line says `nil`. A
+coroutine that dies takes only itself with it — read `resume`'s second
+result, or you will never know.
+'''
+starter     = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+  local results = {}
+
+  local function square(index, value)
+    results[index] = value * value
+  end
+
+  local runners = {}
+  for i = 1, #nums do
+    local co = coroutine.create(square)
+    runners[i] = co
+    coroutine.resume(co)
+  end
+
+  for i = 1, #nums do
+    print(results[i])
+  end
+  print("THREADS " .. #nums)
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+  local results = {}
+
+  local function square(index, value)
+    results[index] = value * value
+  end
+
+  local runners = {}
+  for i = 1, #nums do
+    local co = coroutine.create(square)
+    runners[i] = co
+    -- the arguments of the first resume are the function's parameters
+    local ok, err = coroutine.resume(co, i, nums[i])
+    if not ok then
+      error(err)
+    end
+  end
+
+  for i = 1, #nums do
+    print(results[i])
+  end
+  print("THREADS " .. #nums)
+end
+
+main()
+'''
+hints = [
+  "coroutine.resume(co, i, nums[i]) — the first resume's arguments are what square receives, and the starter passes none.",
+  "resume returns ok, ... — false and the error message when the coroutine died. Check it; the starter's runners all died on `value * value` with value nil, silently.",
+  "results is an upvalue of square: the nested function sees the same table main sees, which is why the writes are visible afterwards.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n2 3 4\n",      expect = "4\n9\n16\nTHREADS 3\n",         visible = true },
+  { name = "single", stdin = "1\n-5\n",         expect = "25\nTHREADS 1\n",               visible = false },
+  { name = "wide",   stdin = "4\n0 1 10 100\n", expect = "0\n1\n100\n10000\nTHREADS 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "lua.advanced.02.lock"
+node        = 19
+title       = "ONE DRAWER, EIGHT HANDS"
+difficulty  = 3
+story       = "Every stall on the lane pays into the one cash drawer at the committee's table, and at the end of the run the drawer holds one stall's money and every stall swears it paid."
+concepts    = ["shared-state", "concurrency", "thread-safety"]
+requires    = ["lua.advanced.01.threads"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Create one coroutine per value that adds it to **one shared total** and
+bumps a shared hit count, and drive them all round-robin — every runner
+gets a turn until every runner is dead. Then print `TOTAL <sum>` and
+`HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+The starter prints `TOTAL 4`, deterministically, on the sample. Every
+runner reads the drawer, **yields**, and then writes back what it read plus
+its own value. By the time the first one writes, all four have read `0`,
+and the last write wins: one stall's money and four hits. That is the lost
+update, and it happened on one thread, with no lock in the language to
+forget.
+
+There is no `Lock` in Lua because there is no preemption. A coroutine runs
+until it says `coroutine.yield()`, and nothing else runs in between. The
+critical section is any stretch of code with no yield in it, and the bug is
+a yield between the read and the write. Move the yield out of the middle —
+wait for the floor first, then read, add and write in one stretch — and
+the drawer is right. When the update genuinely has to yield in the middle
+(waiting on a socket, say), the lock is a flag: `while busy do
+coroutine.yield() end`, set it, work, clear it. That is a mutex, spelled
+out.
+
+The scheduler is written in the program: a loop over the runners resuming
+each one that is not `dead`, until a whole round finds none alive.
+'''
+starter     = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local total = 0
+  local hits = 0
+
+  local function pay(value)
+    local drawer = total          -- read the drawer
+    coroutine.yield()             -- hand the floor to the next stall
+    total = drawer + value        -- write it back
+    hits = hits + 1
+  end
+
+  local runners = {}
+  for i = 1, #nums do
+    runners[i] = coroutine.create(pay)
+  end
+
+  -- round robin: every runner that is not dead gets a turn, until none is left
+  local live = #runners
+  while live > 0 do
+    live = 0
+    for i, co in ipairs(runners) do
+      if coroutine.status(co) ~= "dead" then
+        local ok, err = coroutine.resume(co, nums[i])
+        if not ok then
+          error(err)
+        end
+        if coroutine.status(co) ~= "dead" then
+          live = live + 1
+        end
+      end
+    end
+  end
+
+  print("TOTAL " .. total)
+  print("HITS " .. hits)
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local total = 0
+  local hits = 0
+
+  local function pay(value)
+    coroutine.yield()             -- wait for the floor, then
+    -- read, add and write in one stretch with no yield in it: nothing can
+    -- run between the read and the write, so the update cannot be lost
+    total = total + value
+    hits = hits + 1
+  end
+
+  local runners = {}
+  for i = 1, #nums do
+    runners[i] = coroutine.create(pay)
+  end
+
+  -- round robin: every runner that is not dead gets a turn, until none is left
+  local live = #runners
+  while live > 0 do
+    live = 0
+    for i, co in ipairs(runners) do
+      if coroutine.status(co) ~= "dead" then
+        local ok, err = coroutine.resume(co, nums[i])
+        if not ok then
+          error(err)
+        end
+        if coroutine.status(co) ~= "dead" then
+          live = live + 1
+        end
+      end
+    end
+  end
+
+  print("TOTAL " .. total)
+  print("HITS " .. hits)
+end
+
+main()
+'''
+hints = [
+  "Run the starter: TOTAL 4, HITS 4. Four runners read 0, yield, and each writes 0 plus its own value. The last write is the total.",
+  "total = total + value with no yield between the read and the write. The yield can stay in pay; it just cannot sit in the middle of the update.",
+  "Do not write local total = total + value: that makes a new local that shadows the upvalue, and the outer total never moves. The closure shares the variable only if you assign to it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four",   stdin = "4\n1 2 3 4\n",                 expect = "TOTAL 10\nHITS 4\n",      visible = true },
+  { name = "single", stdin = "1\n-5\n",                      expect = "TOTAL -5\nHITS 1\n",      visible = false },
+  { name = "big",    stdin = "3\n1000000 1000000 1000000\n", expect = "TOTAL 3000000\nHITS 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "lua.advanced.03.queue"
+node        = 20
+title       = "WHO CLOSES THE HATCH"
+difficulty  = 3
+story       = "The dumpling stall on Ormsby Street passes every order through the hatch to the kitchen, and after the last one the counter stands there waiting for a next that never comes."
+concepts    = ["channels", "concurrency", "iteration"]
+requires    = ["lua.advanced.02.lock"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+One producer coroutine pushes each value multiplied by ten onto a queue,
+yielding after each, then pushes a **sentinel**. The main loop takes from
+the queue until it sees the sentinel, printing each value and keeping a
+total, then prints `SUM <total>` and `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+A queue is a table with a head and a tail, and a table has no `close`.
+Nothing on it can tell the consumer that there will be no more; that has
+to be an item. And the item cannot be `nil`, because `nil` in a table is
+the absence of an item. The sentinel is a value of its own — `local CLOSED
+= {}`, a table nobody else holds — and `value == CLOSED` is true only for
+that one table, because `==` on tables is identity.
+
+The starter never pushes it. `take` resumes the kitchen until something is
+in the queue, and when the kitchen is dead and the queue is empty it gives
+up and returns `nil`; the loop prints the word `nil`, and then adds it to
+the total and dies. In a language with blocking queues this would be a
+hang. In Lua it is a `nil`, followed.
+
+The producer pushes the sentinel. Never the consumer — the side that knows
+the stream is over is the side that ends it.
+'''
+starter     = '''
+local CLOSED = {}   -- the sentinel: a table nobody else has a reference to
+
+local function new_queue()
+  return { head = 1, tail = 0 }
+end
+
+local function push(queue, value)
+  queue.tail = queue.tail + 1
+  queue[queue.tail] = value
+end
+
+local function pop(queue)
+  local value = queue[queue.head]
+  queue[queue.head] = nil
+  queue.head = queue.head + 1
+  return value
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local hatch = new_queue()
+
+  local kitchen = coroutine.create(function()
+    for _, value in ipairs(nums) do
+      push(hatch, value * 10)
+      coroutine.yield()
+    end
+    -- the hatch is still open
+  end)
+
+  local function take()
+    while hatch.head > hatch.tail do
+      if coroutine.status(kitchen) == "dead" then
+        return nil
+      end
+      coroutine.resume(kitchen)
+    end
+    return pop(hatch)
+  end
+
+  local total = 0
+  while true do
+    local value = take()
+    if value == CLOSED then
+      break
+    end
+    print(value)
+    total = total + value
+  end
+
+  print("SUM " .. total)
+  print("CLOSED")
+end
+
+main()
+'''
+solution    = '''
+local CLOSED = {}   -- the sentinel: a table nobody else has a reference to
+
+local function new_queue()
+  return { head = 1, tail = 0 }
+end
+
+local function push(queue, value)
+  queue.tail = queue.tail + 1
+  queue[queue.tail] = value
+end
+
+local function pop(queue)
+  local value = queue[queue.head]
+  queue[queue.head] = nil
+  queue.head = queue.head + 1
+  return value
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local hatch = new_queue()
+
+  local kitchen = coroutine.create(function()
+    for _, value in ipairs(nums) do
+      push(hatch, value * 10)
+      coroutine.yield()
+    end
+    push(hatch, CLOSED)
+  end)
+
+  local function take()
+    while hatch.head > hatch.tail do
+      if coroutine.status(kitchen) == "dead" then
+        return nil
+      end
+      coroutine.resume(kitchen)
+    end
+    return pop(hatch)
+  end
+
+  local total = 0
+  while true do
+    local value = take()
+    if value == CLOSED then
+      break
+    end
+    print(value)
+    total = total + value
+  end
+
+  print("SUM " .. total)
+  print("CLOSED")
+end
+
+main()
+'''
+hints = [
+  "One line, at the end of the kitchen's function: push(hatch, CLOSED).",
+  "The consumer already checks value == CLOSED. It was waiting for something the producer never sent, and got nil instead.",
+  "The sentinel is a fresh table because nil cannot be stored in a table and because a table compares equal only to itself. If the values could be tables too, the sentinel is still safe: nobody else can have this one.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",     expect = "10\n20\n30\nSUM 60\nCLOSED\n",       visible = true },
+  { name = "zero",   stdin = "1\n0\n",         expect = "0\nSUM 0\nCLOSED\n",                 visible = false },
+  { name = "signed", stdin = "4\n-1 -2 3 4\n", expect = "-10\n-20\n30\n40\nSUM 40\nCLOSED\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "lua.advanced.04.thread-pool"
+node        = 21
+title       = "EIGHT PORTERS"
+difficulty  = 4
+story       = "Forty crates of incense at the Lily Street end and eight porters. Nobody wants forty porters; they want the eight never standing still."
+concepts    = ["concurrency", "collections", "closures"]
+requires    = ["lua.advanced.03.queue"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Run a **pool** of `w` porters: at most `w` coroutines in flight at once,
+each carrying one job that yields once on the way and then returns
+`(index, value * value)`. Collect the results as the jobs **finish**,
+sort by index, print `<index> <value>` one per line, then `WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+A coroutine is not a result. `coroutine.resume(co)` returns `true` and then
+whatever the job yielded or returned — that is the only door the value
+comes out of, and it opens on the resume that finishes the job, which is
+whichever turn of the pool that happens to be. The starter collects the
+finished coroutines themselves — `thread: 0x...` values — and the sort
+tries to index one.
+
+Carrying the index in the result is what makes the output the same every
+run; sorting on it is the last line of the answer, not the first. The pool
+is the scheduler from the drawer quest with a cap: top up to `w` running,
+give each one turn, retire the dead, repeat until the jobs and the running
+are both empty.
+'''
+starter     = '''
+local function square(index, value)
+  coroutine.yield()              -- the porter walks the crate over
+  return index, value * value
+end
+
+local function pool(workers, jobs)
+  local results = {}
+  local running = {}
+  local next_job = 1
+  while next_job <= #jobs or #running > 0 do
+    while #running < workers and next_job <= #jobs do
+      local job = jobs[next_job]
+      next_job = next_job + 1
+      running[#running + 1] = coroutine.create(function()
+        return square(job.index, job.value)
+      end)
+    end
+    local i = 1
+    while i <= #running do
+      local co = running[i]
+      local ok, err = coroutine.resume(co)
+      if not ok then
+        error(err)
+      end
+      if coroutine.status(co) == "dead" then
+        results[#results + 1] = co
+        table.remove(running, i)
+      else
+        i = i + 1
+      end
+    end
+  end
+  return results
+end
+
+local function main()
+  local data = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    data[#data + 1] = tonumber(token)
+  end
+  local workers, n = data[1], data[2]
+  local jobs = {}
+  for i = 1, n do
+    jobs[i] = { index = i - 1, value = data[2 + i] }
+  end
+
+  local results = pool(workers, jobs)
+  table.sort(results, function(a, b) return a[1] < b[1] end)
+  for _, result in ipairs(results) do
+    print(result[1] .. " " .. result[2])
+  end
+  print("WORKERS " .. workers)
+end
+
+main()
+'''
+solution    = '''
+local function square(index, value)
+  coroutine.yield()              -- the porter walks the crate over
+  return index, value * value
+end
+
+local function pool(workers, jobs)
+  local results = {}
+  local running = {}
+  local next_job = 1
+  while next_job <= #jobs or #running > 0 do
+    -- top up: at most `workers` in flight
+    while #running < workers and next_job <= #jobs do
+      local job = jobs[next_job]
+      next_job = next_job + 1
+      running[#running + 1] = coroutine.create(function()
+        return square(job.index, job.value)
+      end)
+    end
+    -- one turn each; the resume that finishes a job returns its result
+    local i = 1
+    while i <= #running do
+      local co = running[i]
+      local ok, index, value = coroutine.resume(co)
+      if not ok then
+        error(index)
+      end
+      if coroutine.status(co) == "dead" then
+        results[#results + 1] = { index, value }
+        table.remove(running, i)
+      else
+        i = i + 1
+      end
+    end
+  end
+  return results
+end
+
+local function main()
+  local data = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    data[#data + 1] = tonumber(token)
+  end
+  local workers, n = data[1], data[2]
+  local jobs = {}
+  for i = 1, n do
+    jobs[i] = { index = i - 1, value = data[2 + i] }
+  end
+
+  local results = pool(workers, jobs)
+  table.sort(results, function(a, b) return a[1] < b[1] end)
+  for _, result in ipairs(results) do
+    print(result[1] .. " " .. result[2])
+  end
+  print("WORKERS " .. workers)
+end
+
+main()
+'''
+hints = [
+  "The starter dies in the sort or the print: attempt to index local 'a' (a thread value). A coroutine is the job, not its answer.",
+  "local ok, index, value = coroutine.resume(co) — on the resume that runs the job to its return, the returned values follow the ok. Keep { index, value } when the status is dead.",
+  "The pool finishes jobs in its own order, and the index in the result is the only record of where each one came from. Sort on it before printing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-workers",  stdin = "2 3\n2 3 4\n",     expect = "0 4\n1 9\n2 16\nWORKERS 2\n",              visible = true },
+  { name = "one-each",     stdin = "1 1\n-5\n",        expect = "0 25\nWORKERS 1\n",                        visible = false },
+  { name = "more-workers", stdin = "3 5\n1 2 3 4 5\n", expect = "0 1\n1 4\n2 9\n3 16\n4 25\nWORKERS 3\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "lua.advanced.05.asyncio"
+node        = 22
+title       = "WHERE DOES ASYNC ACTUALLY RUN"
+difficulty  = 4
+story       = "Mei has written async code for four years and has never once seen the thing that drives it. Tonight the loop is a while loop she can read, and every runner on the lane takes turns on it."
+concepts    = ["async", "concurrency", "functions"]
+requires    = ["lua.advanced.04.thread-pool"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Write `double(value)` so that it yields to the scheduler once —
+`coroutine.yield()` — and returns the value doubled. Make one coroutine per
+value, run them all with `gather`, print each result in input order, then
+`SUM <total>` and `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`coroutine.create(f)` does not run `f`. It builds a **coroutine object** and
+hands it back, and nothing inside happens until something resumes it. The
+starter's `run` returns three of them, unresumed, and the output is three
+lines of `thread: 0x...` followed by `attempt to perform arithmetic on a
+thread value`.
+
+`gather` is the event loop, and here you write it: a `while` over the
+tasks that resumes each one that is not dead, in order, round after round,
+until none is left, keeping each task's **return value** in that task's
+slot. The results come out in the order you passed the tasks in, whatever
+order they finished in. That is the whole reason to reach for it over a
+loop that resumes one task to death before touching the next: that loop
+would be correct and sequential, and `gather` is correct and interleaved.
+
+There is exactly one thread here. `coroutine.yield()` is the point at which
+a task hands the thread back to the loop so another can use it. Nothing
+runs in parallel; things run **in turn**, at the places they said they
+could stop.
+'''
+starter     = '''
+local function double(value)
+  coroutine.yield()
+  return value * 2
+end
+
+local function run(nums)
+  local tasks = {}
+  for i, value in ipairs(nums) do
+    tasks[i] = coroutine.create(function()
+      return double(value)
+    end)
+  end
+  return tasks
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local results = run(nums)
+  local total = 0
+  for _, value in ipairs(results) do
+    print(value)
+    total = total + value
+  end
+  print("SUM " .. total)
+  print("TASKS " .. #nums)
+end
+
+main()
+'''
+solution    = '''
+local function double(value)
+  coroutine.yield()
+  return value * 2
+end
+
+local function gather(tasks)
+  -- the loop: round after round, every task that is not dead gets a turn,
+  -- and the resume that finishes one carries its return value
+  local results = {}
+  local live = #tasks
+  while live > 0 do
+    live = 0
+    for i, co in ipairs(tasks) do
+      if coroutine.status(co) ~= "dead" then
+        local ok, value = coroutine.resume(co)
+        if not ok then
+          error(value)
+        end
+        if coroutine.status(co) == "dead" then
+          results[i] = value
+        else
+          live = live + 1
+        end
+      end
+    end
+  end
+  return results
+end
+
+local function run(nums)
+  local tasks = {}
+  for i, value in ipairs(nums) do
+    tasks[i] = coroutine.create(function()
+      return double(value)
+    end)
+  end
+  return gather(tasks)
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local results = run(nums)
+  local total = 0
+  for _, value in ipairs(results) do
+    print(value)
+    total = total + value
+  end
+  print("SUM " .. total)
+  print("TASKS " .. #nums)
+end
+
+main()
+'''
+hints = [
+  "return gather(tasks) instead of return tasks — and gather is the loop you write: resume every task that is not dead, again and again, until none is.",
+  "The resume that makes a task dead is the one whose second return value is the task's return. Store it at the task's own index; that is what keeps the results in input order.",
+  "If you needed results as they finish, that is the pool from the last quest, and then you carry the index yourself.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n",   expect = "2\n4\n6\nSUM 12\nTASKS 3\n",      visible = true },
+  { name = "one",   stdin = "1\n5\n",       expect = "10\nSUM 10\nTASKS 1\n",           visible = false },
+  { name = "mixed", stdin = "2\n0 -3\n",    expect = "0\n-6\nSUM -6\nTASKS 2\n",        visible = false },
+  { name = "four",  stdin = "4\n1 1 1 1\n", expect = "2\n2\n2\n2\nSUM 8\nTASKS 4\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "lua.advanced.06.async-queue"
+node        = 23
+title       = "WHO SAYS IT IS DONE"
+difficulty  = 4
+story       = "Three runners clear the ticket queue at the Victoria Park lantern gate and the marshal waits for the queue to say it is empty. It never says so, because nobody told it a ticket was finished."
+concepts    = ["async", "channels", "concurrency", "deadlock"]
+requires    = ["lua.advanced.05.asyncio"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+Standard input is two integers `w` and `n`, then `n` values.
+
+Put `{ index, value }` jobs on a queue that counts what is pending. Start
+`w` consumer coroutines that loop forever taking a job, writing
+`value * 10` into `results[index]`, and calling `task_done`. The main
+function runs `join` — the scheduler that resumes the consumers until every
+`put` has had its `task_done` — then cancels the consumers, then prints the
+results in index order and `CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`join` returns when the pending count is `0`, and only `task_done` lowers
+it. The starter's consumers never call it, so every job is handled and the
+count still says `4`, every consumer is parked in `get` on an empty queue,
+and there is nothing left that could change anything. A loop with no
+detector would spin there until the runner killed the program. This one
+detects it: a full round in which no consumer lowered the count is a
+deadlock, and `join` says so with `error`. Same hang as the hatch quest,
+different spelling — and the fix is again one line, on the consumer side.
+
+The consumers are `while true` loops. They end because main cancels them
+after the join, and cancelling here means **resuming with a signal**:
+`get` yields while the queue is empty, and when the resume that wakes it
+passes `"cancel"`, `get` returns `nil` and the consumer returns. A
+coroutine parked on a yield is stopped by the value it wakes up to.
+'''
+starter     = '''
+local function new_queue()
+  return { head = 1, tail = 0, pending = 0 }
+end
+
+local function put(queue, item)
+  queue.tail = queue.tail + 1
+  queue[queue.tail] = item
+  queue.pending = queue.pending + 1
+end
+
+local function get(queue)
+  -- yields while the queue is empty; a resume carrying "cancel" makes it return nil
+  while queue.head > queue.tail do
+    local signal = coroutine.yield("idle")
+    if signal == "cancel" then
+      return nil
+    end
+  end
+  local item = queue[queue.head]
+  queue[queue.head] = nil
+  queue.head = queue.head + 1
+  return item
+end
+
+local function task_done(queue)
+  queue.pending = queue.pending - 1
+end
+
+local function consumer(queue, results)
+  while true do
+    local job = get(queue)
+    if job == nil then
+      return
+    end
+    results[job.index] = job.value * 10
+  end
+end
+
+local function join(queue, tasks)
+  -- resume every consumer in turn until every put has had a task_done;
+  -- a full round in which nobody lowered the count is a deadlock
+  while queue.pending > 0 do
+    local progressed = false
+    for _, co in ipairs(tasks) do
+      if coroutine.status(co) == "suspended" then
+        local before = queue.pending
+        local ok, err = coroutine.resume(co)
+        if not ok then
+          error(err)
+        end
+        if queue.pending < before then
+          progressed = true
+        end
+      end
+    end
+    if not progressed then
+      error("deadlock: every consumer is idle and " .. queue.pending .. " tasks are not done")
+    end
+  end
+end
+
+local function run(workers, nums)
+  local queue = new_queue()
+  local results = {}
+  for i, value in ipairs(nums) do
+    put(queue, { index = i, value = value })
+  end
+
+  local tasks = {}
+  for w = 1, workers do
+    tasks[w] = coroutine.create(function()
+      consumer(queue, results)
+    end)
+  end
+  join(queue, tasks)
+
+  for _, co in ipairs(tasks) do
+    coroutine.resume(co, "cancel")
+  end
+  return results
+end
+
+local function main()
+  local data = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    data[#data + 1] = tonumber(token)
+  end
+  local workers, n = data[1], data[2]
+  local nums = {}
+  for i = 1, n do
+    nums[i] = data[2 + i]
+  end
+
+  for _, value in ipairs(run(workers, nums)) do
+    print(value)
+  end
+  print("CONSUMERS " .. workers)
+end
+
+main()
+'''
+solution    = '''
+local function new_queue()
+  return { head = 1, tail = 0, pending = 0 }
+end
+
+local function put(queue, item)
+  queue.tail = queue.tail + 1
+  queue[queue.tail] = item
+  queue.pending = queue.pending + 1
+end
+
+local function get(queue)
+  -- yields while the queue is empty; a resume carrying "cancel" makes it return nil
+  while queue.head > queue.tail do
+    local signal = coroutine.yield("idle")
+    if signal == "cancel" then
+      return nil
+    end
+  end
+  local item = queue[queue.head]
+  queue[queue.head] = nil
+  queue.head = queue.head + 1
+  return item
+end
+
+local function task_done(queue)
+  queue.pending = queue.pending - 1
+end
+
+local function consumer(queue, results)
+  while true do
+    local job = get(queue)
+    if job == nil then
+      return
+    end
+    results[job.index] = job.value * 10
+    task_done(queue)
+  end
+end
+
+local function join(queue, tasks)
+  -- resume every consumer in turn until every put has had a task_done;
+  -- a full round in which nobody lowered the count is a deadlock
+  while queue.pending > 0 do
+    local progressed = false
+    for _, co in ipairs(tasks) do
+      if coroutine.status(co) == "suspended" then
+        local before = queue.pending
+        local ok, err = coroutine.resume(co)
+        if not ok then
+          error(err)
+        end
+        if queue.pending < before then
+          progressed = true
+        end
+      end
+    end
+    if not progressed then
+      error("deadlock: every consumer is idle and " .. queue.pending .. " tasks are not done")
+    end
+  end
+end
+
+local function run(workers, nums)
+  local queue = new_queue()
+  local results = {}
+  for i, value in ipairs(nums) do
+    put(queue, { index = i, value = value })
+  end
+
+  local tasks = {}
+  for w = 1, workers do
+    tasks[w] = coroutine.create(function()
+      consumer(queue, results)
+    end)
+  end
+  join(queue, tasks)
+
+  -- every consumer is parked in get; the signal wakes it up to a nil job
+  for _, co in ipairs(tasks) do
+    coroutine.resume(co, "cancel")
+  end
+  return results
+end
+
+local function main()
+  local data = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    data[#data + 1] = tonumber(token)
+  end
+  local workers, n = data[1], data[2]
+  local nums = {}
+  for i = 1, n do
+    nums[i] = data[2 + i]
+  end
+
+  for _, value in ipairs(run(workers, nums)) do
+    print(value)
+  end
+  print("CONSUMERS " .. workers)
+end
+
+main()
+'''
+hints = [
+  "task_done(queue) after each job is handled. join counts puts against task_dones and nothing else.",
+  "coroutine.create schedules nothing; the consumer runs the first time join resumes it, and a consumer that finds the queue empty yields \"idle\" from inside get.",
+  "A consumer woken with \"cancel\" gets nil from get and returns, which ends the while true. Resuming it with nothing would just park it again.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-workers", stdin = "3 4\n1 2 3 4\n", expect = "10\n20\n30\n40\nCONSUMERS 3\n", visible = true },
+  { name = "one-worker",    stdin = "1 2\n-1 5\n",    expect = "-10\n50\nCONSUMERS 1\n",        visible = false },
+  { name = "more-workers",  stdin = "4 1\n7\n",       expect = "70\nCONSUMERS 4\n",             visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "lua.advanced.07.context-managers"
+node        = 24
+title       = "THE SHUTTER COMES DOWN ANYWAY"
+difficulty  = 4
+story       = "A stall on Wun Sha Street opens its shutter for every order and closes it after. The one that got a bad order at 21:40 has been open since, because the closing line was after the line that failed."
+concepts    = ["error-handling", "generators", "functions"]
+requires    = ["lua.advanced.06.async-queue"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <CENTS>`, where
+`CENTS` is supposed to be an integer.
+
+Write `opened(stall, body)` — a function that takes the block as a
+function — that prints `OPEN <STALL>` on the way in, runs `body`, and
+prints `SHUT <STALL>` on the way out **whether or not the body raised**.
+Inside the body, parse the cents and add them to a total. A line whose
+cents do not parse is reported as `BAD <STALL>` after the shutter has
+closed. Finally print `TOTAL <sum>` and `REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+Lua has no `with` and no `finally`; the nearest thing is a function that
+takes the body as a closure, and `pcall` around the call. Everything before
+the `pcall` is the enter, everything after it is the exit, and the exit
+runs on both paths because `pcall` turns the error into a return value
+instead of letting it climb past the `SHUT`. The starter calls `body()`
+bare, and `WONG`'s shutter never closes.
+
+After the shutter is down, the error goes back up: `error(err, 0)`
+re-raises it — the `0` keeps `error` from prepending a second position to
+the message — and the caller's own `pcall` sees it and prints `BAD`. Do
+not swallow it in `opened`: the caller wants to know.
+'''
+starter     = '''
+local function opened(stall, body)
+  print("OPEN " .. stall)
+  body()
+  print("SHUT " .. stall)
+end
+
+local function parse_cents(text)
+  if not text:match("^%-?%d+$") then
+    error("not a number: " .. text, 0)
+  end
+  return tonumber(text)
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local total = 0
+  local rejected = 0
+  for _ = 1, n do
+    local stall, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    local ok = pcall(opened, stall, function()
+      total = total + parse_cents(cents)
+    end)
+    if not ok then
+      rejected = rejected + 1
+      print("BAD " .. stall)
+    end
+  end
+  print("TOTAL " .. total)
+  print("REJECTED " .. rejected)
+end
+
+main()
+'''
+solution    = '''
+local function opened(stall, body)
+  print("OPEN " .. stall)
+  local ok, err = pcall(body)
+  -- runs on the normal exit and on the error the body raised
+  print("SHUT " .. stall)
+  if not ok then
+    error(err, 0)
+  end
+end
+
+local function parse_cents(text)
+  if not text:match("^%-?%d+$") then
+    error("not a number: " .. text, 0)
+  end
+  return tonumber(text)
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local total = 0
+  local rejected = 0
+  for _ = 1, n do
+    local stall, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    local ok = pcall(opened, stall, function()
+      total = total + parse_cents(cents)
+    end)
+    if not ok then
+      rejected = rejected + 1
+      print("BAD " .. stall)
+    end
+  end
+  print("TOTAL " .. total)
+  print("REJECTED " .. rejected)
+end
+
+main()
+'''
+hints = [
+  "local ok, err = pcall(body) then print(SHUT) then if not ok then error(err, 0) end. The pcall is the finally.",
+  "The error passes through opened and out to main's pcall, so main's BAD still prints — after SHUT, because SHUT printed before the re-raise.",
+  "total = total + parse_cents(cents) evaluates the right side first; when parse_cents raises, nothing is assigned, so the bad line adds nothing.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",   stdin = "3\nLAM 1200\nWONG xx\nCHAN 800\n", expect = "OPEN LAM\nSHUT LAM\nOPEN WONG\nSHUT WONG\nBAD WONG\nOPEN CHAN\nSHUT CHAN\nTOTAL 2000\nREJECTED 1\n", visible = true },
+  { name = "clean",   stdin = "1\nLAM 5\n",                       expect = "OPEN LAM\nSHUT LAM\nTOTAL 5\nREJECTED 0\n",                                                 visible = false },
+  { name = "all-bad", stdin = "2\nA x\nB y\n",                    expect = "OPEN A\nSHUT A\nBAD A\nOPEN B\nSHUT B\nBAD B\nTOTAL 0\nREJECTED 2\n",                       visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "lua.advanced.08.pipeline"
+node        = 25
+title       = "THE LINE COOK"
+difficulty  = 4
+story       = "Chef Bo's line at the Tai Hang dumpling stall: one station squares the order, the next keeps the running count, and nobody waits for the whole batch."
+concepts    = ["generators", "iteration", "closures"]
+requires    = ["lua.advanced.07.context-managers"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+Standard input is a count `n` and then `n` integers.
+
+Build a two-stage pipeline of **coroutine iterators**:
+
+1. `squares(values)` yields each value squared
+2. `running(stream)` takes any iterator of numbers, keeps a running total,
+   and yields `value, total` pairs
+
+`main` prints each pair as `<square> <total>`, then `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Neither stage builds a list. Each `coroutine.yield` hands one item to the
+next stage and pauses; `main` pulls, `running` pulls from `squares`,
+`squares` pulls from the input. Nothing is computed before it is wanted,
+and the whole pipeline holds one item in flight. That is what makes the
+same three functions work on a file of a hundred million lines.
+
+The starter's second stage has `return` where it should have `yield`, so
+it is a plain function that returns the final total — a number — and
+`main`'s `for` tries to call it: `attempt to call a number value`.
+'''
+starter     = '''
+local function squares(values)
+  return coroutine.wrap(function()
+    for _, value in ipairs(values) do
+      coroutine.yield(value * value)
+    end
+  end)
+end
+
+local function running(stream)
+  local total = 0
+  for value in stream do
+    total = total + value
+  end
+  return total
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local count = 0
+  for square, total in running(squares(nums)) do
+    print(square .. " " .. total)
+    count = count + 1
+  end
+  print("PIPE " .. count)
+end
+
+main()
+'''
+solution    = '''
+local function squares(values)
+  return coroutine.wrap(function()
+    for _, value in ipairs(values) do
+      coroutine.yield(value * value)
+    end
+  end)
+end
+
+local function running(stream)
+  return coroutine.wrap(function()
+    local total = 0
+    for value in stream do
+      total = total + value
+      coroutine.yield(value, total)
+    end
+  end)
+end
+
+local function main()
+  local nums = {}
+  local first = true
+  for token in io.read("*a"):gmatch("%S+") do
+    if first then
+      first = false
+    else
+      nums[#nums + 1] = tonumber(token)
+    end
+  end
+
+  local count = 0
+  for square, total in running(squares(nums)) do
+    print(square .. " " .. total)
+    count = count + 1
+  end
+  print("PIPE " .. count)
+end
+
+main()
+'''
+hints = [
+  "The error is attempt to call a number value — running returned a total instead of an iterator the for could call.",
+  "Wrap the loop in coroutine.wrap and coroutine.yield(value, total) inside it. A yield can carry several values, and the for receives them as its several variables.",
+  "running(squares(nums)) composes because a wrapped coroutine is a function the for can call; running never knows or cares that its input is another coroutine.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",  stdin = "3\n1 2 3\n",   expect = "1 1\n4 5\n9 14\nPIPE 3\n",       visible = true },
+  { name = "single", stdin = "1\n-3\n",      expect = "9 9\nPIPE 1\n",                  visible = false },
+  { name = "repeat", stdin = "4\n0 2 2 2\n", expect = "0 0\n4 4\n4 8\n4 12\nPIPE 4\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "lua.advanced.09.itertools"
+node        = 26
+title       = "THE TOOLBOX ON THE SHELF"
+difficulty  = 3
+story       = "The committee's desk at Lin Fa Kung has a shelf of tools nobody opens, and the clerk counts runs of identical tickets by hand every evening."
+concepts    = ["generators", "iteration", "collections", "imports"]
+requires    = ["lua.advanced.08.pipeline"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+Standard input is one line of integers.
+
+Print three lines, each built with the `tools` table at the top of the
+program and nothing hand-rolled:
+
+1. `SUMS` followed by the running sums — `tools.accumulate`
+2. `RUNS` followed by each run of **adjacent** equal values as `<v>x<k>` —
+   `tools.groupby`
+3. `PAIRS <k>`: how many unordered pairs of **distinct** values there are —
+   `tools.combinations` over the sorted distinct values
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Lua has no `itertools`; a module is a table of functions, and `tools` is
+one written at the top of the file instead of loaded with `require`. Its
+three functions are already there — the shelf nobody opens — and each
+returns a coroutine iterator, so they go straight into a `for`.
+
+`groupby` groups **adjacent** equal items only. It is not a counter, and
+the sample is chosen so the two disagree: `1` appears four times, in two
+runs. The starter uses a table of counts for the second line and is wrong
+on exactly that input — and prints the counts in `pairs` order, which is
+no order.
+
+Each iterator is lazy: `accumulate` yields one running sum per pull, and
+`groupby` yields the value and its run as a list, so `#run` is the length.
+Collect an iterator into a list when you need `table.concat`; count one
+with a loop when you only need how many.
+'''
+starter     = '''
+local tools = {}
+
+function tools.accumulate(list)
+  return coroutine.wrap(function()
+    local total = 0
+    for _, value in ipairs(list) do
+      total = total + value
+      coroutine.yield(total)
+    end
+  end)
+end
+
+function tools.groupby(list)
+  -- yields (value, run) for every run of adjacent equal values
+  return coroutine.wrap(function()
+    local i = 1
+    while i <= #list do
+      local value, run = list[i], {}
+      while i <= #list and list[i] == value do
+        run[#run + 1] = list[i]
+        i = i + 1
+      end
+      coroutine.yield(value, run)
+    end
+  end)
+end
+
+function tools.combinations(list, r)
+  -- yields every r-subset of list, in order, as r values
+  return coroutine.wrap(function()
+    local chosen = {}
+    local function pick(start, depth)
+      if depth > r then
+        coroutine.yield(unpack(chosen, 1, r))
+        return
+      end
+      for i = start, #list do
+        chosen[depth] = list[i]
+        pick(i + 1, depth + 1)
+      end
+    end
+    pick(1, 1)
+  end)
+end
+
+local function main()
+  local nums = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    nums[#nums + 1] = tonumber(token)
+  end
+
+  print("SUMS " .. table.concat(nums, " "))
+
+  local counts = {}
+  for _, value in ipairs(nums) do
+    counts[value] = (counts[value] or 0) + 1
+  end
+  local runs = {}
+  for value, count in pairs(counts) do
+    runs[#runs + 1] = value .. "x" .. count
+  end
+  print("RUNS " .. table.concat(runs, " "))
+
+  print("PAIRS 0")
+end
+
+main()
+'''
+solution    = '''
+local tools = {}
+
+function tools.accumulate(list)
+  return coroutine.wrap(function()
+    local total = 0
+    for _, value in ipairs(list) do
+      total = total + value
+      coroutine.yield(total)
+    end
+  end)
+end
+
+function tools.groupby(list)
+  -- yields (value, run) for every run of adjacent equal values
+  return coroutine.wrap(function()
+    local i = 1
+    while i <= #list do
+      local value, run = list[i], {}
+      while i <= #list and list[i] == value do
+        run[#run + 1] = list[i]
+        i = i + 1
+      end
+      coroutine.yield(value, run)
+    end
+  end)
+end
+
+function tools.combinations(list, r)
+  -- yields every r-subset of list, in order, as r values
+  return coroutine.wrap(function()
+    local chosen = {}
+    local function pick(start, depth)
+      if depth > r then
+        coroutine.yield(unpack(chosen, 1, r))
+        return
+      end
+      for i = start, #list do
+        chosen[depth] = list[i]
+        pick(i + 1, depth + 1)
+      end
+    end
+    pick(1, 1)
+  end)
+end
+
+local function collect(iter)
+  local out = {}
+  for value in iter do
+    out[#out + 1] = value
+  end
+  return out
+end
+
+local function main()
+  local nums = {}
+  for token in io.read("*a"):gmatch("%S+") do
+    nums[#nums + 1] = tonumber(token)
+  end
+
+  print("SUMS " .. table.concat(collect(tools.accumulate(nums)), " "))
+
+  local runs = {}
+  for value, run in tools.groupby(nums) do
+    runs[#runs + 1] = value .. "x" .. #run
+  end
+  print("RUNS " .. table.concat(runs, " "))
+
+  local seen, distinct = {}, {}
+  for _, value in ipairs(nums) do
+    if not seen[value] then
+      seen[value] = true
+      distinct[#distinct + 1] = value
+    end
+  end
+  table.sort(distinct)
+  local pairs_count = 0
+  for _ in tools.combinations(distinct, 2) do
+    pairs_count = pairs_count + 1
+  end
+  print("PAIRS " .. pairs_count)
+end
+
+main()
+'''
+hints = [
+  "tools.accumulate(nums) yields the running total after each element; collect it into a list for table.concat.",
+  "for value, run in tools.groupby(nums) do — the run is a list of that run's members, and #run is its length.",
+  "tools.combinations(distinct, 2) yields each unordered pair once. Counting them is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "1 1 2 1 1 3\n", expect = "SUMS 1 2 4 5 6 9\nRUNS 1x2 2x1 1x2 3x1\nPAIRS 3\n", visible = true },
+  { name = "flat",   stdin = "7 7 7\n",       expect = "SUMS 7 14 21\nRUNS 7x3\nPAIRS 0\n",                  visible = false },
+  { name = "rising", stdin = "1 2 3 4\n",     expect = "SUMS 1 3 6 10\nRUNS 1x1 2x1 3x1 4x1\nPAIRS 6\n",    visible = false },
+  { name = "one",    stdin = "-5\n",          expect = "SUMS -5\nRUNS -5x1\nPAIRS 0\n",                     visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "lua.advanced.10.functools"
+node        = 27
+title       = "REMEMBER WHAT YOU WORKED OUT"
+difficulty  = 4
+story       = "The incense stall works out the same night's price from the same two numbers eleven thousand times before the dragon passes, from scratch, every time."
+concepts    = ["decorators", "recursion", "functions", "closures"]
+requires    = ["lua.advanced.09.itertools"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief       = '''
+Standard input is `n k bits`: two integers and a string of binary digits.
+
+Print four lines:
+
+1. `FIB <fib(n)>` — from a **recursive** `fib`, wrapped by `memoize`
+2. `PRODUCT <k!>` — `reduce` with a multiply over `1..k`, with an initial
+   value so `k = 0` gives `1`
+3. `BIN <value>` — `bits` parsed by a `partial` of a base-taking parser
+   with the base bound to `2`
+4. `MISSES <m>` — `fib.misses`, how many times the recursion actually ran
+   the body
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` is at most `400`, which is nothing to LuaJIT's stack. Without the
+cache, `fib(35)` is about thirty million calls and `fib(90)` does not
+finish. With it, every `fib(i)` runs once and `MISSES` is `n + 1`.
+`memoize` is the wrapper from the WRAPPED quest with a cache in its
+closure: a callable table, so `fib.misses` is a field, and `fib =
+memoize(function ... end)` so the recursion inside goes through the cache
+too. The starter's `fib` is a plain function, and its last line dies on
+`fib.misses`.
+
+`fib(90)` and `20!` are past 2^53, and a Lua number is a double: past
+that, digits are lost silently. The starter carries `big`, a number as a
+list of base-10^7 limbs, with `add`, `mul_small` and `tostring`; `fib`
+adds bigs and the product multiplies one by a small number. `partial`
+freezes some leading arguments of a function and gives you a new one;
+`reduce` folds a two-argument function across an iterator. Neither is
+clever. Both are asked about.
+'''
+starter     = '''
+-- big: a non-negative integer as base-10^7 limbs, least significant first
+local BASE = 10000000
+local big = {}
+
+function big.from(n)
+  local limbs = {}
+  repeat
+    limbs[#limbs + 1] = n % BASE
+    n = math.floor(n / BASE)
+  until n == 0
+  return limbs
+end
+
+function big.add(a, b)
+  local out, carry = {}, 0
+  for i = 1, math.max(#a, #b) do
+    local sum = (a[i] or 0) + (b[i] or 0) + carry
+    out[i] = sum % BASE
+    carry = math.floor(sum / BASE)
+  end
+  if carry > 0 then
+    out[#out + 1] = carry
+  end
+  return out
+end
+
+function big.mul_small(a, m)
+  local out, carry = {}, 0
+  for i = 1, #a do
+    local product = a[i] * m + carry
+    out[i] = product % BASE
+    carry = math.floor(product / BASE)
+  end
+  while carry > 0 do
+    out[#out + 1] = carry % BASE
+    carry = math.floor(carry / BASE)
+  end
+  return out
+end
+
+function big.tostring(a)
+  local parts = { tostring(a[#a]) }
+  for i = #a - 1, 1, -1 do
+    parts[#parts + 1] = string.format("%07d", a[i])
+  end
+  return table.concat(parts)
+end
+
+local function fib(n)
+  if n < 2 then
+    return big.from(n)
+  end
+  return big.add(fib(n - 1), fib(n - 2))
+end
+
+local function main()
+  local n, k, bits = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  n, k = tonumber(n), tonumber(k)
+
+  print("FIB " .. big.tostring(fib(n)))
+
+  local product = big.from(1)
+  for i = 1, k do
+    product = big.mul_small(product, i)
+  end
+  print("PRODUCT " .. big.tostring(product))
+
+  print("BIN " .. tonumber(bits, 2))
+  print("MISSES " .. fib.misses)
+end
+
+main()
+'''
+solution    = '''
+-- big: a non-negative integer as base-10^7 limbs, least significant first
+local BASE = 10000000
+local big = {}
+
+function big.from(n)
+  local limbs = {}
+  repeat
+    limbs[#limbs + 1] = n % BASE
+    n = math.floor(n / BASE)
+  until n == 0
+  return limbs
+end
+
+function big.add(a, b)
+  local out, carry = {}, 0
+  for i = 1, math.max(#a, #b) do
+    local sum = (a[i] or 0) + (b[i] or 0) + carry
+    out[i] = sum % BASE
+    carry = math.floor(sum / BASE)
+  end
+  if carry > 0 then
+    out[#out + 1] = carry
+  end
+  return out
+end
+
+function big.mul_small(a, m)
+  local out, carry = {}, 0
+  for i = 1, #a do
+    local product = a[i] * m + carry
+    out[i] = product % BASE
+    carry = math.floor(product / BASE)
+  end
+  while carry > 0 do
+    out[#out + 1] = carry % BASE
+    carry = math.floor(carry / BASE)
+  end
+  return out
+end
+
+function big.tostring(a)
+  local parts = { tostring(a[#a]) }
+  for i = #a - 1, 1, -1 do
+    parts[#parts + 1] = string.format("%07d", a[i])
+  end
+  return table.concat(parts)
+end
+
+local function memoize(func)
+  -- a callable table: the cache lives in the closure, the miss count on the table
+  local cache = {}
+  local wrapper = { misses = 0 }
+  return setmetatable(wrapper, {
+    __call = function(self, n)
+      local hit = cache[n]
+      if hit ~= nil then
+        return hit
+      end
+      self.misses = self.misses + 1
+      local value = func(n)
+      cache[n] = value
+      return value
+    end,
+  })
+end
+
+local function reduce(f, iter, init)
+  local acc = init
+  for value in iter do
+    acc = f(acc, value)
+  end
+  return acc
+end
+
+local function range(lo, hi)
+  local i = lo - 1
+  return function()
+    i = i + 1
+    if i <= hi then
+      return i
+    end
+  end
+end
+
+local function partial(f, ...)
+  local bound = { ... }
+  local count = select("#", ...)
+  return function(...)
+    return f(unpack(bound, 1, count), ...)
+  end
+end
+
+-- declared first so the body's recursive fib is the wrapped one
+local fib
+fib = memoize(function(n)
+  if n < 2 then
+    return big.from(n)
+  end
+  return big.add(fib(n - 1), fib(n - 2))
+end)
+
+local function main()
+  local n, k, bits = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  n, k = tonumber(n), tonumber(k)
+
+  print("FIB " .. big.tostring(fib(n)))
+
+  local product = reduce(big.mul_small, range(1, k), big.from(1))
+  print("PRODUCT " .. big.tostring(product))
+
+  local function parse(base, text)
+    return tonumber(text, base)
+  end
+  local from_binary = partial(parse, 2)
+  print("BIN " .. from_binary(bits))
+
+  print("MISSES " .. fib.misses)
+end
+
+main()
+'''
+hints = [
+  "local fib; fib = memoize(function(n) ... end) — declare the name first, so the fib inside the body is the upvalue that ends up holding the wrapper. The starter dies on the last line because a plain function has no misses field.",
+  "reduce(big.mul_small, range(1, k), big.from(1)) — the third argument is the starting value, and it is what makes the empty range give 1.",
+  "partial(parse, 2) returns a function that supplies the base itself and takes the text. unpack(bound, 1, count) puts the bound arguments first; select(\"#\", ...) counts them even if one is nil.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 1010\n",    expect = "FIB 55\nPRODUCT 120\nBIN 10\nMISSES 11\n",                     visible = true },
+  { name = "zero",   stdin = "0 0 0\n",        expect = "FIB 0\nPRODUCT 1\nBIN 0\nMISSES 1\n",                          visible = false },
+  { name = "ninety", stdin = "90 20 11111111\n", expect = "FIB 2880067194370816120\nPRODUCT 2432902008176640000\nBIN 255\nMISSES 91\n", visible = false },
+  { name = "deep",   stdin = "400 1 1\n",      expect = "FIB 176023680645013966468226945392411250770384383304492191886725992896575345044216019675\nPRODUCT 1\nBIN 1\nMISSES 401\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "lua.advanced.11.protocol"
+node        = 28
+title       = "IT ONLY HAS TO RENDER"
+difficulty  = 4
+story       = "The Victoria Park lantern directory lists stalls and counters, built by two different programs, and the board only wants to know that each of them can draw itself."
+concepts    = ["duck-typing", "dispatch", "structs"]
+requires    = ["lua.advanced.10.functools"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each either
+
+* `STALL <NAME> <AISLE>` — renders as `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` — renders as `COUNTER <NUMBER>`
+
+Declare a protocol `Sign` as a list of method names — `{ "render" }` —
+and `implements(object, protocol)`, which is true when the object has a
+function at every one of them. Write `Stall` and `Counter` as plain
+classes — **no mention of `Sign`** — and a single function `show(sign)`
+that prints the rendering. Print every sign, then `SIGNS <n>` counted with
+`implements(x, Sign)`, then `STALLS <k>` counted with `is_a(x, Stall)`,
+which compares metatables.
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+A protocol is a **structural** type: a class satisfies it by having the
+methods, not by saying so. Lua has no name for that because it is the only
+kind of type Lua has. The check is a lookup by name, at run time, and it
+has to be the **same lookup the call makes**: `object[name]`, which goes
+through `__index` to the class where the methods live. The starter checks
+with `rawget`, which looks only in the instance itself, finds no `render`
+on any of them, and reports `SIGNS 0`.
+
+`show` dispatches at run time by that lookup — `sign:render()` finds
+whichever `render` the metatable chain has. There is no static dispatch to
+choose instead; Lua has one mechanism and this is it.
+'''
+starter     = '''
+local Sign = { "render" }   -- the protocol: the methods a sign must have
+
+local function implements(object, protocol)
+  for _, name in ipairs(protocol) do
+    if type(rawget(object, name)) ~= "function" then
+      return false
+    end
+  end
+  return true
+end
+
+local function is_a(object, class)
+  return getmetatable(object) == class
+end
+
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, aisle)
+  return setmetatable({ name = name, aisle = aisle }, Stall)
+end
+
+function Stall:render()
+  return self.name .. " / A" .. self.aisle
+end
+
+local Counter = {}
+Counter.__index = Counter
+
+function Counter.new(number)
+  return setmetatable({ number = number }, Counter)
+end
+
+function Counter:render()
+  return "COUNTER " .. self.number
+end
+
+local function show(sign)
+  print(sign:render())
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local signs = {}
+  for _ = 1, n do
+    local parts = {}
+    for token in io.read("*l"):gmatch("%S+") do
+      parts[#parts + 1] = token
+    end
+    if parts[1] == "STALL" then
+      signs[#signs + 1] = Stall.new(parts[2], tonumber(parts[3]))
+    else
+      signs[#signs + 1] = Counter.new(tonumber(parts[2]))
+    end
+  end
+
+  local sign_count, stall_count = 0, 0
+  for _, sign in ipairs(signs) do
+    show(sign)
+    if implements(sign, Sign) then
+      sign_count = sign_count + 1
+    end
+    if is_a(sign, Stall) then
+      stall_count = stall_count + 1
+    end
+  end
+  print("SIGNS " .. sign_count)
+  print("STALLS " .. stall_count)
+end
+
+main()
+'''
+solution    = '''
+local Sign = { "render" }   -- the protocol: the methods a sign must have
+
+local function implements(object, protocol)
+  -- the same lookup a method call makes: through __index to the class
+  for _, name in ipairs(protocol) do
+    if type(object[name]) ~= "function" then
+      return false
+    end
+  end
+  return true
+end
+
+local function is_a(object, class)
+  return getmetatable(object) == class
+end
+
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, aisle)
+  return setmetatable({ name = name, aisle = aisle }, Stall)
+end
+
+function Stall:render()
+  return self.name .. " / A" .. self.aisle
+end
+
+local Counter = {}
+Counter.__index = Counter
+
+function Counter.new(number)
+  return setmetatable({ number = number }, Counter)
+end
+
+function Counter:render()
+  return "COUNTER " .. self.number
+end
+
+local function show(sign)
+  -- one function, any type with a render(): the lookup happens now, by name
+  print(sign:render())
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local signs = {}
+  for _ = 1, n do
+    local parts = {}
+    for token in io.read("*l"):gmatch("%S+") do
+      parts[#parts + 1] = token
+    end
+    if parts[1] == "STALL" then
+      signs[#signs + 1] = Stall.new(parts[2], tonumber(parts[3]))
+    else
+      signs[#signs + 1] = Counter.new(tonumber(parts[2]))
+    end
+  end
+
+  local sign_count, stall_count = 0, 0
+  for _, sign in ipairs(signs) do
+    show(sign)
+    if implements(sign, Sign) then
+      sign_count = sign_count + 1
+    end
+    if is_a(sign, Stall) then
+      stall_count = stall_count + 1
+    end
+  end
+  print("SIGNS " .. sign_count)
+  print("STALLS " .. stall_count)
+end
+
+main()
+'''
+hints = [
+  "object[name] instead of rawget(object, name). That is the whole fix: rawget skips the metatable, and the methods are on the class behind __index.",
+  "Neither Stall nor Counter mentions Sign anywhere. They satisfy it by having render(); that is what structural means.",
+  "implements checks that a function exists at the name, not its arity or what it returns. Nothing in Lua ever checks those; the call finds out.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three",    stdin = "3\nSTALL LAM 4\nCOUNTER 2\nSTALL WONG 1\n", expect = "LAM / A4\nCOUNTER 2\nWONG / A1\nSIGNS 3\nSTALLS 2\n", visible = true },
+  { name = "counter",  stdin = "1\nCOUNTER 116\n",                          expect = "COUNTER 116\nSIGNS 1\nSTALLS 0\n",                   visible = false },
+  { name = "stalls",   stdin = "2\nSTALL A 0\nSTALL B 9\n",                 expect = "A / A0\nB / A9\nSIGNS 2\nSTALLS 2\n",                visible = false },
+  { name = "none",     stdin = "0\n",                                       expect = "SIGNS 0\nSTALLS 0\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "lua.advanced.12.frozen"
+node        = 29
+title       = "IT DOES NOT CHANGE"
+difficulty  = 4
+story       = "The printed price list for the night is handed to every stall at 18:00, and by 21:30 three of them have written on it and one has added a column that is not there."
+concepts    = ["structs", "mutability", "error-handling"]
+requires    = ["lua.advanced.11.protocol"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<NAME> <CENTS>`.
+
+Build each line into a **frozen** record `Price.new(name, cents)`. Then,
+for each price, try to overwrite its `cents` and print `FROZEN <NAME>` when
+the attempt raises. Next, a `Tally` class with one declared slot, `count`:
+set `tally.count`, then try to set a misspelt `tally.cuont` and print
+`SLOTS YES` when *that* raises. Finally `IN_SET <k>`, the size of a set
+of the prices keyed by **value**, and `TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+A Lua table is writable, always; freezing one is a metatable trick. Keep
+the fields in a table the caller never sees, hand back an **empty proxy**
+whose `__index` is the fields — every read falls through — and whose
+`__newindex` raises: every write to a key the proxy does not have goes
+there, and the proxy has none. `pcall` around the assignment is how the
+attempt is made without dying.
+
+The set is the other half. Tables are keys **by identity**: two records
+with the same fields are two keys, and the starter's `IN_SET` says `3`.
+A frozen record can stand for its value only if the key is made from the
+fields — `price:key()` — and that is safe precisely because the fields
+cannot change under it.
+
+`Tally`'s slot is `__newindex` again, allowing only declared names:
+`rawset` for `count`, an error for anything else. A typo in an attribute
+name becomes an error at the assignment instead of a silent new field
+nobody reads.
+'''
+starter     = '''
+local Price = {}
+Price.__index = Price
+
+function Price.new(name, cents)
+  return setmetatable({ name = name, cents = cents }, Price)
+end
+
+local Tally = {}
+Tally.__index = Tally
+
+function Tally.new()
+  return setmetatable({ count = 0 }, Tally)
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local prices = {}
+  for _ = 1, n do
+    local name, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    prices[#prices + 1] = Price.new(name, tonumber(cents))
+  end
+
+  for _, price in ipairs(prices) do
+    local ok = pcall(function() price.cents = 0 end)
+    if ok then
+      print("MUTATED " .. price.name)
+    else
+      print("FROZEN " .. price.name)
+    end
+  end
+
+  local tally = Tally.new()
+  tally.count = n
+  local ok = pcall(function() tally.cuont = 0 end)
+  print(ok and "SLOTS NO" or "SLOTS YES")
+
+  local set, members = {}, 0
+  for _, price in ipairs(prices) do
+    if not set[price] then
+      set[price] = true
+      members = members + 1
+    end
+  end
+  print("IN_SET " .. members)
+
+  local total = 0
+  for _, price in ipairs(prices) do
+    total = total + price.cents
+  end
+  print("TOTAL " .. total)
+end
+
+main()
+'''
+solution    = '''
+local Price = {}
+Price.__index = Price
+
+function Price.new(name, cents)
+  -- the fields live here, behind the proxy; the proxy itself stays empty
+  local fields = setmetatable({ name = name, cents = cents }, Price)
+  return setmetatable({}, {
+    __index = fields,
+    __newindex = function(_, key)
+      error("frozen: cannot set " .. key, 2)
+    end,
+  })
+end
+
+function Price:key()
+  -- a value key: two records with the same fields are one member
+  return self.name .. ":" .. self.cents
+end
+
+local Tally = {}
+Tally.__index = Tally
+local SLOTS = { count = true }
+
+function Tally.new()
+  return setmetatable({}, {
+    __index = Tally,
+    __newindex = function(self, key, value)
+      if not SLOTS[key] then
+        error("no slot " .. key, 2)
+      end
+      rawset(self, key, value)
+    end,
+  })
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local prices = {}
+  for _ = 1, n do
+    local name, cents = io.read("*l"):match("(%S+)%s+(%S+)")
+    prices[#prices + 1] = Price.new(name, tonumber(cents))
+  end
+
+  for _, price in ipairs(prices) do
+    local ok = pcall(function() price.cents = 0 end)
+    if ok then
+      print("MUTATED " .. price.name)
+    else
+      print("FROZEN " .. price.name)
+    end
+  end
+
+  local tally = Tally.new()
+  tally.count = n
+  local ok = pcall(function() tally.cuont = 0 end)
+  print(ok and "SLOTS NO" or "SLOTS YES")
+
+  local set, members = {}, 0
+  for _, price in ipairs(prices) do
+    if not set[price:key()] then
+      set[price:key()] = true
+      members = members + 1
+    end
+  end
+  print("IN_SET " .. members)
+
+  local total = 0
+  for _, price in ipairs(prices) do
+    total = total + price.cents
+  end
+  print("TOTAL " .. total)
+end
+
+main()
+'''
+hints = [
+  "Price.new returns an empty table whose metatable has __index = the fields and a __newindex that errors. Reads fall through; writes have nowhere to land but the metamethod.",
+  "Key the set by price:key(), a string built from the fields. The table itself is a key only to itself.",
+  "The TOTAL is the sum of the original cents, which only holds because the assignments failed. In the starter every price is 0 by then, and TOTAL is 0 — the mutation was not only allowed, it went through.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\nLAM 1200\nWONG 900\nLAM 1200\n", expect = "FROZEN LAM\nFROZEN WONG\nFROZEN LAM\nSLOTS YES\nIN_SET 2\nTOTAL 3300\n", visible = true },
+  { name = "one",    stdin = "1\nCHAN 5\n",                       expect = "FROZEN CHAN\nSLOTS YES\nIN_SET 1\nTOTAL 5\n",                          visible = false },
+  { name = "none",   stdin = "0\n",                               expect = "SLOTS YES\nIN_SET 0\nTOTAL 0\n",                                      visible = false },
+  { name = "distinct", stdin = "2\nA 1\nA 2\n",                   expect = "FROZEN A\nFROZEN A\nSLOTS YES\nIN_SET 2\nTOTAL 3\n",                   visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "lua.advanced.13.exceptions"
+node        = 30
+title       = "AN ERROR OF YOUR OWN"
+difficulty  = 4
+story       = "Four layers of the rice counter's pricing each raise their own thing, and the counter's front end catches one of them and is taken down by the others."
+concepts    = ["error-handling", "structs", "control-flow"]
+requires    = ["lua.advanced.12.frozen"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines, each meant to be a weight in
+kg.
+
+Define an error hierarchy of **tables**: `PriceError` as the base, with
+`NotANumber` and `Negative` made from it by `class(PriceError)`. `Negative`
+carries the weight and its message is `negative weight: <kg>`;
+`NotANumber`'s message is `not a number`. `price(text)` converts the text,
+raising `NotANumber` with the parse failure kept as its `cause`, rejects
+a negative weight, and otherwise returns `500 + 100 * kg`.
+
+Print each price or the error's message, then `ERRORS <k>`. Catch the
+**base class**, once, with `is_a`.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+`error` raises any value, and a table is the one that can carry a message,
+a cause and a class. The class is its metatable; `is_a(err, cls)` walks
+`parent` links up from it, and one `if is_a(err, PriceError)` catches every
+member of the hierarchy. The starter catches `Negative` and nothing else,
+so the `xx` line takes the program down with an uncaught table:
+`(error object is not a string)`.
+
+`print(err)` prints `tostring(err)`, and `tostring` looks for `__tostring`
+**in the metatable, directly** — metamethods are not found through
+`__index` chains — so `class` has to put one on every class it makes. The
+`cause` is the string `pcall` handed back from the failed parse; nothing
+here prints it, and a debugger would show both, one above the other. That
+chain is the reason to keep it.
+'''
+starter     = '''
+local function class(parent)
+  local c = {}
+  c.__index = c
+  c.__tostring = function(self) return self.message end
+  c.parent = parent
+  return setmetatable(c, { __index = parent })
+end
+
+local function is_a(err, cls)
+  local c = getmetatable(err)
+  while c ~= nil do
+    if c == cls then
+      return true
+    end
+    c = c.parent
+  end
+  return false
+end
+
+local PriceError = class(nil)
+
+local NotANumber = class(PriceError)
+function NotANumber.new(cause)
+  return setmetatable({ message = "not a number", cause = cause }, NotANumber)
+end
+
+local Negative = class(PriceError)
+function Negative.new(kg)
+  return setmetatable({ message = "negative weight: " .. kg, kg = kg }, Negative)
+end
+
+local function parse_kg(text)
+  if not text:match("^%-?%d+$") then
+    error("bad integer: " .. text, 0)
+  end
+  return tonumber(text)
+end
+
+local function price(text)
+  local ok, kg = pcall(parse_kg, text)
+  if not ok then
+    error(NotANumber.new(kg))
+  end
+  if kg < 0 then
+    error(Negative.new(kg))
+  end
+  return 500 + 100 * kg
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local errors = 0
+  for _ = 1, n do
+    local line = io.read("*l"):match("^%s*(.-)%s*$")
+    local ok, result = pcall(price, line)
+    if ok then
+      print(result)
+    elseif is_a(result, Negative) then
+      errors = errors + 1
+      print(result)
+    else
+      error(result, 0)
+    end
+  end
+  print("ERRORS " .. errors)
+end
+
+main()
+'''
+solution    = '''
+local function class(parent)
+  local c = {}
+  c.__index = c
+  -- set on every class: tostring reads the metatable directly, never through __index
+  c.__tostring = function(self) return self.message end
+  c.parent = parent
+  return setmetatable(c, { __index = parent })
+end
+
+local function is_a(err, cls)
+  local c = getmetatable(err)
+  while c ~= nil do
+    if c == cls then
+      return true
+    end
+    c = c.parent
+  end
+  return false
+end
+
+local PriceError = class(nil)
+
+local NotANumber = class(PriceError)
+function NotANumber.new(cause)
+  return setmetatable({ message = "not a number", cause = cause }, NotANumber)
+end
+
+local Negative = class(PriceError)
+function Negative.new(kg)
+  return setmetatable({ message = "negative weight: " .. kg, kg = kg }, Negative)
+end
+
+local function parse_kg(text)
+  if not text:match("^%-?%d+$") then
+    error("bad integer: " .. text, 0)
+  end
+  return tonumber(text)
+end
+
+local function price(text)
+  local ok, kg = pcall(parse_kg, text)
+  if not ok then
+    -- the parse failure becomes the cause; the caller sees our type
+    error(NotANumber.new(kg))
+  end
+  if kg < 0 then
+    error(Negative.new(kg))
+  end
+  return 500 + 100 * kg
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local errors = 0
+  for _ = 1, n do
+    local line = io.read("*l"):match("^%s*(.-)%s*$")
+    local ok, result = pcall(price, line)
+    if ok then
+      print(result)
+    elseif is_a(result, PriceError) then
+      errors = errors + 1
+      print(result)
+    else
+      error(result, 0)
+    end
+  end
+  print("ERRORS " .. errors)
+end
+
+main()
+'''
+hints = [
+  "elseif is_a(result, PriceError) then — the base class catches both subclasses, and that is the point of having a base class.",
+  "print(result) prints tostring(result), which is the __tostring on the error's own class. No handler formatting needed.",
+  "Order matters when you test several classes: a subclass test after its base class test is dead code, and Lua will not warn you. Re-raise what you do not recognise — error(result, 0) — rather than swallowing it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed",    stdin = "3\n4\nxx\n-2\n",   expect = "900\nnot a number\nnegative weight: -2\nERRORS 2\n", visible = true },
+  { name = "clean",    stdin = "1\n0\n",           expect = "500\nERRORS 0\n",                                    visible = false },
+  { name = "all-junk", stdin = "2\nzz\nyy\n",      expect = "not a number\nnot a number\nERRORS 2\n",             visible = false },
+  { name = "negative", stdin = "1\n-1\n",          expect = "negative weight: -1\nERRORS 1\n",                    visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id          = "lua.advanced.14.iterator"
+node        = 31
+title       = "NEXT, UNTIL IT STOPS"
+difficulty  = 4
+story       = "The ticket machine at the Victoria Park lantern gate hands out numbers from a start in fixed steps and keeps no list of them, and the queue board wants to loop over it like any list."
+concepts    = ["iteration", "duck-typing", "structs"]
+requires    = ["lua.advanced.13.exceptions"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief       = '''
+Standard input is three integers: `start`, `step`, `count`.
+
+Write a class `Tickets` that implements the **iterator protocol by hand**:
+`next` returns the next value, or `nil` when `count` values have been
+handed out, and `iter` returns what a generic `for` needs. Print each
+value on its own line, then `SUM <total>` computed by handing a second
+`Tickets` to `sum`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+This is what `coroutine.wrap` writes for you. A generic `for` takes three
+things — a function `f`, a state `s`, and a control value — and calls
+`f(s, control)` before every turn, stopping when the first result is `nil`.
+`Tickets.next` already has that shape: its `self` is the state, and its
+second parameter is a control value it can ignore. So `iter` is one line:
+`return Tickets.next, self`. `sum`, `collect` and `for` all do the same
+dance, and none of them cares what the state is.
+
+The starter has `next` and no `iter`, and the `for` says `attempt to call
+method 'iter' (a nil value)`. A `nil` from `next` is `StopIteration`
+here; it is why a ticket can never be `nil`, and why `0` is a fine ticket
+— `0` is not `nil`.
+
+`iter` returning `self` as the state is the mark of an **iterator**: it
+can be walked once and is then spent. A **container** returns a fresh
+state from `iter` each time and can be walked repeatedly; `Bag` from
+earlier on this road was one. Say which you are writing; the difference
+shows up the second time somebody loops.
+'''
+starter     = '''
+local Tickets = {}
+Tickets.__index = Tickets
+
+function Tickets.new(start, step, count)
+  return setmetatable({ current = start, step = step, left = count }, Tickets)
+end
+
+function Tickets:next()
+  if self.left == 0 then
+    return nil
+  end
+  local value = self.current
+  self.current = self.current + self.step
+  self.left = self.left - 1
+  return value
+end
+
+local function sum(iterable)
+  local total = 0
+  for value in iterable:iter() do
+    total = total + value
+  end
+  return total
+end
+
+local function main()
+  local start, step, count = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  start, step, count = tonumber(start), tonumber(step), tonumber(count)
+
+  for value in Tickets.new(start, step, count):iter() do
+    print(value)
+  end
+  print("SUM " .. sum(Tickets.new(start, step, count)))
+end
+
+main()
+'''
+solution    = '''
+local Tickets = {}
+Tickets.__index = Tickets
+
+function Tickets.new(start, step, count)
+  return setmetatable({ current = start, step = step, left = count }, Tickets)
+end
+
+function Tickets:next()
+  if self.left == 0 then
+    return nil
+  end
+  local value = self.current
+  self.current = self.current + self.step
+  self.left = self.left - 1
+  return value
+end
+
+function Tickets:iter()
+  -- the iterator protocol: the function, then the state it is called with;
+  -- the for calls Tickets.next(self, previous) until it returns nil
+  return Tickets.next, self
+end
+
+local function sum(iterable)
+  local total = 0
+  for value in iterable:iter() do
+    total = total + value
+  end
+  return total
+end
+
+local function main()
+  local start, step, count = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+  start, step, count = tonumber(start), tonumber(step), tonumber(count)
+
+  for value in Tickets.new(start, step, count):iter() do
+    print(value)
+  end
+  print("SUM " .. sum(Tickets.new(start, step, count)))
+end
+
+main()
+'''
+hints = [
+  "function Tickets:iter() return Tickets.next, self end. Two values, and for starts working.",
+  "nil is returned, not raised. The for loop stops on it; you never see it. Save the value you are about to return before you advance, or you are off by one step.",
+  "for value in obj:iter() is for value in Tickets.next, obj — the method call just produces the pair. Returning a closure over self would also work; the pair is the protocol without the extra function.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five",     stdin = "2 3 5\n",   expect = "2\n5\n8\n11\n14\nSUM 40\n", visible = true },
+  { name = "flat",     stdin = "0 0 3\n",   expect = "0\n0\n0\nSUM 0\n",          visible = false },
+  { name = "backward", stdin = "10 -4 4\n", expect = "10\n6\n2\n-2\nSUM 16\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id          = "lua.advanced.15.collections"
+node        = 32
+title       = "THE RIGHT CONTAINER"
+difficulty  = 4
+story       = "The committee's desk keeps the night's tickets in one long list and answers every question about them by reading it from the top."
+concepts    = ["collections", "heaps", "binary-search", "sorting"]
+requires    = ["lua.advanced.14.iterator"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief       = '''
+Three lines of standard input: a line of words, a line of integers already
+**sorted ascending**, and one integer `x`.
+
+Print four lines:
+
+1. `TOP <word> <count>` — the most frequent word, ties by the word ascending
+   — from a table of counts
+2. `BISECT <l> <r>` — `bisect_left` and `bisect_right` of `x` in the sorted
+   integers: how many values are below `x`, and how many are not above it
+3. `SMALLEST3` followed by the three smallest integers — popped from a
+   **heap** — or fewer if there are fewer
+4. `GROUPS` followed by `<letter>:<k>` for each first letter of the words,
+   letters ascending — a table whose `__index` **creates the list on first
+   access**, keyed by first letter
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+Lua ships one container, and every other one is a table plus a discipline.
+The starter's `TOP` keeps the first word to reach the top count, which is
+`tofu`, in **insertion order**, and the statement says `egg`: sort the
+words and say what you mean. Its `BISECT` scans for the index of `x` and
+falls over when `x` is absent; a binary search over a sorted list never
+raises, and `left` and `right` differ by how many copies of `x` there
+are. Its `SMALLEST3` sorts the whole list to read three values off the
+front, which is the thing a heap exists to avoid when `k` is small and
+`n` is not. And its `GROUPS` walks a table of counts in `pairs` order,
+which is no order at all.
+
+`setmetatable({}, { __index = function(t, k) local v = {}; rawset(t, k,
+v); return v end })` is Lua's `defaultdict(list)`: the first read of a
+missing key makes the list and stores it, so `groups[letter][#... + 1]`
+never needs a check.
+'''
+starter     = '''
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function index_of(list, x)
+  for i, value in ipairs(list) do
+    if value == x then
+      return i - 1
+    end
+  end
+end
+
+local function main()
+  local words = split(io.read("*l"))
+  local nums = {}
+  for _, token in ipairs(split(io.read("*l"))) do
+    nums[#nums + 1] = tonumber(token)
+  end
+  local x = tonumber(io.read("*l"))
+
+  local counts = {}
+  for _, word in ipairs(words) do
+    counts[word] = (counts[word] or 0) + 1
+  end
+  local top
+  for _, word in ipairs(words) do
+    if top == nil or counts[word] > counts[top] then
+      top = word
+    end
+  end
+  print("TOP " .. top .. " " .. counts[top])
+
+  print("BISECT " .. index_of(nums, x) .. " " .. (index_of(nums, x) + 1))
+
+  local sorted = { unpack(nums) }
+  table.sort(sorted)
+  local smallest = {}
+  for i = 1, math.min(3, #sorted) do
+    smallest[i] = sorted[i]
+  end
+  print("SMALLEST3 " .. table.concat(smallest, " "))
+
+  local groups = {}
+  for _, word in ipairs(words) do
+    local letter = word:sub(1, 1)
+    groups[letter] = (groups[letter] or 0) + 1
+  end
+  local parts = {}
+  for letter, count in pairs(groups) do
+    parts[#parts + 1] = letter .. ":" .. count
+  end
+  print("GROUPS " .. table.concat(parts, " "))
+end
+
+main()
+'''
+solution    = '''
+local function split(line)
+  local parts = {}
+  for token in line:gmatch("%S+") do
+    parts[#parts + 1] = token
+  end
+  return parts
+end
+
+local function sorted_keys(t)
+  local keys = {}
+  for key in pairs(t) do
+    keys[#keys + 1] = key
+  end
+  table.sort(keys)
+  return keys
+end
+
+-- first position (0-based) whose value is not below x
+local function bisect_left(list, x)
+  local lo, hi = 1, #list + 1
+  while lo < hi do
+    local mid = math.floor((lo + hi) / 2)
+    if list[mid] < x then
+      lo = mid + 1
+    else
+      hi = mid
+    end
+  end
+  return lo - 1
+end
+
+-- first position (0-based) whose value is above x
+local function bisect_right(list, x)
+  local lo, hi = 1, #list + 1
+  while lo < hi do
+    local mid = math.floor((lo + hi) / 2)
+    if list[mid] <= x then
+      lo = mid + 1
+    else
+      hi = mid
+    end
+  end
+  return lo - 1
+end
+
+-- a binary min-heap in a list: the parent of i is floor(i / 2)
+local Heap = {}
+Heap.__index = Heap
+
+function Heap.new()
+  return setmetatable({ items = {} }, Heap)
+end
+
+function Heap:push(value)
+  local items = self.items
+  items[#items + 1] = value
+  local i = #items
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if items[parent] <= items[i] then
+      break
+    end
+    items[parent], items[i] = items[i], items[parent]
+    i = parent
+  end
+end
+
+function Heap:pop()
+  local items = self.items
+  local n = #items
+  if n == 0 then
+    return nil
+  end
+  local top = items[1]
+  items[1] = items[n]
+  items[n] = nil
+  n = n - 1
+  local i = 1
+  while true do
+    local left, right, smallest = 2 * i, 2 * i + 1, i
+    if left <= n and items[left] < items[smallest] then
+      smallest = left
+    end
+    if right <= n and items[right] < items[smallest] then
+      smallest = right
+    end
+    if smallest == i then
+      break
+    end
+    items[i], items[smallest] = items[smallest], items[i]
+    i = smallest
+  end
+  return top
+end
+
+local function main()
+  local words = split(io.read("*l"))
+  local nums = {}
+  for _, token in ipairs(split(io.read("*l"))) do
+    nums[#nums + 1] = tonumber(token)
+  end
+  local x = tonumber(io.read("*l"))
+
+  local counts = {}
+  for _, word in ipairs(words) do
+    counts[word] = (counts[word] or 0) + 1
+  end
+  -- walk the words in sorted order and replace only on a strictly higher
+  -- count: the first of equal counts is alphabetically first
+  local top
+  for _, word in ipairs(sorted_keys(counts)) do
+    if top == nil or counts[word] > counts[top] then
+      top = word
+    end
+  end
+  print("TOP " .. top .. " " .. counts[top])
+
+  print("BISECT " .. bisect_left(nums, x) .. " " .. bisect_right(nums, x))
+
+  local heap = Heap.new()
+  for _, value in ipairs(nums) do
+    heap:push(value)
+  end
+  local smallest = {}
+  for _ = 1, 3 do
+    local value = heap:pop()
+    if value == nil then
+      break
+    end
+    smallest[#smallest + 1] = value
+  end
+  print("SMALLEST3 " .. table.concat(smallest, " "))
+
+  -- a table that makes the list on the first read of a missing key
+  local groups = setmetatable({}, {
+    __index = function(t, key)
+      local list = {}
+      rawset(t, key, list)
+      return list
+    end,
+  })
+  for _, word in ipairs(words) do
+    local bucket = groups[word:sub(1, 1)]
+    bucket[#bucket + 1] = word
+  end
+  local parts = {}
+  for _, letter in ipairs(sorted_keys(groups)) do
+    parts[#parts + 1] = letter .. ":" .. #groups[letter]
+  end
+  print("GROUPS " .. table.concat(parts, " "))
+end
+
+main()
+'''
+hints = [
+  "Walk sorted_keys(counts) instead of words and replace the top only on a strictly greater count; the tie then goes to the alphabetically first, which is egg.",
+  "bisect_left and bisect_right never raise; the starter's index_of returns nil when x is absent and one of the hidden cases is exactly that. Both are the same loop with < swapped for <=.",
+  "The heap is a list where the parent of i is floor(i / 2): push appends and swims up, pop moves the last item to the top and sinks it. Three pops are the three smallest, whatever n is.",
+  "The __index metamethod runs only for a missing key; rawset inside it stores the new list so the next read is a plain hit. Sort the keys before printing — a table with a metatable is still in no order.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "tofu egg tofu egg fish\n1 3 3 5 8\n3\n", expect = "TOP egg 2\nBISECT 1 3\nSMALLEST3 1 3 3\nGROUPS e:2 f:1 t:2\n", visible = true },
+  { name = "absent", stdin = "a b c\n10 20 30\n25\n",                 expect = "TOP a 1\nBISECT 2 2\nSMALLEST3 10 20 30\nGROUPS a:1 b:1 c:1\n", visible = false },
+  { name = "short",  stdin = "zz zz\n4\n4\n",                         expect = "TOP zz 2\nBISECT 0 1\nSMALLEST3 4\nGROUPS z:2\n",              visible = false },
+  { name = "before", stdin = "fish tofu fish\n5 5 5\n1\n",            expect = "TOP fish 2\nBISECT 0 0\nSMALLEST3 5 5 5\nGROUPS f:2 t:1\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id          = "lua.advanced.16.timeouts"
+node        = 33
+title       = "STOP WAITING"
+difficulty  = 4
+story       = "The marshal's board pings every stall on the lane for its wait time, and the stall whose card reader is down never answers, so the board never redraws."
+concepts    = ["async", "cancellation", "error-handling"]
+requires    = ["lua.advanced.15.collections"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief       = '''
+Standard input is a count `n`, then `n` lines of `<STALL> <SECONDS>`, where
+`SECONDS` is `0` for a stall that answers at once and `1` for one that does
+not answer in time.
+
+Time here is **ticks**: a tenth of a second is one `coroutine.yield()`, and
+`fetch(stall, seconds)` yields ten times per second before it returns
+`<STALL> OK`. For each stall, run its `fetch` as a coroutine under
+`wait_for(task, 2)` — a deadline of two ticks, 0.2 seconds — and print
+`<STALL> OK` or `<STALL> TIMEOUT`, in input order. Then start a `watch()`
+coroutine that loops forever, give it one turn, cancel it by **resuming it
+with `"cancel"`**, and let it print `CANCELLED` from its handler and
+`CLEANUP` from the code that runs on every path. Last, print
+`TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` resumes the task at most `ticks` times and reports whether it
+finished; if it is still `suspended` after its last turn, that is the
+timeout, and the task is simply never resumed again. The starter resumes
+`fetch` to the end instead, so `WONG` takes all ten ticks and then says
+`OK`.
+
+Cancelling a coroutine is delivering a value to the yield it is parked on.
+`watch` yields inside a `pcall`, and when the yield returns `"cancel"` it
+raises; the `pcall` catches that — the handler that prints `CANCELLED` —
+and then the cleanup line runs, and then the error is raised again, so the
+resume that delivered the cancel gets `false, "cancelled"` back. The
+starter creates the watcher, gives it a turn, and drops it: a coroutine
+nobody resumes again runs nothing, ever, and neither line prints. Re-raise
+after handling — swallowing the cancel is how a task becomes
+uncancellable.
+'''
+starter     = '''
+-- a tenth of a second is one yield
+local function fetch(stall, seconds)
+  for _ = 1, seconds * 10 do
+    coroutine.yield()
+  end
+  return stall .. " OK"
+end
+
+local function run_to_end(task)
+  local value
+  repeat
+    local ok, result = coroutine.resume(task)
+    if not ok then
+      error(result, 0)
+    end
+    value = result
+  until coroutine.status(task) == "dead"
+  return value
+end
+
+local function watch()
+  local ok, err = pcall(function()
+    while true do
+      local signal = coroutine.yield()
+      if signal == "cancel" then
+        error("cancelled", 0)
+      end
+    end
+  end)
+  if not ok then
+    print("CANCELLED")
+  end
+  print("CLEANUP")
+  if not ok then
+    error(err, 0)
+  end
+end
+
+local function run(stalls)
+  local timeouts = 0
+  for _, stall in ipairs(stalls) do
+    local task = coroutine.create(function()
+      return fetch(stall.name, stall.seconds)
+    end)
+    print(run_to_end(task))
+  end
+
+  local watcher = coroutine.create(watch)
+  coroutine.resume(watcher)
+  watcher = nil   -- cancelled, surely
+  print("TIMEOUTS " .. timeouts)
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local stalls = {}
+  for _ = 1, n do
+    local name, seconds = io.read("*l"):match("(%S+)%s+(%S+)")
+    stalls[#stalls + 1] = { name = name, seconds = tonumber(seconds) }
+  end
+  run(stalls)
+end
+
+main()
+'''
+solution    = '''
+-- a tenth of a second is one yield
+local function fetch(stall, seconds)
+  for _ = 1, seconds * 10 do
+    coroutine.yield()
+  end
+  return stall .. " OK"
+end
+
+-- at most `ticks` turns; returns true and the result, or false on the deadline
+local function wait_for(task, ticks)
+  for _ = 1, ticks do
+    local ok, result = coroutine.resume(task)
+    if not ok then
+      error(result, 0)
+    end
+    if coroutine.status(task) == "dead" then
+      return true, result
+    end
+  end
+  return false
+end
+
+local function watch()
+  local ok, err = pcall(function()
+    while true do
+      local signal = coroutine.yield()
+      if signal == "cancel" then
+        error("cancelled", 0)
+      end
+    end
+  end)
+  if not ok then
+    print("CANCELLED")    -- the handler
+  end
+  print("CLEANUP")        -- runs on every path
+  if not ok then
+    error(err, 0)         -- re-raise: the canceller sees false, "cancelled"
+  end
+end
+
+local function run(stalls)
+  local timeouts = 0
+  for _, stall in ipairs(stalls) do
+    local task = coroutine.create(function()
+      return fetch(stall.name, stall.seconds)
+    end)
+    local done, result = wait_for(task, 2)
+    if done then
+      print(result)
+    else
+      timeouts = timeouts + 1
+      print(stall.name .. " TIMEOUT")
+    end
+  end
+
+  local watcher = coroutine.create(watch)
+  coroutine.resume(watcher)              -- one turn: it parks on its first yield
+  local ok, err = coroutine.resume(watcher, "cancel")
+  if ok or err ~= "cancelled" then
+    error("the watcher did not cancel: " .. tostring(err), 0)
+  end
+  print("TIMEOUTS " .. timeouts)
+end
+
+local function main()
+  local n = tonumber(io.read("*l"))
+  local stalls = {}
+  for _ = 1, n do
+    local name, seconds = io.read("*l"):match("(%S+)%s+(%S+)")
+    stalls[#stalls + 1] = { name = name, seconds = tonumber(seconds) }
+  end
+  run(stalls)
+end
+
+main()
+'''
+hints = [
+  "wait_for(task, 2): resume up to twice, return true and the result if the task went dead, false otherwise. A task that timed out is just never resumed again.",
+  "coroutine.resume(watcher, \"cancel\") — the string is what the watcher's yield returns, and its own code turns that into an error. Setting the variable to nil cancels nothing; it only forgets the coroutine.",
+  "The first resume after create gives the watcher its turn to start and park on the yield, so the cancel has a yield to land on and not a function that has not begun.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "mixed", stdin = "3\nLAM 0\nWONG 1\nCHAN 0\n", expect = "LAM OK\nWONG TIMEOUT\nCHAN OK\nCANCELLED\nCLEANUP\nTIMEOUTS 1\n", visible = true },
+  { name = "fast",  stdin = "1\nLAM 0\n",                 expect = "LAM OK\nCANCELLED\nCLEANUP\nTIMEOUTS 0\n",                        visible = false },
+  { name = "slow",  stdin = "2\nA 1\nB 1\n",              expect = "A TIMEOUT\nB TIMEOUT\nCANCELLED\nCLEANUP\nTIMEOUTS 2\n",           visible = false },
+  { name = "none",  stdin = "0\n",                        expect = "CANCELLED\nCLEANUP\nTIMEOUTS 0\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+
+[[quest]]
+id          = "lua.advanced.17.coroutine"
+node        = 34
+title       = "THE COROUTINE"
+difficulty  = 5
+story       = "Wun Sha Street, the dragon at full length, one incense runner per segment. One of them never hands over the floor, the whole dragon stops on one segment with the drums still going, and the totals come back as nothing at all."
+concepts    = ["concurrency", "shared-state", "thread-safety", "data-races"]
+requires    = ["lua.advanced.16.timeouts", "lua.advanced.02.lock"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+Standard input is two integers `k` and `n`.
+
+Split `1..n` into `k` contiguous chunks — chunk `i` is
+`floor(n*i/k) + 1` to `floor(n*(i+1)/k)` inclusive — and give each chunk
+to its own **coroutine**, which sums the squares of its range: a plain
+loop, no library call, yielding every 100 000 numbers so the others get a
+turn. Every runner adds its result to **one shared total** in one stretch
+with no yield in it, and also records it in its own slot. Drive them
+round-robin until all are dead. Print `CHUNK <i> <sum>` for each chunk in
+index order, then `TOTAL <sum>`, then `THREADS <k>` — the type name of a
+coroutine is `thread`, and that is the count.
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+The starter fails for a reason that has nothing to do with timing.
+`local part = coroutine.resume(co, lo, hi)` keeps the **first** result of
+`resume`, which is `true`, and the answer that followed it is dropped on
+the floor; the first `CHUNK` line is `attempt to concatenate local 'part'
+(a boolean value)`. That is the small bug. Fix it the way the drawer quest
+did: a shared total updated with no yield between the read and the write,
+the per-chunk slot written by exactly one runner, and the scheduler from
+the lock quest — every runner that is not dead gets a turn, until none is
+left.
+
+The sums pass 2^53 on the big case, and a Lua number is a double: past
+that point `+` rounds. Carry each sum as two limbs — a low part under 10^9
+and a high part of the rest — and print them as `%d%09d`.
+
+The big thing is the boss, and it is not a bug you can fix. Run this with
+`k = 4` and `n = 4000000` and time it, then run it with `k = 1`. They take
+the same time. Then delete the yield from the loop and run it again: the
+same output, the same time, and no error. A coroutine holds the floor
+until it says `yield`; a runner that never says it runs to the end while
+the other three wait, and nothing tells you, because nothing else needed
+the floor. That is the dragon stopped on one segment with the drums still
+going. Four coroutines on four cores sum the squares in turn, on one core,
+plus the cost of switching. LuaJIT has no threads. A coroutine is a place
+to stop, not a second core; the run is **in turn**, at the places each
+runner said it could pause. Parallel work is a second process — `io.popen`
+— or the LÖVE client's `love.thread`, which is a separate Lua state that
+shares nothing and talks through a channel.
+
+The output is deterministic because the chunks are printed by index and
+the total is the sum of the chunks, not the order the runners finished in.
+Print `TOTAL` from the shared total, not from summing the slots — the
+update with no yield in it is the thing this map is about, and the two
+have to agree.
+'''
+starter     = '''
+local function work(lo, hi)
+  -- sum of i*i for i in lo..hi, as a plain loop on purpose
+  local part = 0
+  for i = lo, hi do
+    part = part + i * i
+  end
+  return part
+end
+
+local function main()
+  local k, n = io.read("*l"):match("(%S+)%s+(%S+)")
+  k, n = tonumber(k), tonumber(n)
+
+  local runners = {}
+  for i = 0, k - 1 do
+    runners[i + 1] = coroutine.create(work)
+  end
+
+  local total = 0
+  for i = 0, k - 1 do
+    local lo = math.floor(n * i / k) + 1
+    local hi = math.floor(n * (i + 1) / k)
+    local part = coroutine.resume(runners[i + 1], lo, hi)
+    print("CHUNK " .. i .. " " .. part)
+    total = total + part
+  end
+
+  print("TOTAL " .. total)
+  print("THREADS " .. k)
+end
+
+main()
+'''
+solution    = '''
+-- a sum past 2^53 as two limbs: hi * 10^9 + lo, both exact doubles
+local BASE = 1000000000
+
+local function new_sum()
+  return { hi = 0, lo = 0 }
+end
+
+local function add_small(sum, x)
+  sum.lo = sum.lo + x
+  if sum.lo >= BASE then
+    local carry = math.floor(sum.lo / BASE)
+    sum.hi = sum.hi + carry
+    sum.lo = sum.lo - carry * BASE
+  end
+end
+
+local function add_sum(sum, other)
+  sum.hi = sum.hi + other.hi
+  add_small(sum, other.lo)
+end
+
+local function show(sum)
+  if sum.hi == 0 then
+    return string.format("%d", sum.lo)
+  end
+  return string.format("%d%09d", sum.hi, sum.lo)
+end
+
+local function main()
+  local k, n = io.read("*l"):match("(%S+)%s+(%S+)")
+  k, n = tonumber(k), tonumber(n)
+
+  local chunks = {}
+  local total = new_sum()
+
+  local function work(index, lo, hi)
+    -- sum of i*i for i in lo..hi, as a plain loop on purpose: this is the
+    -- CPU-bound work that runs in turn however many coroutines carry it
+    local part = new_sum()
+    for i = lo, hi do
+      add_small(part, i * i)
+      if i % 100000 == 0 then
+        coroutine.yield()      -- hand the floor over; delete this and nothing changes
+      end
+    end
+    chunks[index] = part
+    -- read, add, write with no yield between: the update cannot be lost
+    add_sum(total, part)
+  end
+
+  local runners = {}
+  for i = 0, k - 1 do
+    local lo = math.floor(n * i / k) + 1
+    local hi = math.floor(n * (i + 1) / k)
+    runners[i + 1] = coroutine.create(function()
+      work(i, lo, hi)
+    end)
+  end
+
+  -- round robin until every runner is dead
+  local live = k
+  while live > 0 do
+    live = 0
+    for _, co in ipairs(runners) do
+      if coroutine.status(co) ~= "dead" then
+        local ok, err = coroutine.resume(co)
+        if not ok then
+          error(err, 0)
+        end
+        if coroutine.status(co) ~= "dead" then
+          live = live + 1
+        end
+      end
+    end
+  end
+
+  for i = 0, k - 1 do
+    print("CHUNK " .. i .. " " .. show(chunks[i]))
+  end
+  print("TOTAL " .. show(total))
+  print("THREADS " .. k)
+end
+
+main()
+'''
+hints = [
+  "resume returns ok first and the values after it. Better: give work an index and a slot to write, and a shared total to add into, and let the scheduler resume until dead; then nothing has to come out of resume at all.",
+  "Resume all, round after round, then print. Printing inside the runners would interleave; printing after the loop, from the slots, cannot.",
+  "Two limbs: lo under 10^9 with the carry moved to hi on every add. 41666791666750000 is hi 41666791 and lo 666750000, printed as %d%09d.",
+  "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right. Then time k=1 against k=4 on a big n: when they match, you have met the coroutine.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 10\n",       expect = "CHUNK 0 14\nCHUNK 1 77\nCHUNK 2 294\nTOTAL 385\nTHREADS 3\n", visible = true },
+  { name = "one",      stdin = "1 4\n",        expect = "CHUNK 0 30\nTOTAL 30\nTHREADS 1\n",                           visible = false },
+  { name = "idle",     stdin = "3 2\n",        expect = "CHUNK 0 0\nCHUNK 1 1\nCHUNK 2 4\nTOTAL 5\nTHREADS 3\n",       visible = false },
+  { name = "big",      stdin = "4 2000000\n",  expect = "CHUNK 0 41666791666750000\nCHUNK 1 291667041666750000\nCHUNK 2 791667291666750000\nCHUNK 3 1541667541666750000\nTOTAL 2666668666667000000\nTHREADS 4\n", visible = false },
+]

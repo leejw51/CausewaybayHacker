@@ -116,6 +116,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0022_remix",
         include_str!("../migrations/0022_remix.sql"),
     ),
+    (
+        23,
+        "0023_zig_lua",
+        include_str!("../migrations/0023_zig_lua.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

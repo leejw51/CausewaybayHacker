@@ -58,10 +58,11 @@ return function()
     end
   end)
 
-  T.case("TAB walks rust → go → cpp → python → pytorch → typescript → remix and wraps to rust", function()
+  T.case("TAB walks rust → go → cpp → python → pytorch → typescript → zig → lua → remix and wraps", function()
     -- SPEC §0's order, the same one the land cards come in, so what TAB does
     -- on the map is what RIGHT does on the land screen.
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" })
+    T.same(Land.ORDER,
+      { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "remix" })
     -- On BASIC, a road every land has; a road REMIX lacks is the next case.
     local map, asked, app = fake_map("rust", "basic")
     local seen = {}
@@ -71,17 +72,17 @@ return function()
       T.eq(map.category, "basic", "the category never moves")
       T.eq(app.land, map.land, "the app followed")
     end
-    T.same(seen, { "go", "cpp", "python", "pytorch", "typescript", "remix", "rust" })
+    T.same(seen, { "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "remix", "rust" })
     T.same(asked,
       { "go.basic", "cpp.basic", "python.basic", "pytorch.basic", "typescript.basic",
-        "remix.basic", "rust.basic" },
+        "zig.basic", "lua.basic", "remix.basic", "rust.basic" },
       "one world.map per step, each for the right map")
   end)
 
   T.case("TAB into a land without this road lands on the last road it has", function()
-    -- TYPESCRIPT × HACKER, then TAB: REMIX has no hacker road, and the
-    -- switch must not ask the server for a map it would answer not_found.
-    local map, asked, app = fake_map("typescript", "hacker")
+    -- LUA × HACKER, then TAB: REMIX has no hacker road, and the switch must
+    -- not ask the server for a map it would answer not_found.
+    local map, asked, app = fake_map("lua", "hacker")
     map:cycle_land()
     T.eq(map.land, "remix")
     T.eq(map.category, "basic")

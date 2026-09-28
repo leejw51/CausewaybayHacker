@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { capLines, landGrid, roadColumn } from "../src/scenes/lands";
 import { landRowAt, landRowLines } from "../src/scenes/stats";
 import { LANDS } from "../src/net/protocol";
+import { TRACK_COL, TRACK_HAZE } from "../src/engine/theme";
 
 /** A roomy landscape column: 980 wide, 520 tall, which is the real case. */
 const COL: [number, number, number, number] = [20, 100, 980, 520];
@@ -279,6 +280,35 @@ describe("landGrid — where the plates actually land", () => {
     }
   });
 
+  it("puts nine lands three across and three down — the column seven opened, filled", () => {
+    // ZIG and LUA. Seven took a third row at 980 wide with one plate on it;
+    // nine fills that row (3+3+3) and adds no fourth. The plates keep their
+    // height, so the third row is still reached by scrolling, as it was for
+    // seven — and not by more than the one row it already cost.
+    const seven = landGrid(COL, 7, GAP, MIN_COL, VIABLE, COMFORTABLE, 5, true, 0);
+    const g = landGrid(COL, 9, GAP, MIN_COL, VIABLE, COMFORTABLE, 5, true, 0);
+    expect(g.cols).toBe(3);
+    expect(g.rows).toBe(3);
+    expect(g.ph).toBeGreaterThanOrEqual(VIABLE);
+    expect(g.overflow).toBe(seven.overflow);
+    expect(g.cols * g.rows).toBe(9);
+    for (const o of g.origins) {
+      expect(o.x).toBeGreaterThanOrEqual(COL[0]);
+      expect(o.x + g.pw).toBeLessThanOrEqual(COL[0] + COL[2]);
+    }
+    // And on a phone: two across, five down, the last row half full, and
+    // nothing scrolled out of reach.
+    for (const col of [
+      [16, 120, 358, 520],
+      [16, 64, 400, 260],
+    ] as Array<[number, number, number, number]>) {
+      const phone = landGrid(col, 9, GAP, 150, 0, 0, 5, true, 0);
+      expect(phone.overflow).toBe(0);
+      expect(phone.cols).toBe(2);
+      expect(phone.rows).toBe(5);
+    }
+  });
+
   it("never costs a sixth land a row a fifth did not, once two columns fit", () => {
     // Where one column is all that fits, every land is a row and that is the
     // phone's problem to solve (below). Anywhere wider, six packs into the
@@ -517,5 +547,49 @@ describe("roadColumn", () => {
   it("never lets a tile ask for less than the button row", () => {
     const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, 10);
     expect(col.tile[3]).toBe(PLAY);
+  });
+});
+
+describe("the track colours — every land its own bar", () => {
+  it("has a colour and a haze for every land", () => {
+    for (const land of LANDS) {
+      expect(TRACK_COL[land], land).toBeDefined();
+      expect(TRACK_HAZE[land], land).toBeDefined();
+    }
+  });
+
+  it("zig is amber: warmer than Python's gold and yellower than Rust's orange", () => {
+    // Three warm lands in a row on the bar. Red is pegged at the top on all
+    // three; the green channel is what tells them apart, and Zig's sits
+    // between Ferris's orange and Python's gold, with less blue than either
+    // — sodium light on concrete, not a sunset and not a market.
+    const [zr, zg, zb] = TRACK_COL.zig;
+    const [rr, rg, rb] = TRACK_COL.rust;
+    const [pr, pg, pb] = TRACK_COL.python;
+    expect(zr).toBe(rr);
+    expect(zr).toBe(pr);
+    expect(zg).toBeGreaterThan(rg);
+    expect(zg).toBeLessThan(pg);
+    expect(zb).toBeLessThan(rb);
+    expect(zb).toBeLessThan(pb);
+  });
+
+  it("lua is the one violet: blue leads, and red is well over green", () => {
+    // C++'s navy and TypeScript's LED blue are blue-green: green is their
+    // second channel. Lua's is blue-red, a lantern and not a screen, and
+    // no other land is.
+    const [lr, lg, lb] = TRACK_COL.lua;
+    expect(lb).toBeGreaterThan(lr);
+    expect(lb).toBeGreaterThan(lg);
+    expect(lr - lg).toBeGreaterThan(16 / 255);
+    for (const other of ["cpp", "typescript", "go"]) {
+      const [r, g] = TRACK_COL[other];
+      expect(g, other).toBeGreaterThan(r);
+    }
+    const violets = LANDS.filter((l) => {
+      const [r, g, b] = TRACK_COL[l];
+      return b > r && b > g && r > g;
+    });
+    expect(violets).toEqual(["lua"]);
   });
 });

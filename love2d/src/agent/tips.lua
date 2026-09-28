@@ -116,6 +116,40 @@ M.TIPS = {
     "`readonly` and `as const` cost nothing at runtime and catch the mutation you did not mean.",
     "`for…of` walks values; `for…in` walks keys, as strings. On an array you want `of`.",
   },
+  -- Zig Land builds with `zig build-exe -O Debug`, so every safety check is
+  -- on and every failure is loud, and the standard library is 0.16's: the
+  -- io and the allocator come in through `main`'s `Init`, and the writer is
+  -- buffered.
+  zig = {
+    "`try f()` hands the error up; `f() catch |e| …` handles it here. One or the other — an unhandled error union does not compile.",
+    "`?T` is null or a `T`. `opt orelse default` unwraps with a fallback; `if (opt) |v|` unwraps with a branch.",
+    "`defer x.deinit();` on the line after the `init`, and the cleanup can never be forgotten by an early `return`.",
+    "`errdefer` runs only when the block leaves with an error: the undo for the thing you just half-built.",
+    "`comptime` is the compiler running your code. A `type` is a value there, which is the whole of generics.",
+    "`[N]T` is an array with its length in the type; `[]T` is a slice, a pointer and a length. Functions take slices.",
+    "`-O Debug` panics on integer overflow, on an index past the end, on a null unwrap. Every one of them says where.",
+    "An unused `const` or parameter is a compile error. `_ = x;` says you meant it.",
+    "`std.debug.print` writes to stderr. The tests read stdout, so the answer goes through the writer and `flush()`.",
+    "Every allocation names its allocator, and `init.gpa` is the one `main` was given. Free on the same one.",
+    "`for (xs, 0..) |x, i|` is the index loop. `for (a, b) |x, y|` walks two slices in step, and they must be the same length.",
+    "`switch` must be exhaustive: name every case, or end with `else =>`. A missing enum value is a compile error.",
+  },
+  -- Lua Land runs on LuaJIT 2.1, which is Lua 5.1: one table for every
+  -- structure, numbered from 1, and no integer type at all.
+  lua = {
+    "A table's list part starts at 1. `t[0]` is just another key, and `#t` does not count it.",
+    "A missing key is `nil`, not an error; the error comes later, when you index into the `nil`. `#t` stops at the first hole.",
+    "`pairs` promises no order at all. When the output has to be in order, collect the keys and `table.sort` them.",
+    "`local` or it is a global. A global lives in `_G`, is seen by every function, and a typo silently makes another.",
+    "`..` joins strings and numbers, but not `nil`: `\"n = \" .. tostring(x)` when `x` might be missing.",
+    "A class is a table with `__index` pointing at itself: `setmetatable(obj, Class)` and a missing method is looked up there.",
+    "A closure captures the variable, not the value: two closures over one `local i` share it.",
+    "`ipairs` stops at the first `nil`. A list with a hole in it is two lists as far as `ipairs` can tell.",
+    "`string.format(\"%d\", 1.5)` is an error in LuaJIT: `%d` wants an integer. `math.floor` it, or use `%.0f`.",
+    "`coroutine.wrap(f)` turns a function into a generator: `coroutine.yield(v)` inside, one value per call outside.",
+    "`select(\"#\", ...)` counts the varargs, `nil`s included; `#{...}` does not.",
+    "`string.format(\"%.2f\", x)` for two decimals. `print(0.1 + 0.2)` shows `0.3`, but `==` on it is false.",
+  },
 }
 
 --- The next tip after `last`, never the same one twice running.
@@ -502,6 +536,136 @@ local function has_global(s)
   end
 end
 
+--- `/^\s*_\s*=\s*[\w.]*\.(flush|print|append|parseInt|put|writeAll)\(/m` —
+--- a line that is `_ = something.method(` where the method is one of the
+--- six that return an error union. `_ = x;` is how an unused value is
+--- declared on purpose, so the rule is only about those calls: discarding
+--- one is dropping an error on the floor. The prefix cannot cross a space,
+--- so `_ = try w.flush()` is not a discard, and a bare `_ = foo()` has no
+--- `.` in front of its name and is not one either.
+local DISCARDED = { flush = true, print = true, append = true, parseInt = true, put = true, writeAll = true }
+local function discards_call(s)
+  for line in (s .. "\n"):gmatch("([^\n]*)\n") do
+    local method = line:match("^%s*_%s*=%s*[%w_%.]*%.([%w_]+)%(")
+    if method and DISCARDED[method] then
+      return true
+    end
+  end
+  return false
+end
+
+--- `/\bvar\s+(\w+)\s*:\s*([^=]+?)=\s*undefined\s*;/g`, and then for each:
+--- skip it when the type opens with `[` (an array declared `undefined` is
+--- the buffer idiom, filled by whatever it is handed to); otherwise find the
+--- first later mention of the name — `(^|[^\w.])name\b`, so not a field —
+--- and if that mention is not an assignment (`\s*=[^=]` after it), the
+--- value is read before it is given: `-O Debug` fills it with 0xAA. The
+--- first such name is returned, since the sentence says it by name; `nil`
+--- when there is none.
+local function undefined_read(s)
+  local at = 1
+  while true do
+    local a, b, name, ty = s:find("%f[%w_]var%s+([%w_]+)%s*:%s*([^=][^=]-)=%s*undefined%s*;", at)
+    if not a then
+      return nil
+    end
+    at = b + 1
+    if not ty:find("^%s*%[") then
+      local after = s:sub(b + 1)
+      local i = 1
+      while true do
+        local c, d = after:find("%f[%w_]" .. name .. "%f[^%w_]", i)
+        if not c then
+          break
+        end
+        if after:sub(c - 1, c - 1) ~= "." then
+          if not after:find("^%s*=[^=]", d + 1) then
+            return name
+          end
+          break
+        end
+        i = c + 1
+      end
+    end
+  end
+end
+
+--- Lua without its strings and comments, so a `//` in a URL or a comment is
+--- not a finding. Only the `//` rule and `lua_global` read this copy; the
+--- other Lua rules read the source as written, as the web's do. Long strings
+--- and block comments are cut on one line each; the lines are kept, so
+--- line-shaped rules still see them.
+local function lua_bare(s)
+  s = s:gsub("%-%-%[%[.-%]%]", ""):gsub("%[%[.-%]%]", '""')
+  s = s:gsub('"[^"\n]*"', '""'):gsub("'[^'\n]*'", "''")
+  return (s:gsub("%-%-[^\n]*", ""))
+end
+
+--- Lua: a line that is a bare name and `=` — not `local`, not `t.x =`,
+--- not `==`, and not a field inside a `{ … }` constructor, which is what
+--- `name = value` means there. The brace depth is counted line by line.
+local function lua_global(s)
+  local depth = 0
+  for line in (lua_bare(s) .. "\n"):gmatch("([^\n]*)\n") do
+    if depth == 0 then
+      local name = line:match("^%s*([%a_][%w_]*)%s*=[^=]")
+      if name and name ~= "local" then
+        return true
+      end
+    end
+    local _, opens = line:gsub("{", "")
+    local _, closes = line:gsub("}", "")
+    depth = math.max(0, depth + opens - closes)
+  end
+  return false
+end
+
+--- `/#\s*([A-Za-z_]\w*)\b(?![\w.[(])/g` — every `#t` that is the whole of
+--- the operand (not `#t.list`, `#t[1]` or `#t()`), and for each, whether
+--- `t` is somewhere in this file given a string key:
+--- `/\bt\s*=\s*\{\s*\w+\s*=[^=]/` (built as `{ k = … }`, judged by its first
+--- entry) or `/\bt(\.\w+|\[\s*["'][^"']*["']\s*\])\s*=[^=]/` (written to as
+--- `t.k = …` or `t["k"] = …`). Such a table has an empty list part.
+local function len_of_map(s)
+  local at = 1
+  while true do
+    local a, b, t = s:find("#%s*([%a_][%w_]*)", at)
+    if not a then
+      return false
+    end
+    at = a + 1
+    if not s:sub(b + 1, b + 1):find("[%w_%.%[%(]") then
+      if s:find("%f[%w_]" .. t .. "%s*=%s*{%s*[%w_]+%s*=[^=]")
+        or s:find("%f[%w_]" .. t .. "%.[%w_]+%s*=[^=]")
+        or s:find("%f[%w_]" .. t .. "%[%s*[\"'][^\"']*[\"']%s*%]%s*=[^=]") then
+        return true
+      end
+    end
+  end
+end
+
+--- `/\bfor\s+[\w, ]+\s+in\s+pairs\s*\([^)]*\)\s*do\b[\s\S]{0,120}?\b(print|io\.write)\s*\(/`
+--- — a `for … in pairs(…) do` with a `print(` or an `io.write(` starting
+--- within 120 characters of the `do`. The window is the web's: it does not
+--- stop at the loop's `end`, and a print further down the body is out of it.
+local function pairs_feeds_print(s)
+  local at = 1
+  while true do
+    local _, b = s:find("%f[%w_]for%s+[%w_, ]+%s+in%s+pairs%s*%([^%)]*%)%s*do%f[^%w_]", at)
+    if not b then
+      return false
+    end
+    local after = s:sub(b + 1)
+    local p = after:find("%f[%w_]print%s*%(")
+    local w = after:find("%f[%w_]io%.write%s*%(")
+    local first = math.min(p or math.huge, w or math.huge)
+    if first <= 121 then
+      return true
+    end
+    at = b + 1
+  end
+end
+
 --- One sentence per thing a reviewer would circle. Heuristics, not a linter:
 --- every rule here is cheap, obvious when it fires, and about a habit rather
 --- than a compile error (the compiler already says those better).
@@ -639,6 +803,62 @@ function M.advise(lang, source)
     end
     if source:find("%f[%w_]var%s+[%w_]") then
       say("ts.var", "`var` is function-scoped and hoisted. `const`, or `let` when it has to change.")
+    end
+  elseif lang == "zig" then
+    -- `/\bstd\.debug\.print\s*\(/`
+    if source:find("%f[%w_]std%.debug%.print%s*%(") then
+      say(
+        "zig.debug-print",
+        "`std.debug.print` goes to stderr. The tests read stdout: print through the writer, then `flush()`."
+      )
+    end
+    -- `/\bcatch\s+unreachable\b/`
+    if source:find("%f[%w_]catch%s+unreachable%f[^%w_]") then
+      say(
+        "zig.catch-unreachable",
+        "`catch unreachable` is a crash with the error's name on it. `try`, or a `catch |e|` that does something."
+      )
+    end
+    if discards_call(source) then
+      say(
+        "zig.discard-error",
+        "`_ =` on a call that can fail throws the error away. `try` it, or `catch` it and say what happens."
+      )
+    end
+    local name = undefined_read(source)
+    if name then
+      say(
+        "zig.undefined-read",
+        "`" .. name .. "` is `undefined` and then read. Debug fills it with 0xAA, so the value is garbage: give it a value first."
+      )
+    end
+  elseif lang == "lua" then
+    if lua_global(source) then
+      say(
+        "lua.global",
+        "That assignment has no `local`, so it makes a global. `local name = …`, and the value belongs to this block."
+      )
+    end
+    -- `/\btable\.unpack\b/`, on the source as written.
+    if source:find("%f[%w_]table%.unpack%f[^%w_]") then
+      say("lua.table-unpack", "LuaJIT is Lua 5.1: `table.unpack` is `nil`. It is `unpack(t)` here.")
+    end
+    -- `/[^-]\/\/(?!\/)/` on the source with its comments and strings gone: a
+    -- `//` with something other than a `-` in front of it and no third `/`.
+    if lua_bare(source):find("[^%-]//%f[^/]") then
+      say("lua.floor-div", "There is no `//` in Lua 5.1. `math.floor(a / b)` is the integer division LuaJIT has.")
+    end
+    if len_of_map(source) then
+      say(
+        "lua.len-of-map",
+        "`#` counts the list part only. A table keyed by strings has a length of 0, however much is in it."
+      )
+    end
+    if pairs_feeds_print(source) then
+      say(
+        "lua.pairs-order",
+        "`pairs` visits keys in no promised order, and that loop prints. Sort the keys first if the output is checked."
+      )
     end
   elseif lang == "cpp" then
     if source:find("using%s+namespace%s+std%s*;") then

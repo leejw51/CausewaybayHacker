@@ -10,12 +10,14 @@ a cleared player would still not recognise, and then closing what was worth
 closing. **The residual list in §5 is the important part of this document.**
 
 State of the content when this audit was written: **278 quests** across four
-lands. It is **844 across seven** now — the four roads are 27/27/33–34/34 per
+lands. It is **1088 across nine** now — the four roads are 27/27/33–34/34 per
 land, PYTORCH LAND joined with 122 of its own (`docs/story.md` §3),
 TYPESCRIPT LAND with 122 more, a port of Python's roads node for node whose
-HACKER road asks the same 34 questions as the other language lands, and REMIX
+HACKER road asks the same 34 questions as the other language lands, REMIX
 LAND with 114 on its two grammar roads: nineteen trios, each the same program
-in Go, Rust and Python, judged by those three toolchains. The
+in Go, Rust and Python, judged by those three toolchains, and ZIG LAND and
+LUA LAND with 122 each — Zig a port of C++'s roads and Lua of Python's, node
+for node, the same 34 interview questions on both HACKER roads. The
 paragraph below is the audit's own snapshot and is kept as it was written;
 §5's residual list is what this document is for.
 

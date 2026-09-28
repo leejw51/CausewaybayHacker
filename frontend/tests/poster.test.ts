@@ -223,6 +223,22 @@ describe("colouring from the grammar", () => {
     expect(tones("package main", "go")[0]).toBe("keyword");
     expect(tones("int main() { return 0; }", "cpp")[0]).toBe("type");
   });
+
+  it("colours Zig from its grammar and Lua from its token stream", () => {
+    const z = tones('const s = "hi"; // c', "zig");
+    expect(z[0]).toBe("keyword");
+    expect(z[6]).toBe("name");
+    expect(z[11]).toBe("string");
+    expect(z[17]).toBe("comment");
+    // Lua's parser is a `StreamLanguage`: no tree, one leaf per token, and
+    // `parser.parse` works on it just the same.
+    const l = tones('local s = "hi" -- c', "lua");
+    expect(l[0]).toBe("keyword");
+    expect(l[6]).toBe("name");
+    expect(l[11]).toBe("string");
+    expect(l[16]).toBe("comment");
+    expect(tones("print(1)", "lua")[0]).toBe("call");
+  });
 });
 
 describe("the label", () => {

@@ -255,6 +255,42 @@ const TYPESCRIPT_QUESTS = [
   },
 ];
 
+const ZIG_QUESTS = [
+  {
+    id: "zig.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter:
+      'const std = @import("std");\n\npub fn main(init: std.process.Init) !void {\n    var buf: [256]u8 = undefined;\n    var out = std.Io.File.stdout().writerStreaming(init.io, &buf);\n    const w = &out.interface;\n    // FILL\n    try w.flush();\n}\n',
+    solution:
+      'const std = @import("std");\n\npub fn main(init: std.process.Init) !void {\n    var buf: [256]u8 = undefined;\n    var out = std.Io.File.stdout().writerStreaming(init.io, &buf);\n    const w = &out.interface;\n    try w.print("hello, causewaybay\\n", .{});\n    try w.flush();\n}\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
+const LUA_QUESTS = [
+  {
+    id: "lua.basic.01.hello",
+    node: 1,
+    title: "FIRST LIGHT",
+    difficulty: 1,
+    kind: "quest",
+    x: 0.12,
+    y: 0.74,
+    requires: [],
+    starter: "local function main()\n  -- FILL\nend\n\nmain()\n",
+    solution: 'print("hello, causewaybay")\n',
+    expect: "hello, causewaybay\n",
+    hints: [],
+  },
+];
+
 /**
  * REMIX LAND is the one land that is not a language: one trio of nodes, the
  * same program in Go, Rust and Python, each quest carrying its own `lang`
@@ -315,6 +351,8 @@ const LANDS = {
   python: PYTHON_QUESTS,
   pytorch: PYTORCH_QUESTS,
   typescript: TYPESCRIPT_QUESTS,
+  zig: ZIG_QUESTS,
+  lua: LUA_QUESTS,
   remix: REMIX_QUESTS,
 };
 const questsOf = (land) => LANDS[land] ?? [];
@@ -738,6 +776,10 @@ wss.on("connection", (ws) => {
             // Same shape as Python's, because it is Python's runner.
             pytorch: () => /print\("([^"]*)"\)/.exec(src)?.[1],
             typescript: () => /console\.log\("([^"]*)"\)/.exec(src)?.[1],
+            // The greeting is what `print` prints, minus the `\n` the writer
+            // is handed in the source.
+            zig: () => /w\.print\("([^"\\]*)\\n"/.exec(src)?.[1],
+            lua: () => /print\("([^"]*)"\)/.exec(src)?.[1],
           }[langOf(q)]?.();
           const ok = printed !== undefined && `${printed}\n` === q.expect;
           const had = progress.get(`${me}|${q.id}`);

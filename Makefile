@@ -465,6 +465,12 @@ doctor: ## check the toolchains and the server's own view of things
 	@command -v prettier >/dev/null && echo "prettier    $$(prettier --version)" \
 	  || echo "no prettier on PATH — optional; the typescript land has no fmt without it"
 	@command -v node  >/dev/null && node --version    || echo "MISSING: node   — needed for the browser client and the typescript land"
+	@command -v zig   >/dev/null && echo "zig         $$(zig version)" \
+	  || echo "MISSING: zig    — needed for the zig land: zig 0.16.0 (brew install zig, or the tarball on PATH)"
+	@command -v luajit >/dev/null && echo "luajit      $$(luajit -v 2>&1 | head -1)" \
+	  || echo "MISSING: luajit — needed for the lua land and the LÖVE suite (brew install luajit); plain lua will not do"
+	@command -v stylua >/dev/null && echo "stylua      $$(stylua --version)" \
+	  || echo "no stylua on PATH — optional; the lua land has no fmt without it"
 	@command -v love  >/dev/null && love --version    || echo "no love on PATH — 'make -C love2d love-bin' fetches it"
 	@test -x $(BACK_BIN) && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) doctor \
 	  || echo "backend not built yet — 'make start' or 'cd backend && cargo build'"

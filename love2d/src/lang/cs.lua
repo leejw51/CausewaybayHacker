@@ -146,6 +146,8 @@ return {
   ["dicts, generators, the GIL"] = "slovníky, generátory, GIL",
   ["tensors, gradients, attention"] = "tenzory, gradienty, attention",
   ["interfaces, generics, narrowing"] = "rozhraní, generika, zužování typů",
+  ["optionals, errors as values, comptime"] = "optionály, chyby jako hodnoty, comptime",
+  ["tables, closures, coroutines"] = "tabulky, closures, korutiny",
   ["go, rust, python: one program, three times"] = "go, rust, python: jeden program, třikrát",
   -- UNREVIEWED: "fused" ranking — no settled term
   ["both rankings, fused"] = "obě pořadí sloučená",

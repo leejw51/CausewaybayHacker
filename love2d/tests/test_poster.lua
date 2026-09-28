@@ -190,6 +190,35 @@ return function()
     T.eq(py[1].tone, "keyword")
   end)
 
+  T.case("colours Zig and Lua by their own comment rules", function()
+    local function tone_of(toks, word)
+      for _, t in ipairs(toks) do
+        if t.text:find(word, 1, true) then
+          return t.tone
+        end
+      end
+    end
+    local zig = Poster.tokens('const std = @import("std"); // std', "zig", false)
+    T.eq(tone_of(zig, "const"), "keyword")
+    T.eq(tone_of(zig, "@import"), "call", "a builtin is a call")
+    T.eq(tone_of(zig, "// std"), "comment")
+    local _, open = Poster.tokens("x = 1; /* not one", "zig", false)
+    T.eq(open, false, "Zig has no block comment")
+    local lua = Poster.tokens("local n = #t -- fn", "lua", false)
+    T.eq(tone_of(lua, "local"), "keyword")
+    T.eq(tone_of(lua, "#"), "operator")
+    T.eq(tone_of(lua, "-- fn"), "comment")
+    T.eq(tone_of(Poster.tokens("x // 2", "lua", false), "2"), "number", "// is not a comment in Lua")
+    local toks
+    toks, open = Poster.tokens("--[[ open", "lua", false)
+    T.eq(open, true, "--[[ carries to the next line")
+    T.eq(toks[1].tone, "comment")
+    toks, open = Poster.tokens("still */ ]] local x", "lua", true)
+    T.eq(open, false, "and closes on ]], not */")
+    T.eq(toks[1].text, "still */ ]]")
+    T.eq(tone_of(toks, "local"), "keyword")
+  end)
+
   T.section("disk reader — the verdict")
 
   local function recover(message, signature)

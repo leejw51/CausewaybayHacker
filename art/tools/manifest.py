@@ -21,11 +21,12 @@ ORDER = [
     "map_pytorch", "map_pytorch_p",
     "map_typescript", "map_typescript_p",
     "map_remix", "map_remix_p",
+    "map_zig", "map_zig_p", "map_lua", "map_lua_p",
     "bg_street", "bg_times", "bg_till", "bg_mtr",
     "bg_room732", "bg_room732_p", "bg_datacentre",
     "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
     "sprite_cpp", "sprite_python", "sprite_pytorch",
-    "sprite_typescript", "sprite_remix",
+    "sprite_typescript", "sprite_remix", "sprite_zig", "sprite_lua",
     "agent_skynet",
     # The Rust coder — the AI agent on the code screens — and the three
     # provider bots that fly beside it. Borrowed from CausewaybayRaiden
@@ -64,6 +65,8 @@ ORDER = [
     # REMIX LAND has two roads, VERY BASIC and BASIC, and the quiz road draws
     # no band on any land — so one band and one mascot.
     "emblem_remix_basic",
+    "emblem_zig_basic", "emblem_zig_advanced", "emblem_zig_hacker",
+    "emblem_lua_basic", "emblem_lua_advanced", "emblem_lua_hacker",
     "mascot_rust_basic", "mascot_rust_advanced", "mascot_rust_hacker",
     "mascot_go_basic", "mascot_go_advanced", "mascot_go_hacker",
     "mascot_cpp_basic", "mascot_cpp_advanced", "mascot_cpp_hacker",
@@ -71,6 +74,8 @@ ORDER = [
     "mascot_pytorch_basic", "mascot_pytorch_advanced", "mascot_pytorch_hacker",
     "mascot_typescript_basic", "mascot_typescript_advanced", "mascot_typescript_hacker",
     "mascot_remix_basic",
+    "mascot_zig_basic", "mascot_zig_advanced", "mascot_zig_hacker",
+    "mascot_lua_basic", "mascot_lua_advanced", "mascot_lua_hacker",
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",

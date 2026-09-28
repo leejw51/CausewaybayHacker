@@ -119,6 +119,12 @@ const STARTER: Record<Lang, string> = {
   // and `require("fs").readFileSync(0, "utf8")` is the idiom it declares.
   typescript:
     'const input: string = require("fs").readFileSync(0, "utf8");\n\nconsole.log("hello, causewaybay");\n',
+  // Zig 0.16's whole hello: the writer is buffered and has to be flushed,
+  // and `main` takes the `Init` that carries the io and the allocator, so a
+  // scratchpad that opens on this has the two things every Zig Land quest
+  // needs and would otherwise have to be looked up.
+  zig: 'const std = @import("std");\n\npub fn main(init: std.process.Init) !void {\n    var buf: [256]u8 = undefined;\n    var out = std.Io.File.stdout().writerStreaming(init.io, &buf);\n    const w = &out.interface;\n    try w.print("hello, causewaybay\\n", .{});\n    try w.flush();\n}\n',
+  lua: 'print("hello, causewaybay")\n',
 };
 
 /** The outcomes as the poster prints them: English, whatever the screen is in. */

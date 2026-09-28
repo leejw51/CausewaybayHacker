@@ -499,4 +499,43 @@ return function()
     _, events = typed("d = {\n    1: 2}", { lang = "python" })
     T.eq(#loops(events), 0)
   end)
+
+  T.case("lua: the `end` of a for or while and the `until` of a repeat — never a brace", function()
+    local _, events = typed("for i = 1, 3 do\nprint(i)\nend", { lang = "lua" })
+    local found = loops(events)
+    T.eq(#found, 1, "one loop closed")
+    T.eq(found[1].open[1], 1)
+    T.eq(found[1].open[2], 1, "the `for`")
+    T.eq(found[1].close[1], 3, "the `end`")
+    _, events = typed("while x do\nx = x - 1\nend", { lang = "lua" })
+    T.eq(#loops(events), 1, "while … do … end")
+    _, events = typed("repeat\nx = x + 1\nuntil", { lang = "lua" })
+    found = loops(events)
+    T.eq(#found, 1, "repeat closes on its until")
+    T.eq(found[1].open[1], 1)
+    -- An `if` or a `function` ends too, and is not a loop.
+    _, events = typed("if x then\ny()\nend", { lang = "lua" })
+    T.eq(#loops(events), 0)
+    _, events = typed("local function f()\nreturn 1\nend", { lang = "lua" })
+    T.eq(#loops(events), 0)
+    -- Nested: the inner `end` is the if's, the outer the for's.
+    _, events = typed("for i = 1, 3 do\nif i then\ny()\nend\nend", { lang = "lua" })
+    found = loops(events)
+    T.eq(#found, 1)
+    T.eq(found[1].close[1], 5, "the outer end")
+    -- A one-liner opens and closes itself; a stray `end` under it matches nothing.
+    _, events = typed("for i = 1, 3 do print(i) end\nend", { lang = "lua" })
+    T.eq(#loops(events), 0)
+    -- A `}` in Lua ends a table, never a loop — even under a `for`.
+    _, events = typed("for _, v in ipairs({ 1, 2 }) do\nprint(v)\n", { lang = "lua" })
+    T.eq(#loops(events), 0, "the table's brace in the header closed nothing")
+  end)
+
+  T.case("zig: for and while close on their brace, like C++", function()
+    local _, events = typed("pub fn main() void {\nfor (xs) |x| {\nuse(x);\n}\nwhile (i < 3) : (i += 1) { }\n}",
+      { lang = "zig" })
+    T.eq(#loops(events), 2, "a for with a capture and a while with a continue expression")
+    _, events = typed("pub fn main() void {\nif (x) { y(); }\n}", { lang = "zig" })
+    T.eq(#loops(events), 0)
+  end)
 end

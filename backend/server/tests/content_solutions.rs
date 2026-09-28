@@ -41,6 +41,18 @@ fn every_python_reference_solution_is_accepted_and_no_starter_is() {
     check_land("python");
 }
 
+#[test]
+#[ignore = "compiles every quest in content/zig; run it with --ignored"]
+fn every_zig_reference_solution_is_accepted_and_no_starter_is() {
+    check_land("zig");
+}
+
+#[test]
+#[ignore = "runs every quest in content/lua; run it with --ignored"]
+fn every_lua_reference_solution_is_accepted_and_no_starter_is() {
+    check_land("lua");
+}
+
 fn check_land(land: &str) {
     let Some(root) = content_root(land) else {
         eprintln!("no content/{land} yet — nothing to check");

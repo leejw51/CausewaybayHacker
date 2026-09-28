@@ -58,6 +58,7 @@ import {
 } from "@codemirror/commands";
 import {
   HighlightStyle,
+  StreamLanguage,
   bracketMatching,
   ensureSyntaxTree,
   indentOnInput,
@@ -72,6 +73,8 @@ import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
+import { zig } from "codemirror-lang-zig";
+import { lua } from "@codemirror/legacy-modes/mode/lua";
 import { RUBBLE_MAX } from "../engine/burst";
 import { Theme } from "../engine/theme";
 import type { Lang } from "../net/protocol";
@@ -86,6 +89,13 @@ const MODE: Record<Lang, () => Extension> = {
   pytorch: python,
   // TypeScript is its own grammar, not a dialect of anything above it.
   typescript: () => javascript({ typescript: true }),
+  // Zig is a Lezer grammar of its own (`codemirror-lang-zig`), with a tree
+  // the help and the loop effect can read like the others.
+  zig,
+  // Lua is a *stream* mode: one token at a time, no tree. It colours, and it
+  // indents on ENTER, and that is the whole of what it knows — the tables
+  // below that read node names get nothing from it and say so.
+  lua: () => StreamLanguage.define(lua),
 };
 
 /**
@@ -120,6 +130,12 @@ export const INDENT: Record<Lang, string> = {
   pytorch: "    ",
   // prettier writes two spaces, and FORMAT is prettier on this land.
   typescript: "  ",
+  // `zig fmt` writes four spaces and takes no argument about it.
+  zig: "    ",
+  // `stylua` is run bare (no stylua.toml beside a one-file program), and its
+  // default `indent_type` is Tabs — so a tab, as in Go, or FORMAT would
+  // rewrite every block the editor had indented.
+  lua: "\t",
 };
 
 export const MAIN_FILE: Record<Lang, string> = {
@@ -129,6 +145,8 @@ export const MAIN_FILE: Record<Lang, string> = {
   python: "main.py",
   pytorch: "main.py",
   typescript: "main.ts",
+  zig: "main.zig",
+  lua: "main.lua",
 };
 
 const hex = (c: readonly [number, number, number, number]) =>
@@ -752,6 +770,16 @@ const COMMON: Record<Lang, ReadonlySet<string>> = (() => {
         " ",
       ),
     ),
+    zig: new Set(
+      "const var fn pub return if else for while switch try catch orelse defer struct enum union error comptime null undefined true false break continue and or std io gpa init print writer interface flush items append len u8 i64 usize f64 bool void anytype ArrayList AutoHashMap parseInt tokenizeAny".split(
+        " ",
+      ),
+    ),
+    lua: new Set(
+      "local function end return if then elseif else for while do repeat until in and or not nil true false break print io read write string table insert remove sort concat format tostring tonumber pairs ipairs setmetatable coroutine yield resume wrap math floor".split(
+        " ",
+      ),
+    ),
   };
 })();
 
@@ -1020,6 +1048,30 @@ const LOOPS: Record<Lang, ReadonlySet<string>> = {
   // @lezer/javascript: `for (…;…;…)`, `for…of` and `for…in` are all one
   // `ForStatement`, told apart only by their spec child.
   typescript: new Set(["ForStatement", "WhileStatement", "DoStatement"]),
+  zig: new Set(["ForStatement", "WhileStatement"]),
+  // A stream mode has no tree, so there is no node a Lua loop could be.
+  lua: new Set(),
+};
+
+/**
+ * What a stream mode's tokens are. `StreamLanguage` names each leaf after
+ * its highlight tag — `keyword`, `string`, `variableName` — under a root
+ * called `Document`; none of the Lezer grammars here uses those spellings,
+ * and left to the regexes below `string` and `comment` would come out as
+ * keywords, being lowercase words. `variableName.standard` is the mode's
+ * name for a library function (`print`, `ipairs`), which is what the call
+ * tone is for.
+ */
+const STREAM_TONE: Record<string, Tone> = {
+  comment: "comment",
+  string: "string",
+  number: "number",
+  atom: "number",
+  keyword: "keyword",
+  variableName: "name",
+  "variableName.standard": "call",
+  builtin: "call",
+  operator: "operator",
 };
 
 /**
@@ -1041,6 +1093,7 @@ export function toneOfNode(name: string, parent: string): Tone | null {
   ) {
     return /Call|Macro/.test(parent) ? "call" : "name";
   }
+  if (parent === "Document" && name in STREAM_TONE) return STREAM_TONE[name];
   // A keyword's node is named after itself: `for`, `fn`, `return`.
   if (/^[a-z_]+$/.test(name) && name.length > 1) return "keyword";
   return null;
@@ -1089,6 +1142,10 @@ export function loopClosedBy(
   text: string,
 ): { from: number; to: number } | null {
   if (text.length === 0) return null;
+  // Lua's mode is a stream of tokens with no tree, so there is no node to
+  // walk out to and no honest way to tell an `end` that closes a `for` from
+  // one that closes an `if`. No opinion, rather than a guess.
+  if (lang === "lua") return null;
   const loops = LOOPS[lang];
   if (lang === "python") {
     if (text[0] !== "\n") return null;

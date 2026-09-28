@@ -154,6 +154,10 @@ export const cs: Partial<Catalogue> = {
     "Tenzory, gradienty, attention. Všechno je tvar a ta věc ve sklepě je z nich poskládaná.",
   "lands.typescriptBlurb":
     "Rozhraní, generika, zužování typů. Každá hodnota má typ dřív, než se spustí, a kompilátor už to všechno přečetl.",
+  "lands.zigBlurb":
+    "Optionály, chyby jako hodnoty, comptime. Nic není skryté: každá alokace se platí a každé selhání má jméno.",
+  "lands.luaBlurb":
+    "Tabulky, uzávěry, metatabulky, korutiny. Jedna struktura na všechno, a čísluje se od jedničky.",
   "lands.remixBlurb":
     "Go, Rust, Python: tentýž program třikrát. Jedna myšlenka, tři gramatiky, vedle sebe v prstech.",
   "lands.verybasicBlurb":
@@ -195,6 +199,8 @@ export const cs: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.zig": "ZIG",
+  "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "v této ulici zatím nic není",
   "map.failed": "mapu se nepodařilo načíst",
@@ -387,6 +393,8 @@ export const cs: Partial<Catalogue> = {
   "pg.python": "PYTHON",
   "pg.pytorch": "PYTORCH",
   "pg.typescript": "TYPESCRIPT",
+  "pg.zig": "ZIG",
+  "pg.lua": "LUA",
   "pg.stdin": "STDIN",
   "pg.stdinHint": "stdin — co program čte",
   "pg.unsaved": "NEULOŽENO",
@@ -539,6 +547,8 @@ export const cs: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.zig": "ZIG",
+  "search.lua": "LUA",
   "search.remix": "REMIX",
   "search.unified": "SPOJENĚ",
   "search.text": "SLOVA",
@@ -632,6 +642,8 @@ export const cs: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.zig": "ZIG",
+  "ai.lua": "LUA",
   "ai.remix": "REMIX",
   "ai.newPlan": "NOVÝ PLÁN",
   "ai.drillSize": "TRÉNINK {n}",

@@ -64,6 +64,8 @@ export const LANDS = [
   "python",
   "pytorch",
   "typescript",
+  "zig",
+  "lua",
   "remix",
 ] as const;
 export type Land = (typeof LANDS)[number];
@@ -476,7 +478,11 @@ export async function identifyOpenQuest(
 function landOfStarter(src: string): Land | null {
   if (/^package\s+main\b/m.test(src)) return "go";
   if (/^#include\b/m.test(src)) return "cpp";
+  // Zig before Rust: `pub fn main(` would match Rust's `fn main(`.
+  if (/@import\("std"\)|\bpub\s+fn\s+main\b/.test(src)) return "zig";
   if (/\bfn\s+main\s*\(/.test(src)) return "rust";
+  // Lua before Python: both `print(`, but only Lua opens a `local function`.
+  if (/^\s*local\s+(function\s+)?\w|\bio\.read\(/m.test(src)) return "lua";
   if (
     /\bconsole\.log\(|\breadFileSync\(|^\s*(const|let|function|interface|type)\s/m.test(
       src,

@@ -1,0 +1,24 @@
+luajit: main.lua:3: stack overflow
+stack traceback:
+	main.lua:2: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	...
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:3: in function 'depth'
+	main.lua:5: in main chunk
+	[C]: at 0x<pc>

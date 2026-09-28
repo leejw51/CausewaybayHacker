@@ -1,0 +1,16 @@
+error: InvalidCharacter
+<zig-std>/fmt.zig:578:24: 0x<pc> in charToDigit (main)
+    if (value >= base) return error.InvalidCharacter;
+                       ^
+<zig-std>/fmt.zig:443:23: 0x<pc> in parseIntWithSign__anon_27139 (main)
+        const digit = try charToDigit(math.cast(u8, c) orelse return error.InvalidCharacter, buf_base);
+                      ^
+<zig-std>/fmt.zig:331:5: 0x<pc> in parseIntWithGenericCharacter__anon_27133 (main)
+    return parseIntWithSign(Result, Character, buf, base, .pos);
+    ^
+<zig-std>/fmt.zig:318:5: 0x<pc> in parseInt__anon_26989 (main)
+    return parseIntWithGenericCharacter(T, u8, buf, base);
+    ^
+<work>/main.zig:4:15: 0x<pc> in main (main)
+    const n = try std.fmt.parseInt(i64, "x1", 10);
+              ^

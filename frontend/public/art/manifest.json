@@ -97,6 +97,30 @@
       "h": 1152
     },
     {
+      "name": "map_zig",
+      "file": "map_zig.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_zig_p",
+      "file": "map_zig_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "map_lua",
+      "file": "map_lua.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "map_lua_p",
+      "file": "map_lua_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_street",
       "file": "bg_street.jpg",
       "w": 1152,
@@ -270,6 +294,36 @@
         "minx": 9,
         "miny": 7,
         "maxx": 117,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_zig",
+      "file": "sprite_zig.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 7,
+        "miny": 7,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "sprite_lua",
+      "file": "sprite_lua.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 19,
+        "miny": 7,
+        "maxx": 108,
         "maxy": 120
       }
     },
@@ -1155,6 +1209,96 @@
       }
     },
     {
+      "name": "emblem_zig_basic",
+      "file": "emblem_zig_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 98.0,
+        "minx": 21,
+        "miny": 23,
+        "maxx": 362,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_zig_advanced",
+      "file": "emblem_zig_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 110.0,
+        "minx": 21,
+        "miny": 11,
+        "maxx": 362,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_zig_hacker",
+      "file": "emblem_zig_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 44,
+        "miny": 7,
+        "maxx": 339,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_lua_basic",
+      "file": "emblem_lua_basic.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 92,
+        "miny": 7,
+        "maxx": 290,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_lua_advanced",
+      "file": "emblem_lua_advanced.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 38,
+        "miny": 7,
+        "maxx": 345,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "emblem_lua_hacker",
+      "file": "emblem_lua_hacker.png",
+      "w": 384,
+      "h": 128,
+      "box": {
+        "cx": 191.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 50,
+        "miny": 7,
+        "maxx": 332,
+        "maxy": 120
+      }
+    },
+    {
       "name": "mascot_rust_basic",
       "file": "mascot_rust_basic.png",
       "w": 128,
@@ -1436,6 +1580,96 @@
         "minx": 7,
         "miny": 25,
         "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_zig_basic",
+      "file": "mascot_zig_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 104.0,
+        "minx": 7,
+        "miny": 17,
+        "maxx": 120,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_zig_advanced",
+      "file": "mascot_zig_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 10,
+        "miny": 7,
+        "maxx": 117,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_zig_hacker",
+      "file": "mascot_zig_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 28,
+        "miny": 7,
+        "maxx": 98,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_lua_basic",
+      "file": "mascot_lua_basic.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.5,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 16,
+        "miny": 7,
+        "maxx": 111,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_lua_advanced",
+      "file": "mascot_lua_advanced.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 16,
+        "miny": 7,
+        "maxx": 110,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "mascot_lua_hacker",
+      "file": "mascot_lua_hacker.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 113.0,
+        "minx": 34,
+        "miny": 8,
+        "maxx": 92,
         "maxy": 120
       }
     },

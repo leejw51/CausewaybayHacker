@@ -597,7 +597,7 @@ fn migration_0020_opens_the_fifth_land() {
     assert!(
         conn.execute(
             "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
-               VALUES ('s3', '0xaa', 'nope', 'zig', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
+               VALUES ('s3', '0xaa', 'nope', 'cobol', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
             [],
         )
         .is_err(),
@@ -703,7 +703,7 @@ fn migration_0021_opens_the_sixth_land() {
     assert!(
         conn.execute(
             "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
-               VALUES ('s3', '0xaa', 'nope', 'zig', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
+               VALUES ('s3', '0xaa', 'nope', 'cobol', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
             [],
         )
         .is_err(),
@@ -739,15 +739,13 @@ fn migration_0021_opens_the_sixth_land() {
 }
 
 #[test]
-fn the_newest_migration_opens_the_seventh_land_and_gives_every_quest_a_language() {
-    // The "newest migration" pin: fails loudly if a 0023 is added without a
-    // test of its own here. 0022 is the first land that is not a language:
-    // `remix` joins `quests.land`, and `quests.lang` — the toolchain a quest
-    // is judged in — arrives beside it, filled in from `land` for every row
-    // that was already there and for every INSERT that does not say.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 21);
-    let conn = database_at_version(previous);
+fn migration_0022_opens_the_seventh_land_and_gives_every_quest_a_language() {
+    // 0022 is the first land that is not a language: `remix` joins
+    // `quests.land`, and `quests.lang` — the toolchain a quest is judged in
+    // — arrives beside it, filled in from `land` for every row that was
+    // already there and for every INSERT that does not say. (The "newest
+    // migration" pin moved on to 0023's test below.)
+    let conn = database_at_version(21);
     conn.execute(
         "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
                              starter, solution, tests, checksum)
@@ -863,4 +861,163 @@ fn the_newest_migration_opens_the_seventh_land_and_gives_every_quest_a_language(
         )
         .unwrap();
     assert!(hits >= 1, "the FTS index came back with the table");
+}
+
+#[test]
+fn the_newest_migration_opens_the_eighth_and_ninth_lands() {
+    // The "newest migration" pin: fails loudly if a 0024 is added without a
+    // test of its own here. 0023 is two more toolchains, `zig` and `lua`,
+    // and to the database that is two names in four CHECK constraints —
+    // `quests.land`, `quests.lang`, `attempts.lang`, `snippets.lang` — with
+    // everything 0022 built (the `lang` fill-in trigger, the narrowed FTS
+    // update trigger) carried across the rebuild.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 22);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
+           VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum, lang)
+         VALUES ('remix.basic.01.a', 'p', 'remix', 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c',
+                 'go')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+           VALUES ('s1', '0xaa', 'old', 'rust', 'fn main() {}',
+                   '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+    for land in ["zig", "lua"] {
+        assert!(
+            conn.execute(
+                "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                     starter, solution, tests, checksum)
+                 VALUES (?1, 'p', ?2, 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+                rusqlite::params![format!("{land}.basic.01.a"), land],
+            )
+            .is_err(),
+            "0022 has no {land} in its CHECK"
+        );
+    }
+
+    db::prepare(&conn).unwrap();
+
+    // After it, both are — in all three tables that name a land, and the
+    // `lang` trigger fills a new land's rows from its land as it always did.
+    for land in ["zig", "lua"] {
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES (?1, 'p', ?2, 'basic', 1, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            rusqlite::params![format!("{land}.basic.01.a"), land],
+        )
+        .unwrap_or_else(|e| panic!("quests takes {land}: {e}"));
+        let lang: String = conn
+            .query_row(
+                "SELECT lang FROM quests WHERE id = ?1",
+                [format!("{land}.basic.01.a")],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(lang, land, "the fill-in trigger survived the rebuild");
+        conn.execute(
+            "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+               VALUES (?1, '0xaa', 'pad', ?2, 'x', '2026-02-02T00:00:00Z', '2026-02-02T00:00:00Z')",
+            rusqlite::params![format!("s_{land}"), land],
+        )
+        .unwrap_or_else(|e| panic!("snippets takes {land}: {e}"));
+        conn.execute(
+            "INSERT INTO attempts (id, address, quest_id, lang, source, verdict, created_at)
+               VALUES (?1, '0xaa', ?2, ?3, 'x', 'accepted', '2026-02-02T00:00:00Z')",
+            rusqlite::params![format!("a_{land}"), format!("{land}.basic.01.a"), land],
+        )
+        .unwrap_or_else(|e| panic!("attempts takes {land}: {e}"));
+    }
+
+    // A remix quest may be judged in one of the new languages too: the
+    // widened `lang` CHECK admits it, and one that still does not say is
+    // still refused.
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum, lang)
+         VALUES ('remix.basic.02.b', 'p', 'remix', 'basic', 2, 't', 'b', 's', 1, 's', 's', '{}', 'c',
+                 'zig')",
+        [],
+    )
+    .expect("a remix quest may say zig");
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('remix.basic.03.c', 'p', 'remix', 'basic', 3, 't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "a remix quest that does not say its language is still refused"
+    );
+
+    // A land that is still not a land is still refused: widened, not removed.
+    assert!(
+        conn.execute(
+            "INSERT INTO snippets (id, address, name, lang, source, created_at, updated_at)
+               VALUES ('s9', '0xaa', 'nope', 'cobol', 'x', '2026-02-03T00:00:00Z', '2026-02-03T00:00:00Z')",
+            [],
+        )
+        .is_err(),
+        "the CHECK is widened, not removed"
+    );
+
+    // Nothing that was there before was lost, and the FTS index and the
+    // `OF`-narrowed update trigger came back with the table: a `lang` change
+    // does not touch the index, a title change does.
+    let kept: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quests WHERE id = 'remix.basic.01.a' AND lang = 'go'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        kept, 1,
+        "the rebuild carried the quests across, lang and all"
+    );
+    let snips: i64 = conn
+        .query_row("SELECT count(*) FROM snippets WHERE id = 's1'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(snips, 1, "the rebuild carried the snippets across");
+    conn.execute(
+        "UPDATE quests SET lang = 'rust' WHERE id = 'remix.basic.01.a'",
+        [],
+    )
+    .expect("a lang update does not go near the FTS index");
+    conn.execute(
+        "UPDATE quests SET title = 'lantern' WHERE id = 'lua.basic.01.a'",
+        [],
+    )
+    .unwrap();
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'lantern'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS update trigger came back with the table");
+    let total: i64 = conn
+        .query_row("SELECT count(*) FROM quest_fts", [], |r| r.get(0))
+        .unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM quests", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(total, rows, "one FTS row per quest, no more and no fewer");
 }

@@ -62,6 +62,8 @@ const QUIET = new Set([
   "BlockComment",
   "Comment",
   "String",
+  // Zig's.
+  "StringLiteral",
   "RawString",
   "SystemLibString",
   "ContinuedString",
@@ -69,6 +71,9 @@ const QUIET = new Set([
   "Char",
   "CharLiteral",
   "Rune",
+  // A stream mode (Lua) names its tokens after their tags, in lowercase.
+  "comment",
+  "string",
 ]);
 
 /**
@@ -366,13 +371,67 @@ const NODES_BY_LAND = {
     ObjectExpression:
       "An object literal is checked for excess properties: a key its type does not have is an error, not a free field.",
   },
+  // `codemirror-lang-zig`. A function body resolves to `Block` under `Decl`
+  // with the `FnProto` beside it, not above, so the signature teaches only
+  // while the caret is in it; `try`, `catch`, `orelse` and `defer` live
+  // inside expression nodes and are taught as words below.
+  zig: {
+    ForStatement:
+      "`for (xs) |x| { … }` walks a slice; `for (xs, 0..) |x, i|` walks it with the index. No counter, no `i++`.",
+    WhileStatement:
+      "`while (cond) : (i += 1) { … }` — the continue expression after the colon runs at the end of every turn.",
+    IfExpr:
+      "`if (opt) |v| { … } else { … }` unwraps an optional. An `if` is an expression too: `const x = if (a) 1 else 2;`.",
+    SwitchExpr:
+      "`switch` must be exhaustive: every value of the type, or an `else` prong. A range is `1...5`, several are `1, 2 =>`.",
+    SwitchProng:
+      "A prong is `value => expr,` or `value => { … },`. Capture the payload with `|v|` after the arrow.",
+    SwitchItem: "`a...b` is an inclusive range in a prong. Two prongs that overlap do not compile.",
+    FnProto:
+      "`fn name(x: T) !U` — the `!` means it can fail. `anytype` takes any argument and checks it at the call.",
+    ParamDecl:
+      "A parameter is immutable: to change it, copy it into a `var`. A `[]const u8` is a string without owning it.",
+    ContainerDecl:
+      "`struct { … }`, `enum { … }` and `union(enum) { … }` are types, so they go on the right of a `const`.",
+    ContainerField:
+      "`name: T = default,` — a field with a default may be left out of the literal. Trailing comma always.",
+    VarDecl:
+      "`const` unless it changes, then `var`. An unused one is a compile error, and `_ = x;` is how you say it is on purpose.",
+    ReturnExpr:
+      "`return error.Name` returns a failure; a `!T` function's caller must `try`, `catch` or switch on it.",
+    BreakExpr:
+      "`break :label value` leaves a labelled block with a value. A loop is an expression too.",
+    InitList:
+      "`.{ … }` is an anonymous list or struct: the type is inferred from where it goes. `[_]T{ … }` infers only the length.",
+    PrefixTypeOp:
+      "`?T` may be null, `*T` is one, `[]T` is many, `!T` may fail. Read a type right to left and it says itself.",
+    ArrayTypeStart:
+      "`[N]T` is an array — the length is in the type and it lives where it is declared. `[]T` is a slice into one.",
+    PtrPayload:
+      "`|*x|` captures by pointer, so `x.* = …` writes through to the slice. `|x|` is a copy.",
+    PtrListPayload: "`|x, i|` — the item then the index, in the order of the things after `for (`.",
+    Payload:
+      "`|err|` after `catch` is the error that happened; `|v|` after `if` or `while` is the value that was there.",
+    FnCallArguments:
+      "Arguments are passed by value, and a big struct is passed by reference behind your back. Pass a slice, not an array.",
+    BuiltinIdentifier:
+      "A `@name(…)` is a compiler builtin: `@import`, `@intCast`, `@as`, `@memset`. They are the only things that start with `@`.",
+    AssignExpr:
+      "`+=` and friends check for overflow in Debug. `+%=` wraps and `+|=` saturates, and both say so in the source.",
+    LabeledStatement:
+      "`outer: while (…) { … continue :outer; }` — a label is how an inner loop reaches the outer one.",
+  },
+  // Lua's mode is a token stream: there are no constructs in the tree to
+  // resolve, so the land teaches by word only.
+  lua: {},
 };
 
 /**
  * PyTorch Lang is parsed by the same `@lezer/python` grammar, so a `for` is a
  * `ForStatement` in both and the construct help is the same sentence. The
- * *words* differ, and those are the catalogue below. TypeScript Lang is its
- * own grammar and has its own entry above.
+ * *words* differ, and those are the catalogue below. TypeScript and Zig are
+ * grammars of their own and have their own entries above; Lua has an empty
+ * one, because a stream mode has no constructs to name.
  */
 const NODES: Record<Lang, Record<string, string>> = {
   ...NODES_BY_LAND,
@@ -620,6 +679,111 @@ const WORDS: Record<Lang, Record<string, string>> = {
       'Pass the radix: `parseInt(s, 10)`. It stops at the first non-digit, so `parseInt("12px", 10)` is `12`.',
     BigInt:
       "Past 2^53 a `number` loses integers. A `bigint` such as `10n` is exact, but does not mix with `number` in arithmetic.",
+  },
+  zig: {
+    try: "`try f()` is `f() catch |e| return e`: the error goes up to the caller, who must be able to fail too.",
+    catch:
+      "`x catch default` picks a value; `catch |err| { … }` handles it. `catch unreachable` is a crash with a name.",
+    orelse:
+      "`opt orelse default` unwraps an optional. `orelse return` and `orelse unreachable` are the other two habits.",
+    defer:
+      "`defer` runs at the end of the block, last one first. Put the `deinit` on the line after the `init`.",
+    errdefer:
+      "`errdefer` runs only if the block leaves with an error — the undo for the thing you just built.",
+    comptime:
+      "`comptime` runs it in the compiler. A type is a `comptime` value, which is how `fn max(comptime T: type)` is generic.",
+    undefined:
+      "`= undefined` is memory with nothing in it. Reading it before writing is a bug the Debug build fills with 0xAA to catch.",
+    null: "`null` only fits a `?T`. A plain `T` cannot be null, so a check for it is a compile error, not a runtime one.",
+    unreachable:
+      "`unreachable` is a promise. In Debug it panics if reached; in ReleaseFast the compiler believes you.",
+    error:
+      "`error.NotFound` is a value of an error set. `error{A, B}` names a set; `anyerror` is all of them.",
+    anytype:
+      "`anytype` takes whatever is passed and checks the body against it at the call site: duck typing at compile time.",
+    usize:
+      "`usize` is the index and length type. Mixing it with an `i64` needs `@intCast`, which panics on a bad value.",
+    u8: "`u8` is a byte. A string is `[]const u8`: bytes, not characters, and `len` counts the bytes.",
+    i64: "`i64` overflows loudly in Debug. `+%` wraps on purpose and `+|` saturates, if that is what you meant.",
+    f64: "`f64` division is `/`. Integer division is `@divTrunc` or `@divFloor`, and you have to say which.",
+    bool: "`and` and `or` are words, and they short-circuit. `!x` is not, `x != y` is the comparison.",
+    void: "`void` is the unit; `!void` is a function that only ever fails or does not. `noreturn` is one that never comes back.",
+    import:
+      '`@import("std")` is the standard library. There is no other package here: no build.zig, no dependencies.',
+    gpa: "`init.gpa` is the general-purpose allocator handed to `main`. Everything you allocate says which allocator, and frees on it.",
+    ArrayList:
+      "`std.ArrayList(T)` grows on an allocator: `var xs: std.ArrayList(T) = .empty; try xs.append(gpa, v); defer xs.deinit(gpa);`.",
+    AutoHashMap:
+      "`std.AutoHashMap(K, V).init(gpa)` — `put`, `get` (an optional), `getOrPut`. `defer m.deinit();` beside the `init`.",
+    parseInt:
+      '`std.fmt.parseInt(i64, s, 10)` returns an error union: `try` it, and `std.mem.trim(u8, s, " \n")` first.',
+    tokenizeAny:
+      '`std.mem.tokenizeAny(u8, s, " \n")` skips empty pieces; `splitScalar` keeps them. `while (it.next()) |tok|`.',
+    interface:
+      "`.interface` is the plain `*std.Io.Writer` (or `Reader`) inside a streaming one: that is what `print` and `flush` hang off.",
+    flush:
+      "Output sits in the buffer until `flush()`. Forget it and the program ends with an empty stdout and every test failing.",
+    print:
+      '`w.print("{d} {s}\n", .{ n, s })` — `{d}` an integer, `{s}` a string, `{any}` anything. `std.debug.print` goes to stderr.',
+    allocRemaining:
+      "`reader.interface.allocRemaining(gpa, .unlimited)` reads all of stdin into one owned slice. Free it, or `defer`.",
+  },
+  lua: {
+    local:
+      "`local` or it is a global. A global lives in `_G`, is shared by every function, and a typo makes a new one.",
+    function:
+      "A function is a value: `local f = function(x) … end` and `local function f(x) … end` are the same, except the second can recurse.",
+    end: "`end` closes `if`, `for`, `while`, `function` and `do`. `repeat` is the one block that closes with `until`.",
+    nil: "`nil` is absence. A missing key reads as `nil`, and assigning `nil` to a key deletes it.",
+    pairs:
+      "`pairs(t)` visits every key in no promised order. For a list, `ipairs` walks 1, 2, 3… and stops at the first nil.",
+    ipairs:
+      "`ipairs(t)` walks `t[1]`, `t[2]`, … and stops at the first `nil`. A hole in the list ends the loop early.",
+    table:
+      "`table.insert`, `table.remove`, `table.sort`, `table.concat`. The list starts at 1; `#t` is its length up to the first hole.",
+    insert:
+      "`table.insert(t, v)` appends; `table.insert(t, i, v)` shifts the rest up. Both are 1-based.",
+    remove:
+      "`table.remove(t)` pops the last; `table.remove(t, 1)` shifts everything down, which is O(n).",
+    sort: "`table.sort(t, function(a, b) return a < b end)` — in place, and the comparator must be a strict less-than.",
+    concat:
+      '`table.concat(t, ", ")` joins a list of strings or numbers. Anything else in the list is an error.',
+    unpack:
+      "LuaJIT is Lua 5.1: it is `unpack(t)`, and `table.unpack` is `nil` and a call on it an error.",
+    setmetatable:
+      "`setmetatable(t, mt)` — with `mt.__index = mt`, a missing key on `t` is looked up in `mt`. That is a class.",
+    __index:
+      "`__index` is where a lookup goes when the key is not in the table. A table or a function; a table is the usual class.",
+    tostring:
+      '`tostring(n)` and `..` — `"n = " .. n` works on numbers too, but a `nil` in a `..` is an error.',
+    tonumber:
+      '`tonumber(s)` is `nil` on bad input, not an error. `tonumber("10", 2)` reads a base.',
+    string:
+      "`string.format`, `string.sub`, `string.find`, `string.gmatch`. Indices are 1-based and a negative one counts from the end.",
+    format:
+      '`string.format("%.2f", x)` — `%d` wants an integer and errors on 1.5 in LuaJIT; `%s` takes anything through `tostring`.',
+    io: '`io.read("*a")` is all of stdin; `io.read("*l")` one line, `"*n"` a number. `io.write` prints without a newline.',
+    read: '`io.read("*a")` reads everything; `io.read("*n")` a number, `io.read()` a line. Each returns `nil` at the end.',
+    write:
+      "`io.write(a, b)` prints its arguments with no separator and no newline. `print` puts tabs and a newline.",
+    print:
+      "`print(a, b)` separates with a tab and ends with a newline. For exact output, `io.write` and your own spaces.",
+    coroutine:
+      "`coroutine.wrap(f)` gives a function that resumes `f`; inside, `coroutine.yield(v)` hands a value out and waits.",
+    yield:
+      "`coroutine.yield(v)` pauses this coroutine and hands `v` to whoever resumed it. The next resume returns here.",
+    resume:
+      "`coroutine.resume(co, …)` runs until the next yield and returns `true, values…` — or `false, error`.",
+    wrap: "`coroutine.wrap(f)` is `create` plus `resume` as one function; an error inside propagates instead of returning `false`.",
+    select:
+      '`select("#", ...)` counts the varargs, nils included, which `#{...}` does not. `select(2, ...)` drops the first.',
+    math: "`math.floor`, `math.max`, `math.huge`. Numbers are doubles: `7 / 2` is 3.5, and there is no `//` in 5.1.",
+    floor:
+      "`math.floor(x)` is integer division's other half: `math.floor(a / b)`. There is no `//` in LuaJIT's Lua 5.1.",
+    pcall:
+      "`pcall(f, …)` calls `f` and returns `true, results` or `false, err`. It is how an `error(…)` is caught.",
+    error: '`error("msg")` throws; `error({code = 1})` throws any value. Catch it with `pcall`.',
+    bit: "LuaJIT has no `&` or `<<`: `bit.band`, `bit.bor`, `bit.lshift`, `bit.bxor` from the `bit` library.",
   },
 };
 

@@ -1019,6 +1019,480 @@ fn typescript_runtime_line(stderr: &str) -> Option<i64> {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Zig (SPEC §7.1's sixth column)
+//
+// Zig has no error codes and one voice at compile time, `main.zig:3:20:
+// error: expected type 'i32', found '*const [2:0]u8'`, followed by the source
+// line, a caret, and `note:` and `referenced by:` context that is nothing for
+// the table. The identity is made from the message's shape, as it is for
+// C++, and the player's own names stay in `message`. At runtime the land is
+// its safety checks: `thread N panic: index out of bounds: index 3, len 3`
+// with the player's `main.zig:L:C` frame under it; a `main` that returned an
+// error prints `error: InvalidCharacter` and an error return trace.
+// ---------------------------------------------------------------------------
+
+/// The message after `error:` → the kind and the identity, most specific
+/// phrase first. "expected type" is a coercion failure and "expected ';'" is
+/// the parser's, so the type wordings are tested before the bare `expected`.
+pub fn zig_kind(message: &str) -> (&'static str, &'static str) {
+    let lower = message.to_ascii_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|n| lower.contains(n));
+
+    if has(&[
+        "unused local",
+        "unused function parameter",
+        "unused capture",
+        "is never mutated",
+        "pointless discard",
+        "unused variable",
+    ]) {
+        return ("unused", "zig:unused");
+    }
+    if has(&[
+        "cannot assign to constant",
+        "cannot assign to a constant",
+        "cannot modify constant",
+    ]) {
+        return ("mutability", "zig:cannot-assign-constant");
+    }
+    if has(&["use of undeclared identifier", "undeclared identifier"]) {
+        return ("unknown-name", "zig:undeclared-identifier");
+    }
+    if has(&[
+        "unable to load",
+        "unable to find",
+        "file not found",
+        "filenotfound",
+    ]) {
+        return ("unknown-name", "zig:import-not-found");
+    }
+    if has(&[
+        "no field named",
+        "no member named",
+        "no field or member function named",
+    ]) {
+        return ("missing-trait", "zig:no-member");
+    }
+    if has(&[
+        "error union is ignored",
+        "error is discarded",
+        "error is ignored",
+        "error set is discarded",
+        "not handled in switch",
+        "error not handled",
+    ]) {
+        return ("unhandled-error", "zig:error-not-handled");
+    }
+    if has(&[
+        "switch must handle all possibilities",
+        "unhandled enumeration field",
+        "unhandled switch",
+    ]) {
+        return ("unhandled-error", "zig:switch-not-exhaustive");
+    }
+    if has(&[
+        "outside array of length",
+        "outside slice of length",
+        "out of bounds",
+    ]) {
+        return ("index-range", "zig:index-out-of-bounds");
+    }
+    if has(&["overflow of integer type", "integer overflow", "cannot fit"]) {
+        return ("unhandled-error", "zig:integer-overflow");
+    }
+    if has(&["division by zero"]) {
+        return ("unhandled-error", "zig:division-by-zero");
+    }
+    // An optional read as if it were the value: `expected type 'i32', found
+    // '?i32'`, or a field taken off a `?T`. The erased-null lesson of the
+    // basic road's boss, caught before the run.
+    if has(&["found '?"]) || (has(&["does not support field access"]) && lower.contains("'?")) {
+        return ("nil-deref", "zig:optional-unwrapped");
+    }
+    if has(&[
+        "expected type",
+        "expected error union type",
+        "expected optional type",
+        "expected integer",
+        "expected float",
+        "expected pointer",
+        "expected bool",
+        "expected enum",
+        "expected struct",
+        "expected slice",
+        "expected array",
+        "expected function",
+        "expected error set",
+        "expected comptime",
+        "expected tuple",
+        "expected union",
+        "argument(s), found",
+        "arguments, found",
+        "argument, found",
+        "cannot convert",
+        "cannot cast",
+        "incompatible types",
+        "invalid operands",
+        "cannot be coerced",
+        "does not support",
+        "not a valid",
+        "invalid operator",
+        "comptime-only type",
+        "cannot dereference",
+    ]) {
+        return ("type-mismatch", "zig:expected-type");
+    }
+    if has(&[
+        "expected ",
+        "invalid token",
+        "invalid character",
+        "unterminated",
+        "unexpected",
+        "missing",
+    ]) {
+        return ("syntax", "zig:expected-token");
+    }
+    ("other", "zig:other")
+}
+
+/// Classify the output of `zig build-exe`. Only `error:` lines with a
+/// location count; the echoed source, the caret, the `note:`s and the
+/// `referenced by:` trail are context for the player and nothing for the
+/// table. A `note:` must not become a mistake for the reason C++'s do not.
+pub fn classify_zig_build(stderr: &str) -> Vec<Mistake> {
+    let mut out = Vec::new();
+    for line in stderr.lines() {
+        if line.starts_with(char::is_whitespace) {
+            continue;
+        }
+        let Some((line_no, col_no, message)) = split_zig_diagnostic(line) else {
+            continue;
+        };
+        let (kind, code) = zig_kind(message);
+        out.push(Mistake {
+            kind: kind.to_string(),
+            code: Some(code.to_string()),
+            message: normalize_message(message),
+            line: line_no,
+            col: col_no,
+        });
+    }
+    // The linker has its own voice and no location, as for C++. Kept as
+    // `other` under one identity rather than dropped.
+    let lower = stderr.to_ascii_lowercase();
+    if out.is_empty()
+        && (lower.contains("undefined symbol") || lower.contains("undefined reference"))
+    {
+        let hit = stderr
+            .lines()
+            .find(|l| {
+                let l = l.to_ascii_lowercase();
+                l.contains("undefined symbol") || l.contains("undefined reference")
+            })
+            .unwrap_or("undefined symbol at link time");
+        out.push(Mistake {
+            kind: "other".into(),
+            code: Some("zig:undefined-symbol".into()),
+            message: normalize_message(hit),
+            line: None,
+            col: None,
+        });
+    }
+    out
+}
+
+/// `main.zig:5:18: error: message` → `(5, 18, "message")`. Only the player's
+/// file counts: a diagnostic inside `std` names a `.zig` under the compiler's
+/// own tree and is a consequence of something in `main.zig`, which the
+/// compiler reports too.
+fn split_zig_diagnostic(line: &str) -> Option<(Option<i64>, Option<i64>, &str)> {
+    let rest = line.strip_prefix("main.zig:")?;
+    let mut parts = rest.splitn(4, ':');
+    let line_no = parts.next()?.trim().parse::<i64>().ok()?;
+    let col_no = parts.next()?.trim().parse::<i64>().ok()?;
+    let level = parts.next()?.trim();
+    if level != "error" {
+        return None;
+    }
+    Some((Some(line_no), Some(col_no), parts.next()?.trim()))
+}
+
+/// Zig's runtime failures. Every one is a `panic:` with the check's own
+/// words, except a `main` that returned an error (`error: Name`) and a stack
+/// that ran out, which the segfault handler reports as an address.
+pub fn classify_zig_runtime(stderr: &str) -> Vec<Mistake> {
+    let line = zig_runtime_line(stderr);
+    let lower = stderr.to_ascii_lowercase();
+    let first_line_with = |needle: &str| {
+        stderr
+            .lines()
+            .find(|l| l.to_ascii_lowercase().contains(needle))
+            .map(normalize_message)
+    };
+    let one = |kind: &str, code: &str, message: String| {
+        vec![Mistake {
+            kind: kind.into(),
+            code: Some(code.into()),
+            message,
+            line,
+            col: None,
+        }]
+    };
+    const PANICS: &[(&str, &str, &str)] = &[
+        (
+            "index out of bounds",
+            "index-range",
+            "zig:index-out-of-bounds",
+        ),
+        ("attempt to use null value", "nil-deref", "zig:null-unwrap"),
+        ("attempt to unwrap null", "nil-deref", "zig:null-unwrap"),
+        (
+            "attempt to unwrap error",
+            "unhandled-error",
+            "zig:error-unwrapped",
+        ),
+        (
+            "integer overflow",
+            "unhandled-error",
+            "zig:integer-overflow",
+        ),
+        (
+            "attempt to cast negative value",
+            "unhandled-error",
+            "zig:integer-overflow",
+        ),
+        (
+            "integer part of floating point value out of bounds",
+            "unhandled-error",
+            "zig:integer-overflow",
+        ),
+        (
+            "reached unreachable code",
+            "unhandled-error",
+            "zig:unreachable",
+        ),
+        (
+            "division by zero",
+            "unhandled-error",
+            "zig:division-by-zero",
+        ),
+        (
+            "remainder division by zero",
+            "unhandled-error",
+            "zig:division-by-zero",
+        ),
+        ("out of memory", "timeout", "zig:out-of-memory"),
+        ("outofmemory", "timeout", "zig:out-of-memory"),
+        ("stack overflow", "wrong-answer", "zig:stack-overflow"),
+    ];
+    for (needle, kind, code) in PANICS {
+        if lower.contains(needle) {
+            let message = first_line_with(needle).unwrap_or_else(|| (*needle).to_string());
+            return one(kind, code, message);
+        }
+    }
+    if let Some(hit) = first_line_with("panic:") {
+        return one("unhandled-error", "zig:panic", hit);
+    }
+    // `error: InvalidCharacter` at the top: `main` returned it, nobody
+    // handled it, and the trace under it says where.
+    if let Some(hit) = stderr
+        .lines()
+        .map(str::trim)
+        .find(|l| l.starts_with("error: ") && !l.starts_with("error: ld"))
+    {
+        return one(
+            "unhandled-error",
+            "zig:error-returned",
+            normalize_message(hit),
+        );
+    }
+    // Deep recursion in Debug is a segfault the handler prints as an address;
+    // the harness's signal note says the same thing for a binary that died
+    // before the handler ran.
+    if lower.contains("segmentation fault")
+        || lower.contains("sigsegv")
+        || lower.contains("signal 11")
+    {
+        let message = first_line_with("segmentation")
+            .or_else(|| first_line_with("sig"))
+            .unwrap_or_else(|| "segmentation fault".into());
+        return one("wrong-answer", "zig:stack-overflow", message);
+    }
+    Vec::new()
+}
+
+/// The first `main.zig:N` in the trace: the player's frame, whichever
+/// frames of `std` sit above it.
+fn zig_runtime_line(stderr: &str) -> Option<i64> {
+    stderr.lines().find_map(|line| {
+        let (_, rest) = line.split_once("main.zig:")?;
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        digits.parse::<i64>().ok()
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Lua (SPEC §7.1's seventh column)
+//
+// LuaJIT has one voice and it is one line: `luajit: main.lua:2: attempt to
+// index local 'x' (a nil value)`, then a `stack traceback:` that is context.
+// The syntax check (`luajit -b`) speaks the same way, `luajit: main.lua:1:
+// unexpected symbol near '='`. The identity is the `attempt to …` phrase and
+// what kind of thing it was tried on — a global that was never defined is a
+// different lesson from a field that is nil — and the player's names stay in
+// `message`.
+// ---------------------------------------------------------------------------
+
+/// The message after the location → the kind and the identity.
+pub fn lua_kind(message: &str) -> (&'static str, &'static str) {
+    let lower = message.to_ascii_lowercase();
+    let nil = lower.contains("(a nil value)");
+    let global = lower.contains(" global '");
+    if lower.starts_with("attempt to index") {
+        return if nil {
+            if global {
+                ("unknown-name", "lua:undefined-global")
+            } else {
+                ("nil-deref", "lua:index-nil")
+            }
+        } else {
+            ("missing-trait", "lua:index-non-table")
+        };
+    }
+    if lower.starts_with("attempt to call") {
+        return if nil {
+            if global {
+                ("unknown-name", "lua:undefined-global")
+            } else {
+                ("nil-deref", "lua:call-nil")
+            }
+        } else {
+            ("missing-trait", "lua:call-non-function")
+        };
+    }
+    if lower.starts_with("attempt to perform arithmetic") {
+        return if nil {
+            if global {
+                ("unknown-name", "lua:undefined-global")
+            } else {
+                ("nil-deref", "lua:arithmetic-nil")
+            }
+        } else {
+            ("type-mismatch", "lua:arithmetic-type")
+        };
+    }
+    if lower.starts_with("attempt to concatenate") {
+        return if nil {
+            if global {
+                ("unknown-name", "lua:undefined-global")
+            } else {
+                ("nil-deref", "lua:concatenate-nil")
+            }
+        } else {
+            ("type-mismatch", "lua:concatenate-type")
+        };
+    }
+    if lower.starts_with("attempt to compare") {
+        return ("type-mismatch", "lua:compare-type");
+    }
+    if lower.starts_with("attempt to get length") {
+        return if nil {
+            ("nil-deref", "lua:length-nil")
+        } else {
+            ("type-mismatch", "lua:length-type")
+        };
+    }
+    if lower.starts_with("bad argument") {
+        return ("type-mismatch", "lua:bad-argument");
+    }
+    if lower.contains("stack overflow") {
+        return ("wrong-answer", "lua:stack-overflow");
+    }
+    if lower.contains("not enough memory") {
+        return ("timeout", "lua:memory");
+    }
+    if lower.contains("cannot resume")
+        || lower.contains("attempt to yield")
+        || lower.contains("coroutine")
+    {
+        return ("unhandled-error", "lua:coroutine");
+    }
+    if lower.contains("unexpected symbol")
+        || lower.contains("' expected")
+        || lower.contains("unfinished")
+        || lower.contains("malformed")
+        || lower.contains("near '")
+        || lower.contains("near <eof>")
+    {
+        return ("syntax", "lua:syntax");
+    }
+    ("unhandled-error", "lua:error")
+}
+
+/// Classify what `luajit -b` said: one line, and it is a syntax error.
+pub fn classify_lua_compile(stderr: &str) -> Vec<Mistake> {
+    let Some((line, message)) = first_lua_message(stderr) else {
+        return Vec::new();
+    };
+    // The check phase can only fail to parse; whatever the words, it is
+    // syntax, and the identity says so.
+    vec![Mistake {
+        kind: "syntax".into(),
+        code: Some("lua:syntax".into()),
+        message: normalize_message(message),
+        line,
+        col: None,
+    }]
+}
+
+/// Classify what `luajit main.lua` left on stderr: the one line above the
+/// traceback.
+pub fn classify_lua_runtime(stderr: &str) -> Vec<Mistake> {
+    let Some((line, message)) = first_lua_message(stderr) else {
+        return Vec::new();
+    };
+    let (kind, code) = lua_kind(message);
+    vec![Mistake {
+        kind: kind.into(),
+        code: Some(code.into()),
+        message: normalize_message(message),
+        line,
+        col: None,
+    }]
+}
+
+/// `luajit: main.lua:2: attempt to …` → `(Some(2), "attempt to …")`. The
+/// `luajit:` prefix and the `main.lua:N:` location are both optional: an
+/// `error({})` prints `luajit: (error object is not a string)`, and a
+/// traceback line has a location and no `luajit:`.
+fn first_lua_message(stderr: &str) -> Option<(Option<i64>, &str)> {
+    let first = stderr
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && *l != "stack traceback:")?;
+    let rest = first
+        .strip_prefix("luajit:")
+        .or_else(|| first.strip_prefix("lua:"))
+        .unwrap_or(first)
+        .trim();
+    // `main.lua:2: message`, or `(command line):1: main.lua:2: message` when
+    // the error was raised through `-e`.
+    let mut line = None;
+    let mut message = rest;
+    if let Some(idx) = rest.find("main.lua:") {
+        let after = &rest[idx + "main.lua:".len()..];
+        let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(n) = digits.parse::<i64>() {
+            line = Some(n);
+            let tail = after[digits.len()..].trim_start_matches(':').trim();
+            message = tail;
+        }
+    }
+    Some((line, message))
+}
+
 /// Compile diagnostics, whichever land they came from. Every land has an
 /// explicit arm: a new one falling through to the rustc JSON classifier
 /// would silently find nothing in it and the table would learn nothing.
@@ -1030,6 +1504,8 @@ pub fn classify_compile(lang: &str, stderr: &str) -> Vec<Mistake> {
         // the same `py:syntax` it is in Python Land.
         "python" | "pytorch" => classify_python_compile(stderr),
         "typescript" => classify_typescript_compile(stderr),
+        "zig" => classify_zig_build(stderr),
+        "lua" => classify_lua_compile(stderr),
         _ => classify_rust_json(stderr),
     }
 }
@@ -1044,6 +1520,8 @@ pub fn classify_runtime(lang: &str, stderr: &str) -> Vec<Mistake> {
         "cpp" => classify_cpp_runtime(stderr),
         "python" | "pytorch" => classify_python_runtime(stderr),
         "typescript" => classify_typescript_runtime(stderr),
+        "zig" => classify_zig_runtime(stderr),
+        "lua" => classify_lua_runtime(stderr),
         _ => classify_rust_runtime(stderr),
     }
 }

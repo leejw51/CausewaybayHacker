@@ -87,6 +87,10 @@ const env = {
   // the same fallback verify_pack.py takes. `node` is this script's own.
   tsc: which("tsc") || existsSync(join(ROOT, "frontend/node_modules/.bin/tsc")),
   rustc: which("rustc"),
+  // Zig Land's `zig` and Lua Land's `luajit` — the one this file already
+  // asks for on the LÖVE suite's behalf, which is the point: the client and
+  // the land run on the same interpreter.
+  zig: which("zig"),
   luajit: which("luajit"),
   love: which("love") || existsSync(join(ROOT, "love2d/build/love.app/Contents/MacOS/love")),
   wallet: existsSync(WALLET),
@@ -159,9 +163,25 @@ const PACKS_TYPESCRIPT = [
 //     written and invisible to every other check;
 //   * `--complete` fails on a concept slug no §7.1 mistake kind can reach,
 //     so the AI drills cannot be pointed at a dead end.
+// Zig Land's four need `zig`, Lua Land's four need `luajit`; both optional
+// the way `tsc` is, and neither carries a slug of its own.
+const PACKS_ZIG = [
+  "content/zig/verybasic.toml",
+  "content/zig/basic.toml",
+  "content/zig/advanced.toml",
+  "content/zig/hacker.toml",
+];
+const PACKS_LUA = [
+  "content/lua/verybasic.toml",
+  "content/lua/basic.toml",
+  "content/lua/advanced.toml",
+  "content/lua/hacker.toml",
+];
 const CONTENT_ARGS = [
   ...(env.torch ? ["--complete", ...PACKS_COMPILED, ...PACKS_PYTORCH] : PACKS_COMPILED),
   ...(env.tsc ? PACKS_TYPESCRIPT : []),
+  ...(env.zig ? PACKS_ZIG : []),
+  ...(env.luajit ? PACKS_LUA : []),
 ];
 
 /** @type {{name:string, what:string, cwd:string, cmd:string[], needs:[boolean,string][], server?:boolean, slow?:boolean, note?:string}[]} */
@@ -256,6 +276,10 @@ const SUITES = [
           ? null
           : "tsc is not on PATH, so the four typescript packs were left out " +
             "(npm install -g typescript, or npm ci in frontend/)",
+        env.zig ? null : "zig is not on PATH, so the four zig packs were left out (zig 0.16.0)",
+        env.luajit
+          ? null
+          : "luajit is not on PATH, so the four lua packs were left out (brew install luajit)",
       ]
         .filter(Boolean)
         .join("; ") || undefined,

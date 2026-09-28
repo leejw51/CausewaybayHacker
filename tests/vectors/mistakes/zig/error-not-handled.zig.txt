@@ -1,0 +1,4 @@
+main.zig:7:10: error: error union is ignored
+    count("12");
+    ~~~~~^~~~~~
+main.zig:7:10: note: consider using 'try', 'catch', or 'if'

@@ -15,6 +15,9 @@ import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
+import { zig } from "codemirror-lang-zig";
+import { StreamLanguage } from "@codemirror/language";
+import { lua } from "@codemirror/legacy-modes/mode/lua";
 import { describe, expect, it } from "vitest";
 import {
   RUBBLE_MAX,
@@ -296,6 +299,8 @@ const MODE = {
   python,
   pytorch: python,
   typescript: () => javascript({ typescript: true }),
+  zig,
+  lua: () => StreamLanguage.define(lua),
 } as const;
 
 function state(lang: Lang, doc: string): EditorState {
@@ -442,6 +447,48 @@ describe("loopClosedBy: when a loop counts as finished", () => {
     expect(toneOf(st, at("42"), "2")).toBe("number");
     expect(toneOf(st, at('"hi'), "i")).toBe("string");
     expect(toneOf(st, at("number"), "r")).toBe("type");
+  });
+
+  it("zig: a for and a while close on their brace, a fn and an if do not", () => {
+    const f = "pub fn main() void {\n    for (xs, 0..) |x, i| {\n        _ = x;\n    ";
+    const r = closes("zig", f + "\n}\n", f.length, "}");
+    expect(r).not.toBeNull();
+    expect(f.slice(r!.from, r!.from + 3)).toBe("for");
+    const w = "pub fn main() void {\n    var n: usize = 0;\n    while (n < 3) : (n += 1) { ";
+    expect(closes("zig", w + "\n}\n", w.length, "}")).not.toBeNull();
+    const fn = "pub fn main() void {\n    const x = 1;\n";
+    expect(closes("zig", fn, fn.length, "}")).toBeNull();
+    const i = "pub fn main() void {\n    if (true) { ";
+    expect(closes("zig", i + "\n}\n", i.length, "}")).toBeNull();
+  });
+
+  it("zig has its own colours, from its own grammar", () => {
+    const z = 'const n: i64 = 42;\nconst s = "hi";\n// note\n';
+    const st = state("zig", z);
+    const at = (needle: string, off = needle.length) => z.indexOf(needle) + off;
+    expect(toneOf(st, at("const"), "t")).toBe("keyword");
+    expect(toneOf(st, at("42"), "2")).toBe("number");
+    expect(toneOf(st, at('"hi'), "i")).toBe("string");
+    expect(toneOf(st, at("// note"), "e")).toBe("comment");
+  });
+
+  it("lua colours from its token stream, which has no tree", () => {
+    // The stream mode names each token after its tag, lowercase, under a
+    // `Document` root: a `keyword` leaf, a `string` leaf, a `comment` leaf.
+    // Read as node names by the Lezer rules those would all have been
+    // keywords; the stream table says what they are.
+    const l = 'local s = "hi" -- note\nprint(#s, 42)\n';
+    const st = state("lua", l);
+    const at = (needle: string, off = needle.length) => l.indexOf(needle) + off;
+    expect(toneOf(st, at("local"), "l")).toBe("keyword");
+    expect(toneOf(st, at('"hi'), "i")).toBe("string");
+    expect(toneOf(st, at("-- note"), "e")).toBe("comment");
+    expect(toneOf(st, at("42"), "2")).toBe("number");
+    expect(toneOf(st, at("print"), "t")).toBe("call");
+    expect(toneOf(st, at("local s"), "s")).toBe("name");
+    // And with no tree there is no loop to close: `end` is just a word.
+    const body = "for i = 1, 3 do\n\tprint(i)\n";
+    expect(closes("lua", body + "end\n", body.length, "end")).toBeNull();
   });
 
   it("nothing at all is nothing", () => {

@@ -224,7 +224,8 @@ function Coder:bench()
     lang = self.host.lang(),
     file = "main." .. (self.host.lang() == "cpp" and "cpp" or self.host.lang() == "go" and "go"
       or self.host.lang() == "python" and "py" or self.host.lang() == "pytorch" and "py"
-      or self.host.lang() == "typescript" and "ts" or "rs"),
+      or self.host.lang() == "typescript" and "ts" or self.host.lang() == "zig" and "zig"
+      or self.host.lang() == "lua" and "lua" or "rs"),
     read = function()
       return coder.editor and coder.editor:text() or ""
     end,

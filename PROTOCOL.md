@@ -670,7 +670,7 @@ each** — the same ceiling as a submission, because it is the same question
 
 Run the language's own formatter over the source and hand it back. `rustfmt`
 for Rust, `gofmt` for Go, `clang-format` for C++, `black` for Python and
-PyTorch, `prettier` for TypeScript — the tools the player's colleagues would
+PyTorch, `prettier` for TypeScript, `zig fmt` for Zig, `stylua` for Lua — the tools the player's colleagues would
 use, not a house style invented here. **All five run on the server**; no
 client formats anything itself.
 
@@ -1350,14 +1350,14 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"remix"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"zig"|"lua"|"remix"; category: "verybasic"|"basic"|"advanced"|"hacker";
   /** The language the quest is judged in (SPEC §12): the runner, the file
    *  name, the editor's grammar and the formatter all key on it, and a
    *  submit's `lang` must equal it (§4.9). The land's own name everywhere
    *  but REMIX LAND, where one trio of nodes is Go, Rust and Python. A client
    *  keys the screen — backdrop, colour, the way back to the map — on `land`,
    *  and the code on it on `lang`. */
-  lang: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript";
+  lang: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"zig"|"lua";
   node: number; title: string; brief: string; story: string;
   /** §4.8 — the language of title, story, brief and the hints. "en" unless a
    *  translation (SPEC §12.1) was substituted for the `locale` the client
@@ -1428,7 +1428,7 @@ cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 ```ts
 type PlaygroundRun = {
   attempt_id: string;                    // for correlating the stream only
-  lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript";
+  lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua";
   outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
   compile_ms: number; run_ms: number;
   exit_code: number | null;
@@ -1442,7 +1442,7 @@ type PlaygroundRun = {
 
 type Snippet = {
   id: string;                            // "pg_" + 16 hex
-  name: string; lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"; source: string;
+  name: string; lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua"; source: string;
   created_at: string; updated_at: string;
 };
 type SnippetBrief = Omit<Snippet, "source"> & { bytes: number };

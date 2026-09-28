@@ -117,7 +117,7 @@ end
 function Map:switch(land, category)
   land = land or self.land
   category = category or self.category
-  -- A land without this road — TAB from TYPESCRIPT × HACKER to REMIX —
+  -- A land without this road — TAB from LUA × HACKER to REMIX —
   -- lands on the last road it does have.
   local roads = Land.roads(land)
   local has = false

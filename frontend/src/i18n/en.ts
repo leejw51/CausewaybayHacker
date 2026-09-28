@@ -155,6 +155,10 @@ export const en = {
     "Tensors, gradients, attention. Everything is a shape, and the thing in the basement is made of them.",
   "lands.typescriptBlurb":
     "Interfaces, generics, narrowing. Every value has a type before it runs, and the compiler has read all of it.",
+  "lands.zigBlurb":
+    "Optionals, errors as values, comptime. Nothing is hidden: every allocation is paid for and every failure is named.",
+  "lands.luaBlurb":
+    "Tables, closures, metatables, coroutines. One structure for everything, and it is numbered from 1.",
   "lands.remixBlurb":
     "Go, Rust, Python: the same program three times. One idea, three grammars, side by side in the fingers.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
@@ -196,6 +200,8 @@ export const en = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.zig": "ZIG",
+  "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "no streets here yet",
   "map.failed": "could not read the map",
@@ -388,6 +394,8 @@ export const en = {
   "pg.python": "PYTHON",
   "pg.pytorch": "PYTORCH",
   "pg.typescript": "TYPESCRIPT",
+  "pg.zig": "ZIG",
+  "pg.lua": "LUA",
   "pg.stdin": "STDIN",
   "pg.stdinHint": "stdin — what the program reads",
   "pg.unsaved": "UNSAVED",
@@ -543,6 +551,8 @@ export const en = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.zig": "ZIG",
+  "search.lua": "LUA",
   "search.remix": "REMIX",
   "search.unified": "UNIFIED",
   "search.text": "TEXT",
@@ -638,6 +648,8 @@ export const en = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.zig": "ZIG",
+  "ai.lua": "LUA",
   "ai.remix": "REMIX",
   "ai.newPlan": "NEW PLAN",
   "ai.drillSize": "DRILL {n}",

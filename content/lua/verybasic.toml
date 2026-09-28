@@ -1,0 +1,1954 @@
+# LUA LAND — VERY BASIC. The grammar as a question first: four lines, one of
+# them right, and then that line typed. Types, tables, a stack, a queue, a
+# heap, a metatable class, a coroutine, a lock — the constructs a HackerRank-
+# style live coding test leans on, one per node, in Tai Hang on the fifteenth
+# night of the eighth month, from the first lantern on Wun Sha Street at 21:00
+# to the fire dragon's head, which is numbered 1 and not 0. Everything here is
+# a table: a list is a table from 1, a set is a table whose keys are the
+# values, a class is a table with a metatable behind it, and a key that is not
+# there is `nil` — not an error until it is followed. Every quest carries a
+# [quest.quiz]: the choices are code and never translated; the question is
+# the brief. verify_pack swaps each wrong choice into the solution and
+# refuses the quest if it passes, so the quiz has one right answer.
+#
+# Every program is one main.lua, checked by `luajit -b main.lua main.luac`
+# (a syntax error is the compile error) and run as `luajit main.lua`. The
+# runtime is LuaJIT 2.1 — Lua 5.1 plus LuaJIT's extensions, not 5.4: one
+# number type, `6 / 2` prints `3`, no `//`, `unpack` not `table.unpack`.
+# Standard input is read with `io.read("*l")` (one line), `io.read("*n")`
+# (one number) or `io.read("*a")` (all of it); output goes through `print`,
+# which puts a TAB between its arguments, so two values on one line are
+# joined with `..` first.
+#
+# There are no threads: the concurrency nodes are coroutines, one of which
+# runs at a time, and a lock that yields until it is free.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5).
+
+pack = "lua.verybasic"
+land = "lua"
+category = "verybasic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "lua.verybasic.01.print"
+node        = 1
+title       = "THE FIRST LANTERN"
+difficulty  = 1
+story       = '''21:00 on Wun Sha Street. The lantern board over the dragon's shed is dark, and the first line of the night is Mei's to type.'''
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+The program must print exactly `hello, causewaybay` on one line. One built-in writes its arguments and a newline to standard output.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+output: hello, causewaybay
+```
+'''
+starter     = '''
+local function main()
+  -- FILL: greet
+end
+
+main()
+'''
+solution    = '''
+local function main()
+  print("hello, causewaybay")
+end
+
+main()
+'''
+hints = [
+  "print(\"hello, causewaybay\") — parentheses, and the comma inside the string.",
+  "print \"hello causewaybay\" is legal Lua — a string literal may follow a call without parentheses — but the comma is missing. io.write writes no newline, and puts is not a name Lua knows.",
+]
+
+[quest.quiz]
+choices = ["print \"hello causewaybay\"", "puts(\"hello, causewaybay\")", "print(\"hello, causewaybay\")", "io.write(\"hello causewaybay\")"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "lua.verybasic.02.int-types"
+node        = 2
+title       = "THE INCENSE SPLIT"
+difficulty  = 1
+story       = '''The incense bundles are shared out across the dragon's segments at the Lin Fa Kung gate; the tally has to say how many each segment gets and how many are left over, and it says nothing.'''
+concepts    = ["types", "io"]
+requires    = ["lua.verybasic.01.print"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+`a` and `b` are integers. The program must print the whole-number quotient and the remainder on one line, separated by ONE space. LuaJIT has one number type and no integer-division operator: `/` gives the fraction, `math.floor` drops it, and `%` is the remainder. `print` puts a TAB between its arguments, so the two go into one string with `..` first.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+starter     = '''
+local a, b = io.read("*n", "*n")
+-- FILL: quotient and remainder
+'''
+solution    = '''
+local a, b = io.read("*n", "*n")
+print(math.floor(a / b) .. " " .. a % b)
+'''
+hints = [
+  "print(math.floor(a / b) .. \" \" .. a % b) — floor the division, then join with a space.",
+  "a / b is 3.5, not 3. // is not an operator in LuaJIT. And print(x, y) separates with a tab, not a space.",
+]
+
+[quest.quiz]
+choices = ["print(a / b .. \" \" .. a % b)", "print(math.floor(a / b) .. \" \" .. a % b)", "print(a // b .. \" \" .. a % b)", "print(math.floor(a / b), a % b)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3 1\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2 2\n", visible = false },
+  { name = "nine-three", stdin = "9 3\n", expect = "3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "lua.verybasic.03.floats"
+node        = 3
+title       = "THE EXACT WEIGHT"
+difficulty  = 1
+story       = '''The scale at the shed on School Street gives the dragon's weight per carrier to three places and the printed programme wants two; the programme line is blank.'''
+concepts    = ["types", "io"]
+requires    = ["lua.verybasic.02.int-types"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+`x` and `y` are numbers. The program must print `x / y` with exactly two digits after the point. `string.format` takes a C-style spec: `f` is a fixed-point number and the digit after the dot is how many decimals.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+starter     = '''
+local x, y = io.read("*n", "*n")
+-- FILL: x over y, two decimals
+'''
+solution    = '''
+local x, y = io.read("*n", "*n")
+print(string.format("%.2f", x / y))
+'''
+hints = [
+  "print(string.format(\"%.2f\", x / y)) — the dot before the 2 is the decimals.",
+  "math.floor(x / y * 100) / 100 is still a number, and a number prints as 3.5, not 3.50; %d is for integers.",
+]
+
+[quest.quiz]
+choices = ["print(string.format(\"%2f\", x / y))", "print(math.floor(x / y * 100) / 100)", "print(string.format(\"%.2d\", x / y))", "print(string.format(\"%.2f\", x / y))"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3.50\n", visible = true },
+  { name = "one-three", stdin = "1 3\n", expect = "0.33\n", visible = false },
+  { name = "ten-four", stdin = "10 4\n", expect = "2.50\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "lua.verybasic.04.strings"
+node        = 4
+title       = "THE ROUTE SIGN"
+difficulty  = 1
+story       = '''The route sign at the mouth of Lily Street is painted in capitals and the crew list has it in lowercase; the sign-writer needs it shouted back.'''
+concepts    = ["strings", "io"]
+requires    = ["lua.verybasic.03.floats"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+`s` is one line of text. After its length, the program must print `s` in upper case. A string method returns a copy with every letter capitalised, and a method is called with a colon so the string passes itself.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+starter     = '''
+local s = io.read("*l")
+print(#s)
+-- FILL: s in capitals
+'''
+solution    = '''
+local s = io.read("*l")
+print(#s)
+print(s:upper())
+'''
+hints = [
+  "print(s:upper()) — the colon passes s as the first argument.",
+  "s.upper() with a dot passes nothing, and upper complains it got no string; toUpperCase is JavaScript.",
+]
+
+[quest.quiz]
+choices = ["print(s:upper())", "print(s:toUpperCase())", "print(s.upper())", "print(upper(s))"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan", stdin = "kwan lee\n", expect = "8\nKWAN LEE\n", visible = true },
+  { name = "bok", stdin = "bok choy 3\n", expect = "10\nBOK CHOY 3\n", visible = false },
+  { name = "one", stdin = "x\n", expect = "1\nX\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "lua.verybasic.05.bool-if"
+node        = 5
+title       = "EVEN OR ODD"
+difficulty  = 1
+story       = '''The dragon's segments are carried on the left by the even numbers and on the right by the odd; a carrier on Wun Sha Street has his number and needs his side.'''
+concepts    = ["control-flow", "types"]
+requires    = ["lua.verybasic.04.strings"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+`n` is a positive integer. The program must print `even` when `n` is divisible by two and `odd` otherwise. The condition is an `if` header comparing the remainder to zero, and it ends in `then`.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  4
+output: even
+```
+'''
+starter     = '''
+local n = tonumber(io.read("*l"))
+if false then  -- FILL: is n even?
+  print("even")
+else
+  print("odd")
+end
+'''
+solution    = '''
+local n = tonumber(io.read("*l"))
+if n % 2 == 0 then
+  print("even")
+else
+  print("odd")
+end
+'''
+hints = [
+  "if n % 2 == 0 then — two equals signs compare; one assigns.",
+  "n / 2 is a fraction; it is never zero for a positive n.",
+]
+
+[quest.quiz]
+choices = ["if n % 2 == 0 then", "if n % 2 = 0 then", "if n % 2 == 1 then", "if n / 2 == 0 then"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "even\n", visible = true },
+  { name = "seven", stdin = "7\n", expect = "odd\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "even\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "lua.verybasic.06.loops"
+node        = 6
+title       = "THE TALLY"
+difficulty  = 1
+story       = '''The incense count for the night is one plus two plus three up to the last segment, and the tally board at the shed shows a zero.'''
+concepts    = ["control-flow", "io"]
+requires    = ["lua.verybasic.05.bool-if"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+`n` is a positive integer. The loop must visit every integer from 1 up to and including `n`, adding each to `total`. A numeric `for` takes a start and a stop, and the stop IS included.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  4
+output: 10
+```
+'''
+starter     = '''
+local n = tonumber(io.read("*l"))
+local total = 0
+for i = 1, 0 do  -- FILL: 1 up to n, inclusive
+  total = total + i
+end
+print(total)
+'''
+solution    = '''
+local n = tonumber(io.read("*l"))
+local total = 0
+for i = 1, n do
+  total = total + i
+end
+print(total)
+'''
+hints = [
+  "for i = 1, n do — the stop is inclusive, so it is n itself.",
+  "for i in ... is the other loop, the one that takes an iterator function; a number is not one.",
+]
+
+[quest.quiz]
+choices = ["for i = 1, n do", "for i = 0, n - 1 do", "for i = 1, n - 1 do", "for i in 1, n do"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4\n", expect = "10\n", visible = true },
+  { name = "ten", stdin = "10\n", expect = "55\n", visible = false },
+  { name = "one", stdin = "1\n", expect = "1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "lua.verybasic.07.functions"
+node        = 7
+title       = "THE CARRIER'S RATE"
+difficulty  = 1
+story       = '''The first ten laps of Wun Sha Street pay a carrier five each and every lap after that pays three; the pay function hands back nothing.'''
+concepts    = ["functions", "control-flow"]
+requires    = ["lua.verybasic.06.loops"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+`pay(laps)` must return the pay: the first ten laps at 5 each, every lap after the tenth at 3. A function hands a value back with one keyword; a function that only prints hands back `nil`.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3
+output: 15
+```
+'''
+starter     = '''
+local function pay(laps)
+  -- FILL: the pay for that many laps
+end
+
+local n = tonumber(io.read("*l"))
+local p = pay(n)
+print(p)
+'''
+solution    = '''
+local function pay(laps)
+  return math.min(laps, 10) * 5 + math.max(laps - 10, 0) * 3
+end
+
+local n = tonumber(io.read("*l"))
+local p = pay(n)
+print(p)
+'''
+hints = [
+  "return math.min(laps, 10) * 5 + math.max(laps - 10, 0) * 3",
+  "math.max with one argument is that argument: max(laps - 10) goes negative for a short night. And print inside pay leaves the caller printing nil.",
+]
+
+[quest.quiz]
+choices = ["return laps * 5", "print(math.min(laps, 10) * 5 + math.max(laps - 10, 0) * 3)", "return math.min(laps, 10) * 5 + math.max(laps - 10, 0) * 3", "return math.min(laps, 10) * 5 + math.max(laps - 10) * 3"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n", expect = "15\n", visible = true },
+  { name = "twelve", stdin = "12\n", expect = "56\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "lua.verybasic.08.structs"
+node        = 8
+title       = "ONE STALL, TWO FIELDS"
+difficulty  = 1
+story       = '''Every stall at the Victoria Park lantern fair has a name and a price on its card. The card's price is never stored and the label prints half a stall.'''
+concepts    = ["structs", "bindings"]
+requires    = ["lua.verybasic.07.functions"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`Stall.new(name, price)` builds a table with `Stall` as its metatable — Lua's class. It must store `price` on the object the same way `name` is stored, so `s.price` reads it back. A field is written on `self`; a bare name is a local.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+starter     = '''
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price)
+  local self = setmetatable({}, Stall)
+  self.name = name
+  -- FILL: keep price on the object
+  return self
+end
+
+local name, price = io.read("*l"):match("(%S+)%s+(%S+)")
+local s = Stall.new(name, tonumber(price))
+print(s.name .. " " .. s.price)
+'''
+solution    = '''
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price)
+  local self = setmetatable({}, Stall)
+  self.name = name
+  self.price = price
+  return self
+end
+
+local name, price = io.read("*l"):match("(%S+)%s+(%S+)")
+local s = Stall.new(name, tonumber(price))
+print(s.name .. " " .. s.price)
+'''
+hints = [
+  "self.price = price — self is the table; the bare name is the parameter.",
+  "Two equals signs compare, and a comparison on its own is not a statement Lua accepts.",
+]
+
+[quest.quiz]
+choices = ["self.price = price", "price = price", "self.price == price", "self.price = name"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tofu", stdin = "tofu 12\n", expect = "tofu 12\n", visible = true },
+  { name = "fish", stdin = "fish 48\n", expect = "fish 48\n", visible = false },
+  { name = "egg", stdin = "egg 3\n", expect = "egg 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "lua.verybasic.09.struct-method"
+node        = 9
+title       = "THE LINE TOTAL"
+difficulty  = 1
+story       = '''Price times quantity is one line of every order at the lantern-fair noodle stall, and the method that should say it says nothing.'''
+concepts    = ["structs", "functions"]
+requires    = ["lua.verybasic.08.structs"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+`Stall:total()` must return price times quantity. A method declared with a colon has a hidden first parameter, `self`, and the object's fields are reached through it; `price` on its own is a global that was never set.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+starter     = '''
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  local self = setmetatable({}, Stall)
+  self.name = name
+  self.price = price
+  self.qty = qty
+  return self
+end
+
+function Stall:total()
+  -- FILL: price times quantity
+end
+
+local name, price, qty = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+local s = Stall.new(name, tonumber(price), tonumber(qty))
+print(s.name .. ": " .. s:total())
+'''
+solution    = '''
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  local self = setmetatable({}, Stall)
+  self.name = name
+  self.price = price
+  self.qty = qty
+  return self
+end
+
+function Stall:total()
+  return self.price * self.qty
+end
+
+local name, price, qty = io.read("*l"):match("(%S+)%s+(%S+)%s+(%S+)")
+local s = Stall.new(name, tonumber(price), tonumber(qty))
+print(s.name .. ": " .. s:total())
+'''
+hints = [
+  "return self.price * self.qty — both fields through self.",
+  "price on its own is a global, nil, and nil cannot be multiplied.",
+]
+
+[quest.quiz]
+choices = ["return price * qty", "return self.price * self.qty", "return self.price + self.qty", "return self.price * qty"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tofu", stdin = "tofu 12 3\n", expect = "tofu: 36\n", visible = true },
+  { name = "fish", stdin = "fish 48 2\n", expect = "fish: 96\n", visible = false },
+  { name = "egg", stdin = "egg 3 10\n", expect = "egg: 30\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "lua.verybasic.10.enums"
+node        = 10
+title       = "THE LINE COLOUR"
+difficulty  = 2
+story       = '''The MTR map at the Tin Hau exit names three lines; the crew has the word and needs the constant it stands for.'''
+concepts    = ["enums", "pattern-matching"]
+requires    = ["lua.verybasic.09.struct-method"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+`word` is one of `island`, `tsuenwan`, `kwuntong`. Lua has no enum: `Line` is a table of named numbers, the nearest thing, and `COLOUR` is keyed by those numbers. The program must turn `word` into the matching `Line` member. A table is indexed by a key, and the keys here are in capitals; a table is not callable, and `Line.word` looks for a key spelled `word`.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+starter     = '''
+local Line = { ISLAND = 1, TSUENWAN = 2, KWUNTONG = 3 }
+
+local COLOUR = { [Line.ISLAND] = "blue", [Line.TSUENWAN] = "red", [Line.KWUNTONG] = "green" }
+local word = io.read("*l"):match("%S+")
+local line = nil  -- FILL: the Line member named by word
+print(COLOUR[line])
+'''
+solution    = '''
+local Line = { ISLAND = 1, TSUENWAN = 2, KWUNTONG = 3 }
+
+local COLOUR = { [Line.ISLAND] = "blue", [Line.TSUENWAN] = "red", [Line.KWUNTONG] = "green" }
+local word = io.read("*l"):match("%S+")
+local line = Line[word:upper()]
+print(COLOUR[line])
+'''
+hints = [
+  "local line = Line[word:upper()] — square brackets look a key up by name, and the names are in capitals.",
+  "Line[word] with the lowercase word finds no key, gives nil, and COLOUR[nil] is nil too: the board prints nil.",
+]
+
+[quest.quiz]
+choices = ["local line = Line[word:upper()]", "local line = Line(word:upper())", "local line = Line.word", "local line = Line[word]"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = true },
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "lua.verybasic.11.vector"
+node        = 11
+title       = "THE SEGMENT LIST"
+difficulty  = 1
+story       = '''Every segment off the lorry on Tai Hang Road goes on the list in the order it came, and the list stays empty.'''
+concepts    = ["slices", "iteration"]
+requires    = ["lua.verybasic.10.enums"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+`xs` starts as an empty table, and a Lua list is a table with keys 1, 2, 3, ... Each integer `x` read in the loop must be added at the end, keeping the input's order. The `table` library has a function for that; with two arguments it appends, with three the middle one is a position.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+starter     = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  -- FILL: add x at the end
+end
+print(#xs)
+print(table.concat(xs, " "))
+'''
+solution    = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  table.insert(xs, x)
+end
+print(#xs)
+print(table.concat(xs, " "))
+'''
+hints = [
+  "table.insert(xs, x) — the table first, one value, on the end.",
+  "xs[#xs] = x writes to index 0 while the table is empty, and #xs stays 0; a position of 1 puts each one at the front and reverses the order.",
+]
+
+[quest.quiz]
+choices = ["table.insert(xs, x)", "xs.push(x)", "xs[#xs] = x", "table.insert(xs, 1, x)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "4\n3 1 4 1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "1\n7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "5\n5 4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "lua.verybasic.12.vector-edit"
+node        = 12
+title       = "THE HEAD COMES OFF"
+difficulty  = 1
+story       = '''The first segment on the list is the head, and the head goes in on its own pole; it has to come off the list, and everything after it moves up one.'''
+concepts    = ["slices", "collections"]
+requires    = ["lua.verybasic.11.vector"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers, from index 1. The program must remove the element at index 1 so the rest shift down. `table.remove` takes a position and shifts what follows; setting a slot to `nil` leaves a hole, not a shorter list.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+starter     = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+-- FILL: remove the element at index 1
+print(table.concat(xs, " "))
+'''
+solution    = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+table.remove(xs, 1)
+print(table.concat(xs, " "))
+'''
+hints = [
+  "table.remove(xs, 1) — the position is the second argument.",
+  "table.remove(xs) with no position takes the LAST one; xs[1] = nil leaves a nil in the list, and table.concat refuses it.",
+]
+
+[quest.quiz]
+choices = ["table.remove(xs)", "xs.remove(1)", "xs[1] = nil", "table.remove(xs, 1)"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 4 1\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "lua.verybasic.13.list"
+node        = 13
+title       = "THE FRONT OF THE CHAIN"
+difficulty  = 1
+story       = '''The lantern chain hangs the length of Wun Sha Street and the newest lantern goes on at the front; the crew keeps hanging it at the back.'''
+concepts    = ["collections", "iteration"]
+requires    = ["lua.verybasic.12.vector-edit"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+`chain` is a table used as a list. Lua has no deque; `table.insert` with a position is the nearest thing, and it shifts everything after that position up one. Each `x` read in the loop must be added at the FRONT, so the last one read ends up first.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+starter     = '''
+local chain = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  -- FILL: add x at the front
+end
+print(table.concat(chain, " "))
+'''
+solution    = '''
+local chain = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  table.insert(chain, 1, x)
+end
+print(table.concat(chain, " "))
+'''
+hints = [
+  "table.insert(chain, 1, x) — three arguments: the table, the position, the value.",
+  "Two arguments append at the back; chain[1] = x overwrites the front instead of pushing it along; a plain table has no insert method to call with a colon.",
+]
+
+[quest.quiz]
+choices = ["table.insert(chain, x)", "chain[1] = x", "chain:insert(1, x)", "table.insert(chain, 1, x)"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "3 2 1\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1 2 3 4 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "lua.verybasic.14.maps"
+node        = 14
+title       = "THE INCENSE NOTEBOOK"
+difficulty  = 1
+story       = '''One notebook per street, one line per item the crew burns, a count next to each; the first time an item appears there is no line to add to.'''
+concepts    = ["collections", "strings"]
+requires    = ["lua.verybasic.13.list"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+`counts` is a table keyed by word. For each word `w` the program must add one to its count, starting from zero the first time. A missing key reads as `nil`, and `nil` cannot be added to; `or` supplies a default, and it binds looser than `+`, so the default needs its own parentheses.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+starter     = '''
+local counts = {}
+for w in io.read("*l"):gmatch("%S+") do
+  -- FILL: one more w
+end
+local words = {}
+for w in pairs(counts) do words[#words + 1] = w end
+table.sort(words)
+for _, w in ipairs(words) do
+  print(w .. " " .. counts[w])
+end
+'''
+solution    = '''
+local counts = {}
+for w in io.read("*l"):gmatch("%S+") do
+  counts[w] = (counts[w] or 0) + 1
+end
+local words = {}
+for w in pairs(counts) do words[#words + 1] = w end
+table.sort(words)
+for _, w in ipairs(words) do
+  print(w .. " " .. counts[w])
+end
+'''
+hints = [
+  "counts[w] = (counts[w] or 0) + 1 — the parentheses make the default happen before the add.",
+  "Without them, counts[w] or 0 + 1 is counts[w] or 1: the first sighting is 1 and every later one stays 1. counts[w] + 1 on a missing key is arithmetic on nil.",
+]
+
+[quest.quiz]
+choices = ["counts[w] = (counts[w] or 0) + 1", "counts[w] = counts[w] + 1", "counts[w] = counts[w] or 0 + 1", "counts[w] = (counts[w] or 0)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "siu-mai", stdin = "siu mai har gau siu mai\n", expect = "gau 1\nhar 1\nmai 2\nsiu 2\n", visible = true },
+  { name = "one", stdin = "tofu\n", expect = "tofu 1\n", visible = false },
+  { name = "three", stdin = "a b a\n", expect = "a 2\nb 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "lua.verybasic.15.hashtable"
+node        = 15
+title       = "THE LOOKUP"
+difficulty  = 1
+story       = '''The stall table at the lantern fair maps a name to its number, and asking for a stall that is not there should say -1, not blank the board.'''
+concepts    = ["collections", "hashing"]
+requires    = ["lua.verybasic.14.maps"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`stalls` maps names to stall numbers. For the word `w` the program must print its number, or `-1` when `w` is not in the table. A missing key is `nil`, not an error, and `or` turns a `nil` into a default.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+starter     = '''
+local stalls = {}
+local n = tonumber(io.read("*l"))
+for _ = 1, n do
+  local name, num = io.read("*l"):match("(%S+)%s+(%S+)")
+  stalls[name] = tonumber(num)
+end
+local w = io.read("*l"):match("%S+")
+-- FILL: the number for w, or -1
+'''
+solution    = '''
+local stalls = {}
+local n = tonumber(io.read("*l"))
+for _ = 1, n do
+  local name, num = io.read("*l"):match("(%S+)%s+(%S+)")
+  stalls[name] = tonumber(num)
+end
+local w = io.read("*l"):match("%S+")
+print(stalls[w] or -1)
+'''
+hints = [
+  "print(stalls[w] or -1) — the right side of or is the default.",
+  "stalls[w] on its own prints nil for a missing name; stalls.w looks for a stall called w, literally.",
+]
+
+[quest.quiz]
+choices = ["print(stalls[w])", "print(stalls[w] or -1)", "print(stalls.w or -1)", "print(stalls[w] or -1"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "missing", stdin = "2\ntofu 3\nfish 7\negg\n", expect = "-1\n", visible = true },
+  { name = "hit", stdin = "2\ntofu 3\nfish 7\nfish\n", expect = "7\n", visible = false },
+  { name = "one", stdin = "1\nbun 9\nbun\n", expect = "9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "lua.verybasic.16.sets"
+node        = 16
+title       = "DISTINCT PRICES"
+difficulty  = 1
+story       = '''Six lantern stalls, three different prices. The board wants how many different prices there are, and it prints six.'''
+concepts    = ["collections", "types"]
+requires    = ["lua.verybasic.15.hashtable"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. The program must print how many DISTINCT values there are. Lua has no set: a table whose KEYS are the values is the nearest thing — a key stored twice is one key — and the count loop already walks the keys with `pairs`, because `#` counts only the slots from 1. Each `x` must be marked in `seen` as a key.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+starter     = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+local seen = {}
+for _, x in ipairs(xs) do
+  -- FILL: mark x as seen
+end
+local count = 0
+for _ in pairs(seen) do count = count + 1 end
+print(count)
+'''
+solution    = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+local seen = {}
+for _, x in ipairs(xs) do
+  seen[x] = true
+end
+local count = 0
+for _ in pairs(seen) do count = count + 1 end
+print(count)
+'''
+hints = [
+  "seen[x] = true — x is the key, true is just something that is not nil.",
+  "seen.x is the key spelled x, one key for everything; table.insert appends and keeps the duplicates; seen[x] + 1 is arithmetic on nil the first time.",
+]
+
+[quest.quiz]
+choices = ["seen[x] = true", "seen.x = true", "table.insert(seen, x)", "seen[x] = seen[x] + 1"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "3 5 3 8 5 3\n", expect = "3\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "1\n", visible = false },
+  { name = "all", stdin = "1 2 3\n", expect = "3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "lua.verybasic.17.stack"
+node        = 17
+title       = "THE INCENSE STACK"
+difficulty  = 1
+story       = '''Incense bundles go on the pile by the shed door and come off the top; the runner keeps taking one from the bottom.'''
+concepts    = ["stacks-queues", "collections"]
+requires    = ["lua.verybasic.16.sets"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+`stack` is a table used as a stack. The program must take the TOP (last) element off into `top`. `table.remove` removes and returns an element, and with no position it takes the last one.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+starter     = '''
+local stack = {}
+for tok in io.read("*l"):gmatch("%S+") do stack[#stack + 1] = tonumber(tok) end
+local top = nil  -- FILL: take the top off the stack
+print(top)
+print(table.concat(stack, " "))
+'''
+solution    = '''
+local stack = {}
+for tok in io.read("*l"):gmatch("%S+") do stack[#stack + 1] = tonumber(tok) end
+local top = table.remove(stack)
+print(top)
+print(table.concat(stack, " "))
+'''
+hints = [
+  "local top = table.remove(stack) — no position means the last one.",
+  "stack[#stack] reads the top but leaves it on the pile; a position of 1 takes the bottom.",
+]
+
+[quest.quiz]
+choices = ["local top = table.remove(stack, 1)", "local top = stack:pop()", "local top = stack[#stack]", "local top = table.remove(stack)"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "4\n1 2 3\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7\n9\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1\n5 4 3 2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "lua.verybasic.18.queue"
+node        = 18
+title       = "THE CARRIER QUEUE"
+difficulty  = 1
+story       = '''Carriers are called to the dragon in the order they signed in at the shed; the marshal keeps calling the newest name.'''
+concepts    = ["stacks-queues", "collections"]
+requires    = ["lua.verybasic.17.stack"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`q` is a table holding the carriers in order. Lua has no deque; `table.remove` with a position is the nearest thing, and everything after that position shifts down. The program must take the FIRST one off into `first`.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+starter     = '''
+local q = {}
+for tok in io.read("*l"):gmatch("%S+") do q[#q + 1] = tonumber(tok) end
+local first = nil  -- FILL: take the first carrier
+print(first)
+print(table.concat(q, " "))
+'''
+solution    = '''
+local q = {}
+for tok in io.read("*l"):gmatch("%S+") do q[#q + 1] = tonumber(tok) end
+local first = table.remove(q, 1)
+print(first)
+print(table.concat(q, " "))
+'''
+hints = [
+  "local first = table.remove(q, 1) — position 1, and the rest shift down.",
+  "table.remove(q) with no position takes from the back; q[1] reads without removing.",
+]
+
+[quest.quiz]
+choices = ["local first = table.remove(q, 1)", "local first = table.remove(q)", "local first = q:shift()", "local first = q[1]"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "1\n2 3 4\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "9\n7\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "5\n4 3 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "lua.verybasic.19.heap"
+node        = 19
+title       = "THE LOWEST NUMBER FIRST"
+difficulty  = 2
+story       = '''Segment numbers come in from the lanes in any order and the marshal wants the lowest one next, every time; the pile they are kept on has no idea which that is.'''
+concepts    = ["heaps", "collections"]
+requires    = ["lua.verybasic.18.queue"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+Lua's standard library has no heap, so the starter carries a small `MinHeap` class: `push` adds a value and sifts it up, `pop` takes the smallest. Each `x` must go in through the heap's own method, called with a colon so the heap passes itself, so that `pop` later returns the smallest first. Writing into `items` directly skips the sift and breaks the order.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+starter     = '''
+local MinHeap = {}
+MinHeap.__index = MinHeap
+
+function MinHeap.new()
+  return setmetatable({ items = {} }, MinHeap)
+end
+
+function MinHeap:push(v)
+  local a = self.items
+  a[#a + 1] = v
+  local i = #a
+  while i > 1 do
+    local p = math.floor(i / 2)
+    if a[p] <= a[i] then break end
+    a[p], a[i] = a[i], a[p]
+    i = p
+  end
+end
+
+function MinHeap:pop()
+  local a = self.items
+  if #a == 0 then return nil end
+  local top = a[1]
+  local last = table.remove(a)
+  if #a > 0 then
+    a[1] = last
+    local i = 1
+    while true do
+      local l, r, m = 2 * i, 2 * i + 1, i
+      if l <= #a and a[l] < a[m] then m = l end
+      if r <= #a and a[r] < a[m] then m = r end
+      if m == i then break end
+      a[m], a[i] = a[i], a[m]
+      i = m
+    end
+  end
+  return top
+end
+
+function MinHeap:size()
+  return #self.items
+end
+
+local heap = MinHeap.new()
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  -- FILL: push x, keeping the heap order
+end
+local out = {}
+while heap:size() > 0 do
+  out[#out + 1] = heap:pop()
+end
+print(table.concat(out, " "))
+'''
+solution    = '''
+local MinHeap = {}
+MinHeap.__index = MinHeap
+
+function MinHeap.new()
+  return setmetatable({ items = {} }, MinHeap)
+end
+
+function MinHeap:push(v)
+  local a = self.items
+  a[#a + 1] = v
+  local i = #a
+  while i > 1 do
+    local p = math.floor(i / 2)
+    if a[p] <= a[i] then break end
+    a[p], a[i] = a[i], a[p]
+    i = p
+  end
+end
+
+function MinHeap:pop()
+  local a = self.items
+  if #a == 0 then return nil end
+  local top = a[1]
+  local last = table.remove(a)
+  if #a > 0 then
+    a[1] = last
+    local i = 1
+    while true do
+      local l, r, m = 2 * i, 2 * i + 1, i
+      if l <= #a and a[l] < a[m] then m = l end
+      if r <= #a and a[r] < a[m] then m = r end
+      if m == i then break end
+      a[m], a[i] = a[i], a[m]
+      i = m
+    end
+  end
+  return top
+end
+
+function MinHeap:size()
+  return #self.items
+end
+
+local heap = MinHeap.new()
+for tok in io.read("*l"):gmatch("%S+") do
+  local x = tonumber(tok)
+  heap:push(x)
+end
+local out = {}
+while heap:size() > 0 do
+  out[#out + 1] = heap:pop()
+end
+print(table.concat(out, " "))
+'''
+hints = [
+  "heap:push(x) — the colon passes the heap as self, and push sifts x up to where it belongs.",
+  "heap.push(x) with a dot makes x the self, and a number has no items; table.insert(heap.items, x) puts x on the end and skips the sift.",
+]
+
+[quest.quiz]
+choices = ["heap:push(x)", "heap.push(x)", "heap:heappush(x)", "table.insert(heap.items, x)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5 1 4 2 3\n", expect = "1 2 3 4 5\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+  { name = "six", stdin = "6 2 8 1 9 3\n", expect = "1 2 3 6 8 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "lua.verybasic.20.sorting"
+node        = 20
+title       = "THE LANTERN LADDER"
+difficulty  = 1
+story       = '''The lantern prices on the fair's board are in the order the stalls opened, and the buyer wants them cheapest first.'''
+concepts    = ["sorting", "slices"]
+requires    = ["lua.verybasic.19.heap"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. The program must sort `xs` in place, ascending, before it is printed. The `table` library has a function that does it, ascending by default; a second argument would be a comparison function.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+starter     = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+-- FILL: sort xs ascending, in place
+print(table.concat(xs, " "))
+'''
+solution    = '''
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+table.sort(xs)
+print(table.concat(xs, " "))
+'''
+hints = [
+  "table.sort(xs) — the library function, the table as its argument.",
+  "A comparison that returns a > b sorts descending; a plain table has no sort method, and sort on its own is not a global.",
+]
+
+[quest.quiz]
+choices = ["table.sort(xs, function(a, b) return a > b end)", "table.sort(xs)", "xs:sort()", "sort(xs)"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "3 1 4 1\n", expect = "1 1 3 4\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "7 9\n", visible = false },
+  { name = "five", stdin = "5 4 3 2 1\n", expect = "1 2 3 4 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "lua.verybasic.21.sort-by-key"
+node        = 21
+title       = "THE LEADERBOARD"
+difficulty  = 2
+story       = '''The carriers' board on the shed wall is laps high to low, and two carriers on the same count go by name; the board is in sign-in order.'''
+concepts    = ["sorting", "closures"]
+requires    = ["lua.verybasic.20.sorting"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+`rows` is a list of tables with a `name` and a `score`. It must be sorted by score descending, then by name ascending. `table.sort` takes a comparison function that answers whether `a` goes before `b`; the score decides unless the two are equal, and then the name does.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+starter     = '''
+local n = tonumber(io.read("*l"))
+local rows = {}
+for _ = 1, n do
+  local name, score = io.read("*l"):match("(%S+)%s+(%S+)")
+  rows[#rows + 1] = { name = name, score = tonumber(score) }
+end
+-- FILL: score descending, then name ascending
+for _, r in ipairs(rows) do
+  print(r.name .. " " .. r.score)
+end
+'''
+solution    = '''
+local n = tonumber(io.read("*l"))
+local rows = {}
+for _ = 1, n do
+  local name, score = io.read("*l"):match("(%S+)%s+(%S+)")
+  rows[#rows + 1] = { name = name, score = tonumber(score) }
+end
+table.sort(rows, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.name < b.name end)
+for _, r in ipairs(rows) do
+  print(r.name .. " " .. r.score)
+end
+'''
+hints = [
+  "table.sort(rows, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.name < b.name end) — greater-than on the score to go descending, and the name only on a tie.",
+  "A comparison on the score alone leaves a tie in whatever order the sort happened to visit it; table.sort is not stable.",
+]
+
+[quest.quiz]
+choices = ["table.sort(rows, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.name < b.name end)", "table.sort(rows, function(a, b) return a.score > b.score end)", "table.sort(rows, function(a, b) if a.score ~= b.score then return a.score < b.score end return a.name < b.name end)", "rows:sort(function(a, b) if a.score ~= b.score then return a.score > b.score end return a.name < b.name end)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nmei 7\nalex 9\nbo 7\n", expect = "alex 9\nbo 7\nmei 7\n", visible = true },
+  { name = "two", stdin = "2\nx 1\ny 2\n", expect = "y 2\nx 1\n", visible = false },
+  { name = "tie", stdin = "3\nc 5\na 5\nb 5\n", expect = "a 5\nb 5\nc 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "lua.verybasic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = '''The dragon's name is painted on the tail banner back to front, so it reads right from the far side, and the programme wants it that way.'''
+concepts    = ["strings", "slices"]
+requires    = ["lua.verybasic.21.sort-by-key"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`s` is one line of text. The program must print it reversed. The string library has a method for exactly that, called with a colon; `sub` cuts a piece out and does not turn it round.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+starter     = '''
+local s = io.read("*l")
+-- FILL: s reversed
+'''
+solution    = '''
+local s = io.read("*l")
+print(s:reverse())
+'''
+hints = [
+  "print(s:reverse()) — the whole method name, with the colon.",
+  "s:sub(-1, 1) asks for the piece from the last character to the first, which is empty for anything longer than one letter.",
+]
+
+[quest.quiz]
+choices = ["print(s:rev())", "print(reverse(s))", "print(s:sub(-1, 1))", "print(s:reverse())"]
+answer  = 3
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan", stdin = "kwan lee\n", expect = "eel nawk\n", visible = true },
+  { name = "abc", stdin = "abc\n", expect = "cba\n", visible = false },
+  { name = "one", stdin = "x\n", expect = "x\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "lua.verybasic.23.closures"
+node        = 23
+title       = "THE MARKUP"
+difficulty  = 2
+story       = '''The lantern stall adds the same markup to every wholesale price, and the function meant to remember the markup forgets it.'''
+concepts    = ["closures", "functions"]
+requires    = ["lua.verybasic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`make_adder(k)` defines an inner function `add` that returns `x + k`. It must hand back that inner function itself — a function is a value like any other — so `add(x)` can be called later with `k` remembered.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  -- FILL: hand back the inner function
+end
+
+local k = tonumber(io.read("*l"))
+local nums = {}
+for tok in io.read("*l"):gmatch("%S+") do nums[#nums + 1] = tonumber(tok) end
+local add = make_adder(k)
+local out = {}
+for i, x in ipairs(nums) do out[i] = add(x) end
+print(table.concat(out, " "))
+'''
+solution    = '''
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  return add
+end
+
+local k = tonumber(io.read("*l"))
+local nums = {}
+for tok in io.read("*l"):gmatch("%S+") do nums[#nums + 1] = tonumber(tok) end
+local add = make_adder(k)
+local out = {}
+for i, x in ipairs(nums) do out[i] = add(x) end
+print(table.concat(out, " "))
+'''
+hints = [
+  "return add — the bare name, no parentheses.",
+  "add() calls it with no x and adds nil; returning k hands back a number, and a number cannot be called.",
+]
+
+[quest.quiz]
+choices = ["return add", "return add()", "return function(x) return x - k end", "return k"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "neg", stdin = "-2\n10 0 2\n", expect = "8 -2 0\n", visible = false },
+  { name = "big", stdin = "100\n7\n", expect = "107\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "lua.verybasic.24.lambdas"
+node        = 24
+title       = "EVEN SQUARES"
+difficulty  = 2
+story       = '''The even-numbered segments pay by the square of their number and the odd ones pay nothing; the ledger at the shed wants one total.'''
+concepts    = ["closures", "iteration"]
+requires    = ["lua.verybasic.23.closures"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+`xs` holds the line's integers. Lua has no `map` or `filter` built in, so the starter carries `map(f, xs)`, `filter(f, xs)` and `sum(xs)`. `total` must be the sum of the squares of the EVEN values, built from those three and two anonymous functions — `function(x) ... end` is Lua's lambda.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+starter     = '''
+local function map(f, xs)
+  local out = {}
+  for i, x in ipairs(xs) do out[i] = f(x) end
+  return out
+end
+
+local function filter(f, xs)
+  local out = {}
+  for _, x in ipairs(xs) do
+    if f(x) then out[#out + 1] = x end
+  end
+  return out
+end
+
+local function sum(xs)
+  local s = 0
+  for _, x in ipairs(xs) do s = s + x end
+  return s
+end
+
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+local total = 0  -- FILL: sum of the squares of the even values
+print(total)
+'''
+solution    = '''
+local function map(f, xs)
+  local out = {}
+  for i, x in ipairs(xs) do out[i] = f(x) end
+  return out
+end
+
+local function filter(f, xs)
+  local out = {}
+  for _, x in ipairs(xs) do
+    if f(x) then out[#out + 1] = x end
+  end
+  return out
+end
+
+local function sum(xs)
+  local s = 0
+  for _, x in ipairs(xs) do s = s + x end
+  return s
+end
+
+local xs = {}
+for tok in io.read("*l"):gmatch("%S+") do xs[#xs + 1] = tonumber(tok) end
+local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))
+print(total)
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))",
+  "filter keeps what its function returns true for; map transforms. A bare x * x outside a function is a global x, nil, multiplied.",
+]
+
+[quest.quiz]
+choices = ["local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 1 end, xs)))", "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))", "local total = sum(map(x * x, filter(function(x) return x % 2 == 0 end, xs)))", "local total = sum(map(function(x) return x * 2 end, filter(function(x) return x % 2 == 0 end, xs)))"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six", stdin = "1 2 3 4 5 6\n", expect = "56\n", visible = true },
+  { name = "odd", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "neg", stdin = "-4 3 -2\n", expect = "20\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "lua.verybasic.25.threads"
+node        = 25
+title       = "EVERY SEGMENT AT ONCE"
+difficulty  = 3
+story       = '''Every segment's incense runner squares its own count on its own coroutine, and the tally is printed before any of them has got past its first yield.'''
+concepts    = ["concurrency", "closures"]
+requires    = ["lua.verybasic.24.lambdas"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+There are no threads here: a coroutine is the nearest thing, a function that runs only while it is resumed and hands control back with `yield`. Every worker in `workers` has been started — resumed once, as far as its first yield — and none has written its result. Before the results are printed, the main program must run each `co` to its end. One function in the `coroutine` library continues a coroutine from where it yielded.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+starter     = '''
+local nums = {}
+for tok in io.read("*l"):gmatch("%S+") do nums[#nums + 1] = tonumber(tok) end
+local results = {}
+for i = 1, #nums do results[i] = 0 end
+
+local function square(i)
+  coroutine.yield()
+  results[i] = nums[i] * nums[i]
+end
+
+local workers = {}
+for i = 1, #nums do
+  workers[i] = coroutine.create(function() square(i) end)
+  coroutine.resume(workers[i])
+end
+for _, co in ipairs(workers) do
+  -- FILL: run co to its end
+end
+print(table.concat(results, " "))
+local total = 0
+for _, r in ipairs(results) do total = total + r end
+print(total)
+'''
+solution    = '''
+local nums = {}
+for tok in io.read("*l"):gmatch("%S+") do nums[#nums + 1] = tonumber(tok) end
+local results = {}
+for i = 1, #nums do results[i] = 0 end
+
+local function square(i)
+  coroutine.yield()
+  results[i] = nums[i] * nums[i]
+end
+
+local workers = {}
+for i = 1, #nums do
+  workers[i] = coroutine.create(function() square(i) end)
+  coroutine.resume(workers[i])
+end
+for _, co in ipairs(workers) do
+  coroutine.resume(co)
+end
+print(table.concat(results, " "))
+local total = 0
+for _, r in ipairs(results) do total = total + r end
+print(total)
+'''
+hints = [
+  "coroutine.resume(co) — the same call that started it, and it carries on from the yield.",
+  "coroutine.status(co) only asks; yield from the main program is an error, since there is nothing to yield to; a coroutine is not a table and has no methods.",
+]
+
+[quest.quiz]
+choices = ["coroutine.resume(co)", "coroutine.yield(co)", "co:resume()", "coroutine.status(co)"]
+answer  = 0
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n14\n", visible = true },
+  { name = "one", stdin = "12\n", expect = "144\n144\n", visible = false },
+  { name = "five", stdin = "5 -2 0 3 1\n", expect = "25 4 0 9 1\n39\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "lua.verybasic.26.mutex"
+node        = 26
+title       = "ONE COUNTER, FOUR HANDS"
+difficulty  = 3
+story       = '''Four incense runners add to one counter chalked on the shed wall, taking turns at the chalk; the counter has a lock, and nobody takes it before they read.'''
+concepts    = ["shared-state", "concurrency"]
+requires    = ["lua.verybasic.25.threads"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+One coroutine runs at a time, and still a race: each worker reads `counter`, yields, and writes it back, and the other three run in the gap. Lua has no mutex; `lock` is a small cooperative one, and its `acquire` yields until the lock is free and then takes it. Before the read, each worker must TAKE the lock through that method — with a colon, so the lock passes itself; the release is already written after the write.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  1000
+output: 4000
+```
+'''
+starter     = '''
+local Lock = {}
+Lock.__index = Lock
+
+function Lock.new()
+  return setmetatable({ held = false }, Lock)
+end
+
+function Lock:acquire()
+  while self.held do coroutine.yield() end
+  self.held = true
+end
+
+function Lock:release()
+  if not self.held then error("release of an unheld lock") end
+  self.held = false
+end
+
+local counter = 0
+local lock = Lock.new()
+
+local function work(n)
+  for _ = 1, n do
+    -- FILL: take the lock
+    local seen = counter
+    coroutine.yield()
+    counter = seen + 1
+    lock:release()
+  end
+end
+
+local n = tonumber(io.read("*l"))
+local workers = {}
+for i = 1, 4 do
+  workers[i] = coroutine.create(function() work(n) end)
+end
+local running = true
+while running do
+  running = false
+  for _, co in ipairs(workers) do
+    if coroutine.status(co) ~= "dead" then
+      running = true
+      local ok, err = coroutine.resume(co)
+      if not ok then error(err, 0) end
+    end
+  end
+end
+print(counter)
+'''
+solution    = '''
+local Lock = {}
+Lock.__index = Lock
+
+function Lock.new()
+  return setmetatable({ held = false }, Lock)
+end
+
+function Lock:acquire()
+  while self.held do coroutine.yield() end
+  self.held = true
+end
+
+function Lock:release()
+  if not self.held then error("release of an unheld lock") end
+  self.held = false
+end
+
+local counter = 0
+local lock = Lock.new()
+
+local function work(n)
+  for _ = 1, n do
+    lock:acquire()
+    local seen = counter
+    coroutine.yield()
+    counter = seen + 1
+    lock:release()
+  end
+end
+
+local n = tonumber(io.read("*l"))
+local workers = {}
+for i = 1, 4 do
+  workers[i] = coroutine.create(function() work(n) end)
+end
+local running = true
+while running do
+  running = false
+  for _, co in ipairs(workers) do
+    if coroutine.status(co) ~= "dead" then
+      running = true
+      local ok, err = coroutine.resume(co)
+      if not ok then error(err, 0) end
+    end
+  end
+end
+print(counter)
+'''
+hints = [
+  "lock:acquire() — then the read and the write, then the release that is already there.",
+  "lock.acquire() with a dot passes no self, and there is no held to look at; releasing a lock nobody holds is an error by design.",
+]
+
+[quest.quiz]
+choices = ["lock:aquire()", "lock:acquire()", "lock.acquire()", "lock:release()"]
+answer  = 1
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "thousand", stdin = "1000\n", expect = "4000\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "4\n", visible = false },
+  { name = "fifty", stdin = "50\n", expect = "200\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "lua.verybasic.27.binary-tree"
+node        = 27
+title       = "THE ZERO"
+difficulty  = 4
+story       = '''21:00 at the head of the dragon on Wun Sha Street: the segment numbers go into a tree, the segments start at 1, and `segments[0]` is `nil` — the head is nowhere, the tree's left branch is the same nowhere, and the dance starts from the second lantern.'''
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["lua.verybasic.26.mutex"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+The segment numbers are read into `segments`, which starts at 1 like every Lua list — `segments[0]` is `nil`, and so is a child that is not there yet; neither is an error until it is followed. `insert(n, v)` returns the root of the tree with `v` in it; the `nil` case and the right-hand side are written. For a smaller `v` the left child must be replaced by the result of inserting into it, so a `nil` child becomes a node.
+
+Pick the line that does it, then type it where the `-- FILL` comment is.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''
+local Node = {}
+Node.__index = Node
+
+function Node.new(val)
+  return setmetatable({ val = val, left = nil, right = nil }, Node)
+end
+
+local function insert(n, v)
+  if n == nil then
+    return Node.new(v)
+  end
+  if v < n.val then
+    -- FILL: insert into the left subtree and keep the result
+  else
+    n.right = insert(n.right, v)
+  end
+  return n
+end
+
+local function inorder(n, out)
+  if n == nil then
+    return
+  end
+  inorder(n.left, out)
+  out[#out + 1] = n.val
+  inorder(n.right, out)
+end
+
+local function height(n)
+  if n == nil then
+    return 0
+  end
+  return 1 + math.max(height(n.left), height(n.right))
+end
+
+local segments = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  segments[#segments + 1] = tonumber(tok)
+end
+local root = nil
+for i = 1, #segments do
+  root = insert(root, segments[i])
+end
+local out = {}
+inorder(root, out)
+print(table.concat(out, " "))
+print(height(root))
+'''
+solution    = '''
+local Node = {}
+Node.__index = Node
+
+function Node.new(val)
+  return setmetatable({ val = val, left = nil, right = nil }, Node)
+end
+
+local function insert(n, v)
+  if n == nil then
+    return Node.new(v)
+  end
+  if v < n.val then
+    n.left = insert(n.left, v)
+  else
+    n.right = insert(n.right, v)
+  end
+  return n
+end
+
+local function inorder(n, out)
+  if n == nil then
+    return
+  end
+  inorder(n.left, out)
+  out[#out + 1] = n.val
+  inorder(n.right, out)
+end
+
+local function height(n)
+  if n == nil then
+    return 0
+  end
+  return 1 + math.max(height(n.left), height(n.right))
+end
+
+local segments = {}
+for tok in io.read("*l"):gmatch("%S+") do
+  segments[#segments + 1] = tonumber(tok)
+end
+local root = nil
+for i = 1, #segments do
+  root = insert(root, segments[i])
+end
+local out = {}
+inorder(root, out)
+print(table.concat(out, " "))
+print(height(root))
+'''
+hints = [
+  "n.left = insert(n.left, v) — the recursion returns the subtree's new root; store it.",
+  "Calling insert without storing the result leaves the nil where it was, and nothing complains: a nil is not an error until it is followed. Leaving v off inserts a nil value, and the next comparison with it is.",
+]
+
+[quest.quiz]
+choices = ["n.left = insert(n.right, v)", "insert(n.left, v)", "n.left = insert(n.left, v)", "n.left = insert(n.left)"]
+answer  = 2
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "chain", stdin = "4 3 2 1\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "single", stdin = "7\n", expect = "7\n1\n", visible = false },
+  { name = "left-deep", stdin = "9 4 2 6 1\n", expect = "1 2 4 6 9\n4\n", visible = false },
+]

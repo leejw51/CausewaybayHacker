@@ -77,7 +77,9 @@ void main() {
  * water; Python is the wet market at dawn, amber coming up under a night that
  * has not quite gone; PyTorch is two floors underground, where there is no sky
  * and the only light is the rack in front of you; TypeScript is the office
- * tower at dusk, cold blue glass and every floor still lit.
+ * tower at dusk, cold blue glass and every floor still lit; Zig is the tunnel
+ * toll plaza at six, grey concrete and amber sodium light; Lua is Tai Hang on
+ * Mid-Autumn night, indigo, lanterns and the full moon.
  */
 const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   rust: { top: 0x161e50, bottom: 0x2c1a1e, glow: 0xf27828 },
@@ -90,6 +92,14 @@ const SKY: Record<Land, { top: number; bottom: number; glow: number }> = {
   // TypeScript is the ICC tower at dusk: a clear cold blue going to steel,
   // and every window lit the same TypeScript blue.
   typescript: { top: 0x0e2a5c, bottom: 0x0a1428, glow: 0x3178c6 },
+  // Zig is the Cross-Harbour Tunnel toll plaza at 06:00: a cold grey dawn
+  // over the booths, going to the brown of wet concrete under the Canal Road
+  // flyover, and the sodium lamps still burning amber.
+  zig: { top: 0x4a5058, bottom: 0x2a2620, glow: 0xf8b010 },
+  // Lua is Tai Hang on the fifteenth night: an indigo sky going to the
+  // violet the lanterns throw on the lanes, and the glow is lantern light
+  // under a full moon.
+  lua: { top: 0x1a1040, bottom: 0x3a1858, glow: 0x6850d0 },
   // REMIX LAND is tea time on Sugar Street: a pale afternoon sky going to
   // the caramel of the café front, and a milk-tea glow.
   remix: { top: 0x4a86c0, bottom: 0x5c3c18, glow: 0xd8a870 },

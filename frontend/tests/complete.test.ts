@@ -54,6 +54,17 @@ describe("completeAt offers the language's own shapes", () => {
     expect(s.text.slice(s.caret, s.caret + 2)).toBe("xs");
   });
 
+  it("gives Zig and Lua their own `for`, and Zig's `try` is the print", () => {
+    expect(taken("zig", "pub fn main() !void {\n    fo‸\n}\n")).toContain("for (xs) |x| {");
+    expect(taken("zig", "pub fn main() !void {\n    tr‸\n}\n")).toContain(
+      'try w.print("{d}\\n", .{});',
+    );
+    expect(taken("lua", "local function f()\n\tfo‸\nend\n")).toBe(
+      "\tfor i, x in ipairs(xs) do\n\t\t\n\tend",
+    );
+    expect(taken("lua", "local function f()\n\trep‸\nend\n")).toContain("until cond");
+  });
+
   it("brings the catch with the try and the case with the switch", () => {
     expect(taken("cpp", "int main() {\n  tr‸\n}\n")).toContain("catch (const std::exception& e)");
     expect(taken("go", "package main\nfunc f() {\n\tsw‸\n}\n")).toContain("default:");
@@ -152,6 +163,8 @@ describe("the template table itself", () => {
       python: (l) => `def f():\n    ${l}\n`,
       pytorch: (l) => `def f():\n    ${l}\n`,
       typescript: (l) => `function f(): void {\n  ${l}\n}\n`,
+      zig: (l) => `pub fn main() !void {\n    ${l}\n}\n`,
+      lua: (l) => `local function f()\n\t${l}\nend\n`,
     };
     for (const t of all) {
       const marked = around[t.id]
@@ -162,7 +175,8 @@ describe("the template table itself", () => {
   });
 
   it("covers every land with a grammar of its own", () => {
-    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Lang[]) {
+    // Lua's mode has no tree, but a template is text: it qualifies here.
+    for (const lang of ["rust", "go", "cpp", "python", "typescript", "zig", "lua"] as Lang[]) {
       expect(all.filter((t) => t.lang === lang).length).toBeGreaterThan(9);
     }
   });

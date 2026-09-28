@@ -546,6 +546,70 @@ return function()
     T.eq(kind_of(editor.highlight("interface X", "code"), "interface"), "text")
   end)
 
+  T.case("Zig is coloured as Zig: builtins as macros, and no macros", function()
+    local function kind_of(spans, word)
+      for _, s in ipairs(spans) do
+        if s.text == word then return s.kind end
+      end
+    end
+    local spans = editor.highlight('const std = @import("std"); // fn', "code", "zig")
+    T.eq(kind_of(spans, "const"), "keyword")
+    T.eq(kind_of(spans, "@import"), "macro", "a builtin is coloured as Rust's macros are")
+    T.eq(kind_of(spans, '"std"'), "string")
+    T.eq(spans[#spans].kind, "comment", "// is a comment")
+    spans = editor.highlight("pub fn main() anyerror!void { try w.flush(); }", "code", "zig")
+    T.eq(kind_of(spans, "try"), "keyword")
+    T.eq(kind_of(spans, "anyerror"), "type", "`anyerror!` is an error union, not a macro")
+    T.eq(kind_of(spans, "void"), "type")
+    T.eq(kind_of(editor.highlight("var buf: [256]u8 = undefined;", "code", "zig"), "u8"), "type")
+    -- A char literal, and a multiline string line.
+    T.eq(kind_of(editor.highlight("const c = 'x';", "code", "zig"), "'x'"), "string")
+    local multi = editor.highlight("    \\\\line two", "code", "zig")
+    T.eq(multi[#multi].kind, "string", "a line starting with \\\\ is a string to its end")
+    T.eq(multi[#multi].text, "\\\\line two")
+    -- No block comments in Zig, so `/*` opens nothing.
+    local _, state = editor.highlight("x = 1; /* not a comment", "code", "zig")
+    T.eq(state, "code")
+    -- Rust's words are plain words there.
+    T.eq(kind_of(editor.highlight("impl match", "code", "zig"), "impl"), "text")
+  end)
+
+  T.case("Lua is coloured as Lua: -- comments, three kinds of string, # an operator", function()
+    local function kind_of(spans, word)
+      for _, s in ipairs(spans) do
+        if s.text == word then return s.kind end
+      end
+    end
+    local spans = editor.highlight("local n = #t -- fn end", "code", "lua")
+    T.eq(kind_of(spans, "local"), "keyword")
+    T.eq(kind_of(spans, "#"), "punct", "# is the length operator, not a comment")
+    T.eq(spans[#spans].kind, "comment")
+    T.eq(spans[#spans].text, "-- fn end")
+    T.eq(kind_of(editor.highlight("if x then return end", "code", "lua"), "end"), "keyword")
+    T.eq(kind_of(editor.highlight("print(#xs)", "code", "lua"), "print"), "type",
+      "the standard library's names take the type colour, since Lua has no types")
+    -- `//` is two slashes in Lua, not a comment.
+    local slashes = editor.highlight("x // 2", "code", "lua")
+    T.eq(slashes[#slashes].kind, "number", "the 2 after // is still code")
+    -- Single quotes and long brackets are strings.
+    local strings = {}
+    for _, sp in ipairs(editor.highlight("local s = 'a(b' .. [[c)d]] .. \"e\"", "code", "lua")) do
+      if sp.kind == "string" then strings[#strings + 1] = sp.text end
+    end
+    T.same(strings, { "'a(b'", "[[c)d]]", '"e"' })
+    -- A block comment carries across lines, and closes on ]] not */.
+    local _, state = editor.highlight("--[[ the borrow checker", "code", "lua")
+    T.eq(state, "block_comment")
+    local more, state2 = editor.highlight("   is not here */ ]] local x = 1", state, "lua")
+    T.eq(state2, "code")
+    T.eq(more[1].kind, "comment")
+    T.eq(more[1].text, "   is not here */ ]]")
+    T.eq(kind_of(more, "local"), "keyword", "code after the close is code again")
+    -- Rust's words are plain words there, and Lua's are plain in Rust.
+    T.eq(kind_of(editor.highlight("fn impl match", "code", "lua"), "fn"), "text")
+    T.eq(kind_of(editor.highlight("local end", "code"), "local"), "text")
+  end)
+
   T.case("a block comment carries across lines", function()
     local _, state = editor.highlight("/* the borrow checker", "code")
     T.eq(state, "block_comment")
@@ -573,6 +637,21 @@ return function()
       local joined = {}
       for i, s in ipairs(spans) do joined[i] = s.text end
       T.eq(table.concat(joined), line, "spans must rebuild the line exactly")
+    end
+    for _, case in ipairs({
+      { "zig", 'const std = @import("std");' },
+      { "zig", "    \\\\ multi" },
+      { "zig", "const c = '\\'';" },
+      { "zig", "@" },
+      { "lua", "--[[ open" },
+      { "lua", "local n = #t .. [[long" },
+      { "lua", "x // 2 -- 'q" },
+      { "lua", "[[" },
+    }) do
+      local spans = editor.highlight(case[2], "code", case[1])
+      local joined = {}
+      for i, s in ipairs(spans) do joined[i] = s.text end
+      T.eq(table.concat(joined), case[2], case[1] .. ": spans must rebuild the line exactly")
     end
   end)
 

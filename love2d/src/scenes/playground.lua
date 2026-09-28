@@ -65,6 +65,11 @@ local STARTER = {
   pytorch = 'import torch\n\nprint("hello", torch.tensor([1, 2, 3]).tolist())\n',
   -- Stdin the one way `node.d.ts` declares it: there is no @types/node.
   typescript = 'const input: string = require("fs").readFileSync(0, "utf8");\n\nconsole.log("hello");\n',
+  -- Zig 0.16: stdout is a buffered writer that has to be flushed, or the
+  -- program ends with "hello" still in `buf`. `std.debug.print` would be
+  -- the short way, and it is stderr, which the judge does not read.
+  zig = 'const std = @import("std");\n\npub fn main(init: std.process.Init) !void {\n    var buf: [256]u8 = undefined;\n    var out = std.Io.File.stdout().writerStreaming(init.io, &buf);\n    const w = &out.interface;\n    try w.print("hello\\n", .{});\n    try w.flush();\n}\n',
+  lua = 'print("hello")\n',
 }
 Playground.LANGS = LANGS
 Playground.STARTER = STARTER
@@ -1647,7 +1652,7 @@ function Playground:make_poster(lib)
     lang = self.lang,
     name = pad_name,
     file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py", pytorch = "main.py",
-      typescript = "main.ts" })[self.lang],
+      typescript = "main.ts", zig = "main.zig", lua = "main.lua" })[self.lang],
     source = source,
     run = Poster.run_of(self.result, log_lines),
     user = { name = self.app.session:display_name() or "hacker", address = address },

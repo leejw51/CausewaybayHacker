@@ -5,21 +5,22 @@
 In Causeway Bay, a Rust coder wakes up and cannot write a `for` loop. The
 vibe-coding was never a convenience — it was Skynet's long game, and it worked.
 Every skill is still in there somewhere. You get them back one street at a time,
-in Rust, in Go, in C++, in Python, in PyTorch and in TypeScript — and, in the
-café on Sugar Street, in three of them at once — and then you go and fight the
+in Rust, in Go, in C++, in Python, in PyTorch, in TypeScript, in Zig and in
+Lua — and, in the café on Sugar Street, in three of them at once — and then
+you go and fight the
 thing that took them — which, in PyTorch Land, you build a small one of
 yourself.
 
-Seven lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
-**PYTORCH LAND**, **TYPESCRIPT LAND** and **REMIX LAND**. Four roads through
-each language land, and two through REMIX:
+Nine lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
+**PYTORCH LAND**, **TYPESCRIPT LAND**, **ZIG LAND**, **LUA LAND** and **REMIX
+LAND**. Four roads through each language land, and two through REMIX:
 
 | | |
 | --- | --- |
 | **VERY BASIC** | the quiz: types, containers, a thread, a mutex, a heap, a stack, a struct — the grammar a live coding test leans on, asked as a question first. Four lines, one right; pick it, then type it; untimed |
 | **BASIC** | grammar activation, not a quiz: each node shows one construct with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed. In Rust Land this is the language's own grammar, the half a live coding screen assumes — ownership and the move, `&` and `&mut`, `mem::swap`/`take`, slices, `String`/`&str`, chars and bytes, `Option`/`Result`/`?`, `match`, iterator chains, the entry API, comparators, a `Reverse` heap, a derived `Ord`, fast stdin, formatting, overflow, lifetimes on a function and a struct, a trait, a generic bound, `Box<dyn>`, `Rc<RefCell>`, closure kinds, threads, `Arc<Mutex>`, atomics and `RwLock`, a channel, many producers and one consumer, a worker pool at the boss. The other lands' BASIC roads are the plain grammar — integer widths, floats, strings, slices, loops, functions, structs, enums, containers, sorting, closures, a thread, a tree |
 | **ADVANCED** | the live coding test, untimed: a brief, a whole program, visible and hidden cases. Rust Land applies what BASIC drilled — ownership, slices, errors, traits, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, a pipeline, DEADLOCK. The other lands keep the same shape with their own grammar: interfaces, pointers, goroutines, `select`, async, RAII, generators |
-| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — TypeScript's included — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
+| **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — TypeScript's, Zig's and Lua's included — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
 
 **REMIX LAND** is the one land that is not a language. It is the same program
 three times: every concept is a *trio* of nodes — Go, then Rust, then Python,
@@ -42,8 +43,10 @@ Each road is a Super Mario World overworld. Clear a node, it is stamped
 **The code is really compiled.** Rust goes through `rustc`/`cargo`, Go through
 `go build`/`go test`, C++ through the system `c++` (clang or gcc, `-std=c++20`),
 Python through `py_compile` and then `python3 -I`, TypeScript through a strict
-`tsc` and then `node`, on your machine, against hidden tests. There is no
-pretend-verdict — and no running a TypeScript program `tsc` has rejected.
+`tsc` and then `node`, Zig through `zig build-exe -O Debug` with every safety
+check on, Lua through `luajit` — the interpreter the LÖVE client itself runs
+on — on your machine, against hidden tests. There is no pretend-verdict — and
+no running a TypeScript program `tsc` has rejected.
 
 **Your mistakes are the curriculum.** Every attempt is kept — the source, the
 verdict, the compiler's own error codes. `E0382` five times in a week is not a

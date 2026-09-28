@@ -17,6 +17,7 @@ local Reader = {}
 
 local LANDS = {
   rust = true, go = true, cpp = true, python = true, pytorch = true, typescript = true,
+  zig = true, lua = true,
 }
 
 --- The verdict on a claim, given `recover(message, signature) -> address|nil`.

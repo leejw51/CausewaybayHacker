@@ -123,6 +123,8 @@ test.describe("the lands are drawn in their own colours", () => {
       "python",
       "pytorch",
       "typescript",
+      "zig",
+      "lua",
       "remix",
     ] as Land[]) {
       await pickLand(page, land);

@@ -76,7 +76,7 @@ She starts with `println!`.
 
 ---
 
-## 3. The six lands
+## 3. The nine lands
 
 ### RUST LAND — the street
 
@@ -181,9 +181,50 @@ sentinel per runner.
 Colour: milk tea with the coffee in it, a caramel warmer and greyer than
 Rust's orange. Time: 15:00, honey light through the front window.
 
+### ZIG LAND — the toll plaza
+
+The Causeway Bay portal of the Cross-Harbour Tunnel at first light: the toll
+plaza, its row of booths with their coin trays, the axle counters, the Canal
+Road flyover overhead with the villain-hitters already at work under it,
+beating a paper Skynet with a slipper. Everything here is **explicit**: no
+hidden control flow, no hidden allocation. Every toll is counted by hand,
+every byte is paid for up front and handed back on the way out, every error
+is a value in a return and is either handled or named. The question is always
+"who pays for this, and who gives it back".
+
+Nothing hides: a `?T` has to be unwrapped before it is read, an `!T` has to
+be `try`'d or caught, an integer that overflows says so and stops, an index
+past the end says so and stops. The land is built out of those checks, so
+its programs are built in `-O Debug`, where every one of them is on.
+
+Colour: Zig amber off wet concrete — a deeper, yellower orange than
+Ferris's, under sodium lamps that have not been switched off yet. Time:
+06:00, the first tram over the flyover, the last of the night traffic paying
+its way out.
+
+### LUA LAND — the fire dragon
+
+Tai Hang on the fifteenth night of the eighth month: the Mid-Autumn fire
+dragon, sixty-seven metres of straw and incense carried through the lanes by
+three hundred people, the lanterns in Victoria Park, and the full moon over
+all of it. *Lua* is the moon. Everything here is **a table**: the dragon is a
+table of segments and the segments start at 1, the lanterns are a table of
+tables, a function is a value that lives in one, and behind every object that
+seems to be something more there is a metatable saying how. The question is
+always "what is at this key, and what does the table do when nothing is".
+
+The runtime is LuaJIT, the same one the LÖVE client runs on, so a program
+that works on the desk works on the dragon. It is the one land whose whole
+grammar fits on a napkin, and the one land where a missing key is not an
+error until it is followed.
+
+Colour: moon indigo — a lantern-lit violet-blue night, warmer than
+TypeScript's LED blue and nothing like C++'s noon navy. Time: 21:00, the
+drums starting, the incense lit, the moon just clear of the ridge.
+
 The player picks a land. The others are still there, unchanged, and can be
 started at any time. None of them is a sequel to another, and the hacker road
-asks the same thirty-four questions in five of them, so the interview can be
+asks the same thirty-four questions in seven of them, so the interview can be
 sat in whichever language the player is taking back. PyTorch Land's hacker
 road is the exception and is meant to be: it is the machine-learning
 interview, and its thirty-four questions are that interview's.
@@ -232,6 +273,14 @@ One per map, always the last node, `map.kind = "boss"`.
 | `typescript.basic` | 27 | **UNDEFINED** | `Cannot read properties of undefined (reading 'left')`: the tree of screen ids has a branch that is not there yet, and the insert has to look before it walks. |
 | `typescript.advanced` | 34 | **THE EVENT LOOP** | The signage control room, one thread for every screen on the island. One callback never yields, and every board from Tin Hau to Hysan freezes on the same frame. |
 | `typescript.hacker` | 34 | **THE ERASURE** | The sixth interview, Room 7-32. The types are gone at runtime and the clock is not. |
+| `zig.verybasic` | 27 | **THE OVERFLOW** | Booth 3's axle counter is a `u8`. The two-hundred-and-fifty-sixth axle of the morning is not zero, it is `panic: integer overflow`, and the barrier stays down. One wider type would have carried it. |
+| `zig.basic` | 27 | **THE NULL** | `panic: attempt to use null value`: an optional child, unwrapped with `.?` before anyone looked. The tree of toll receipts has a branch that is not there yet, and the insert has to look before it walks. |
+| `zig.advanced` | 34 | **THE UNREACHABLE** | The flyover's lane model marks one branch `unreachable`, and at 07:59 the traffic reaches it. `panic: reached unreachable code`, and every lane closes at once. |
+| `zig.hacker` | 34 | **THE TOLL** | The seventh interview, Room 7-32. Every allocation paid for, every error handled or named, and the clock. |
+| `lua.verybasic` | 27 | **THE ZERO** | The dragon's segments are numbered from 1. `segments[0]` is `nil`, the head is nowhere, and the dance starts from the second lantern. |
+| `lua.basic` | 27 | **NIL** | `attempt to index a nil value (field 'left')`: a child that is `nil`, followed. The tree of lantern numbers has a branch that is not there yet, and the insert has to look before it walks. |
+| `lua.advanced` | 34 | **THE COROUTINE** | The incense runners along the dragon are coroutines, one per segment. One never yields, and the whole dragon stops on one segment with the drums still going. |
+| `lua.hacker` | 34 | **THE MOON** | The eighth interview, Room 7-32, under the full moon. One table type for every structure, and the clock. |
 
 On the merged ADVANCED road the four old BASIC bosses keep their stories but
 lose the `boss` mark and their titles, so the name and the art belong to one

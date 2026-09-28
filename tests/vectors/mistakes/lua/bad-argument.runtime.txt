@@ -1,0 +1,5 @@
+luajit: main.lua:2: bad argument #2 to 'rep' (number expected, got table)
+stack traceback:
+	[C]: in function 'rep'
+	main.lua:2: in main chunk
+	[C]: at 0x<pc>

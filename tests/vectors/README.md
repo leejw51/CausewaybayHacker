@@ -213,6 +213,8 @@ go build -o prog main.go                                        # then ./prog
 go vet ./main.go            # the unhandled-error row only
 go run -race main.go        # the data-race row only
 c++ -std=c++20 -O2 -pthread -o prog main.cpp                    # then ./prog
+zig build-exe main.zig -O Debug --color off -femit-bin=prog      # then ./prog (zig 0.16.0)
+luajit -b main.lua main.luac                                    # then luajit main.lua
 python3 -m py_compile main.py                                   # then python3 -I main.py
 ```
 
@@ -275,8 +277,13 @@ behave alike:
 
 ### Two groups of cases
 
-* **42 synthetic sources** under `rust/`, `go/`, `cpp/` and `python/`, one or
-  more per taxonomy row, written to isolate one diagnostic each.
+* **79 synthetic sources** under `rust/`, `go/`, `cpp/`, `python/`,
+  `typescript/`, `zig/` and `lua/`, one or more per taxonomy row, written to
+  isolate one diagnostic each. The Zig captures (`*.zig.txt`, and the
+  `*.runtime.txt` beside a panic) have the scratch path, the thread id and the
+  addresses taken out and the `referenced by:` trail cut, since it names
+  lines inside the compiler's own `std`; the LuaJIT captures (`*.luajit.txt`)
+  have the interpreter's own `[C]: at 0x…` address taken out.
 * **6 real starters** from the shipped content, under `content_starter_cases`
   in `expected.json`. These are worth more than the synthetic ones beside
   them: they are the exact bytes a player's editor opens with, so the

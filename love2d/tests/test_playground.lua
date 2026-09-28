@@ -97,7 +97,7 @@ return function()
     local Playground = require("src.scenes.playground")
     local Land = require("src.land")
     T.same(Playground.LANGS, Land.LANGS, "TAB walks the languages' order")
-    T.same(Land.LANGS, { "rust", "go", "cpp", "python", "pytorch", "typescript" })
+    T.same(Land.LANGS, { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua" })
     T.eq(Playground.STARTER.remix, nil, "remix is not a language a scratchpad can be in")
     for _, lang in ipairs(Land.LANGS) do
       local starter = Playground.STARTER[lang]
@@ -116,6 +116,13 @@ return function()
       "the TypeScript starter reads stdin the one way node.d.ts declares")
     T.ok(Playground.STARTER.typescript:find("console.log(", 1, true) ~= nil,
       "and prints with console.log")
+    T.ok(Playground.STARTER.zig:find("writerStreaming", 1, true) ~= nil,
+      "the Zig starter prints through 0.16's buffered writer")
+    T.ok(Playground.STARTER.zig:find("flush()", 1, true) ~= nil,
+      "and flushes it, or hello never leaves the buffer")
+    T.ok(Playground.STARTER.zig:find("std.debug.print", 1, true) == nil,
+      "and not through std.debug.print, which is stderr")
+    T.ok(Playground.STARTER.lua:find("print(", 1, true) ~= nil, "the Lua starter prints")
   end)
 
   T.case("the run shares the one execution slot", function()

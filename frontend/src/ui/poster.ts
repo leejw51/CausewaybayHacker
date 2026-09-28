@@ -54,7 +54,9 @@ import { goLanguage } from "@codemirror/lang-go";
 import { cppLanguage } from "@codemirror/lang-cpp";
 import { pythonLanguage } from "@codemirror/lang-python";
 import { typescriptLanguage } from "@codemirror/lang-javascript";
-import type { LRLanguage } from "@codemirror/language";
+import { zigLanguage } from "codemirror-lang-zig";
+import { lua } from "@codemirror/legacy-modes/mode/lua";
+import { StreamLanguage, type Language } from "@codemirror/language";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import qrcode from "qrcode-generator";
 import type { Lang } from "../net/protocol";
@@ -384,13 +386,21 @@ export function fitDisc(
 
 // -- tokenising (pure) ---------------------------------------------------------
 
-const PARSER: Record<Lang, LRLanguage> = {
+/**
+ * `Language`, not `LRLanguage`: Lua's is a `StreamLanguage`, whose parser is
+ * a token stream rather than a Lezer tree. All `tones` needs of either is
+ * `parser.parse`, and a stream parser's tree has one leaf per token, named
+ * after its tag, which `toneOfNode` reads.
+ */
+const PARSER: Record<Lang, Language> = {
   rust: rustLanguage,
   go: goLanguage,
   cpp: cppLanguage,
   python: pythonLanguage,
   pytorch: pythonLanguage,
   typescript: typescriptLanguage,
+  zig: zigLanguage,
+  lua: StreamLanguage.define(lua),
 };
 
 /**

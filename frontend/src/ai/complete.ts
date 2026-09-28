@@ -254,6 +254,54 @@ const TEMPLATES: Record<Lang, readonly Template[]> = {
     { id: "ts.require", key: "require", lines: ['require("fs").readFileSync(0, "utf8")$'] },
     { id: "ts.map", key: "new", lines: ["new Map<$string, number>()"] },
   ],
+  // Zig Land: four spaces, as `zig fmt` writes, and the writer is `w`, as
+  // the starter names it. `try` *is* the print — `try w.print(…)` is the
+  // `try` this land types most, and a template's first line has to start
+  // with its key, which `w.print` does not. No key is a prefix of another.
+  zig: [
+    { id: "zig.for", key: "for", stmt: true, lines: ["for ($xs) |x| {", "\t", "}"] },
+    { id: "zig.while", key: "while", stmt: true, lines: ["while ($cond) {", "\t", "}"] },
+    { id: "zig.if", key: "if", stmt: true, lines: ["if ($cond) {", "\t", "}"] },
+    { id: "zig.fn", key: "fn", stmt: true, lines: ["fn $name() void {", "\t", "}"] },
+    { id: "zig.pub", key: "pub", stmt: true, lines: ["pub fn $name() !void {", "\t", "}"] },
+    { id: "zig.struct", key: "struct", lines: ["struct {", "\t$", "}"] },
+    { id: "zig.enum", key: "enum", lines: ["enum {", "\t$", "}"] },
+    {
+      id: "zig.switch",
+      key: "switch",
+      stmt: true,
+      lines: ["switch ($x) {", "\telse => {},", "}"],
+    },
+    { id: "zig.const", key: "const", stmt: true, lines: ["const $x = ;"] },
+    { id: "zig.var", key: "var", stmt: true, lines: ["var $x = ;"] },
+    { id: "zig.print", key: "try", stmt: true, lines: ['try w.print("{d}\\n", .{$});'] },
+    { id: "zig.defer", key: "defer", stmt: true, lines: ["defer $x.deinit();"] },
+    { id: "zig.errdefer", key: "errdefer", stmt: true, lines: ["errdefer $x.deinit();"] },
+    { id: "zig.catch", key: "catch", lines: ["catch |err| {", "\t$", "}"] },
+    { id: "zig.orelse", key: "orelse", lines: ["orelse $0"] },
+  ],
+  // Lua Land: blocks close on `end`, a tab per level as `stylua` writes
+  // bare. One `for`, the `ipairs` one: a numeric `for i = 1, n` would have
+  // the same key, and the second of two templates on one key is never
+  // offered. No key is a prefix of another.
+  lua: [
+    { id: "lua.for", key: "for", stmt: true, lines: ["for i, x in ipairs($xs) do", "\t", "end"] },
+    { id: "lua.while", key: "while", stmt: true, lines: ["while $cond do", "\t", "end"] },
+    { id: "lua.if", key: "if", stmt: true, lines: ["if $cond then", "\t", "end"] },
+    {
+      id: "lua.function",
+      key: "function",
+      stmt: true,
+      lines: ["function $name()", "\t", "end"],
+    },
+    { id: "lua.local", key: "local", stmt: true, lines: ["local $x = "] },
+    { id: "lua.repeat", key: "repeat", stmt: true, lines: ["repeat", "\t", "until $cond"] },
+    { id: "lua.table", key: "table", stmt: true, lines: ["table.insert($xs, )"] },
+    { id: "lua.print", key: "print", stmt: true, lines: ["print($)"] },
+    { id: "lua.io", key: "io", lines: ['io.read("*a")$'] },
+    { id: "lua.coroutine", key: "coroutine", lines: ["coroutine.wrap(function ()", "\t$", "end)"] },
+    { id: "lua.setmetatable", key: "setmetatable", lines: ["setmetatable($t, { __index = })"] },
+  ],
 };
 
 /** Shortest prefix worth guessing from. One letter matches everything. */

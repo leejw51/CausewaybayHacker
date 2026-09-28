@@ -112,6 +112,8 @@ pub fn source_filename(lang: &str) -> &'static str {
         // so its programs are `main.py` too (SPEC §5.1).
         "python" | "pytorch" => "main.py",
         "typescript" => "main.ts",
+        "zig" => "main.zig",
+        "lua" => "main.lua",
         _ => "main.rs",
     }
 }

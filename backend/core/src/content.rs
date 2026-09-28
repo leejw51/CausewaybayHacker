@@ -68,7 +68,9 @@ pub struct QuestDef {
     pub lang: Option<String>,
 }
 
-/// Every land, in SPEC §0's order. `remix` is the one that is not a language.
+/// Every land, in SPEC §0's order. `remix` is the one that is not a language
+/// and stays last; the eighth and ninth, `zig` and `lua`, are languages and
+/// sit before it.
 pub const LANDS: &[&str] = &[
     "rust",
     "go",
@@ -76,6 +78,8 @@ pub const LANDS: &[&str] = &[
     "python",
     "pytorch",
     "typescript",
+    "zig",
+    "lua",
     "remix",
 ];
 

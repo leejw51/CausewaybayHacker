@@ -41,6 +41,8 @@ local BLURB = {
   python = "dicts, generators, the GIL",
   pytorch = "tensors, gradients, attention",
   typescript = "interfaces, generics, narrowing",
+  zig = "optionals, errors as values, comptime",
+  lua = "tables, closures, coroutines",
   remix = "go, rust, python: one program, three times",
 }
 

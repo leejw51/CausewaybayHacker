@@ -36,6 +36,8 @@ fn untidy(lang: &str) -> &'static str {
         // fixture this land's rather than a copy of the one above.
         "pytorch" => "import torch\ndef main():\n  x=torch.tensor([1])\n  print( x )\nmain()\n",
         "typescript" => "function main(){const x:number=1\nconsole.log( x )}\nmain()\n",
+        "zig" => "pub fn main() void {const x:i32=1;_=x;}\n",
+        "lua" => "local function main()\nlocal x=1\nprint( x )\nend\nmain()\n",
         other => panic!("no fixture for {other}"),
     }
 }
@@ -49,11 +51,22 @@ fn tidy_mark(lang: &str) -> &'static str {
         "python" => "    x = 1",
         "pytorch" => "    x = torch.tensor([1])",
         "typescript" => "  const x: number = 1;",
+        "zig" => "    const x: i32 = 1;",
+        "lua" => "local x = 1",
         other => panic!("no mark for {other}"),
     }
 }
 
-const LANDS: [&str; 6] = ["rust", "go", "cpp", "python", "pytorch", "typescript"];
+const LANDS: [&str; 8] = [
+    "rust",
+    "go",
+    "cpp",
+    "python",
+    "pytorch",
+    "typescript",
+    "zig",
+    "lua",
+];
 
 #[test]
 fn every_advertised_land_formats_and_the_rest_refuse_cleanly() {
@@ -118,6 +131,8 @@ fn half_written_source_never_loses_a_character() {
         ("cpp", "int main( { std::cout <<"),
         ("python", "def main(:\n  x=1\n"),
         ("typescript", "function main( { const x ="),
+        ("zig", "pub fn main() void { const x = = 1; }"),
+        ("lua", "local function main(\nlocal x = 1\n"),
     ];
     for (lang, source) in broken {
         if !format::supported_langs().contains(&lang) {

@@ -14,6 +14,9 @@ import { go } from "@codemirror/lang-go";
 import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
+import { zig } from "codemirror-lang-zig";
+import { StreamLanguage } from "@codemirror/language";
+import { lua } from "@codemirror/legacy-modes/mode/lua";
 import type { CodeContext } from "../src/ai/help";
 import type { Lang } from "../src/net/protocol";
 
@@ -27,6 +30,8 @@ const MODE: Record<Lang, () => Extension> = {
   python,
   pytorch: python,
   typescript: () => javascript({ typescript: true }),
+  zig,
+  lua: () => StreamLanguage.define(lua),
 };
 
 /** The context the editor would build, from a fixture with the caret at `‸`. */

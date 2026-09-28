@@ -7514,3 +7514,108 @@ by `checknodes.py`. The land's colour is milk tea, `(216, 168, 112)`.
 rust.basic ids the 2026-09-28 rewrite retired, and CI's backend job was red
 on it; it now names the current first two quests and asserts the shape of
 the hints rather than one hint's text.
+
+## 2026-09-28 — An eighth and a ninth land: ZIG and LUA, two toolchains and eighteen paintings
+
+ZIG LAND and LUA LAND are `rust`, `go`, `cpp`, `python`, `pytorch`,
+`typescript`, **`zig`**, **`lua`**, `remix` — inserted before REMIX, which
+stays last because it is the land that is not a language. Both are
+toolchains of their own, `runner/src/zig.rs` and `runner/src/lua.rs`, and
+both are ports node for node: Zig of C++'s four roads, Lua of Python's, the
+same `map`, `difficulty`, `concepts`, `requires` and the same cases byte for
+byte, 27/27/34/34, so both HACKER roads ask the thirty-four interview
+questions the other language lands ask. The bosses are `docs/story.md` §5's:
+THE OVERFLOW, THE NULL, THE UNREACHABLE, THE TOLL; THE ZERO, NIL, THE
+COROUTINE, THE MOON.
+
+**`-O Debug`, on purpose.** ZIG LAND is about the checks Zig makes explicit:
+an index past the end, an optional unwrapped while null, an integer that
+overflows, a branch marked `unreachable`. In Debug every one of them is on
+and dies saying what it is — `panic: index out of bounds: index 3, len 3`,
+on the player's line — and `ReleaseFast` would make three of the four silent
+undefined behaviour, which is the lesson the land exists to un-teach. Debug
+is also the fast compile: under a second warm against four for an optimised
+build, and the measured cost at runtime is nothing the clock notices (a
+four-million-operation Fenwick case in 0.26 s). The two caches are named on
+the command line because `zig` derives its global cache from `HOME`, which
+`toolchain_base` points at the attempt: without the flag every attempt
+rebuilt `std` from scratch.
+
+**Zig 0.16.0, pinned.** The `std` API moved under this land while it was
+being written — `std.heap.GeneralPurposeAllocator` is gone, `std.io.getStdIn`
+is `std.Io.File.stdin()` and needs the `Io` that `main(init:
+std.process.Init)` is handed, `std.Thread.Mutex` is `std.Io.Mutex`,
+`ArrayList` and `PriorityQueue` are unmanaged. Every idiom in the packs was
+compiled on 0.16.0 and the packs are only known to compile there, so the
+runner's hint, `make doctor` and CI (`mlugg/setup-zig`, `ZIG_VERSION`) all
+name the version, the way `TYPESCRIPT_VERSION` is named and for the same
+reason: a starter is asserted to *fail*, and a different compiler can find a
+different reason for it to.
+
+**LuaJIT, and only LuaJIT.** It is the interpreter the LÖVE client runs on
+and its headless suite tests under, so the land's programs run on the same
+runtime the desk does. It is Lua 5.1 with LuaJIT's extensions, which is not
+Lua 5.4: `print(6 / 2)` is `3` here and `3.0` there, `//` does not parse,
+`table.unpack` does not exist, a product past 2^53 loses digits, and a plain
+recursive function overflows the stack near twenty thousand frames (Python's
+limit is a thousand; the deep-DFS quests use an explicit stack). A pack
+verified on one interpreter is wrong on the other, so `lua.rs` looks for
+`luajit` and refuses without it rather than falling back to a `lua` that
+would judge the land's own solutions wrong. `luajit -b main.lua main.luac`
+is the compile phase — the bytecode is thrown away; what it finds is a
+syntax error, before a line runs, as `py_compile` does — and the run is the
+source, so a traceback names `main.lua` and the line.
+
+**The classifiers.** Zig has no error codes and one voice, `main.zig:3:20:
+error: expected type 'i32', found '?i32'`, so its identity is made from the
+message's shape as C++'s is, under `zig:` slugs; the runtime rows are the
+panics, each keyed on its own words, plus `error: Name` for an error `main`
+returned and nobody handled, and a segfault filed as `zig:stack-overflow`
+under `wrong-answer` because in Debug that is what deep recursion looks
+like. Zig's compile errors include two that no other land has as errors —
+an unused local and a `var` never mutated — and they file as `unused`. Lua's
+one line, `attempt to index field 'left' (a nil value)`, splits on what was
+tried on what: a global that is nil is a name that was never defined
+(`lua:undefined-global`, unknown-name), a local or field that is nil is a
+nil followed (`lua:index-nil`, nil-deref), anything else is a type that does
+not do that (`lua:arithmetic-type`, type-mismatch). `tests/vectors/mistakes`
+gained thirteen Zig and ten Lua fixtures, all captured from the real
+toolchains and all verified.
+
+**Migration 0023** rebuilds the three tables the way 0021 did, from 0022's
+shapes, with `zig` and `lua` in four CHECKs — `quests.land`, `quests.lang`,
+`attempts.lang`, `snippets.lang`. Its first draft copied 0022's INSERT
+verbatim, which fills `lang` from `land`; for a remix row that is `remix`,
+which the `lang` CHECK refuses, and the migration test written for 0023
+failed on exactly that before the migration ever met a real database. The
+column is copied from `lang` now. Three tests used `zig` as the sentinel
+for "a land the game does not have"; the sentinel is `cobol`.
+
+**The web editor.** Zig has a real Lezer grammar (`codemirror-lang-zig`), so
+the construct help, the loop-closing effect and the poster's colouring all
+read its tree — `ForStatement`, `SwitchExpr`, `FnProto`, `ContainerDecl`
+— and the package resolves as published, with no build configuration. Lua
+rides on `@codemirror/legacy-modes/mode/lua`, a stream mode with tokens and
+no tree: it highlights (its lowercase token names needed a branch of their
+own in `toneOfNode`, or `string` read as a keyword), the word catalogue
+teaches, and the two tree-driven effects honestly do nothing rather than
+guess. Lua's indent unit is a tab, because `stylua` — the land's `code.format`
+— writes tabs by default and the editor's rule is "what the formatter
+writes". The LÖVE editor's line tokenizer learned `--` and `--[[ … ]]`
+comments and `'…'` / `[[…]]` strings for Lua, and `@builtin` names and `\\`
+string lines for Zig; the two clients' tips and advice for the new languages
+were written apart and then made word for word the same, the web's being the
+source.
+
+**Colours.** Zig amber `(248, 176, 16)`: yellower than Ferris's orange,
+darker than Python's gold, the third warm land and the one that sits between
+the other two on the green channel. Lua moon indigo `(104, 80, 208)`: the
+first violet on the map, nothing like C++'s noon navy or TypeScript's LED
+blue. The art is Grok's: the amber wall gecko in a hi-vis vest on a coin
+tray, the villain-hitters under the Canal Road flyover, the tunnel control
+room, a toll-plaza overworld at first light; the moon's white rabbit with a
+lantern, a Tai Hang lane under the full moon, the fire dragon coming
+through, the lantern carnival, and an indigo overworld with the dragon
+coiled where the boss sits. Both portrait plates were re-rolled once for a
+flat patch under a node, which `checknodes.py` found and the prompt had not
+prevented.

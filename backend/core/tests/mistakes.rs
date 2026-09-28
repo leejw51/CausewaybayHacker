@@ -961,3 +961,340 @@ fn the_new_concepts_are_reachable_from_the_taxonomy() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Zig: no codes, one voice, the message's shape as the identity.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn every_zig_row_of_the_table_maps() {
+    // What `zig build-exe` really prints (zig 0.16.0), one diagnostic per
+    // row of SPEC §7.1's Zig column, with the echoed source and the caret
+    // that follow each — which must not become mistakes of their own.
+    let rows = [
+        (
+            "main.zig:4:23: error: expected type 'i32', found '*const [6:0]u8'",
+            "type-mismatch",
+            "zig:expected-type",
+        ),
+        (
+            "main.zig:5:32: error: use of undeclared identifier 'totl'",
+            "unknown-name",
+            "zig:undeclared-identifier",
+        ),
+        (
+            "main.zig:3:9: error: unused local variable",
+            "unused",
+            "zig:unused",
+        ),
+        (
+            "main.zig:3:9: error: local variable is never mutated",
+            "unused",
+            "zig:unused",
+        ),
+        (
+            "main.zig:5:5: error: cannot assign to constant",
+            "mutability",
+            "zig:cannot-assign-constant",
+        ),
+        (
+            "main.zig:7:10: error: error union is ignored",
+            "unhandled-error",
+            "zig:error-not-handled",
+        ),
+        (
+            "main.zig:6:33: error: no field named 'lanes' in struct 'main.Booth'",
+            "missing-trait",
+            "zig:no-member",
+        ),
+        (
+            "main.zig:2:42: error: no field or member function named 'len' in '[1:0]u8'",
+            "missing-trait",
+            "zig:no-member",
+        ),
+        (
+            "main.zig:5:24: error: expected type 'i32', found '?i32'",
+            "nil-deref",
+            "zig:optional-unwrapped",
+        ),
+        (
+            "main.zig:3:16: error: expected ';' after statement",
+            "syntax",
+            "zig:expected-token",
+        ),
+        (
+            "main.zig:3:39: error: switch must handle all possibilities",
+            "unhandled-error",
+            "zig:switch-not-exhaustive",
+        ),
+        (
+            "main.zig:2:51: error: index 3 outside array of length 1",
+            "index-range",
+            "zig:index-out-of-bounds",
+        ),
+        (
+            "main.zig:2:20: error: expected 2 argument(s), found 1",
+            "type-mismatch",
+            "zig:expected-type",
+        ),
+    ];
+    for (line, kind, code) in rows {
+        let stderr = format!("{line}\n    const x = 1\n              ^\n");
+        let found = mistakes::classify_compile("zig", &stderr);
+        assert_eq!(found.len(), 1, "{line}: {found:?}");
+        assert_eq!(found[0].kind, kind, "{line}");
+        assert_eq!(found[0].code.as_deref(), Some(code), "{line}");
+        assert!(found[0].line.is_some(), "{line}: no line");
+        assert!(found[0].col.is_some(), "{line}: no column");
+    }
+}
+
+#[test]
+fn a_zig_note_and_the_reference_trail_are_not_mistakes() {
+    let stderr = "main.zig:4:23: error: expected type 'i32', found '?i32'\n\
+        const value: i32 = child;\n\
+                           ^~~~~\n\
+    main.zig:3:18: note: optional type declared here\n\
+        const child: ?i32 = null;\n\
+                     ^~~~\n\
+    referenced by:\n\
+        callMain [inlined]: /opt/zig/lib/zig/std/start.zig:698:59\n\
+        1 reference(s) hidden; use '-freference-trace=4' to see all references\n";
+    let found = mistakes::classify_compile("zig", stderr);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].kind, "nil-deref");
+    assert_eq!(found[0].line, Some(4));
+    assert_eq!(found[0].col, Some(23));
+    assert_eq!(found[0].message, "expected type 'i32', found '?i32'");
+}
+
+#[test]
+fn an_unrecognised_zig_message_is_other_with_its_identity_kept() {
+    let found = mistakes::classify_compile(
+        "zig",
+        "main.zig:2:5: error: something nobody has seen before\n",
+    );
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "other");
+    assert_eq!(found[0].code.as_deref(), Some("zig:other"));
+    assert!(mistakes::classify_compile("zig", "").is_empty());
+    assert!(
+        mistakes::classify_compile("zig", "/opt/zig/lib/std/fmt.zig:1:1: error: inside std\n")
+            .is_empty()
+    );
+}
+
+#[test]
+fn zig_panics_classify_and_carry_the_players_frame() {
+    // The panic header, then the trace: `std`'s frames above, the player's
+    // `main.zig` frame below. The line is the player's.
+    let trace = |panic: &str| {
+        format!(
+            "thread 1886086 panic: {panic}\n\
+             /opt/zig/lib/zig/std/debug.zig:1234:5: 0x1024748ff in defaultPanic (prog)\n\
+             /tmp/build/zig/att/main.zig:6:34: 0x1024748ff in main (prog)\n\
+                 std.debug.print(\"{{d}}\\n\", .{{xs[i]}});\n\
+                                                  ^\n\
+             ???:?:?: 0x18f503e7f in start (/usr/lib/dyld)\n"
+        )
+    };
+    let rows = [
+        (
+            "index out of bounds: index 3, len 3",
+            "index-range",
+            "zig:index-out-of-bounds",
+        ),
+        ("attempt to use null value", "nil-deref", "zig:null-unwrap"),
+        (
+            "integer overflow",
+            "unhandled-error",
+            "zig:integer-overflow",
+        ),
+        (
+            "reached unreachable code",
+            "unhandled-error",
+            "zig:unreachable",
+        ),
+        (
+            "division by zero",
+            "unhandled-error",
+            "zig:division-by-zero",
+        ),
+        (
+            "attempt to unwrap error: Bad",
+            "unhandled-error",
+            "zig:error-unwrapped",
+        ),
+        ("something new", "unhandled-error", "zig:panic"),
+    ];
+    for (panic, kind, code) in rows {
+        let found = mistakes::classify_runtime("zig", &trace(panic));
+        assert_eq!(found.len(), 1, "{panic}: {found:?}");
+        assert_eq!(found[0].kind, kind, "{panic}");
+        assert_eq!(found[0].code.as_deref(), Some(code), "{panic}");
+        assert_eq!(found[0].line, Some(6), "{panic}: the player's line");
+        assert!(found[0].message.contains(panic), "{}", found[0].message);
+    }
+    // An error `main` returned: no panic, an `error:` line and a trace.
+    let returned = "error: InvalidCharacter\n\
+        /opt/zig/lib/zig/std/fmt.zig:578:24: 0x100611f27 in charToDigit (prog)\n\
+        /tmp/att/main.zig:3:15: 0x1006bdaa7 in main (prog)\n\
+            const v = try parse(\"x1\");\n\
+                      ^\n";
+    let found = mistakes::classify_runtime("zig", returned);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].kind, "unhandled-error");
+    assert_eq!(found[0].code.as_deref(), Some("zig:error-returned"));
+    assert_eq!(found[0].message, "error: InvalidCharacter");
+    assert_eq!(found[0].line, Some(3));
+    // The stack that ran out: the handler prints an address, and the
+    // harness's signal note says the same thing when it did not get to.
+    for stderr in [
+        "Segmentation fault at address 0x16df93df8\n/tmp/att/main.zig:2: 0x100f69da4 in rec (prog)\n",
+        "the program was killed by signal 11 (SIGSEGV: segmentation fault)\n",
+    ] {
+        let found = mistakes::classify_runtime("zig", stderr);
+        assert_eq!(found[0].kind, "wrong-answer", "{stderr}");
+        assert_eq!(found[0].code.as_deref(), Some("zig:stack-overflow"));
+    }
+    assert!(mistakes::classify_runtime("zig", "").is_empty());
+    assert!(mistakes::classify_runtime("zig", "just some output\n").is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Lua: one line, the `attempt to …` phrase and what it was tried on.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn every_lua_row_of_the_table_maps() {
+    let rows = [
+        (
+            "attempt to index field 'left' (a nil value)",
+            "nil-deref",
+            "lua:index-nil",
+        ),
+        (
+            "attempt to index local 'x' (a nil value)",
+            "nil-deref",
+            "lua:index-nil",
+        ),
+        (
+            "attempt to index global 'config' (a nil value)",
+            "unknown-name",
+            "lua:undefined-global",
+        ),
+        (
+            "attempt to index a number value",
+            "missing-trait",
+            "lua:index-non-table",
+        ),
+        (
+            "attempt to call global 'foo' (a nil value)",
+            "unknown-name",
+            "lua:undefined-global",
+        ),
+        (
+            "attempt to call field 'length' (a nil value)",
+            "nil-deref",
+            "lua:call-nil",
+        ),
+        (
+            "attempt to call a table value",
+            "missing-trait",
+            "lua:call-non-function",
+        ),
+        (
+            "attempt to perform arithmetic on global 'totl' (a nil value)",
+            "unknown-name",
+            "lua:undefined-global",
+        ),
+        (
+            "attempt to perform arithmetic on field 'n' (a nil value)",
+            "nil-deref",
+            "lua:arithmetic-nil",
+        ),
+        (
+            "attempt to perform arithmetic on local 'segments' (a table value)",
+            "type-mismatch",
+            "lua:arithmetic-type",
+        ),
+        (
+            "attempt to concatenate field 'size' (a nil value)",
+            "nil-deref",
+            "lua:concatenate-nil",
+        ),
+        (
+            "attempt to concatenate a table value",
+            "type-mismatch",
+            "lua:concatenate-type",
+        ),
+        (
+            "attempt to compare string with number",
+            "type-mismatch",
+            "lua:compare-type",
+        ),
+        (
+            "attempt to get length of local 't' (a nil value)",
+            "nil-deref",
+            "lua:length-nil",
+        ),
+        (
+            "bad argument #2 to 'rep' (number expected, got table)",
+            "type-mismatch",
+            "lua:bad-argument",
+        ),
+        ("stack overflow", "wrong-answer", "lua:stack-overflow"),
+        ("not enough memory", "timeout", "lua:memory"),
+        (
+            "cannot resume dead coroutine",
+            "unhandled-error",
+            "lua:coroutine",
+        ),
+        ("no such lantern", "unhandled-error", "lua:error"),
+    ];
+    for (message, kind, code) in rows {
+        let stderr = format!(
+            "luajit: main.lua:7: {message}\nstack traceback:\n\tmain.lua:7: in main chunk\n\t[C]: at 0x0100440c0c\n"
+        );
+        let found = mistakes::classify_runtime("lua", &stderr);
+        assert_eq!(found.len(), 1, "{message}: {found:?}");
+        assert_eq!(found[0].kind, kind, "{message}");
+        assert_eq!(found[0].code.as_deref(), Some(code), "{message}");
+        assert_eq!(found[0].line, Some(7), "{message}");
+        assert_eq!(found[0].message, message);
+    }
+}
+
+#[test]
+fn a_lua_syntax_error_from_the_bytecode_step_is_syntax_with_the_parsers_line() {
+    for stderr in [
+        "luajit: main.lua:2: unexpected symbol near '='\n",
+        "luajit: main.lua:9: 'end' expected (to close 'function' at line 1) near '<eof>'\n",
+        "luajit: main.lua:3: unfinished string near '\"abc'\n",
+    ] {
+        let found = mistakes::classify_compile("lua", stderr);
+        assert_eq!(found.len(), 1, "{stderr}: {found:?}");
+        assert_eq!(found[0].kind, "syntax");
+        assert_eq!(found[0].code.as_deref(), Some("lua:syntax"));
+        assert!(found[0].line.is_some(), "{stderr}");
+    }
+    assert!(mistakes::classify_compile("lua", "").is_empty());
+}
+
+#[test]
+fn a_lua_error_without_a_location_is_still_kept() {
+    // `error({})`: no line, no string, and still a row rather than nothing.
+    let found = mistakes::classify_runtime("lua", "luajit: (error object is not a string)\n");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].kind, "unhandled-error");
+    assert_eq!(found[0].code.as_deref(), Some("lua:error"));
+    assert_eq!(found[0].line, None);
+    // A stack overflow reported through a traceback whose first line is the
+    // function, not the main chunk.
+    let found = mistakes::classify_runtime(
+        "lua",
+        "luajit: main.lua:1: stack overflow\nstack traceback:\n\tmain.lua:1: in function 'f'\n",
+    );
+    assert_eq!(found[0].code.as_deref(), Some("lua:stack-overflow"));
+    assert!(mistakes::classify_runtime("lua", "").is_empty());
+}

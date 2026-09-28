@@ -1,0 +1,4 @@
+luajit: main.lua:3: attempt to perform arithmetic on local 'segments' (a table value)
+stack traceback:
+	main.lua:3: in main chunk
+	[C]: at 0x<pc>

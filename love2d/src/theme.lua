@@ -38,6 +38,14 @@ T.land = {
   -- TypeScript blue #3178C6: lighter and colder than C++'s navy #00599C,
   -- with red and green both well up where C++ has almost none.
   typescript = { 49 / 255, 120 / 255, 198 / 255, 1 },
+  -- ZIG LAND is the toll plaza at 06:00: Zig amber #F8B010 off wet
+  -- concrete, a deeper, yellower orange than Rust's and darker than
+  -- Python's gold — its green sits between the two and its blue below both.
+  zig = { 248 / 255, 176 / 255, 16 / 255, 1 },
+  -- LUA LAND is Tai Hang under the full moon (lua is the moon): indigo
+  -- #6850D0, the first violet on the map — blue leads, and red runs well
+  -- ahead of green, which no other blue-led land's does.
+  lua = { 104 / 255, 80 / 255, 208 / 255, 1 },
   -- REMIX LAND is the yuenyeung café at tea time: milk tea with the coffee
   -- in it, a caramel warmer and greyer than Rust's orange and darker than
   -- Python's gold.
@@ -54,6 +62,11 @@ T.haze = {
   python = { 255 / 255, 212 / 255, 59 / 255, 0.12 },
   pytorch = { 232 / 255, 72 / 255, 32 / 255, 0.18 },
   typescript = { 49 / 255, 120 / 255, 198 / 255, 0.16 },
+  -- Amber over concrete at dawn is nearly gold over a plate, so it is
+  -- kept light, as Go's is; the moon indigo over a night street can carry
+  -- the full weight.
+  zig = { 248 / 255, 176 / 255, 16 / 255, 0.14 },
+  lua = { 104 / 255, 80 / 255, 208 / 255, 0.18 },
   remix = { 216 / 255, 168 / 255, 112 / 255, 0.14 },
 }
 

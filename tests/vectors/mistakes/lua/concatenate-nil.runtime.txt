@@ -1,0 +1,4 @@
+luajit: main.lua:3: attempt to concatenate field 'size' (a nil value)
+stack traceback:
+	main.lua:3: in main chunk
+	[C]: at 0x<pc>

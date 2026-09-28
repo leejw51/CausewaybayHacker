@@ -16,15 +16,20 @@ return function()
   T.section("lands — the four, and what each resolves to")
 
   T.case("the order is SPEC §0's, and every land has a name", function()
-    T.same(Land.ORDER, { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" })
+    T.same(Land.ORDER,
+      { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "remix" })
+    T.same(Land.LANGS, { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua" },
+      "the languages are the lands without REMIX, which stays last")
     T.eq(Land.name("rust"), "RUST")
     T.eq(Land.name("go"), "GO")
     T.eq(Land.name("cpp"), "C++", "nobody calls it CPP")
     T.eq(Land.name("python"), "PYTHON")
     T.eq(Land.name("pytorch"), "PYTORCH")
     T.eq(Land.name("typescript"), "TYPESCRIPT")
+    T.eq(Land.name("zig"), "ZIG")
+    T.eq(Land.name("lua"), "LUA")
     T.eq(Land.name("remix"), "REMIX")
-    T.eq(Land.name("zig"), "ZIG", "a land the client has not heard of keeps its id")
+    T.eq(Land.name("cobol"), "COBOL", "a land the client has not heard of keeps its id")
     T.eq(Land.name(nil), "?")
   end)
 
@@ -33,8 +38,10 @@ return function()
     T.eq(Land.rank("python"), 4)
     T.eq(Land.rank("pytorch"), 5)
     T.eq(Land.rank("typescript"), 6)
-    T.eq(Land.rank("remix"), 7)
-    T.eq(Land.rank("zig"), 8)
+    T.eq(Land.rank("zig"), 7)
+    T.eq(Land.rank("lua"), 8)
+    T.eq(Land.rank("remix"), 9)
+    T.eq(Land.rank("cobol"), 10)
     local seen = {}
     for _, land in ipairs(Land.ORDER) do
       local phase = Land.phase(land)
@@ -69,7 +76,7 @@ return function()
         T.eq(tint[i], haze[i], "the haze is the tint at map strength")
       end
     end
-    T.ok(Map.haze("zig") == Theme.haze.rust, "an unknown land gets Rust's, not nothing")
+    T.ok(Map.haze("cobol") == Theme.haze.rust, "an unknown land gets Rust's, not nothing")
   end)
 
   T.case("the new tints are the languages' own colours", function()
@@ -92,6 +99,31 @@ return function()
     T.ok(d * 255 > 90, "far enough from C++'s navy to read as another land")
   end)
 
+  T.case("Zig's amber sits between Rust's orange and Python's gold", function()
+    -- #F8B010: a deeper, yellower orange than Rust's, darker than Python's
+    -- gold. Green is what separates the three, and blue is under both.
+    local zig, rust, py = Theme.land.zig, Theme.land.rust, Theme.land.python
+    T.same({ math.floor(zig[1] * 255 + 0.5), math.floor(zig[2] * 255 + 0.5),
+      math.floor(zig[3] * 255 + 0.5) }, { 0xF8, 0xB0, 0x10 })
+    T.ok(zig[1] > zig[2] and zig[2] > zig[3], "red over green over blue: an amber")
+    T.ok(zig[2] > rust[2], "yellower than Rust's orange")
+    T.ok(zig[2] < py[2], "and warmer than Python's gold")
+    T.ok(zig[3] < rust[3] and zig[3] < py[3], "blue below both")
+  end)
+
+  T.case("Lua's moon indigo is the first violet: blue leads, and red beats green", function()
+    -- #6850D0. The other blue-led lands (C++, TypeScript, Go) are all
+    -- green-over-red, which is what makes them blue and this one violet.
+    local lua = Theme.land.lua
+    T.same({ math.floor(lua[1] * 255 + 0.5), math.floor(lua[2] * 255 + 0.5),
+      math.floor(lua[3] * 255 + 0.5) }, { 0x68, 0x50, 0xD0 })
+    for _, land in ipairs(Land.ORDER) do
+      local c = Theme.land[land]
+      local violet = c[3] > c[1] and c[3] > c[2] and (c[1] - c[2]) * 255 >= 20
+      T.eq(violet, land == "lua", land .. (land == "lua" and " is the violet" or " is not a violet"))
+    end
+  end)
+
   T.case("each land names a mascot sprite; the new ones have a stand-in", function()
     for _, land in ipairs(Land.ORDER) do
       T.ok(Land.MASCOT[land] ~= nil, land .. " has a mascot")
@@ -100,16 +132,20 @@ return function()
     T.eq(Land.MASCOT.python, "sprite_python")
     T.eq(Land.MASCOT.pytorch, "sprite_pytorch")
     T.eq(Land.MASCOT.typescript, "sprite_typescript")
+    T.eq(Land.MASCOT.zig, "sprite_zig")
+    T.eq(Land.MASCOT.lua, "sprite_lua")
     T.eq(Land.MASCOT.remix, "sprite_remix")
     -- Headless there are no images at all, so `pick` finds nothing — which
     -- is the behaviour on a checkout without `art/`, and must not error.
     T.eq(Land.mascot("cpp"), nil)
-    T.eq(Land.mascot("zig"), nil)
+    T.eq(Land.mascot("cobol"), nil)
   end)
 
   T.case("each language has a scratch-file extension for $EDITOR", function()
-    T.same(External.EXT,
-      { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts" })
+    T.same(External.EXT, {
+      rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts",
+      zig = "zig", lua = "lua",
+    })
     for _, land in ipairs(Land.ORDER) do
       -- REMIX is a land and not a language: its quests are judged in Go,
       -- Rust or Python, and the extension follows the quest's `lang`.
@@ -125,7 +161,7 @@ return function()
       T.same(Land.roads(land), { "verybasic", "basic", "advanced", "hacker" }, land)
     end
     T.same(Land.roads("remix"), { "verybasic", "basic" })
-    T.same(Land.roads("zig"), Land.CATEGORIES, "an unknown land is offered every road")
+    T.same(Land.roads("cobol"), Land.CATEGORIES, "an unknown land is offered every road")
   end)
 
   T.case("a quest's language is its own lang, else its land, and never remix", function()
@@ -233,7 +269,7 @@ return function()
     T.eq(Land.category_label("verybasic"), "VERY BASIC", "two words on screen, not the id")
     T.eq(Land.category_label("basic"), "BASIC")
     T.eq(Land.category_label("hacker"), "HACKER")
-    T.eq(Land.category_label("zig"), "ZIG", "an unknown road keeps its id, upper-cased")
+    T.eq(Land.category_label("cobol"), "COBOL", "an unknown road keeps its id, upper-cased")
   end)
 
   T.case("a pick is right only at the wire's 0-based answer", function()

@@ -26,8 +26,12 @@ nothing else.
 A 16-bit trainer. A rust coder in Causeway Bay lost their craft to vibe coding —
 Skynet's plan all along — and takes it back one street at a time.
 
-* Seven **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`,
-  `remix`. The player picks one; the others are still there. `pytorch` is
+* Nine **lands**: `rust`, `go`, `cpp`, `python`, `pytorch`, `typescript`,
+  `zig`, `lua`, `remix`. The player picks one; the others are still there.
+  `zig` and `lua` are two more toolchains of their own — `zig build-exe -O
+  Debug`, where every safety check is on and a panic names itself, and
+  `luajit`, the interpreter the LÖVE client runs on — with `zig:` and `lua:`
+  mistake codes made from the message's shape as `cpp:` ones are. `pytorch` is
   Python with `torch`: the same interpreter, the same `main.py`, the same
   stdio harness and the same `py:` mistake codes — what differs is what a
   program may import, and that is the content's business rather than the
@@ -37,7 +41,7 @@ Skynet's plan all along — and takes it back one street at a time.
   language**: the same program three times, one trio of nodes per concept
   in Go, Rust and Python, and every quest of it carries a `lang` of its own
   (§12) naming which of the three judges it. A land is a place on the lands
-  screen; a language is what compiles. In six lands they are the same word.
+  screen; a language is what compiles. In eight lands they are the same word.
 * Four **categories** per land: `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
   shown, one to four lines to type — in Rust Land the language's own
@@ -855,7 +859,74 @@ PATH, and a server started by hand gets whatever that PATH holds. CI installs
 the same two versions globally with `npm` (`TYPESCRIPT_VERSION`,
 `PRETTIER_VERSION`), matching the lock file.
 
-All four are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
+**Zig**
+
+```
+zig build-exe main.zig -O Debug --color off \
+    --cache-dir <attempt>/zig-cache --global-cache-dir build/zig/zig-global \
+    -femit-bin=prog                                  # the compile phase: any error ⇒ compile_error
+./prog                                               # the run, per case, stdio harness
+```
+
+A real toolchain, `runner/src/zig.rs`, **zig 0.16.0** — pinned that hard
+because the `std` API moves between releases (0.16 renamed the whole I/O
+layer) and every quest was verified on this one. `-O Debug` is the point of
+the land rather than a shortcut: the land is about the checks Zig makes
+explicit — an index past the end, an optional unwrapped while null, an
+integer that overflows, a branch marked `unreachable` — and in Debug every
+one of them is on and dies saying what it is, `panic: index out of bounds:
+index 3, len 3`, on the player's line; `ReleaseFast` would make three of the
+four silent undefined behaviour. It is also the fast compile (under a second
+warm, four for an optimised build), and the Debug binary still clears a
+four-million-operation Fenwick case in a quarter of a second. The two caches
+are named on the command line because `zig` otherwise derives its global
+cache from `HOME`, which `toolchain_base` points at the attempt: the
+compiled `std` lives under the land's cache root, as `CARGO_HOME` does, and
+the local cache inside the attempt, pruned with it.
+
+`zig` reports on stderr, `main.zig:3:20: error: …` with the source line and a
+caret; unused locals and a `var` that is never mutated are compile errors,
+and the land files them as `unused`. `std.debug.print` is stderr: output
+goes through a buffered `std.Io.File.stdout().writerStreaming(init.io, &buf)`
+that must be `flush()`ed, and every quest reads its input with one idiom:
+
+```zig
+pub fn main(init: std.process.Init) !void {
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(init.io, &in_buf);
+    const input = try stdin.interface.allocRemaining(init.gpa, .unlimited);
+```
+
+`unsupported("zig", Stdio)` refuses a submission when `zig` does not answer,
+with the version in the hint. Formatter: `zig fmt --stdin`, which ships with
+`zig`, so a land that runs can format; it refuses source it cannot parse
+with `<stdin>:1:11: error: …` and exit 2, and the original comes back whole.
+The boot report's row is `zig`, compiler `zig`, formatter `zig fmt`.
+
+**Lua**
+
+```
+luajit -b main.lua main.luac      # the compile phase: a syntax error ⇒ compile_error
+luajit main.lua                   # the run, per case, stdio harness
+```
+
+`runner/src/lua.rs`. **LuaJIT, and only LuaJIT** — the interpreter the LÖVE
+client runs on, so a program that works on the desk works on the dragon —
+and it is a Lua 5.1 with LuaJIT's extensions, which is not Lua 5.4:
+`print(6 / 2)` is `3` here and `3.0` there, `//` does not parse here,
+`table.unpack` does not exist here. A pack verified on one is wrong on the
+other, so the runner does not fall back from one to the other:
+`unsupported("lua", Stdio)` refuses when `luajit` does not answer, and a
+machine with only `lua` is told to install `luajit`. `-b` compiles to
+bytecode without running a line, which is the one mistake the interpreter
+can find before the run — a syntax error, `luajit: main.lua:3: unexpected
+symbol near '='` — and the run is the *source*, so a traceback names
+`main.lua` and its line. Input is `io.read("*a")`; output `print` (a TAB
+between arguments) or `io.write`. Formatter: `stylua -`, asked of the
+machine like `black`. The boot report's row is `lua`, compiler `luajit`,
+formatter `stylua`.
+
+All six are stdio-harness only. `Harness::Cargo` / `Harness::Gotest` remain
 rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ### 5.2 The test spec
@@ -864,7 +935,7 @@ rust-only / go-only; `unsupported()` returns a message for any other pairing.
 
 ```json
 {
-  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python, pytorch and typescript are stdio-only
+  "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python, pytorch, typescript, zig and lua are stdio-only
   "timeout_ms": 5000,
   "compile_timeout_ms": 30000,
   "max_stdout_bytes": 262144,
@@ -1101,34 +1172,43 @@ identity Python gives. TypeScript has two voices, one per half of the land:
 way rustc's `E0382` is — the same mistake in every version and every locale,
 where the prose is neither — and, once the types are erased, the class of the
 exception `node` threw, given a `ts:` slug the way Python's classes get `py:`
-ones; its line is the source-mapped `main.ts` line from the stack. Every code
+ones; its line is the source-mapped `main.ts` line from the stack. Zig has no
+codes and one voice, `main.zig:L:C: error: message`, so its identity is made
+from the message's shape as C++'s is, and its runtime rows are `-O Debug`'s
+own checks, each a `panic:` that names itself, with the player's `main.zig`
+frame under it; an error `main` returned prints `error: Name` and is filed
+as one nobody handled. LuaJIT has one line, `luajit: main.lua:L: attempt to
+index field 'left' (a nil value)`, and the identity is the `attempt to …`
+phrase and what it was tried on — a global that was never defined
+(`lua:undefined-global`, unknown-name) is a different lesson from a field
+that is nil (`lua:index-nil`, nil-deref). Every code
 is prefixed by its land except the ones the compiler numbers itself — Rust's
-and `tsc`'s: `go:`, `cpp:`, `py:`, `ts:`. There is no
+and `tsc`'s: `go:`, `cpp:`, `py:`, `ts:`, `zig:`, `lua:`. There is no
 `pytorch:` prefix and there is not going to be one: PyTorch Land runs the same
 interpreter and raises the same exceptions, so its mistakes are `py:` codes
 and its column below is Python's column.
 
 Kinds (the slug stored in `mistakes.kind`), each mapped from one or more codes:
 
-| kind | rust | go | cpp | python / pytorch | typescript |
-| --- | --- | --- | --- | --- | --- |
-| `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — | — |
-| `borrow-conflict` | E0499, E0502 | — | — | — | — |
-| `lifetime` | E0106, E0597, E0621, E0373 | — | — | — | — |
-| `type-mismatch` | E0308 | `cannot use … as … value` | `cpp:no-matching-function`, `cpp:cannot-convert` | `py:type-error` (`TypeError`) | TS2322, TS2345, TS2554, TS7006, … (assignability, arity, implicit `any`); `ts:type-error` (any other `TypeError`) |
-| `unknown-name` | E0425, E0433 | `undefined: X` | `cpp:undeclared-identifier` | `py:name-error` (`NameError`) | TS2304, TS2552, TS2305, TS2307, TS2583, TS2584, TS2503, TS2448; `ts:reference-error` (`ReferenceError`) |
-| `missing-trait` | E0277 | — | — | `py:attribute-error` (`AttributeError`, not on `None`) | TS2339, TS2551; `ts:not-a-function` (`TypeError: … is not a function` / `is not iterable`) |
-| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` | `cpp:unused` (`-Wall`) | — | TS6133, … (only where the options ask, and they do not — an unfinished starter still runs) |
-| `mutability` | E0596, E0594 | — | `cpp:const-discard` | — | TS2588, TS2540, TS2542 |
-| `nil-deref` | — | runtime `nil pointer dereference` | `cpp:segfault` (signal 11 / `Segmentation fault`) | `py:none-attribute` (`AttributeError: 'NoneType'`) | TS2531, TS2532, TS2533, TS2454, TS2722, TS18047–18049; `ts:undefined-property` (`TypeError: Cannot read/set properties of undefined`/`null`) |
-| `index-range` | runtime `index out of bounds` | runtime `index out of range` | `cpp:out-of-range` (`std::out_of_range`) | `py:index-error`, `py:key-error` | `ts:range-error` (any other `RangeError`) |
-| `data-race` | — | `go test -race` report | — | — | — |
-| `deadlock` | — | `all goroutines are asleep` | — (not detectable; it is a `timeout`) | — | — |
-| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked | `cpp:abort` (`terminate called` / signal 6) | `py:zero-division`, `py:value-error`, `py:exception` (any other uncaught) | `ts:json-parse` (a runtime `SyntaxError`: `JSON.parse`), `ts:throw` (a thrown non-`Error`), `ts:exception` (any other uncaught) |
-| `syntax` | any parse error | any parse error | `cpp:expected-token` | `py:syntax` (`SyntaxError`, `IndentationError`) | TS1xxx (any parser error) |
-| `wrong-answer` | — | — (verdict, not a compiler code) | — | `py:recursion` (`RecursionError`) | `ts:recursion` (`RangeError: Maximum call stack size exceeded`) |
-| `timeout` | — | — | — | — | `ts:heap-limit` (`JavaScript heap out of memory`) |
-| `other` | anything unmatched, with its code kept | same | `cpp:other` | same | any unmatched `TSnnnn`, with its code kept |
+| kind | rust | go | cpp | python / pytorch | typescript | zig | lua |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `borrow-after-move` | E0382, E0505 | — | `cpp:use-after-move` (clang `-Wall`) | — | — | — | — |
+| `borrow-conflict` | E0499, E0502 | — | — | — | — | — | — |
+| `lifetime` | E0106, E0597, E0621, E0373 | — | — | — | — | — | — |
+| `type-mismatch` | E0308 | `cannot use … as … value` | `cpp:no-matching-function`, `cpp:cannot-convert` | `py:type-error` (`TypeError`) | TS2322, TS2345, TS2554, TS7006, … (assignability, arity, implicit `any`); `ts:type-error` (any other `TypeError`) | `zig:expected-type` (expected type / argument count / cannot convert) | `lua:arithmetic-type`, `lua:concatenate-type`, `lua:compare-type`, `lua:bad-argument` |
+| `unknown-name` | E0425, E0433 | `undefined: X` | `cpp:undeclared-identifier` | `py:name-error` (`NameError`) | TS2304, TS2552, TS2305, TS2307, TS2583, TS2584, TS2503, TS2448; `ts:reference-error` (`ReferenceError`) | `zig:undeclared-identifier`, `zig:import-not-found` | `lua:undefined-global` (a global that is nil, indexed, called or added) |
+| `missing-trait` | E0277 | — | — | `py:attribute-error` (`AttributeError`, not on `None`) | TS2339, TS2551; `ts:not-a-function` (`TypeError: … is not a function` / `is not iterable`) | `zig:no-member` (no field named / no member function named) | `lua:index-non-table`, `lua:call-non-function` |
+| `unused` | unused_variables, unused_imports | `declared and not used`, `imported and not used` | `cpp:unused` (`-Wall`) | — | TS6133, … (only where the options ask, and they do not — an unfinished starter still runs) | `zig:unused` (unused local, never mutated — errors in Zig) | — |
+| `mutability` | E0596, E0594 | — | `cpp:const-discard` | — | TS2588, TS2540, TS2542 | `zig:cannot-assign-constant` | — |
+| `nil-deref` | — | runtime `nil pointer dereference` | `cpp:segfault` (signal 11 / `Segmentation fault`) | `py:none-attribute` (`AttributeError: 'NoneType'`) | TS2531, TS2532, TS2533, TS2454, TS2722, TS18047–18049; `ts:undefined-property` (`TypeError: Cannot read/set properties of undefined`/`null`) | `zig:optional-unwrapped` (compile: `found '?T'`), `zig:null-unwrap` (`panic: attempt to use null value`) | `lua:index-nil`, `lua:call-nil`, `lua:arithmetic-nil`, `lua:concatenate-nil`, `lua:length-nil` (`… (a nil value)` on a local or field) |
+| `index-range` | runtime `index out of bounds` | runtime `index out of range` | `cpp:out-of-range` (`std::out_of_range`) | `py:index-error`, `py:key-error` | `ts:range-error` (any other `RangeError`) | `zig:index-out-of-bounds` (compile-time on an array, `panic: index out of bounds` at runtime) | — |
+| `data-race` | — | `go test -race` report | — | — | — | — | — |
+| `deadlock` | — | `all goroutines are asleep` | — (not detectable; it is a `timeout`) | — | — | — | — |
+| `unhandled-error` | E0277 *discriminated*, see below | `err` assigned and not checked | `cpp:abort` (`terminate called` / signal 6) | `py:zero-division`, `py:value-error`, `py:exception` (any other uncaught) | `ts:json-parse` (a runtime `SyntaxError`: `JSON.parse`), `ts:throw` (a thrown non-`Error`), `ts:exception` (any other uncaught) | `zig:error-not-handled` (`error union is ignored`), `zig:switch-not-exhaustive`, `zig:integer-overflow`, `zig:division-by-zero`, `zig:unreachable`, `zig:error-unwrapped` (`catch unreachable`), `zig:error-returned` (`main` returned it), `zig:panic` (any other) | `lua:error` (`error(…)`, any other), `lua:coroutine` |
+| `syntax` | any parse error | any parse error | `cpp:expected-token` | `py:syntax` (`SyntaxError`, `IndentationError`) | TS1xxx (any parser error) | `zig:expected-token` (`expected ';'`, …) | `lua:syntax` (from `luajit -b`) |
+| `wrong-answer` | — | — (verdict, not a compiler code) | — | `py:recursion` (`RecursionError`) | `ts:recursion` (`RangeError: Maximum call stack size exceeded`) | `zig:stack-overflow` (a segfault: deep recursion in Debug) | `lua:stack-overflow` |
+| `timeout` | — | — | — | — | `ts:heap-limit` (`JavaScript heap out of memory`) | `zig:out-of-memory` | `lua:memory` (`not enough memory`) |
+| `other` | anything unmatched, with its code kept | same | `cpp:other` | same | any unmatched `TSnnnn`, with its code kept | `zig:other`, `zig:undefined-symbol` | — |
 
 An unmatched code is stored as `other` with `code` set, so the taxonomy can
 grow from real data instead of guesses. **Never drop a code you did not
@@ -1311,7 +1391,7 @@ Both orientations are first-class on every screen, not just the map.
 ```
 backend/            Rust workspace
   core/             domain: store, quests, progress, mistakes, search, drills
-  runner/           compile + run, rust, go, cpp, python and typescript, limits and streaming
+  runner/           compile + run, rust, go, cpp, python, typescript, zig and lua, limits and streaming
   server/           axum, the websocket, the message catalogue, static files
   cli/              `cwbhacker`: serve, import, prune, doctor
 love2d/             LÖVE 11.5 desktop client, same protocol
@@ -1330,6 +1410,8 @@ content/            quest packs (TOML), one file per land+category
   python/{basic,advanced,hacker}.toml
   pytorch/{verybasic,basic,advanced,hacker}.toml
   typescript/{verybasic,basic,advanced,hacker}.toml
+  zig/{verybasic,basic,advanced,hacker}.toml
+  lua/{verybasic,basic,advanced,hacker}.toml
   i18n/<locale>/<land>.<category>.toml   translations of the packs above (§12.1)
 docs/               decisions.md, story.md, art.md
 tests/vectors/      shared fixtures: addresses, signatures, mistake sources (five

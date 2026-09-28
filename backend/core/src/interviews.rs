@@ -103,7 +103,7 @@ pub fn start(
 ) -> Result<Session> {
     if !matches!(
         land,
-        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript"
+        "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua"
     ) {
         return Err(bad_request(format!("unknown land '{land}'")));
     }

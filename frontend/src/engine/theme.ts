@@ -58,6 +58,15 @@ export const TRACK_COL: Record<string, RGBA> = {
   // deep navy with no red in it at all, this is the brighter, lighter blue
   // with red and green both well up — side by side they read as two lands.
   typescript: c(48, 120, 200),
+  // Zig amber off wet concrete, on the grid: a deeper, yellower orange than
+  // Rust's — the green channel sits between Ferris's 152 and Python's 208,
+  // the blue under both — so the toll plaza is neither the harbour at
+  // sunset nor the wet market's gold, and the three warm lands read as three.
+  zig: c(248, 176, 16),
+  // Moon indigo: the first violet on the map. Blue leads and red is well
+  // above green, which is the opposite of C++'s navy and TypeScript's LED
+  // blue, where green is the second channel — a lantern, not a screen.
+  lua: c(104, 80, 208),
   // REMIX LAND is the yuenyeung café at tea time: milk tea with the coffee
   // in it, a caramel on the same grid. Warmer and greyer than Rust's
   // orange and darker than Python's gold, so the three warm lands read as
@@ -77,6 +86,12 @@ export const TRACK_HAZE: Record<string, RGBA> = {
   // TYPESCRIPT LAND is the office tower at dusk: cold glass, lit floors.
   // Lighter and greyer than C++'s deep blue, so the two maps do not match.
   typescript: [0.08, 0.18, 0.34, 0.22],
+  // ZIG LAND is the toll plaza at six: grey concrete under a dawn that has
+  // not warmed up yet, the sodium lamps still on.
+  zig: [0.14, 0.14, 0.12, 0.22],
+  // LUA LAND is Tai Hang on Mid-Autumn night: a violet dark, lantern-lit,
+  // and the moon over it. Nothing like C++'s blue or TypeScript's steel.
+  lua: [0.14, 0.06, 0.28, 0.28],
   // REMIX LAND is Sugar Street at three in the afternoon: honey light, a
   // haze the colour of the tea.
   remix: [0.34, 0.24, 0.1, 0.2],

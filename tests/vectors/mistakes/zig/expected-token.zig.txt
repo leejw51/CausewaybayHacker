@@ -1,0 +1,3 @@
+main.zig:3:16: error: expected ';' after statement
+    const x = 1
+               ^

@@ -359,6 +359,8 @@ local KEYWORDS = {
   python = "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print",
   pytorch = "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print torch nn tensor shape dtype grad backward forward parameters zero_grad step no_grad eval train softmax relu Linear Module Sequential Embedding LayerNorm Conv2d Dropout Adam SGD",
   typescript = "let const var function return if else for while do of in new class interface type enum extends implements readonly private public protected static abstract async await import from export as keyof typeof instanceof satisfies declare namespace switch case default break continue try catch finally throw this super yield delete void true false null undefined number string boolean bigint never unknown any",
+  zig = "const var fn pub return if else for while switch try catch orelse defer errdefer struct enum union error comptime inline null undefined true false break continue and or unreachable test extern export threadlocal packed align volatile async await suspend resume noalias anytype usingnamespace u8 u16 u32 u64 usize i8 i16 i32 i64 isize f32 f64 bool void type anyerror noreturn",
+  lua = "and break do else elseif end false for function goto if in local nil not or repeat return then true until while",
 }
 local KW = {}
 for lang, list in pairs(KEYWORDS) do
@@ -369,12 +371,20 @@ for lang, list in pairs(KEYWORDS) do
 end
 
 --- Runs of one tone for a line: `{ { text, tone }, … }`. `in_block` is
---- carried between lines for a `/* … */` or `"""` that spans them; the
---- second return is the state after this line.
+--- carried between lines for a `/* … */`, a `"""` or Lua's `--[[ … ]]`
+--- that spans them; the second return is the state after this line.
+---
+--- Lua spells a comment `--` and `//` is not one there; Zig has no block
+--- comment at all. Strings: `'` is a quote in every land (a char in the
+--- brace ones, which is close enough for a poster), and a backtick only in
+--- Go and TypeScript — not Zig, which has none.
 function Poster.tokens(line, lang, in_block)
   local out = {}
   local i, n = 1, #line
-  local comment_line = (lang == "python") and "#" or "//"
+  local comment_line = (lang == "python") and "#" or (lang == "lua") and "--" or "//"
+  local block_open = (lang == "python") and '"""' or (lang == "lua") and "--[[" or "/*"
+  local block_close = (lang == "python") and '"""' or (lang == "lua") and "]]" or "*/"
+  if lang == "zig" then block_open = nil end
   local function push(text, tone)
     if text == "" then
       return
@@ -388,11 +398,10 @@ function Poster.tokens(line, lang, in_block)
   end
   while i <= n do
     if in_block then
-      local close = (lang == "python") and '"""' or "*/"
-      local at = line:find(close, i, true)
+      local at = line:find(block_close, i, true)
       if at then
-        push(line:sub(i, at + #close - 1), "comment")
-        i = at + #close
+        push(line:sub(i, at + #block_close - 1), "comment")
+        i = at + #block_close
         in_block = false
       else
         push(line:sub(i), "comment")
@@ -400,17 +409,20 @@ function Poster.tokens(line, lang, in_block)
       end
     else
       local c = line:sub(i, i)
-      if line:sub(i, i + #comment_line - 1) == comment_line then
+      -- `--[[` before `--`, or a Lua block comment is a line comment that
+      -- forgets to end.
+      if block_open and line:sub(i, i + #block_open - 1) == block_open then
+        in_block = true
+        push(block_open, "comment")
+        i = i + #block_open
+      elseif line:sub(i, i + #comment_line - 1) == comment_line then
         push(line:sub(i), "comment")
         i = n + 1
-      elseif lang ~= "python" and line:sub(i, i + 1) == "/*" then
-        in_block = true
-        push("/*", "comment")
-        i = i + 2
-      elseif lang == "python" and line:sub(i, i + 2) == '"""' then
-        in_block = true
-        push('"""', "comment")
-        i = i + 3
+      elseif lang == "zig" and c == "@" and line:sub(i + 1, i + 1):match("[%a_]") then
+        -- `@import`, `@intCast`: the builtins, coloured as the calls they are.
+        local word = line:match("^@[%w_]+", i)
+        push(word, "call")
+        i = i + #word
       elseif c == '"' or c == "'" or (c == "`" and (lang == "go" or lang == "typescript")) then
         local j = i + 1
         while j <= n and line:sub(j, j) ~= c do

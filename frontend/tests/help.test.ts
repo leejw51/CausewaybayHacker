@@ -121,6 +121,22 @@ describe("helpAt names the construct the caret is in", () => {
     );
   });
 
+  it("finds Zig's own constructs, from its own grammar", () => {
+    expect(at("zig", "pub fn main() void {\n    for (xs) |x| {\n        ‸\n    }\n}\n")!.id).toBe(
+      "zig.n.ForStatement",
+    );
+    expect(
+      at("zig", "pub fn main() void {\n    while (n < 3) : (n += 1) {\n        ‸\n    }\n}\n")!.id,
+    ).toBe("zig.n.WhileStatement");
+    expect(at("zig", "pub fn main() void {\n    switch (x) {\n        ‸\n    }\n}\n")!.id).toBe(
+      "zig.n.SwitchExpr",
+    );
+    expect(at("zig", "const P = struct {\n    x: i6‸4,\n};\n")!.id).toBe("zig.n.ContainerField");
+    // The signature is beside the body, not above it: in the parameter
+    // list the nearest construct is the parameter.
+    expect(at("zig", "fn f(a: i6‸4) void {}\n")!.id).toBe("zig.n.ParamDecl");
+  });
+
   it("finds a Python match clause and a decorator", () => {
     expect(at("python", "match cmd:\n    case 1:\n        ‸\n")!.id).toBe("python.n.MatchClause");
     expect(at("python", "@d‸\ndef f():\n    pass\n")!.id).toBe("python.n.Decorator");
@@ -139,6 +155,13 @@ describe("helpAt prefers the word the caret is actually on", () => {
     expect(at("python", "for i, x in enumerate‸(xs):\n    pass\n")!.id).toBe("python.w.enumerate");
     expect(at("cpp", "int main() { auto b = std::move‸(a); }\n")!.id).toBe("cpp.w.move");
     expect(at("typescript", "const v: unknown‸ = 1;\n")!.id).toBe("typescript.w.unknown");
+    expect(at("zig", "pub fn main() !void {\n    const v = f() catch‸ 0;\n}\n")!.id).toBe(
+      "zig.w.catch",
+    );
+    // Lua has no constructs, only words: the stream mode's tree is a row
+    // of tokens under `Document`, and a word is found by the caret alone.
+    expect(at("lua", "for k, v in pairs‸(t) do end\n")!.id).toBe("lua.w.pairs");
+    expect(at("lua", "local t = setmetatable‸({}, mt)\n")!.id).toBe("lua.w.setmetatable");
   });
 
   it("falls back to the construct when the word is not in the catalogue", () => {
@@ -155,10 +178,18 @@ describe("helpAt keeps quiet where it should", () => {
     expect(at("python", "s = 'for ‸x'\n")).toBeNull();
     expect(at("cpp", "/* the ‸loop */\nint main() {}\n")).toBeNull();
     expect(at("typescript", "const s = `for ‸x`;\n")).toBeNull();
+    expect(at("zig", 'const s = "try ‸this";\n')).toBeNull();
+    expect(at("zig", "// defer ‸this\n")).toBeNull();
+    // The stream mode's `string` and `comment` tokens are prose too.
+    expect(at("lua", 'local s = "pairs ‸here"\n')).toBeNull();
+    expect(at("lua", "-- local ‸here\n")).toBeNull();
+    // And a Lua construct the catalogue has no word for is nothing, not a
+    // node: there are none.
+    expect(at("lua", "for i = 1, 3 do\n\t‸\nend\n")).toBeNull();
   });
 
   it("says nothing on an empty document", () => {
-    for (const lang of ["rust", "go", "cpp", "python", "typescript"] as Lang[]) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript", "zig", "lua"] as Lang[]) {
       expect(at(lang, "‸")).toBeNull();
     }
   });
@@ -191,9 +222,12 @@ describe("the catalogue itself", () => {
   });
 
   it("covers every land with a grammar of its own, on both layers", () => {
-    for (const lang of ["rust", "go", "cpp", "python", "typescript"]) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript", "zig"]) {
       expect(all.filter((h) => h.id.startsWith(`${lang}.w.`)).length).toBeGreaterThan(15);
       expect(all.filter((h) => h.id.startsWith(`${lang}.n.`)).length).toBeGreaterThan(15);
     }
+    // Lua's mode is a token stream: words only, and no construct at all.
+    expect(all.filter((h) => h.id.startsWith("lua.w.")).length).toBeGreaterThan(19);
+    expect(all.filter((h) => h.id.startsWith("lua.n.")).length).toBe(0);
   });
 });

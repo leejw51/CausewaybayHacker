@@ -21,6 +21,8 @@ export const LINE_COMMENT: Record<Lang, string> = {
   python: "#",
   pytorch: "#",
   typescript: "//",
+  zig: "//",
+  lua: "--",
 };
 
 /** The mark that says who wrote the comment, so it reads as the coder's. */

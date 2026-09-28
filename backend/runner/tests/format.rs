@@ -193,7 +193,16 @@ fn the_supported_list_is_what_this_machine_can_actually_run() {
     // what a client draws its FORMAT button from (§4.3), so the two answers
     // must be the same answer.
     let langs = format::supported_langs();
-    for lang in ["rust", "go", "cpp", "python", "pytorch"] {
+    for lang in [
+        "rust",
+        "go",
+        "cpp",
+        "python",
+        "pytorch",
+        "typescript",
+        "zig",
+        "lua",
+    ] {
         assert_eq!(
             langs.contains(&lang),
             format::is_supported(lang),
@@ -202,7 +211,7 @@ fn the_supported_list_is_what_this_machine_can_actually_run() {
     }
     assert!(langs.contains(&"rust"), "rustfmt ships with the toolchain");
     assert!(
-        !langs.contains(&"zig"),
+        !langs.contains(&"cobol"),
         "a land with no formatter is off the list"
     );
 }
@@ -225,7 +234,16 @@ fn the_toolchain_report_covers_every_land_and_agrees_with_the_gate() {
     let lands: Vec<_> = report.iter().map(|t| t.land).collect();
     assert_eq!(
         lands,
-        vec!["rust", "go", "cpp", "python", "pytorch", "typescript"],
+        vec![
+            "rust",
+            "go",
+            "cpp",
+            "python",
+            "pytorch",
+            "typescript",
+            "zig",
+            "lua"
+        ],
         "a land without a row is a land nobody is told about"
     );
     for tool in &report {

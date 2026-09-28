@@ -1,0 +1,4728 @@
+# LUA LAND — HACKER. The eighth interview. HKU, Chow Yei Ching Building,
+# Room 7-32 again, a clock on the wall, and outside the window the fifteenth
+# night of the eighth month: the fire dragon going through Tai Hang, the
+# lanterns in Victoria Park, the full moon over all of it. Lua is the moon.
+#
+# Every quest here carries `time_limit_s` — the player's clock for the whole
+# quest, not the per-run `timeout_ms` — and at least one hidden case.
+# See docs/decisions.md, 2026-09-11, for where that key lives in the TOML.
+#
+# The 34 problems port content/python/hacker.toml node for node — same
+# concepts, difficulty, map, route, clock and test cases, byte for byte — so
+# a player can sit the same interview in any land. The ids mirror too: the
+# LRU boss is `lua.hacker.28.lru` at node 34, exactly as it is in the other
+# lands, because SPEC §12 makes the id an identity and `node` the position.
+# Node 16, `16.union-find`, takes the `n m seed` input Python converted it
+# to, with the same four cases. The two hidden cases Python shrank for its
+# interpreter — range-queries at 300000 operations and the one-letter
+# palindrome at 8000 characters — are kept at Python's size: this is a port
+# of the Python pack, and the cases are the reference's.
+#
+# Every program is one main.lua, syntax-checked with `luajit -b` and run as
+# `luajit main.lua`. It is LuaJIT 2.1 — Lua 5.1 plus LuaJIT's extensions —
+# and not Lua 5.4: one number type, doubles, so `6 / 2` prints `3`, there is
+# no `//`, a product past 2^53 loses digits, and `bit.*` is how bits are
+# done. Standard input is read whole with `io.read("*a")` and split with
+# `gmatch("%S+")`.
+#
+# The generator every big case is built from is 64-bit arithmetic that
+# wraps, and LuaJIT has that as a value: `0ULL + seed` is an unsigned 64-bit
+# integer, `*` and `+` on it wrap at 2^64 exactly as the statement asks,
+# `bit.rshift` takes it, and `tonumber` brings the 31-bit result back to a
+# plain number. No mask is written by hand in this pack; the type is the
+# mask. `32.modular` does not multiply two residues with `*`: their product
+# passes 2^53, so it carries a 16-bit split `mulmod`, and its solution
+# precomputes inverse factorials so a query is two of them.
+#
+# Where a starter is rejected by the clock, that was measured here against
+# the 10 s run limits: union-find's walk-per-link had not finished after
+# 25 s, the O(n²) inversion count had not finished after 25 s, and modular's
+# per-query product had not finished after 25 s. Two of Python's slow
+# starters were not slow enough on LuaJIT — the O(V²) Dijkstra scan and the
+# per-query slice sum both cleared in about 14 s, which is rejected here and
+# would not be on a faster machine — so those two starters are a slower
+# honest shape instead: `29.dijkstra` keeps the unvisited stops in a set
+# and scans it with `pairs` (32.6 s), and `30.range-queries` is node 23's
+# prefix-sum table, rebuilt after every update (57 s). Both print the right
+# answer on every case they finish.
+#
+# Two starters fail for a reason of this language's own. `34.stable-sort`
+# calls `table.sort` with a plain descending comparator, and `table.sort` is
+# a quicksort with no promise about ties — the sample comes out scrambled,
+# which is the lesson, inverted from Python's. The boss, THE MOON, is not
+# the recursion limit: a proper tail call costs no frame in Lua, so its
+# starter walks the two thousand operations recursively and gets through.
+# It is wrong instead about what a table remembers — a `GET` reads the
+# value and moves nothing, so the cache evicts first-in rather than
+# least-recently-used, and `GET 2` on the sample prints `20`. Same problem,
+# same cases, same concepts; the recursion is in the room as the thing that
+# turned out not to be the trap.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+#
+# **Which quests enforce their complexity differs by land, and that is a
+# measurement rather than an oversight.** All the packs hold the same problems
+# in the same order under the same ids, and the small cases are identical
+# wherever the problem is the same problem. What differs is the big case that
+# rejects a correct-but-slow answer: it is sized per land, and in several
+# quests it exists in one land and not another. Whether a generated input can
+# punish the naive answer is a fact about the language and its runtime, and
+# each land measured it rather than assuming it. Lua keeps Python's enforced
+# set — union-find, inversions, dijkstra, range-queries, palindrome, modular,
+# grid-paths — and leaves `06.stack` alone for the reason Python gives: the
+# naive next-greater scan is only quadratic on near-descending input, which
+# this generator never produces.
+
+pack = "lua.hacker"
+land = "lua"
+category = "hacker"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id           = "lua.hacker.01.two-sum"
+node         = 1
+title        = "TWO LANTERNS"
+difficulty   = 3
+time_limit_s = 600
+story        = "Room 7-32, eighth time, the moon over the ridge and the drums starting down in Tai Hang. The first question is the one everybody gets, and the clock starts on the way in."
+concepts     = ["hashing", "complexity", "collections"]
+requires     = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` integers.
+
+Print the **1-based** indices `i j` of two different entries that add up to
+`target`, as `i j` with `i < j`. If more than one pair works, give the one
+whose second index is smallest; if that still ties, the smallest first index.
+If no pair works, print `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+The hidden cases here are small: they check the tie-break and the
+no-answer case, not your speed. The question is still the linear one — one
+pass, one table — because a real `n` is 200000 and the nested loop is what
+this question exists to weed out. Write the answer the question is asking for,
+not the one that happens to clear these four cases.
+
+A Lua table is the hash map. `seen[target - x]` is `nil` when the key was
+never written, and `nil` is the miss — test it with `~= nil`, and write a key
+only the first time you see it, so a repeated value keeps its first index.
+The list is 1-based, which for once is the index the statement wants.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, target = data[1], data[2]
+local nums = {}
+for i = 1, n do nums[i] = data[2 + i] end
+
+local seen = {}
+
+-- one pass: for each value, has target - value been seen already?
+print(-1)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, target = data[1], data[2]
+local nums = {}
+for i = 1, n do nums[i] = data[2 + i] end
+
+local seen = {}
+for j = 1, n do
+  local x = nums[j]
+  local i = seen[target - x]
+  -- nil is the miss; a stored index is never nil, so this is the whole test
+  if i ~= nil then
+    print(i .. " " .. j)
+    return
+  end
+  -- keep the first index of a repeated value: that is the tie-break
+  if seen[x] == nil then seen[x] = j end
+end
+print(-1)
+'''
+hints = [
+  "One pass. For each value ask whether target minus it has already been seen.",
+  "Only write a key the first time — `if seen[x] == nil then seen[x] = j end` keeps the first index of a repeat, which is the tie-break the statement asks for.",
+  "Print and `return` the moment you find it — a `return` at the top level of the chunk ends the program, and the first hit as you scan is already the smallest second index.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "4 9\n2 7 11 15\n",      expect = "1 2\n",  visible = true },
+  { name = "late",    stdin = "5 10\n1 2 3 4 6\n",     expect = "4 5\n",  visible = false },
+  { name = "none",    stdin = "3 100\n1 2 3\n",        expect = "-1\n",   visible = false },
+  { name = "signed",  stdin = "6 0\n-3 4 3 90 -1 1\n", expect = "1 3\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id           = "lua.hacker.02.window"
+node         = 2
+title        = "NO REPEATS"
+difficulty   = 4
+time_limit_s = 900
+story        = "The second question is on the board before you have put the marker down. Through the window a line of incense goes past, one stick per segment, no two alike."
+concepts     = ["two-pointers", "strings", "complexity"]
+requires     = ["lua.hacker.01.two-sum"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief        = '''
+One line of text, no spaces.
+
+Print the length of the longest run of characters with no repeat in it, then
+the run itself. If several runs tie, print the leftmost.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+The window only ever moves right. If you find yourself rescanning from the
+start after a repeat, you have written the quadratic one.
+
+The four cases here are a dozen characters at most, and the clock is not
+measuring speed on them — the quadratic one clears them too. There is no big
+hidden case because there is no honest one to build: on text with a small
+alphabet the longest run is bounded by the alphabet, so rescanning costs a
+constant factor and not a quadratic one, and the input that would punish it
+is not text any more. Write the one-pass answer because it is the answer, not
+because these four cases force it.
+
+A Lua string is not a table: `text[i]` is `nil`, not a character. The
+character at `i` is `text:sub(i, i)` (or `text:byte(i)` as a number), and the
+run is `text:sub(start, start + length - 1)` — both ends **inclusive**, and
+1-based, which is where the off-by-one lives here.
+'''
+starter      = '''
+local text = io.read("*a"):match("%S+") or ""
+
+local last = {}
+
+-- print the best length, then the run itself
+print(0)
+print("?")
+'''
+solution     = '''
+local text = io.read("*a"):match("%S+") or ""
+
+local last = {}
+local start = 1
+local best_len = 0
+local best_start = 1
+
+for i = 1, #text do
+  local c = text:sub(i, i)
+  local previous = last[c]
+  if previous ~= nil and previous >= start then start = previous + 1 end
+  last[c] = i
+  local length = i - start + 1
+  if length > best_len then
+    best_len = length
+    best_start = start
+  end
+end
+
+print(best_len)
+print(text:sub(best_start, best_start + best_len - 1))
+'''
+hints = [
+  "Keep the index where each character was last seen in a table keyed by the character, and the index the window starts at.",
+  "A repeat only matters if its last position is inside the current window — that is the `previous ~= nil and previous >= start` test.",
+  "Record the best length *and* where it started, or you cannot print the run at the end. `text:sub(start, start + length - 1)` is the run; `sub` includes both ends.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "abcabcbb\n",    expect = "3\nabc\n",      visible = true },
+  { name = "one",     stdin = "bbbbb\n",       expect = "1\nb\n",        visible = false },
+  { name = "middle",  stdin = "pwwkew\n",      expect = "3\nwke\n",      visible = false },
+  { name = "street",  stdin = "causewaybay\n", expect = "7\nusewayb\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id           = "lua.hacker.03.intervals"
+node         = 3
+title        = "THE DRUM ROTA"
+difficulty   = 4
+time_limit_s = 900
+story        = "They hand you the drummers' rota for the three nights of the dragon and ask which hours actually have somebody on the drum."
+concepts     = ["intervals", "sorting", "complexity"]
+requires     = ["lua.hacker.02.window"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are `<start> <end>` with `start <= end`.
+
+Merge every pair that overlaps or touches, and print the result in increasing
+order, one `<start> <end>` per line, then `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Touching counts as overlapping: `1 4` and `4 5` merge into `1 5`.
+
+The four cases here are three or four intervals each, and the clock is not
+measuring speed on them. Sorting and sweeping is `O(n log n)`; a version that
+rescans the merged list for every interval is `O(n²)` and clears these four
+just as easily. The bar is real on a real rota. It is not what these cases
+check.
+
+`table.sort` takes a comparator, and it needs one here: the intervals are
+tables, and two tables have no order of their own — `{1, 3} < {2, 6}` is an
+error, not a guess. The comparator is `function(p, q) return p[1] < q[1] end`,
+and the merged list is a table of tables, so `merged[#merged][2] = e` extends
+the last one in place.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local spans = {}
+for i = 1, n do spans[i] = { data[2 * i], data[2 * i + 1] } end
+
+-- sort, sweep, merge, print, then COUNT <k>
+print("COUNT " .. #spans)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local spans = {}
+for i = 1, n do spans[i] = { data[2 * i], data[2 * i + 1] } end
+
+-- a comparator, always: two tables cannot be compared with <
+table.sort(spans, function(p, q)
+  if p[1] ~= q[1] then return p[1] < q[1] end
+  return p[2] < q[2]
+end)
+
+local merged = {}
+for _, span in ipairs(spans) do
+  local top = merged[#merged]
+  if top ~= nil and span[1] <= top[2] then
+    if span[2] > top[2] then top[2] = span[2] end
+  else
+    merged[#merged + 1] = { span[1], span[2] }
+  end
+end
+
+for _, span in ipairs(merged) do
+  print(span[1] .. " " .. span[2])
+end
+print("COUNT " .. #merged)
+'''
+hints = [
+  "Sort by start first, with a comparator. After that one left-to-right pass is enough and you never look backwards more than one interval.",
+  "Extend the last merged interval when the new start is <= its end; otherwise append a new one. `merged[#merged]` is the last one, and it is a table, so writing `top[2] = e` changes it in place.",
+  "Extend to the larger of the two ends — a short interval swallowed by a long one must not shrink it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "4\n1 3\n2 6\n8 10\n15 18\n", expect = "1 6\n8 10\n15 18\nCOUNT 3\n", visible = true },
+  { name = "touching", stdin = "2\n1 4\n4 5\n",              expect = "1 5\nCOUNT 1\n",              visible = false },
+  { name = "point",    stdin = "1\n5 5\n",                   expect = "5 5\nCOUNT 1\n",              visible = false },
+  { name = "unsorted", stdin = "3\n5 6\n1 2\n3 4\n",         expect = "1 2\n3 4\n5 6\nCOUNT 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id           = "lua.hacker.04.grid"
+node         = 4
+title        = "OUT OF THE BUILDING"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A floor plan of the Chow Yei Ching Building on the whiteboard, a fire door at the far corner, and the interviewer watching the clock rather than the marker while the drums come up from Tai Hang."
+concepts     = ["graphs", "stacks-queues", "complexity"]
+requires     = ["lua.hacker.03.intervals"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are the floor: `.` is open, `#` is wall.
+
+Start at the top-left `(0,0)` and reach the bottom-right `(r-1, c-1)`, moving
+up, down, left or right through open cells only.
+
+Print the number of **steps** on a shortest route, or `-1` if there is none.
+Then print `REACHED <k>`: how many open cells are reachable from the start,
+counting the start itself.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Breadth first, not depth first. A depth-first walk finds *a* route; the
+question asks for the shortest one. And there is no queue in the standard
+library: a table is one, **if** you read it with a moving head index.
+`table.remove(queue, 1)` shifts every remaining element down by one, which
+is `O(n)`, and turns the whole search quadratic.
+
+A table can have any key, so `open[0]` is a real row and `open[-1]` is simply
+`nil` — no error, and no wrap to the last row either. The error comes one
+step later, when `open[-1][c]` follows the `nil`: `attempt to index a nil
+value`. A missing key is not a mistake until it is followed; check the bounds
+before the read, not after.
+'''
+starter      = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local rows, cols = tonumber(tokens[1]), tonumber(tokens[2])
+
+-- open[r][c] is true where the floor is '.', rows and columns counted from 0
+local open = {}
+for r = 0, rows - 1 do
+  open[r] = {}
+  local line = tokens[3 + r]
+  for c = 0, cols - 1 do open[r][c] = line:sub(c + 1, c + 1) == "." end
+end
+
+local queue, head = {}, 1
+
+-- print the shortest step count or -1, then REACHED <k>
+print(-1)
+print("REACHED 0")
+'''
+solution     = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local rows, cols = tonumber(tokens[1]), tonumber(tokens[2])
+
+-- open[r][c] is true where the floor is '.', rows and columns counted from 0
+local open = {}
+for r = 0, rows - 1 do
+  open[r] = {}
+  local line = tokens[3 + r]
+  for c = 0, cols - 1 do open[r][c] = line:sub(c + 1, c + 1) == "." end
+end
+
+-- -1 means not seen yet, so the distance grid is the visited set too
+local dist = {}
+for r = 0, rows - 1 do
+  dist[r] = {}
+  for c = 0, cols - 1 do dist[r][c] = -1 end
+end
+
+local queue, head = {}, 1
+local reached = 0
+if open[0][0] then
+  dist[0][0] = 0
+  queue[1] = { 0, 0 }
+  reached = 1
+end
+
+local steps = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }
+while head <= #queue do
+  local r, c = queue[head][1], queue[head][2]
+  head = head + 1
+  local nxt = dist[r][c] + 1
+  for _, d in ipairs(steps) do
+    local nr, nc = r + d[1], c + d[2]
+    -- open[-1] is nil and open[-1][nc] is an error: the bounds come first
+    if nr >= 0 and nr < rows and nc >= 0 and nc < cols
+        and open[nr][nc] and dist[nr][nc] < 0 then
+      dist[nr][nc] = nxt
+      reached = reached + 1
+      queue[#queue + 1] = { nr, nc }
+    end
+  end
+end
+
+print(dist[rows - 1][cols - 1])
+print("REACHED " .. reached)
+'''
+hints = [
+  "A head index that only moves forward is the whole difference between a queue and a stack here; `queue[#queue + 1] = cell` pushes, `queue[head]` with `head = head + 1` pops from the front in O(1).",
+  "Mark a cell when you push it, not when you pop it, or it goes into the queue several times.",
+  "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
+  "`open[nr]` is nil off the top or bottom of the floor, and indexing it is a runtime error. Check `nr >= 0 and nr < rows` before you read `open[nr][nc]` — or read `open[nr] and open[nr][nc]`, which is the same check said in Lua.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\n...\n.#.\n...\n",              expect = "4\nREACHED 8\n",   visible = true },
+  { name = "blocked", stdin = "2 2\n.#\n#.\n",                     expect = "-1\nREACHED 1\n",  visible = false },
+  { name = "single",  stdin = "1 1\n.\n",                          expect = "0\nREACHED 1\n",   visible = false },
+  { name = "maze",    stdin = "4 5\n.....\n###.#\n.....\n.#.#.\n", expect = "7\nREACHED 14\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id           = "lua.hacker.05.binary-search"
+node         = 5
+title        = "HOW BIG A LORRY"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The straw for the dragon comes down from the New Territories in loads, in order. The committee wants the smallest lorry that clears the list in the days they have, and they will only tell you whether one you name is too small."
+concepts     = ["binary-search", "complexity", "slices"]
+requires     = ["lua.hacker.04.grid"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief        = '''
+Line one is `n d`. Line two is `n` package weights, in the order they must be
+loaded — the order cannot change.
+
+Find the smallest lorry capacity that ships all `n` packages in at most `d`
+days, loading in order and never splitting a package.
+
+Print the capacity, then `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+You are not searching the list. You are searching the **answer**: the
+capacities from `max(weights)` to `sum(weights)`, on which "does it fit in
+`d` days" is false, false, false, then true forever. Binary search that. There
+is no `bisect` in Lua and it could not help anyway — there is no list to
+bisect, only a predicate — so this one is written by hand.
+
+The four cases here are ten weights at most, and the clock is not measuring
+speed on them: walking the capacities up one at a time from `max(weights)`
+clears every one, because every answer is under twenty. It would not clear a
+real docket, where the gap between `max` and `sum` is billions wide — and
+that is the input the question is really about. These cases check that you
+got the search right, not that you wrote one.
+
+`(low + high) / 2` is a real division in Lua — `(3 + 4) / 2` is `3.5`, and a
+capacity of `3.5` is a capacity nothing in the input can equal. `math.floor`
+it. There is no `//` here.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, days = data[1], data[2]
+local weights = {}
+local heaviest = 0
+for i = 1, n do
+  weights[i] = data[2 + i]
+  if weights[i] > heaviest then heaviest = weights[i] end
+end
+
+local function days_needed(capacity)
+  -- how many days does this capacity take, loading in order?
+  return 0
+end
+
+print(0)
+print("MAX " .. heaviest)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, days = data[1], data[2]
+local weights = {}
+local heaviest, total = 0, 0
+for i = 1, n do
+  weights[i] = data[2 + i]
+  total = total + weights[i]
+  if weights[i] > heaviest then heaviest = weights[i] end
+end
+
+local function days_needed(capacity)
+  local count, load = 1, 0
+  for _, w in ipairs(weights) do
+    if load + w > capacity then
+      count = count + 1
+      load = 0
+    end
+    load = load + w
+  end
+  return count
+end
+
+local low, high = heaviest, total
+while low < high do
+  local mid = math.floor((low + high) / 2)
+  if days_needed(mid) <= days then
+    high = mid
+  else
+    low = mid + 1
+  end
+end
+
+print(low)
+print("MAX " .. heaviest)
+'''
+hints = [
+  "The lower bound is the heaviest single package — anything smaller can never carry it.",
+  "The upper bound is the total: one day, everything on it.",
+  "math.floor((low + high) / 2) — `/` gives you 7.5 otherwise — and move `high` down to `mid` on success so you keep the smallest capacity that worked.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5\n1 2 3 4 5 6 7 8 9 10\n", expect = "15\nMAX 10\n", visible = true },
+  { name = "tight",  stdin = "3 3\n3 2 2\n",                 expect = "3\nMAX 3\n",   visible = false },
+  { name = "spread", stdin = "5 4\n1 2 3 1 1\n",             expect = "3\nMAX 3\n",   visible = false },
+  { name = "one",    stdin = "1 1\n7\n",                     expect = "7\nMAX 7\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id           = "lua.hacker.06.stack"
+node         = 6
+title        = "THE NEXT TALLER ONE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A column of lantern heights on the board and one question: for each of them, which is the next one after it that is taller."
+concepts     = ["stacks-queues", "slices", "complexity"]
+requires     = ["lua.hacker.05.binary-search"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+For each entry print the first entry **to its right** that is strictly
+greater, or `-1` if there is none. Put them on one line, space separated. Then
+print `NONE <k>`, how many of them were `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Keep a stack of positions whose answer is still unknown, and it stays
+decreasing from the bottom up. Each position is pushed once and popped once,
+so the whole thing is one pass however it looks. A Lua table is the stack:
+`pending[#pending + 1] = i` pushes, `pending[#pending]` is the top, and
+`pending[#pending] = nil` pops — all `O(1)`, because `#` on a sequence with
+no holes is a length, not a count.
+
+The five cases here are six numbers at most, and the clock is not measuring
+speed on them. Nor would a bigger one, and that is worth knowing: the naive
+answer — for each entry, walk right until something bigger turns up — is
+quadratic only on input that is already close to descending. On random input
+it stops after about `ln(n)` steps on average, so no run limit separates it
+from the stack. The stack is still the answer, because it is `O(n)` on every
+input including the descending one — but on this quest that is a claim you
+have to take on the argument rather than on the clock.
+
+`table.concat(answer, " ")` joins numbers as well as strings, and it is the
+way to print a line of values — `print(a, b)` puts a **tab** between them.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local nums = {}
+for i = 1, n do nums[i] = data[1 + i] end
+
+local answer = {}
+for i = 1, n do answer[i] = -1 end
+local pending = {}
+
+print(table.concat(answer, " "))
+print("NONE " .. n)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local nums = {}
+for i = 1, n do nums[i] = data[1 + i] end
+
+local answer = {}
+for i = 1, n do answer[i] = -1 end
+local pending = {}
+
+for i = 1, n do
+  local value = nums[i]
+  -- the stack holds indices still waiting; the new value answers every top
+  -- it beats
+  while #pending > 0 and nums[pending[#pending]] < value do
+    answer[pending[#pending]] = value
+    pending[#pending] = nil
+  end
+  pending[#pending + 1] = i
+end
+
+local none = 0
+for i = 1, n do
+  if answer[i] == -1 then none = none + 1 end
+end
+
+print(table.concat(answer, " "))
+print("NONE " .. none)
+'''
+hints = [
+  "The stack holds indices that are still waiting for their answer, not values.",
+  "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several. `pending[#pending] = nil` is the pop.",
+  "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "4\n2 1 2 4\n",     expect = "4 2 4 -1\nNONE 1\n",        visible = true },
+  { name = "descending", stdin = "3\n5 4 3\n",       expect = "-1 -1 -1\nNONE 3\n",        visible = false },
+  { name = "ascending",  stdin = "5\n1 2 3 4 5\n",   expect = "2 3 4 5 -1\nNONE 1\n",      visible = false },
+  { name = "plateau",    stdin = "6\n2 2 2 1 3 1\n", expect = "3 3 3 3 -1 -1\nNONE 2\n",   visible = false },
+  { name = "single",     stdin = "1\n5\n",           expect = "-1\nNONE 1\n",              visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id           = "lua.hacker.07.coins"
+node         = 7
+title        = "EXACT CHANGE"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The incense stall at the mouth of Wun Sha Street has three coin trays and a customer who will not take a note."
+concepts     = ["dynamic-programming", "complexity", "slices"]
+requires     = ["lua.hacker.06.stack"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief        = '''
+Line one is `n target`. Line two is `n` coin values. Every coin is available
+in unlimited quantity.
+
+Print the smallest number of coins that makes `target` exactly, or `-1` if it
+cannot be made. Then print `REACH <k>`: how many of the amounts `0..target`
+can be made at all, counting `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+The hidden cases are small, so what they catch is wrongness rather than
+slowness — and one of them catches the usual wrong answer. Greedy, taking the
+biggest coin that fits and repeating, makes `6` out of `3 4` by grabbing the
+`4` and then failing, and there is a case for exactly that. The other bad
+answer, plain recursion with no table, is not caught here and still is not
+the one to write: `target` is 100000 in the real thing, and the same amount
+gets recomputed thousands of times.
+
+The table runs from `0` to `target`, and a Lua table is happy to start at
+`0` — `best[0] = 0` is a real entry. An amount that cannot be made is simply
+**absent**: `best[amount]` is `nil`, and `nil` is the honest "unreachable"
+here. Test it with `~= nil` before you add one to it, because `nil + 1` is
+`attempt to perform arithmetic on a nil value`. And never use `#best` to
+count anything in a table with holes in it: `#` is a border, not a count.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, target = data[1], data[2]
+local coins = {}
+for i = 1, n do coins[i] = data[2 + i] end
+
+-- best[amount] is the fewest coins for that amount; nil means unreachable
+local best = { [0] = 0 }
+
+-- fill the table bottom up, then print the answer and REACH <k>
+print(-1)
+print("REACH 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, target = data[1], data[2]
+local coins = {}
+for i = 1, n do coins[i] = data[2 + i] end
+
+-- best[amount] is the fewest coins for that amount; nil means unreachable
+local best = { [0] = 0 }
+
+for amount = 1, target do
+  for _, coin in ipairs(coins) do
+    if coin <= amount and best[amount - coin] ~= nil then
+      local candidate = best[amount - coin] + 1
+      if best[amount] == nil or candidate < best[amount] then
+        best[amount] = candidate
+      end
+    end
+  end
+end
+
+-- count the entries by walking 0..target; # would stop at the first hole
+local reach = 0
+for amount = 0, target do
+  if best[amount] ~= nil then reach = reach + 1 end
+end
+
+if best[target] == nil then print(-1) else print(best[target]) end
+print("REACH " .. reach)
+'''
+hints = [
+  "best[0] = 0, and best[a] is one more than the cheapest best[a - coin] over every coin that fits.",
+  "nil is the honest `unreachable` in Lua — an amount nobody has made has no entry at all. Check `~= nil` before you add one, or the addition itself is the error.",
+  "REACH is how many of 0..target have an entry — walk the range and count; `#best` is a border on a table with holes and can be anything.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "3 11\n1 2 5\n", expect = "3\nREACH 12\n", visible = true },
+  { name = "impossible", stdin = "1 3\n2\n",      expect = "-1\nREACH 2\n", visible = false },
+  { name = "not-greedy", stdin = "2 6\n3 4\n",    expect = "2\nREACH 4\n",  visible = false },
+  { name = "zero",       stdin = "3 0\n1 2 5\n",  expect = "0\nREACH 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id           = "lua.hacker.08.top-k"
+node         = 8
+title        = "FIVE MOST ASKED"
+difficulty   = 4
+time_limit_s = 900
+story        = "Warm-up round. They ask for the five words that came up most on last year's lantern riddles, and they time it anyway."
+concepts     = ["hashing", "sorting", "complexity"]
+requires     = ["lua.hacker.07.coins", "lua.hacker.01.two-sum"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` words separated by spaces.
+
+Print the `k` most frequent words, most frequent first, ties broken by the
+word ascending, one per line. If there are fewer than `k` distinct words,
+print all of them. Then print `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Count in a table keyed by the word, then rank. The tie-break is not
+decoration, and in Lua it is the whole quest: **`pairs` walks a table in no
+order at all** — not insertion order, not alphabetical, and not the same
+order from one run to the next. So the words come out of the count table into
+a sequence, and the sequence is sorted with a comparison that is **total**:
+count descending, then the word ascending, which is what `table.sort` needs
+to give one answer and what the interviewer is listening for.
+
+The four cases here are a handful of words, and the clock is not measuring
+speed on them: counting by scanning the whole list once per distinct word is
+`O(n²)` and clears all four. On a year of riddles it would not. What these
+cases check is the tie-break, which is the part people actually get wrong.
+'''
+starter      = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local k = tonumber(tokens[2])
+
+local counts = {}
+local words = {}
+
+-- count, collect the distinct words into `words`, sort them by count
+-- descending then word ascending, print k of them, then DISTINCT <d>
+print("DISTINCT " .. #words)
+'''
+solution     = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local k = tonumber(tokens[2])
+
+local counts = {}
+local words = {}
+for i = 3, #tokens do
+  local word = tokens[i]
+  if counts[word] == nil then
+    counts[word] = 0
+    words[#words + 1] = word
+  end
+  counts[word] = counts[word] + 1
+end
+
+-- a total order: pairs has none, and table.sort promises nothing about ties
+table.sort(words, function(a, b)
+  if counts[a] ~= counts[b] then return counts[a] > counts[b] end
+  return a < b
+end)
+
+for i = 1, math.min(k, #words) do
+  print(words[i])
+end
+print("DISTINCT " .. #words)
+'''
+hints = [
+  "One table for the counts, and a second, sequence-shaped one that gets the word appended the first time it is seen — that second table is what you sort, because you cannot sort a table you walk with pairs.",
+  "The comparator returns counts[a] > counts[b] when they differ, and a < b when they do not. Strings compare with < in Lua, byte by byte, which is the ascending the statement asks for.",
+  "math.min(k, #words) is the loop bound — running the loop to k on a shorter list prints nil.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "6 2\ntram tram bus bus bus mtr\n", expect = "bus\ntram\nDISTINCT 3\n", visible = true },
+  { name = "one",       stdin = "4 1\na b a c\n",                   expect = "a\nDISTINCT 3\n",         visible = false },
+  { name = "ties",      stdin = "5 3\nx y z x y\n",                 expect = "x\ny\nz\nDISTINCT 3\n",   visible = false },
+  { name = "k-too-big", stdin = "3 5\nq q q\n",                     expect = "q\nDISTINCT 1\n",         visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id           = "lua.hacker.09.linked-list"
+node         = 9
+title        = "THE CHAIN"
+difficulty   = 4
+time_limit_s = 900
+story        = "They want it without a sequence. Tables that point at tables, the way the dragon's segments hold on to the one in front, because that is the shape the question is really about."
+concepts     = ["linked-lists", "two-pointers", "structs"]
+requires     = ["lua.hacker.08.top-k"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers, in order.
+
+Build a singly linked list from them — a node is a table with `value` and
+`next` — and then answer from the nodes. The reversal, the middle and the
+length all come from walking the chain, not from the sequence you read the
+input into; collecting the output in a sequence to `table.concat` it at the
+end is fine. Print three lines:
+
+1. the list reversed, space separated
+2. the value at the middle node (for an even `n`, the second of the two)
+3. `LEN <n>` counted by walking the list, not by trusting the input
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+The middle is the runner: one pointer one step at a time, one two steps at a
+time, and when the fast one runs out the slow one is there. One pass.
+
+A node is `{ value = v, next = head }`, and the end of the chain is `next`
+being `nil` — which is not a field set to nothing, it is the field not being
+there at all. `while cursor ~= nil do` is the walk. Reverse it with a loop:
+the recursive reverse is three pretty lines, and LuaJIT's stack does hold a
+few thousand of them, but the version of this question with a hundred
+thousand nodes is the one that gets asked, and that one is `stack overflow`.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local values = {}
+for i = 2, #data do values[#values + 1] = data[i] end
+
+local head = nil
+
+-- build the list, reverse it, find the middle by walking twice as fast
+print("?")
+print(0)
+print("LEN 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local values = {}
+for i = 2, #data do values[#values + 1] = data[i] end
+
+-- build it back to front, so each new node points at what we had
+local head = nil
+for i = #values, 1, -1 do
+  head = { value = values[i], next = head }
+end
+
+-- walk it to count, and run a second pointer at half speed for the middle
+local length = 0
+local slow, fast = head, head
+while fast ~= nil do
+  length = length + 1
+  fast = fast.next
+  if fast ~= nil then
+    length = length + 1
+    fast = fast.next
+    slow = slow.next
+  end
+end
+local middle = 0
+if slow ~= nil then middle = slow.value end
+
+-- reverse by moving nodes off the front of one list onto the front of another
+local reversed_head = nil
+local cursor = head
+while cursor ~= nil do
+  local following = cursor.next
+  cursor.next = reversed_head
+  reversed_head = cursor
+  cursor = following
+end
+
+local out = {}
+local walk = reversed_head
+while walk ~= nil do
+  out[#out + 1] = walk.value
+  walk = walk.next
+end
+
+print(table.concat(out, " "))
+print(middle)
+print("LEN " .. length)
+'''
+hints = [
+  "Building back to front is the easy direction: each new node takes the old head as its next, and the first node built has next = nil.",
+  "Save cursor.next before you overwrite it. Once cursor.next points backwards, the rest of the old list is unreachable.",
+  "For the middle, advance slow only on the steps where fast managed two.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "odd",    stdin = "5\n1 2 3 4 5\n", expect = "5 4 3 2 1\n3\nLEN 5\n", visible = true },
+  { name = "even",   stdin = "4\n7 8 9 10\n",  expect = "10 9 8 7\n9\nLEN 4\n",  visible = false },
+  { name = "single", stdin = "1\n42\n",        expect = "42\n42\nLEN 1\n",       visible = false },
+  { name = "signed", stdin = "3\n-1 0 1\n",    expect = "1 0 -1\n0\nLEN 3\n",    visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id           = "lua.hacker.10.tree-walk"
+node         = 10
+title        = "THREE WAYS ROUND A TREE"
+difficulty   = 4
+time_limit_s = 900
+story        = "A tree of lantern numbers on the whiteboard and the question nobody should have to think about twice: name the three orders."
+concepts     = ["trees", "recursion", "stacks-queues"]
+requires     = ["lua.hacker.09.linked-list"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` values in **level order**, where `-1` means
+"no node here" — so the tree is stored the way a heap is: the children of
+index `i` are `2i+1` and `2i+2`.
+
+Print four lines: the **preorder**, **inorder** and **postorder** walks, each
+space separated, and then `DEPTH <d>` — the number of nodes on the longest
+root-to-leaf path.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder is node, left, right. Inorder is left, node, right. Postorder is
+left, right, node. The recursion is the same three lines each time and only
+the position of the append moves. The recursion here is as deep as the tree,
+which for a heap-shaped array is `log n`, so the stack is not a concern — say
+that out loud, because it will be asked.
+
+The formula wants the root at index `0`, and a Lua table can have a `0` key:
+store the values as `tree[0] .. tree[n-1]` and `2i+1` works unchanged. Off
+the end of the table `tree[i]` is `nil`, and so is the test for it. A
+`local function walk(...)` can call itself; a plain `local walk = function`
+cannot, because the name is not in scope inside its own body yet.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local tree = {}
+for i = 0, n - 1 do tree[i] = data[2 + i] end
+
+local function walk(i, order, out)
+  -- order 0 = preorder, 1 = inorder, 2 = postorder
+end
+
+local function depth(i)
+  return 0
+end
+
+for order = 0, 2 do
+  local out = {}
+  walk(0, order, out)
+  print(table.concat(out, " "))
+end
+print("DEPTH " .. depth(0))
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local tree = {}
+for i = 0, n - 1 do tree[i] = data[2 + i] end
+
+local function present(i)
+  return i < n and tree[i] ~= -1
+end
+
+local function walk(i, order, out)
+  if not present(i) then return end
+  if order == 0 then out[#out + 1] = tree[i] end
+  walk(2 * i + 1, order, out)
+  if order == 1 then out[#out + 1] = tree[i] end
+  walk(2 * i + 2, order, out)
+  if order == 2 then out[#out + 1] = tree[i] end
+end
+
+local function depth(i)
+  if not present(i) then return 0 end
+  return 1 + math.max(depth(2 * i + 1), depth(2 * i + 2))
+end
+
+for order = 0, 2 do
+  local out = {}
+  walk(0, order, out)
+  print(table.concat(out, " "))
+end
+print("DEPTH " .. depth(0))
+'''
+hints = [
+  "One recursive function with the append in three possible places beats three near-identical functions.",
+  "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
+  "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n1 2 3 -1 4\n",        expect = "1 2 4 3\n2 4 1 3\n4 2 3 1\nDEPTH 3\n", visible = true },
+  { name = "leaf",   stdin = "1\n9\n",                 expect = "9\n9\n9\nDEPTH 1\n",                   visible = false },
+  { name = "left",   stdin = "7\n1 2 -1 3 -1 -1 -1\n", expect = "1 2 3\n3 2 1\n3 2 1\nDEPTH 3\n",       visible = false },
+  { name = "full",   stdin = "7\n4 2 6 1 3 5 7\n",     expect = "4 2 1 3 6 5 7\n1 2 3 4 5 6 7\n1 3 2 5 7 6 4\nDEPTH 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id           = "lua.hacker.11.bst"
+node         = 11
+title        = "IS IT ACTUALLY A BST"
+difficulty   = 4
+time_limit_s = 900
+story        = "The follow-up, same tree of lantern numbers. Everyone checks the two children and everyone is wrong the first time."
+concepts     = ["trees", "recursion", "binary-search"]
+requires     = ["lua.hacker.10.tree-walk"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief        = '''
+Same level-order encoding as the last quest: `-1` is a missing node, children
+of `i` are `2i+1` and `2i+2`.
+
+Line one is `n q`. Line two is the `n` tree values. Line three is `q` query
+values.
+
+Print `VALID` or `INVALID` — is this a binary search tree, with every value in
+the left subtree strictly smaller than the node and every value in the right
+strictly larger? Then one line per query: `<value> FOUND <depth>` if it is in
+the tree, `<value> ABSENT` if not, where the root is depth 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Checking `left < node < right` at each node **is not enough** — a value deep
+in the left subtree can still be larger than an ancestor. Carry the open
+interval down instead. Lua has no smallest integer to start from; the bounds
+start as `nil`, meaning "no bound yet", and `nil` needs its own check because
+`value <= nil` is `attempt to compare number with nil`, a runtime error, not
+a false.
+
+A query is answered by the **descent**: compare with the node, go left when
+you are smaller and right otherwise, and report `ABSENT` when you fall off
+the tree. That matters because the tree is not promised to be a BST, and in
+one that is not, a value can sit in the array somewhere the descent never
+looks. It is `ABSENT` — you are being asked what the lookup does, not what a
+scan of the array would find.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q = data[1], data[2]
+local tree = {}
+for i = 0, n - 1 do tree[i] = data[3 + i] end
+local queries = {}
+for i = 1, q do queries[i] = data[2 + n + i] end
+
+local function present(i)
+  return i < n and tree[i] ~= -1
+end
+
+local function valid(i, low, high)
+  -- the node must sit strictly inside (low, high), and each child
+  -- inherits a narrower window; nil means no bound on that side
+  return true
+end
+
+if valid(0, nil, nil) then print("VALID") else print("INVALID") end
+for _, target in ipairs(queries) do
+  print(target .. " ABSENT")
+end
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q = data[1], data[2]
+local tree = {}
+for i = 0, n - 1 do tree[i] = data[3 + i] end
+local queries = {}
+for i = 1, q do queries[i] = data[2 + n + i] end
+
+local function present(i)
+  return i < n and tree[i] ~= -1
+end
+
+local function valid(i, low, high)
+  if not present(i) then return true end
+  local value = tree[i]
+  -- nil is "no bound": it has to be tested before it is compared
+  if low ~= nil and value <= low then return false end
+  if high ~= nil and value >= high then return false end
+  return valid(2 * i + 1, low, value) and valid(2 * i + 2, value, high)
+end
+
+local function find(target)
+  local i, depth = 0, 1
+  while present(i) do
+    if tree[i] == target then return depth end
+    if target < tree[i] then i = 2 * i + 1 else i = 2 * i + 2 end
+    depth = depth + 1
+  end
+  return nil
+end
+
+if valid(0, nil, nil) then print("VALID") else print("INVALID") end
+for _, target in ipairs(queries) do
+  local depth = find(target)
+  if depth == nil then
+    print(target .. " ABSENT")
+  else
+    print(target .. " FOUND " .. depth)
+  end
+end
+'''
+hints = [
+  "Pass an open interval (low, high) down. The root gets (nil, nil); a left child gets (low, node), a right child gets (node, high).",
+  "A missing node is vacuously valid — that is the base case, and it returns true, not false.",
+  "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took. Falling off the tree returns nil, and nil prints as ABSENT.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "7 2\n4 2 6 1 3 5 7\n3 8\n",  expect = "VALID\n3 FOUND 3\n8 ABSENT\n",  visible = true },
+  { name = "sneaky",    stdin = "7 1\n5 1 7 -1 6 -1 -1\n6\n", expect = "INVALID\n6 ABSENT\n",           visible = false },
+  { name = "root",      stdin = "1 1\n10\n10\n",              expect = "VALID\n10 FOUND 1\n",           visible = false },
+  { name = "left-only", stdin = "3 2\n8 4 -1\n4 8\n",         expect = "VALID\n4 FOUND 2\n8 FOUND 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id           = "lua.hacker.12.heap"
+node         = 12
+title        = "K SORTED QUEUES"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Every lane the dragon passes through sends its lantern numbers already in order. Merge them into one list without sorting the lot again."
+concepts     = ["heaps", "sorting", "complexity"]
+requires     = ["lua.hacker.11.bst"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief        = '''
+Line one is `k`. Then `k` lines, each a count followed by that many integers,
+already sorted ascending.
+
+Print all of them merged into one ascending line, space separated, then
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+There is no `heapq` in Lua. A binary min-heap is a table and two functions —
+`push` sifts the new last element up, `pop` moves the last element to the
+top and sifts it down — and the starter carries one, two functions of
+fifteen lines each, so the loop is the question here and not the heap. Read it once; you will write it
+yourself further along this road.
+
+The entry is `{ value, which list, how far into it }`, and the heap orders
+entries by `value` first and by the list index on a tie — which is fine,
+because it only has to be *some* order, and it has to be a **total** one,
+because the heap's comparison is written by you and a comparison that says
+"equal" both ways is not a mistake Lua will report.
+
+The heap holds one entry per list, not one per element, so it stays at size
+`k` however long the lists are.
+
+The four cases here are a handful of numbers across two or three lists, and
+the clock is not measuring speed on them: pouring everything into one table
+and `table.sort`ing it clears all four, and so does rescanning all `k` heads
+on every step. The heap is what keeps it `O(N log k)` when `k` is large, and
+that is a promise about input these cases do not contain.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local k = data[1]
+
+local lists = {}
+local at = 2
+for which = 1, k do
+  local count = data[at]
+  at = at + 1
+  local items = {}
+  for i = 1, count do
+    items[i] = data[at]
+    at = at + 1
+  end
+  lists[which] = items
+end
+
+-- a binary min-heap of { value, which, at } entries, ordered by value then
+-- by which
+local heap = {}
+
+local function less(a, b)
+  if a[1] ~= b[1] then return a[1] < b[1] end
+  return a[2] < b[2]
+end
+
+local function push(entry)
+  local i = #heap + 1
+  heap[i] = entry
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if not less(heap[i], heap[parent]) then break end
+    heap[i], heap[parent] = heap[parent], heap[i]
+    i = parent
+  end
+end
+
+local function pop()
+  local top = heap[1]
+  local last = heap[#heap]
+  heap[#heap] = nil
+  local size = #heap
+  if size > 0 then
+    heap[1] = last
+    local i = 1
+    while true do
+      local l, r, smallest = 2 * i, 2 * i + 1, i
+      if l <= size and less(heap[l], heap[smallest]) then smallest = l end
+      if r <= size and less(heap[r], heap[smallest]) then smallest = r end
+      if smallest == i then break end
+      heap[i], heap[smallest] = heap[smallest], heap[i]
+      i = smallest
+    end
+  end
+  return top
+end
+
+-- seed the heap with the head of each list, then pop and refill
+print("?")
+print("POPS 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local k = data[1]
+
+local lists = {}
+local at = 2
+for which = 1, k do
+  local count = data[at]
+  at = at + 1
+  local items = {}
+  for i = 1, count do
+    items[i] = data[at]
+    at = at + 1
+  end
+  lists[which] = items
+end
+
+-- a binary min-heap of { value, which, at } entries, ordered by value then
+-- by which
+local heap = {}
+
+local function less(a, b)
+  if a[1] ~= b[1] then return a[1] < b[1] end
+  return a[2] < b[2]
+end
+
+local function push(entry)
+  local i = #heap + 1
+  heap[i] = entry
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if not less(heap[i], heap[parent]) then break end
+    heap[i], heap[parent] = heap[parent], heap[i]
+    i = parent
+  end
+end
+
+local function pop()
+  local top = heap[1]
+  local last = heap[#heap]
+  heap[#heap] = nil
+  local size = #heap
+  if size > 0 then
+    heap[1] = last
+    local i = 1
+    while true do
+      local l, r, smallest = 2 * i, 2 * i + 1, i
+      if l <= size and less(heap[l], heap[smallest]) then smallest = l end
+      if r <= size and less(heap[r], heap[smallest]) then smallest = r end
+      if smallest == i then break end
+      heap[i], heap[smallest] = heap[smallest], heap[i]
+      i = smallest
+    end
+  end
+  return top
+end
+
+-- one entry per list: its head
+for which, items in ipairs(lists) do
+  if #items > 0 then push({ items[1], which, 1 }) end
+end
+
+local out = {}
+while #heap > 0 do
+  local entry = pop()
+  out[#out + 1] = entry[1]
+  local items = lists[entry[2]]
+  if entry[3] < #items then
+    push({ items[entry[3] + 1], entry[2], entry[3] + 1 })
+  end
+end
+
+print(table.concat(out, " "))
+print("POPS " .. #out)
+'''
+hints = [
+  "The heap entry has to carry where the value came from, or you cannot refill after popping it.",
+  "{ value, which, at } with `less` comparing value first is exactly what you want; seed it with the first element of every non-empty list — a list with a count of 0 has no head to seed.",
+  "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n3 1 4 5\n2 1 3\n2 2 6\n", expect = "1 1 2 3 4 5 6\nPOPS 7\n", visible = true },
+  { name = "one",    stdin = "1\n3 -5 0 5\n",              expect = "-5 0 5\nPOPS 3\n",         visible = false },
+  { name = "ragged", stdin = "3\n1 9\n0\n4 1 2 3 4\n",     expect = "1 2 3 4 9\nPOPS 5\n",      visible = false },
+  { name = "dupes",  stdin = "2\n2 2 2\n2 2 2\n",          expect = "2 2 2 2\nPOPS 4\n",        visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id           = "lua.hacker.13.backtracking"
+node         = 13
+title        = "EVERY COMBINATION"
+difficulty   = 4
+time_limit_s = 900
+story        = "List every way the lanterns could be hung on the stall. All of them, in a fixed order, and do not print the same one twice."
+concepts     = ["backtracking", "recursion", "slices"]
+requires     = ["lua.hacker.12.heap"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` distinct integers **already in ascending
+order**.
+
+Print every subset, one per line, values space separated, the empty subset as
+`-`. Order them the way the obvious recursion produces them: at each position,
+first the branch that **takes** the element, then the branch that skips it.
+Then print `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Push, recurse, **pop**. The pop is the part people leave out, and the symptom
+is every line after the first being too long. In Lua the push is
+`chosen[#chosen + 1] = v` and the pop is `chosen[#chosen] = nil` — assigning
+`nil` to the last slot is how a sequence gets shorter, and `#chosen` follows
+it down. There is no `itertools` here to give you the subsets in some other
+order; the order is the recursion's own, and that is what is being checked.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+local out = {}
+
+local function build(at, chosen)
+  -- past the end of the list, record `chosen`; otherwise take it, recurse,
+  -- undo, then skip it and recurse
+end
+
+build(1, {})
+
+for _, line in ipairs(out) do print(line) end
+print("SUBSETS " .. #out)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+local out = {}
+
+local function build(at, chosen)
+  if at > #nums then
+    if #chosen > 0 then
+      out[#out + 1] = table.concat(chosen, " ")
+    else
+      out[#out + 1] = "-"
+    end
+    return
+  end
+
+  chosen[#chosen + 1] = nums[at]
+  build(at + 1, chosen)
+  chosen[#chosen] = nil
+
+  build(at + 1, chosen)
+end
+
+build(1, {})
+
+for _, line in ipairs(out) do print(line) end
+print("SUBSETS " .. #out)
+'''
+hints = [
+  "Two recursive calls per element: one with it appended, one without. Take first, and the order in the sample falls out.",
+  "chosen[#chosen] = nil goes between the two calls. That is the `undo` in try-recurse-undo.",
+  "The base case is at > #nums, and the empty selection there is the empty subset, which still counts — and prints as `-`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n", expect = "1 2 3\n1 2\n1 3\n1\n2 3\n2\n3\n-\nSUBSETS 8\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",     expect = "5\n-\nSUBSETS 2\n",                             visible = false },
+  { name = "two",   stdin = "2\n-1 4\n",  expect = "-1 4\n-1\n4\n-\nSUBSETS 4\n",                   visible = false },
+  { name = "none",  stdin = "0\n\n",      expect = "-\nSUBSETS 1\n",                                visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id           = "lua.hacker.14.word-search"
+node         = 14
+title        = "IS THE WORD IN THE GRID"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A board of letters and a name off a lantern riddle. They want to know whether the name is written in it, and they want the count of dead ends."
+concepts     = ["backtracking", "matrix", "graphs"]
+requires     = ["lua.hacker.13.backtracking"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief        = '''
+Line one is `r c`. The next `r` lines are a grid of lowercase letters. The
+last line is the word.
+
+The word is in the grid if you can spell it by moving up, down, left or right
+between **adjacent** cells, never using the same cell twice in one attempt.
+
+Print `FOUND` or `ABSENT`, then `STARTS <k>`: how many cells hold the word's
+first letter.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Mark the cell used on the way in and **unmark it on the way out**. A cell
+that stays marked after a failed branch makes later branches fail for a reason
+that is not in the grid. A Lua string cannot be marked in place — it is
+immutable, and `s:sub` only ever makes a new one — so each row becomes a
+table of one-character strings first, and the mark is a write into that
+table.
+
+`or` short-circuits in Lua exactly as it does elsewhere, so chaining the four
+directions with `or` stops at the first one that spells the rest of the word.
+'''
+starter      = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local rows, cols = tonumber(tokens[1]), tonumber(tokens[2])
+
+-- grid[r][c] is a one-character string, so a cell can be overwritten
+local grid = {}
+for r = 1, rows do
+  grid[r] = {}
+  local line = tokens[2 + r]
+  for c = 1, cols do grid[r][c] = line:sub(c, c) end
+end
+local word = tokens[3 + rows]
+local letters = {}
+for i = 1, #word do letters[i] = word:sub(i, i) end
+
+local function search(r, c, at)
+  return false
+end
+
+local starts = 0
+
+print("ABSENT")
+print("STARTS " .. starts)
+'''
+solution     = '''
+local tokens = {}
+for token in io.read("*a"):gmatch("%S+") do tokens[#tokens + 1] = token end
+local rows, cols = tonumber(tokens[1]), tonumber(tokens[2])
+
+-- grid[r][c] is a one-character string, so a cell can be overwritten
+local grid = {}
+for r = 1, rows do
+  grid[r] = {}
+  local line = tokens[2 + r]
+  for c = 1, cols do grid[r][c] = line:sub(c, c) end
+end
+local word = tokens[3 + rows]
+local letters = {}
+for i = 1, #word do letters[i] = word:sub(i, i) end
+
+local function search(r, c, at)
+  if grid[r][c] ~= letters[at] then return false end
+  if at == #letters then return true end
+
+  local here = grid[r][c]
+  grid[r][c] = "#"
+
+  -- `or` short-circuits, so the first direction that spells the rest of the
+  -- word stops the other three from being tried at all
+  local found = (r > 1 and search(r - 1, c, at + 1))
+    or (r < rows and search(r + 1, c, at + 1))
+    or (c > 1 and search(r, c - 1, at + 1))
+    or (c < cols and search(r, c + 1, at + 1))
+
+  grid[r][c] = here
+  return found
+end
+
+-- count the starting letters before any cell is marked
+local starts = 0
+for r = 1, rows do
+  for c = 1, cols do
+    if grid[r][c] == letters[1] then starts = starts + 1 end
+  end
+end
+
+-- stop at the first cell the word spells out from
+local found = false
+for r = 1, rows do
+  for c = 1, cols do
+    if not found and search(r, c, 1) then found = true end
+  end
+end
+
+if found then print("FOUND") else print("ABSENT") end
+print("STARTS " .. starts)
+'''
+hints = [
+  "Overwrite the cell with a character the word cannot contain, recurse, then put the original back.",
+  "Count the starting letters in a separate pass before you search, or the '#' marks will confuse the count.",
+  "The success base case is `at == #letters` — checked after matching this cell, not before.",
+  "Chain the four directions with `or` rather than four ifs and a `found` flag: `or` already stops at the first branch that succeeds. Carrying on after a hit is work you were asked not to do.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 4\nabce\nsfcs\nadee\nabcced\n", expect = "FOUND\nSTARTS 2\n",  visible = true },
+  { name = "absent",  stdin = "3 4\nabce\nsfcs\nadee\nabcb\n",   expect = "ABSENT\nSTARTS 2\n", visible = false },
+  { name = "reuse",   stdin = "1 3\naba\naba\n",                 expect = "FOUND\nSTARTS 2\n",  visible = false },
+  { name = "single",  stdin = "1 1\na\na\n",                     expect = "FOUND\nSTARTS 1\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id           = "lua.hacker.15.topo-sort"
+node         = 15
+title        = "WHAT ORDER DOES IT BUILD IN"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Eleven jobs to get the dragon out of the shed — straw, frame, incense, the head last — and a sheet of what waits on what. Name an order, or name the cycle that means there is not one."
+concepts     = ["graphs", "stacks-queues", "sorting"]
+requires     = ["lua.hacker.14.word-search"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief        = '''
+Line one is `n m`: `n` tasks numbered `0..n-1` and `m` edges. The next `m`
+lines are `<a> <b>`, meaning `a` must be built before `b`.
+
+Print a build order on one line, space separated. When several tasks are ready
+at once, take the **lowest numbered** one, so the answer is unique. If no
+order exists, print `CYCLE` instead. Then print `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahn's algorithm: count how many things each task waits on, start with the
+ones waiting on nothing, and when you take a task, decrement its dependents.
+If you finish with tasks left over, those tasks are the cycle. The ready set
+is a min-heap of numbers — the one from node 12 with the comparison down to
+`<` — so "lowest numbered" costs `log n` rather than a scan. The tasks are
+numbered from `0`, and `after[0]` and `waiting[0]` are ordinary entries in a
+Lua table; only `ipairs` and `#` pretend a table starts at `1`, so walk the
+tasks with a numeric `for`.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m = data[1], data[2]
+
+local after, waiting = {}, {}
+for task = 0, n - 1 do
+  after[task] = {}
+  waiting[task] = 0
+end
+for e = 0, m - 1 do
+  local a, b = data[3 + 2 * e], data[4 + 2 * e]
+  after[a][#after[a] + 1] = b
+  waiting[b] = waiting[b] + 1
+end
+
+-- a binary min-heap of numbers
+local ready = {}
+
+local function push(value)
+  local i = #ready + 1
+  ready[i] = value
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if ready[parent] <= ready[i] then break end
+    ready[i], ready[parent] = ready[parent], ready[i]
+    i = parent
+  end
+end
+
+local function pop()
+  local top = ready[1]
+  local last = ready[#ready]
+  ready[#ready] = nil
+  local size = #ready
+  if size > 0 then
+    ready[1] = last
+    local i = 1
+    while true do
+      local l, r, smallest = 2 * i, 2 * i + 1, i
+      if l <= size and ready[l] < ready[smallest] then smallest = l end
+      if r <= size and ready[r] < ready[smallest] then smallest = r end
+      if smallest == i then break end
+      ready[i], ready[smallest] = ready[smallest], ready[i]
+      i = smallest
+    end
+  end
+  return top
+end
+
+-- start with everything waiting on nothing, take the smallest each time
+print("CYCLE")
+print("DONE 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m = data[1], data[2]
+
+local after, waiting = {}, {}
+for task = 0, n - 1 do
+  after[task] = {}
+  waiting[task] = 0
+end
+for e = 0, m - 1 do
+  local a, b = data[3 + 2 * e], data[4 + 2 * e]
+  after[a][#after[a] + 1] = b
+  waiting[b] = waiting[b] + 1
+end
+
+-- a binary min-heap of numbers
+local ready = {}
+
+local function push(value)
+  local i = #ready + 1
+  ready[i] = value
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if ready[parent] <= ready[i] then break end
+    ready[i], ready[parent] = ready[parent], ready[i]
+    i = parent
+  end
+end
+
+local function pop()
+  local top = ready[1]
+  local last = ready[#ready]
+  ready[#ready] = nil
+  local size = #ready
+  if size > 0 then
+    ready[1] = last
+    local i = 1
+    while true do
+      local l, r, smallest = 2 * i, 2 * i + 1, i
+      if l <= size and ready[l] < ready[smallest] then smallest = l end
+      if r <= size and ready[r] < ready[smallest] then smallest = r end
+      if smallest == i then break end
+      ready[i], ready[smallest] = ready[smallest], ready[i]
+      i = smallest
+    end
+  end
+  return top
+end
+
+for task = 0, n - 1 do
+  if waiting[task] == 0 then push(task) end
+end
+
+local order = {}
+while #ready > 0 do
+  local task = pop()
+  order[#order + 1] = task
+  for _, nxt in ipairs(after[task]) do
+    waiting[nxt] = waiting[nxt] - 1
+    if waiting[nxt] == 0 then push(nxt) end
+  end
+end
+
+if #order < n then
+  print("CYCLE")
+else
+  print(table.concat(order, " "))
+end
+print("DONE " .. #order)
+'''
+hints = [
+  "waiting[b] is the in-degree of b — how many edges point at it.",
+  "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
+  "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "diamond", stdin = "4 4\n0 1\n0 2\n1 3\n2 3\n", expect = "0 1 2 3\nDONE 4\n",   visible = true },
+  { name = "cycle",   stdin = "3 3\n0 1\n1 2\n2 0\n",      expect = "CYCLE\nDONE 0\n",     visible = false },
+  { name = "loose",   stdin = "3 0\n",                     expect = "0 1 2\nDONE 3\n",     visible = false },
+  { name = "chain",   stdin = "5 4\n4 3\n3 2\n2 1\n1 0\n", expect = "4 3 2 1 0\nDONE 5\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id           = "lua.hacker.16.union-find"
+node         = 16
+title        = "WHO IS CONNECTED TO WHOM"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The tram, the MTR and the minibus routes on one sheet, and every lane the dragon closes tonight. How many separate networks are there really."
+concepts     = ["disjoint-set", "graphs", "complexity"]
+requires     = ["lua.hacker.15.topo-sort"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops numbered `0..n-1`, `m` undirected
+links. There are no links in the input — you build them, with **exactly** this
+generator, in 64-bit arithmetic that wraps:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the m links, in order:
+    a = next() % n
+    b = next() % n
+    link a — b
+```
+
+Print three lines: how many separate networks there are, the size of the
+largest, and `REDUNDANT <k>` — how many of the links joined two stops that
+were already connected. A link from a stop to itself is one of those.
+
+```
+input:  8 5 1
+output: 4
+        5
+        REDUNDANT 1
+```
+
+For `8 5 1` the five links are `6—1`, `4—6`, `2—3`, `2—6`, `1—2`. The last one
+joins two stops already in the same network, so it is the redundant one, and
+what is left is `{1,2,3,4,6}` plus stops `0`, `5` and `7` on their own.
+
+A Lua number is a double, and a double holds 53 bits: multiply two of those
+constants in it and the low bits are gone before the `+` happens. LuaJIT has
+the type the statement is written in. `0ULL + seed` is an unsigned 64-bit
+integer, `*` and `+` on it wrap at `2^64` — no mask, the type *is* the mask —
+`bit.rshift(x, 33)` takes it, and `tonumber(...)` brings the 31-bit result
+back to a plain number that `%` is happy with. Every big case on this road
+uses that same four-line generator.
+
+**The complexity here is enforced.** One hidden case is `n = 200000` with
+`m = 200000` links. The obvious answer that is not union-find — walk the
+network out from `a` and see whether `b` is already in it, once per link — is
+correct, and it is `O(n)` per link and so `O(n·m)` in total: on this machine
+it had not finished after **25 seconds**, against a ten second run limit.
+That is what the starter is. Union-find with path compression and union by
+size does the same 200000 links in **0.01 seconds**, measured here with the
+solution that ships in this quest.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer on
+the sample and on both of the small hidden cases. It is rejected only for
+arriving far too late.
+
+Union-find: every stop points at a parent, `find` walks to the root, `union`
+points one root at the other. Compress the path on the way back out of `find`
+and the whole thing is effectively constant time per query.
+
+Write `find` as a loop. The recursive one is the textbook version and it is
+a `stack overflow` on a chain twenty thousand long — which is exactly the
+shape union-by-size exists to prevent, and exactly the shape a hostile input
+has before the first `find` ever compresses it.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m, seed = data[1], data[2], data[3]
+
+-- 64-bit arithmetic that wraps: LuaJIT's unsigned 64-bit integer
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local links = {}
+for stop = 0, n - 1 do links[stop] = {} end
+local redundant = 0
+
+for _ = 1, m do
+  local a = nxt() % n
+  local b = nxt() % n
+
+  -- correct, and far too slow: walk the whole network out from a to see
+  -- whether b is already in it. This is what the big hidden case rejects.
+  local seen = { [a] = true }
+  local queue, head = { a }, 1
+  local found = a == b
+  while head <= #queue and not found do
+    local at = queue[head]
+    head = head + 1
+    for _, nx in ipairs(links[at]) do
+      if not seen[nx] then
+        if nx == b then
+          found = true
+          break
+        end
+        seen[nx] = true
+        queue[#queue + 1] = nx
+      end
+    end
+  end
+  if found then redundant = redundant + 1 end
+  links[a][#links[a] + 1] = b
+  links[b][#links[b] + 1] = a
+end
+
+local groups, largest = 0, 0
+local seen = {}
+for start = 0, n - 1 do
+  if not seen[start] then
+    groups = groups + 1
+    seen[start] = true
+    local queue, head, count = { start }, 1, 0
+    while head <= #queue do
+      local at = queue[head]
+      head = head + 1
+      count = count + 1
+      for _, nx in ipairs(links[at]) do
+        if not seen[nx] then
+          seen[nx] = true
+          queue[#queue + 1] = nx
+        end
+      end
+    end
+    if count > largest then largest = count end
+  end
+end
+
+print(groups)
+print(largest)
+print("REDUNDANT " .. redundant)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m, seed = data[1], data[2], data[3]
+
+-- 64-bit arithmetic that wraps: LuaJIT's unsigned 64-bit integer
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local parent, size = {}, {}
+for stop = 0, n - 1 do
+  parent[stop] = stop
+  size[stop] = 1
+end
+
+local function find(v)
+  local root = v
+  while parent[root] ~= root do root = parent[root] end
+  -- path compression: point everything we walked over straight at the root
+  while parent[v] ~= root do
+    parent[v], v = root, parent[v]
+  end
+  return root
+end
+
+local groups, redundant = n, 0
+for _ = 1, m do
+  local a = find(nxt() % n)
+  local b = find(nxt() % n)
+  if a == b then
+    redundant = redundant + 1
+  else
+    -- hang the smaller tree under the bigger one
+    if size[a] < size[b] then a, b = b, a end
+    parent[b] = a
+    size[a] = size[a] + size[b]
+    groups = groups - 1
+  end
+end
+
+-- only a root's size entry means anything
+local largest = 0
+for stop = 0, n - 1 do
+  if parent[stop] == stop and size[stop] > largest then largest = size[stop] end
+end
+
+print(groups)
+print(largest)
+print("REDUNDANT " .. redundant)
+'''
+hints = [
+  "Draw the two endpoints as you go — one generator step each, in that order — rather than building a list of links first. Nothing here needs the links twice.",
+  "Start with every stop as its own parent and n groups; each successful union drops the count by one. Only a root's size entry is meaningful afterwards, so read the largest off the roots, not off every index.",
+  "A link whose two ends already have the same root is the redundant one — count it and move on. A self-link, a == b, falls out of that test on its own.",
+  "parent[v], v = root, parent[v] compresses in one line: Lua evaluates the whole right-hand side before it assigns anything, so the old parent[v] is read before it is overwritten.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 5 1\n",               expect = "4\n5\nREDUNDANT 1\n",              visible = true },
+  { name = "single", stdin = "1 2 7\n",               expect = "1\n1\nREDUNDANT 2\n",              visible = false },
+  { name = "dozen",  stdin = "12 9 99\n",             expect = "5\n5\nREDUNDANT 2\n",              visible = false },
+  { name = "big",    stdin = "200000 200000 12345\n", expect = "32158\n159720\nREDUNDANT 32158\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id           = "lua.hacker.17.lis"
+node         = 17
+title        = "THE LONGEST RUN UP"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A year of nightly takings at the lantern stall. They want the longest stretch of improving nights, and they do not have to be consecutive."
+concepts     = ["dynamic-programming", "binary-search", "complexity"]
+requires     = ["lua.hacker.16.union-find"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print the length of the longest **strictly increasing subsequence** — the
+values keep their order but need not be adjacent. Then print
+`TAILS <k>` where `k` is that same length, read off the patience-sorting pile
+count.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+The `O(n²)` table is the answer you should be able to write cold. The `O(n log n)`
+one keeps, for each length, the smallest value a subsequence of that length can
+end on — a table that is always sorted, so the position of a new value is a
+binary search. There is no `bisect` in Lua; the search is six lines, written
+by hand, and it finds the **first** tail that is `>= value` — the left one,
+not the right one, because strictly increasing means an equal value replaces
+rather than extends. Either answer passes here; the cases are small and say
+so. Write the second one anyway, because the follow-up is always "and
+faster?".
+
+Writing `tails[#tails + 1] = value` appends; writing `tails[at] = value` for
+an `at` inside the sequence replaces. The binary search hands you `at`, and
+when it lands one past the end the same assignment does the append.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+local tails = {}
+
+-- for each value, find where it belongs among the pile tops and put it there
+print(0)
+print("TAILS 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+-- tails[i] = the smallest value an increasing subsequence of length i can
+-- end on. It is sorted, always.
+local tails = {}
+for _, value in ipairs(nums) do
+  -- the first tail >= value, or #tails + 1 if there is none
+  local low, high = 1, #tails + 1
+  while low < high do
+    local mid = math.floor((low + high) / 2)
+    if tails[mid] < value then
+      low = mid + 1
+    else
+      high = mid
+    end
+  end
+  tails[low] = value
+end
+
+print(#tails)
+print("TAILS " .. #tails)
+'''
+hints = [
+  "tails is not a subsequence. Its length is the answer; its contents are only the best ending values.",
+  "Strictly increasing means you replace the first tail that is >= value, which is what the search with `tails[mid] < value` finds. Searching for the first tail > value would give you non-decreasing instead.",
+  "Running off the end of tails — low == #tails + 1 — means this value extends the longest run so far, and `tails[low] = value` is then an append.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",     stdin = "8\n10 9 2 5 3 7 101 18\n", expect = "4\nTAILS 4\n", visible = true },
+  { name = "descending", stdin = "4\n5 4 3 2\n",             expect = "1\nTAILS 1\n", visible = false },
+  { name = "flat",       stdin = "5\n7 7 7 7 7\n",           expect = "1\nTAILS 1\n", visible = false },
+  { name = "ascending",  stdin = "6\n1 2 3 4 5 6\n",         expect = "6\nTAILS 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id           = "lua.hacker.18.edit-distance"
+node         = 18
+title        = "HOW FAR APART"
+difficulty   = 5
+time_limit_s = 1200
+story        = "Two spellings of the same lane on two different street signs. How many single-character edits between them."
+concepts     = ["dynamic-programming", "strings", "matrix"]
+requires     = ["lua.hacker.17.lis"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief        = '''
+Two lines, one word each, lowercase. Either line may be **empty**, and then
+the answer is the length of the other one.
+
+Print the **edit distance**: the fewest single-character insertions,
+deletions or substitutions that turn the first into the second. Then print
+`LCS <k>`, the length of their longest common subsequence.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Two tables over the same two strings, and both are the same three-line
+recurrence with a different tie-break. Fill row by row; the answer is the far
+corner. Row `0` and column `0` are not zero for the edit table — they are the
+cost of deleting or inserting everything.
+
+An empty first line means `gmatch("%S+")` would hand you the second word as
+the first. Read by lines, not by tokens, on this one — `gmatch("(.-)\n")`
+walks the lines and hands back an empty string for an empty one.
+
+A `(len(a)+1) × (len(b)+1)` table is a table of tables, and every row must
+be its **own** table: build each one in the loop with `{}`. One row table
+assigned to every index is one row, written over from every direction, and
+the answer at the far corner is nonsense that looks plausible.
+'''
+starter      = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+local a = (lines[1] or ""):match("^%s*(.-)%s*$")
+local b = (lines[2] or ""):match("^%s*(.-)%s*$")
+
+-- edit[i][j] and lcs[i][j] over the prefixes a[1..i] and b[1..j]
+local edit, lcs = {}, {}
+for i = 0, #a do
+  edit[i], lcs[i] = {}, {}
+  for j = 0, #b do
+    edit[i][j] = 0
+    lcs[i][j] = 0
+  end
+end
+
+-- fill both tables; the answers are the bottom-right corners
+print(0)
+print("LCS 0")
+'''
+solution     = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+local a = (lines[1] or ""):match("^%s*(.-)%s*$")
+local b = (lines[2] or ""):match("^%s*(.-)%s*$")
+
+-- edit[i][j] and lcs[i][j] over the prefixes a[1..i] and b[1..j]
+local edit, lcs = {}, {}
+for i = 0, #a do
+  edit[i], lcs[i] = {}, {}
+  for j = 0, #b do
+    edit[i][j] = 0
+    lcs[i][j] = 0
+  end
+end
+
+for i = 0, #a do edit[i][0] = i end
+for j = 0, #b do edit[0][j] = j end
+for i = 1, #a do
+  for j = 1, #b do
+    if a:byte(i) == b:byte(j) then
+      edit[i][j] = edit[i - 1][j - 1]
+    else
+      edit[i][j] = 1 + math.min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])
+    end
+  end
+end
+
+for i = 1, #a do
+  for j = 1, #b do
+    if a:byte(i) == b:byte(j) then
+      lcs[i][j] = lcs[i - 1][j - 1] + 1
+    else
+      lcs[i][j] = math.max(lcs[i - 1][j], lcs[i][j - 1])
+    end
+  end
+end
+
+print(edit[#a][#b])
+print("LCS " .. lcs[#a][#b])
+'''
+hints = [
+  "edit[i][0] = i and edit[0][j] = j: turning a prefix into nothing costs one deletion per character.",
+  "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours. a:byte(i) == b:byte(j) compares the characters without making two new strings.",
+  "LCS is the same walk with max instead of min, and no diagonal step on a mismatch. And build every row with its own {} inside the loop — one shared row table is the bug that prints a plausible wrong number.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "horse\nros\n",         expect = "3\nLCS 2\n", visible = true },
+  { name = "same",    stdin = "causeway\ncauseway\n", expect = "0\nLCS 8\n", visible = false },
+  { name = "nothing", stdin = "abc\nxyz\n",           expect = "3\nLCS 0\n", visible = false },
+  { name = "insert",  stdin = "mtr\nmetro\n",         expect = "2\nLCS 3\n", visible = false },
+  { name = "empty",   stdin = "\nabc\n",              expect = "3\nLCS 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id           = "lua.hacker.19.knapsack"
+node         = 19
+title        = "WHAT FITS IN THE BAG"
+difficulty   = 5
+time_limit_s = 1200
+story        = "One runner, one bag of incense, and a board of stalls each with a weight and a price. Greedy picks the wrong ones."
+concepts     = ["dynamic-programming", "greedy", "slices"]
+requires     = ["lua.hacker.18.edit-distance"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief        = '''
+Line one is `n cap`. The next `n` lines are `<weight> <value>`. Each item can
+be taken at most **once**.
+
+Print the best total value that fits in `cap`, then `GREEDY <v>`: what you
+would get by repeatedly taking the item with the best value-per-weight that
+still fits. On equal value-per-weight, the lighter item goes first.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+The two numbers being different is the whole point of the quest, and the
+sample shows it: the best value-per-weight is the `6 10` item at `1.67`, and
+taking it leaves four units of room that nothing fits into. Passing on it and
+taking both `5 7` items is worth `14`. The hidden cases are small, so what
+they check is that you got both numbers right, not that the table is fast.
+
+Compare the ratios exactly. Lua has one number type and it is a double, so
+`value / weight` is a float, and two ratios that are equal on paper can come
+out a bit apart in binary. There is no `Fraction` here; there is
+cross-multiplication: `p.value * q.weight > q.value * p.weight` is the same
+comparison with no division in it, and the products are integers a double
+holds exactly.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, cap = data[1], data[2]
+local items = {}
+for i = 1, n do items[i] = { weight = data[1 + 2 * i], value = data[2 + 2 * i] } end
+
+local best = {}
+for room = 0, cap do best[room] = 0 end
+
+-- one row per item, capacities walked downwards so each item is used once
+print(0)
+print("GREEDY 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, cap = data[1], data[2]
+local items = {}
+for i = 1, n do items[i] = { weight = data[1 + 2 * i], value = data[2 + 2 * i] } end
+
+local best = {}
+for room = 0, cap do best[room] = 0 end
+for _, item in ipairs(items) do
+  -- downwards, so this item cannot be picked up twice in one pass
+  for room = cap, item.weight, -1 do
+    local candidate = best[room - item.weight] + item.value
+    if candidate > best[room] then best[room] = candidate end
+  end
+end
+
+-- best ratio first, lighter first on a tie; cross-multiplied, so it is exact
+local order = {}
+for i, item in ipairs(items) do order[i] = item end
+table.sort(order, function(p, q)
+  local lhs, rhs = p.value * q.weight, q.value * p.weight
+  if lhs ~= rhs then return lhs > rhs end
+  return p.weight < q.weight
+end)
+
+local room, greedy = cap, 0
+for _, item in ipairs(order) do
+  if item.weight <= room then
+    room = room - item.weight
+    greedy = greedy + item.value
+  end
+end
+
+print(best[cap])
+print("GREEDY " .. greedy)
+'''
+hints = [
+  "for room = cap, weight, -1 walks the capacities downwards, which is what makes it 0/1 instead of unbounded. Upwards lets the same item be reused.",
+  "p.value * q.weight > q.value * p.weight is the ratio comparison with no division in it; put it in the comparator and the sort is exact.",
+  "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "3 10\n6 10\n5 7\n5 7\n", expect = "14\nGREEDY 10\n", visible = true },
+  { name = "no-room",   stdin = "2 1\n5 100\n9 900\n",    expect = "0\nGREEDY 0\n",   visible = false },
+  { name = "takes-all", stdin = "3 10\n1 1\n2 2\n3 3\n",  expect = "6\nGREEDY 6\n",   visible = false },
+  { name = "one",       stdin = "1 4\n4 9\n",             expect = "9\nGREEDY 9\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id           = "lua.hacker.20.bits"
+node         = 20
+title        = "THE ONE THAT IS ALONE"
+difficulty   = 4
+time_limit_s = 600
+story        = "Every incense docket is scanned twice except one. They will not let you use a table and they will not let you sort."
+concepts     = ["bit-manipulation", "math", "complexity"]
+requires     = ["lua.hacker.19.knapsack"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` non-negative integers, in which every value
+appears exactly twice except one.
+
+Print four lines:
+
+1. the value that appears once, found with **xor** and constant extra space
+2. how many `1` bits are set in it
+3. `POW2 YES` if it is a power of two, `POW2 NO` otherwise (`0` is not)
+4. the value with its lowest set bit cleared, or `0` if it has none
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` and `x ^ 0 == x`, and xor does not care what order it happens in.
+That is the whole first line. `x & (x - 1)` clears the lowest set bit, which
+gives you the third and fourth lines for free.
+
+Lua 5.1 has no bit operators — `^` is **exponentiation** here, and `4 ^ 4` is
+`256`. The bits live in the `bit` library: `bit.bxor(a, b)`, `bit.band(a,
+b)`, `bit.bor`, `bit.lshift`, `bit.rshift`. They work on 32-bit integers and
+hand back a signed one, so a value at or above `2^31` would come back
+negative; the values here are small. Write the bit-count loop, because the
+loop is what they ask for.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: a count table clears every one, and so would sorting. Nor would
+a bigger case change that, because the bar this question sets is **space** —
+one accumulator and nothing else — and no run limit can tell a constant-space
+answer from a table. That one is on your honour, and on the interviewer, who
+will ask.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+local band, bxor = bit.band, bit.bxor
+local alone = 0
+
+-- xor everything together, then read the bits off the result
+print(alone)
+print(0)
+print("POW2 NO")
+print(0)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local nums = {}
+for i = 2, #data do nums[#nums + 1] = data[i] end
+
+local band, bxor = bit.band, bit.bxor
+local alone = 0
+for _, value in ipairs(nums) do
+  alone = bxor(alone, value)
+end
+
+local bits = 0
+local walk = alone
+while walk ~= 0 do
+  walk = band(walk, walk - 1)
+  bits = bits + 1
+end
+
+local power_of_two = alone ~= 0 and band(alone, alone - 1) == 0
+local cleared = 0
+if alone ~= 0 then cleared = band(alone, alone - 1) end
+
+print(alone)
+print(bits)
+if power_of_two then print("POW2 YES") else print("POW2 NO") end
+print(cleared)
+'''
+hints = [
+  "The pairs cancel themselves out whatever order they arrive in, so one fold over the list with bit.bxor is enough.",
+  "Counting bits by clearing the lowest one each time — walk = bit.band(walk, walk - 1) — runs once per set bit, not once per bit width.",
+  "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\n4 1 2 1 2\n",    expect = "4\n1\nPOW2 YES\n0\n",    visible = true },
+  { name = "seven",  stdin = "3\n7 9 9\n",        expect = "7\n3\nPOW2 NO\n6\n",     visible = false },
+  { name = "single", stdin = "1\n0\n",            expect = "0\n0\nPOW2 NO\n0\n",     visible = false },
+  { name = "big",    stdin = "5\n1024 5 5 8 8\n", expect = "1024\n1\nPOW2 YES\n0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id           = "lua.hacker.21.matrix"
+node         = 21
+title        = "TURN THE FLOOR PLAN"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The plan of the lantern fair is the wrong way up and there is no room on the table for a second copy of it."
+concepts     = ["matrix", "slices", "iteration"]
+requires     = ["lua.hacker.20.bits"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief        = '''
+Line one is `n`. The next `n` lines are an `n × n` grid of integers.
+
+Print the grid rotated **90° clockwise**, `n` lines of space-separated values.
+Then print its values in **spiral order** — outer ring clockwise from the top
+left, inwards — on one line.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+The rotation is the one to do in place: transpose, then reverse each row.
+Naming that out loud is half the question. Lua's multiple assignment is the
+swap — `grid[r][c], grid[c][r] = grid[c][r], grid[r][c]` — with no temporary,
+because the right-hand side is evaluated in full before anything is stored.
+There is no `zip(*grid)` one-liner here and nothing to reverse a row for you;
+both are loops, and you should be able to say why each one works.
+
+The spiral wants the **original** grid, and a table is a reference: `copy =
+grid` is two names for one table, and `{unpack(grid)}` copies the outer table
+and shares every row. Copy the rows one by one.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local grid = {}
+for r = 1, n do
+  grid[r] = {}
+  for c = 1, n do grid[r][c] = data[1 + (r - 1) * n + c] end
+end
+
+-- transpose, reverse each row, print; then walk the spiral
+for _ = 1, n do print("?") end
+print("?")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n = data[1]
+local original, grid = {}, {}
+for r = 1, n do
+  original[r], grid[r] = {}, {}
+  for c = 1, n do
+    original[r][c] = data[1 + (r - 1) * n + c]
+    grid[r][c] = original[r][c]
+  end
+end
+
+-- transpose: swap across the diagonal, above it only
+for r = 1, n do
+  for c = r + 1, n do
+    grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+  end
+end
+-- then reverse every row, and that is the clockwise turn
+for r = 1, n do
+  local row = grid[r]
+  for i = 1, math.floor(n / 2) do
+    row[i], row[n + 1 - i] = row[n + 1 - i], row[i]
+  end
+  print(table.concat(row, " "))
+end
+
+local spiral = {}
+local top, bottom, left, right = 1, n, 1, n
+while top <= bottom and left <= right do
+  for c = left, right do spiral[#spiral + 1] = original[top][c] end
+  top = top + 1
+  for r = top, bottom do spiral[#spiral + 1] = original[r][right] end
+  right = right - 1
+  if top <= bottom then
+    for c = right, left, -1 do spiral[#spiral + 1] = original[bottom][c] end
+    bottom = bottom - 1
+  end
+  if left <= right then
+    for r = bottom, top, -1 do spiral[#spiral + 1] = original[r][left] end
+    left = left + 1
+  end
+end
+print(table.concat(spiral, " "))
+'''
+hints = [
+  "Transpose by swapping only above the diagonal — c starting at r + 1 — or you swap everything back. Multiple assignment swaps without a temporary.",
+  "The spiral wants the original grid, so copy it row by row before you rotate in place: a table is a reference, and `copy = grid` copies nothing.",
+  "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\n1 2 3\n4 5 6\n7 8 9\n", expect = "7 4 1\n8 5 2\n9 6 3\n1 2 3 6 9 8 7 4 5\n", visible = true },
+  { name = "one",   stdin = "1\n5\n",                   expect = "5\n5\n",                                   visible = false },
+  { name = "two",   stdin = "2\n1 2\n3 4\n",            expect = "3 1\n4 2\n1 2 4 3\n",                      visible = false },
+  { name = "four",  stdin = "4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16\n", expect = "13 9 5 1\n14 10 6 2\n15 11 7 3\n16 12 8 4\n1 2 3 4 8 12 16 15 14 13 9 5 6 7 11 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id           = "lua.hacker.22.trie"
+node         = 22
+title        = "THE PREFIX BOX"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Autocomplete for the stop board on the tram — the honest kind, that only completes what is actually on the list."
+concepts     = ["tries", "strings", "collections"]
+requires     = ["lua.hacker.21.matrix"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief        = '''
+Line one is `n q`. The next `n` lines are lowercase words to insert. The next
+`q` lines are queries, each `WORD <s>` or `PREFIX <s>`.
+
+Build a trie — a tree of nodes each holding a map from letter to child —
+and answer:
+
+* `WORD <s>` → `YES` if `s` was inserted, `NO` otherwise
+* `PREFIX <s>` → how many of the `n` inserted words start with `s`
+
+The `n` words are not promised to be distinct, and `PREFIX` counts
+**insertions**, not distinct words: insert `tram` twice and `PREFIX tram` is
+`2`. `NODES` counts nodes, so the second insertion adds none.
+
+Then print `NODES <k>`, the number of nodes in the trie including the root.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Keep a count on every node of how many inserted words pass through it, and
+`PREFIX` is a walk with no counting at the end. A node is a table — `{
+children = {}, through = 0, terminal = false }` — and `children` is a table
+keyed by the one-character string, because a 26-slot array is the C answer
+and the table is the Lua one. A child that is not there is `nil`, and `nil`
+is the signal both to create one on insert and to stop on lookup. The
+letters of a word come from `word:gmatch(".")`, one at a time.
+'''
+starter      = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+local n, q = lines[1]:match("(%d+)%s+(%d+)")
+n, q = tonumber(n), tonumber(q)
+
+local function new_node()
+  return { children = {}, through = 0, terminal = false }
+end
+
+local root = new_node()
+local nodes = 1
+
+for i = 1, n do
+  local word = lines[1 + i]:match("%S+") or ""
+  -- walk down, creating nodes as needed, bumping `through`
+end
+
+for i = 1, q do
+  local kind, text = lines[1 + n + i]:match("(%S+)%s*(%S*)")
+  print("NO")
+end
+print("NODES " .. nodes)
+'''
+solution     = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+local n, q = lines[1]:match("(%d+)%s+(%d+)")
+n, q = tonumber(n), tonumber(q)
+
+local function new_node()
+  return { children = {}, through = 0, terminal = false }
+end
+
+local root = new_node()
+local nodes = 1
+
+for i = 1, n do
+  local word = lines[1 + i]:match("%S+") or ""
+  local at = root
+  for letter in word:gmatch(".") do
+    local child = at.children[letter]
+    if child == nil then
+      child = new_node()
+      at.children[letter] = child
+      nodes = nodes + 1
+    end
+    child.through = child.through + 1
+    at = child
+  end
+  at.terminal = true
+end
+
+for i = 1, q do
+  local kind, text = lines[1 + n + i]:match("(%S+)%s*(%S*)")
+
+  local at = root
+  for letter in text:gmatch(".") do
+    at = at.children[letter]
+    if at == nil then break end
+  end
+
+  if kind == "WORD" then
+    if at ~= nil and at.terminal then print("YES") else print("NO") end
+  else
+    if at ~= nil then print(at.through) else print(0) end
+  end
+end
+
+print("NODES " .. nodes)
+'''
+hints = [
+  "children[letter] is nil for a missing child, and nil is the signal both to create one on insert and to stop on lookup.",
+  "`through` is bumped on the node you step *onto*, so the root never counts itself.",
+  "A query that falls off the trie leaves `at` as nil, and nil answers NO and 0 — but only if you test `at ~= nil` before you read a field off it; `nil.terminal` is a runtime error.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "3 3\ntram\ntramway\ntrain\nWORD tram\nPREFIX tra\nWORD tra\n", expect = "YES\n3\nNO\nNODES 10\n", visible = true },
+  { name = "missing", stdin = "1 2\nmtr\nPREFIX z\nWORD mtr\n",                              expect = "0\nYES\nNODES 4\n",     visible = false },
+  { name = "nested",  stdin = "2 2\na\nab\nPREFIX a\nWORD a\n",                              expect = "2\nYES\nNODES 3\n",     visible = false },
+  { name = "empty-q", stdin = "2 1\nhku\nhk\nPREFIX hk\n",                                   expect = "2\nNODES 4\n",          visible = false },
+  { name = "twice",   stdin = "3 3\ntram\ntram\ntrap\nPREFIX tram\nPREFIX tra\nWORD tram\n",  expect = "2\n3\nYES\nNODES 6\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id           = "lua.hacker.23.prefix-sums"
+node         = 23
+title        = "HOW MANY WAYS TO HIT THE TARGET"
+difficulty   = 5
+time_limit_s = 1200
+story        = "A night of takings, hour by hour, and a number the committee's auditor wants to see. How many runs of consecutive hours add up to exactly that."
+concepts     = ["prefix-sums", "hashing", "complexity"]
+requires     = ["lua.hacker.22.trie"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief        = '''
+Line one is `n k`. Line two is `n` integers, which may be negative.
+
+Print how many contiguous runs sum to exactly `k`, then `RANGE <s>`, the sum
+of the whole list, read off the last prefix sum rather than by adding again.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Negative values kill the sliding window — a window that is too big cannot be
+fixed by shrinking it. What survives is prefix sums: a run `i..j` sums to `k`
+exactly when `prefix[j] - prefix[i] == k`, so count how many earlier prefixes
+equal `prefix[j] - k`. Seed the table with `[0] = 1` for runs that start at
+the beginning.
+
+A count that was never written is `nil`, and `nil + 1` is an error, not `1`.
+`(seen[key] or 0) + 1` is the Lua for "zero if absent" — the `or` is the
+`defaultdict`.
+
+The four cases here are five numbers at most, and the clock is not measuring
+speed on them: the `O(n²)` double loop over every start and every end clears
+all four. The bar is real — on a night of takings that double loop is
+minutes — and it is not what these cases check. What they check is the part
+that is easy to get wrong: the `[0] = 1` seed, and looking up before
+recording.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, k = data[1], data[2]
+local nums = {}
+for i = 1, n do nums[i] = data[2 + i] end
+
+local seen = { [0] = 1 }
+
+-- running prefix; for each one, how many earlier prefixes were prefix - k
+print(0)
+print("RANGE 0")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, k = data[1], data[2]
+local nums = {}
+for i = 1, n do nums[i] = data[2 + i] end
+
+local seen = { [0] = 1 }
+
+local prefix, runs = 0, 0
+for _, value in ipairs(nums) do
+  prefix = prefix + value
+  -- look up first, then record: a run of length zero must not count itself
+  runs = runs + (seen[prefix - k] or 0)
+  seen[prefix] = (seen[prefix] or 0) + 1
+end
+
+print(runs)
+print("RANGE " .. prefix)
+'''
+hints = [
+  "Look the earlier prefix up *before* you record the current one, or a run of length zero counts itself when k is 0.",
+  "seen = { [0] = 1 } up front is what lets a run that starts at index 1 be found at all.",
+  "The final prefix is the total, so the second line costs nothing extra. (seen[key] or 0) is how a missing count reads as zero.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "5 3\n1 2 3 -3 3\n",  expect = "5\nRANGE 6\n",  visible = true },
+  { name = "zeroes",   stdin = "3 0\n0 0 0\n",       expect = "6\nRANGE 0\n",  visible = false },
+  { name = "none",     stdin = "3 9\n1 1 1\n",       expect = "0\nRANGE 3\n",  visible = false },
+  { name = "negative", stdin = "4 -2\n-1 -1 2 -2\n", expect = "3\nRANGE -2\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id           = "lua.hacker.24.inversions"
+node         = 24
+title        = "THE ONE THE CLOCK CATCHES"
+difficulty   = 5
+time_limit_s = 1500
+story        = "First question of the evening round. The naive answer is correct, and it is the wrong answer."
+concepts     = ["sorting", "complexity", "recursion"]
+requires     = ["lua.hacker.23.prefix-sums"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief        = '''
+Standard input is two integers, `n` and `seed`. There is no array in the input
+— you build it, with **exactly** this generator, in 64-bit arithmetic that
+wraps:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (mod 2^64)
+    next value = (x >> 33) % 1000000007
+```
+
+Count the **inversions**: pairs `i < j` where `a[i] > a[j]`. Print the count,
+then `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+For `8 1` the array is
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**This quest enforces its complexity, and it is the only kind that can.** One
+hidden case is `n = 200000`. The `O(n²)` double loop — which is what the
+starter is — is `2 × 10^10` comparisons, and on this machine it had not
+finished after **25 seconds** against the ten second run limit. Counting
+inversions during a merge sort is `O(n log n)` and finishes in a few
+hundredths of a second. Measured, on this machine, with these two programs.
+
+Two things this language decides differently. The generator runs in
+LuaJIT's 64-bit integer — `0ULL + seed`, and the constants with `ULL` on the
+end — because a plain number is a double and the product would lose its low
+bits; `tonumber(bit.rshift(x, 33))` brings each draw back to a number. And
+the answer, `9990744366`, is over `2^32` and well under `2^53`, so a double
+holds it exactly and `print` shows every digit; saying *why* that is safe,
+and where it would stop being, is part of the answer.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, seed = data[1], data[2]
+
+local x = 0ULL + seed
+local values = {}
+local largest = 0
+for i = 1, n do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  local value = tonumber(bit.rshift(x, 33)) % 1000000007
+  values[i] = value
+  if value > largest then largest = value end
+end
+
+-- correct, and far too slow: this is what the big hidden case rejects
+local inversions = 0
+for i = 1, n do
+  local left = values[i]
+  for j = i + 1, n do
+    if left > values[j] then inversions = inversions + 1 end
+  end
+end
+
+print(inversions)
+print("MAX " .. largest)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, seed = data[1], data[2]
+
+local x = 0ULL + seed
+local values = {}
+local largest = 0
+for i = 1, n do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  local value = tonumber(bit.rshift(x, 33)) % 1000000007
+  values[i] = value
+  if value > largest then largest = value end
+end
+
+-- merge sort of a[lo..hi] in place through one shared buffer, returning how
+-- many inversions it removed
+local buffer = {}
+local function sort_count(a, lo, hi)
+  if hi - lo < 1 then return 0 end
+  local mid = math.floor((lo + hi) / 2)
+  local inversions = sort_count(a, lo, mid) + sort_count(a, mid + 1, hi)
+
+  local i, j, k = lo, mid + 1, lo
+  while i <= mid and j <= hi do
+    if a[i] <= a[j] then
+      buffer[k] = a[i]
+      i = i + 1
+    else
+      -- a[i..mid] are all greater than a[j]
+      inversions = inversions + (mid - i + 1)
+      buffer[k] = a[j]
+      j = j + 1
+    end
+    k = k + 1
+  end
+  while i <= mid do
+    buffer[k] = a[i]
+    i = i + 1
+    k = k + 1
+  end
+  while j <= hi do
+    buffer[k] = a[j]
+    j = j + 1
+    k = k + 1
+  end
+  for p = lo, hi do a[p] = buffer[p] end
+  return inversions
+end
+
+print(sort_count(values, 1, n))
+print("MAX " .. largest)
+'''
+hints = [
+  "Take the max as you generate, or off the original table before you sort — this merge sort works in place.",
+  "When the right-hand value wins the merge, every remaining element of the left half is greater than it — that is `mid - i + 1` inversions in one go, and it is the whole trick.",
+  "The recursion is log2(200000), about eighteen frames deep — nowhere near LuaJIT's roof. A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 1\n",          expect = "19\nMAX 908834774\n",          visible = true },
+  { name = "single", stdin = "1 7\n",          expect = "0\nMAX 59165271\n",            visible = false },
+  { name = "dozen",  stdin = "12 99\n",        expect = "33\nMAX 998275676\n",          visible = false },
+  { name = "big",    stdin = "200000 12345\n", expect = "9990744366\nMAX 999991076\n",  visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id           = "lua.hacker.25.test-cases"
+node         = 25
+title        = "T TEST CASES FOLLOW"
+difficulty   = 3
+time_limit_s = 900
+story        = "The shape every screen uses, and the bug every candidate writes at least once: the second case remembers the first, the way the second night of the dragon remembers the incense of the first."
+concepts     = ["io", "collections", "control-flow", "sorting"]
+requires     = ["lua.hacker.24.inversions"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief        = '''
+Line one is `T`, the number of independent test cases. Each case is a line
+with `n`, then a line with `n` integers — and when `n` is `0` that second line
+is empty.
+
+For each case print the **second largest distinct** value, or `NONE` if there
+are fewer than two distinct values. After all of them print `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+This is the standard competitive-screen wrapper and it fails candidates for
+one reason: state that should have been per-case was declared before the
+loop. Every accumulator, every set, every `best` goes **inside** the `for` —
+a `local` declared inside the loop body is a fresh variable on every turn.
+
+Read by whitespace token rather than by line, and the empty line for `n = 0`
+stops being a special case at all — which is the second thing this shape
+teaches. The set is a table with the values as keys; to rank them, copy the
+keys out with `pairs` into a sequence and `table.sort` it, because `pairs`
+has no order and the second largest is a question about order.
+'''
+starter      = '''
+local next_token = io.read("*a"):gmatch("%S+")
+local cases = tonumber(next_token())
+
+-- declared once, reused for every case — this is the bug
+local distinct = {}
+
+for _ = 1, cases do
+  local n = tonumber(next_token())
+  for _ = 1, n do
+    distinct[tonumber(next_token())] = true
+  end
+  local ranked = {}
+  for value in pairs(distinct) do ranked[#ranked + 1] = value end
+  table.sort(ranked)
+  if #ranked >= 2 then print(ranked[#ranked - 1]) else print("NONE") end
+end
+print("CASES " .. cases)
+'''
+solution     = '''
+local next_token = io.read("*a"):gmatch("%S+")
+local cases = tonumber(next_token())
+
+for _ = 1, cases do
+  -- fresh for every case
+  local distinct = {}
+
+  local n = tonumber(next_token())
+  for _ = 1, n do
+    distinct[tonumber(next_token())] = true
+  end
+
+  local ranked = {}
+  for value in pairs(distinct) do ranked[#ranked + 1] = value end
+  table.sort(ranked)
+  if #ranked >= 2 then print(ranked[#ranked - 1]) else print("NONE") end
+end
+print("CASES " .. cases)
+'''
+hints = [
+  "Move the `local distinct = {}` inside the loop. That is the entire fix, and it is the entire quest.",
+  "A table keyed by the values de-duplicates; pairs gets the keys back out in no particular order, and table.sort puts them in one, so ranked[#ranked - 1] is the second largest distinct value.",
+  "ranked[#ranked - 1] on a sequence of one is ranked[0], which is nil and prints as `nil` rather than raising — which is why the length check comes first, and why a missing key is not an error until it is followed.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "3\n5\n3 1 4 1 5\n3\n7 7 7\n0\n\n",         expect = "4\nNONE\nNONE\nCASES 3\n",     visible = true },
+  { name = "one",    stdin = "1\n2\n10 -10\n",                           expect = "-10\nCASES 1\n",               visible = false },
+  { name = "pairs",  stdin = "2\n1\n5\n4\n2 2 3 3\n",                    expect = "NONE\n2\nCASES 2\n",           visible = false },
+  { name = "leaky",  stdin = "4\n3\n9 8 7\n1\n1\n2\n4 4\n3\n-1 -2 -3\n", expect = "8\nNONE\nNONE\n-2\nCASES 4\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id           = "lua.hacker.26.statistics"
+node         = 26
+title        = "SIX DECIMAL PLACES"
+difficulty   = 3
+time_limit_s = 900
+story        = "The lantern stall's takings, five nights of them. They want the numbers rounded the way the spec says, not the way your language happens to print them — and this language prints 4 for 4.0."
+concepts     = ["math", "sorting", "types"]
+requires     = ["lua.hacker.25.test-cases"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief        = '''
+Line one is `n`. Line two is `n` integers.
+
+Print three lines, each to **six decimal places**: the mean, the **population**
+standard deviation (divide by `n`, not `n - 1`), and the median — which for an
+even `n` is the average of the two middle values.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+This quest is judged with `match = "float:1e-6"`, so the comparison is
+numeric: `3.8` and `3.800000` both pass, and a value that is off by `1e-7`
+passes too. That is deliberate — the point is not your formatter, it is that
+the mean has to be a mean and that the even-length median is a boundary
+people get wrong under a clock.
+
+Lua has one number type. `19 / 5` is `3.8` and `print` shows it as `3.8`;
+`20 / 5` is `4` and `print` shows it as `4`, not `4.0` — so the six places
+come from `string.format("%.6f", v)`, and `%d` on `3.8` is an error, not a
+rounding. Population, not sample: there is no `statistics` module to reach
+for, so the loop is yours — the mean of the squared deviations, then
+`math.sqrt`. Read the statement twice; on a real screen the difference
+between `n` and `n - 1` is the whole submission.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local values = {}
+for i = 2, #data do values[#values + 1] = data[i] end
+table.sort(values)
+local n = #values
+
+local sum = 0
+for _, v in ipairs(values) do sum = sum + v end
+
+-- floored, so the mean is wrong before anything else is
+local mean = math.floor(sum / n)
+
+print(string.format("%.6f", mean))
+print("0.000000")
+print(string.format("%.6f", values[math.floor(n / 2) + 1]))
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local values = {}
+for i = 2, #data do values[#values + 1] = data[i] end
+table.sort(values)
+local n = #values
+
+local sum = 0
+for _, v in ipairs(values) do sum = sum + v end
+local mean = sum / n
+
+-- population: divide by n, not n - 1
+local squares = 0
+for _, v in ipairs(values) do squares = squares + (v - mean) * (v - mean) end
+local deviation = math.sqrt(squares / n)
+
+local median
+if n % 2 == 1 then
+  median = values[(n + 1) / 2]
+else
+  median = (values[n / 2] + values[n / 2 + 1]) / 2
+end
+
+print(string.format("%.6f", mean))
+print(string.format("%.6f", deviation))
+print(string.format("%.6f", median))
+'''
+hints = [
+  "`/` is real division, always: sum / n is already the mean, and the starter's math.floor is what threw the fraction away.",
+  "The population deviation is the square root of the mean of the squared differences from the mean — divide by n. Dividing by n - 1 is the sample one and is wrong here.",
+  "For an even count the median is the average of values[n / 2] and values[n / 2 + 1] in a 1-based table, and that pair of indices is where the off-by-one lives. n / 2 is a whole number when n is even, so it is a valid key.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "float:1e-6"
+cases = [
+  { name = "odd",    stdin = "5\n2 4 4 4 5\n", expect = "3.800000\n0.979796\n4.000000\n", visible = true },
+  { name = "even",   stdin = "4\n1 2 3 4\n",   expect = "2.500000\n1.118034\n2.500000\n", visible = false },
+  { name = "single", stdin = "1\n7\n",         expect = "7.000000\n0.000000\n7.000000\n", visible = false },
+  { name = "signed", stdin = "2\n-3 3\n",      expect = "0.000000\n3.000000\n0.000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id           = "lua.hacker.27.commands"
+node         = 27
+title        = "THE INPUT IS THE PROBLEM"
+difficulty   = 4
+time_limit_s = 1200
+story        = "The incense stall's till log comes off the machine wrapped at eighty columns, and the count at the top is a count of commands, not of words."
+concepts     = ["io", "stacks-queues", "control-flow"]
+requires     = ["lua.hacker.26.statistics"]
+map          = { x = 0.199, y = 0.742, kind = "quest" }
+brief        = '''
+Line one is `k`, the number of **commands** that follow. The commands are
+whitespace-separated tokens packed across the remaining lines however they
+happened to wrap — any number per line, any amount of spacing, possibly a
+trailing blank line.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | two | push an item |
+| `VOID` | one | remove the last item, or do nothing if there is none |
+| `TOTAL` | one | print the current sum |
+| `CLEAR` | one | remove everything |
+
+After the `k` commands, print `COMMANDS <k>` and `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` counts commands, and `ADD` is one command made of two tokens — so a loop
+that runs `k` times and reads one token per turn stops in the wrong place.
+Read `k` commands, pulling the argument only when the command has one — and
+the tool for "pull the next token when I ask for it" is the **iterator**
+`gmatch` hands back: `local next_token = input:gmatch("%S+")`, and every
+`next_token()` is one more token, or `nil` once the input is spent, so the
+end of input is a value and not an error.
+
+`VOID` on an empty till and `TOTAL` before anything was added both have to
+work. There is no line in the statement saying they cannot happen, and on a
+real screen that silence is the specification. `items[#items] = nil` on an
+empty table writes `items[0] = nil`, which does nothing — Lua is forgiving
+here where other languages raise — and knowing that it is, and saying so, is
+the answer when it is asked.
+'''
+starter      = '''
+local next_token = io.read("*a"):gmatch("%S+")
+local commands = tonumber(next_token())
+
+local items = {}
+
+-- one token per command — which is wrong for ADD
+for _ = 1, commands do
+  local command = next_token() or ""
+  if command == "TOTAL" then
+    local sum = 0
+    for _, v in ipairs(items) do sum = sum + v end
+    print(sum)
+  end
+end
+
+print("COMMANDS " .. commands)
+print("ITEMS " .. #items)
+'''
+solution     = '''
+local next_token = io.read("*a"):gmatch("%S+")
+local commands = tonumber(next_token())
+
+local items = {}
+
+for _ = 1, commands do
+  local command = next_token() or ""
+  if command == "ADD" then
+    -- the argument is a second token of the same command
+    items[#items + 1] = tonumber(next_token()) or 0
+  elseif command == "VOID" then
+    if #items > 0 then items[#items] = nil end
+  elseif command == "TOTAL" then
+    local sum = 0
+    for _, v in ipairs(items) do sum = sum + v end
+    print(sum)
+  elseif command == "CLEAR" then
+    items = {}
+  end
+end
+
+print("COMMANDS " .. commands)
+print("ITEMS " .. #items)
+'''
+hints = [
+  "gmatch(\"%S+\") splits on every run of spaces, tabs and newlines, so the wrapping in the file stops mattering the moment you stop reading lines.",
+  "Pull the ADD argument inside the ADD branch, from the same iterator. The loop counter counts commands, not tokens.",
+  "`if #items > 0 then items[#items] = nil end` is the pop with its guard — the guard is free in Lua, and writing it anyway says you saw the case.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "5\nADD 600 ADD 2800 TOTAL VOID TOTAL\n",              expect = "3400\n600\nCOMMANDS 5\nITEMS 1\n", visible = true },
+  { name = "ragged", stdin = "6\nADD 100\n  ADD 200   TOTAL\nVOID\n\nVOID TOTAL\n", expect = "300\n0\nCOMMANDS 6\nITEMS 0\n",    visible = false },
+  { name = "empty",  stdin = "3\nVOID TOTAL VOID\n",                                expect = "0\nCOMMANDS 3\nITEMS 0\n",         visible = false },
+  { name = "clear",  stdin = "6\nADD 1 ADD 2 TOTAL CLEAR TOTAL ADD 9\n",            expect = "3\n0\nCOMMANDS 6\nITEMS 1\n",      visible = false },
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id           = "lua.hacker.29.dijkstra"
+node         = 28
+title        = "NOT EVERY STREET IS THE SAME LENGTH"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Every map you have cleared so far counted hops. The tram does not care how many stops there are; it cares how long they take — and tonight every lane in Tai Hang takes longer."
+concepts     = ["graphs", "heaps", "complexity"]
+requires     = ["lua.hacker.27.commands"]
+map          = { x = 0.114, y = 0.663, kind = "quest" }
+brief        = '''
+Standard input is `n m seed`: `n` stops, `m` undirected weighted edges. Build
+the graph yourself, with **exactly** this generator, in 64-bit arithmetic that
+wraps (`0ULL + seed`, as on node 16):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Print the sum of the shortest distances from stop `0` to every reachable stop
+(including `0` itself, which is `0`), then `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**The complexity here is enforced.** One hidden case is `n = 100000`,
+`m = 200000`. Dijkstra is the right algorithm either way; what the clock
+decides is the priority queue. The starter keeps the unvisited stops in a
+set — a table with the stop as the key — and finds the nearest one by
+walking the set with `pairs`, which is `O(V)` per step and `O(V²)` in all:
+on this machine, **32 seconds** against a ten second run limit. A binary
+heap makes it `O((V + E) log V)` and it finishes in about a sixth of a
+second. Both measured on this machine, with the two programs that ship in
+this quest.
+
+Worth seeing clearly, because it is the most common way to fail a timed
+screen: **the starter is not wrong.** It prints exactly the right answer. It
+is rejected only for arriving far too late.
+
+There is no `heapq` here: the heap is the one you were handed on node 12,
+holding `{ distance, stop }` entries and comparing on the distance, and it
+is yours to write this time. It has no decrease-key, and you do not need
+one: push the improved distance as a new entry and skip any entry you pop
+whose distance is already worse than the one you have recorded. That
+"stale entry" skip is the line people forget, and without it the heap
+grows without bound. `math.huge` is the honest `unreached`: it compares
+greater than every number and needs no `nil` check in the relaxation.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+-- graph[u] is a sequence of { v, w } edges
+local graph = {}
+for u = 0, n - 1 do graph[u] = {} end
+local function edge(a, b, w)
+  graph[a][#graph[a] + 1] = { b, w }
+  graph[b][#graph[b] + 1] = { a, w }
+end
+for i = 1, n - 1 do
+  local p = nxt() % i
+  local w = nxt() % 1000 + 1
+  edge(p, i, w)
+end
+for _ = 1, math.max(0, m - (n - 1)) do
+  local a = nxt() % n
+  local b = nxt() % n
+  local w = nxt() % 1000 + 1
+  edge(a, b, w)
+end
+
+local dist = {}
+local remaining = {}
+for u = 0, n - 1 do
+  dist[u] = math.huge
+  remaining[u] = true
+end
+dist[0] = 0
+
+-- correct, and far too slow: the nearest unvisited stop is found by walking
+-- the whole set of them
+while true do
+  local best, best_dist = nil, math.huge
+  for u in pairs(remaining) do
+    if dist[u] < best_dist then
+      best_dist = dist[u]
+      best = u
+    end
+  end
+  if best == nil then break end
+  remaining[best] = nil
+  for _, e in ipairs(graph[best]) do
+    local v, w = e[1], e[2]
+    if best_dist + w < dist[v] then dist[v] = best_dist + w end
+  end
+end
+
+local total, largest = 0, 0
+for u = 0, n - 1 do
+  if dist[u] < math.huge then
+    total = total + dist[u]
+    if dist[u] > largest then largest = dist[u] end
+  end
+end
+print(total)
+print("MAX " .. largest)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, m, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+-- graph[u] is a sequence of { v, w } edges
+local graph = {}
+for u = 0, n - 1 do graph[u] = {} end
+local function edge(a, b, w)
+  graph[a][#graph[a] + 1] = { b, w }
+  graph[b][#graph[b] + 1] = { a, w }
+end
+for i = 1, n - 1 do
+  local p = nxt() % i
+  local w = nxt() % 1000 + 1
+  edge(p, i, w)
+end
+for _ = 1, math.max(0, m - (n - 1)) do
+  local a = nxt() % n
+  local b = nxt() % n
+  local w = nxt() % 1000 + 1
+  edge(a, b, w)
+end
+
+-- a binary min-heap of { distance, stop }, ordered by distance
+local heap = {}
+
+local function push(d, v)
+  local i = #heap + 1
+  heap[i] = { d, v }
+  while i > 1 do
+    local parent = math.floor(i / 2)
+    if heap[parent][1] <= heap[i][1] then break end
+    heap[i], heap[parent] = heap[parent], heap[i]
+    i = parent
+  end
+end
+
+local function pop()
+  local top = heap[1]
+  local last = heap[#heap]
+  heap[#heap] = nil
+  local size = #heap
+  if size > 0 then
+    heap[1] = last
+    local i = 1
+    while true do
+      local l, r, smallest = 2 * i, 2 * i + 1, i
+      if l <= size and heap[l][1] < heap[smallest][1] then smallest = l end
+      if r <= size and heap[r][1] < heap[smallest][1] then smallest = r end
+      if smallest == i then break end
+      heap[i], heap[smallest] = heap[smallest], heap[i]
+      i = smallest
+    end
+  end
+  return top[1], top[2]
+end
+
+local dist = {}
+for u = 0, n - 1 do dist[u] = math.huge end
+dist[0] = 0
+
+push(0, 0)
+while #heap > 0 do
+  local d, u = pop()
+  -- a stale entry: we already found a shorter way to u
+  if d <= dist[u] then
+    for _, e in ipairs(graph[u]) do
+      local v, w = e[1], e[2]
+      local candidate = d + w
+      if candidate < dist[v] then
+        dist[v] = candidate
+        push(candidate, v)
+      end
+    end
+  end
+end
+
+local total, largest = 0, 0
+for u = 0, n - 1 do
+  if dist[u] < math.huge then
+    total = total + dist[u]
+    if dist[u] > largest then largest = dist[u] end
+  end
+end
+print(total)
+print("MAX " .. largest)
+'''
+hints = [
+  "{ distance, stop } entries in a min-heap keyed on the first field: the heap from node 12 with `less` reduced to comparing [1].",
+  "Skipping an entry whose distance is greater than dist[u] is the stale-entry skip. Without it the algorithm is still correct and the heap fills with obsolete entries.",
+  "math.huge is the honest `unreached`: it compares greater than every number and needs no nil check in the relaxation. The spanning-tree half of the generator guarantees every stop is reachable, so the final filter never removes anything — keep it anyway, because the version of this question with an unreachable stop is the follow-up.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "6 8 1\n",           expect = "4594\nMAX 1582\n",      visible = true },
+  { name = "pair",   stdin = "2 1 5\n",           expect = "774\nMAX 774\n",        visible = false },
+  { name = "ten",    stdin = "10 12 3\n",         expect = "12277\nMAX 2237\n",     visible = false },
+  { name = "big",    stdin = "100000 200000 7\n", expect = "249521722\nMAX 6142\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id           = "lua.hacker.30.range-queries"
+node         = 29
+title        = "TOTALS THAT KEEP CHANGING"
+difficulty   = 5
+time_limit_s = 1500
+story        = "Three hundred thousand till operations from one night across every stall in the park, half of them corrections, and somebody wants the running totals."
+concepts     = ["prefix-sums", "complexity", "collections"]
+requires     = ["lua.hacker.29.dijkstra"]
+map          = { x = 0.059, y = 0.950, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Build an array of `n` values and then run `q`
+operations, all from the same generator, in 64-bit arithmetic that wraps
+(`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r]) to a running total
+```
+
+Print the running total of every query answer, then `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**The complexity here is enforced.** The big hidden case is `n = 500000,
+q = 300000`. The starter is the answer from node 23: a prefix-sum table,
+which makes every query `O(1)` — and which every update breaks, so the
+starter rebuilds it, `O(n)` per update, a hundred and fifty thousand times.
+On this machine that took **57 seconds** against a ten second run limit.
+(Summing the range with a plain loop instead is no better in kind and only
+a little better in practice: it is `O(n)` per *query* rather than per
+update, and it took about 14 seconds here.) A Fenwick tree does the whole
+thing in a few hundredths of a second. All measured, with the programs in
+this quest.
+
+(The Rust and Go versions of this quest run four million operations. This
+land keeps Python's three hundred thousand, because the cases are the
+reference's — and the point is to separate the right structure from the
+wrong one, not one runtime from another.)
+
+The lesson is the one an interviewer is fishing for: *point update, range sum*
+is the exact shape a Fenwick tree exists for. Three short functions — add,
+prefix, and range as the difference of two prefixes — and `bit.band(i, -i)`
+is how you step by the lowest set bit: the `bit` library treats `-i` as a
+two's-complement 32-bit integer, which is what makes that trick work.
+
+The running total passes `10^13`. A Lua number holds every integer up to
+`2^53` exactly, and `print` shows all fourteen digits of it; that is the
+margin you have, and knowing it is part of the answer.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local values = {}
+for i = 0, n - 1 do values[i] = nxt() % 1000 end
+
+-- prefix sums, as on node 23: prefix[i] is the sum of values[0..i-1]
+local prefix = { [0] = 0 }
+local function rebuild()
+  for i = 0, n - 1 do prefix[i + 1] = prefix[i] + values[i] end
+end
+rebuild()
+
+local total, updates = 0, 0
+for _ = 1, q do
+  local a, b, c = nxt(), nxt(), nxt()
+  if a % 2 == 0 then
+    values[b % n] = values[b % n] + c % 1000 + 1
+    updates = updates + 1
+    -- correct, and far too slow: every update rebuilds the whole table
+    rebuild()
+  else
+    local l, r = b % n, c % n
+    if l > r then l, r = r, l end
+    total = total + prefix[r + 1] - prefix[l]
+  end
+end
+
+print(total)
+print("UPDATES " .. updates)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local band = bit.band
+
+-- Fenwick tree, 1-based: tree[i] covers the band(i, -i) values ending at i
+local tree = {}
+for i = 1, n do tree[i] = 0 end
+
+local function add(index, delta)
+  local i = index + 1
+  while i <= n do
+    tree[i] = tree[i] + delta
+    i = i + band(i, -i)  -- step up by the lowest set bit
+  end
+end
+
+local function prefix(upto)
+  local i, sum = upto, 0
+  while i > 0 do
+    sum = sum + tree[i]
+    i = i - band(i, -i)
+  end
+  return sum
+end
+
+local function range(l, r)
+  return prefix(r + 1) - prefix(l)
+end
+
+for i = 0, n - 1 do add(i, nxt() % 1000) end
+
+local total, updates = 0, 0
+for _ = 1, q do
+  local a, b, c = nxt(), nxt(), nxt()
+  if a % 2 == 0 then
+    add(b % n, c % 1000 + 1)
+    updates = updates + 1
+  else
+    local l, r = b % n, c % n
+    if l > r then l, r = r, l end
+    total = total + range(l, r)
+  end
+end
+
+print(total)
+print("UPDATES " .. updates)
+'''
+hints = [
+  "Build the tree by calling add once per initial value. The O(n) bottom-up build is a nice optimisation and is not what the clock is testing.",
+  "bit.band(i, -i) isolates the lowest set bit — the bit library sees -i as two's complement. Adding it walks up the tree; subtracting it walks down.",
+  "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging. Binding bit.band to a local is the only micro-optimisation this quest needs, and LuaJIT barely needs that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 6 1\n",           expect = "4112\nUPDATES 3\n",            visible = true },
+  { name = "no-ups", stdin = "5 4 9\n",           expect = "4458\nUPDATES 0\n",            visible = false },
+  { name = "mid",    stdin = "1000 2000 3\n",     expect = "249603264\nUPDATES 987\n",     visible = false },
+  { name = "big",    stdin = "500000 300000 7\n", expect = "14403406318963\nUPDATES 149814\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id           = "lua.hacker.31.palindrome"
+node         = 30
+title        = "THE SAME BACKWARDS"
+difficulty   = 4
+time_limit_s = 1200
+story        = "Top-twenty question, asked in some form in most screens, and the one most people have written once and never understood. The dragon reads the same from the tail, the interviewer says, and does not smile."
+concepts     = ["strings", "two-pointers", "complexity"]
+requires     = ["lua.hacker.30.range-queries"]
+map          = { x = 0.260, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `n alphabet seed`. Build the string yourself, in 64-bit
+arithmetic that wraps (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Print the length of the longest palindromic substring, then `AT <index>` — the
+0-based start of the **leftmost** one of that length.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Expand around each centre. There are `2n - 1` centres, not `n`: every
+character is a centre for the odd-length palindromes, and every gap between
+two characters is a centre for the even-length ones. Forgetting the gaps is
+why a correct-looking solution returns `1` on `abba` — and it is what the
+starter does.
+
+You never need the string as a string. Keep the draws in a table of small
+numbers — `s[i] = next() % alphabet` — and compare numbers; `..` on twenty
+thousand one-character strings makes twenty thousand strings first. The
+table is 1-based and the statement's `AT` is 0-based, so the index you print
+is one less than the index you found.
+
+**What the tests do and do not enforce**, plainly. The hidden case that does
+the work is `n = 8000` over a **one**-letter alphabet. It is the worst case
+for expand-around-centre — every centre runs to the end of the string — so
+the right answer does its full `O(n²)` there, thirty-two million comparisons,
+and LuaJIT does them in a few hundredths of a second. It also rejects
+check-every-substring-and-test-each-one, which is cubic — on the order of
+`10^11` comparisons here — and far outside the ten second limit.
+
+The other big case, `n = 20000` over a two-letter alphabet, is a
+**correctness** case and not a speed one: on a random binary string the
+palindrome test fails after a character or two. It checks that your generator
+and your leftmost-index tie-break agree with ours at scale.
+
+So: the tests reject cubic and accept quadratic. They do **not** demand
+Manacher's algorithm, which is the `O(n)` answer. Know that it exists and what
+it does, because "and can you do better than quadratic?" is the follow-up this
+question is usually asked to set up.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, alphabet, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local s = {}
+for i = 1, n do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  s[i] = tonumber(bit.rshift(x, 33)) % alphabet
+end
+
+-- only the odd centres, so every even-length palindrome is invisible
+local best_len, best_start = 0, 0
+for centre = 1, n do
+  local i, j = centre, centre
+  while i >= 1 and j <= n and s[i] == s[j] do
+    i = i - 1
+    j = j + 1
+  end
+  local length = j - i - 1
+  if length > best_len then
+    best_len = length
+    best_start = i
+  end
+end
+
+print(best_len)
+print("AT " .. best_start)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, alphabet, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local s = {}
+for i = 1, n do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  s[i] = tonumber(bit.rshift(x, 33)) % alphabet
+end
+
+local best_len, best_start = 0, 0
+for centre = 1, n do
+  -- gap 0: one character at the middle, odd length; gap 1: the space to the
+  -- right of it, even length
+  for gap = 0, 1 do
+    local i, j = centre, centre + gap
+    while i >= 1 and j <= n and s[i] == s[j] do
+      i = i - 1
+      j = j + 1
+    end
+    -- i and j have each stepped one too far; i is the 0-based start
+    local length = j - i - 1
+    if length > best_len then
+      best_len = length
+      best_start = i
+    end
+  end
+end
+
+print(best_len)
+print("AT " .. best_start)
+'''
+hints = [
+  "Two expansions per centre: (c, c) for odd lengths and (c, c + 1) for even ones. The starter is missing the second.",
+  "When the loop stops, i and j have both moved one past the palindrome — so its length is j - i - 1, and in a 1-based table i is already the 0-based start.",
+  "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for. s[0] is nil, not a wrapped character, and nil == s[j] is simply false — the `i >= 1` check is still the honest one to write.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",  stdin = "12 3 5\n",    expect = "5\nAT 1\n",      visible = true },
+  { name = "one",     stdin = "1 4 2\n",     expect = "1\nAT 0\n",      visible = false },
+  { name = "random",  stdin = "20000 2 9\n", expect = "41\nAT 2166\n",  visible = false },
+  { name = "all-one", stdin = "8000 1 9\n",  expect = "8000\nAT 0\n",   visible = false },
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id           = "lua.hacker.32.modular"
+node         = 31
+title        = "MODULO ONE BILLION AND SEVEN"
+difficulty   = 5
+time_limit_s = 1500
+story        = "The phrase appears at the bottom of the statement and half the room does not know what it is asking them to do. In this room it is asking one more thing: a number that holds fifty-three bits, multiplied twice."
+concepts     = ["math", "complexity", "recursion"]
+requires     = ["lua.hacker.31.palindrome"]
+map          = { x = 0.335, y = 0.936, kind = "quest" }
+brief        = '''
+Standard input is `n q seed`. Generate `q` queries, in 64-bit arithmetic that
+wraps (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+For each query compute the binomial coefficient `C(a, b)` **modulo
+1000000007**. Print the sum of all `q` answers, itself modulo `1000000007`,
+then `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` has hundreds of thousands of digits at these sizes, and nothing in
+Lua will hold it. Every multiplication is reduced as you go. The problem is
+the division: `a! / (b! (a-b)!)` has no meaning in modular arithmetic. What
+replaces it is the **modular inverse**, and because `1000000007` is prime,
+Fermat's little theorem gives it to you: `inverse(v) = v^(p-2) mod p`, by
+repeated squaring — `^` here is a floating-point power and cannot do it, so
+the loop is yours.
+
+So: precompute `factorial[0..n]` once, and answer each query as
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**And the multiplication itself is the trap in this language.** Two residues
+are each under `2^30`; their product is under `2^60`, and a Lua number is a
+double that holds `2^53`. `(a * b) % P` is wrong past that point — not an
+error, not an overflow, just the low bits gone and a residue that is off by a
+little. The honest `mulmod` splits one factor into a high and a low 16-bit
+half, so each partial product stays under `2^46`, and reduces between the
+halves. It is five lines and the starter carries it; every product on this
+node goes through it.
+
+**The complexity here is enforced.** One hidden case is `n = 200000`,
+`q = 200000`. Computing each coefficient independently — multiply `b` terms,
+divide by `b` terms, one modular inverse each — had not finished after
+**25 seconds** against the ten second run limit; that is the starter. One
+shared factorial table, with the inverse factorials precomputed backwards
+from one `powmod`, answers every query in two `mulmod`s and finishes in a few
+hundredths of a second. Both measured on this machine.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q, seed = data[1], data[2], data[3]
+local P = 1000000007
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+-- a * b mod P without ever passing 2^53: split a into 16-bit halves
+local function mulmod(a, b)
+  local high = math.floor(a / 65536)
+  local low = a - high * 65536
+  return ((high * b) % P * 65536 + low * b) % P
+end
+
+-- base^e mod P by repeated squaring; e is at most P - 2
+local function powmod(base, e)
+  local result = 1
+  while e > 0 do
+    if e % 2 == 1 then result = mulmod(result, base) end
+    base = mulmod(base, base)
+    e = math.floor(e / 2)
+  end
+  return result
+end
+
+local total, last = 0, 0
+for _ = 1, q do
+  local a = nxt() % (n + 1)
+  local b = nxt() % (a + 1)
+
+  -- correct, and far too slow: b multiplications and a modular inverse
+  -- for every single query
+  local numerator, denominator = 1, 1
+  for k = 0, b - 1 do
+    numerator = mulmod(numerator, a - k)
+    denominator = mulmod(denominator, k + 1)
+  end
+  local value = mulmod(numerator, powmod(denominator, P - 2))
+
+  total = (total + value) % P
+  last = value
+end
+
+print(total)
+print("LAST " .. last)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, q, seed = data[1], data[2], data[3]
+local P = 1000000007
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+-- a * b mod P without ever passing 2^53: split a into 16-bit halves
+local function mulmod(a, b)
+  local high = math.floor(a / 65536)
+  local low = a - high * 65536
+  return ((high * b) % P * 65536 + low * b) % P
+end
+
+-- base^e mod P by repeated squaring; e is at most P - 2
+local function powmod(base, e)
+  local result = 1
+  while e > 0 do
+    if e % 2 == 1 then result = mulmod(result, base) end
+    base = mulmod(base, base)
+    e = math.floor(e / 2)
+  end
+  return result
+end
+
+-- one shared factorial table, and the inverse factorials walked backwards
+-- from a single Fermat inverse: inv(k-1)! = inv(k!) * k
+local factorial = { [0] = 1 }
+for i = 1, n do factorial[i] = mulmod(factorial[i - 1], i) end
+local inv_factorial = {}
+inv_factorial[n] = powmod(factorial[n], P - 2)
+for i = n, 1, -1 do inv_factorial[i - 1] = mulmod(inv_factorial[i], i) end
+
+local total, last = 0, 0
+for _ = 1, q do
+  local a = nxt() % (n + 1)
+  local b = nxt() % (a + 1)
+
+  local value = mulmod(mulmod(factorial[a], inv_factorial[b]), inv_factorial[a - b])
+
+  total = (total + value) % P
+  last = value
+end
+
+print(total)
+print("LAST " .. last)
+'''
+hints = [
+  "Reduce after every multiplication, and multiply only through mulmod: a plain a * b of two residues is past 2^53 and silently wrong.",
+  "powmod(v, P - 2) is the modular inverse, and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
+  "Precompute inverse factorials as well, backwards from powmod(factorial[n], P - 2): inv_factorial[i - 1] = inv_factorial[i] * i. Then a query is two mulmods and no powmod at all.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "10 5 3\n",           expect = "209\nLAST 1\n",               visible = true },
+  { name = "tiny",   stdin = "1 1 1\n",            expect = "1\nLAST 1\n",                 visible = false },
+  { name = "mid",    stdin = "100 50 4\n",         expect = "707023692\nLAST 689856059\n", visible = false },
+  { name = "big",    stdin = "200000 200000 11\n", expect = "390914381\nLAST 201898882\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id           = "lua.hacker.33.grid-paths"
+node         = 32
+title        = "ACROSS THE BLOCK, NEVER BACKWARDS"
+difficulty   = 5
+time_limit_s = 1200
+story        = "The Tai Hang grid with three lanes closed for the dragon. How many ways across, and which way is cheapest."
+concepts     = ["dynamic-programming", "matrix", "math"]
+requires     = ["lua.hacker.32.modular"]
+map          = { x = 0.538, y = 0.857, kind = "quest" }
+brief        = '''
+Standard input is `r c pct seed`. Build the grid yourself, in row-major order,
+drawing **two** values for every cell, in 64-bit arithmetic that wraps
+(`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Move only **right** or **down**, through open cells. Print:
+
+1. `PATHS <k>` — how many distinct routes from `(0,0)` to `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — the smallest total cost of a route, counting both endpoints,
+   or `-1` if there is no route
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+One pass in row-major order does both: a cell's routes are the sum of the
+routes into it from above and from the left, and its best cost is its own cost
+plus the cheaper of those two. Because you only ever move right or down, the
+two cells you need are always already finished — which is why this needs no
+recursion and no visited set. A memoised recursion would also be linear in
+the cells, and on the `1000 × 1000` case it would also be two thousand
+frames deep — under LuaJIT's roof, as it happens, but the loop is the answer
+here for the usual reason: the shape of the problem is a table filled in
+order.
+
+The `PATHS` count is taken modulo `1000000007` for the usual reason: on the
+`1000 × 1000` hidden case the true number has over six hundred digits, and a
+double would have turned it into `inf` long before. Reduce as you add — two
+residues added together stay under `2^31`, so this is the one place on this
+road where plain `+` and `%` are enough.
+
+An unreachable cell has **no** best cost: `nil`, and `nil` is tested with
+`~= nil` before anything is added to it or compared with it. A `1000 × 1000`
+table of tables is a million entries and LuaJIT does not mind.
+
+**What the big case enforces:** it rejects any answer that enumerates routes.
+There are more of them than there are lanterns in the park.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local rows, cols, pct, seed = data[1], data[2], data[3], data[4]
+local P = 1000000007
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local open_cell, cost = {}, {}
+for i = 0, rows - 1 do
+  open_cell[i], cost[i] = {}, {}
+  for j = 0, cols - 1 do
+    local a = nxt()
+    local b = nxt()
+    local corner = (i == 0 and j == 0) or (i == rows - 1 and j == cols - 1)
+    open_cell[i][j] = corner or a % 100 >= pct
+    cost[i][j] = b % 9 + 1
+  end
+end
+
+-- fill `ways` and `best` in row-major order; a missing `best` is unreachable
+local ways, best = {}, {}
+
+print("PATHS 0")
+print("MIN -1")
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local rows, cols, pct, seed = data[1], data[2], data[3], data[4]
+local P = 1000000007
+
+local x = 0ULL + seed
+local function nxt()
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  return tonumber(bit.rshift(x, 33))
+end
+
+local open_cell, cost = {}, {}
+for i = 0, rows - 1 do
+  open_cell[i], cost[i] = {}, {}
+  for j = 0, cols - 1 do
+    local a = nxt()
+    local b = nxt()
+    local corner = (i == 0 and j == 0) or (i == rows - 1 and j == cols - 1)
+    open_cell[i][j] = corner or a % 100 >= pct
+    cost[i][j] = b % 9 + 1
+  end
+end
+
+-- nil in `best` means unreachable; a cell with no open neighbour above or
+-- left stays that way
+local ways, best = {}, {}
+for i = 0, rows - 1 do
+  ways[i], best[i] = {}, {}
+  for j = 0, cols - 1 do
+    ways[i][j] = 0
+    if open_cell[i][j] then
+      if i == 0 and j == 0 then
+        ways[0][0] = 1
+        best[0][0] = cost[0][0]
+      else
+        local routes, cheapest = 0, nil
+        if i > 0 and best[i - 1][j] ~= nil then
+          routes = routes + ways[i - 1][j]
+          cheapest = best[i - 1][j]
+        end
+        if j > 0 and best[i][j - 1] ~= nil then
+          routes = routes + ways[i][j - 1]
+          if cheapest == nil or best[i][j - 1] < cheapest then
+            cheapest = best[i][j - 1]
+          end
+        end
+        ways[i][j] = routes % P
+        if cheapest ~= nil then best[i][j] = cheapest + cost[i][j] end
+      end
+    end
+  end
+end
+
+print("PATHS " .. ways[rows - 1][cols - 1])
+local final = best[rows - 1][cols - 1]
+if final == nil then print("MIN -1") else print("MIN " .. final) end
+'''
+hints = [
+  "Draw both values for every cell, including the two corners — the generator does not skip them, it only refuses to block them.",
+  "An open cell with no open neighbour above or left is reachable by zero routes and has no best cost; nil is the honest `unreachable`, and `~= nil` is the guard before you compare or add.",
+  "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 10000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",   stdin = "3 4 30 2\n",        expect = "PATHS 9\nMIN 27\n",           visible = true },
+  { name = "one-cell", stdin = "1 1 0 1\n",         expect = "PATHS 1\nMIN 4\n",            visible = false },
+  { name = "walled",   stdin = "5 5 60 4\n",        expect = "PATHS 0\nMIN -1\n",           visible = false },
+  { name = "big",      stdin = "1000 1000 20 13\n", expect = "PATHS 442990855\nMIN 6890\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id           = "lua.hacker.34.stable-sort"
+node         = 33
+title        = "TIES KEEP THEIR PLACE"
+difficulty   = 4
+time_limit_s = 900
+story        = "Two runners finished the dragon's circuit on the same score and the leaderboard puts them in a different order every time it redraws."
+concepts     = ["sorting", "slices", "complexity"]
+requires     = ["lua.hacker.33.grid-paths"]
+map          = { x = 0.605, y = 0.932, kind = "quest" }
+brief        = '''
+Standard input is `n buckets seed`. Build `n` riders, where rider `i` has
+index `i` and a score, in 64-bit arithmetic that wraps (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Sort the riders by score **descending**. Riders with the same score must keep
+the order they arrived in. Print their indices, space separated, then
+`TIES <k>` — how many adjacent pairs in your sorted order have equal scores.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` is small, so almost everything is a tie, and the answer is almost
+entirely decided by what happens to them.
+
+**This is the quest about knowing which sort you are holding.** `table.sort`
+is **not stable**. It is a quicksort, it promises nothing about the order of
+elements that compare equal, and it keeps that non-promise: on the sample,
+sorted with a plain `a.score > b.score`, the ties come out `5 1 6 0 4 3 2 7`
+— which is what the starter does. Nothing raises. The answer is simply a
+different answer, on this input, and on a real input it always will be.
+
+There is one correct answer here, and it is the one to reach for by default
+in every language: make the comparison **total**. Sort by `(-score, index)`
+— score descending, then index ascending — so no two riders ever compare
+equal and stability stops being a question. A total order has nothing to
+prove. (The other answer the Python interview accepts, "the sort is stable,
+lean on it", is not available in this room, and knowing that is the point.)
+
+The clock is not measuring speed here, and there is nothing for it to
+measure: `table.sort` is `table.sort` whichever comparator you hand it.
+These four cases are decided entirely by what happens to the ties.
+'''
+starter      = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, buckets, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local riders = {}
+for i = 0, n - 1 do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  riders[#riders + 1] = { score = tonumber(bit.rshift(x, 33)) % buckets, index = i }
+end
+
+-- descending by score, and nothing said about the ties — so table.sort
+-- puts them wherever its quicksort leaves them
+table.sort(riders, function(a, b) return a.score > b.score end)
+
+local out = {}
+for i, rider in ipairs(riders) do out[i] = rider.index end
+print(table.concat(out, " "))
+
+local ties = 0
+for i = 2, #riders do
+  if riders[i].score == riders[i - 1].score then ties = ties + 1 end
+end
+print("TIES " .. ties)
+'''
+solution     = '''
+local data = {}
+for token in io.read("*a"):gmatch("%S+") do data[#data + 1] = tonumber(token) end
+local n, buckets, seed = data[1], data[2], data[3]
+
+local x = 0ULL + seed
+local riders = {}
+for i = 0, n - 1 do
+  x = x * 6364136223846793005ULL + 1442695040888963407ULL
+  riders[#riders + 1] = { score = tonumber(bit.rshift(x, 33)) % buckets, index = i }
+end
+
+-- a total order: score descending, then arrival ascending. No two riders
+-- compare equal, so the sort's silence about ties cannot matter.
+table.sort(riders, function(a, b)
+  if a.score ~= b.score then return a.score > b.score end
+  return a.index < b.index
+end)
+
+local out = {}
+for i, rider in ipairs(riders) do out[i] = rider.index end
+print(table.concat(out, " "))
+
+local ties = 0
+for i = 2, #riders do
+  if riders[i].score == riders[i - 1].score then ties = ties + 1 end
+end
+print("TIES " .. ties)
+'''
+hints = [
+  "Add the second half to the comparator: when the scores are equal, return a.index < b.index. That is the whole fix.",
+  "Never write a comparator that says `<=` or returns true both ways — `invalid order function for sorting` is table.sort telling you the order is not an order.",
+  "TIES counts adjacent equal scores in the finished order, and that count is the same whichever comparator you wrote — it is the index order that gives you away.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample", stdin = "8 3 5\n",    expect = "1 5 6 0 2 3 4 7\nTIES 6\n", visible = true },
+  { name = "three",  stdin = "3 2 1\n",    expect = "1 0 2\nTIES 1\n",           visible = false },
+  { name = "sixty",  stdin = "60 3 11\n",  expect = "2 9 11 12 14 15 16 19 22 23 31 33 36 38 47 48 52 56 57 58 0 1 4 5 6 13 17 18 20 24 27 32 34 35 39 40 42 44 45 46 50 51 53 54 59 3 7 8 10 21 25 26 28 29 30 37 41 43 49 55\nTIES 57\n", visible = false },
+  { name = "many",   stdin = "200 10 4\n", expect = "30 32 45 51 62 71 83 86 87 94 103 118 128 130 142 149 164 170 172 176 180 190 191 194 18 19 20 23 31 38 48 74 91 113 116 129 141 146 148 168 175 187 5 15 17 24 28 50 58 68 88 102 110 124 132 137 188 193 196 198 199 0 9 12 25 26 46 49 52 55 70 75 78 84 97 108 112 134 156 158 163 4 10 21 35 42 73 99 104 106 107 114 120 121 125 131 136 150 160 166 173 174 177 2 8 11 13 16 39 40 41 54 65 72 82 93 95 119 123 143 169 178 179 195 197 7 27 36 47 56 61 64 67 69 76 100 126 140 153 157 161 162 181 1 37 57 60 77 85 92 96 98 105 111 117 133 135 138 159 167 186 192 3 6 14 43 53 59 63 66 80 81 101 109 115 122 127 144 145 151 154 155 165 171 183 189 22 29 33 34 44 79 89 90 139 147 152 182 184 185\nTIES 190\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 34  BOSS
+[[quest]]
+id           = "lua.hacker.28.lru"
+node         = 34
+title        = "THE MOON"
+difficulty   = 5
+time_limit_s = 1800
+story        = "Room 7-32, last question, eighth time. The interviewer turns the monitor off, and the only light on the whiteboard is the moon through the window: one table type for every structure, and the clock."
+concepts     = ["collections", "linked-lists", "recursion", "complexity"]
+requires     = ["lua.hacker.34.stable-sort", "lua.hacker.24.inversions"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief        = '''
+Line one is `cap q`, and then either `q` lines of operations, each
+`PUT <key> <value>` or `GET <key>` — or, when line one carries a **third**
+number `seed`, no further lines at all, and the `q` operations come from the
+generator below.
+
+Implement a fixed-capacity cache that evicts the **least recently used** entry
+when it is full. A `GET` and a `PUT` both count as using a key. A `PUT` of a
+key the cache already holds replaces its value and makes it the most recent —
+it adds no entry, so it evicts nothing however full the cache is.
+
+For each `GET` print the value, or `-1` if it is not there. At the end print
+the surviving keys, most-recently-used first, space separated — or `-` if the
+cache is empty — and then `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Follow the sample through: `GET 1` makes `1` recent again, so when `PUT 3`
+needs room it is `2` that goes. `GET 2` misses. `GET 3` hits and makes `3` the
+most recent, which is why the survivors print as `3 1`.
+
+The generated form, in 64-bit arithmetic that wraps (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q operations:
+    a   = next()
+    key = next() % (2 * cap)
+    if a % 4 == 0:   GET key
+    else:            PUT key (next() % 100)        # the value is a third draw
+```
+
+**The starter is wrong, and the sample shows it.** It keeps the cache in two
+tables — `cache[key]` for the values and `order`, a sequence of keys, oldest
+first — and it evicts `order[1]`. A `PUT` of a new key appends to `order`. A
+`GET` reads `cache[key]` and does nothing else, because reading a table
+moves nothing in it: the table remembers what is at a key, not when you last
+looked. So the cache evicts the key that came in **first**, not the one used
+**least recently**, and on the sample `GET 2` prints `20`.
+
+That is the boss. Everything in this land is a table, and a table has no
+memory of being read. Recency is a thing you have to *write* — on every hit
+and every overwrite, not only on insert — and the structure that makes that
+write `O(1)` is the textbook one: a hash table into a doubly linked list.
+There is no `OrderedDict` with the pointers hidden. Here the pointers are
+fields: a node is `{ key = k, value = v, prev = p, next = n }`, `nodes[key]`
+finds it, unlinking it and relinking it at the hot end is four assignments,
+and the cold end is `head.next`. Two sentinel tables at the ends mean no
+`nil` check anywhere in the list code. Every operation is `O(1)`, and you can
+say so without hedging.
+
+The starter's `table.remove(order, 1)` is `O(cap)` on top of being wrong,
+and its `order` is the tell: a sequence can say who came first, but moving a
+key to the end on every touch is a search and a shift, and the linked list
+is what "move to the end in constant time" looks like when you build it
+yourself.
+
+(In the Python version of this interview the boss was the recursion limit,
+and the two-thousand-operation hidden case is still here. The starter walks
+the operations recursively — `return step(i + 1)` at the end of `step` — and
+it gets through, because that is a **proper tail call**: Lua reuses the frame,
+and a tail call costs nothing however many there are. Twenty thousand or so
+non-tail frames is where `stack overflow` lives. Know both facts; the
+recursion was never the shape of this problem, and a sequence of operations
+is a `for` loop.)
+'''
+starter      = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+
+local header = {}
+for token in lines[1]:gmatch("%S+") do header[#header + 1] = tonumber(token) end
+local cap, q = header[1], header[2]
+
+-- ops[i] is { kind = "GET" | "PUT", key = k, value = v }
+local ops = {}
+if #header == 3 then
+  local x = 0ULL + header[3]
+  local function nxt()
+    x = x * 6364136223846793005ULL + 1442695040888963407ULL
+    return tonumber(bit.rshift(x, 33))
+  end
+  for _ = 1, q do
+    local a = nxt()
+    local key = nxt() % (2 * cap)
+    if a % 4 == 0 then
+      ops[#ops + 1] = { kind = "GET", key = key }
+    else
+      ops[#ops + 1] = { kind = "PUT", key = key, value = nxt() % 100 }
+    end
+  end
+else
+  for i = 1, q do
+    local kind, key, value = lines[1 + i]:match("(%S+)%s+(%S+)%s*(%S*)")
+    ops[#ops + 1] = { kind = kind, key = tonumber(key), value = tonumber(value) }
+  end
+end
+
+local cache = {}   -- key -> value
+local order = {}   -- keys, oldest first
+local evicted = 0
+local out = {}
+
+local function step(i)
+  if i > #ops then return end
+  local op = ops[i]
+  if op.kind == "GET" then
+    local value = cache[op.key]
+    -- reading a table moves nothing in it
+    if value == nil then out[#out + 1] = "-1" else out[#out + 1] = tostring(value) end
+  else
+    if cache[op.key] == nil then
+      if #order == cap then
+        local coldest = table.remove(order, 1)
+        cache[coldest] = nil
+        evicted = evicted + 1
+      end
+      order[#order + 1] = op.key
+    end
+    cache[op.key] = op.value
+  end
+  -- a proper tail call: no frame, however many operations there are
+  return step(i + 1)
+end
+step(1)
+
+for _, line in ipairs(out) do print(line) end
+if #order == 0 then
+  print("-")
+else
+  local survivors = {}
+  for i = #order, 1, -1 do survivors[#survivors + 1] = order[i] end
+  print(table.concat(survivors, " "))
+end
+print("EVICTED " .. evicted)
+'''
+solution     = '''
+local input = io.read("*a")
+local lines = {}
+for line in (input .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+
+local header = {}
+for token in lines[1]:gmatch("%S+") do header[#header + 1] = tonumber(token) end
+local cap, q = header[1], header[2]
+
+-- ops[i] is { kind = "GET" | "PUT", key = k, value = v }
+local ops = {}
+if #header == 3 then
+  local x = 0ULL + header[3]
+  local function nxt()
+    x = x * 6364136223846793005ULL + 1442695040888963407ULL
+    return tonumber(bit.rshift(x, 33))
+  end
+  for _ = 1, q do
+    local a = nxt()
+    local key = nxt() % (2 * cap)
+    if a % 4 == 0 then
+      ops[#ops + 1] = { kind = "GET", key = key }
+    else
+      ops[#ops + 1] = { kind = "PUT", key = key, value = nxt() % 100 }
+    end
+  end
+else
+  for i = 1, q do
+    local kind, key, value = lines[1 + i]:match("(%S+)%s+(%S+)%s*(%S*)")
+    ops[#ops + 1] = { kind = kind, key = tonumber(key), value = tonumber(value) }
+  end
+end
+
+-- a hash table into a doubly linked list: nodes[key] finds the node, the
+-- list holds the order. Two sentinels: head.next is the coldest entry,
+-- tail.prev the hottest, and neither end is ever nil.
+local head, tail = {}, {}
+head.next, tail.prev = tail, head
+local nodes = {}
+local count, evicted = 0, 0
+local out = {}
+
+local function unlink(node)
+  node.prev.next = node.next
+  node.next.prev = node.prev
+end
+
+local function link_hot(node)
+  node.prev = tail.prev
+  node.next = tail
+  tail.prev.next = node
+  tail.prev = node
+end
+
+-- a sequence of operations is a for loop, however it was handed to you
+for _, op in ipairs(ops) do
+  local node = nodes[op.key]
+  if op.kind == "GET" then
+    if node == nil then
+      out[#out + 1] = "-1"
+    else
+      -- the touch: recency is written, not remembered
+      unlink(node)
+      link_hot(node)
+      out[#out + 1] = tostring(node.value)
+    end
+  elseif node ~= nil then
+    -- an overwrite is a touch, not an insert: nothing is evicted
+    node.value = op.value
+    unlink(node)
+    link_hot(node)
+  else
+    if count >= cap and count > 0 then
+      local coldest = head.next
+      unlink(coldest)
+      nodes[coldest.key] = nil
+      count = count - 1
+      evicted = evicted + 1
+    end
+    node = { key = op.key, value = op.value }
+    nodes[op.key] = node
+    link_hot(node)
+    count = count + 1
+  end
+end
+
+for _, line in ipairs(out) do print(line) end
+local survivors = {}
+local walk = tail.prev
+while walk ~= head do
+  survivors[#survivors + 1] = walk.key
+  walk = walk.prev
+end
+if #survivors == 0 then print("-") else print(table.concat(survivors, " ")) end
+print("EVICTED " .. evicted)
+'''
+hints = [
+  "Trace the sample on the starter: GET 1 reads cache[1] and order is still { 1, 2 }, so PUT 3 evicts 1 and GET 2 finds 20. The touch has to move the key, and a GET is a touch.",
+  "A node is { key, value, prev, next }; unlink is two assignments and link-at-the-hot-end is four. With a head and a tail sentinel there is no nil at either end and no special case for an empty list.",
+  "Overwriting a key that is already present is a touch, not an insert — check nodes[key] before you decide the cache is full, or the overwrite case evicts something it should not.",
+  "The survivors are the list read from the hot end: walk tail.prev back to head. No sort, no stamps, and never pairs — pairs has no order to give you.",
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sample",    stdin = "2 6\nPUT 1 10\nPUT 2 20\nGET 1\nPUT 3 30\nGET 2\nGET 3\n", expect = "10\n-1\n30\n3 1\nEVICTED 1\n", visible = true },
+  { name = "overwrite", stdin = "1 3\nPUT 5 1\nPUT 5 2\nGET 5\n",                           expect = "2\n5\nEVICTED 0\n",           visible = false },
+  { name = "miss",      stdin = "2 2\nGET 9\nGET 8\n",                                      expect = "-1\n-1\n-\nEVICTED 0\n",      visible = false },
+  { name = "churn",     stdin = "1 4\nPUT 1 1\nPUT 2 2\nPUT 3 3\nGET 1\n",                  expect = "-1\n3\nEVICTED 2\n",          visible = false },
+  { name = "depth",     stdin = "3 2000 7\n",                                               expect = "-1\n-1\n80\n-1\n-1\n44\n72\n83\n35\n88\n-1\n33\n-1\n7\n7\n7\n-1\n-1\n-1\n-1\n-1\n5\n-1\n-1\n-1\n-1\n-1\n-1\n90\n12\n-1\n48\n-1\n48\n-1\n-1\n-1\n66\n-1\n-1\n-1\n80\n-1\n-1\n2\n-1\n-1\n-1\n43\n50\n-1\n88\n-1\n-1\n35\n-1\n-1\n-1\n90\n90\n18\n18\n-1\n63\n65\n14\n41\n-1\n-1\n82\n66\n9\n-1\n-1\n-1\n-1\n38\n-1\n40\n-1\n-1\n10\n-1\n-1\n42\n-1\n59\n85\n20\n-1\n-1\n24\n-1\n-1\n58\n55\n-1\n-1\n24\n-1\n-1\n-1\n-1\n-1\n19\n38\n-1\n89\n89\n63\n61\n77\n-1\n-1\n-1\n-1\n31\n31\n31\n-1\n-1\n-1\n-1\n47\n84\n47\n-1\n12\n95\n-1\n58\n-1\n-1\n13\n-1\n-1\n-1\n34\n34\n-1\n61\n-1\n82\n87\n52\n68\n-1\n-1\n-1\n-1\n84\n68\n78\n-1\n-1\n-1\n-1\n21\n-1\n-1\n73\n73\n-1\n-1\n-1\n39\n4\n52\n52\n-1\n-1\n-1\n-1\n62\n-1\n-1\n-1\n11\n-1\n49\n93\n-1\n-1\n70\n70\n-1\n70\n-1\n-1\n-1\n-1\n32\n93\n32\n-1\n-1\n-1\n44\n-1\n-1\n35\n13\n81\n-1\n-1\n-1\n49\n58\n-1\n-1\n-1\n66\n66\n-1\n-1\n-1\n76\n-1\n62\n62\n86\n34\n-1\n97\n66\n95\n-1\n-1\n79\n37\n61\n-1\n4\n-1\n27\n-1\n99\n11\n3\n69\n69\n12\n-1\n98\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n28\n-1\n-1\n-1\n29\n21\n68\n89\n55\n-1\n-1\n55\n80\n44\n-1\n-1\n91\n12\n-1\n-1\n-1\n-1\n2\n-1\n33\n2\n-1\n5\n46\n-1\n4\n-1\n4\n-1\n97\n-1\n9\n64\n-1\n-1\n-1\n-1\n-1\n59\n-1\n54\n-1\n-1\n41\n-1\n-1\n98\n-1\n-1\n60\n17\n54\n74\n7\n64\n76\n9\n-1\n-1\n55\n73\n-1\n42\n-1\n7\n81\n-1\n74\n90\n-1\n10\n-1\n-1\n-1\n-1\n-1\n-1\n52\n-1\n71\n74\n-1\n75\n-1\n11\n-1\n49\n-1\n58\n95\n-1\n41\n98\n-1\n16\n45\n-1\n0\n-1\n99\n-1\n-1\n39\n39\n-1\n78\n78\n-1\n62\n-1\n-1\n10\n75\n-1\n-1\n-1\n78\n-1\n35\n-1\n-1\n-1\n-1\n61\n-1\n80\n-1\n-1\n2\n-1\n2\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n42\n-1\n-1\n74\n7\n7\n-1\n58\n-1\n-1\n47\n68\n71\n61\n-1\n66\n-1\n36\n-1\n-1\n87\n-1\n-1\n-1\n50\n-1\n79\n54\n-1\n89\n-1\n-1\n-1\n57\n59\n39\n39\n-1\n-1\n-1\n-1\n70\n-1\n98\n-1\n81\n96\n96\n96\n96\n90\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n-1\n38\n-1\n38\n-1\n63\n24\n-1\n83\n24\n21\n-1\n-1\n42\n16\n28\n28\n45\n22\n-1\n-1\n-1\n-1\n91\n-1\n35\n-1\n-1\n28\n84\n-1\n43\n43\n-1\n-1\n-1\n-1\n47\n8\n-1\n-1\n0 1 2\nEVICTED 787\n",        visible = false },
+]

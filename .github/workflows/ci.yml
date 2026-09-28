@@ -104,6 +104,11 @@ env:
   # and here check with one tsc and format with one prettier.
   TYPESCRIPT_VERSION: "5.9.3"
   PRETTIER_VERSION: "3.9.6"
+  # Zig Land's compiler (SPEC §5.1). Pinned harder than most: the `std` API
+  # moves between releases (0.16 renamed the whole I/O layer), so a pack
+  # verified on one version is not known to compile on the next. The same
+  # version `make doctor` names and the runner's hint asks for.
+  ZIG_VERSION: "0.16.0"
 
 jobs:
   version:
@@ -194,6 +199,19 @@ jobs:
             typescript@${{ env.TYPESCRIPT_VERSION }} prettier@${{ env.PRETTIER_VERSION }}
           tsc --version
           prettier --version
+
+      # Zig Land is the eighth land (runner/src/zig.rs) and Lua Land the
+      # ninth (runner/src/lua.rs). `zig` is pinned to the version the packs
+      # were verified on; `luajit` is Ubuntu's, which is the LuaJIT 2.1 the
+      # LÖVE client already tests under. Neither is a plain `lua`.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Install LuaJIT, the Lua land's interpreter
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends luajit
+          zig version
+          luajit -v
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -458,6 +476,19 @@ jobs:
           tsc --version
           prettier --version
 
+      # Zig Land is the eighth land (runner/src/zig.rs) and Lua Land the
+      # ninth (runner/src/lua.rs). `zig` is pinned to the version the packs
+      # were verified on; `luajit` is Ubuntu's, which is the LuaJIT 2.1 the
+      # LÖVE client already tests under. Neither is a plain `lua`.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Install LuaJIT, the Lua land's interpreter
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends luajit
+          zig version
+          luajit -v
+
       # The data-race fixture is checked with `go run -race`, and the first
       # `-race` build on a fresh runner instruments the standard library from
       # scratch — minutes of work that blew the generator's per-run timeout
@@ -513,6 +544,10 @@ jobs:
           content/pytorch/verybasic.toml content/pytorch/basic.toml
           content/pytorch/advanced.toml content/pytorch/hacker.toml
           content/remix/verybasic.toml content/remix/basic.toml
+          content/zig/verybasic.toml content/zig/basic.toml
+          content/zig/advanced.toml content/zig/hacker.toml
+          content/lua/verybasic.toml content/lua/basic.toml
+          content/lua/advanced.toml content/lua/hacker.toml
 
       # A printed zero must be an exact zero. `pytorch.advanced.17.layernorm`
       # prints the mean of a normalised row: zero by construction, `1.49e-08`
@@ -541,7 +576,7 @@ jobs:
       - run: >
           python3 tests/content/verify_pack.py --i18n
           content/rust/*.toml content/go/*.toml content/cpp/*.toml content/python/*.toml
-          content/pytorch/*.toml content/remix/*.toml
+          content/pytorch/*.toml content/remix/*.toml content/zig/*.toml content/lua/*.toml
 
   # A dry run of the server tarball, on every push and pull request. It is the
   # whole release path minus signing: the frontend and both binaries are

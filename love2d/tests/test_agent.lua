@@ -850,7 +850,7 @@ return function()
   T.section("the coder — what it says for free")
 
   T.case("has a catalogue for every land, and never repeats a tip", function()
-    for _, lang in ipairs({ "rust", "go", "cpp", "python", "typescript" }) do
+    for _, lang in ipairs({ "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua" }) do
       T.ok(#(Tips.TIPS[lang] or {}) >= 8, lang .. " has " .. #(Tips.TIPS[lang] or {}) .. " tips")
     end
     local last = 1
@@ -881,5 +881,65 @@ return function()
       "a clean program is left alone")
     local go = Tips.advise("go", "func main() {\n\tv, err := f()\n\t_ = v\n}\n")
     T.ok(#go > 0 and go[1].id == "go.err-unchecked", "an unchecked err in Go")
+  end)
+
+  T.case("reads Zig for the four habits the judge or the compiler would not name", function()
+    local function ids(source)
+      local out = {}
+      for _, finding in ipairs(Tips.advise("zig", source)) do out[finding.id] = finding.text end
+      return out
+    end
+    T.ok(ids('std.debug.print("{d}\\n", .{x});')["zig.debug-print"],
+      "std.debug.print is stderr, and the judge reads stdout")
+    T.ok(ids("const n = std.fmt.parseInt(i64, s, 10) catch unreachable;")["zig.catch-unreachable"])
+    T.nope(ids("const n = mycatch unreachable;")["zig.catch-unreachable"], "the word, not a suffix of one")
+    T.ok(ids('_ = w.print("x", .{});')["zig.discard-error"], "a discarded call may be a discarded error")
+    T.ok(ids("_ = w.flush();")["zig.discard-error"], "flush returns an error union too")
+    T.nope(ids('_ = try w.print("x", .{});')["zig.discard-error"], "handled with try, it is only a value")
+    T.nope(ids("_ = x;")["zig.discard-error"], "an unused value declared on purpose")
+    T.nope(ids("_ = foo();")["zig.discard-error"], "a bare call is not one of the six error-union methods")
+    T.ok(ids("var n: i64 = undefined;\nstd.debug.assert(n == 1);")["zig.undefined-read"],
+      "read before it is ever assigned")
+    T.eq(ids("var n: i64 = undefined;\nconst m = n + 1;")["zig.undefined-read"],
+      "`n` is `undefined` and then read. Debug fills it with 0xAA, so the value is garbage: give it a value first.",
+      "the sentence names the variable")
+    T.nope(ids("var n: i64 = undefined;\nn = 3;")["zig.undefined-read"], "assigned first")
+    T.nope(ids("var n: i64 = undefined;\nn = 1;\nconst m = n + 1;")["zig.undefined-read"],
+      "assigned first, read second")
+    T.nope(ids("var n: i64 = undefined;\nconst m = s.n + 1;")["zig.undefined-read"],
+      "a field of the same name is not the variable")
+    T.nope(ids("var buf: [256]u8 = undefined;\nconst n = buf[0];")["zig.undefined-read"],
+      "an array declared undefined is the buffer idiom")
+    T.eq(#Tips.advise("zig", require("src.scenes.playground").STARTER.zig), 0,
+      "the desk's starter is clean: its undefined buffer is an array, which is the buffer idiom")
+  end)
+
+  T.case("reads Lua for the five habits LuaJIT will not warn about", function()
+    local function ids(source)
+      local out = {}
+      for _, finding in ipairs(Tips.advise("lua", source)) do out[finding.id] = finding.text end
+      return out
+    end
+    T.ok(ids("count = 0\nlocal function f() end")["lua.global"], "a bare assignment is a global")
+    T.nope(ids("local count = 0\nlocal t = {\n  a = 1,\n  b = 2,\n}\nt.x = 3\nif a == b then end")["lua.global"],
+      "local, a field in a constructor, a field assignment and == are not")
+    T.ok(ids("local a, b = table.unpack(t)")["lua.table-unpack"], "5.1 spells it unpack")
+    T.nope(ids("local a, b = mytable.unpack(t)")["lua.table-unpack"], "the word, not a suffix of one")
+    T.ok(ids("local q = a // b")["lua.floor-div"], "// is not an operator in 5.1")
+    T.nope(ids('local u = "http://x" -- a // b')["lua.floor-div"], "not in a string or a comment")
+    T.ok(ids("local ages = { tom = 3, ann = 4 }\nprint(#ages)")["lua.len-of-map"],
+      "# of a table with string keys is 0")
+    T.ok(ids('local t = {}\nt["a"] = 1\nprint(#t)')["lua.len-of-map"], "or one given a string key later")
+    T.ok(ids("local t = {}\nt.a = 1\nprint(#t)")["lua.len-of-map"], "as a field, too")
+    T.nope(ids("local xs = { 1, 2, 3 }\nprint(#xs)")["lua.len-of-map"], "# of a list is its length")
+    T.nope(ids("local t = { a = 1 }\nprint(#t.list)")["lua.len-of-map"], "#t.list is a different table")
+    T.ok(ids("for k, v in pairs(t) do\n  print(k, v)\nend")["lua.pairs-order"],
+      "pairs feeding print is unordered output")
+    T.ok(ids("for k, v in pairs(t) do\n  io.write(k)\nend")["lua.pairs-order"], "io.write counts as printing")
+    T.nope(ids("for i, v in ipairs(t) do\n  print(i, v)\nend")["lua.pairs-order"], "ipairs is in order")
+    T.nope(ids("for k in pairs(t) do\n  keys[#keys + 1] = k\nend\ntable.sort(keys)")["lua.pairs-order"],
+      "collecting the keys to sort is the fix, not the habit")
+    T.eq(#Tips.advise("lua", 'print("hello")\n'), 0, "the desk's starter is clean")
+    T.eq(#Tips.advise("lua", 'print("hello")\nlocal t = { a = 1 }\n'), 0, "and so is the web's")
   end)
 end

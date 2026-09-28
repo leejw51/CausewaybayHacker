@@ -134,6 +134,8 @@ return {
   ["dicts, generators, the GIL"] = "dicts、generators、そして GIL",
   ["tensors, gradients, attention"] = "テンソル、勾配、attention",
   ["interfaces, generics, narrowing"] = "interfaces、generics、型の絞り込み",
+  ["optionals, errors as values, comptime"] = "optionals、値としてのエラー、comptime",
+  ["tables, closures, coroutines"] = "tables、closures、coroutines",
   ["go, rust, python: one program, three times"] = "go、rust、python：同じプログラムを三回",
   ["both rankings, fused"] = "二つのランキングを統合",
   ["the words you typed"] = "入力した語そのもの",

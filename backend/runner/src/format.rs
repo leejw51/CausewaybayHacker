@@ -59,6 +59,12 @@ pub fn is_supported(lang: &str) -> bool {
         // everyone's colleagues actually run — but it ships with neither
         // `tsc` nor `node`, so it is asked of the machine like `black`.
         "typescript" => prettier_is_installed(),
+        // `zig fmt` ships with `zig`, as `gofmt` does with `go`: a land that
+        // runs at all can format.
+        "zig" => crate::zig::is_installed(),
+        // Lua has no formatter in the box. `stylua` is the one the player's
+        // colleagues run, and it is asked of the machine like `prettier`.
+        "lua" => stylua_is_installed(),
         _ => false,
     }
 }
@@ -67,10 +73,19 @@ pub fn is_supported(lang: &str) -> bool {
 /// its button with (PROTOCOL §4.3): a button that always refuses is worse
 /// than no button.
 pub fn supported_langs() -> Vec<&'static str> {
-    ["rust", "go", "cpp", "python", "pytorch", "typescript"]
-        .into_iter()
-        .filter(|lang| is_supported(lang))
-        .collect()
+    [
+        "rust",
+        "go",
+        "cpp",
+        "python",
+        "pytorch",
+        "typescript",
+        "zig",
+        "lua",
+    ]
+    .into_iter()
+    .filter(|lang| is_supported(lang))
+    .collect()
 }
 
 /// Python's formatter is `black`, which is not in the standard library and
@@ -142,6 +157,25 @@ pub fn typescript_is_installed() -> bool {
 
 fn prettier_is_installed() -> bool {
     answers("prettier", &["--version"])
+}
+
+/// What to type when Zig Land cannot run. One program, one version: the
+/// `std` API moves between releases, and every quest was verified on this
+/// one, so a newer or older `zig` is a land whose own solutions may not
+/// compile. The version is pinned here and in CI (`ZIG_VERSION`).
+pub(crate) const ZIG_HINT: &str =
+    "install zig 0.16.0 (https://ziglang.org/download/ — brew install zig, or \
+     the tarball on PATH)";
+
+/// What to type when Lua Land cannot run. `luajit`, not `lua`: the land is
+/// verified on LuaJIT's dialect (`lua.rs`). `stylua` rides along because it
+/// is the land's formatter.
+pub(crate) const LUA_HINT: &str =
+    "install luajit (brew install luajit, or apt install luajit); the \
+     formatter is stylua (cargo install stylua, or brew install stylua)";
+
+fn stylua_is_installed() -> bool {
+    answers("stylua", &["--version"])
 }
 
 /// Where `clang-format` is, if it is anywhere.
@@ -230,6 +264,33 @@ pub fn format(lang: &str, source: &str) -> std::io::Result<Formatted> {
             return Ok(Formatted::unchanged(
                 source,
                 "prettier is not installed on this machine",
+            ))
+        }
+        "zig" if crate::zig::is_installed() => {
+            // `zig fmt --stdin` is stdin to stdout, and it refuses a file it
+            // cannot parse with `<stdin>:1:11: error: …` and exit 2 — which
+            // is the rule this module wants: the original comes back whole.
+            let mut c = Command::new("zig");
+            c.arg("fmt").arg("--stdin");
+            c
+        }
+        "zig" => {
+            return Ok(Formatted::unchanged(
+                source,
+                "zig is not installed on this machine",
+            ))
+        }
+        "lua" if stylua_is_installed() => {
+            // `-` is stdin to stdout; the file name tells it nothing it
+            // needs, since stylua formats only Lua.
+            let mut c = Command::new("stylua");
+            c.arg("-");
+            c
+        }
+        "lua" => {
+            return Ok(Formatted::unchanged(
+                source,
+                "stylua is not installed on this machine",
             ))
         }
         other => {
@@ -391,6 +452,12 @@ pub fn toolchains() -> Vec<Toolchain> {
             "prettier",
             TYPESCRIPT_HINT,
         ),
+        // Zig Land's compiler and formatter are one program, so one probe
+        // answers for both.
+        ("zig", "zig", &["version"][..], "zig fmt", ZIG_HINT),
+        // Lua Land's interpreter is `luajit` — never `lua`, see `lua.rs` —
+        // and its formatter is asked of the machine like `black`.
+        ("lua", "luajit", &["-v"][..], "stylua", LUA_HINT),
     ] {
         let compiles = answers(compiler, args);
         let formats = is_supported(land);

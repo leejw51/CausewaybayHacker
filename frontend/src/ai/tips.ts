@@ -108,6 +108,40 @@ export const TIPS: Record<Lang, readonly string[]> = {
     "`readonly` and `as const` cost nothing at runtime and catch the mutation you did not mean.",
     "`for…of` walks values; `for…in` walks keys, as strings. On an array you almost always want `of`.",
   ],
+  // Zig Land builds with `zig build-exe -O Debug`, so every safety check is
+  // on and every failure is loud, and the standard library is 0.16's: the
+  // io and the allocator come in through `main`'s `Init`, and the writer is
+  // buffered.
+  zig: [
+    "`try f()` hands the error up; `f() catch |e| …` handles it here. One or the other — an unhandled error union does not compile.",
+    "`?T` is null or a `T`. `opt orelse default` unwraps with a fallback; `if (opt) |v|` unwraps with a branch.",
+    "`defer x.deinit();` on the line after the `init`, and the cleanup can never be forgotten by an early `return`.",
+    "`errdefer` runs only when the block leaves with an error: the undo for the thing you just half-built.",
+    "`comptime` is the compiler running your code. A `type` is a value there, which is the whole of generics.",
+    "`[N]T` is an array with its length in the type; `[]T` is a slice, a pointer and a length. Functions take slices.",
+    "`-O Debug` panics on integer overflow, on an index past the end, on a null unwrap. Every one of them says where.",
+    "An unused `const` or parameter is a compile error. `_ = x;` says you meant it.",
+    "`std.debug.print` writes to stderr. The tests read stdout, so the answer goes through the writer and `flush()`.",
+    "Every allocation names its allocator, and `init.gpa` is the one `main` was given. Free on the same one.",
+    "`for (xs, 0..) |x, i|` is the index loop. `for (a, b) |x, y|` walks two slices in step, and they must be the same length.",
+    "`switch` must be exhaustive: name every case, or end with `else =>`. A missing enum value is a compile error.",
+  ],
+  // Lua Land runs on LuaJIT 2.1, which is Lua 5.1: one table for every
+  // structure, numbered from 1, and no integer type at all.
+  lua: [
+    "A table's list part starts at 1. `t[0]` is just another key, and `#t` does not count it.",
+    "A missing key is `nil`, not an error; the error comes later, when you index into the `nil`. `#t` stops at the first hole.",
+    "`pairs` promises no order at all. When the output has to be in order, collect the keys and `table.sort` them.",
+    "`local` or it is a global. A global lives in `_G`, is seen by every function, and a typo silently makes another.",
+    '`..` joins strings and numbers, but not `nil`: `"n = " .. tostring(x)` when `x` might be missing.',
+    "A class is a table with `__index` pointing at itself: `setmetatable(obj, Class)` and a missing method is looked up there.",
+    "A closure captures the variable, not the value: two closures over one `local i` share it.",
+    "`ipairs` stops at the first `nil`. A list with a hole in it is two lists as far as `ipairs` can tell.",
+    '`string.format("%d", 1.5)` is an error in LuaJIT: `%d` wants an integer. `math.floor` it, or use `%.0f`.',
+    "`coroutine.wrap(f)` turns a function into a generator: `coroutine.yield(v)` inside, one value per call outside.",
+    '`select("#", ...)` counts the varargs, `nil`s included; `#{...}` does not.',
+    '`string.format("%.2f", x)` for two decimals. `print(0.1 + 0.2)` shows `0.3`, but `==` on it is false.',
+  ],
 };
 
 /** The next tip after `last`, never the same one twice running. */
@@ -327,6 +361,105 @@ export function advise(lang: Lang, source: string): Advice[] {
         say(
           "ts.var",
           "`var` is function-scoped and hoisted. `const`, or `let` when it has to change.",
+        );
+      }
+      break;
+    }
+    case "zig": {
+      if (/\bstd\.debug\.print\s*\(/.test(source)) {
+        say(
+          "zig.debug-print",
+          "`std.debug.print` goes to stderr. The tests read stdout: print through the writer, then `flush()`.",
+        );
+      }
+      if (/\bcatch\s+unreachable\b/.test(source)) {
+        say(
+          "zig.catch-unreachable",
+          "`catch unreachable` is a crash with the error's name on it. `try`, or a `catch |e|` that does something.",
+        );
+      }
+      // `_ = x;` is how an unused value is declared on purpose, so the rule
+      // is only about the calls that return an error union: discarding one
+      // of those is dropping an error on the floor.
+      if (/^\s*_\s*=\s*[\w.]*\.(flush|print|append|parseInt|put|writeAll)\(/m.test(source)) {
+        say(
+          "zig.discard-error",
+          "`_ =` on a call that can fail throws the error away. `try` it, or `catch` it and say what happens.",
+        );
+      }
+      // `= undefined` and then read: `x` declared undefined, and the next
+      // thing done with it is not an assignment. An array (`[N]T`) declared
+      // undefined is the buffer idiom and is filled by whatever it is handed
+      // to, so those are left alone.
+      for (const m of source.matchAll(/\bvar\s+(\w+)\s*:\s*([^=]+?)=\s*undefined\s*;/g)) {
+        if (/^\s*\[/.test(m[2])) continue;
+        const name = m[1];
+        const after = source.slice(m.index! + m[0].length);
+        const first = new RegExp(`(^|[^\\w.])${name}\\b`).exec(after);
+        if (first && !/^\s*=[^=]/.test(after.slice(first.index + first[0].length))) {
+          say(
+            "zig.undefined-read",
+            `\`${name}\` is \`undefined\` and then read. Debug fills it with 0xAA, so the value is garbage: give it a value first.`,
+          );
+          break;
+        }
+      }
+      break;
+    }
+    case "lua": {
+      // A bare `name = …` at the start of a line, outside a table
+      // constructor and not a field or an index: a global by omission.
+      let depth = 0;
+      for (const line of source.split("\n")) {
+        const code = line.replace(/--.*$/, "");
+        if (depth === 0 && /^\s*[A-Za-z_]\w*\s*=[^=]/.test(code) && !/^\s*local\b/.test(code)) {
+          say(
+            "lua.global",
+            "That assignment has no `local`, so it makes a global. `local name = …`, and the value belongs to this block.",
+          );
+          break;
+        }
+        depth += (code.match(/{/g) ?? []).length - (code.match(/}/g) ?? []).length;
+        if (depth < 0) depth = 0;
+      }
+      if (/\btable\.unpack\b/.test(source)) {
+        say(
+          "lua.table-unpack",
+          "LuaJIT is Lua 5.1: `table.unpack` is `nil`. It is `unpack(t)` here.",
+        );
+      }
+      if (
+        /[^-]\/\/(?!\/)/.test(
+          source.replace(/--.*$/gm, "").replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, ""),
+        )
+      ) {
+        say(
+          "lua.floor-div",
+          "There is no `//` in Lua 5.1. `math.floor(a / b)` is the integer division LuaJIT has.",
+        );
+      }
+      // `#t` where `t` is, somewhere in this file, given a string key:
+      // built as `{ k = … }`, or written to as `t.k = …` or `t["k"] = …`.
+      for (const m of source.matchAll(/#\s*([A-Za-z_]\w*)\b(?![\w.[(])/g)) {
+        const t = m[1];
+        const keyed = new RegExp(
+          `\\b${t}\\s*=\\s*\\{\\s*\\w+\\s*=[^=]|\\b${t}(\\.\\w+|\\[\\s*["'][^"']*["']\\s*\\])\\s*=[^=]`,
+        );
+        if (!keyed.test(source)) continue;
+        say(
+          "lua.len-of-map",
+          "`#` counts the list part only. A table keyed by strings has a length of 0, however much is in it.",
+        );
+        break;
+      }
+      if (
+        /\bfor\s+[\w, ]+\s+in\s+pairs\s*\([^)]*\)\s*do\b[\s\S]{0,120}?\b(print|io\.write)\s*\(/.test(
+          source,
+        )
+      ) {
+        say(
+          "lua.pairs-order",
+          "`pairs` visits keys in no promised order, and that loop prints. Sort the keys first if the output is checked.",
         );
       }
       break;

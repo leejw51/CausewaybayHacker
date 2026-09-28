@@ -256,6 +256,8 @@ impl Quest {
             "cpp" => "cpp",
             "python" | "pytorch" => "py",
             "typescript" => "ts",
+            "zig" => "zig",
+            "lua" => "lua",
             _ => "rs",
         }
     }
@@ -634,6 +636,8 @@ mod tests {
         assert_eq!(ext("python"), "py");
         assert_eq!(ext("pytorch"), "py");
         assert_eq!(ext("typescript"), "ts");
+        assert_eq!(ext("zig"), "zig");
+        assert_eq!(ext("lua"), "lua");
     }
 
     /// REMIX LAND's quests say their own language (PROTOCOL §5.3), and the

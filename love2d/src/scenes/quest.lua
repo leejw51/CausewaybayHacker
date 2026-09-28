@@ -142,6 +142,17 @@ function Quest.backdrop(land, category)
     -- the front end is served from for ADVANCED.
     return Assets.pick(advanced and "bg_datacentre" or "bg_street", "bg_street", "bg_flat")
   end
+  if land == "zig" then
+    -- ZIG LAND is the Cross-Harbour Tunnel toll plaza at 06:00: the street
+    -- plate for BASIC, and the toll control room — the data centre — for
+    -- ADVANCED, as C++'s machine room is.
+    return Assets.pick(advanced and "bg_datacentre" or "bg_street", "bg_street", "bg_flat")
+  end
+  if land == "lua" then
+    -- LUA LAND is Tai Hang on Mid-Autumn night: the lanes at night for
+    -- every road but ADVANCED, which gets the square the dragon ends in.
+    return Assets.pick(advanced and "bg_times" or "bg_street", "bg_street", "bg_flat")
+  end
   if land == "remix" then
     -- REMIX LAND is the café on Sugar Street: the till, with its counter and
     -- its price board, is the nearest plate to a cha chaan teng.
@@ -623,9 +634,10 @@ function Quest:copy_ask()
   local lang = Land.lang_of(q, self.app.land)
   local file = "main." .. (lang == "cpp" and "cpp" or lang == "go" and "go"
     or lang == "python" and "py" or lang == "pytorch" and "py"
-    or lang == "typescript" and "ts" or "rs")
+    or lang == "typescript" and "ts" or lang == "zig" and "zig"
+    or lang == "lua" and "lua" or "rs")
   local fence = lang == "python" and "python" or lang == "pytorch" and "python"
-    or lang == "typescript" and "typescript"
+    or lang == "typescript" and "typescript" or lang == "zig" and "zig" or lang == "lua" and "lua"
     or lang == "cpp" and "cpp" or lang == "go" and "go" or "rust"
   local out = {}
   local function put(line) out[#out + 1] = line end
@@ -870,6 +882,8 @@ Quest.COMMON = {
   python = word_set(PY),
   pytorch = word_set(PY .. " torch nn tensor Tensor Module forward backward zeros ones randn optim grad no_grad"),
   typescript = word_set("let const function return if else for while of in new class interface type enum extends implements readonly private public async await import from export as keyof typeof number string boolean undefined null void never unknown true false console log length push map filter reduce split trim join Array Map Set Record Math require readFileSync"),
+  zig = word_set("const var fn pub return if else for while switch try catch orelse defer struct enum union error comptime null undefined true false break continue and or std io gpa init print writer interface flush items append len u8 i64 usize f64 bool void anytype ArrayList AutoHashMap parseInt tokenizeAny"),
+  lua = word_set("local function end return if then elseif else for while do repeat until in and or not nil true false break print io read write string table insert remove sort concat format tostring tonumber pairs ipairs setmetatable coroutine yield resume wrap math floor"),
 }
 
 --- The 0-based `i`th byte of `s` as a one-character string ("" past the end).

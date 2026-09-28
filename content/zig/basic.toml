@@ -1,0 +1,3195 @@
+# ZIG LAND — BASIC. The grammar road: 06:00 at the Causeway Bay portal of
+# the Cross-Harbour Tunnel, the toll booths and their coin trays, the axle
+# counters, the Canal Road flyover overhead and the villain-hitters under
+# it, one construct per node. This is grammar practice, not a quiz: the
+# brief explains one thing and shows how it is written, the starter is the
+# whole program, and the player types the one to four lines that use it —
+# print and parseInt, @divTrunc and {d:.2}, integer widths and @intCast, a
+# 32-byte key, f64 to f32, a string copied and turned round, string, list
+# and byte slices with copy and append, a while loop with its continue
+# expression, a fn, a struct with a method, an enum and an exhaustive
+# switch, an ArrayList worked at the back and at the front, a StringHashMap
+# managed and unmanaged, a set of void, a stack and a Deque, std.mem.sort
+# and a named comparator, a struct in place of a closure, a fn passed to a
+# fold, std.Thread.spawn and join, and the two recursive lines of a binary
+# search tree for the boss — the first time on this road that an optional
+# is unwrapped before anyone looked.
+#
+# Everything here is explicit, because that is the land: every byte is
+# paid for with `gpa` and handed back with `defer`, every error is `try`d,
+# every value that is dropped is dropped with `_ =`, and a name that is
+# never used does not compile — so a starter whose hole leaves a value
+# unused is refused by the compiler, and that refusal is the hole telling
+# you where it is.
+#
+# Every program is one main.zig, built by `zig build-exe main.zig -O
+# Debug` (Zig 0.16: every safety check on, so an index past the end, an
+# unwrapped null and an integer overflow are each a `panic:` that says so)
+# and run per case. Standard input is read with one idiom everywhere:
+#
+#     pub fn main(init: std.process.Init) !void {
+#         const io = init.io;
+#         const gpa = init.gpa;
+#         var in_buf: [4096]u8 = undefined;
+#         var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+#         const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+#         defer gpa.free(input);
+#
+# and output goes through a buffered writer that is flushed on the way out:
+#
+#         var out_buf: [4096]u8 = undefined;
+#         var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+#         const w = &stdout.interface;
+#         defer w.flush() catch {};
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Every solution and starter in this file is run by
+# tests/content/verify_pack.py and by CI (SPEC §9.4, §9.5), with the same
+# line the runner uses. verify_pack also holds every basic solution to
+# BASIC_MAX_ADDED lines over its starter.
+
+pack = "zig.basic"
+land = "zig"
+category = "basic"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "zig.basic.01.first-light"
+node        = 1
+title       = "FIRST LIGHT"
+difficulty  = 1
+story       = "06:00 at the Causeway Bay portal. The sign over booth 1 comes on because something wrote to the right address, and the line it shows is blank."
+concepts    = ["io", "strings"]
+requires    = []
+map          = { x = 0.044, y = 0.146, kind = "quest" }
+brief       = '''
+Print exactly:
+
+```
+hello, causewaybay
+```
+
+Lowercase, one comma, one space, one line. Nothing else.
+
+Output in Zig goes through a writer. `w` is one, made over standard output
+with a buffer, and `w.print(fmt, args)` writes a formatted string through
+it: the format, then a tuple of arguments — `.{}` when there are none.
+It can fail, so it is `try`d. The buffer reaches the terminal only when it
+is flushed, and the `defer w.flush()` above the hole does that on the way
+out of `main`.
+
+```
+try w.print("hello, causewaybay\n", .{});
+```
+
+Type that line at `// your code here`.
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    // your code here
+    // ANSWER: try w.print("hello, causewaybay\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(init.io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    try w.print("hello, causewaybay\n", .{});
+}
+'''
+hints = [
+  'try w.print("hello, causewaybay\n", .{}); is the whole program. The writer and its flush are already there.',
+  'The string is exact: lowercase, one comma, one space after it, and the \n at the end.',
+  'print returns an error union, and Zig will not let one be ignored: the try in front is not optional.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "greets", stdin = "", expect = "hello, causewaybay\n", visible = true },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "zig.basic.02.bindings"
+node        = 2
+title       = "THE BOOTH SLATE"
+difficulty  = 1
+story       = "The slate at booth 1 shows the night's axle count and then two blanks: the count doubled for the return trips, and the count squared for the audit."
+concepts    = ["io", "bindings", "types"]
+requires    = ["zig.basic.01.first-light"]
+map          = { x = 0.247, y = 0.058, kind = "quest" }
+brief       = '''
+A binding in Zig is `const` or `var`: `const n = try std.fmt.parseInt(i64,
+text, 10);` reads a 64-bit integer out of `text` and names it `n`, and a
+`const` cannot be changed afterwards. `try w.print("{d}\n", .{n})` prints
+it: `{d}` is a decimal number, and the tuple after the format is what fills
+it. Arithmetic on the name is just arithmetic: `n * 2`, `n * n`.
+
+```
+try w.print("{d}\n", .{n * n});
+```
+
+The program reads `n` and prints it and its double. Type that line at
+`// FILL`: the third print, `n * n`.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+
+    try w.print("{d}\n", .{n});
+    try w.print("{d}\n", .{n * 2});
+    // FILL: print n * n on its own line
+    // ANSWER: try w.print("{d}\n", .{n * n});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+
+    try w.print("{d}\n", .{n});
+    try w.print("{d}\n", .{n * 2});
+    try w.print("{d}\n", .{n * n});
+}
+'''
+hints = [
+  'try w.print("{d}\n", .{n * n}); — the same shape as the line above it, with n * n in the tuple.',
+  'i64 holds 3000000000 squared; an i32 would overflow, and in Debug an overflow is a panic, which is why the slate says i64.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "twelve", stdin = "12\n", expect = "12\n24\n144\n", visible = true },
+  { name = "negative", stdin = "-3\n", expect = "-3\n-6\n9\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n0\n0\n", visible = false },
+  { name = "wide", stdin = "3000000000\n", expect = "3000000000\n6000000000\n9000000000000000000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "zig.basic.03.types"
+node        = 3
+title       = "THE SPLIT TAKINGS"
+difficulty  = 1
+story       = "The plaza splits a night's takings across its open booths and the ledger writes each share as a whole number, always, even when it is not."
+concepts    = ["types", "io"]
+requires    = ["zig.basic.02.bindings"]
+map          = { x = 0.333, y = 0.132, kind = "quest" }
+brief       = '''
+Zig will not divide two signed integers with `/`: it makes you say which
+rounding you mean. `@divTrunc(a, b)` rounds toward zero, so `7 / 2` is
+`3`, and `@rem(a, b)` is the remainder, `1`. To get `3.5` both sides have
+to be floats first: `@floatFromInt(a)` converts an integer, and `@as(f64,
+...)` says which float it becomes. `{d:.2}` prints a float with exactly
+two decimals.
+
+```
+try w.print("{d}\n", .{@divTrunc(a, b)});
+try w.print("{d}\n", .{@rem(a, b)});
+try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});
+```
+
+The integer division and the remainder are printed. Write the third line
+at `// FILL`: the division as an `f64` with two decimals.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const a = try std.fmt.parseInt(i64, it.next().?, 10);
+    const b = try std.fmt.parseInt(i64, it.next().?, 10);
+
+    try w.print("{d}\n", .{@divTrunc(a, b)});
+    try w.print("{d}\n", .{@rem(a, b)});
+    // FILL: a / b as an f64, with exactly two decimals
+    // ANSWER: try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const a = try std.fmt.parseInt(i64, it.next().?, 10);
+    const b = try std.fmt.parseInt(i64, it.next().?, 10);
+
+    try w.print("{d}\n", .{@divTrunc(a, b)});
+    try w.print("{d}\n", .{@rem(a, b)});
+    try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});
+}
+'''
+hints = [
+  'try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});',
+  'Both operands need the conversion: Zig does not divide an f64 by an i64, and @floatFromInt needs @as to know which float to make.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven-two", stdin = "7 2\n", expect = "3\n1\n3.50\n", visible = true },
+  { name = "ten-four", stdin = "10 4\n", expect = "2\n2\n2.50\n", visible = false },
+  { name = "exact", stdin = "9 3\n", expect = "3\n0\n3.00\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "zig.basic.04.int-types"
+node        = 4
+title       = "THE COUNTER WIDTHS"
+difficulty  = 1
+story       = "The axle counter in booth 3 is 32 bits wide and the plaza's ledger is 64; a count copied from one to the other keeps its value only if somebody says so."
+concepts    = ["types", "bindings"]
+requires    = ["zig.basic.03.types"]
+map          = { x = 0.518, y = 0.065, kind = "quest" }
+brief       = '''
+Zig names integers by their width: `i32` and `i64` are signed, `u32` and
+`u64` unsigned. A value moves between widths with `@intCast`, which takes
+its target type from where the result is going — the `: u64` on the
+binding — and panics in Debug if the value does not fit. `std.math.maxInt(T)`
+is the largest value a width can hold.
+
+```
+const b: u64 = @intCast(a);
+try w.print("{d}\n", .{std.math.maxInt(u64)});
+```
+
+`a` is read as an `i32`. Type the cast line at the first `// FILL`, and
+the second print line at the second.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const a = try std.fmt.parseInt(i32, std.mem.trim(u8, input, " \r\n"), 10);
+
+    const b: u64 = 0;  // FILL: b is a, widened to u64 with @intCast
+    // ANSWER: const b: u64 = @intCast(a);
+    try w.print("{d}\n", .{b});
+    try w.print("{d}\n", .{std.math.maxInt(i32)});
+    try w.print("{d}\n", .{0});  // FILL: the largest u64, from std.math.maxInt
+    // ANSWER: try w.print("{d}\n", .{std.math.maxInt(u64)});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const a = try std.fmt.parseInt(i32, std.mem.trim(u8, input, " \r\n"), 10);
+
+    const b: u64 = @intCast(a);
+    try w.print("{d}\n", .{b});
+    try w.print("{d}\n", .{std.math.maxInt(i32)});
+    try w.print("{d}\n", .{std.math.maxInt(u64)});
+}
+'''
+hints = [
+  'const b: u64 = @intCast(a); — the cast takes its width from the binding it lands in.',
+  'std.math.maxInt(u64) is 18446744073709551615; the i32 line above it is the same call with the other type.',
+  'The starter does not compile while a is unused: Zig refuses a name nothing reads, and that refusal points at the hole.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "seven", stdin = "7\n", expect = "7\n2147483647\n18446744073709551615\n", visible = true },
+  { name = "max32", stdin = "2147483647\n", expect = "2147483647\n2147483647\n18446744073709551615\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n2147483647\n18446744073709551615\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "zig.basic.05.big-int"
+node        = 5
+title       = "THIRTY-TWO BYTES"
+difficulty  = 2
+story       = "The Autotoll tags are 32-byte keys and the gantry reader takes them a byte at a time from the big end; the buffer is all zeros until the bytes are put in."
+concepts    = ["types", "slices", "strings"]
+requires    = ["zig.basic.04.int-types"]
+map          = { x = 0.604, y = 0.137, kind = "quest" }
+brief       = '''
+A 32-byte integer — a tag, a key, a hash — is a `[32]u8`: 32 bytes,
+big-endian, the most significant byte first, and `[_]u8{0} ** 32` is that
+array, all zeros. A `u64` fills the last eight of them. Shifting right by
+`8 * i` bits brings byte `i` (counting from the small end) down to the
+bottom — the shift amount has to be a `u6`, which `@intCast` makes it —
+and `@truncate` keeps only the byte that fits in a `u8`.
+
+```
+buf[31 - i] = @truncate(v >> @intCast(8 * i));
+```
+
+The loop over `i` and the hex print (`{x:0>2}` is one byte as two hex
+digits) are written. Type that line as the loop body at `// FILL`.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const v = try std.fmt.parseInt(u64, std.mem.trim(u8, input, " \r\n"), 10);
+    var buf = [_]u8{0} ** 32;
+
+    for (0..8) |i| {
+        buf[31 - i] = @truncate(v);  // FILL: byte i of v, counted from the small end
+        // ANSWER: buf[31 - i] = @truncate(v >> @intCast(8 * i));
+    }
+
+    for (buf) |byte| try w.print("{x:0>2}", .{byte});
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const v = try std.fmt.parseInt(u64, std.mem.trim(u8, input, " \r\n"), 10);
+    var buf = [_]u8{0} ** 32;
+
+    for (0..8) |i| {
+        buf[31 - i] = @truncate(v >> @intCast(8 * i));
+    }
+
+    for (buf) |byte| try w.print("{x:0>2}", .{byte});
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'buf[31 - i] = @truncate(v >> @intCast(8 * i)); — the last index gets the lowest byte.',
+  'v >> @intCast(8 * i) slides byte i to the bottom; @truncate throws the rest away. Without the shift every slot gets the same lowest byte.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ff", stdin = "255\n", expect = "00000000000000000000000000000000000000000000000000000000000000ff\n", visible = true },
+  { name = "0100", stdin = "256\n", expect = "0000000000000000000000000000000000000000000000000000000000000100\n", visible = false },
+  { name = "max64", stdin = "18446744073709551615\n", expect = "000000000000000000000000000000000000000000000000ffffffffffffffff\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "zig.basic.06.floats"
+node        = 6
+title       = "THE AIR GAUGE"
+difficulty  = 1
+story       = "The tunnel's air monitor logs in f64 and the display board over the mouth is f32, and the two disagree in the tenth decimal place."
+concepts    = ["types", "io"]
+requires    = ["zig.basic.05.big-int"]
+map          = { x = 0.822, y = 0.054, kind = "quest" }
+brief       = '''
+`f64` is the 64-bit float and `f32` the 32-bit one. `std.fmt.parseFloat(f64,
+s)` parses text into an `f64`; narrowing it to an `f32` is `@floatCast`,
+with the target type on the binding, and the cast is where precision is
+lost — `0.1` has no exact binary form, and the `f32` keeps fewer of its
+digits. Zig would print an `f32` with the fewest digits that read back as
+the same `f32`, which hides the loss, so the second print widens `y` back
+to `f64` first: the ten decimals then show what the float actually holds.
+
+```
+const x = try std.fmt.parseFloat(f64, s);
+const y: f32 = @floatCast(x);
+```
+
+`s` is the line read in, and both prints use ten decimals. Type those two
+lines at `// FILL`.
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const s = std.mem.trim(u8, input, " \r\n");
+
+    const x: f64 = 0.0;  // FILL: parse s with std.fmt.parseFloat
+    // ANSWER: const x = try std.fmt.parseFloat(f64, s);
+    const y: f32 = 0.0;  // FILL: x narrowed to f32 with @floatCast
+    // ANSWER: const y: f32 = @floatCast(x);
+
+    try w.print("{d:.10}\n", .{x});
+    try w.print("{d:.10}\n", .{@as(f64, y)});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const s = std.mem.trim(u8, input, " \r\n");
+
+    const x = try std.fmt.parseFloat(f64, s);
+    const y: f32 = @floatCast(x);
+
+    try w.print("{d:.10}\n", .{x});
+    try w.print("{d:.10}\n", .{@as(f64, y)});
+}
+'''
+hints = [
+  'const x = try std.fmt.parseFloat(f64, s); — text to f64; it can fail, so it is tried.',
+  'const y: f32 = @floatCast(x); — the narrowing is spelled out, and the width comes from the binding; y prints with fewer true digits.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tenth", stdin = "0.1\n", expect = "0.1000000000\n0.1000000015\n", visible = true },
+  { name = "exact", stdin = "3.5\n", expect = "3.5000000000\n3.5000000000\n", visible = false },
+  { name = "big", stdin = "123456.789\n", expect = "123456.7890000000\n123456.7890625000\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "zig.basic.04.strings"
+node        = 7
+title       = "THE PLATE"
+difficulty  = 1
+story       = "A lorry's plate is painted on the front in capitals and the rear camera reads it back to front, and the plaza's log has it in neither."
+concepts    = ["strings", "iteration"]
+requires    = ["zig.basic.06.floats"]
+map          = { x = 0.898, y = 0.144, kind = "quest" }
+brief       = '''
+A line from input is a `[]const u8`: a slice — a pointer and a length —
+that you can read but not write. `line.len` is its length. To change it,
+copy it first: `gpa.dupe(u8, line)` gives a `[]u8` you own, and the
+`defer gpa.free(...)` under it hands the bytes back. `for (upper) |*c|`
+walks the copy with a pointer to each byte, so `c.* = ...` writes it back
+in place; `std.mem.reverse(u8, rev)` turns a slice round in place.
+
+```
+for (upper) |*c| c.* = std.ascii.toUpper(c.*);
+std.mem.reverse(u8, rev);
+```
+
+`upper` and `rev` are both copies of the line, already freed on the way
+out. Type those two lines at the two `// FILL` marks.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const line = std.mem.trim(u8, input, "\r\n");
+
+    const upper = try gpa.dupe(u8, line);
+    defer gpa.free(upper);
+    // FILL: upper-case every byte of upper, in place
+    // ANSWER: for (upper) |*c| c.* = std.ascii.toUpper(c.*);
+    const rev = try gpa.dupe(u8, line);
+    defer gpa.free(rev);
+    // FILL: turn rev round, in place
+    // ANSWER: std.mem.reverse(u8, rev);
+
+    try w.print("{d}\n", .{line.len});
+    try w.print("{s}\n", .{upper});
+    try w.print("{s}\n", .{rev});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const line = std.mem.trim(u8, input, "\r\n");
+
+    const upper = try gpa.dupe(u8, line);
+    defer gpa.free(upper);
+    for (upper) |*c| c.* = std.ascii.toUpper(c.*);
+    const rev = try gpa.dupe(u8, line);
+    defer gpa.free(rev);
+    std.mem.reverse(u8, rev);
+
+    try w.print("{d}\n", .{line.len});
+    try w.print("{s}\n", .{upper});
+    try w.print("{s}\n", .{rev});
+}
+'''
+hints = [
+  'for (upper) |*c| c.* = std.ascii.toUpper(c.*); — the star on the capture is a pointer to the byte, and c.* is the byte itself.',
+  'std.mem.reverse(u8, rev); — in place, nothing returned; it works because rev is a []u8 you own, not the []const u8 the input is.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "kwan-lee", stdin = "kwan lee\n", expect = "8\nKWAN LEE\neel nawk\n", visible = true },
+  { name = "gun", stdin = "gun\n", expect = "3\nGUN\nnug\n", visible = false },
+  { name = "mixed", stdin = "Noon Day Gun 12\n", expect = "15\nNOON DAY GUN 12\n21 nuG yaD nooN\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "zig.basic.08.string-slices"
+node        = 8
+title       = "THE SHORT PLATE"
+difficulty  = 1
+story       = "The overhead board has room for four characters of a plate and a mark after them, and the clerk copies the whole plate in."
+concepts    = ["strings", "slices"]
+requires    = ["zig.basic.04.strings"]
+map          = { x = 0.953, y = 0.263, kind = "quest" }
+brief       = '''
+`s[0..4]` is a slice of a string: four bytes starting at `0`, and it is a
+**view** — it shares memory with `s` and cannot grow. A string you can
+append to is a `std.ArrayList(u8)`: `appendSlice(gpa, bytes)` copies
+bytes onto its end, and every call names `gpa` because a list in 0.16
+does not remember its allocator. `t.items` is the bytes so far.
+
+```
+try t.appendSlice(gpa, s[0..4]);
+try t.appendSlice(gpa, "...");
+```
+
+`s` is the line read in (at least four characters), and `t` is an empty
+list, freed on the way out. Type those two lines at the two `// FILL`
+marks.
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const s = std.mem.trim(u8, input, "\r\n");
+
+    var t: std.ArrayList(u8) = .empty;
+    defer t.deinit(gpa);
+    // FILL: append the first four bytes of s to t
+    // ANSWER: try t.appendSlice(gpa, s[0..4]);
+    // FILL: append "..." to t
+    // ANSWER: try t.appendSlice(gpa, "...");
+
+    try w.print("{s}\n", .{t.items});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const s = std.mem.trim(u8, input, "\r\n");
+
+    var t: std.ArrayList(u8) = .empty;
+    defer t.deinit(gpa);
+    try t.appendSlice(gpa, s[0..4]);
+    try t.appendSlice(gpa, "...");
+
+    try w.print("{s}\n", .{t.items});
+}
+'''
+hints = [
+  'try t.appendSlice(gpa, s[0..4]); — start at 0, stop before 4; the list copies the four bytes in.',
+  'try t.appendSlice(gpa, "..."); — a string literal is a slice too, and the same call appends it.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "causewaybay", stdin = "causewaybay\n", expect = "caus...\n", visible = true },
+  { name = "noonday", stdin = "noonday\n", expect = "noon...\n", visible = false },
+  { name = "hong-kong", stdin = "hong kong\n", expect = "hong...\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "zig.basic.09.int-slices"
+node        = 9
+title       = "TWO FROM THE MIDDLE"
+difficulty  = 1
+story       = "The shift log wants the second and third booth counts copied out on their own, then the whole row appended after them, and the copy is the whole row twice."
+concepts    = ["slices", "collections"]
+requires    = ["zig.basic.08.string-slices"]
+map          = { x = 0.753, y = 0.338, kind = "quest" }
+brief       = '''
+A list's contents are a slice, `v.items`, and a slice of that is
+`v.items[1..3]` — elements 1 and 2, up to but not including 3 — which is
+still a **view** of `v` and copies nothing. The copy is the append:
+`part.appendSlice(gpa, v.items[1..3])` copies those two into a list of
+your own, and the same call with the whole `v.items` appends everything.
+
+```
+try part.appendSlice(gpa, v.items[1..3]);
+try part.appendSlice(gpa, v.items);
+```
+
+`v` holds the line's integers (at least three) and `part` is an empty
+list. Type those two lines at the two `// FILL` marks.
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    var part: std.ArrayList(i64) = .empty;
+    defer part.deinit(gpa);
+    // FILL: append elements 1 and 2 of v to part
+    // ANSWER: try part.appendSlice(gpa, v.items[1..3]);
+    // FILL: append all of v to part
+    // ANSWER: try part.appendSlice(gpa, v.items);
+
+    for (part.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    var part: std.ArrayList(i64) = .empty;
+    defer part.deinit(gpa);
+    try part.appendSlice(gpa, v.items[1..3]);
+    try part.appendSlice(gpa, v.items);
+
+    for (part.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'try part.appendSlice(gpa, v.items[1..3]); — the end of a slice is one past the last element taken.',
+  'try part.appendSlice(gpa, v.items); — the whole slice, appended after the two.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "2 3 1 2 3 4\n", visible = true },
+  { name = "three", stdin = "7 8 9\n", expect = "8 9 7 8 9\n", visible = false },
+  { name = "five", stdin = "5 1 4 1 3\n", expect = "1 4 5 1 4 1 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "zig.basic.10.byte-slices"
+node        = 10
+title       = "THE FIRST THREE BYTES"
+difficulty  = 1
+story       = "The tag reader's wire carries a plate as bytes, the receiver keeps the first three and tacks the last two on the end, and the buffer it prints is the whole plate."
+concepts    = ["slices", "strings", "types"]
+requires    = ["zig.basic.09.int-slices"]
+map          = { x = 0.671, y = 0.280, kind = "quest" }
+brief       = '''
+Bytes are `u8`, and the line read in already is one byte slice, a
+`[]const u8`. The same two idioms as the last node apply: `bytes[0..3]`
+is a view of the first three, `bytes[bytes.len - 2 ..]` a view of the
+last two — an open end runs to the end — and `appendSlice` copies a view
+into a list you own. `{x:0>2}` prints one byte in hex; `{s}` prints the
+list as text.
+
+```
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);
+```
+
+`bytes` holds the line (at least three bytes) and `head` is an empty
+list. Type those two lines at the two `// FILL` marks. The hex line and
+the text line are printed for you.
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const bytes = std.mem.trim(u8, input, "\r\n");
+
+    var head: std.ArrayList(u8) = .empty;
+    defer head.deinit(gpa);
+    // FILL: append the first three bytes of bytes to head
+    // ANSWER: try head.appendSlice(gpa, bytes[0..3]);
+    // FILL: append the last two bytes of bytes to head
+    // ANSWER: try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);
+
+    for (head.items) |b| try w.print("{x:0>2}", .{b});
+    try w.print("\n{s}\n", .{head.items});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const bytes = std.mem.trim(u8, input, "\r\n");
+
+    var head: std.ArrayList(u8) = .empty;
+    defer head.deinit(gpa);
+    try head.appendSlice(gpa, bytes[0..3]);
+    try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);
+
+    for (head.items) |b| try w.print("{x:0>2}", .{b});
+    try w.print("\n{s}\n", .{head.items});
+}
+'''
+hints = [
+  'try head.appendSlice(gpa, bytes[0..3]); — three bytes, copied into the list.',
+  'try head.appendSlice(gpa, bytes[bytes.len - 2 ..]); — from two before the end, to the end; nothing after the .. means the end.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "sampan", stdin = "sampan\n", expect = "73616d616e\nsaman\n", visible = true },
+  { name = "gun", stdin = "gun\n", expect = "67756e756e\ngunun\n", visible = false },
+  { name = "winch", stdin = "winch\n", expect = "77696e6368\nwinch\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "zig.basic.05.loops"
+node        = 11
+title       = "COUNTING THE AXLES"
+difficulty  = 1
+story       = "Booth 3 counts one axle a tick, the slate wants the running total, and which of the ticks landed on a third axle."
+concepts    = ["control-flow", "io"]
+requires    = ["zig.basic.10.byte-slices"]
+map          = { x = 0.474, y = 0.314, kind = "quest" }
+brief       = '''
+A counted loop in Zig is a `while` with a continue expression: `while (i
+<= n) : (i += 1)` tests, runs the body, then does `i += 1`, and tests
+again. The counter is a `var` declared before it, so `i` visits `1`
+through `n` inclusive. `@rem(i, 3) == 0` says "a multiple of 3" — there
+is no `%` on signed integers here.
+
+```
+while (i <= n) : (i += 1) {
+```
+
+The body is written: it adds `i` to `sum` and counts the multiples of 3.
+Type that `while` line at `// FILL`, replacing the one that stops one
+short.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+
+    var sum: i64 = 0;
+    var threes: i64 = 0;
+    var i: i64 = 1;
+    while (i < n) : (i += 1) {  // FILL: keep going while i <= n, inclusive
+    // ANSWER: while (i <= n) : (i += 1) {
+        sum += i;
+        if (@rem(i, 3) == 0) threes += 1;
+    }
+
+    try w.print("{d}\n", .{sum});
+    try w.print("{d}\n", .{threes});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+
+    var sum: i64 = 0;
+    var threes: i64 = 0;
+    var i: i64 = 1;
+    while (i <= n) : (i += 1) {
+        sum += i;
+        if (@rem(i, 3) == 0) threes += 1;
+    }
+
+    try w.print("{d}\n", .{sum});
+    try w.print("{d}\n", .{threes});
+}
+'''
+hints = [
+  'while (i <= n) : (i += 1) { — test, body, then the continue expression after the colon.',
+  '<= n, not < n: the count includes the n-th axle.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "ten", stdin = "10\n", expect = "55\n3\n", visible = true },
+  { name = "one", stdin = "1\n", expect = "1\n0\n", visible = false },
+  { name = "nine", stdin = "9\n", expect = "45\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "zig.basic.06.functions"
+node        = 12
+title       = "THE TOLL TARIFF"
+difficulty  = 1
+story       = "The plaza charges five an axle for the first ten axles and three for every axle after that, and the tariff board just says fare."
+concepts    = ["functions", "control-flow"]
+requires    = ["zig.basic.05.loops"]
+map          = { x = 0.396, y = 0.276, kind = "quest" }
+brief       = '''
+A function names a piece of work: `fn`, its name, its parameters with
+their types, its return type, and a body that ends in `return`. `fn
+fare(rides: i64) i64` takes one number and gives one back. A function
+can `return` early from inside an `if`, and anything after that line is
+the other case. Zig refuses a line it can prove never runs, so the
+placeholder `return` goes when the two real lines go in.
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+The tariff: the first 10 rides cost 5 each, every ride after that costs
+3. `main` reads `n` and prints `fare(n)`. Type those two lines as the body
+of `fare` at `// FILL`, replacing the `return rides;`.
+
+```
+input:  13
+output: 59
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn fare(rides: i64) i64 {
+    // FILL: rides <= 10 cost 5 each; beyond that, 50 plus 3 per extra ride
+    // ANSWER: if (rides <= 10) return rides * 5;
+    // ANSWER: return 50 + (rides - 10) * 3;
+    return rides;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+    try w.print("{d}\n", .{fare(n)});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn fare(rides: i64) i64 {
+    if (rides <= 10) return rides * 5;
+    return 50 + (rides - 10) * 3;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const n = try std.fmt.parseInt(i64, std.mem.trim(u8, input, " \r\n"), 10);
+    try w.print("{d}\n", .{fare(n)});
+}
+'''
+hints = [
+  'if (rides <= 10) return rides * 5; — then, on the next line, return 50 + (rides - 10) * 3;',
+  'Ten rides at 5 is 50, and every ride past the tenth adds 3 on top of that.',
+  'Delete the return rides; — with two returns above it the compiler calls it unreachable code and stops.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "thirteen", stdin = "13\n", expect = "59\n", visible = true },
+  { name = "four", stdin = "4\n", expect = "20\n", visible = false },
+  { name = "ten", stdin = "10\n", expect = "50\n", visible = false },
+  { name = "zero", stdin = "0\n", expect = "0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "zig.basic.07.structs"
+node        = 13
+title       = "ONE BOOTH, THREE FIELDS"
+difficulty  = 2
+story       = "Booth 5 writes its lane name, its toll and its vehicle count on three separate slates and nobody has put them on one."
+concepts    = ["structs", "functions"]
+requires    = ["zig.basic.06.functions"]
+map          = { x = 0.185, y = 0.313, kind = "quest" }
+brief       = '''
+A `struct` groups named fields into one value, and a `fn` declared inside
+it is a method: `s.total()` passes `s` in as `self`, and the fields are
+read through it, `self.price`. Building one names every field, in any
+order: `Stall{ .name = name, .price = price, .qty = qty }`. Zig has no
+positional form; a field you forget is a compile error, not a zero.
+
+```
+return self.price * self.qty;
+const s = Stall{ .name = name, .price = price, .qty = qty };
+```
+
+`Stall` has a name, a price and a quantity, and `main` prints
+`name: total`. Type those two lines at the two `// FILL` marks: the first
+is the body of `total()`, the second builds `s` in `main`.
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+starter     = '''
+const std = @import("std");
+
+const Stall = struct {
+    name: []const u8,
+    price: i64,
+    qty: i64,
+    fn total(self: Stall) i64 {
+        return self.qty;  // FILL: price times qty
+        // ANSWER: return self.price * self.qty;
+    }
+};
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const name = it.next().?;
+    const price = try std.fmt.parseInt(i64, it.next().?, 10);
+    const qty = try std.fmt.parseInt(i64, it.next().?, 10);
+
+    const s = Stall{ .name = "", .price = 0, .qty = 0 };  // FILL: build s from name, price and qty
+    // ANSWER: const s = Stall{ .name = name, .price = price, .qty = qty };
+
+    try w.print("{s}: {d}\n", .{ s.name, s.total() });
+}
+'''
+solution    = '''
+const std = @import("std");
+
+const Stall = struct {
+    name: []const u8,
+    price: i64,
+    qty: i64,
+    fn total(self: Stall) i64 {
+        return self.price * self.qty;
+    }
+};
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const name = it.next().?;
+    const price = try std.fmt.parseInt(i64, it.next().?, 10);
+    const qty = try std.fmt.parseInt(i64, it.next().?, 10);
+
+    const s = Stall{ .name = name, .price = price, .qty = qty };
+
+    try w.print("{s}: {d}\n", .{ s.name, s.total() });
+}
+'''
+hints = [
+  'return self.price * self.qty; inside total(), and const s = Stall{ .name = name, .price = price, .qty = qty }; in main.',
+  'Every field is named with a leading dot: .name = name. There is no order to get wrong, only a name to leave out.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "fish", stdin = "fish 12 3\n", expect = "fish: 36\n", visible = true },
+  { name = "tofu", stdin = "tofu 5 20\n", expect = "tofu: 100\n", visible = false },
+  { name = "none", stdin = "ice 40 0\n", expect = "ice: 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "zig.basic.08.enums"
+node        = 14
+title       = "THE LINE COLOURS"
+difficulty  = 2
+story       = "The interchange sign at the tunnel mouth names three MTR lines for the buses coming out, and the strip of colour beside each one has been painted out."
+concepts    = ["enums", "pattern-matching"]
+requires    = ["zig.basic.07.structs"]
+map          = { x = 0.119, y = 0.272, kind = "quest" }
+brief       = '''
+An `enum` is a closed set of named values: `.island`, `.tsuen_wan`,
+`.kwun_tong`, and nothing else. A `switch` over one is an expression that
+picks the prong for the value it holds, and each prong is `.name => value,`.
+The switch must cover every value: an `else` prong covers the ones you
+did not name, and once you name them all Zig refuses an `else` it can
+never reach — so the `else => "",` goes when the two prongs go in.
+
+```
+.tsuen_wan => "red",
+.kwun_tong => "green",
+```
+
+`parse` turns the word into a `Line`, and the `.island` prong is written.
+Type those two prongs at the `// FILL` marks, under the `.island` one,
+and delete the `else`.
+
+```
+input:  island
+output: blue
+```
+'''
+starter     = '''
+const std = @import("std");
+
+const Line = enum { island, tsuen_wan, kwun_tong };
+
+fn parse(word: []const u8) Line {
+    if (std.mem.eql(u8, word, "island")) return .island;
+    if (std.mem.eql(u8, word, "tsuenwan")) return .tsuen_wan;
+    return .kwun_tong;
+}
+
+fn colour(l: Line) []const u8 {
+    return switch (l) {
+        .island => "blue",
+        // FILL: .tsuen_wan ... "red"
+        // ANSWER: .tsuen_wan => "red",
+        // FILL: .kwun_tong ... "green"
+        // ANSWER: .kwun_tong => "green",
+        else => "",
+    };
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const word = std.mem.trim(u8, input, " \r\n");
+    try w.print("{s}\n", .{colour(parse(word))});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+const Line = enum { island, tsuen_wan, kwun_tong };
+
+fn parse(word: []const u8) Line {
+    if (std.mem.eql(u8, word, "island")) return .island;
+    if (std.mem.eql(u8, word, "tsuenwan")) return .tsuen_wan;
+    return .kwun_tong;
+}
+
+fn colour(l: Line) []const u8 {
+    return switch (l) {
+        .island => "blue",
+        .tsuen_wan => "red",
+        .kwun_tong => "green",
+    };
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    const word = std.mem.trim(u8, input, " \r\n");
+    try w.print("{s}\n", .{colour(parse(word))});
+}
+'''
+hints = [
+  '.tsuen_wan => "red", and .kwun_tong => "green", — the same shape as the .island prong, comma and all.',
+  'An enum value is written with a leading dot when the type is known: .tsuen_wan, never Line::TsuenWan.',
+  'Delete the else => "", — once all three are named the compiler reports an unreachable else prong and stops.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "island", stdin = "island\n", expect = "blue\n", visible = true },
+  { name = "tsuenwan", stdin = "tsuenwan\n", expect = "red\n", visible = false },
+  { name = "kwuntong", stdin = "kwuntong\n", expect = "green\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "zig.basic.09.vector"
+node        = 15
+title       = "THE MORNING, IN ORDER"
+difficulty  = 1
+story       = "Every booth calls its count across the plaza one number at a time and the shift clerk has nowhere to put them until the last booth is in."
+concepts    = ["slices", "iteration"]
+requires    = ["zig.basic.08.enums"]
+map          = { x = 0.055, y = 0.556, kind = "quest" }
+brief       = '''
+`std.ArrayList(i64)` is the growable array, and the four things you do to
+one are add, remove, edit and sort. `append(gpa, x)` adds at the end;
+`orderedRemove(i)` removes the element at index `i`, closes the gap, and
+hands the element back — `_ =` throws it away, because Zig will not let a
+value fall on the floor unsaid; `items[i] = x` overwrites what is there;
+`std.mem.sort(i64, xs.items, {}, std.sort.asc(i64))` sorts the slice
+ascending. Index `0` is the front.
+
+```
+try xs.append(gpa, 99);
+_ = xs.orderedRemove(0);
+xs.items[0] = 700;
+std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));
+```
+
+`xs` holds the line's integers. Type those four lines at the four
+`// FILL` marks: add `99` at the end, remove the first element, set the
+new first element to `700`, then sort. The list is printed, then its
+length.
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    // FILL: add 99 at the end
+    // ANSWER: try xs.append(gpa, 99);
+    // FILL: remove the first element
+    // ANSWER: _ = xs.orderedRemove(0);
+    // FILL: set the first element to 700
+    // ANSWER: xs.items[0] = 700;
+    // FILL: sort ascending
+    // ANSWER: std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));
+
+    for (xs.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n{d}\n", .{xs.items.len});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    try xs.append(gpa, 99);
+    _ = xs.orderedRemove(0);
+    xs.items[0] = 700;
+    std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));
+
+    for (xs.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n{d}\n", .{xs.items.len});
+}
+'''
+hints = [
+  'try xs.append(gpa, 99); _ = xs.orderedRemove(0); xs.items[0] = 700; std.mem.sort(i64, xs.items, {}, std.sort.asc(i64)); — add, remove, edit, sort.',
+  'append can fail (it may allocate), so it is tried; orderedRemove returns the element, so it is assigned to _; the sort takes the slice, xs.items, not the list.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "4 8 15 16\n", expect = "15 16 99 700\n4\n", visible = true },
+  { name = "one", stdin = "9\n", expect = "700\n1\n", visible = false },
+  { name = "negatives", stdin = "-2 5 -7\n", expect = "-7 99 700\n3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "zig.basic.16.list"
+node        = 16
+title       = "FRONT OR BACK"
+difficulty  = 1
+story       = "Lorries with an even plate queue at the back of the Autotoll lane and odd ones at the front, and the lane list just keeps adding to the back."
+concepts    = ["collections", "iteration"]
+requires    = ["zig.basic.09.vector"]
+map          = { x = 0.255, y = 0.468, kind = "quest" }
+brief       = '''
+Zig's `std.DoublyLinkedList` is intrusive — the link lives inside your
+own struct — and cannot sort, so the drill at both ends is done on the
+ArrayList. `insert(gpa, 0, x)` puts a value at the front and shifts the
+rest along; `pop()` takes the last one off and hands it back as an
+optional, `_ =` discards it; `items[0]` is the front, and assigning to it
+changes the first element; `std.mem.sort` sorts the slice.
+
+```
+try l.insert(gpa, 0, 0);
+_ = l.pop();
+l.items[0] = 99;
+std.mem.sort(i64, l.items, {}, std.sort.asc(i64));
+```
+
+`l` already holds the line's integers in order. Type those four lines at
+the `// FILL` marks: add `0` at the front, remove the last element,
+overwrite the front with `99`, then sort. The list is printed.
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var l: std.ArrayList(i64) = .empty;
+    defer l.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try l.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    // FILL: add 0 at the front
+    // ANSWER: try l.insert(gpa, 0, 0);
+    // FILL: remove the last element
+    // ANSWER: _ = l.pop();
+    // FILL: overwrite the front with 99
+    // ANSWER: l.items[0] = 99;
+    // FILL: sort ascending
+    // ANSWER: std.mem.sort(i64, l.items, {}, std.sort.asc(i64));
+
+    for (l.items, 0..) |v, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", v });
+    }
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var l: std.ArrayList(i64) = .empty;
+    defer l.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try l.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    try l.insert(gpa, 0, 0);
+    _ = l.pop();
+    l.items[0] = 99;
+    std.mem.sort(i64, l.items, {}, std.sort.asc(i64));
+
+    for (l.items, 0..) |v, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", v });
+    }
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'try l.insert(gpa, 0, 0); _ = l.pop(); l.items[0] = 99; std.mem.sort(i64, l.items, {}, std.sort.asc(i64)); — one line each, in that order.',
+  'insert takes the allocator, the index, then the value; pop returns ?i64 and the _ = says you do not want it.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "1 2 3 4 99\n", visible = true },
+  { name = "two", stdin = "2 4\n", expect = "2 99\n", visible = false },
+  { name = "three", stdin = "7 8 9\n", expect = "7 8 99\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "zig.basic.10.maps"
+node        = 17
+title       = "THE TALLY BOARD"
+difficulty  = 2
+story       = "The plaza's tally board lists every vehicle class that came through in the night, one word per vehicle, and the audit wants one line per class with a count."
+concepts    = ["collections", "strings"]
+requires    = ["zig.basic.16.list"]
+map          = { x = 0.327, y = 0.554, kind = "quest" }
+brief       = '''
+Zig's std has no tree-ordered map: `std.StringHashMap(i64)` is the
+dictionary, made with `.init(gpa)` so it remembers its allocator, and its
+keys are slices of `input`, which outlives it. `put(k, v)` adds a key (or
+overwrites one that exists); `remove(k)` takes one out and says whether it
+was there — `_ =` throws the answer away; `getPtr(k)` is a pointer to an
+existing key's value, or `null` when it is missing, so `.?.* = 9` unwraps
+it and writes through it. A hash map walks its keys in no order, so the
+scaffold copies them out and sorts them before printing; the next node
+makes you write that line.
+
+```
+try counts.put("crab", 1);
+_ = counts.remove("rice");
+counts.getPtr("fish").?.* = 9;
+```
+
+`counts` already tallies every word on the line, and every line has
+`fish` on it. Type those three lines at the `// FILL` marks: add `crab`
+at `1`, remove `rice`, then set `fish` to `9`. The sorted print is written.
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn lessStr(_: void, a: []const u8, b: []const u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var counts = std.StringHashMap(i64).init(gpa);
+    defer counts.deinit();
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |word| {
+        const e = try counts.getOrPut(word);
+        if (!e.found_existing) e.value_ptr.* = 0;
+        e.value_ptr.* += 1;
+    }
+
+    // FILL: add the key "crab" with the value 1
+    // ANSWER: try counts.put("crab", 1);
+    // FILL: remove the key "rice"
+    // ANSWER: _ = counts.remove("rice");
+    // FILL: set the existing key "fish" to 9
+    // ANSWER: counts.getPtr("fish").?.* = 9;
+
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(gpa);
+    var kit = counts.keyIterator();
+    while (kit.next()) |k| try keys.append(gpa, k.*);
+    std.mem.sort([]const u8, keys.items, {}, lessStr);
+    for (keys.items) |k| try w.print("{s} {d}\n", .{ k, counts.get(k).? });
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn lessStr(_: void, a: []const u8, b: []const u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var counts = std.StringHashMap(i64).init(gpa);
+    defer counts.deinit();
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |word| {
+        const e = try counts.getOrPut(word);
+        if (!e.found_existing) e.value_ptr.* = 0;
+        e.value_ptr.* += 1;
+    }
+
+    try counts.put("crab", 1);
+    _ = counts.remove("rice");
+    counts.getPtr("fish").?.* = 9;
+
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(gpa);
+    var kit = counts.keyIterator();
+    while (kit.next()) |k| try keys.append(gpa, k.*);
+    std.mem.sort([]const u8, keys.items, {}, lessStr);
+    for (keys.items) |k| try w.print("{s} {d}\n", .{ k, counts.get(k).? });
+}
+'''
+hints = [
+  'try counts.put("crab", 1); _ = counts.remove("rice"); counts.getPtr("fish").?.* = 9; — add, remove, edit.',
+  'put creates a missing key; getPtr refuses to, and hands back null instead. Use getPtr when the key must already be there — the .? is the promise that it is.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "fish rice fish tea\n", expect = "crab 1\nfish 9\ntea 1\n", visible = true },
+  { name = "one", stdin = "fish\n", expect = "crab 1\nfish 9\n", visible = false },
+  { name = "rice", stdin = "rice fish rice\n", expect = "crab 1\nfish 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "zig.basic.18.hashtable"
+node        = 18
+title       = "THE UNORDERED TALLY"
+difficulty  = 1
+story       = "The tunnel canteen counts every dish on a hash table and then reads it back in whatever order the buckets happen to be, and no two prints agree."
+concepts    = ["collections", "hashing", "sorting"]
+requires    = ["zig.basic.10.maps"]
+map          = { x = 0.529, y = 0.468, kind = "quest" }
+brief       = '''
+`std.StringHashMapUnmanaged(i64)` is the same hash table without the
+allocator inside it: it starts as `.empty`, and `put(gpa, k, v)` — like
+`getOrPut(gpa, k)` and `deinit(gpa)` — names the allocator on every call,
+the way an ArrayList does. `remove(k)` and `getPtr(k)` are as before. It
+is in **no particular order** when walked, which is why the keys are
+sorted before printing: `std.mem.sort` over the key slice, with the
+string comparator `lessStr` written above `main`.
+
+```
+try counts.put(gpa, "gun", 12);
+_ = counts.remove("siu");
+counts.getPtr("mai").?.* = 0;
+std.mem.sort([]const u8, keys.items, {}, lessStr);
+```
+
+`counts` already tallies every word on the line, and every line has `mai`
+on it; `keys` is a list of its keys, copied out in whatever order the
+buckets gave. Type those four lines at the `// FILL` marks: add `gun` at
+`12`, remove `siu`, set `mai` to `0`, then sort the keys so the print is
+the same every time.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn lessStr(_: void, a: []const u8, b: []const u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var counts: std.StringHashMapUnmanaged(i64) = .empty;
+    defer counts.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |word| {
+        const e = try counts.getOrPut(gpa, word);
+        if (!e.found_existing) e.value_ptr.* = 0;
+        e.value_ptr.* += 1;
+    }
+
+    // FILL: add the key "gun" with the value 12
+    // ANSWER: try counts.put(gpa, "gun", 12);
+    // FILL: remove the key "siu"
+    // ANSWER: _ = counts.remove("siu");
+    // FILL: set the existing key "mai" to 0
+    // ANSWER: counts.getPtr("mai").?.* = 0;
+
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(gpa);
+    var kit = counts.keyIterator();
+    while (kit.next()) |k| try keys.append(gpa, k.*);
+    // FILL: sort keys, because a hash table has no order
+    // ANSWER: std.mem.sort([]const u8, keys.items, {}, lessStr);
+    for (keys.items) |k| try w.print("{s} {d}\n", .{ k, counts.get(k).? });
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn lessStr(_: void, a: []const u8, b: []const u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var counts: std.StringHashMapUnmanaged(i64) = .empty;
+    defer counts.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |word| {
+        const e = try counts.getOrPut(gpa, word);
+        if (!e.found_existing) e.value_ptr.* = 0;
+        e.value_ptr.* += 1;
+    }
+
+    try counts.put(gpa, "gun", 12);
+    _ = counts.remove("siu");
+    counts.getPtr("mai").?.* = 0;
+
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(gpa);
+    var kit = counts.keyIterator();
+    while (kit.next()) |k| try keys.append(gpa, k.*);
+    std.mem.sort([]const u8, keys.items, {}, lessStr);
+    for (keys.items) |k| try w.print("{s} {d}\n", .{ k, counts.get(k).? });
+}
+'''
+hints = [
+  'try counts.put(gpa, "gun", 12); _ = counts.remove("siu"); counts.getPtr("mai").?.* = 0; then std.mem.sort([]const u8, keys.items, {}, lessStr); — add, remove, edit, sort.',
+  'The unmanaged map takes gpa on put and getOrPut and deinit; remove and getPtr allocate nothing and take none.',
+  'The table has no order of its own: the keys are copied out for you; sorting them with lessStr is the fourth line, before the print.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "dim-sum", stdin = "siu mai har gau siu mai\n", expect = "gau 1\ngun 12\nhar 1\nmai 0\n", visible = true },
+  { name = "one", stdin = "mai\n", expect = "gun 12\nmai 0\n", visible = false },
+  { name = "repeat", stdin = "a mai a\n", expect = "a 2\ngun 12\nmai 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "zig.basic.11.sets"
+node        = 19
+title       = "THE PLATE NUMBERS"
+difficulty  = 2
+story       = "The lane log has a plate number on it once for every time it came through, and the shift clerk wants to know how many vehicles that actually is."
+concepts    = ["collections", "sorting"]
+requires    = ["zig.basic.18.hashtable"]
+map          = { x = 0.619, y = 0.533, kind = "quest" }
+brief       = '''
+A set in Zig is a hash map whose value type is `void`:
+`std.AutoHashMap(i64, void)`, and `{}` is the one value of `void`.
+`put(x, {})` adds a value (a duplicate is overwritten with itself) and
+`remove(x)` takes one out (a missing value returns `false`, and `_ =`
+discards it). A set has no edit: a value is its own key, so turning `1`
+into `-1` is a `remove` followed by a `put`. `count()` is the size, and
+the sorted walk is written, because a hash set has no order.
+
+```
+try seen.put(100, {});
+_ = seen.remove(3);
+_ = seen.remove(1); try seen.put(-1, {});
+```
+
+`seen` already holds the line's distinct values. Type those three lines at
+the `// FILL` marks: add `100`, remove `3`, then turn `1` into `-1`. The
+size and the sorted walk are written.
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var seen = std.AutoHashMap(i64, void).init(gpa);
+    defer seen.deinit();
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try seen.put(try std.fmt.parseInt(i64, tok, 10), {});
+
+    // FILL: add 100
+    // ANSWER: try seen.put(100, {});
+    // FILL: remove 3
+    // ANSWER: _ = seen.remove(3);
+    // FILL: turn 1 into -1 (remove, then put)
+    // ANSWER: _ = seen.remove(1); try seen.put(-1, {});
+
+    try w.print("{d}\n", .{seen.count()});
+    var vals: std.ArrayList(i64) = .empty;
+    defer vals.deinit(gpa);
+    var kit = seen.keyIterator();
+    while (kit.next()) |k| try vals.append(gpa, k.*);
+    std.mem.sort(i64, vals.items, {}, std.sort.asc(i64));
+    for (vals.items, 0..) |v, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", v });
+    }
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var seen = std.AutoHashMap(i64, void).init(gpa);
+    defer seen.deinit();
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try seen.put(try std.fmt.parseInt(i64, tok, 10), {});
+
+    try seen.put(100, {});
+    _ = seen.remove(3);
+    _ = seen.remove(1); try seen.put(-1, {});
+
+    try w.print("{d}\n", .{seen.count()});
+    var vals: std.ArrayList(i64) = .empty;
+    defer vals.deinit(gpa);
+    var kit = seen.keyIterator();
+    while (kit.next()) |k| try vals.append(gpa, k.*);
+    std.mem.sort(i64, vals.items, {}, std.sort.asc(i64));
+    for (vals.items, 0..) |v, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", v });
+    }
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'try seen.put(100, {}); _ = seen.remove(3); _ = seen.remove(1); try seen.put(-1, {}); — the last two calls share a line.',
+  'remove(3) on a set without a 3 returns false and changes nothing, and put(-1, {}) when -1 is already there overwrites void with void: both are safe.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "3 1 3 2 1\n", expect = "3\n-1 2 100\n", visible = true },
+  { name = "all-same", stdin = "7 7 7\n", expect = "3\n-1 7 100\n", visible = false },
+  { name = "spread", stdin = "10 -1 4 10\n", expect = "4\n-1 4 10 100\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "zig.basic.12.stack-queue"
+node        = 20
+title       = "LAST IN, FIRST IN"
+difficulty  = 2
+story       = "Lorries stack up in the breakdown bay in the order they arrive: the last one in is the first that can leave, and the first one into the toll lane is the first one served."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["zig.basic.11.sets"]
+map          = { x = 0.801, y = 0.447, kind = "quest" }
+brief       = '''
+Zig's std has no stack type, because an ArrayList is one: `append(gpa,
+x)` is push, `pop()` takes the top off and hands it back as an optional,
+and `items[items.len - 1]` is the top — assign to it to edit the top in
+place. The queue is `std.Deque(i64)`: `pushBack(gpa, x)` at the back,
+`popFront()` at the front, both written for you.
+
+```
+try st.append(gpa, 0);
+_ = st.pop();
+st.items[st.items.len - 1] = 99;
+```
+
+Every number is already pushed onto both `st` and `q`. Type those three
+lines at the `// FILL` marks: add `0` on top, pop it off again, then
+overwrite the top with `99`. The stack is then drained and printed, and
+the queue's first two are taken.
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var st: std.ArrayList(i64) = .empty;
+    defer st.deinit(gpa);
+    var q: std.Deque(i64) = .empty;
+    defer q.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| {
+        const x = try std.fmt.parseInt(i64, tok, 10);
+        try st.append(gpa, x);
+        try q.pushBack(gpa, x);
+    }
+
+    // FILL: push 0 on top
+    // ANSWER: try st.append(gpa, 0);
+    // FILL: pop the top
+    // ANSWER: _ = st.pop();
+    // FILL: overwrite the top with 99
+    // ANSWER: st.items[st.items.len - 1] = 99;
+
+    var first = true;
+    while (st.pop()) |top| {
+        try w.print("{s}{d}", .{ if (first) "" else " ", top });
+        first = false;
+    }
+    try w.print("\n", .{});
+
+    try w.print("{d} {d}\n", .{ q.popFront().?, q.popFront().? });
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var st: std.ArrayList(i64) = .empty;
+    defer st.deinit(gpa);
+    var q: std.Deque(i64) = .empty;
+    defer q.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| {
+        const x = try std.fmt.parseInt(i64, tok, 10);
+        try st.append(gpa, x);
+        try q.pushBack(gpa, x);
+    }
+
+    try st.append(gpa, 0);
+    _ = st.pop();
+    st.items[st.items.len - 1] = 99;
+
+    var first = true;
+    while (st.pop()) |top| {
+        try w.print("{s}{d}", .{ if (first) "" else " ", top });
+        first = false;
+    }
+    try w.print("\n", .{});
+
+    try w.print("{d} {d}\n", .{ q.popFront().?, q.popFront().? });
+}
+'''
+hints = [
+  'try st.append(gpa, 0); _ = st.pop(); st.items[st.items.len - 1] = 99; — add, remove, edit on the stack; the queue is untouched.',
+  'items.len - 1 is the top, so assigning there changes the element the next pop() would hand back.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "four", stdin = "1 2 3 4\n", expect = "99 3 2 1\n1 2\n", visible = true },
+  { name = "two", stdin = "9 7\n", expect = "99 9\n9 7\n", visible = false },
+  { name = "five", stdin = "5 1 4 1 3\n", expect = "99 1 4 1 5\n5 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "zig.basic.13.sorting"
+node        = 21
+title       = "LANE ORDER"
+difficulty  = 1
+story       = "The axle counts along the row of booths were written down in the order the clerk walked them, and the report wants them lowest to highest and then highest to lowest."
+concepts    = ["sorting", "slices"]
+requires    = ["zig.basic.12.stack-queue"]
+map          = { x = 0.901, y = 0.543, kind = "quest" }
+brief       = '''
+`std.mem.sort(T, slice, context, lessThan)` orders a slice in place: the
+element type, the slice, a context (`{}` when there is none) and a
+comparator. `std.sort.asc(i64)` is the ascending one and
+`std.sort.desc(i64)` is "larger first".
+
+```
+std.mem.sort(i64, v.items, {}, std.sort.asc(i64));
+std.mem.sort(i64, v.items, {}, std.sort.desc(i64));
+```
+
+The numbers are read into `v` and printed twice. Type the first line at
+the first `// FILL` and the second at the second.
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn printAll(w: *std.Io.Writer, v: []const i64) !void {
+    for (v) |x| try w.print("{d} ", .{x});
+    try w.print("\n", .{});
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    // FILL: sort v ascending
+    // ANSWER: std.mem.sort(i64, v.items, {}, std.sort.asc(i64));
+    try printAll(w, v.items);
+    // FILL: sort v descending
+    // ANSWER: std.mem.sort(i64, v.items, {}, std.sort.desc(i64));
+    try printAll(w, v.items);
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn printAll(w: *std.Io.Writer, v: []const i64) !void {
+    for (v) |x| try w.print("{d} ", .{x});
+    try w.print("\n", .{});
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    std.mem.sort(i64, v.items, {}, std.sort.asc(i64));
+    try printAll(w, v.items);
+    std.mem.sort(i64, v.items, {}, std.sort.desc(i64));
+    try printAll(w, v.items);
+}
+'''
+hints = [
+  'std.mem.sort(i64, v.items, {}, std.sort.asc(i64)); then std.mem.sort(i64, v.items, {}, std.sort.desc(i64));',
+  'std.mem.sort takes a slice, not a list: v.items, never v.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3 1 2\n", expect = "1 2 3\n3 2 1\n", visible = true },
+  { name = "five", stdin = "5 -1 4 0 2\n", expect = "-1 0 2 4 5\n5 4 2 0 -1\n", visible = false },
+  { name = "ties", stdin = "2 2 1\n", expect = "1 2 2\n2 2 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "zig.basic.22.reverse"
+node        = 22
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = "The last lorry in should be the first out and the bay board reads the queue the way it was written, and the plate on the back of it is the wrong way round too."
+concepts    = ["slices", "strings", "iteration"]
+requires    = ["zig.basic.13.sorting"]
+map          = { x = 0.953, y = 0.667, kind = "quest" }
+brief       = '''
+`std.mem.reverse(T, slice)` turns a slice round in place, whatever its
+element type. A string from input is `[]const u8` and cannot be written,
+so it is turned round the other way: walked backwards without a copy.
+`std.mem.reverseIterator(s)` hands the bytes out from the end, `while
+(rit.next()) |c|` takes them one at a time, and `w.writeByte(c)` prints
+one byte.
+
+```
+std.mem.reverse(i64, v.items);
+var rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.writeByte(c);
+```
+
+`v` holds the first line's integers and `s` the second line. Type the
+first line at the first `// FILL`, and the other two at the second, before
+the newline that is printed for you.
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+starter     = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var lines = std.mem.splitScalar(u8, input, '\n');
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, lines.next() orelse "", " \r");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+    const s = std.mem.trim(u8, lines.next() orelse "", " \r");
+
+    // FILL: reverse v in place
+    // ANSWER: std.mem.reverse(i64, v.items);
+
+    for (v.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n", .{});
+    // FILL: walk s backwards with a reverse iterator, one byte at a time
+    // ANSWER: var rit = std.mem.reverseIterator(s);
+    // ANSWER: while (rit.next()) |c| try w.writeByte(c);
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var lines = std.mem.splitScalar(u8, input, '\n');
+    var v: std.ArrayList(i64) = .empty;
+    defer v.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, lines.next() orelse "", " \r");
+    while (it.next()) |tok| try v.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+    const s = std.mem.trim(u8, lines.next() orelse "", " \r");
+
+    std.mem.reverse(i64, v.items);
+
+    for (v.items, 0..) |x, i| {
+        try w.print("{s}{d}", .{ if (i == 0) "" else " ", x });
+    }
+    try w.print("\n", .{});
+    var rit = std.mem.reverseIterator(s);
+    while (rit.next()) |c| try w.writeByte(c);
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'std.mem.reverse(i64, v.items); — in place; nothing is returned.',
+  'var rit = std.mem.reverseIterator(s); then while (rit.next()) |c| try w.writeByte(c); — the iterator is a var because next() moves it.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-gun", stdin = "1 2 3\ngun\n", expect = "3 2 1\nnug\n", visible = true },
+  { name = "one-sampan", stdin = "5\nsampan\n", expect = "5\nnapmas\n", visible = false },
+  { name = "four-winch", stdin = "4 8 15 16\nwinch\n", expect = "16 15 8 4\nhcniw\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "zig.basic.14.sort-by-key"
+node        = 23
+title       = "THE LEADERBOARD"
+difficulty  = 3
+story       = "The plaza's board lists every booth with its takings, in the order the shift started, and the supervisor wants the top earner at the top."
+concepts    = ["sorting", "structs"]
+requires    = ["zig.basic.22.reverse"]
+map          = { x = 0.750, y = 0.724, kind = "quest" }
+brief       = '''
+`std.mem.sort` takes a comparator: a function of the context and two
+elements that says whether the first belongs before the second. Zig has
+no lambdas, so the comparator is a named `fn` — `fn byScore(_: void, a:
+Row, b: Row) bool` — and "by score descending, then by name ascending" is
+two lines: when the scores differ, the higher goes first; when they tie,
+`std.mem.lessThan(u8, a.name, b.name)` puts the smaller name first. The
+placeholder `return` under them goes: Zig refuses a line that can never
+run.
+
+```
+if (a.score != b.score) return a.score > b.score;
+return std.mem.lessThan(u8, a.name, b.name);
+std.mem.sort(Row, rows.items, {}, byScore);
+```
+
+The rows are read and printed. Type the two comparator lines at the
+`// FILL` inside `byScore`, and the `std.mem.sort` at the one in `main`.
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+starter     = '''
+const std = @import("std");
+
+const Row = struct { name: []const u8, score: i64 };
+
+fn byScore(_: void, a: Row, b: Row) bool {
+    // FILL: higher score first; on a tie, the smaller name first
+    // ANSWER: if (a.score != b.score) return a.score > b.score;
+    // ANSWER: return std.mem.lessThan(u8, a.name, b.name);
+    return a.score < b.score;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const n = try std.fmt.parseInt(usize, it.next().?, 10);
+    var rows: std.ArrayList(Row) = .empty;
+    defer rows.deinit(gpa);
+    for (0..n) |_| {
+        const name = it.next().?;
+        const score = try std.fmt.parseInt(i64, it.next().?, 10);
+        try rows.append(gpa, .{ .name = name, .score = score });
+    }
+
+    // FILL: sort rows with byScore
+    // ANSWER: std.mem.sort(Row, rows.items, {}, byScore);
+
+    for (rows.items) |r| try w.print("{s} {d}\n", .{ r.name, r.score });
+}
+'''
+solution    = '''
+const std = @import("std");
+
+const Row = struct { name: []const u8, score: i64 };
+
+fn byScore(_: void, a: Row, b: Row) bool {
+    if (a.score != b.score) return a.score > b.score;
+    return std.mem.lessThan(u8, a.name, b.name);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const n = try std.fmt.parseInt(usize, it.next().?, 10);
+    var rows: std.ArrayList(Row) = .empty;
+    defer rows.deinit(gpa);
+    for (0..n) |_| {
+        const name = it.next().?;
+        const score = try std.fmt.parseInt(i64, it.next().?, 10);
+        try rows.append(gpa, .{ .name = name, .score = score });
+    }
+
+    std.mem.sort(Row, rows.items, {}, byScore);
+
+    for (rows.items) |r| try w.print("{s} {d}\n", .{ r.name, r.score });
+}
+'''
+hints = [
+  'if (a.score != b.score) return a.score > b.score; then return std.mem.lessThan(u8, a.name, b.name); in byScore, and std.mem.sort(Row, rows.items, {}, byScore); in main.',
+  'The comparator answers "does a go before b": higher score first, and on a tie the smaller name. Delete the placeholder return under it.',
+  'The context parameter is _: void because there is no context; the sort passes {} for it.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "3\nmei 40\nalex 55\nsam 40\n", expect = "alex 55\nmei 40\nsam 40\n", visible = true },
+  { name = "one", stdin = "1\nyu 9\n", expect = "yu 9\n", visible = false },
+  { name = "ties", stdin = "4\nd 1\nb 2\nc 2\na 1\n", expect = "b 2\nc 2\na 1\nd 1\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "zig.basic.15.closures"
+node        = 24
+title       = "THE PEAK SURCHARGE"
+difficulty  = 2
+story       = "Every toll on the morning list was taken at the night rate and the supervisor wants them all corrected by today's surcharge, which she read off the board once."
+concepts    = ["closures", "functions"]
+requires    = ["zig.basic.14.sort-by-key"]
+map          = { x = 0.666, y = 0.676, kind = "quest" }
+brief       = '''
+Zig has no closures: a function cannot capture a name from the scope
+around it. The nearest thing is a struct that carries the value and a
+method that uses it — the capture list, written out as fields.
+`Adder{ .k = k }` keeps `k` for as long as it lives, and `add.call(v)`
+reads it back as `self.k`.
+
+```
+return v + self.k;
+const add = Adder{ .k = k };
+```
+
+`k` and the numbers are read, and the loop applies `add.call` to each.
+Type the first line at the `// FILL` inside `call`, and the second at the
+one in `main`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+starter     = '''
+const std = @import("std");
+
+const Adder = struct {
+    k: i64,
+    fn call(self: Adder, v: i64) i64 {
+        return self.k;  // FILL: v plus the captured k
+        // ANSWER: return v + self.k;
+    }
+};
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const k = try std.fmt.parseInt(i64, it.next().?, 10);
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const add = Adder{ .k = 0 };  // FILL: an Adder that carries k
+    // ANSWER: const add = Adder{ .k = k };
+
+    for (xs.items) |v| try w.print("{d} ", .{add.call(v)});
+    try w.print("\n", .{});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+const Adder = struct {
+    k: i64,
+    fn call(self: Adder, v: i64) i64 {
+        return v + self.k;
+    }
+};
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    const k = try std.fmt.parseInt(i64, it.next().?, 10);
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const add = Adder{ .k = k };
+
+    for (xs.items) |v| try w.print("{d} ", .{add.call(v)});
+    try w.print("\n", .{});
+}
+'''
+hints = [
+  'return v + self.k; in call, and const add = Adder{ .k = k }; in main.',
+  'The struct is the capture: k goes in as a field once, and every call reads it back through self.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "5\n1 2 3\n", expect = "6 7 8\n", visible = true },
+  { name = "zero", stdin = "0\n4 4\n", expect = "4 4\n", visible = false },
+  { name = "negative", stdin = "-3\n10 0 3\n", expect = "7 -3 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "zig.basic.16.lambdas"
+node        = 25
+title       = "EVEN LANES, SQUARED"
+difficulty  = 2
+story       = "The even-numbered lanes pay by the square of their number and the odd ones pay nothing, and the ledger has one line for the total."
+concepts    = ["closures", "iteration"]
+requires    = ["zig.basic.15.closures"]
+map          = { x = 0.472, y = 0.739, kind = "quest" }
+brief       = '''
+There is no `accumulate` in Zig's std; a fold is a function that takes
+another function. `fold(xs, start, step)` calls `step(acc, v)` for every
+element and keeps what it returns, and `step` is a `comptime fn`
+parameter: any function of the right shape, named where a lambda would be
+written. The step here is `evenSquare`, and `if` is an expression in Zig,
+so `return if (cond) a else b;` is one line.
+
+```
+return if (@rem(v, 2) == 0) acc + v * v else acc;
+const total = fold(xs.items, 0, evenSquare);
+```
+
+`fold` is written, the numbers are in `xs`, and `total` is printed. Type
+the first line at the `// FILL` inside `evenSquare` and the second at the
+one in `main`: the step adds the square of `v` when `v` is even and hands
+`acc` back unchanged otherwise.
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn fold(xs: []const i64, start: i64, comptime step: fn (i64, i64) i64) i64 {
+    var acc = start;
+    for (xs) |v| acc = step(acc, v);
+    return acc;
+}
+
+fn evenSquare(acc: i64, v: i64) i64 {
+    return acc + v;  // FILL: acc plus v squared when v is even, acc unchanged otherwise
+    // ANSWER: return if (@rem(v, 2) == 0) acc + v * v else acc;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const total: i64 = 0;  // FILL: fold xs from 0 with evenSquare
+    // ANSWER: const total = fold(xs.items, 0, evenSquare);
+
+    try w.print("{d}\n", .{total});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn fold(xs: []const i64, start: i64, comptime step: fn (i64, i64) i64) i64 {
+    var acc = start;
+    for (xs) |v| acc = step(acc, v);
+    return acc;
+}
+
+fn evenSquare(acc: i64, v: i64) i64 {
+    return if (@rem(v, 2) == 0) acc + v * v else acc;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const total = fold(xs.items, 0, evenSquare);
+
+    try w.print("{d}\n", .{total});
+}
+'''
+hints = [
+  'return if (@rem(v, 2) == 0) acc + v * v else acc; in evenSquare, and const total = fold(xs.items, 0, evenSquare); in main.',
+  'The step gets the running total and one element and returns the new total; @rem(v, 2) == 0 is true for -2 as well as 2.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "five", stdin = "1 2 3 4 5\n", expect = "20\n", visible = true },
+  { name = "odd-only", stdin = "1 3 5\n", expect = "0\n", visible = false },
+  { name = "negatives", stdin = "-2 -3 6\n", expect = "40\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "zig.basic.17.threads"
+node        = 26
+title       = "ONE BOOTH EACH"
+difficulty  = 3
+story       = "Every lorry on the plaza gets its own booth, they all count at once, and the tally is read only after the last barrier has dropped."
+concepts    = ["concurrency", "closures"]
+requires    = ["zig.basic.16.lambdas"]
+map          = { x = 0.394, y = 0.686, kind = "quest" }
+brief       = '''
+`std.Thread.spawn(.{}, f, .{ args })` runs `f` on its own thread the
+moment it is made and hands back the `std.Thread`; `join()` waits for it
+to finish. The arguments are a tuple, copied in: `x` by value, and
+`&results[i]`, a pointer to that thread's own slot, so nothing is shared.
+The threads are kept in a list so they can all be joined, and nothing is
+printed until every `join()` has returned.
+
+```
+try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));
+for (threads.items) |t| t.join();
+```
+
+`square`, `results` (one slot per number) and the printing are written.
+Type the first line at the `// FILL` inside the loop, replacing the
+placeholder, and the second at the `// FILL` after it.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+starter     = '''
+const std = @import("std");
+
+fn square(x: i64, out: *i64) void {
+    out.* = x * x;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const results = try gpa.alloc(i64, xs.items.len);
+    defer gpa.free(results);
+    var threads: std.ArrayList(std.Thread) = .empty;
+    defer threads.deinit(gpa);
+    for (xs.items, 0..) |x, i| {
+        results[i] = x;  // FILL: spawn a thread that squares x into results[i], and keep it
+        // ANSWER: try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));
+    }
+    // FILL: join every thread
+    // ANSWER: for (threads.items) |t| t.join();
+
+    var total: i64 = 0;
+    for (results) |r| {
+        try w.print("{d} ", .{r});
+        total += r;
+    }
+    try w.print("\n{d}\n", .{total});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+fn square(x: i64, out: *i64) void {
+    out.* = x * x;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var xs: std.ArrayList(i64) = .empty;
+    defer xs.deinit(gpa);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| try xs.append(gpa, try std.fmt.parseInt(i64, tok, 10));
+
+    const results = try gpa.alloc(i64, xs.items.len);
+    defer gpa.free(results);
+    var threads: std.ArrayList(std.Thread) = .empty;
+    defer threads.deinit(gpa);
+    for (xs.items, 0..) |x, i| {
+        try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));
+    }
+    for (threads.items) |t| t.join();
+
+    var total: i64 = 0;
+    for (results) |r| {
+        try w.print("{d} ", .{r});
+        total += r;
+    }
+    try w.print("\n{d}\n", .{total});
+}
+'''
+hints = [
+  'try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] })); in the loop, then for (threads.items) |t| t.join(); after it.',
+  'spawn can fail and so can append, so there are two trys on one line; the .{} first is the spawn config, the .{ x, &results[i] } is the argument tuple.',
+  'A thread not joined is a thread whose slot may still be empty when results is printed; join them all before the print.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three", stdin = "1 2 3\n", expect = "1 4 9\n14\n", visible = true },
+  { name = "one", stdin = "7\n", expect = "49\n49\n", visible = false },
+  { name = "eight", stdin = "1 1 2 3 5 8 13 21\n", expect = "1 1 4 9 25 64 169 441\n714\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "zig.basic.18.binary-tree"
+node        = 27
+title       = "THE NULL"
+difficulty  = 4
+story       = "06:00 at the Causeway Bay portal. The night's receipts are a tree of amounts, and the clerk unwrapped a left child that was never there — panic: attempt to use null value, at the one booth in Causeway Bay that must not be wrong."
+concepts    = ["trees", "recursion", "structs"]
+requires    = ["zig.basic.17.threads"]
+map          = { x = 0.818, y = 0.870, kind = "boss" }
+brief       = '''
+A binary search tree is nodes with a value and two optional child
+pointers, `?*Node`, `null` until something hangs there: smaller values
+live under `left`, larger under `right`. Inserting is recursive: an empty
+subtree (`null`) becomes a new node from `gpa.create`, and otherwise the
+value goes down one side — and whatever that side becomes is stored back,
+because the side may have been `null` a moment ago. `n orelse { ... }` is
+how the null case is handled first, and `.?` on a child nobody checked is
+`panic: attempt to use null value` — that is the boss, and it is exactly
+what the two placeholder lines do.
+
+```
+cur.left = try insert(gpa, cur.left, v);
+cur.right = try insert(gpa, cur.right, v);
+```
+
+`Node`, the `null` case, `inorder`, `height`, `freeTree` and `main` are
+written. Type the two descent lines at the two `// FILL` marks, replacing
+the placeholders: the left one in the `if`, the right one in the `else`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+starter     = '''
+const std = @import("std");
+
+const Node = struct {
+    val: i64,
+    left: ?*Node = null,
+    right: ?*Node = null,
+};
+
+fn insert(gpa: std.mem.Allocator, n: ?*Node, v: i64) !*Node {
+    const cur = n orelse {
+        const fresh = try gpa.create(Node);
+        fresh.* = .{ .val = v };
+        return fresh;
+    };
+    if (v < cur.val) {
+        _ = cur.left.?;  // FILL: descend left, storing the result back into cur.left
+        // ANSWER: cur.left = try insert(gpa, cur.left, v);
+    } else {
+        _ = cur.right.?;  // FILL: descend right, storing the result back into cur.right
+        // ANSWER: cur.right = try insert(gpa, cur.right, v);
+    }
+    return cur;
+}
+
+fn inorder(n: ?*Node, w: *std.Io.Writer) !void {
+    const cur = n orelse return;
+    try inorder(cur.left, w);
+    try w.print("{d} ", .{cur.val});
+    try inorder(cur.right, w);
+}
+
+fn height(n: ?*Node) i64 {
+    const cur = n orelse return 0;
+    return 1 + @max(height(cur.left), height(cur.right));
+}
+
+fn freeTree(gpa: std.mem.Allocator, n: ?*Node) void {
+    const cur = n orelse return;
+    freeTree(gpa, cur.left);
+    freeTree(gpa, cur.right);
+    gpa.destroy(cur);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var root: ?*Node = null;
+    defer freeTree(gpa, root);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| root = try insert(gpa, root, try std.fmt.parseInt(i64, tok, 10));
+
+    try inorder(root, w);
+    try w.print("\n{d}\n", .{height(root)});
+}
+'''
+solution    = '''
+const std = @import("std");
+
+const Node = struct {
+    val: i64,
+    left: ?*Node = null,
+    right: ?*Node = null,
+};
+
+fn insert(gpa: std.mem.Allocator, n: ?*Node, v: i64) !*Node {
+    const cur = n orelse {
+        const fresh = try gpa.create(Node);
+        fresh.* = .{ .val = v };
+        return fresh;
+    };
+    if (v < cur.val) {
+        cur.left = try insert(gpa, cur.left, v);
+    } else {
+        cur.right = try insert(gpa, cur.right, v);
+    }
+    return cur;
+}
+
+fn inorder(n: ?*Node, w: *std.Io.Writer) !void {
+    const cur = n orelse return;
+    try inorder(cur.left, w);
+    try w.print("{d} ", .{cur.val});
+    try inorder(cur.right, w);
+}
+
+fn height(n: ?*Node) i64 {
+    const cur = n orelse return 0;
+    return 1 + @max(height(cur.left), height(cur.right));
+}
+
+fn freeTree(gpa: std.mem.Allocator, n: ?*Node) void {
+    const cur = n orelse return;
+    freeTree(gpa, cur.left);
+    freeTree(gpa, cur.right);
+    gpa.destroy(cur);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+    var out_buf: [4096]u8 = undefined;
+    var stdout = std.Io.File.stdout().writerStreaming(io, &out_buf);
+    const w = &stdout.interface;
+    defer w.flush() catch {};
+
+    var root: ?*Node = null;
+    defer freeTree(gpa, root);
+    var it = std.mem.tokenizeAny(u8, input, " \r\n");
+    while (it.next()) |tok| root = try insert(gpa, root, try std.fmt.parseInt(i64, tok, 10));
+
+    try inorder(root, w);
+    try w.print("\n{d}\n", .{height(root)});
+}
+'''
+hints = [
+  'cur.left = try insert(gpa, cur.left, v); on the left, cur.right = try insert(gpa, cur.right, v); on the right.',
+  'Store the result back: the child may have been null, and the new node is what insert returns. insert can fail to allocate, so the call is tried.',
+  'The placeholder unwraps the child with .? before anything has been hung there — that is the panic. The real line hands the null to insert, whose orelse is the check.',
+]
+
+[quest.tests]
+harness    = "stdio"
+timeout_ms = 5000
+compile_timeout_ms = 30000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "balanced", stdin = "5 3 8 1 4\n", expect = "1 3 4 5 8\n3\n", visible = true },
+  { name = "single", stdin = "42\n", expect = "42\n1\n", visible = false },
+  { name = "chain", stdin = "1 2 3 4\n", expect = "1 2 3 4\n4\n", visible = false },
+  { name = "seven", stdin = "50 25 75 10 30 60 90\n", expect = "10 25 30 50 60 75 90\n3\n", visible = false },
+]

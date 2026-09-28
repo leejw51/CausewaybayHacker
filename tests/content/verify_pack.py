@@ -60,7 +60,7 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix|zig|lua)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 # REMIX LAND (SPEC §12): the same program three times, one trio of nodes per
 # concept, always in this order. `lang` on the quest says which toolchain
@@ -207,6 +207,35 @@ def build(lang, src, workdir):
             launcher.write_text(
                 "#!/bin/sh\nexec node --enable-source-maps \"$(dirname \"$0\")/main.js\"\n")
             launcher.chmod(0o755)
+    elif lang == "zig":
+        # The runner's own line (SPEC §5.1): `-O Debug`, so every safety check
+        # is on and a panic says what it is ("index out of bounds", "attempt to
+        # use null value", "integer overflow") — the land is about those checks
+        # — and so a compile is under a second warm. Both caches are named so
+        # a `HOME` pointed elsewhere does not make every build the cold one.
+        f = workdir / "main.zig"
+        f.write_text(src)
+        p = subprocess.run(
+            ["zig", "build-exe", "main.zig", "-O", "Debug",
+             "--cache-dir", str(workdir / "zig-cache"),
+             "--global-cache-dir", str(CACHE / "zig-global"),
+             "-femit-bin=prog"],
+            cwd=workdir, capture_output=True, text=True, timeout=180)
+    elif lang == "lua":
+        # LuaJIT, and only LuaJIT (SPEC §5.1): `print(6/2)` is `3` here and
+        # `3.0` on Lua 5.4, so a pack verified on one is wrong on the other.
+        # `-b` compiles to bytecode without running a line, which is the one
+        # mistake the interpreter can find before the run — a syntax error —
+        # and it lands as compile_error the way `py_compile` does.
+        f = workdir / "main.lua"
+        f.write_text(src)
+        p = subprocess.run(
+            ["luajit", "-b", "main.lua", "main.luac"],
+            cwd=workdir, capture_output=True, text=True, timeout=60)
+        if p.returncode == 0:
+            launcher = workdir / "prog"
+            launcher.write_text("#!/bin/sh\nexec luajit \"$(dirname \"$0\")/main.lua\"\n")
+            launcher.chmod(0o755)
     else:
         raise ValueError(f"no toolchain for land {lang!r}")
     return p.returncode == 0, p.stderr
@@ -231,17 +260,23 @@ def tsc():
 
 
 def run_case(workdir, stdin, timeout_ms, max_bytes):
+    # Bytes in, bytes out, decoded lossily: a program can print anything —
+    # a Lua `s:reverse()` on a UTF-8 string emits bytes that are not text —
+    # and the runner reads its stdout with `from_utf8_lossy`. Decoding
+    # strictly here crashed the whole run on one wrong starter instead of
+    # failing the one case.
     try:
-        p = subprocess.run([str(workdir / "prog")], input=stdin,
-                           capture_output=True, text=True,
+        p = subprocess.run([str(workdir / "prog")], input=stdin.encode(),
+                           capture_output=True,
                            timeout=timeout_ms / 1000.0, cwd=workdir)
     except subprocess.TimeoutExpired:
         return None, "timeout"
-    if len(p.stdout.encode()) > max_bytes:
+    if len(p.stdout) > max_bytes:
         return None, "output_limit"
+    got = p.stdout.decode("utf-8", errors="replace")
     if p.returncode != 0:
-        return p.stdout, f"runtime_error(exit={p.returncode})"
-    return p.stdout, None
+        return got, f"runtime_error(exit={p.returncode})"
+    return got, None
 
 
 def judge(lang, src, q, workdir):
@@ -306,8 +341,10 @@ VERYBASIC_MAX_ADDED = 1
 MAX_ADDED = {"basic": BASIC_MAX_ADDED, "verybasic": VERYBASIC_MAX_ADDED}
 
 # `* ` and `*/` are the inside and the end of a block comment; a bare `*` is
-# not, or Rust's `*count.entry(..) += 1` would be free.
-COMMENT_STARTS = ("//", "#", "/*", "* ", "*/")
+# not, or Rust's `*count.entry(..) += 1` would be free. `--` is Lua's line
+# comment, so a `-- ANSWER:` at a hole is a comment there too; a bare `-`
+# is not, or `-x` would be free.
+COMMENT_STARTS = ("//", "#", "/*", "* ", "*/", "--")
 
 
 def added_lines(starter, solution):

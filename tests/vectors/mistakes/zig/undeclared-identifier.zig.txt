@@ -1,0 +1,3 @@
+main.zig:5:32: error: use of undeclared identifier 'totl'
+    std.debug.print("{d}\n", .{totl});
+                               ^~~~

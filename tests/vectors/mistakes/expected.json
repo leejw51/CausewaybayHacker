@@ -5,9 +5,11 @@
     "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
     "go": "go version go1.27.1 darwin/arm64",
     "cxx": "clang-darwin: Apple clang version 21.0.0 (clang-2100.3.34.2)",
-    "python": "Python 3.13.13",
+    "python": "Python 3.14.6",
     "tsc": "Version 5.9.3",
     "node": "v26.9.0",
+    "zig": "0.16.0",
+    "luajit": "LuaJIT 2.1.1788856981 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
     "host": "Darwin 27.0.0 arm64"
   },
   "cpp_toolchains_captured": [
@@ -1823,6 +1825,649 @@
       },
       "captured": "typescript/exception.tsc.txt",
       "captured_runtime": "typescript/exception.runtime.txt"
+    },
+    {
+      "file": "zig/expected-type.zig",
+      "lang": "zig",
+      "kind": "type-mismatch",
+      "code": "zig:expected-type",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "expected type 'i32', found '*const [6:0]u8'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 4,
+            "col": 23,
+            "message": "expected type 'i32', found '*const [6:0]u8'"
+          }
+        ]
+      },
+      "captured": "zig/expected-type.zig.txt"
+    },
+    {
+      "file": "zig/undeclared-identifier.zig",
+      "lang": "zig",
+      "kind": "unknown-name",
+      "code": "zig:undeclared-identifier",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "use of undeclared identifier 'totl'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 5,
+            "col": 32,
+            "message": "use of undeclared identifier 'totl'"
+          }
+        ]
+      },
+      "captured": "zig/undeclared-identifier.zig.txt"
+    },
+    {
+      "file": "zig/unused.zig",
+      "lang": "zig",
+      "kind": "unused",
+      "code": "zig:unused",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "unused local variable"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 3,
+            "col": 9,
+            "message": "unused local variable"
+          }
+        ]
+      },
+      "captured": "zig/unused.zig.txt"
+    },
+    {
+      "file": "zig/cannot-assign-constant.zig",
+      "lang": "zig",
+      "kind": "mutability",
+      "code": "zig:cannot-assign-constant",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "cannot assign to constant"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 5,
+            "col": 5,
+            "message": "cannot assign to constant"
+          }
+        ]
+      },
+      "captured": "zig/cannot-assign-constant.zig.txt"
+    },
+    {
+      "file": "zig/error-not-handled.zig",
+      "lang": "zig",
+      "kind": "unhandled-error",
+      "code": "zig:error-not-handled",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "error union is ignored"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 7,
+            "col": 10,
+            "message": "error union is ignored"
+          },
+          {
+            "level": "note",
+            "file": "main.zig",
+            "line": 7,
+            "col": 10,
+            "message": "consider using 'try', 'catch', or 'if'"
+          }
+        ]
+      },
+      "captured": "zig/error-not-handled.zig.txt"
+    },
+    {
+      "file": "zig/no-member.zig",
+      "lang": "zig",
+      "kind": "missing-trait",
+      "code": "zig:no-member",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "no field named 'lanes' in struct 'main.Booth'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 6,
+            "col": 34,
+            "message": "no field named 'lanes' in struct 'main.Booth'"
+          },
+          {
+            "level": "note",
+            "file": "main.zig",
+            "line": 3,
+            "col": 15,
+            "message": "struct declared here"
+          }
+        ]
+      },
+      "captured": "zig/no-member.zig.txt"
+    },
+    {
+      "file": "zig/optional-unwrapped.zig",
+      "lang": "zig",
+      "kind": "nil-deref",
+      "code": "zig:optional-unwrapped",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "expected type 'i32', found '?i32'"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 5,
+            "col": 24,
+            "message": "expected type 'i32', found '?i32'"
+          },
+          {
+            "level": "note",
+            "file": "main.zig",
+            "line": 5,
+            "col": 24,
+            "message": "cannot convert optional to payload type"
+          },
+          {
+            "level": "note",
+            "file": "main.zig",
+            "line": 5,
+            "col": 24,
+            "message": "consider using '.?', 'orelse', or 'if'"
+          }
+        ]
+      },
+      "captured": "zig/optional-unwrapped.zig.txt"
+    },
+    {
+      "file": "zig/expected-token.zig",
+      "lang": "zig",
+      "kind": "syntax",
+      "code": "zig:expected-token",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 1,
+        "identities": [
+          "expected ';' after statement"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.zig",
+            "line": 3,
+            "col": 16,
+            "message": "expected ';' after statement"
+          }
+        ]
+      },
+      "captured": "zig/expected-token.zig.txt"
+    },
+    {
+      "file": "zig/index-out-of-bounds.zig",
+      "lang": "zig",
+      "kind": "index-range",
+      "code": "zig:index-out-of-bounds",
+      "phase": "runtime",
+      "level": "panic",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 0,
+        "identities": [
+          "thread <tid> panic: index out of bounds: index 2, len 2"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -6,
+        "run_signal": 6,
+        "run_stderr": "thread <tid> panic: index out of bounds: index 2, len 2\n<work>/main.zig:7:37: 0x<pc> in main (main)\n    std.debug.print(\"{d}\\n\", .{lanes[i]});\n                                    ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+      },
+      "captured": "zig/index-out-of-bounds.zig.txt",
+      "captured_runtime": "zig/index-out-of-bounds.runtime.txt"
+    },
+    {
+      "file": "zig/null-unwrap.zig",
+      "lang": "zig",
+      "kind": "nil-deref",
+      "code": "zig:null-unwrap",
+      "phase": "runtime",
+      "level": "panic",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 0,
+        "identities": [
+          "thread <tid> panic: attempt to use null value"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -6,
+        "run_signal": 6,
+        "run_stderr": "thread <tid> panic: attempt to use null value\n<work>/main.zig:6:36: 0x<pc> in main (main)\n    std.debug.print(\"{d}\\n\", .{left.?});\n                                   ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+      },
+      "captured": "zig/null-unwrap.zig.txt",
+      "captured_runtime": "zig/null-unwrap.runtime.txt"
+    },
+    {
+      "file": "zig/integer-overflow.zig",
+      "lang": "zig",
+      "kind": "unhandled-error",
+      "code": "zig:integer-overflow",
+      "phase": "runtime",
+      "level": "panic",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 0,
+        "identities": [
+          "thread <tid> panic: integer overflow"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -6,
+        "run_signal": 6,
+        "run_stderr": "thread <tid> panic: integer overflow\n<work>/main.zig:6:37: 0x<pc> in main (main)\n    while (i < 10) : (i += 1) axles += 1;\n                                    ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+      },
+      "captured": "zig/integer-overflow.zig.txt",
+      "captured_runtime": "zig/integer-overflow.runtime.txt"
+    },
+    {
+      "file": "zig/unreachable.zig",
+      "lang": "zig",
+      "kind": "unhandled-error",
+      "code": "zig:unreachable",
+      "phase": "runtime",
+      "level": "panic",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 0,
+        "identities": [
+          "thread <tid> panic: reached unreachable code"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": -6,
+        "run_signal": 6,
+        "run_stderr": "thread <tid> panic: reached unreachable code\n<work>/main.zig:6:20: 0x<pc> in main (main)\n    if (lane == 3) unreachable;\n                   ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+      },
+      "captured": "zig/unreachable.zig.txt",
+      "captured_runtime": "zig/unreachable.runtime.txt"
+    },
+    {
+      "file": "zig/error-returned.zig",
+      "lang": "zig",
+      "kind": "unhandled-error",
+      "code": "zig:error-returned",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "zig build-exe main.zig -O Debug --color off -femit-bin=prog",
+        "compile_exit": 0,
+        "identities": [
+          "error: InvalidCharacter"
+        ],
+        "diagnostics": [],
+        "run_command": "./prog",
+        "run_exit": 1,
+        "run_stderr": "error: InvalidCharacter\n<zig-std>/fmt.zig:578:24: 0x<pc> in charToDigit (main)\n    if (value >= base) return error.InvalidCharacter;\n                       ^\n<zig-std>/fmt.zig:443:23: 0x<pc> in parseIntWithSign__anon_27139 (main)\n        const digit = try charToDigit(math.cast(u8, c) orelse return error.InvalidCharacter, buf_base);\n                      ^\n<zig-std>/fmt.zig:331:5: 0x<pc> in parseIntWithGenericCharacter__anon_27133 (main)\n    return parseIntWithSign(Result, Character, buf, base, .pos);\n    ^\n<zig-std>/fmt.zig:318:5: 0x<pc> in parseInt__anon_26989 (main)\n    return parseIntWithGenericCharacter(T, u8, buf, base);\n    ^\n<work>/main.zig:4:15: 0x<pc> in main (main)\n    const n = try std.fmt.parseInt(i64, \"x1\", 10);\n              ^\n"
+      },
+      "captured": "zig/error-returned.zig.txt",
+      "captured_runtime": "zig/error-returned.runtime.txt"
+    },
+    {
+      "file": "lua/syntax.lua",
+      "lang": "lua",
+      "kind": "syntax",
+      "code": "lua:syntax",
+      "phase": "compile",
+      "level": "error",
+      "compile_time": true,
+      "compiles": false,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 1,
+        "identities": [
+          "unexpected symbol near '='"
+        ],
+        "diagnostics": [
+          {
+            "level": "error",
+            "file": "main.lua",
+            "line": 2,
+            "col": null,
+            "message": "unexpected symbol near '='"
+          }
+        ]
+      },
+      "captured": "lua/syntax.luajit.txt"
+    },
+    {
+      "file": "lua/index-nil.lua",
+      "lang": "lua",
+      "kind": "nil-deref",
+      "code": "lua:index-nil",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to index field 'left' (a nil value)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to index field 'left' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/index-nil.luajit.txt",
+      "captured_runtime": "lua/index-nil.runtime.txt"
+    },
+    {
+      "file": "lua/undefined-global.lua",
+      "lang": "lua",
+      "kind": "unknown-name",
+      "code": "lua:undefined-global",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to perform arithmetic on global 'totl' (a nil value)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on global 'totl' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/undefined-global.luajit.txt",
+      "captured_runtime": "lua/undefined-global.runtime.txt"
+    },
+    {
+      "file": "lua/call-nil.lua",
+      "lang": "lua",
+      "kind": "nil-deref",
+      "code": "lua:call-nil",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to call field 'length' (a nil value)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to call field 'length' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/call-nil.luajit.txt",
+      "captured_runtime": "lua/call-nil.runtime.txt"
+    },
+    {
+      "file": "lua/arithmetic-type.lua",
+      "lang": "lua",
+      "kind": "type-mismatch",
+      "code": "lua:arithmetic-type",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to perform arithmetic on local 'segments' (a table value)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on local 'segments' (a table value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/arithmetic-type.luajit.txt",
+      "captured_runtime": "lua/arithmetic-type.runtime.txt"
+    },
+    {
+      "file": "lua/compare-type.lua",
+      "lang": "lua",
+      "kind": "type-mismatch",
+      "code": "lua:compare-type",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to compare string with number"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to compare string with number\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/compare-type.luajit.txt",
+      "captured_runtime": "lua/compare-type.runtime.txt"
+    },
+    {
+      "file": "lua/concatenate-nil.lua",
+      "lang": "lua",
+      "kind": "nil-deref",
+      "code": "lua:concatenate-nil",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: attempt to concatenate field 'size' (a nil value)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: attempt to concatenate field 'size' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/concatenate-nil.luajit.txt",
+      "captured_runtime": "lua/concatenate-nil.runtime.txt"
+    },
+    {
+      "file": "lua/bad-argument.lua",
+      "lang": "lua",
+      "kind": "type-mismatch",
+      "code": "lua:bad-argument",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:2: bad argument #2 to 'rep' (number expected, got table)"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:2: bad argument #2 to 'rep' (number expected, got table)\nstack traceback:\n\t[C]: in function 'rep'\n\tmain.lua:2: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/bad-argument.luajit.txt",
+      "captured_runtime": "lua/bad-argument.runtime.txt"
+    },
+    {
+      "file": "lua/stack-overflow.lua",
+      "lang": "lua",
+      "kind": "wrong-answer",
+      "code": "lua:stack-overflow",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:3: stack overflow"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:3: stack overflow\nstack traceback:\n\tmain.lua:2: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\t...\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:5: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/stack-overflow.luajit.txt",
+      "captured_runtime": "lua/stack-overflow.runtime.txt"
+    },
+    {
+      "file": "lua/error.lua",
+      "lang": "lua",
+      "kind": "unhandled-error",
+      "code": "lua:error",
+      "phase": "runtime",
+      "level": "error",
+      "compile_time": false,
+      "compiles": true,
+      "verified": true,
+      "assert_me": true,
+      "observed": {
+        "compile_command": "luajit -b main.lua main.luac",
+        "compile_exit": 0,
+        "identities": [
+          "luajit: main.lua:2: no such lantern"
+        ],
+        "diagnostics": [],
+        "run_command": "luajit main.lua",
+        "run_exit": 1,
+        "run_stderr": "luajit: main.lua:2: no such lantern\nstack traceback:\n\t[C]: in function 'error'\n\tmain.lua:2: in main chunk\n\t[C]: at 0x<pc>\n"
+      },
+      "captured": "lua/error.luajit.txt",
+      "captured_runtime": "lua/error.runtime.txt"
     }
   ],
   "content_starter_cases": [

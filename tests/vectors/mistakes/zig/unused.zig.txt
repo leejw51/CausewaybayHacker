@@ -1,0 +1,3 @@
+main.zig:3:9: error: unused local variable
+    var count: i32 = 0;
+        ^~~~~

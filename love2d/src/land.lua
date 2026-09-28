@@ -14,26 +14,31 @@ local Land = {}
 
 -- SPEC §0's order: the two lands the game shipped with, then the two that
 -- joined them, then the one the ending was always about, then TypeScript,
--- then REMIX — the one land that is not a language: the same program in
--- Go, Rust and Python, whose quests each carry a `lang` of their own.
-Land.ORDER = { "rust", "go", "cpp", "python", "pytorch", "typescript", "remix" }
+-- then ZIG (the toll plaza at dawn: everything explicit, every allocation
+-- paid for) and LUA (Tai Hang on Mid-Autumn night, on the very interpreter
+-- this client runs on), and last REMIX — the one land that is not a
+-- language: the same program in Go, Rust and Python, whose quests each
+-- carry a `lang` of their own. REMIX stays last whatever joins before it.
+Land.ORDER = { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "remix" }
 
 -- The languages: every land but REMIX, in the same order. A scratchpad, an
 -- attempt and a formatter are in a language, never in a land (PROTOCOL
 -- §5.9), so the playground's TAB walks this list and not `ORDER`.
-Land.LANGS = { "rust", "go", "cpp", "python", "pytorch", "typescript" }
+Land.LANGS = { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua" }
 
 -- The name on the card. `("cpp"):upper()` is "CPP", which nobody calls the
 -- language; the other three happen to upper-case into themselves.
 Land.NAME = {
   rust = "RUST", go = "GO", cpp = "C++", python = "PYTHON", pytorch = "PYTORCH",
-  typescript = "TYPESCRIPT", remix = "REMIX",
+  typescript = "TYPESCRIPT", zig = "ZIG", lua = "LUA", remix = "REMIX",
 }
 
 -- The land's mascot, and what stands in while the art is being drawn: the
 -- platypus is a hue-shifted Ferris until it is not, and the coiled python a
--- hue-shifted Gogo. `Assets.pick` takes whichever is on disk, so a checkout
--- without the new files still shows a creature on the card.
+-- hue-shifted Gogo; the gecko in the hi-vis vest is an amber crab until the
+-- art is there, and the moon rabbit a Gogo. `Assets.pick` takes whichever
+-- is on disk, so a checkout without the new files still shows a creature
+-- on the card.
 Land.MASCOT = {
   rust = "sprite_ferris",
   go = "sprite_gogo",
@@ -41,11 +46,14 @@ Land.MASCOT = {
   python = "sprite_python",
   pytorch = "sprite_pytorch",
   typescript = "sprite_typescript",
+  zig = "sprite_zig",
+  lua = "sprite_lua",
   remix = "sprite_remix",
 }
 local STANDIN = {
   cpp = "sprite_ferris", python = "sprite_gogo", pytorch = "sprite_python",
-  typescript = "sprite_cpp", remix = "sprite_python",
+  typescript = "sprite_cpp", zig = "sprite_ferris", lua = "sprite_gogo",
+  remix = "sprite_python",
 }
 
 function Land.name(land)

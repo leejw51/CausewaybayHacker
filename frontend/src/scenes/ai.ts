@@ -399,6 +399,8 @@ export class AiScene implements Scene {
         ["land:python", T("ai.python"), "python"],
         ["land:pytorch", T("ai.pytorch"), "pytorch"],
         ["land:typescript", T("ai.typescript"), "typescript"],
+        ["land:zig", T("ai.zig"), "zig"],
+        ["land:lua", T("ai.lua"), "lua"],
         ["land:remix", T("ai.remix"), "remix"],
       ] as Array<[string, string, Land | null]>
     ).map(([id, label, value]) => ({

@@ -14,6 +14,7 @@ pub mod format;
 pub mod go;
 pub mod gotest;
 pub mod harness;
+pub mod lua;
 pub mod proc;
 pub mod python;
 pub mod reap;
@@ -21,6 +22,7 @@ pub mod rust;
 pub mod spec;
 pub mod suite;
 pub mod typescript;
+pub mod zig;
 
 pub use spec::{Case, Harness, MatchMode, TestSpec};
 
@@ -176,15 +178,39 @@ pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
                 format::TYPESCRIPT_HINT
             )
         }),
+        // Zig Land's toolchain is one program, `zig`, which no operating
+        // system ships; Lua Land's is `luajit` — and only that one: a plain
+        // `lua` 5.4 prints `3.0` where LuaJIT prints `3`, so a fallback
+        // would judge the land's own solutions wrong (`lua.rs`). Both are
+        // refused here, with the command, rather than answering
+        // `internal_error` for every node of the map.
+        ("zig", Harness::Stdio) => (!zig_is_installed()).then(|| {
+            format!(
+                "this machine has no zig on PATH, which every Zig Land \
+                 quest needs: {}",
+                format::ZIG_HINT
+            )
+        }),
+        ("lua", Harness::Stdio) => (!luajit_is_installed()).then(|| {
+            format!(
+                "this machine has no luajit on PATH, which every Lua Land \
+                 quest needs: {}",
+                format::LUA_HINT
+            )
+        }),
         ("rust" | "go" | "cpp" | "python", Harness::Stdio) => None,
         ("rust", Harness::Cargo) => None,
         ("go", Harness::Gotest) => None,
-        ("rust" | "cpp" | "python" | "pytorch" | "typescript", Harness::Gotest) => Some(format!(
-            "the gotest harness is not a {lang} harness (SPEC §5.2)"
-        )),
-        ("go" | "cpp" | "python" | "pytorch" | "typescript", Harness::Cargo) => Some(format!(
-            "the cargo harness is not a {lang} harness (SPEC §5.2)"
-        )),
+        ("rust" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua", Harness::Gotest) => {
+            Some(format!(
+                "the gotest harness is not a {lang} harness (SPEC §5.2)"
+            ))
+        }
+        ("go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua", Harness::Cargo) => {
+            Some(format!(
+                "the cargo harness is not a {lang} harness (SPEC §5.2)"
+            ))
+        }
         (other, _) => Some(format!("there is no runner for '{other}'")),
     }
 }
@@ -209,6 +235,18 @@ fn typescript_is_installed() -> bool {
     *TS.get_or_init(format::typescript_is_installed)
 }
 
+/// Whether `zig` is on this process's `PATH`, asked once, as above.
+fn zig_is_installed() -> bool {
+    static ZIG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ZIG.get_or_init(zig::is_installed)
+}
+
+/// Whether `luajit` is on this process's `PATH`, asked once, as above.
+fn luajit_is_installed() -> bool {
+    static LUAJIT: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *LUAJIT.get_or_init(lua::is_installed)
+}
+
 /// Dispatch on the land. A language or harness this build cannot judge comes
 /// back as an `internal_error` report rather than a panic — though the server
 /// refuses one before it gets here, having asked [`unsupported`] first.
@@ -222,6 +260,8 @@ pub fn run(sub: &Submission) -> Report {
         // program is allowed to import, and that is the content's business.
         "python" | "pytorch" => python::run(sub),
         "typescript" => typescript::run(sub),
+        "zig" => zig::run(sub),
+        "lua" => lua::run(sub),
         other => Report::internal(format!("unknown language '{other}'")),
     }
 }

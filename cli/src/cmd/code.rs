@@ -408,6 +408,8 @@ fn formatter_label(lang: &str) -> &'static str {
         // Both Python lands format with black; the fifth is not a language.
         "python" | "pytorch" => "black",
         "typescript" => "prettier",
+        "zig" => "zig fmt",
+        "lua" => "stylua",
         _ => "formatter",
     }
 }
@@ -419,8 +421,10 @@ fn lang_for_path(path: &Path) -> Result<&'static str> {
         Some("cpp") => Ok("cpp"),
         Some("py") => Ok("python"),
         Some("ts") => Ok("typescript"),
+        Some("zig") => Ok("zig"),
+        Some("lua") => Ok("lua"),
         _ => Err(error::usage(format!(
-            "cannot tell what language {} is; cwbh fmt takes a .rs, .go, .cpp, .py or .ts file",
+            "cannot tell what language {} is; cwbh fmt takes a .rs, .go, .cpp, .py, .ts, .zig or .lua file",
             path.display()
         ))),
     }

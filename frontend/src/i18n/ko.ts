@@ -141,6 +141,10 @@ export const ko: Partial<Catalogue> = {
     "텐서, 그래디언트, 어텐션. 모든 것이 shape이고, 지하실의 그것도 그것으로 만들어졌다.",
   "lands.typescriptBlurb":
     "인터페이스, 제네릭, 타입 좁히기. 실행되기 전에 모든 값에 타입이 있고, 컴파일러는 이미 전부 읽었다.",
+  "lands.zigBlurb":
+    "옵셔널, 값으로서의 에러, comptime. 숨겨진 것은 없다: 모든 할당은 값을 치르고, 모든 실패에는 이름이 있다.",
+  "lands.luaBlurb":
+    "테이블, 클로저, 메타테이블, 코루틴. 모든 것이 하나의 구조이고, 번호는 1부터 시작한다.",
   "lands.remixBlurb":
     "Go, Rust, Python: 같은 프로그램을 세 번. 하나의 개념, 세 가지 문법을 손가락에 나란히.",
   "lands.verybasicBlurb": "퀴즈. 어느 줄이 맞는 문법인가? 넷 중 하나를 고르고, 그 줄을 친다.",
@@ -181,6 +185,8 @@ export const ko: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.zig": "ZIG",
+  "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "아직 이 거리에는 아무것도 없습니다",
   "map.failed": "지도를 읽지 못했습니다",
@@ -369,6 +375,8 @@ export const ko: Partial<Catalogue> = {
   "pg.python": "PYTHON",
   "pg.pytorch": "PYTORCH",
   "pg.typescript": "TYPESCRIPT",
+  "pg.zig": "ZIG",
+  "pg.lua": "LUA",
   "pg.stdin": "표준 입력",
   "pg.stdinHint": "표준 입력 — 프로그램이 읽는 내용",
   "pg.unsaved": "저장 안 됨",
@@ -521,6 +529,8 @@ export const ko: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.zig": "ZIG",
+  "search.lua": "LUA",
   "search.remix": "REMIX",
   "search.unified": "통합",
   "search.text": "단어",
@@ -612,6 +622,8 @@ export const ko: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.zig": "ZIG",
+  "ai.lua": "LUA",
   "ai.remix": "REMIX",
   "ai.newPlan": "새 계획",
   "ai.drillSize": "{n}개 훈련",

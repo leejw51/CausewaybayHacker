@@ -1,0 +1,6 @@
+main.zig:6:34: error: no field named 'lanes' in struct 'main.Booth'
+    std.debug.print("{d}\n", .{b.lanes});
+                                 ^~~~~
+main.zig:3:15: note: struct declared here
+const Booth = struct { lane: i32 };
+              ^~~~~~~~~~~~~~~~~~~~

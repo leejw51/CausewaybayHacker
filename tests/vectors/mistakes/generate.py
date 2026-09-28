@@ -130,6 +130,38 @@ CASES = [
     ("typescript/recursion.ts", "wrong-answer", "ts:recursion", "runtime", "exception"),
     ("typescript/json-parse.ts", "unhandled-error", "ts:json-parse", "runtime", "exception"),
     ("typescript/exception.ts", "unhandled-error", "ts:exception", "runtime", "exception"),
+    # ---- zig ------------------------------------------------------------
+    # No codes, one voice: `main.zig:L:C: error: message`, classified by the
+    # message's shape as C++ is, under `zig:` slugs. The runtime rows are
+    # `-O Debug`'s safety checks, each a `panic:` that names itself, plus an
+    # error `main` returned and nobody handled.
+    ("zig/expected-type.zig", "type-mismatch", "zig:expected-type", "compile", "error"),
+    ("zig/undeclared-identifier.zig", "unknown-name", "zig:undeclared-identifier", "compile", "error"),
+    ("zig/unused.zig", "unused", "zig:unused", "compile", "error"),
+    ("zig/cannot-assign-constant.zig", "mutability", "zig:cannot-assign-constant", "compile", "error"),
+    ("zig/error-not-handled.zig", "unhandled-error", "zig:error-not-handled", "compile", "error"),
+    ("zig/no-member.zig", "missing-trait", "zig:no-member", "compile", "error"),
+    ("zig/optional-unwrapped.zig", "nil-deref", "zig:optional-unwrapped", "compile", "error"),
+    ("zig/expected-token.zig", "syntax", "zig:expected-token", "compile", "error"),
+    ("zig/index-out-of-bounds.zig", "index-range", "zig:index-out-of-bounds", "runtime", "panic"),
+    ("zig/null-unwrap.zig", "nil-deref", "zig:null-unwrap", "runtime", "panic"),
+    ("zig/integer-overflow.zig", "unhandled-error", "zig:integer-overflow", "runtime", "panic"),
+    ("zig/unreachable.zig", "unhandled-error", "zig:unreachable", "runtime", "panic"),
+    ("zig/error-returned.zig", "unhandled-error", "zig:error-returned", "runtime", "error"),
+    # ---- lua ------------------------------------------------------------
+    # LuaJIT: the syntax check (`-b`) and the run speak one line each,
+    # `luajit: main.lua:L: message`; the identity is the `attempt to …`
+    # phrase and what it was tried on, under `lua:` slugs.
+    ("lua/syntax.lua", "syntax", "lua:syntax", "compile", "error"),
+    ("lua/index-nil.lua", "nil-deref", "lua:index-nil", "runtime", "error"),
+    ("lua/undefined-global.lua", "unknown-name", "lua:undefined-global", "runtime", "error"),
+    ("lua/call-nil.lua", "nil-deref", "lua:call-nil", "runtime", "error"),
+    ("lua/arithmetic-type.lua", "type-mismatch", "lua:arithmetic-type", "runtime", "error"),
+    ("lua/compare-type.lua", "type-mismatch", "lua:compare-type", "runtime", "error"),
+    ("lua/concatenate-nil.lua", "nil-deref", "lua:concatenate-nil", "runtime", "error"),
+    ("lua/bad-argument.lua", "type-mismatch", "lua:bad-argument", "runtime", "error"),
+    ("lua/stack-overflow.lua", "wrong-answer", "lua:stack-overflow", "runtime", "error"),
+    ("lua/error.lua", "unhandled-error", "lua:error", "runtime", "error"),
 ]
 
 # What the row's `code` must be found as in the real output — one needle per
@@ -156,6 +188,15 @@ COMPILE_NEEDLES = {
     "TS2588": ("error TS2588:",),
     "TS1005": ("error TS1005:",),
     "TS2393": ("error TS2393:",),
+    "zig:expected-type": ("error: expected type",),
+    "zig:undeclared-identifier": ("error: use of undeclared identifier",),
+    "zig:unused": ("error: unused local variable",),
+    "zig:cannot-assign-constant": ("error: cannot assign to constant",),
+    "zig:error-not-handled": ("error: error union is ignored", "error: error is discarded"),
+    "zig:no-member": ("error: no field named", "error: no field or member function named"),
+    "zig:optional-unwrapped": ("found '?i32'",),
+    "zig:expected-token": ("error: expected ';'",),
+    "lua:syntax": ("unexpected symbol near",),
 }
 RUNTIME_NEEDLES = {
     None: ("index out of bounds",),
@@ -181,6 +222,20 @@ RUNTIME_NEEDLES = {
     "ts:recursion": ("RangeError: Maximum call stack size exceeded",),
     "ts:json-parse": ("SyntaxError:",),
     "ts:exception": ("Error: no such board",),
+    "zig:index-out-of-bounds": ("panic: index out of bounds",),
+    "zig:null-unwrap": ("panic: attempt to use null value",),
+    "zig:integer-overflow": ("panic: integer overflow",),
+    "zig:unreachable": ("panic: reached unreachable code",),
+    "zig:error-returned": ("error: InvalidCharacter",),
+    "lua:index-nil": ("attempt to index field 'left' (a nil value)",),
+    "lua:undefined-global": ("attempt to perform arithmetic on global 'totl' (a nil value)",),
+    "lua:call-nil": ("attempt to call field 'length' (a nil value)",),
+    "lua:arithmetic-type": ("attempt to perform arithmetic on local 'segments' (a table value)",),
+    "lua:compare-type": ("attempt to compare string with number",),
+    "lua:concatenate-nil": ("attempt to concatenate field 'size' (a nil value)",),
+    "lua:bad-argument": ("bad argument #2 to 'rep'",),
+    "lua:stack-overflow": ("stack overflow",),
+    "lua:error": ("main.lua:2: no such lantern",),
 }
 
 # Cases kept in the suite for the evidence they carry, but whose expected
@@ -539,6 +594,154 @@ def parse_tsc_text(stderr: str) -> list:
     return out
 
 
+# SPEC §5.1: the runner's own line, `-O Debug` so every safety check is on and
+# a panic names itself. Both caches are named so the build does not depend on
+# the machine's `HOME`.
+ZIG_COMPILE = ["zig", "build-exe", "main.zig", "-O", "Debug", "--color", "off", "-femit-bin=prog"]
+# SPEC §5.1: the bytecode step is the compile phase (a syntax error surfaces
+# here, before a line runs); the run is the source, so the traceback names
+# `main.lua`. LuaJIT, never `lua` — the land's dialect is LuaJIT's.
+LUA_CHECK = ["luajit", "-b", "main.lua", "main.luac"]
+LUA_RUN = ["luajit", "main.lua"]
+
+
+def zig_stderr(text: str) -> str:
+    """What zig printed, with the two things that vary taken out: the
+    absolute scratch path in a panic's trace (`<work>/main.zig:6:34`), and
+    the thread id in the panic header, plus the addresses. The `referenced
+    by:` trail names lines inside the compiler's own `std`, which move with
+    every release; cut, as node's internal frames are, so `--check` survives
+    a zig upgrade."""
+    import re
+
+    out = []
+    for line in text.splitlines():
+        if line.startswith("referenced by:"):
+            break
+        # The frames below the player's are the platform's — `???:?:?: … in
+        # start (/usr/lib/dyld)` here, `_start` in libc on Linux — and would
+        # make the capture a fact about one machine. Only the header, the
+        # player's frames and `std`'s survive.
+        if line.startswith("???:") or "/usr/lib/" in line or " in _start " in line or " in start " in line:
+            continue
+        line = re.sub(r"thread \d+ panic:", "thread <tid> panic:", line)
+        line = re.sub(r" 0x[0-9a-f]+ in ", " 0x<pc> in ", line)
+        line = re.sub(r"/[^ :]*/(main\.zig)", r"<work>/\1", line)
+        line = re.sub(r"/[^ :]*/lib/zig/std/", "<zig-std>/", line)
+        out.append(line)
+    return "\n".join(out) + ("\n" if text.endswith("\n") else "")
+
+
+def parse_zig_text(stderr: str) -> list:
+    """`main.zig:3:20: error: message`, one per diagnostic; the echoed source,
+    the caret and the notes are left to the raw capture."""
+    import re
+
+    out = []
+    for line in stderr.splitlines():
+        m = re.match(r"^(main\.zig):(\d+):(\d+): (error|note): (.*)$", line)
+        if m:
+            out.append(
+                {
+                    "level": m.group(4),
+                    "file": m.group(1),
+                    "line": int(m.group(2)),
+                    "col": int(m.group(3)),
+                    "message": m.group(5),
+                }
+            )
+    return out
+
+
+def run_zig(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> dict:
+    shutil.copy(src, work / "main.zig")
+    cmd = [
+        *ZIG_COMPILE,
+        "--cache-dir",
+        str(work / "zig-cache"),
+        "--global-cache-dir",
+        str(build_root / "zig-global"),
+    ]
+    build = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=300)
+    result = {
+        "compiled_as": "main.zig",
+        "compile_command": " ".join(ZIG_COMPILE),
+        "compile_exit": build.returncode,
+        "compiles": build.returncode == 0 and (work / "prog").exists(),
+        "raw_compile_stderr": zig_stderr(build.stderr),
+        "diagnostics": parse_zig_text(build.stderr),
+    }
+    if result["compiles"]:
+        try:
+            run_out = subprocess.run(["./prog"], cwd=work, capture_output=True, text=True, timeout=20)
+            result["run_command"] = "./prog"
+            result["run_exit"] = run_out.returncode
+            if run_out.returncode < 0:
+                result["run_signal"] = -run_out.returncode
+            result["run_stdout"] = normalise_runtime(run_out.stdout)
+            result["run_stderr"] = zig_stderr(run_out.stderr)
+        except subprocess.TimeoutExpired:
+            result["run_command"] = "./prog"
+            result["run_exit"] = None
+            result["run_stderr"] = "<timed out after 20s>"
+    return result
+
+
+def lua_stderr(text: str) -> str:
+    """LuaJIT's traceback ends in a `[C]: at 0x…` frame whose address is the
+    interpreter's own; taken out so the capture is the same on every
+    machine."""
+    import re
+
+    return re.sub(r"\[C\]: at 0x[0-9a-f]+", "[C]: at 0x<pc>", text)
+
+
+def parse_lua_text(stderr: str) -> list:
+    """`luajit: main.lua:2: message` — one line, before the traceback."""
+    import re
+
+    out = []
+    for line in stderr.splitlines():
+        m = re.match(r"^(?:luajit: )?(main\.lua):(\d+): (.*)$", line)
+        if m and not line.startswith("\t"):
+            out.append(
+                {
+                    "level": "error",
+                    "file": m.group(1),
+                    "line": int(m.group(2)),
+                    "col": None,
+                    "message": m.group(3),
+                }
+            )
+            break
+    return out
+
+
+def run_lua(src: pathlib.Path, work: pathlib.Path) -> dict:
+    shutil.copy(src, work / "main.lua")
+    check = subprocess.run(LUA_CHECK, cwd=work, capture_output=True, text=True, timeout=60)
+    result = {
+        "compiled_as": "main.lua",
+        "compile_command": " ".join(LUA_CHECK),
+        "compile_exit": check.returncode,
+        "compiles": check.returncode == 0,
+        "raw_compile_stderr": lua_stderr(check.stderr),
+        "diagnostics": parse_lua_text(check.stderr),
+    }
+    if result["compiles"]:
+        try:
+            run_out = subprocess.run(LUA_RUN, cwd=work, capture_output=True, text=True, timeout=20)
+            result["run_command"] = " ".join(LUA_RUN)
+            result["run_exit"] = run_out.returncode
+            result["run_stdout"] = normalise_runtime(run_out.stdout)
+            result["run_stderr"] = lua_stderr(run_out.stderr)
+        except subprocess.TimeoutExpired:
+            result["run_command"] = " ".join(LUA_RUN)
+            result["run_exit"] = None
+            result["run_stderr"] = "<timed out after 20s>"
+    return result
+
+
 def run_rust(src: pathlib.Path, work: pathlib.Path) -> dict:
     shutil.copy(src, work / "main.rs")
     compile_out = subprocess.run(
@@ -716,6 +919,22 @@ def observed_identity(lang: str, res: dict) -> list:
         if tail:
             ids.append(tail[-1])
         return ids
+    if lang == "zig":
+        ids = [d["message"] for d in res["diagnostics"] if d["level"] == "error"]
+        # The panic header, or the `error: Name` a returned error prints.
+        said = [
+            l for l in (res.get("run_stderr") or "").splitlines()
+            if "panic:" in l or l.startswith("error: ") or l.startswith("Segmentation fault")
+        ]
+        if said:
+            ids.append(said[0])
+        return ids
+    if lang == "lua":
+        ids = [d["message"] for d in res["diagnostics"]]
+        head = (res.get("run_stderr") or "").strip().splitlines()
+        if head:
+            ids.append(head[0])
+        return ids
     return [d["message"] for d in res["diagnostics"]]
 
 
@@ -843,7 +1062,7 @@ def content_starters(build_root: pathlib.Path) -> list:
     return out
 
 
-EXTENSION = {"rust": "rs", "go": "go", "cpp": "cpp", "python": "py", "typescript": "ts"}
+EXTENSION = {"rust": "rs", "go": "go", "cpp": "cpp", "python": "py", "typescript": "ts", "zig": "zig", "lua": "lua"}
 # What the captured compile stream is called, per land: the tool that wrote it.
 CAPTURE_EXT = {
     "rust": "rustc.json",
@@ -851,6 +1070,8 @@ CAPTURE_EXT = {
     "cpp": "cxx.txt",
     "python": "pycompile.txt",
     "typescript": "tsc.txt",
+    "zig": "zig.txt",
+    "lua": "luajit.txt",
 }
 
 
@@ -865,6 +1086,10 @@ def run_case(lang: str, src: pathlib.Path, work: pathlib.Path, build_root: pathl
         return run_python(src, work)
     if lang == "typescript":
         return run_typescript(src, work)
+    if lang == "zig":
+        return run_zig(src, work, build_root)
+    if lang == "lua":
+        return run_lua(src, work)
     raise SystemExit(f"no runner for land {lang!r}")
 
 
@@ -1115,6 +1340,8 @@ def build_doc(cases_out: list, content_out: list, cxx_id: str | None, cxx_versio
             "python": tool_version("python3", "--version"),
             "tsc": tool_version(tsc_program(), "--version"),
             "node": tool_version("node", "--version"),
+            "zig": tool_version("zig", "version"),
+            "luajit": tool_version("luajit", "-v"),
             "host": tool_version("uname", "-srm"),
         },
         # Unlike `toolchain`, this IS compared by --check: it is the list of

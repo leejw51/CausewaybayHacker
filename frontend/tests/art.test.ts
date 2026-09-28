@@ -83,6 +83,8 @@ const LAND_MASCOTS = [
   "sprite_python",
   "sprite_pytorch",
   "sprite_typescript",
+  "sprite_zig",
+  "sprite_lua",
   "sprite_remix",
 ];
 const BOSSES = [
@@ -99,7 +101,7 @@ const BOSSES = [
   "boss_recursion",
 ];
 const CATEGORIES = ["basic", "advanced", "hacker"];
-const LANDS = ["rust", "go", "cpp", "python", "pytorch", "typescript", "remix"];
+const LANDS = ["rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "remix"];
 /**
  * The roads a land has a band and a mascot for. VERY BASIC draws neither on
  * any land, and REMIX LAND has only the two grammar roads, so its art is one

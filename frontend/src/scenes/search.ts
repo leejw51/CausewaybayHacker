@@ -73,6 +73,8 @@ const LANDS = (): ReadonlyArray<{ id: string; label: string; value: Land | null 
   { id: "land:python", label: t("search.python"), value: "python" },
   { id: "land:pytorch", label: t("search.pytorch"), value: "pytorch" },
   { id: "land:typescript", label: t("search.typescript"), value: "typescript" },
+  { id: "land:zig", label: t("search.zig"), value: "zig" },
+  { id: "land:lua", label: t("search.lua"), value: "lua" },
   { id: "land:remix", label: t("search.remix"), value: "remix" },
 ];
 

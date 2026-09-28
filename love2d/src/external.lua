@@ -24,7 +24,10 @@ M.DIR_ENV = "CAUSEWAYBAY_HACKER_HOME"
 
 -- The scratch file's extension, so `$EDITOR` picks the right mode. A land
 -- not listed gets `.txt`, which is plain but never wrong.
-local EXT = { rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts" }
+local EXT = {
+  rust = "rs", go = "go", cpp = "cpp", python = "py", pytorch = "py", typescript = "ts",
+  zig = "zig", lua = "lua",
+}
 M.EXT = EXT
 
 function M.home()

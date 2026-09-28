@@ -93,7 +93,7 @@ return function()
   T.case("a land the client has never heard of still gets a line", function()
     -- The server owns the land list. A client one release behind must show the
     -- new land's record rather than silently omit it.
-    local lines = Stats.land_lines(by_land({ { "zig", 3, 7 } }))
+    local lines = Stats.land_lines(by_land({ { "cobol", 3, 7 } }))
     T.eq(#lines, 1, "it is drawn")
     T.ok(lines[1]:find("3/7", 1, true) ~= nil, "with its numbers")
   end)

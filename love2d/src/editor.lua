@@ -136,8 +136,8 @@ function M.new(opts)
     -- the scenes turn it on, and the ANSWER drill turns it back off.
     auto_close = opts.auto_close or false,
     -- Which land's loop keywords `loop_closed` reads, and which words
-    -- `highlight` colours: "rust", "go", "cpp", "python", "pytorch" or
-    -- "typescript". Nil reads like Rust.
+    -- `highlight` colours: "rust", "go", "cpp", "python", "pytorch",
+    -- "typescript", "zig" or "lua". Nil reads like Rust.
     lang = opts.lang,
     -- The origin span of a mouse drag: nil when no button is down.
     drag = nil,
@@ -1309,6 +1309,14 @@ LOOP_HEAD.pytorch = LOOP_HEAD.python
 -- TypeScript closes its loops on a brace, like C++: `for (…)`, `for…of`,
 -- `for…in` and `while`, all spelled with the one keyword each.
 LOOP_HEAD.typescript = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
+-- Zig too: `for (xs) |x|`, `for (xs, 0..) |x, i|` and `while (…) : (…)`
+-- all end on a brace.
+LOOP_HEAD.zig = { "^%s*for%f[^%w_]", "^%s*while%f[^%w_]" }
+-- Lua closes nothing with a brace: a `}` there ends a table, and the one
+-- under `for _, v in ipairs({ 1, 2 }) do` must not count. Its loops close
+-- on the word `end` (or `until`) — `loop_closed_by_word` below — so the
+-- brace path gets an empty list rather than the Rust fallback.
+LOOP_HEAD.lua = {}
 
 local function loop_head(lang, head)
   for _, pat in ipairs(LOOP_HEAD[lang] or LOOP_HEAD.rust) do
@@ -1373,6 +1381,61 @@ function M.loop_closed_by_newline(lines, line, col, lang)
   return line - 1, hi + 1
 end
 
+--- Lua's block openers, one line at a time: a line that ends in `do` or
+--- `then`, opens a `function`, or is a bare `repeat`. `else` and `elseif`
+--- neither open nor close.
+local LUA_OPENER = {
+  "%f[%w_]do%s*$", "%f[%w_]then%s*$", "^%s*function%f[^%w_]", "%f[%w_]function%s*%(",
+  "^%s*repeat%s*$",
+}
+local function lua_opens(text)
+  local code = text:gsub("%-%-.*$", "")
+  for _, pat in ipairs(LUA_OPENER) do
+    if code:find(pat) then return true end
+  end
+  return false
+end
+local function lua_closes(text)
+  local code = text:gsub("%-%-.*$", "")
+  return code:find("^%s*end%f[^%w_]") ~= nil or code:find("^%s*until%f[^%w_]") ~= nil
+end
+
+--- Lua closes a loop on a word: the `end` of a `for … do` / `while … do`,
+--- or the `until` of a `repeat`. Called when the word has just been typed
+--- alone on its line; walks up counting `end`/`until` lines against opener
+--- lines — a one-liner that opens and closes itself is net nothing — and
+--- celebrates only when the line it lands on is a loop's, not an `if`'s or
+--- a `function`'s. Line-level, like Python's rule, and honest for the code
+--- a quest asks for; the one shape it misses is a `function() … end` that
+--- opens and closes inside a longer line, which reads as an opener and
+--- swallows the loop's `end` — a missed celebration, never a false one.
+--- Returns the keyword's `(line, col)` or nil.
+function M.loop_closed_by_word(lines, line, col, lang)
+  if lang ~= "lua" then return nil end
+  local text = lines[line] or ""
+  if col ~= #text then return nil end
+  local word = text:match("^%s*(end)%s*$") or text:match("^%s*(until)%s*$")
+  if not word then return nil end
+  local depth = 1
+  for i = line - 1, 1, -1 do
+    local above = lines[i] or ""
+    local opens, closes = lua_opens(above), lua_closes(above)
+    if opens and not closes then
+      depth = depth - 1
+      if depth == 0 then
+        local head = above:match("^%s*(%a+)")
+        local is_loop = word == "until" and head == "repeat"
+          or word == "end" and (head == "for" or head == "while")
+        if not is_loop then return nil end
+        return i, above:find("%S") or 1
+      end
+    elseif closes and not opens then
+      depth = depth + 1
+    end
+  end
+  return nil
+end
+
 --- The erase event for the current selection, computed before it goes.
 pending_erase = function(self)
   local l1, c1, l2, c2 = self:selection()
@@ -1429,6 +1492,8 @@ function Editor:textinput(text)
     ol, oc = M.loop_closed_by_brace(self.lines, self.line, self.col - 1, self.lang)
   elseif last == ";" then
     ol, oc = M.loop_closed_by_semicolon(self.lines, self.line, self.col - 1, self.lang)
+  elseif last == "d" or last == "l" then
+    ol, oc = M.loop_closed_by_word(self.lines, self.line, self.col - 1, self.lang)
   end
   if ol then
     emit(self, { kind = "loop", open = { ol, oc }, close = { self.line, self.col - 1 } })
@@ -1524,10 +1589,61 @@ Set Record Partial Readonly Promise Error Math JSON Number String Boolean BigInt
   M.TS_TYPES[w] = true
 end
 
+--- Zig reads nearly as Rust does — `//` comments, `"…"` strings, the same
+--- brace shape — with three differences the colours have to know: a
+--- builtin is an `@` and a word (`@import`, `@intCast`) and is coloured as
+--- Rust's macros are, since it is the same idea; `'c'` is a char literal;
+--- and a line that begins with `\\` is one line of a multiline string, to
+--- its end. There are no block comments and no macros — `anyerror!void` is
+--- an error union, and the `!` is not an invocation.
+M.ZIG_KEYWORDS = {}
+for w in ([[const var fn pub return if else for while switch try catch orelse defer errdefer struct
+enum union error comptime inline null undefined true false break continue and or unreachable test
+extern export threadlocal packed align volatile async await suspend resume noalias anytype
+usingnamespace]]):gmatch("%S+") do
+  M.ZIG_KEYWORDS[w] = true
+end
+M.ZIG_TYPES = {}
+for w in ([[u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize f16 f32 f64 bool void type anyerror
+noreturn ArrayList AutoHashMap StringHashMap PriorityQueue Allocator Io Writer Reader]]):gmatch("%S+") do
+  M.ZIG_TYPES[w] = true
+end
+
+--- Lua is the one land whose comments are not `//`: `--` to the end of the
+--- line, `--[[ … ]]` across lines (carried through `state` the way `/* */`
+--- is), and `//` is two slashes, which LuaJIT refuses. `'…'` and `"…"` are
+--- both strings, and so is `[[…]]` — on one line here; a long string
+--- spanning lines is rare in a quest and would need a third state. `#` is
+--- the length operator, punctuation like any other. Lua has no types, so
+--- the second table is the standard library's names instead: `string`,
+--- `table`, `pairs`, `print`, which are what a reader's eye wants picked
+--- out of a line of plain words.
+M.LUA_KEYWORDS = {}
+for w in ([[and break do else elseif end false for function goto if in local nil not or repeat
+return then true until while]]):gmatch("%S+") do
+  M.LUA_KEYWORDS[w] = true
+end
+M.LUA_TYPES = {}
+for w in ([[string table math io os coroutine print pairs ipairs tostring tonumber type select
+setmetatable getmetatable rawget rawset pcall error assert unpack require]]):gmatch("%S+") do
+  M.LUA_TYPES[w] = true
+end
+
+local WORDS = {
+  typescript = { M.TS_KEYWORDS, M.TS_TYPES },
+  zig = { M.ZIG_KEYWORDS, M.ZIG_TYPES },
+  lua = { M.LUA_KEYWORDS, M.LUA_TYPES },
+}
+
 function M.highlight(line, state, lang)
-  local ts = lang == "typescript"
-  local keywords = ts and M.TS_KEYWORDS or M.KEYWORDS
-  local types = ts and M.TS_TYPES or M.TYPES
+  local ts, zig, lua = lang == "typescript", lang == "zig", lang == "lua"
+  local words = WORDS[lang]
+  local keywords = words and words[1] or M.KEYWORDS
+  local types = words and words[2] or M.TYPES
+  -- Rust's `name!` macro rule holds in Rust, Go, C++ and Python, where it
+  -- is harmless; the three lands that read otherwise turn it off.
+  local macros = not (ts or zig or lua)
+  local block_close = lua and "]]" or "*/"
   local spans = {}
   local i, n = 1, #line
   local start = 1
@@ -1539,10 +1655,10 @@ function M.highlight(line, state, lang)
 
   while i <= n do
     if state == "block_comment" then
-      local close = line:find("*/", i, true)
+      local close = line:find(block_close, i, true)
       if close then
-        push(line:sub(i, close + 1), "comment")
-        i = close + 2
+        push(line:sub(i, close + #block_close - 1), "comment")
+        i = close + #block_close
         state = "code"
       else
         push(line:sub(i), "comment")
@@ -1552,12 +1668,32 @@ function M.highlight(line, state, lang)
     else
       local c = line:sub(i, i)
       local two = line:sub(i, i + 1)
-      if two == "//" then
+      if lua and line:sub(i, i + 3) == "--[[" then
+        -- Before `--`, or the block comment is a line comment that never
+        -- ends. The opener itself is coloured on the way out of the loop.
+        state = "block_comment"
+      elseif lua and two == "--" then
         push(line:sub(i), "comment")
         i = n + 1
-      elseif two == "/*" then
+      elseif lua and two == "[[" then
+        local close = line:find("]]", i + 2, true)
+        local j = close and close + 2 or n + 1
+        push(line:sub(i, j - 1), "string")
+        i = j
+      elseif zig and two == "\\\\" and line:sub(1, i - 1):match("^%s*$") then
+        push(line:sub(i), "string")
+        i = n + 1
+      elseif zig and c == "@" and line:sub(i + 1, i + 1):match("[%a_]") then
+        local j = i + 1
+        while j <= n and line:sub(j, j):match("[%w_]") do j = j + 1 end
+        push(line:sub(i, j - 1), "macro")
+        i = j
+      elseif not lua and two == "//" then
+        push(line:sub(i), "comment")
+        i = n + 1
+      elseif not (zig or lua) and two == "/*" then
         state = "block_comment"
-      elseif c == '"' or (ts and (c == "'" or c == "`")) then
+      elseif c == '"' or ((ts or lua or zig) and c == "'") or (ts and c == "`") then
         local j = i + 1
         while j <= n do
           local cj = line:sub(j, j)
@@ -1581,7 +1717,7 @@ function M.highlight(line, state, lang)
         local j = i
         while j <= n and line:sub(j, j):match("[%w_]") do j = j + 1 end
         local word = line:sub(i, j - 1)
-        if line:sub(j, j) == "!" and not ts then
+        if line:sub(j, j) == "!" and macros then
           push(word .. "!", "macro")
           j = j + 1
         elseif keywords[word] then

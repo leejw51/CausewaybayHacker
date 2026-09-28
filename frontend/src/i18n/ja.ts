@@ -140,6 +140,10 @@ export const ja: Partial<Catalogue> = {
     "テンソル、勾配、アテンション。すべては形であり、地下のあれも同じ形でできている。",
   "lands.typescriptBlurb":
     "インターフェース、ジェネリクス、型の絞り込み。走る前にすべての値に型があり、コンパイラはもう全部読んでいる。",
+  "lands.zigBlurb":
+    "オプショナル、値としてのエラー、comptime。隠れたものは何もない。アロケーションはすべて支払われ、失敗にはすべて名前がある。",
+  "lands.luaBlurb":
+    "テーブル、クロージャ、メタテーブル、コルーチン。すべてがひとつの構造で、番号は 1 から始まる。",
   "lands.remixBlurb":
     "Go、Rust、Python：同じプログラムを三回。ひとつの概念、三つの文法を指に並べて。",
   "lands.verybasicBlurb": "クイズ。どの行が正しい文法か。四つから一つ選び、その行を打つ。",
@@ -180,6 +184,8 @@ export const ja: Partial<Catalogue> = {
   "map.python": "PYTHON",
   "map.pytorch": "PYTORCH",
   "map.typescript": "TYPESCRIPT",
+  "map.zig": "ZIG",
+  "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "このストリートにはまだ何もありません",
   "map.failed": "マップを読み込めませんでした",
@@ -368,6 +374,8 @@ export const ja: Partial<Catalogue> = {
   "pg.python": "PYTHON",
   "pg.pytorch": "PYTORCH",
   "pg.typescript": "TYPESCRIPT",
+  "pg.zig": "ZIG",
+  "pg.lua": "LUA",
   "pg.stdin": "標準入力",
   "pg.stdinHint": "標準入力 — プログラムが読むもの",
   "pg.unsaved": "未保存",
@@ -518,6 +526,8 @@ export const ja: Partial<Catalogue> = {
   "search.python": "PYTHON",
   "search.pytorch": "PYTORCH",
   "search.typescript": "TYPESCRIPT",
+  "search.zig": "ZIG",
+  "search.lua": "LUA",
   "search.remix": "REMIX",
   "search.unified": "統合",
   "search.text": "語句",
@@ -610,6 +620,8 @@ export const ja: Partial<Catalogue> = {
   "ai.python": "PYTHON",
   "ai.pytorch": "PYTORCH",
   "ai.typescript": "TYPESCRIPT",
+  "ai.zig": "ZIG",
+  "ai.lua": "LUA",
   "ai.remix": "REMIX",
   "ai.newPlan": "新しい計画",
   "ai.drillSize": "{n} 問ドリル",

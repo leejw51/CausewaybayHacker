@@ -133,6 +133,39 @@ describe("the advice", () => {
     expect(advise("python", "if x == None:\n    pass\n").map((a) => a.id)).toContain("py.eq-none");
   });
 
+  it("is quiet on the Zig and Lua starters, and circles their classics", () => {
+    // The scratchpad's own hello has a `[256]u8 = undefined` buffer and a
+    // `try w.flush()`: neither is a habit worth a sentence.
+    const zigHello =
+      'const std = @import("std");\n\npub fn main(init: std.process.Init) !void {\n    var buf: [256]u8 = undefined;\n    var out = std.Io.File.stdout().writerStreaming(init.io, &buf);\n    const w = &out.interface;\n    try w.print("hello\\n", .{});\n    try w.flush();\n    _ = init.gpa;\n}\n';
+    expect(advise("zig", zigHello)).toEqual([]);
+    expect(advise("lua", 'print("hello")\nlocal t = { a = 1 }\n')).toEqual([]);
+
+    const ids = (src: string) => advise("zig", src).map((a) => a.id);
+    expect(ids('std.debug.print("{d}\\n", .{n});\n')).toContain("zig.debug-print");
+    expect(ids("const n = parse(s) catch unreachable;\n")).toContain("zig.catch-unreachable");
+    expect(ids("_ = w.flush();\n")).toContain("zig.discard-error");
+    expect(ids("_ = x;\n")).not.toContain("zig.discard-error");
+    expect(ids("var n: i64 = undefined;\nconst m = n + 1;\n")).toContain("zig.undefined-read");
+    expect(ids("var n: i64 = undefined;\nn = 1;\nconst m = n + 1;\n")).not.toContain(
+      "zig.undefined-read",
+    );
+
+    const lua = (src: string) => advise("lua", src).map((a) => a.id);
+    expect(lua("count = 0\n")).toContain("lua.global");
+    expect(lua("local t = {\n  count = 0,\n}\n")).not.toContain("lua.global");
+    expect(lua("t.count = 0\n")).not.toContain("lua.global");
+    expect(lua("local a, b = table.unpack(t)\n")).toContain("lua.table-unpack");
+    expect(lua("local q = a // b\n")).toContain("lua.floor-div");
+    expect(lua('local s = "a // b"\n')).not.toContain("lua.floor-div");
+    expect(lua("local t = { a = 1 }\nprint(#t)\n")).toContain("lua.len-of-map");
+    expect(lua('local t = {}\nt["a"] = 1\nprint(#t)\n')).toContain("lua.len-of-map");
+    expect(lua("local t = { 1, 2 }\nprint(#t)\n")).not.toContain("lua.len-of-map");
+    expect(lua("local t = { a = 1 }\nprint(#t.list)\n")).not.toContain("lua.len-of-map");
+    expect(lua("for k, v in pairs(t) do\n  print(k, v)\nend\n")).toContain("lua.pairs-order");
+    expect(lua("for i, v in ipairs(t) do\n  print(i, v)\nend\n")).not.toContain("lua.pairs-order");
+  });
+
   it("gives every finding a stable id", () => {
     const a = advise("python", "def f(xs=[]):\n    pass\n");
     const b = advise("python", "def g(ys=[]):\n    return 1\n");
@@ -142,7 +175,7 @@ describe("the advice", () => {
 
 describe("the tips", () => {
   it("has a catalogue for every land", () => {
-    for (const lang of ["rust", "go", "cpp", "python"] as const) {
+    for (const lang of ["rust", "go", "cpp", "python", "typescript", "zig", "lua"] as const) {
       expect(TIPS[lang].length).toBeGreaterThanOrEqual(10);
     }
   });

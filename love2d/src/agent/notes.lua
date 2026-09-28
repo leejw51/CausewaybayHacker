@@ -13,6 +13,7 @@ local M = {}
 --- How each land spells "the rest of this line is not code".
 M.LINE_COMMENT = {
   rust = "//", go = "//", cpp = "//", python = "#", pytorch = "#", typescript = "//",
+  zig = "//", lua = "--",
 }
 
 --- The mark that says who wrote the comment.

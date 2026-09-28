@@ -1490,3 +1490,208 @@ generated = "2026-09-28"
 rerolls = 0
 prompt = """\
 16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. Causeway Bay Hong Kong at three in the afternoon, tea time, shrunk to a miniature, in warm honey and caramel light: cream and butter-yellow paving, tan streets, terracotta and caramel-brown roofs, jade-green shop awnings, round green trees, Super Mario World candy colours. Packed densely across every part of the map: a green double-decker tram on a curving track, rows of small cafés with jade-green shopfronts and round stools on the pavement, a bakery with a striped cream awning, tenement blocks in coral and cream with bamboo scaffolding, a small park, rooftop water tanks, a market lane of stalls. The TOP-LEFT holds a small corner café with one round table outside; the streets get busier across the map, and the BOTTOM-RIGHT is one big bright café on a corner with a wide open serving hatch and a long row of round stools. A wide winding PALE CREAM paved walkway snakes back and forth across the whole map from the top left corner to the bottom right corner in smooth S-bends, bright against the ground and unbroken."""
+
+# ---------------------------------------------------------------------------
+# ZIG LAND — the toll plaza (docs/story.md §3). The mascot is the wall gecko
+# every Hong Kong stairwell has, amber, in a hi-vis vest, on a toll booth's
+# coin tray; the three road mascots grow taller and fiercer as TypeScript's
+# panel does. The bands are the plaza at first light, the Canal Road flyover
+# with the villain-hitters under it, and the tunnel control room. The plates
+# are concrete and amber under sodium lamps, no sky, nodes from the quiet
+# booth top left to the tunnel mouth bottom right at (0.818, 0.870).
+#
+# Rolled with art/tools/gen.sh; map_zig_p re-rolled once for a flat patch
+# under node 22 (art/tools/checknodes.py).
+# ---------------------------------------------------------------------------
+
+[[asset]]
+name = "sprite_zig"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon wall gecko, the kind on every Hong Kong stairwell wall: a plump amber-orange body with a paler yellow belly, a wide flat head with two big round white pixel eyes and a small contented smile, four stubby splayed toes on each foot, a long curled tail, wearing a tiny bright yellow hi-vis vest with one grey reflective stripe, standing up on its hind legs on a dark grey metal toll-booth coin tray with a few round amber coins in it. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_zig_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). a small friendly cartoon wall gecko, the kind on every Hong Kong stairwell wall: a plump amber-orange body with a paler yellow belly, a wide flat head with two big round white pixel eyes and a small contented smile, four stubby splayed toes on each foot, a long curled tail, wearing a tiny bright yellow hi-vis vest with one grey reflective stripe — sitting on a low concrete kerb block and holding up one small completely blank pale-grey card with both front feet, head tilted, curious. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_zig_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The same cartoon amber wall gecko grown taller and standing upright, in a bright yellow hi-vis vest with two grey reflective stripes and a small grey hard hat, holding a short grey-and-amber striped barrier arm across its chest like a staff, determined, standing on a flat concrete toll-booth island with an amber lamp on a short post beside it. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_zig_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The same cartoon amber wall gecko at full height, tall and fierce, in a yellow hi-vis vest and a grey hard hat, narrowed white pixel eyes, arms folded, standing on a dark concrete plinth in front of a tall grey control cabinet lit with a column of small amber and red status lights. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "emblem_zig_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A wide toll plaza at the mouth of a road tunnel at first light, the scene filling the whole width of the banner: a row of small square grey toll booths with amber-lit windows and striped barrier arms, wet concrete lanes, a dark tunnel mouth on the left, tall sodium lamps still glowing amber against a cold pale-grey pre-dawn sky, and a small amber cartoon wall gecko in a yellow hi-vis vest standing on the concrete island in the middle. Every part of the scene is concrete grey, charcoal, amber and pale yellow. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_zig_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A heavy concrete road flyover crossing the whole width of the banner on thick grey pillars, morning traffic on it — a green double-decker tram below, red taxis and a minibus above — and under the flyover in the shade a row of small folding stools where old women in aprons sit beating small paper figures with slippers beside little red shrines and burning incense, with a taller amber cartoon wall gecko in a yellow hi-vis vest and hard hat standing on the pavement in the middle. Colours: concrete grey, charcoal, amber, warm morning yellow, a little red. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_zig_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). The inside of a tunnel control room at dawn: a long grey console with rows of small amber and red status lights, a wall of grey monitors showing plain amber blocks of light and simple lane diagrams with no text, thick cables on the floor, one wide window onto the toll plaza and its striped barriers below, and a tall fierce amber cartoon wall gecko in a hi-vis vest standing in front of the console with arms folded. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "map_zig"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. The toll plaza at the Causeway Bay mouth of a cross-harbour road tunnel at first light, shrunk to a miniature, in cold grey dawn light with amber sodium lamps: the ground is wet mid-grey concrete and dark green verges, clearly lit, never black and never empty. Packed densely across every part of the map: rows of small square toll booths with amber-lit windows and striped barrier arms, wide concrete lanes with white markings, a heavy concrete flyover on thick pillars crossing the map diagonally, a green double-decker tram on a curving track, red taxis, tenement blocks in grey and cream with bamboo scaffolding, small shrines with red lanterns under the flyover, round green trees, rooftop water tanks. The TOP-LEFT is quiet: one small toll booth with one amber lamp. The plaza grows busier across the map, and the BOTTOM-RIGHT is the busiest place: the dark tunnel mouth with its wide fan of lanes and a tall grey control tower lit amber. A wide winding PALE CREAM paved walkway snakes back and forth across the whole map from the top left corner to the bottom right corner in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "map_zig_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-28"
+rerolls = 1
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges, with buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere. The toll plaza at the Causeway Bay mouth of a cross-harbour road tunnel at first light, shrunk to a miniature, in cold grey dawn light with amber sodium lamps: the ground is wet mid-grey concrete and dark green verges, clearly lit, never black and never empty. Packed densely across every part of the map: rows of small square toll booths with amber-lit windows and striped barrier arms, wide concrete lanes with white markings, a heavy concrete flyover on thick pillars crossing the map, a green double-decker tram on a curving track, red taxis, tenement blocks in grey and cream with bamboo scaffolding, small shrines with red lanterns under the flyover, round green trees, rooftop water tanks. The TOP-LEFT is quiet: one small toll booth with one amber lamp. The plaza grows busier going down the map, and the BOTTOM-RIGHT is the busiest place: the dark tunnel mouth with its wide fan of lanes and a tall grey control tower lit amber. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the darker ground and unbroken."""
+
+# ---------------------------------------------------------------------------
+# LUA LAND — the fire dragon (docs/story.md §3). The mascot is the moon's
+# rabbit, white, with a paper lantern; the road mascots carry more lanterns
+# and then the dragon's head. The bands are a Tai Hang lane strung with
+# lanterns under the full moon, the fire dragon coming through, and the
+# lantern carnival in Victoria Park. The plates are indigo and lantern red,
+# no sky, the dragon coiled bottom right where the boss node sits.
+#
+# Rolled with art/tools/gen.sh; map_lua_p re-rolled once for flat patches
+# under nodes 13 and 14 (art/tools/checknodes.py).
+# ---------------------------------------------------------------------------
+
+[[asset]]
+name = "sprite_lua"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The character is a small friendly cartoon round rabbit, moon-white with a soft cream belly, two tall ears with pale pink insides, two big round dark pixel eyes and a tiny smile, short stubby paws, holding up a small round red-and-gold paper lantern on a short stick, standing on a small round dark-indigo stone with a thin pale moonlight highlight on it. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_lua_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). a small friendly cartoon round rabbit, moon-white with a soft cream belly, two tall ears with pale pink insides, two big round dark pixel eyes and a tiny smile, short stubby paws, holding up a small round red-and-gold paper lantern on a short stick — sitting on a low dark-indigo stone step, the lantern set down beside it, holding up one small completely blank cream card with both paws, ears up, curious. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_lua_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The same cartoon moon-white rabbit grown taller and standing upright, wearing a small red silk vest with gold trim, carrying a long bamboo pole with three glowing red-and-gold paper lanterns hanging from it, determined, standing on a dark-indigo cobbled lane with a few glowing incense sticks planted beside it. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "mascot_lua_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art mascot sprite, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the character). The same cartoon moon-white rabbit at full height, tall and fierce, in a red silk vest with gold trim, narrowed dark pixel eyes, holding a tall bamboo pole topped with a big glowing orange straw dragon head trailing sparks of incense, standing on a dark-indigo stone plinth. Chunky hard-edged pixels, bold dark outline all the way round the subject, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no logo. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "emblem_lua_basic"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A narrow old Hong Kong lane on a festival night, the scene filling the whole width of the banner: low tenement houses with shuttered shopfronts, strings of glowing red and gold paper lanterns hung across the lane between the balconies, a few round rabbit-shaped and star-shaped lanterns, a big full moon low over the rooftops in a deep indigo sky, cobbled ground in indigo and violet with warm lantern reflections, and a small moon-white cartoon rabbit holding one lantern standing in the middle of the lane. Colours: deep indigo, violet, lantern red, gold and moon white. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_lua_advanced"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A festival night in an old Hong Kong district, the scene filling the whole width of the banner: a long glowing fire dragon made of straw studded with thousands of burning incense sticks, carried through the lane on poles by a crowd of small figures, sparks and smoke rising, drums, strings of red lanterns overhead, a full moon in a deep indigo sky, and a taller moon-white cartoon rabbit in a red vest carrying a pole of lanterns walking at the front. Colours: deep indigo, violet, ember orange, lantern red, gold and moon white. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "emblem_lua_hacker"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 128]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art wide banner, 3:1, on a completely solid flat magenta background (pure magenta RGB 255 0 255 everywhere that is not the scene). A big park at night during a lantern festival: giant glowing lantern sculptures — a huge rabbit, a huge moon, a huge lotus — on a wide lawn under a deep indigo sky with a full moon, crowds of tiny figures with hand lanterns, trees strung with hundreds of small lights, and a tall fierce moon-white cartoon rabbit in a red vest holding a pole with a glowing dragon head standing in front of the giant moon lantern. Colours: deep indigo, violet, gold, lantern red and moon white. Chunky hard-edged pixels, bold dark outline, flat cel shading, no anti-aliasing, no gradient, no glow bloom. Absolutely no text, no letters, no words, no numbers, no symbols on any sign, screen or board; every board is plain. Painted 16-bit console game background art."""
+
+[[asset]]
+name = "map_lua"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-09-28"
+rerolls = 0
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges. The TOP-LEFT CORNER, the TOP-RIGHT CORNER, the BOTTOM-LEFT CORNER and the BOTTOM-RIGHT CORNER each contain buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere — every part of the picture has roofs, kerbs, trees, streets or stalls in it. An old Hong Kong hillside district beside a big park on a lantern festival night, shrunk to a miniature, lit by lanterns and moonlight: the ground is dark indigo and violet paving and dark green lawns with warm red and gold lantern light pooled on it, clearly lit, never black and never empty. Packed densely across every part of the map: narrow lanes of low tenement houses strung with red and gold paper lanterns, small temples with curved roofs and red pillars, a long glowing orange straw fire dragon studded with incense sparks winding through the lanes carried by tiny figures, drum stands, food stalls with striped awnings, a green double-decker tram on a curving track, a big park of round trees hung with strings of small lights and giant glowing lantern sculptures of a rabbit and a moon and a lotus, rooftop water tanks. The TOP-LEFT is quiet: one small lane with one red lantern. The festival grows brighter across the map, and the BOTTOM-RIGHT is the brightest place: the park lawn where the fire dragon coils under a giant glowing moon lantern. A wide winding PALE CREAM paved walkway snakes back and forth across the whole map from the top left corner to the bottom right corner in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "map_lua_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-09-28"
+rerolls = 1
+prompt = """\
+16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges, with buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere. An old Hong Kong hillside district beside a big park on a lantern festival night, shrunk to a miniature, lit by lanterns and moonlight: the ground is dark indigo and violet paving and dark green lawns with warm red and gold lantern light pooled on it, clearly lit, never black and never empty. Packed densely across every part of the map: narrow lanes of low tenement houses strung with red and gold paper lanterns, small temples with curved roofs and red pillars, a long glowing orange straw fire dragon studded with incense sparks winding through the lanes carried by tiny figures, drum stands, food stalls with striped awnings, a green double-decker tram on a curving track, a big park of round trees hung with strings of small lights and giant glowing lantern sculptures of a rabbit and a moon and a lotus, rooftop water tanks. The TOP-LEFT is quiet: one small lane with one red lantern. The festival grows brighter going down the map, and the BOTTOM-RIGHT is the brightest place: the park lawn where the fire dragon coils under a giant glowing moon lantern. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the darker ground and unbroken."""
