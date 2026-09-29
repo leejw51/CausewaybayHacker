@@ -835,9 +835,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   );
   expect(bigger, "A+ makes the code bigger").toBeGreaterThan(beforeFont);
   expect(smaller, "A- takes it back down").toBeLessThan(bigger);
-  // It is the same preference the quest screen keeps, so it survives a visit
-  // to another screen and back.
-  expect(await pref(page, "quest.font")).not.toBe("");
+  // It is one preference for every screen, so it survives a visit to
+  // another screen and back.
+  expect(await pref(page, "ui.text")).not.toBe("");
 
   // The code face, cycled by a button that says which face it is. Measured
   // off the rendered editor: a face button that changes a label and not the
@@ -1368,7 +1368,7 @@ test("3f: every language on the login screen, via the LANG button", async ({
   expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 });
 
-test("5: every code-size step on the quest screen (en)", async ({ page }) => {
+test("5: every text-size step on the quest screen (en)", async ({ page }) => {
   const account = freshAccount();
   const wire = await Wire.as(BACKEND, account);
   try {
@@ -1383,7 +1383,7 @@ test("5: every code-size step on the quest screen (en)", async ({ page }) => {
     const steps: string[] = [];
     let last = "";
     for (let i = 0; i < 20; i++) {
-      const mul = (await pref(page, "quest.font")) ?? "1";
+      const mul = (await pref(page, "ui.text")) ?? "1";
       if (mul === last) break;
       last = mul;
       const pct = Math.round(Number(mul) * 100);
@@ -1396,13 +1396,13 @@ test("5: every code-size step on the quest screen (en)", async ({ page }) => {
     }
     console.log(`[font] steps: ${steps.join(", ")}`);
     expect(steps[0]).toBe("70");
-    expect(steps[steps.length - 1]).toBe("240");
+    expect(steps[steps.length - 1]).toBe("120");
   } finally {
     wire.close();
   }
 });
 
-test("5b: Korean (CJK) at the smallest, default and largest code size, plus the other screens", async ({
+test("5b: Korean (CJK) at the smallest, default and largest text size, plus the other screens", async ({
   page,
 }) => {
   const account = freshAccount();
@@ -1424,15 +1424,15 @@ test("5b: Korean (CJK) at the smallest, default and largest code size, plus the 
     await page.waitForTimeout(300);
     await shot(page, "42-ko-quest-070");
     await editorInsideCanvas(page, "ko 70%");
-    for (let i = 0; i < 14; i++) await clickButton(page, "fontup");
+    for (let i = 0; i < 8; i++) await clickButton(page, "fontup");
     await page.waitForTimeout(300);
-    expect(await pref(page, "quest.font")).toBe("2.4");
-    await shot(page, "42-ko-quest-240");
-    await editorInsideCanvas(page, "ko 240%");
+    expect(await pref(page, "ui.text")).toBe("1.2");
+    await shot(page, "42-ko-quest-120");
+    await editorInsideCanvas(page, "ko 120%");
     // The console drawer and the hint, at the biggest size.
     await clickButton(page, "console");
     await page.waitForTimeout(300);
-    await shot(page, "43-ko-quest-240-console");
+    await shot(page, "43-ko-quest-120-console");
     await clickButton(page, "console");
     // A result and the stats in Korean.
     await setSource(page, WRONG);

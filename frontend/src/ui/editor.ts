@@ -103,17 +103,11 @@ const MODE: Record<Lang, () => Extension> = {
  * editor's panel title calls the thing you are typing into.
  */
 /**
- * How big the player likes code, as a multiple of the screen's own size.
- *
- * One preference, not one per screen: "how big I like my code" is a fact
- * about the person, and a quest screen and a scratchpad that disagreed about
- * it would be two settings to keep in step by hand.
+ * Which face code is drawn in. One preference, not one per screen: a quest
+ * screen and a scratchpad that disagreed about it would be two settings to
+ * keep in step by hand. (The size is `TEXT_SCALE_KEY`, for every screen.)
  */
-export const CODE_FONT_KEY = "quest.font";
-/** Which face code is drawn in. Beside the size, and shared the same way. */
 export const CODE_FACE_KEY = "quest.face";
-export const CODE_FONT_MIN = 0.7;
-export const CODE_FONT_MAX = 2.4;
 
 /**
  * What one level of indentation is, per land: what each land's formatter

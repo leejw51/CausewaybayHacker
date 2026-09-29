@@ -53,9 +53,9 @@
 import type { App, Scene } from "../app";
 import { cjkFloor, ensureFonts, fontAt, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
+import { btnPad, clipped, fill, neonPrint, well, type Ctx, type Rect } from "../engine/ui";
 import { btnBox, pixBtn } from "../engine/ui";
-import { Buttons, footer, header, RUST, titledPanel } from "../ui/chrome";
+import { Buttons, footer, header, headerH, RUST, titledPanel } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { Overlay } from "../ui/overlay";
 import { readNumberPref, writePref } from "../ui/prefs";
@@ -105,7 +105,7 @@ function fitButtonFont(f: Font, label: string, limit: number, floor: number): Fo
   const least = Math.max(Math.round(f.size * 0.66), floor);
   for (let px = f.size; px >= least; px -= 2) {
     out = px === f.size ? f : fontAt(px, "pixel");
-    if (btnBox(out, [label], 0, out.size * 2, 0)[0] <= limit) break;
+    if (btnBox(out, [label], 0, btnPad(out), 0)[0] <= limit) break;
   }
   return out;
 }
@@ -120,7 +120,7 @@ function rowsFor(f: Font, width: number, labels: string[]) {
   let rows = 1;
   let x = 0;
   for (const label of labels) {
-    const [bw] = btnBox(f, [label], 0, f.size * 2, 0);
+    const [bw] = btnBox(f, [label], 0, btnPad(f), 0);
     if (x > 0 && x + bw > width) {
       rows++;
       x = 0;
@@ -761,7 +761,7 @@ export class LoginScene implements Scene {
 
     const colW = Math.min(layout.vw - Math.round(32 * s), Math.round(560 * s));
     const colX = Math.round((layout.vw - colW) / 2);
-    const top = Math.round(38 * s);
+    const top = headerH(layout);
 
     // The title, set over the street rather than inside a box.
     const titleY = top + Math.round((layout.isPortrait() ? 60 : 34) * s);
@@ -999,8 +999,8 @@ export class LoginScene implements Scene {
     // painted by hand below, because `Buttons.draw` sets every button in one
     // face — and the width is clamped to the panel whatever the label does.
     const keepFont = fitButtonFont(fonts.button, keepLabel, innerW, Math.round(cjkFloor() * s));
-    const keepW = Math.min(innerW, btnBox(keepFont, [keepLabel], 0, keepFont.size * 2, 0)[0]);
-    const [cancelW] = btnBox(fonts.button, [cancelLabel], 0, fonts.button.size * 2, 0);
+    const keepW = Math.min(innerW, btnBox(keepFont, [keepLabel], 0, btnPad(keepFont), 0)[0]);
+    const [cancelW] = btnBox(fonts.button, [cancelLabel], 0, btnPad(fonts.button), 0);
     const btnGap = Math.round(fonts.button.size * 0.5);
     // Measured, not "one in landscape, two in portrait": I HAVE WRITTEN IT
     // DOWN and CANCEL wrap in a landscape card too, and the assumed single

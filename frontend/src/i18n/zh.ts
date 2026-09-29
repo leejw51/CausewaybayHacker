@@ -254,7 +254,7 @@ export const zh: Partial<Catalogue> = {
   "quest.combo": "连击",
   "quest.bestCombo": "最高连击",
   "quest.codeFace": "代码字体 {name}",
-  "quest.fontSize": "代码字号 {percent}%",
+  "quest.fontSize": "文字字号 {percent}%",
   "quest.leaveMapTitle": "回到地图吗？",
   "quest.leaveLobbyTitle": "回到大厅吗？",
   "quest.leaveBody": "编辑器里的代码还没保存。离开会丢掉它。",

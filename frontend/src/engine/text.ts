@@ -169,6 +169,31 @@ export function getCodeFace(): CodeFace {
   return codeFace;
 }
 
+/**
+ * How big the player wants *all* the type, as a multiple of the designed size.
+ *
+ * One number for every screen and every face — chrome, buttons, prose and
+ * code alike — because "I can read it at this size" is a fact about the
+ * person, not about which screen they are on. It lives here rather than in
+ * `Layout.uiScale` on purpose: the scale also sets margins and gaps, and
+ * bigger text should mean more room for text, not more room around it.
+ */
+export const TEXT_SCALE_KEY = "ui.text";
+export const TEXT_SCALE_MIN = 0.7;
+export const TEXT_SCALE_MAX = 1.2;
+export const TEXT_SCALE_STEP = 0.1;
+let textMul = 1;
+
+export function setTextScale(mul: number): void {
+  const next = Math.min(TEXT_SCALE_MAX, Math.max(TEXT_SCALE_MIN, Math.round(mul * 100) / 100));
+  if (next === textMul) return;
+  textMul = next;
+  remeasure();
+}
+
+export function getTextScale(): number {
+  return textMul;
+}
 
 /** The two stacks, for the font-coverage test. */
 export function fontStacks(): { pixel: string; body: string } {
@@ -297,7 +322,9 @@ export function fontAt(px: number, family: "pixel" | "body" | "mono"): Font {
  * nothing unless the scale actually moved.
  */
 export function ensureFonts(scale: number): Record<FontName, Font> {
-  const s = Math.max(1, scale);
+  // The layout's scale never goes under the design size; the player's own
+  // multiplier can, which is the whole point of an A- button.
+  const s = Math.max(1, scale) * textMul;
   // The active CJK family is part of the key. Without it, switching language
   // hands back the record built for the previous one and every Korean string
   // on screen is measured — and drawn — in a stack that cannot render it.
@@ -314,8 +341,8 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
    * two code faces. What is in the editor and in a sample well is Rust or Go,
    * in Latin, in every language; raising it because the *interface* is Korean
    * would push the player's own work around for no reading benefit. The
-   * editor has its own size control (A- / A+ on the quest screen) and that is
-   * the right place for that preference.
+   * player's own size (`setTextScale`: A- / A+, F9 / F10) is already in `s`,
+   * so it moves the code with everything else.
    */
   const at = (n: number) => Math.max(n, floorPx * s);
   fonts = {

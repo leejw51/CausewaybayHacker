@@ -13,6 +13,7 @@ import type { Land } from "../net/protocol";
 import { bodyFontAt, ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
+  btnPad,
   clipped,
   fill,
   inRect,
@@ -116,12 +117,12 @@ export function frame(
   // quest — pass nothing and stay full-bleed, because room to read beats
   // room to look.
   const pad = Math.round(10 * s) + Math.round(inset * layout.vw * 0.5);
-  const headerH = Math.round(38 * s);
+  const headH = headerH(layout);
   const footerBar = footerH(layout);
   const x = pad;
-  const y = headerH + pad + reserve;
+  const y = headH + pad + reserve;
   const w = layout.vw - pad * 2;
-  const h = layout.vh - headerH - footerBar - pad * 2 - reserve;
+  const h = layout.vh - headH - footerBar - pad * 2 - reserve;
   const portrait = stack === "auto" ? layout.isPortrait() : stack === "column";
   const gap = pad;
   if (portrait) {
@@ -130,7 +131,7 @@ export function frame(
       body: [x, y, w, h],
       left: [x, y, w, top],
       right: [x, y + top + gap, w, h - top - gap],
-      headerH,
+      headerH: headH,
       footerH: footerBar,
       scale: s,
       portrait,
@@ -142,7 +143,7 @@ export function frame(
     body: [x, y, w, h],
     left: [x, y, lw, h],
     right: [x + lw + gap, y, w - lw - gap, h],
-    headerH,
+    headerH: headH,
     footerH: footerBar,
     scale: s,
     portrait,
@@ -163,7 +164,7 @@ export function frame(
 export function header(g: Ctx, app: App, title: string): void {
   const { layout } = app;
   const s = layout.uiScale();
-  const h = Math.round(38 * s);
+  const h = headerH(layout);
   fill(g, Theme.navy, 0, 0, layout.vw, h);
   fill(g, Theme.coin, 0, h - 3, layout.vw, 3);
   fill(g, Theme.ink, 0, h - 1, layout.vw, 1);
@@ -205,6 +206,24 @@ export function header(g: Ctx, app: App, title: string): void {
   g.fillStyle = css(hot ? Theme.cream : Theme.cyan);
   printf(g, sm, label, bx, by + Math.round(4 * s), w, "center");
   app.logoutRect = [bx, by, w, bh];
+}
+
+/**
+ * How tall the status bar is, in virtual pixels.
+ *
+ * Thirty-eight at the design size, and taller when the player's text size
+ * (`setTextScale`) would otherwise put the title or the LOG OUT chip over the
+ * coin-coloured rule underneath. Every screen that sits something under the
+ * bar asks here rather than repeating the number.
+ */
+export function headerH(layout: Layout): number {
+  const s = layout.uiScale();
+  const f = ensureFonts(s);
+  return Math.max(
+    Math.round(38 * s),
+    f.station.height + Math.round(12 * s),
+    f.stationSm.height + Math.round(14 * s),
+  );
 }
 
 /**
@@ -323,7 +342,7 @@ export class Buttons {
     let cy = y;
     let lineH = 0;
     for (const item of labels) {
-      const [bw, bh] = btnBox(f, [item.label], 0, f.size * 2, minH);
+      const [bw, bh] = btnBox(f, [item.label], 0, btnPad(f), minH);
       if (cx > x && cx + bw > x + w) {
         cx = x;
         cy += lineH + gap;

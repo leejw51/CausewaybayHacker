@@ -27,7 +27,7 @@
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
-import { btnBox, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   clearRibbon,
   clearedStamp,
@@ -40,6 +40,7 @@ import {
   Buttons,
   landColour,
   footerH,
+  headerH,
   landName,
 } from "../ui/chrome";
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
@@ -605,7 +606,7 @@ export class MapScene implements Scene {
     const f = this.barFont(s);
     const gap = Math.round(f.size * 0.5);
     const split = gap * 3;
-    const pad = f.size * 2;
+    const pad = btnPad(f);
     const minH = layout.minTouchH();
     const bh = btnBox(f, [t("map.basic")], 0, pad, minH)[1];
     const x0 = Math.round(8 * s);
@@ -1050,7 +1051,7 @@ export class MapScene implements Scene {
     const portrait = layout.isPortrait();
     const size = this.app.assets?.size(PLATE[this.land], portrait) ?? { w: 3, h: 2 };
     if (layout.isPhone()) {
-      const barBottom = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h;
+      const barBottom = headerH(layout) + Math.round(8 * s) + this.barLayout().h;
       const geo = phoneMapLayout(
         layout.vw,
         layout.vh,
@@ -1063,7 +1064,7 @@ export class MapScene implements Scene {
       this.strip = geo.strip;
       return geo.plate;
     }
-    const top = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
+    const top = headerH(layout) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
     const bottom = layout.vh - footerH(layout) - Math.round(8 * s);
     const infoH = this.infoH();
     const availX = Math.round(8 * s);
@@ -1153,7 +1154,7 @@ export class MapScene implements Scene {
     header(g, this.app, `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`);
     // Outside the plate's lift and alpha: the switcher is chrome, and chrome
     // that fades in with the ground reads as part of the ground.
-    this.drawBar(g, Math.round(38 * s) + Math.round(8 * s));
+    this.drawBar(g, headerH(layout) + Math.round(8 * s));
     const infoDrop = (1 - this.infoIn.out) * Math.round(60 * s);
     g.save();
     g.globalAlpha = Math.min(1, this.infoIn.raw * 2.2);
@@ -1205,7 +1206,7 @@ export class MapScene implements Scene {
     const pad = Math.round(14 * s);
     const x = Math.round(8 * s);
     const w = layout.vw - x * 2;
-    const y = Math.round(38 * s) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
+    const y = headerH(layout) + Math.round(8 * s) + this.barLayout().h + Math.round(10 * s);
     const gap = Math.round(f.size * 0.5);
     this.sheet.reset();
     // The lands, on their own row, the one you are in lit.

@@ -26,7 +26,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
-import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -748,7 +748,7 @@ export class AiScene implements Scene {
     const fonts = ensureFonts(s);
     const gap = Math.round(6 * s);
     const bw = Math.floor((w - gap * (items.length - 1)) / items.length);
-    return items.every((i) => btnBox(fonts.button, [i.label], 0, fonts.button.size * 2)[0] <= bw);
+    return items.every((i) => btnBox(fonts.button, [i.label], 0, btnPad(fonts.button))[0] <= bw);
   }
 
   /** The band the actions need: one row, or one row per action when stacked. */

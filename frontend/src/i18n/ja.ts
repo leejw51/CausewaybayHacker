@@ -265,7 +265,7 @@ export const ja: Partial<Catalogue> = {
   "quest.combo": "コンボ",
   "quest.bestCombo": "最高コンボ",
   "quest.codeFace": "コードの書体 {name}",
-  "quest.fontSize": "コードの大きさ {percent}%",
+  "quest.fontSize": "文字の大きさ {percent}%",
   "quest.leaveMapTitle": "マップへ戻りますか？",
   "quest.leaveLobbyTitle": "ロビーへ戻りますか？",
   "quest.leaveBody": "エディタのコードは保存されていません。出ると失われます。",

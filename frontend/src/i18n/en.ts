@@ -282,7 +282,7 @@ export const en = {
   "quest.combo": "COMBO",
   "quest.bestCombo": "BEST",
   "quest.codeFace": "code face {name}",
-  "quest.fontSize": "code size {percent}%",
+  "quest.fontSize": "text size {percent}%",
   "quest.leaveMapTitle": "BACK TO THE MAP?",
   "quest.leaveLobbyTitle": "BACK TO THE LOBBY?",
   "quest.leaveBody": "The code in the editor is not saved. Leaving throws it away.",

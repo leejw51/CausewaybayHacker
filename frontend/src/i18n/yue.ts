@@ -269,7 +269,7 @@ export const yue: Partial<Catalogue> = {
   "quest.combo": "連擊",
   "quest.bestCombo": "最高連擊",
   "quest.codeFace": "代碼字體 {name}",
-  "quest.fontSize": "碼嘅字大細 {percent}%",
+  "quest.fontSize": "字嘅大細 {percent}%",
   "quest.leaveMapTitle": "返地圖？",
   "quest.leaveLobbyTitle": "返大堂？",
   "quest.leaveBody": "編輯器入面嘅碼未儲。走咗就冇。",
