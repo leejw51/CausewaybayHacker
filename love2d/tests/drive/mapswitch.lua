@@ -7,6 +7,8 @@
 -- ESC → lands → land → category, the gate would be gone and the friction
 -- would not. So: TAB for the land, Q for the category, both from here.
 
+local Land = require("src.land")
+
 local function on_login(app) return app.scene_name == "login" end
 local steps = {}
 local function add(t) steps[#steps + 1] = t end
@@ -32,13 +34,36 @@ add({ text = "legal winner thank year wave sausage worth useful legal winner tha
 add({ key = "return", when = on_login })
 add({ until_ = function(app) return app.scene_name == "lands" end, note = "signed in", timeout = 25 })
 add({ until_ = function(app) return app.scene.lands ~= nil end, timeout = 10 })
+-- RUST and BASIC by name, not by pressing ENTER on whatever the cursor
+-- starts on: the lands screen opens on the land the server says this
+-- account was last in (§1.3), which is wherever the previous run left it.
+add({ until_ = function(app)
+      for i, land in ipairs(app.scene.lands or {}) do
+        if land.land == "rust" then app.scene.cursor = i return true end
+      end
+      return false
+    end, note = "the rust land", timeout = 10 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "categories" and app.scene.categories end,
       timeout = 10 })
+add({ until_ = function(app)
+      for i, cat in ipairs(app.scene.categories or {}) do
+        if cat.category == "basic" then app.scene.cursor = i return true end
+      end
+      return false
+    end, note = "the basic road", timeout = 10 })
 add({ key = "return" })
 add({ until_ = loaded, note = "on the map", timeout = 10 })
 add({ wait = 0.6 })
 add({ until_ = report("start"), timeout = 3 })
+add({ until_ = function(app)
+      local m = app.scene
+      if m.land ~= "rust" or m.category ~= "basic" then
+        print("FAIL: did not start on rust/basic")
+        return false
+      end
+      return true
+    end, note = "started on rust/basic", timeout = 5 })
 add({ shot = "M1-rust-basic.png" })
 
 -- Move the cursor somewhere memorable, so "come back to where I was" is
@@ -82,19 +107,41 @@ add({ until_ = function(app)
     end, note = "land switched, category kept, no walk across", timeout = 10 })
 add({ shot = "M4-go-hacker.png" })
 
--- Back to where we started: TAB walks on through cpp and python and
--- returns to rust/hacker on the third press, and one Q wraps hacker ->
--- basic. (Two Q's overshoot to advanced — which this script did on its
--- first run, and the assertion below caught rather than glossing over.)
+-- Back to where we started: TAB walks on through every land after GO in
+-- `Land.ORDER` and wraps round to RUST. Every language land keeps HACKER;
+-- REMIX has only the two grammar roads, so it lands on its last one, BASIC
+-- (`Map:switch`), and that is what TAB carries on into RUST — which is the
+-- map this script started on.
 add({ note = "back to where we were — nothing is lost by looking" })
-for _, land in ipairs({ "cpp", "python", "rust" }) do
+local after_go = {}
+do
+  local seen_go = false
+  for _, land in ipairs(Land.ORDER) do
+    if seen_go then after_go[#after_go + 1] = land end
+    if land == "go" then seen_go = true end
+  end
+  after_go[#after_go + 1] = "rust"
+end
+local carried = "hacker"
+for _, land in ipairs(after_go) do
+  local roads = Land.roads(land)
+  local has = false
+  for _, road in ipairs(roads) do if road == carried then has = true end end
+  local want = has and carried or roads[#roads]
+  carried = want
   add({ key = "tab" })
   add({ until_ = loaded, timeout = 12 })
-  add({ until_ = function(app) return app.scene.land == land end,
-        note = "TAB reached " .. land, timeout = 10 })
+  add({ until_ = function(app)
+        local m = app.scene
+        if m.land ~= land then return false end
+        if m.category ~= want then
+          print(("FAIL: TAB into %s gave %s, not %s"):format(land, tostring(m.category), want))
+          return false
+        end
+        if m.walk then print("FAIL: a walk survived the switch"); return false end
+        return true
+      end, note = ("TAB reached %s / %s"):format(land, want), timeout = 10 })
 end
-add({ key = "q" })
-add({ until_ = loaded, timeout = 12 })
 add({ wait = 0.6 })
 add({ until_ = function(app)
       local m = app.scene
@@ -114,6 +161,19 @@ add({ until_ = function(app)
       return true
     end, note = "the map remembered where it was left", timeout = 10 })
 add({ shot = "M5-back-at-start.png" })
+
+-- And Q wraps: basic -> advanced -> hacker -> the first road, one press
+-- each, never past the end.
+for _, want in ipairs({ "advanced", "hacker", Land.roads("rust")[1] }) do
+  add({ key = "q" })
+  add({ until_ = loaded, timeout = 12 })
+  add({ until_ = function(app)
+        local m = app.scene
+        if m.category ~= want then return false end
+        if m.land ~= "rust" then print("FAIL: Q changed the land"); return false end
+        return true
+      end, note = "Q reached " .. want, timeout = 10 })
+end
 
 add({ orient = "portrait" })
 add({ resize = { 720, 1000 } })

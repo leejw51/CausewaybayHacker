@@ -11,12 +11,16 @@ local Land = require("src.land")
 
 --- A Map with just enough around it to switch, and a record of every
 --- `world.map` the switch asked for.
-local function fake_map(land, category)
+---
+--- `lands` is what the session kept from the last `world.lands` (ids), or nil
+--- for a client that has not heard it yet.
+local function fake_map(land, category, lands)
   local asked = {}
   local app = {
     land = land, category = category,
     toast = function() end,
     session = {
+      lands = lands,
       request = function(_, type_name, payload)
         if type_name == "world.map" then
           asked[#asked + 1] = payload.land .. "." .. payload.category
@@ -100,6 +104,87 @@ return function()
     map:cycle_land()
     T.eq(map.land, "rust")
     T.eq(map.category, "advanced")
+  end)
+
+  T.section("map — TAB walks the server's lands, not the client's")
+
+  --- A `world.lands` reply (PROTOCOL §4.6) as the wire carries it, with the
+  --- rows in no particular order, run through the real `Session:request` so
+  --- the ids the map reads are the ones the session actually keeps.
+  local function heard(ids)
+    local Session = require("src.session").Session
+    local rows = {}
+    for i = #ids, 1, -1 do
+      rows[#rows + 1] = { land = ids[i], categories = { { category = "basic", open = true } } }
+    end
+    local session = setmetatable({
+      client = { request = function(_, _, _, cb) cb(true, { lands = rows }) end },
+    }, { __index = Session })
+    session:request("world.lands", {}, function() end)
+    return session.lands
+  end
+
+  T.case("a server without ZIG and REMIX: TAB skips both and wraps", function()
+    local lands = heard({ "rust", "go", "cpp", "python", "pytorch", "typescript", "lua" })
+    local map, asked = fake_map("rust", "basic", lands)
+    T.same(map:lands(), { "rust", "go", "cpp", "python", "pytorch", "typescript", "lua" },
+      "the server's lands, in SPEC §0's order whatever order they came in")
+    local seen = {}
+    for _ = 1, 7 do
+      map:cycle_land()
+      seen[#seen + 1] = map.land
+    end
+    T.same(seen, { "go", "cpp", "python", "pytorch", "typescript", "lua", "rust" },
+      "TYPESCRIPT → LUA, skipping ZIG; LUA → RUST, skipping REMIX")
+    for _, key in ipairs(asked) do
+      T.ok(not key:find("^zig%.") and not key:find("^remix%."),
+        "no world.map for a land the server does not have: " .. key)
+    end
+    T.eq(#asked, 7, "one world.map per step")
+  end)
+
+  T.case("the kept rule still holds on the server's list: no road, the last road", function()
+    -- LUA × HACKER, and the server has REMIX: TAB lands on REMIX BASIC.
+    local map, asked = fake_map("lua", "hacker", heard({ "lua", "remix", "rust" }))
+    map:cycle_land()
+    T.eq(map.land, "remix")
+    T.eq(map.category, "basic")
+    map:cycle_land()
+    T.eq(map.land, "rust", "and wraps to the first")
+    T.eq(map.category, "basic", "the category REMIX left it on")
+    T.same(asked, { "remix.basic", "rust.basic" })
+  end)
+
+  T.case("a land the server has and the client does not comes last", function()
+    local map = fake_map("rust", "basic", heard({ "kotlin", "rust", "go" }))
+    T.same(map:lands(), { "rust", "go", "kotlin" })
+  end)
+
+  T.case("standing on a land the server did not report, TAB goes to its first", function()
+    local map = fake_map("zig", "basic", heard({ "rust", "go" }))
+    map:cycle_land()
+    T.eq(map.land, "rust")
+  end)
+
+  T.case("before world.lands is heard, TAB walks every land the client knows", function()
+    local map = fake_map("rust", "basic", nil)
+    T.same(map:lands(), Land.ORDER, "the fallback is Land.ORDER")
+    map:cycle_land()
+    T.eq(map.land, "go")
+    local last = fake_map("remix", "basic", nil)
+    last:cycle_land()
+    T.eq(last.land, "rust", "and it wraps")
+  end)
+
+  T.case("the session forgets the lands when it is pointed at another server", function()
+    local Session = require("src.session").Session
+    local session = setmetatable({
+      lands = { "rust" },
+      store = { load_session = function() return nil end },
+      fire = function() end,
+    }, { __index = Session })
+    session:rebind("ws://127.0.0.1:1/ws")
+    T.eq(session.lands, nil, "another server's lands are not this one's")
   end)
 
   T.case("Q cycles the category in one action, wrapping", function()

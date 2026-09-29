@@ -94,11 +94,17 @@ test("RESET empties the road it was asked about, and keeps the XP", async ({
     const after = (await wire.ok("profile.update", {})).user as { xp: number };
     expect(after.xp, "XP is history, not progress").toBe(before.xp);
 
-    // Nothing left to reset, so the button takes itself off the bar.
-    const gone = await page.evaluate(
-      () => window.__cwbCapture?.buttonAt("reset") ?? null,
-    );
-    expect(gone).toBeNull();
+    // The button stays. It used to take itself off the bar once nothing was
+    // cleared (docs/decisions.md 2026-09-21 "the clients ask before they throw
+    // work away"); the later 2026-09-21 entry "a reset road opens on the
+    // starter" (commit bee9458) made it offered on every road, always,
+    // because what a reset takes back is mostly drafts and edit stacks the map
+    // cannot see — a road with no stamps can still be full of work. The question it asks is the guard.
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__cwbCapture?.buttonAt("reset") ?? null),
+      )
+      .not.toBeNull();
   } finally {
     wire.close();
   }

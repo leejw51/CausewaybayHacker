@@ -1,7 +1,4 @@
 thread <tid> panic: integer overflow
-<work>/main.zig:6:37: 0x<pc> in main (main)
+<work>/main.zig:6:37: 0x<pc> in main
     while (i < 10) : (i += 1) axles += 1;
                                     ^
-<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)
-    if (fn_info.params.len == 0) return wrapMain(root.main());
-                                                          ^

@@ -77,8 +77,26 @@ async function untilIdle(page: Page): Promise<void> {
 
 /** Pick a message: a tap on one picks it, a tap on the picked one lets go. */
 async function pick(page: Page, id: string): Promise<void> {
+  // `buttons()` is the last *frame's* list: the rects a click aims at and the
+  // verbs a pick brings are both a frame behind. Read straight after the
+  // click it was always stale, so the second tap meant for "it was already
+  // picked" let go of a pick that had worked; and after an edit re-orders
+  // the room, a stale rect aims at the message that used to be there. So a
+  // frame is drawn — synchronously, through the capture hook — before the
+  // aim and before the read.
+  const frame = () =>
+    page.evaluate(() => {
+      const api = window.__cwbCapture!;
+      api.step(1);
+      api.resume();
+    });
+  await frame();
   await clickButton(page, id);
-  if (!(await ids(page)).includes("deletemsg")) await clickButton(page, id);
+  await frame();
+  if (!(await ids(page)).includes("deletemsg")) {
+    await clickButton(page, id);
+    await frame();
+  }
   expect(await ids(page)).toContain("deletemsg");
 }
 
@@ -129,15 +147,17 @@ test("CODE PLAYGROUND is a tile, and the coder's panel is on the code page", asy
 
   // DONE with the room open closes the room too: back on the framed page
   // the AGENT button is unlit, and coming back to CODE does not bring a
-  // panel up that nobody asked for.
+  // panel up that nobody asked for. The room reopens on the page it was
+  // left on (SETUP, after the keyless message), so the panel is known by
+  // its provider tabs, which both pages carry.
   await clickButton(page, "agent");
-  await expect.poll(async () => ids(page)).toContain("send");
+  await expect.poll(async () => ids(page)).toContain("prov:anthropic");
   await clickButton(page, "unfocus");
-  await expect.poll(async () => ids(page)).not.toContain("send");
+  await expect.poll(async () => ids(page)).not.toContain("prov:anthropic");
   await expect.poll(async () => ids(page)).toContain("code");
   await clickButton(page, "code");
   await expect.poll(async () => ids(page)).toContain("unfocus");
-  expect(await ids(page)).not.toContain("send");
+  expect(await ids(page)).not.toContain("prov:anthropic");
 });
 
 test("with a key the coder answers, and the room is a messenger that syncs", async ({

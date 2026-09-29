@@ -136,4 +136,48 @@ return function()
     T.eq(netclient.EXECUTES["code.format"], nil,
       "formatting is not a run and must not block one")
   end)
+  T.section("playground — CODE's language button fits every language")
+
+  T.case("the button is measured from every language's name", function()
+    local Playground = require("src.scenes.playground")
+    local Land = require("src.land")
+    local want = {}
+    for i, lang in ipairs(Land.LANGS) do want[i] = Land.name(lang) end
+    T.same(Playground.lang_labels(), want, "one label per language, as Land.name spells it")
+    local src = scene_source()
+    if src then
+      T.ok(src:find('every = { "PYTHON" }', 1, true) == nil, "and not sized for PYTHON alone")
+    end
+  end)
+
+  T.case("every language's label draws at the same size, at every step", function()
+    if not (love and love.graphics) then
+      T.skip("language button fit", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Playground = require("src.scenes.playground")
+    local UI = require("src.ui")
+    local Layout = require("src.layout")
+    local labels = Playground.lang_labels()
+    local was_font = Layout.font
+    for _, step in ipairs({ 1, 2, 3, 4 }) do
+      Layout.font = step
+      -- 8 down to 3: every size the CODE band's shrinking loop can pick.
+      for size = 8, 3, -1 do
+        local w = Playground.button_w(labels, size)
+        for _, label in ipairs(labels) do
+          -- `UI.button` fits its label to `w - 8`; fitting means drawn at
+          -- `size` itself, the size every other label on the band gets.
+          T.eq(UI.fitSize(label, w - 8, size, 3), size,
+            ("step %d size %d: %s drawn at the band's size"):format(step, size, label))
+        end
+      end
+    end
+    -- The report: sized for PYTHON, TYPESCRIPT only fitted by shrinking.
+    Layout.font = 1
+    local old = Playground.button_w({ "PYTHON" }, 8)
+    T.ok(UI.fitSize("TYPESCRIPT", old - 8, 8, 3) < 8,
+      "the old width made TYPESCRIPT draw smaller than the rest")
+    Layout.font = was_font
+  end)
 end

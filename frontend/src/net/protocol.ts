@@ -163,6 +163,29 @@ export const LANDS: readonly Land[] = [...LANGS, "remix"];
 export function isLand(v: unknown): v is Land {
   return typeof v === "string" && (LANDS as readonly string[]).includes(v);
 }
+/**
+ * The lands the map's switcher offers — its land chips and TAB — from the
+ * ids `world.lands` last reported (§4.6), in `LANDS`' order. `null` is a
+ * client that has not heard `world.lands` yet, and gets every land it knows.
+ *
+ * A land this client knows and the server does not is a `world.map` the
+ * server cannot answer, so it is left out. So is a land the server has and
+ * this client does not: there is no art, no palette and no name for it here,
+ * and the LAND SELECT screen is where it is shown.
+ */
+export function mapLands(reported: readonly string[] | null | undefined): readonly Land[] {
+  if (!reported) return LANDS;
+  return LANDS.filter((l) => reported.includes(l));
+}
+/**
+ * TAB on the map: the land after `current` in `lands`, wrapping. A land not
+ * in the list (the server did not report it) steps to the first; an empty
+ * list stays where it is.
+ */
+export function nextLand(lands: readonly Land[], current: Land): Land {
+  if (lands.length === 0) return current;
+  return lands[(lands.indexOf(current) + 1) % lands.length];
+}
 export type Category = "verybasic" | "basic" | "advanced" | "hacker";
 /** SPEC §0's four roads, in the order they are walked. */
 export const CATEGORIES: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];

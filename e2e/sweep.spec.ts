@@ -17,6 +17,7 @@ import {
   test,
   Wire,
   type Account,
+  pressWhenStill,
 } from "./fixtures.js";
 
 /**
@@ -30,7 +31,14 @@ import {
 const SHOTS = process.env.SWEEP_SHOTS ?? "test-results/sweep";
 mkdirSync(SHOTS, { recursive: true });
 
-const BACKEND = process.env.E2E_BACKEND_URL ?? "http://127.0.0.1:5390";
+// The server the wire checks ask. The same one the page is served from when
+// `E2E_BASE_URL` points at a backend (the release build on its own port):
+// without that fallback a run against an isolated server asked the default
+// :5390 — a different database — and read no history for a real submit.
+const BACKEND =
+  process.env.E2E_BACKEND_URL ??
+  process.env.E2E_BASE_URL ??
+  "http://127.0.0.1:5390";
 
 test.describe.configure({ mode: "default" });
 
@@ -447,6 +455,9 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   expect(
     await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
   ).toBe(0);
+  // The buffer is the answer now, which the BLANKS checks below measure from.
+  const full = await docText();
+  expect(full.trim().length).toBeGreaterThan(0);
   await shot(page, "64-answer-completed");
 
   // BLANKS: the same answer with holes in it. The code is on the screen and
@@ -459,8 +470,19 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   await page.mouse.click(blanks![0], blanks![1]);
   await page.waitForTimeout(900);
   const drill = await docText();
-  expect(drill.length).toBeGreaterThan(0);
-  // Something is filled in for you, and something is left to do.
+  // Everything up to the first hole is typed for you (`blanksFill`), and the
+  // hole is where it stops. Not "the buffer is non-empty": the holes are a
+  // seeded third of the words, and when the answer's very first word is one
+  // of them — `fn`, on today's first RUST × BASIC street — the run up to it
+  // is rightly nothing. So: the buffer is a prefix of the answer, and what
+  // follows it is the hole that is live.
+  expect(full.startsWith(drill), `BLANKS buffer ${JSON.stringify(drill)} is the answer's start`).toBe(true);
+  const live = await page.evaluate(() =>
+    (document.querySelector(".cwb-blank-now")?.textContent ?? "").replace(/\u200b/g, ""),
+  );
+  expect(live.length, "a hole is live").toBeGreaterThan(0);
+  expect(full.slice(drill.length).startsWith(live), `the fill stops at the hole ${JSON.stringify(live)}`).toBe(true);
+  // And something is left to do.
   expect(await ghosts()).toBeGreaterThan(0);
   // The holes are drawn as the words they are, breathing, rather than as
   // rows of underscores: a hint you can read is still a hint you must type.
@@ -780,7 +802,8 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     page,
     'fn main() { println!("hello from playground {}", 6 * 7); }\n',
   );
-  await clickButton(page, "run");
+  // RUN sits on the rows SAVE reflows; see `pressWhenStill`.
+  await pressWhenStill(page, "run");
   await expect
     .poll(() => received.some((f) => f.includes("hello from playground 42")), {
       timeout: 180_000,

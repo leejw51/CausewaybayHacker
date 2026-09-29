@@ -9,6 +9,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { phoneCoinRadius, phoneMapLayout } from "../src/scenes/map";
+import { Client } from "../src/net/client";
+import { decode, encode } from "../src/net/codec";
+import { LANDS, mapLands, nextLand, roadsOf, type Land } from "../src/net/protocol";
+import type { Transport, TransportHandlers } from "../src/net/transport";
 
 const PORTRAIT_ART = { w: 768, h: 1152 };
 const LANDSCAPE_ART = { w: 1152, h: 768 };
@@ -80,5 +84,104 @@ describe("phoneCoinRadius", () => {
 
   it("never shrinks below a readable coin", () => {
     expect(phoneCoinRadius(100, 27)).toBeGreaterThanOrEqual(8);
+  });
+});
+
+/**
+ * TAB and the land chips walk the lands the server reported in `world.lands`
+ * (PROTOCOL §4.6), not the client's own list: a client that knows ZIG, talking
+ * to a server that does not, asked `world.map` for a ZIG map it could not
+ * serve.
+ */
+describe("the map's land switcher follows world.lands", () => {
+  const walk = (lands: readonly Land[], from: Land, steps: number): Land[] => {
+    const seen: Land[] = [];
+    let at = from;
+    for (let i = 0; i < steps; i++) seen.push((at = nextLand(lands, at)));
+    return seen;
+  };
+
+  it("skips the lands the server lacks, keeps LANDS' order, and wraps", () => {
+    // Reported out of order and without ZIG and REMIX.
+    const lands = mapLands(["lua", "typescript", "rust", "pytorch", "go", "python", "cpp"]);
+    expect(lands).toEqual(["rust", "go", "cpp", "python", "pytorch", "typescript", "lua"]);
+    expect(walk(lands, "rust", 7)).toEqual([
+      "go",
+      "cpp",
+      "python",
+      "pytorch",
+      "typescript",
+      "lua",
+      "rust",
+    ]);
+  });
+
+  it("falls back to every land the client knows before world.lands is heard", () => {
+    expect(mapLands(null)).toEqual(LANDS);
+    expect(walk(mapLands(null), "lua", 2)).toEqual(["remix", "rust"]);
+  });
+
+  it("leaves out a land the client has no art or name for", () => {
+    expect(mapLands(["kotlin", "go", "rust"])).toEqual(["rust", "go"]);
+  });
+
+  it("from a land the server did not report, TAB goes to its first", () => {
+    expect(nextLand(mapLands(["rust", "go"]), "zig")).toBe("rust");
+    expect(nextLand([], "zig")).toBe("zig");
+  });
+
+  it("the land it reaches still has the road, or its last one", () => {
+    // `switchTo`'s rule, unchanged: LUA × HACKER → REMIX lands on BASIC.
+    const to = nextLand(mapLands(["lua", "remix"]), "lua");
+    expect(to).toBe("remix");
+    expect(roadsOf(to).includes("hacker")).toBe(false);
+    expect(roadsOf(to)[roadsOf(to).length - 1]).toBe("basic");
+  });
+
+  it("the client keeps the ids of the last world.lands, and forgets them with the session", async () => {
+    let handlers: TransportHandlers | null = null;
+    const sent: Array<{ id: string | null; type: string }> = [];
+    const storage = new Map<string, string>();
+    const client = new Client({
+      transport: (h) => {
+        handlers = h;
+        const t: Transport = {
+          send: (text) => {
+            const d = decode(text);
+            if (d.kind === "ok") sent.push({ id: d.frame.id, type: d.frame.type });
+          },
+          close: () => h.onClose("test closed"),
+        };
+        queueMicrotask(() => h.onOpen());
+        return t;
+      },
+      storage: {
+        getItem: (k: string) => storage.get(k) ?? null,
+        setItem: (k: string, v: string) => void storage.set(k, v),
+        removeItem: (k: string) => void storage.delete(k),
+      },
+      keepalive: false,
+    });
+    expect(client.lands).toBeNull();
+    client.connect();
+    await new Promise<void>((r) => queueMicrotask(() => r()));
+    client.state = "authed";
+    const asked = client.request("world.lands", {});
+    const frame = sent.find((f) => f.type === "world.lands")!;
+    handlers!.onMessage(
+      encode(frame.id, "world.lands.ok", {
+        lands: [
+          { land: "go", categories: [] },
+          { land: "rust", categories: [] },
+        ],
+      }),
+    );
+    const res = await asked;
+    expect(res.lands.map((l) => l.land)).toEqual(["go", "rust"]);
+    expect(client.lands).toEqual(["go", "rust"]);
+    expect(mapLands(client.lands)).toEqual(["rust", "go"]);
+    client.forgetToken();
+    expect(client.lands).toBeNull();
+    client.close();
   });
 });

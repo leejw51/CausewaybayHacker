@@ -157,7 +157,7 @@ fn half_written_source_never_loses_a_character() {
 
 #[test]
 fn a_land_with_no_formatter_at_all_is_refused() {
-    let err = handlers::code_format(&json!({ "lang": "zig", "source": "fn main() {}" }))
-        .expect_err("zig is not a land, let alone a formatted one");
-    assert!(format!("{err:?}").contains("zig"), "{err:?}");
+    let err = handlers::code_format(&json!({ "lang": "cobol", "source": "fn main() {}" }))
+        .expect_err("cobol is not a land, let alone a formatted one");
+    assert!(format!("{err:?}").contains("cobol"), "{err:?}");
 }

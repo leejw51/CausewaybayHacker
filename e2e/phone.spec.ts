@@ -3,7 +3,14 @@ import { expect, freshAccount, login, openSelectedNode, pickCategory, pickLand, 
 
 const SHOTS = process.env.PHONE_SHOTS ?? "test-results/phone";
 mkdirSync(SHOTS, { recursive: true });
-const BACKEND = process.env.E2E_BACKEND_URL ?? "http://127.0.0.1:5390";
+// The server the wire checks ask. The same one the page is served from when
+// `E2E_BASE_URL` points at a backend (the release build on its own port):
+// without that fallback a run against an isolated server asked the default
+// :5390 — a different database — and read no history for a real submit.
+const BACKEND =
+  process.env.E2E_BACKEND_URL ??
+  process.env.E2E_BASE_URL ??
+  "http://127.0.0.1:5390";
 
 // A real phone: iPhone-sized CSS viewport, DPR 3, touch. This is the shape
 // the "code page is too small" report came from.

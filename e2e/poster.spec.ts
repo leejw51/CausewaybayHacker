@@ -25,6 +25,7 @@ import {
   setSource,
   test,
   type Account,
+  pressWhenStill,
 } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -54,14 +55,24 @@ function pngText(png: Uint8Array): Record<string, string> {
   return out;
 }
 
-/** Press POSTER and collect the two files it writes. */
+/**
+ * Press POSTER and collect what it writes: one PNG, and nothing else.
+ *
+ * It used to be a PNG and a JPEG. docs/decisions.md 2026-09-18 "LÖVE: the same
+ * kept key, a reader that knows a deflated label, and the poster is a PNG"
+ * took the JPEG out of both clients on purpose — it kept only what the label
+ * held and was the file people sent — so a second download is now a fault.
+ * Waited for past the first file, so a stray JPEG arriving late still fails.
+ */
 async function pressPoster(page: import("@playwright/test").Page) {
   const files: import("@playwright/test").Download[] = [];
   const onDownload = (d: import("@playwright/test").Download) => void files.push(d);
   page.on("download", onDownload);
   try {
-    await clickButton(page, "poster");
-    await expect.poll(() => files.length, { timeout: 60_000 }).toBe(2);
+    await pressWhenStill(page, "poster");
+    await expect.poll(() => files.length, { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
+    await page.waitForTimeout(2_000);
+    expect(files.map((d) => d.suggestedFilename())).toHaveLength(1);
   } finally {
     page.off("download", onDownload);
   }
@@ -75,18 +86,16 @@ async function toPlayground(page: import("@playwright/test").Page, account: Acco
   await expect(page.locator(".cm-content")).toBeVisible();
 }
 
-test("POSTER writes a signed PNG and a JPEG of the pad", async ({ page, ready }, info) => {
+test("POSTER writes a signed PNG of the pad", async ({ page, ready }, info) => {
   void ready;
   const account = freshAccount();
   await toPlayground(page, account);
   await setSource(page, PROGRAM);
 
-  // Two files from one press. The key is in this tab — this session logged
-  // in — so no key field is asked for and the poster is signed.
+  // One file from one press. The key is in this browser — this session
+  // logged in — so no key field is asked for and the poster is signed.
   const files = await pressPoster(page);
-  const names = files.map((d) => d.suggestedFilename()).sort();
-  expect(names[0]).toMatch(/^cwbhacker-.*\.jpg$/);
-  expect(names[1]).toMatch(/^cwbhacker-.*\.png$/);
+  expect(files[0].suggestedFilename()).toMatch(/^cwbhacker-.*\.png$/);
 
   const png = files.find((d) => d.suggestedFilename().endsWith(".png"))!;
   const path = info.outputPath("poster.png");
@@ -124,7 +133,7 @@ test("DISK READER brings the poster back as a new pad", async ({ page, ready }, 
   expect(await editorText(page)).not.toContain("Causeway Bay");
 
   const chooser = page.waitForEvent("filechooser");
-  await clickButton(page, "reader");
+  await pressWhenStill(page, "reader");
   await (await chooser).setFiles(path);
 
   // The program is back, in a new pad, and the pad is named after the poster.
@@ -148,7 +157,7 @@ test("a picture with no disk on it is refused", async ({ page, ready }, info) =>
   const path = info.outputPath("blank.png");
   await import("node:fs").then((fs) => fs.writeFileSync(path, blank));
   const chooser = page.waitForEvent("filechooser");
-  await clickButton(page, "reader");
+  await pressWhenStill(page, "reader");
   await (await chooser).setFiles(path);
   await page.waitForTimeout(1500);
   // Nothing was opened over the program that was being written.

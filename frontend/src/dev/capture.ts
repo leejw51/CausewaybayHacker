@@ -34,6 +34,17 @@ export interface CaptureApi {
   step(n?: number): number;
   /** Run `secs` of game time at a fixed step, then freeze. Default 2.5 s. */
   settle(secs?: number): number;
+  /**
+   * Freeze, and draw one frame **without advancing game time** (a `dt` of 0).
+   *
+   * `step` and `settle` always move the clock, so two captures taken with
+   * them differ by whatever was animating — which makes "did this *state*
+   * change reach the screen?" unanswerable. Two `redraw()`s with nothing
+   * arriving in between are the same picture; a message handled between them
+   * (the loop is frozen, the socket is not) is the only thing that can make
+   * them differ.
+   */
+  redraw(): void;
   /** Force an orientation without going through a key event. */
   orient(mode: "landscape" | "portrait"): void;
   /** The whole screen — both canvases and the DOM overlay — as a PNG data URL. */
@@ -156,8 +167,20 @@ function paintOverlay(app: App, g: CanvasRenderingContext2D): void {
   if (getComputedStyle(app.overlay).visibility === "hidden") return;
   const host = app.overlay.getBoundingClientRect();
   const dpr = app.canvas.width / Math.max(1, app.canvas.clientWidth);
+  // The overlay also holds *canvases* — the effects layer (`ui/codefx.ts`)
+  // and the coder's layer (`ui/agent/layer.ts`), transparent and the size of
+  // the whole screen. They are pictures, not text boxes, and they sit above
+  // the editor, so they are composited after it rather than painted in the
+  // loop below. Painted as a text box, each one was an opaque full-screen
+  // rectangle: every capture of the quest and playground screens came out a
+  // flat dark fill, the same picture whatever was on the screen.
+  const layers: HTMLCanvasElement[] = [];
   for (const el of Array.from(app.overlay.children) as HTMLElement[]) {
     if (el.classList.contains("cwb-hidden")) continue;
+    if (el instanceof HTMLCanvasElement) {
+      layers.push(el);
+      continue;
+    }
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
     const x = (r.left - host.left) * dpr;
@@ -196,6 +219,31 @@ function paintOverlay(app: App, g: CanvasRenderingContext2D): void {
     lines.forEach((line, i) => g.fillText(line, x + pad, y + pad + i * lineH));
     g.restore();
   }
+  // The coder's layer is `z-index: 10` — over everything, whatever order it
+  // was added in — so it goes last. Each at the opacity the page shows it at.
+  layers.sort(
+    (a, b) => Number(a.classList.contains("cwb-agent")) - Number(b.classList.contains("cwb-agent")),
+  );
+  for (const el of layers) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || el.width === 0 || el.height === 0) continue;
+    const alpha = parseFloat(getComputedStyle(el).opacity || "1");
+    if (!(alpha > 0)) continue;
+    g.save();
+    g.globalAlpha = Math.min(1, alpha);
+    try {
+      g.drawImage(
+        el,
+        (r.left - host.left) * dpr,
+        (r.top - host.top) * dpr,
+        r.width * dpr,
+        r.height * dpr,
+      );
+    } catch {
+      /* a lost WebGL context draws nothing, which is what the page shows too */
+    }
+    g.restore();
+  }
 }
 
 export function install(app: App): void {
@@ -211,6 +259,10 @@ export function install(app: App): void {
     frozen: () => app.isFrozen,
     step: (n = 1) => drive(n),
     settle: (secs = 2.5) => drive(Math.round(secs / STEP)),
+    redraw: () => {
+      app.freeze();
+      app.tick(0);
+    },
     orient: (mode) => {
       app.setOrientation(mode);
       // One frame so the new layout is what the next capture sees, rather

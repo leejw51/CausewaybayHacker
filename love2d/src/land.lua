@@ -104,6 +104,23 @@ function Land.lang_of(quest, fallback)
   return fallback or "rust"
 end
 
+--- The lands to offer, from the ids `world.lands` reported (PROTOCOL §4.6),
+--- in `ORDER`'s order with any land the client has not heard of after them
+--- (by id). `nil` — the client has not heard `world.lands` yet — is every
+--- land the client knows. The map's switcher walks this rather than `ORDER`
+--- so no key asks a server for a map of a land it does not have.
+function Land.known(ids)
+  if ids == nil then return Land.ORDER end
+  local out = {}
+  for i, id in ipairs(ids) do out[i] = id end
+  table.sort(out, function(a, b)
+    local ra, rb = Land.rank(a), Land.rank(b)
+    if ra ~= rb then return ra < rb end
+    return tostring(a) < tostring(b)
+  end)
+  return out
+end
+
 --- The idle bob's phase for a land's mascot, spread evenly round the cycle
 --- so four cards in a row never nod in unison.
 function Land.phase(land)

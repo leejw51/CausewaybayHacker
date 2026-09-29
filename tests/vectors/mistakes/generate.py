@@ -606,31 +606,49 @@ LUA_RUN = ["luajit", "main.lua"]
 
 
 def zig_stderr(text: str) -> str:
-    """What zig printed, with the two things that vary taken out: the
-    absolute scratch path in a panic's trace (`<work>/main.zig:6:34`), and
-    the thread id in the panic header, plus the addresses. The `referenced
-    by:` trail names lines inside the compiler's own `std`, which move with
-    every release; cut, as node's internal frames are, so `--check` survives
-    a zig upgrade."""
+    """What zig printed, down to the part that is the player's.
+
+    A trace is the panic header (or `error: Name` for an error `main`
+    returned), then frames: `path:line:col: 0x… in fn (module)`, each followed
+    by its source line and a caret. Only the header and the frames in
+    `main.zig` are kept. Every other frame is the compiler's own `std` or the
+    platform's start-up code, and differs by platform where the player's code
+    does not: macOS prints `???:?:?: … (/usr/lib/dyld)`, Linux prints
+    `start.zig` frames down to `_start`, generic `std` functions carry an
+    `__anon_N` the build numbers, and the module in brackets is the binary on
+    one machine and `std.zig` on another. The classifier reads only the
+    header and the first `main.zig` line, so nothing it needs is cut.
+    Compile output is cut at `referenced by:`, which lists lines inside `std`.
+    """
     import re
 
+    frame = re.compile(r"^(\S+?):(\d+|\?)(?::(\d+|\?))?: 0x[0-9a-f?]+ in (\S+)")
+    lines = text.splitlines()
     out = []
-    for line in text.splitlines():
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         if line.startswith("referenced by:"):
             break
-        # The frames below the player's are the platform's — `???:?:?: … in
-        # start (/usr/lib/dyld)` here, `_start` in libc on Linux — and would
-        # make the capture a fact about one machine. Only the header, the
-        # player's frames and `std`'s survive.
-        if line.startswith("???:") or "/usr/lib/" in line or " in _start " in line or " in start " in line:
+        m = frame.match(line)
+        if m:
+            path = m.group(1)
+            # A frame is followed by its source line and a caret, when zig
+            # could read the source.
+            j = i + 1
+            while j < len(lines) and j <= i + 2 and not frame.match(lines[j]) and lines[j].strip() != "":
+                j += 1
+            if path.endswith("main.zig"):
+                head = f"<work>/main.zig:{m.group(2)}" + (f":{m.group(3)}" if m.group(3) else "")
+                out.append(f"{head}: 0x<pc> in {m.group(4)}")
+                out.extend(lines[i + 1 : j])
+            i = j
             continue
         line = re.sub(r"thread \d+ panic:", "thread <tid> panic:", line)
-        line = re.sub(r" 0x[0-9a-f]+ in ", " 0x<pc> in ", line)
         line = re.sub(r"/[^ :]*/(main\.zig)", r"<work>/\1", line)
-        line = re.sub(r"/[^ :]*/lib/zig/std/", "<zig-std>/", line)
         out.append(line)
+        i += 1
     return "\n".join(out) + ("\n" if text.endswith("\n") else "")
-
 
 def parse_zig_text(stderr: str) -> list:
     """`main.zig:3:20: error: message`, one per diagnostic; the echoed source,
@@ -688,12 +706,12 @@ def run_zig(src: pathlib.Path, work: pathlib.Path, build_root: pathlib.Path) -> 
 
 
 def lua_stderr(text: str) -> str:
-    """LuaJIT's traceback ends in a `[C]: at 0x…` frame whose address is the
-    interpreter's own; taken out so the capture is the same on every
-    machine."""
-    import re
-
-    return re.sub(r"\[C\]: at 0x[0-9a-f]+", "[C]: at 0x<pc>", text)
+    """The error line, and not the traceback under it. The traceback ends in
+    the interpreter's own frames — `[C]: at 0x…` from Homebrew's LuaJIT,
+    `[C]: in ?` from Ubuntu's — and the classifier reads only the first line,
+    which is the same on both."""
+    head = text.split("stack traceback:", 1)[0]
+    return head if head.endswith("\n") or not head else head + "\n"
 
 
 def parse_lua_text(stderr: str) -> list:

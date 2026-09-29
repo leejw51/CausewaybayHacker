@@ -1,7 +1,4 @@
 thread <tid> panic: reached unreachable code
-<work>/main.zig:6:20: 0x<pc> in main (main)
+<work>/main.zig:6:20: 0x<pc> in main
     if (lane == 3) unreachable;
                    ^
-<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)
-    if (fn_info.params.len == 0) return wrapMain(root.main());
-                                                          ^
