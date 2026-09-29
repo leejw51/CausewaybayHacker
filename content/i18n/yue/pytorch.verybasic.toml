@@ -1,0 +1,526 @@
+# PYTORCH LAND — VERY BASIC, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/verybasic.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong practitioners actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "pytorch.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.verybasic.01.first-tensor"
+title = "第一個張量"
+story = "23:00，周亦卿樓地下嘅機房。個 console 開咗，torch 已經 import 咗，但係仲未整過任何嘢。"
+brief = '''
+張量係成個地方淨係靠佢砌出嚟嘅嗰一種值。`torch.tensor` 由一個 Python list 整一個出嚟，順序跟返你畀佢嗰個。
+
+揀出整張量 `1 2 3` 嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+
+```
+output: [1, 2, 3]
+```
+'''
+hints = [
+  "torch.tensor 收一個參數 —— 個 list —— 唔係三個數字。",
+  "個 list 嘅順序就係個張量嘅順序；冇人會幫你排序。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.verybasic.02.shape"
+title = "呢個係咩形狀"
+story = "機架走廊係兩行、每行十二部，但盤點 script 堅持話係二十四個乜嘢。冇人講得出係二十四個乜。"
+brief = '''
+每個張量都知道自己嘅形狀。`x.shape` 係一個 `torch.Size`，底下其實係一個 tuple —— `tuple(...)` 會將佢印做 tuple，外面冇 `torch.Size` 包住。
+
+個張量已經整好。揀出將佢嘅形狀印做普通 tuple 嘅嗰一行。
+
+```
+output: (2, 3)
+```
+'''
+hints = [
+  "tuple(x.shape) —— 形狀本身已經係一個序列；tuple() 淨係改佢印出嚟嘅樣。",
+  "print(x.shape) 印出 torch.Size([2, 3])，唔係同一段文字。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.verybasic.03.dtype"
+title = "以為係整數嗰個"
+story = "電力 log 用瓦數除以樣本數，每一行都得返零。瓦數係整數，答案都係整數，問題就喺度。"
+brief = '''
+一個張量成個得一種 dtype，而 `torch.tensor` 會由你交畀佢嘅嘢推斷出嚟：Python `int` 嘅 list 會得到 `torch.int64`，有 `.` 嘅 list 會得到 `torch.float32`。
+
+揀出整一個浮點張量嘅嗰一行，等印出嚟嘅 dtype 係浮點嗰個。
+
+```
+output: torch.float32
+```
+'''
+hints = [
+  "torch.tensor([1.0, 2.0]) —— 令佢變 float 嘅係個小數點。",
+  "淨係普通 int 嘅 list 會推斷做 torch.int64，而啲零就係由整數除法嚟。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.verybasic.04.zeros"
+title = "空嘅機架"
+story = "一個新嘅累加器裝風扇轉速讀數：三行、每行四個，第一個讀數到之前全部都係零。"
+brief = '''
+`torch.zeros` 將尺寸當做分開嘅參數收 —— 每個維度一個 —— 然後將個張量填滿零。
+
+揀出整三行、每行四個嘅嗰一行，然後打出嚟。
+
+```
+output: (3, 4) 0.0
+```
+'''
+hints = [
+  "torch.zeros(3, 4) —— 行先，然後先到列。",
+  "torch.zeros(4, 3) 係四行、每行三個，係另一個張量。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.verybasic.05.arange"
+title = "數機器"
+story = "六部機，而標籤機想佢哋由零開始編號，好似 switch 啲 port 咁。"
+brief = '''
+`torch.arange(n)` 就係張量版嘅 `range(n)`：由 `0` 數到 `n`，但唔包 `n`。
+
+揀出由零數到五嘅嗰一行，然後打出嚟。
+
+```
+output: [0, 1, 2, 3, 4, 5]
+```
+'''
+hints = [
+  "torch.arange(6) 喺 6 之前停，所以最後一個數係 5。",
+  "torch.arange(5) 去到 4 就停，少咗一個。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.verybasic.06.reshape"
+title = "同樣嗰十二個"
+story = "十二個感應器讀數排成一條長行嚟到。份報告要佢哋變做三個機架、每個四個，唔係咁就唔肯畫。"
+brief = '''
+`reshape` 將同樣嘅數字變做另一個形狀。元素數目一定要夾：十二個數可以係 `(3, 4)`、`(4, 3)` 或者 `(2, 6)`，但永遠唔可以係 `(5, 5)`。
+
+揀出將十二個數排做三行、每行四個嘅嗰一行。
+
+```
+output: [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]
+```
+'''
+hints = [
+  "x.reshape(3, 4) —— 行數先，而 3 * 4 一定要等於 12。",
+  "reshape 唔會抄亦唔會重新排；啲數入去係咩次序，出嚟就係咩次序。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.verybasic.07.index"
+title = "一個讀數"
+story = "冷通道嘅探針報一格格溫度，而個警報淨係理中間嗰行、第二列嗰一個。"
+brief = '''
+2-D 張量 index 嘅時候行先、列後，兩個都由零數起：`x[r, c]`。結果仍然係一個張量 —— 一個 0 維嘅 —— 而 `.item()` 會將入面嘅 Python 數字攞出嚟。
+
+揀出讀第 1 行、第 2 列嘅嗰一行。
+
+```
+output: 6
+```
+'''
+hints = [
+  "x[1, 2] —— 行 index 先，列 index 後，兩個都由零數起。",
+  "x[2, 1] 係另一格；個逗號兩邊唔對稱。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.verybasic.08.slice"
+title = "第二列"
+story = "每個機架報四個數，淨係第二個係入風溫度。個圖要嗰一列，但係而家四個都畫晒出嚟。"
+brief = '''
+`:` 即係*呢條軸上面每一個 index*。所以 `x[:, 1]` 係每一行嘅第 1 列 —— 每行一個數，而行嗰條軸就冇咗。
+
+揀出由每一行攞出第 1 列嘅嗰一行。
+
+```
+output: [1, 5, 9]
+```
+'''
+hints = [
+  "x[:, 1] —— 冒號係行嗰條軸，1 係列。",
+  "x[1, :] 係第 1 行，即係四個數，唔係三個。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.verybasic.09.elementwise"
+title = "兩支探針對得上"
+story = "同一個機架上面兩支探針，份報告要將兩組數逐個位加埋。做呢樣嘢嘅 loop 用嘅時間仲長過讀數嘅間隔。"
+brief = '''
+兩個同形狀嘅張量做算術係逐個元素做嘅，唔使 loop：`a + b` 逐個位加，得返一個同樣形狀嘅張量。
+
+揀出將兩支探針加埋嘅嗰一行。
+
+```
+output: [11, 22, 33]
+```
+'''
+hints = [
+  "a + b —— 個運算符本身已經係逐個元素；周圍唔使再寫任何嘢。",
+  "torch.cat 將兩個張量頭尾駁埋，會得到六個數，唔係三個。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.verybasic.10.broadcast"
+title = "一個 offset，每一行"
+story = "每支探針都讀低咗十度。校準 script 寫咗個 loop 行晒每一行，而啲行就快變成一百萬行。"
+brief = '''
+Broadcast 係一條規則，令唔相等嘅形狀都可以夾埋一齊計。形狀 `(3,)` 嘅張量加落形狀 `(2, 3)` 嘅張量度，會被拉開覆蓋晒每一行 —— 同樣嗰三個數加落每一行，而且唔會抄一份出嚟。
+
+揀出將嗰一行 offset 加落格入面兩行嘅嗰一行。
+
+```
+output: [[11, 22, 33], [14, 25, 36]]
+```
+'''
+hints = [
+  "grid + off —— 兩邊最尾嗰條軸都係 3，所以形狀夾得埋，off 會沿住啲行拉落去。",
+  "off.unsqueeze(1) 會將佢變成一列，broadcast 嘅方向就錯咗。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.verybasic.11.matmul"
+title = "中間嗰個維度"
+story = "一個有兩個讀數嘅 batch，要經過一張三乘二嘅混合表。`*` 報咗個關於形狀嘅錯，而個錯係啱嘅。"
+brief = '''
+`@` 係矩陣乘法，`*` 係逐個元素。`(2, 3) @ (3, 2)` 計得到，係因為中間兩個維度夾 —— 嗰個 3 同嗰個 3 —— 而結果係 `(2, 2)`。
+
+揀出將個 batch 乘以張表嘅嗰一行。
+
+```
+output: [[22, 28], [49, 64]]
+```
+'''
+hints = [
+  "a @ b —— 用 at 符號，唔係星號。",
+  "b @ a 都行得到，但係得出一個 (3, 3)，完全係另一個積。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.verybasic.12.sum-axis"
+title = "逐個機架，唔係總數"
+story = "電力報告將格入面每一個數加埋，成個地庫印一個數出嚟。物業管理要嘅係每個機架一個數。"
+brief = '''
+`x.sum()` 將所有嘢縮做一個數。`dim=` 講明*要縮走邊條軸*：`dim=1` 沿住列加，每一行留低一個數。
+
+揀出每一行得一個總數嘅嗰一行。
+
+```
+output: [6, 15]
+```
+'''
+hints = [
+  "x.sum(dim=1) —— dim 講嘅係會消失嗰條軸，而列就係第 1 軸。",
+  "dim=0 就會縮走啲行，變成每一列一個數。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.verybasic.13.mean"
+title = "平均入風溫度"
+story = "四個入風溫度，而個平均值次次都係整數，冷卻曲線唔信。"
+brief = '''
+`mean` 淨係為浮點張量而設 —— 整數張量會直接報錯，唔會靜靜雞幫你四捨五入。`x.float()` 會回傳一份浮點嘅副本，佢嘅平均值就係浮點數。
+
+揀出計四個讀數平均值嘅嗰一行。
+
+```
+output: 2.5
+```
+'''
+hints = [
+  "x.float().mean() —— 先轉型，再計平均。",
+  "喺 int64 張量上面 x.mean() 會報錯；呢度 torch 唔會幫你揀 dtype。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.verybasic.14.argmax"
+title = "邊個贏咗"
+story = "個分類器印出佢揀中嗰個 class 嘅分數，呢個數冇人可以拎嚟做嘢。問題由頭到尾都係邊一個 class。"
+brief = '''
+`max` 畀你最大嘅值。`argmax` 畀你最大嗰個值*喺邊度* —— 即係 index —— 而呢個先係分類器真正嘅答案。
+
+揀出畀你最大分數嘅 index 嘅嗰一行。
+
+```
+output: 2
+```
+'''
+hints = [
+  "scores.argmax() —— arg 即係「邊個 index」，唔係嗰個位嘅值。",
+  "scores.max() 畀你 0.9，嗰個係分數，唔係 class。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.verybasic.15.mask"
+title = "過咗條線"
+story = "六個入風溫度，過熱保護設喺 30 度。個警報用 Python loop 數，而個 loop 就塞喺讀數間隔入面。"
+brief = '''
+將一個張量同一個數比較，會得到一個逐個元素都係 `True`/`False` 嘅張量。將呢個 boolean 張量加埋就會數到有幾多個 `True`，因為 `True` 就係 1。
+
+揀出數有幾多個讀數嚴格大過 30 嘅嗰一行。
+
+```
+output: 2
+```
+'''
+hints = [
+  "(t > 30).sum() —— 括號好重要，因為 .sum() 綁得緊過 >。",
+  "t >= 30 會計埋啱啱好等於保護線嘅讀數，嗰個唔算高過佢。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.verybasic.16.cat"
+title = "兩個 batch 變一個"
+story = "兩個 capture 檔，每個兩行，而個 loader 要先有一個四行嘅張量先肯做任何嘢。"
+brief = '''
+`torch.cat` 沿住一條本身已經存在嘅軸將張量駁埋。兩個 `(2, 2)` 沿 `dim=0` 駁，就係將啲行疊埋，得到 `(4, 2)`。
+
+揀出整一個四行 batch 嘅嗰一行。
+
+```
+output: (4, 2)
+```
+'''
+hints = [
+  "torch.cat([a, b], dim=0) —— 啲張量放入一個 list，dim=0 係行嗰條軸。",
+  "torch.stack 會開一條新嘅軸，咁形狀就會變 (2, 2, 2)。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.verybasic.17.unsqueeze"
+title = "得一個嘅 batch"
+story = "一個讀數，交咗畀一個從來淨係見過 batch 嘅模型。佢唔肯：佢要兩個維度，但係得一個。"
+brief = '''
+一個用 batch 訓練嘅模型，會預咗前面有條 batch 軸。`unsqueeze(0)` 喺位置 0 插入一條大細係 1 嘅新軸，將 `(3,)` 變做 `(1, 3)` —— 一個樣本、三個 feature —— 一個數都唔使改。
+
+揀出將單一個讀數變成得一個嘅 batch 嘅嗰一行。
+
+```
+output: (1, 3)
+```
+'''
+hints = [
+  "one.unsqueeze(0) —— 個 0 係新軸擺喺邊，而 batch 軸係擺喺前面。",
+  "unsqueeze(1) 會得到 (3, 1)，即係三個 batch、每個一個 feature —— 調轉咗。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.verybasic.18.transpose"
+title = "張表反轉嚟睇"
+story = "張混合表嚟到嗰陣行同列掉轉咗，matmul 話中間兩個維度唔夾。"
+brief = '''
+`x.t()` 將一個 2-D 張量嘅兩條軸對調：`(2, 3)` 變做 `(3, 2)`，第 `i` 行第 `j` 列變做第 `j` 行第 `i` 列。
+
+揀出轉置張表嘅嗰一行。
+
+```
+output: [[1, 4], [2, 5], [3, 6]]
+```
+'''
+hints = [
+  "x.t() —— 最短嗰個，而且佢係 method call，所以要有括號。",
+  "x.reshape(3, 2) 一樣得到 (3, 2)，但係啲數會落錯格。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.verybasic.19.requires-grad"
+title = "識學嘢嗰個"
+story = "地庫入面第一個參數。佢裝住一個數，而到目前為止冇任何嘢知道應該將佢向邊個方向郁。"
+brief = '''
+一個張量淨係喺你開口要求嘅時候，先會記錄發生喺佢身上嘅嘢。`requires_grad=True` 將一個張量標記做要學嘅嘢，由嗰刻起佢身上每個運算都會被記住，等梯度可以追返轉頭。
+
+揀出整一個裝住 2.0、可以學習嘅張量嘅嗰一行。
+
+```
+output: True 2.0
+```
+'''
+hints = [
+  "torch.tensor(2.0, requires_grad=True) —— 呢個 flag 係 constructor 嘅一個 keyword argument。",
+  "requires_grad 淨係喺浮點張量先用得；int 張量帶唔到梯度。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.verybasic.20.backward"
+title = "邊邊係落"
+story = "`w` 係 3.0，損失係 `w * w`，而 `w.grad` 係 None。仲未有嘢叫過個 graph 倒轉行。"
+brief = '''
+Forward pass 砌出一個 graph；`backward()` 倒轉行一次，將梯度留喺 `.grad`。`y = w * w` 嘅導數係 `2w`，所以喺 `w = 3.0` 嗰度梯度係 `6.0`。
+
+揀出行 backward pass 嘅嗰一行。
+
+```
+output: 6.0
+```
+'''
+hints = [
+  "y.backward() —— 係喺損失，即係個 graph 嘅尾度 call，唔係喺參數度。",
+  "w.backward() 係叫個參數對自己求導，唔係 backward 嘅意思。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.verybasic.21.no-grad"
+title = "我哋睇緊嘅時候唔好"
+story = "評估嗰輪砌咗個永遠都唔會用嘅 graph，每次為 validation set 計分，地庫嘅記憶體圖就爬高一截。"
+brief = '''
+推理唔需要 graph。Torch 有一個 context manager，喺佢包住嗰段 block 入面熄咗記錄，所以出嚟嘅結果 `requires_grad` 係 false，亦唔會為一個永遠唔會發生嘅 backward pass 留低任何嘢。
+
+`with` 已經寫好。揀出整佢要入去嗰個 context manager 嘅嗰一行。
+
+```
+output: False
+```
+'''
+hints = [
+  "就係個名講明佢做乜嗰個：成段 block 都冇梯度。",
+  "佢一定要 call —— 淨係個 attribute 唔係 context manager，`with` 會拒絕佢。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.verybasic.22.linear"
+title = "第一層"
+story = "四個 feature 入，兩個 class 出，而應該夾喺中間嗰層仲未砌。"
+brief = '''
+`nn.Linear(in_features, out_features)` 就係一次矩陣乘法加一次 bias 相加，權重會幫你整好。參數次序係 *in* 先、*out* 後 —— `(batch, 4)` 入，`(batch, 2)` 出。
+
+揀出砌呢層嘅嗰一行。
+
+```
+output: (3, 2)
+```
+'''
+hints = [
+  "nn.Linear(4, 2) —— 入嘅 feature 先，出嘅 feature 後。",
+  "nn.Linear(2, 4) 將呢層砌反轉咗，個輸入就再夾唔落。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.verybasic.23.parameters"
+title = "佢有幾大"
+story = "申請撥款份表要填參數數目，而大家手上得嘅數字淨係有幾多層。"
+brief = '''
+`model.parameters()` 會逐個交出個 module 擁有嘅每一個可學習張量，而 `p.numel()` 就係其中一個入面有幾多個數。一個 `Linear(4, 2)` 擁有一個 `(2, 4)` 嘅權重同一個 `(2,)` 嘅 bias：8 + 2 = 10。
+
+揀出將佢哋加總嘅嗰一行。
+
+```
+output: 10
+```
+'''
+hints = [
+  "sum(p.numel() for p in model.parameters()) —— numel 數嘅係數字，唔係張量。",
+  "len(list(model.parameters())) 數嘅係張量，即係 2：一個權重、一個 bias。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.verybasic.24.relu"
+title = "個彎位"
+story = "兩層 linear 疊埋，中間乜都冇，無論加幾多層，成疊都會縮返做一條直線。"
+brief = '''
+疊埋嘅 linear 層仍然係線性；令網絡識得屈嘅，係夾喺佢哋中間嘅 activation。ReLU 係最簡單嗰個：正數留低，所有負數設做零。
+
+揀出用佢嘅嗰一行。
+
+```
+output: [0.0, 0.0, 1.5]
+```
+'''
+hints = [
+  "torch.relu(x) —— 對每個元素做 max(0, x)。",
+  "torch.abs 會將 -2.0 變做 2.0，完全係另一個函數。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.verybasic.25.softmax"
+title = "分數變機率"
+story = "個 console 印出三個原始分數，而夜更嗰個 operator 被人問個模型有幾大信心。原始分數入面搵唔到答案。"
+brief = '''
+Softmax 將一行分數變做一行機率：全部係正數，而成行加埋係 1。`dim=` 講明邊條軸要加埋等於一 —— 一行 class 分數嘅話，就係最後嗰條。
+
+揀出沿住嗰行做 softmax 嘅嗰一行。
+
+```
+output: 1.0 2
+```
+'''
+hints = [
+  "torch.softmax(scores, dim=0) —— dim 一定要畀，而呢個張量淨係得第 0 軸。",
+  "Softmax 係單調嘅：最大嘅分數仍然係最大嘅機率。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.verybasic.26.mse"
+title = "錯幾多，一個數講晒"
+story = "預測係 3.0，真值係 1.0，而個訓練 loop 冇嘢可以最小化，因為冇人講過「錯」係咩意思。"
+brief = '''
+損失係一個數，講一個預測錯成點。Mean squared error 係差嘅平方再攞平均：`3.0` 對 `1.0` 就係 `(3 - 1)² = 4.0`。
+
+揀出砌個損失函數嘅嗰一行。
+
+```
+output: 4.0
+```
+'''
+hints = [
+  "nn.MSELoss() —— 佢係一個 class，所以先砌出嚟，再 call 佢。",
+  "nn.L1Loss() 係差嘅絕對值，會得 2.0 而唔係 4.0。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.verybasic.27.first-step"
+title = "第一步"
+story = "樣樣都齊晒 —— 一個參數、一個損失、一個梯度 —— 但係個數一直唔郁。優化器砌好咗，但從來冇人叫過佢做嘢。"
+brief = '''
+呢個就係成個 loop 行一次：forward、損失、`backward()`，然後係真正郁個參數嘅嗰樣嘢。優化器會用返擺喺 `.grad` 嘅梯度，而做呢樣嘢嘅係優化器自己嘅 method —— 冇咗呢個 call，梯度計完就掉咗，個參數會原封不動留喺起點。
+
+`w` 由 `5.0` 開始，目標係 `0.0`，損失係 `w * w`，所以梯度係 `10.0`。用普通 SGD、`lr=0.1`，呢一步就係 `w - 0.1 * 10.0`。
+
+揀出行呢一步嘅嗰一行。
+
+```
+output: 4.0 moved
+```
+'''
+hints = [
+  "opt.step() —— zero_grad 清走，backward 填入，step 套用。三樣都要，照呢個次序。",
+  "loss.backward() 淨係計梯度；佢從來唔掂個參數。",
+]

@@ -1,0 +1,1248 @@
+# C++ LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "cpp.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.advanced.01.getline"
+title = "舢舨日志"
+story = "避风塘的港务长把每条舢舨记成一行：船名，然后是它卸下的东西，有多少个数字就记多少个。"
+brief = '''
+第一行是数量 `n`。接下来的 `n` 行，每行是一个船名，后面跟着零个或多个整数，用空格分隔。
+
+每条船输出一行，格式为 `<NAME> <how many numbers> <their sum>`，最后输出
+`BOATS <n>`。
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+这里的单位是行，而不是记号。`std::cin >> x` 在空白处停下，不管换行，所以它没法告诉你
+一条船在哪里结束、下一条从哪里开始。`std::getline` 给你整行；在这一行上再套一个
+`std::istringstream`，你就又能用 `>>` 了，但只在这一行里面。
+
+有一件事每个人都会被咬一次：`std::cin >> n` 之后，第一行末尾的换行符还留在流里，
+第一次 `getline` 会把它读成一个空行。
+'''
+hints = [
+  "读完 n 之后调用一次 std::getline(std::cin, junk)，把 >> 留下的换行符扔掉。",
+  "std::istringstream fields(line); fields >> name; 然后 while (fields >> value) 走完剩下的部分 —— 没有东西可解析时循环就结束。",
+  "船名是这一行的第一个记号，只有船名的一行给出 0 0，不需要特殊处理。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.advanced.02.references"
+title = "副本不是原件"
+story = "游艇会船排上的绞车操作员把每一次吊重都写在一张表的副本上，墙上那张表从来不变。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+通过函数 `load` 把每个值压进同一个 `std::vector<long long>`，然后输出三行：
+`LOADED <how many>`，来自只读函数 `total` 的 `TOTAL <sum>`，以及 `FIRST <value>`
+—— 没有任何值时输出 `FIRST NONE`。
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+初始代码能编译，输出 `LOADED 0`。`load` **按值**接收 vector，所以每次调用都拿到自己的
+副本，压进去，返回时再把它扔掉。除非你另外说明，C++ 就是复制。
+
+用 `&` 来另外说明：类型为 `std::vector<long long>&` 的参数是调用者那个 vector 的引用，
+而不是它的副本。`total` 应该接收 `const std::vector<long long>&` —— 它需要看，不需要碰，
+而 `const` 就是在签名里这样说的方式，编译器会让你说到做到。
+
+`FIRST` 是一个指针：`long long* first` 要么是第一个元素的地址，要么是 `nullptr`，而
+`nullptr` 是你在顺着它走之前必须检查的那个值。这就是这片土地的全部，浓缩成一行。
+'''
+hints = [
+  "一个字符就能修好 load：std::vector<long long>& sheet。调用处不用改；引用会直接绑定到写在那里的实参。",
+  "total 应该接收 const std::vector<long long>& —— const 是一个承诺，编译器会检查它。",
+  "&sheet.front() 是第一个元素的地址，只有在有元素时才有意义；写 *first 之前先检查 nullptr。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.advanced.03.vector"
+title = "船阵的中间"
+story = "避风塘里四十条舢舨并排泊在一起。港务长看得见最外面和最里面的，中间的一条也看不见。"
+brief = '''
+标准输入第一行是数量 `n`，第二行是 `n` 个用空格分隔的整数。`n` 至少为 `1`。
+
+输出三行：第一个值、最后一个值，以及严格位于它们之间的所有值的和。少于三个值时这个和是 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`std::vector` 就是这个序列。`front()` 和 `back()` 是两端；从 `begin() + 1` 到
+`end() - 1` 是中间，而对这个范围调用 `std::accumulate` 就是和 —— 只要你交给它的初始值
+是 `long long`。`std::accumulate(first, last, 0)` 用 `int` 求和，因为 `0` 是 `int`，
+而有一个隐藏用例的中间部分装不进去。
+'''
+hints = [
+  "nums.begin() + 1 和 nums.end() - 1 是迭代器，而 <numeric> 和 <algorithm> 正是用一对迭代器来表示一个范围。",
+  "只有一两个值时这个范围是空的或者是反的 —— 在构造它之前先用 if 检查 nums.size()。",
+  "0LL 很重要：accumulate 从初始值推导结果类型，而普通的 0 是 int。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.advanced.04.strings"
+title = "字节不是字符"
+story = "避风塘的告示板把「銅鑼灣」截在三个字节处，只剩下一个字。"
+brief = '''
+读取一行。输出三行：
+
+1. 它的长度，以**字节**计
+2. 它的长度，以**字符**计 —— UTF-8 码点
+3. 把它的字符倒过来之后的这一行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+这一行可能包含 ASCII 以外的字符，那时前两个数字就不一样了。`std::string::size()` 是字节数。
+一直都是。`std::string` 对编码一无所知；它是一串 `char`，而一个 `char` 就是一个字节。
+
+UTF-8 不用解码就很容易数：每个码点都以一个**不是** `10xxxxxx` 形式的字节开头，而每个
+后续字节都是这种形式。所以字节 `c` 恰好在 `(c & 0xC0) != 0x80` 时开始一个字符。倒转的是
+字符，不是字节 —— 直接对字符串用 `std::reverse` 会把 `銅` 切成三块，再倒着打印出来。
+'''
+hints = [
+  "把字节当作 unsigned char 来遍历；普通的 char 可能是有符号的，那样对 0x7F 以上的字节做位测试就会出错。",
+  "把每个字符收集成它自己的小 std::string，把这些字符串组成的 vector 倒过来，再拼起来。",
+  "数一数满足 (c & 0xC0) != 0x80 的字节，就是不解码任何东西的字符数。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.advanced.05.classes"
+title = "船排账本"
+story = "游艇会船排对每次拖船上岸收费，并把各项记在一处 —— 至少在那条建议用一行注释替换掉这个类之前是这样。"
+brief = '''
+第一行是 `<BOAT> <n>`。接下来的 `n` 行是 `<ITEM> <CENTS>`。
+
+为这条船建一个收集各项的 `Ledger`，然后按到达顺序把每一项原样输出为 `<ITEM> <CENTS>`，
+然后是 `TOTAL <sum>`，然后是 `BOAT <name> <count>`。
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` 可能是 `0`，那时只输出最后两行。
+
+`class` 就是成员默认私有的 `struct`，除非你写 `public:`。构造函数在函数体有机会执行之前
+就已经运行，所以成员是在**初始化列表**里设置的 ——
+`Ledger(std::string boat) : boat_(std::move(boat)) {}` —— 而不是在大括号里赋值。
+`total()` 什么都不改，所以它被声明为 `const`，这也是它能在 `const Ledger&` 上被调用的
+唯一原因。
+'''
+hints = [
+  "一个 std::vector<std::pair<std::string, long long>> 就够了。之所以要一个类，是为了让账本拥有它自己的各行。",
+  "初始化列表 —— : boat_(std::move(boat)) —— 在构造时就设置成员；在大括号里赋值会先构造一个空字符串，再把它覆盖掉。",
+  "以 const 引用返回各项，这样 main 遍历它们时不用复制 vector；每个不修改账本的方法都标上 const。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.advanced.06.enum-class"
+title = "谁在掌舵"
+story = "游艇会的闸口对每张卡都收会员价，包括那些不是会员的，还有那张根本不是卡的。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行 `<TYPE> <HOURS>`。
+
+基础价是 `500 + 100 * HOURS` 分。每一行输出下面之一：
+
+* `MEMBER` —— 基础价
+* `CREW` —— 基础价的一半，整数除法
+* `JUNIOR` —— 永远是 `200`
+* 其他任何东西 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+把卡建模成一个有四个值的 `enum class Card`，其中一个是 `Other`。`enum class` 的值不会在
+背后偷偷转换成 `int`，也不会把它的名字泄漏到外层作用域 —— 普通的 `enum` 这两件事都会做，
+而这两件事正是该写它的原因。
+
+C++ 的枚举不能携带数据，所以不认识的标签要放在它旁边一起带着：一个小小的
+`struct Tag { Card card; std::string raw; }`。用一个 `switch` 决定票价。覆盖每一个枚举值，
+编译器就没什么可警告的；漏掉一个，`-Wall` 会告诉你是哪一个。
+'''
+hints = [
+  "Card::Other 是第四个枚举值；它不认识的那个字符串就放在旁边的 Tag::raw 里。",
+  "switch (tag.card)，每个枚举值一个 case，并在每个 case 里直接 return —— 每个分支都返回时就不需要 break。",
+  "std::to_string 把数字变成 std::string；UNKNOWN 那一行就是用 + 拼接字符串。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.advanced.07.maps"
+title = "避风塘在喊什么"
+story = "正午的避风塘：每条舢舨都在喊着什么，港务长要一个排名。"
+brief = '''
+读取整个标准输入，按空白切分。
+
+每个不同的词输出一次，格式为 `<word> <count>`，按次数降序排列，次数相同时按词升序。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std::map<std::string, long long>` 按键排序，`std::unordered_map` 什么顺序都没有，两者都
+不按次数排序 —— 所以排名是单独的一步：把条目复制进一个由 pair 组成的 `std::vector`，
+再用一个比较器对它 `std::sort`。对一个不存在的键做 `counts[word]++`，会先以值 `0` 插入它，
+这正是计数循环想要的。
+'''
+hints = [
+  "while (std::cin >> word) 读取每个以空白分隔的记号，直到输入结束；counts[word]++ 就是整个计数循环。",
+  "可以直接用 map 的 begin() 和 end() 构造一个 vector；每个元素是 std::pair<const std::string, long long>。",
+  "比较器是一个 lambda，当 a 必须排在 b 前面时返回 true：先按次数降序，次数相同时按词升序。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.advanced.08.hashtable"
+title = "根本没有顺序"
+story = "避风塘的点名结果按字母顺序回来了，而港务长要的是船只实际应答的顺序。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行一个船名。`n` 至少为 `1`，一个船名是一串连续的
+非空格字符。同一个船名可能出现不止一次。
+
+每个不同的船名输出一次，格式为 `<name> <count>`，**按这个名字第一次出现的顺序**。
+然后输出 `DISTINCT <k>`。
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+这两种容器单独哪一个都给不了你这个，而这正是整个任务。
+
+`std::map` 是一棵树：遍历它时名字是**排好序**交回来的，而那不是它们应答的顺序。
+`std::unordered_map` 是哈希表：查找平均是 O(1) 而不是 O(log n)，但遍历它时名字是按
+**根本没有规定的顺序**交回来的 —— 不是排序，不是插入顺序，两次也不一定相同。标准没有
+承诺任何顺序，所以一个靠遍历 `unordered_map` 来输出的程序，它的输出取决于它链接的是哪个库。
+初始代码正是这么做的，它甚至能通过只有一个不同名字的用例 —— 这恰恰是破绽：一个分辨不出
+顺序的测试，不能证明顺序是对的。
+
+把两件工作放在两个容器里：一个 `std::vector<std::string>` 记住名字第一次出现的顺序，
+一个 `std::unordered_map<std::string, long
+long>` 负责计数。输出时遍历 vector。
+'''
+hints = [
+  "哈希表用来快速查找。vector 用来记住顺序。两个都需要。",
+  "`count[name]++ == 0` 对每个名字恰好成立一次 —— 在插入时 —— 因为 operator[] 会把值默认构造为 0。",
+  "输出时遍历 vector，再向 map 询问每个名字的次数，永远不要遍历 map。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.advanced.09.set-and-pair"
+title = "谁泊在哪里"
+story = "泊位板上同一条舢舨在同一个泊位登记了两次，谁也说不清哪几行是重复的。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行 `<BERTH> <NAME>`。
+
+每个不同的 `<BERTH> <NAME>` 组合输出一次，先按泊位再按名字排序，然后输出
+`DISTINCT <k>` 和 `DUPES <n - k>`。
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+一个 `std::set<std::pair<int, std::string>>` 一次就做完这三件事：它拒绝任何已经在里面的
+东西的第二份，它保持自身有序，而且 `std::pair` 本来就按输出想要的方式比较 —— 先比第一个
+元素，再比第二个。用范围 `for` 遍历它，并用**结构化绑定** `const auto& [berth, name]`
+把每个 pair 拆开，而不是用 `.first` 和 `.second`。
+'''
+hints = [
+  "换一个容器：std::set<std::pair<int, std::string>>。插入重复项不是错误，而是什么都不做。",
+  "set 按元素类型的 operator< 排序，而 std::pair 先比 first 再比 second —— 正是输出要的先泊位后名字的顺序。",
+  "for (const auto& [berth, name] : moorings) 把每个 pair 拆成两个名字；n 减去 set 的大小就是重复的数量。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.advanced.10.algorithms"
+title = "沿船排走一遍"
+story = "绞车日志是一列吊重。Alex 说写三个 for 循环。Mei 说标准库早就替你写好了。"
+brief = '''
+标准输入是一行用空格分隔的整数。
+
+输出四行：
+
+1. 偶数值的和（没有偶数时为 `0`）
+2. 每个大于 `10` 的值乘以二，保持原顺序，用单个空格连接 ——
+   没有时输出 `-`
+3. 有多少个不同的值
+4. `FIRST_BIG <i>` —— 第一个大于 `10` 的值的 0 基下标，
+   没有时为 `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+用 `<algorithm>` 和 `<numeric>`，不要用下标循环：第一行用带 lambda 的 `std::accumulate`，
+第二行用 `std::copy_if` 和 `std::transform`，第三行先 `std::sort` 再 `std::unique`，
+第四行用 `std::find_if`。它们每一个都接收一对迭代器，需要做判断的地方再接收一个 lambda。
+重点不在于循环难写；而在于名字说明了这个循环是干什么的。
+'''
+hints = [
+  "accumulate 的第四个参数是一个二元函数 (acc, x) -> acc；让它只在 x 是偶数时才加上 x。",
+  "copy_if 需要一个写入的地方 —— std::back_inserter(big) 会随写随增长 vector。transform 可以写回同一个范围。",
+  "std::unique 把重复项移到末尾，并返回指向它们开始处的迭代器；它到 begin() 的距离就是不同值的个数。它只看得到相邻的重复，所以先对一份副本排序。",
+  "find_if 没找到时交回 end()，找到时迭代器减去 begin() 就是下标。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.advanced.11.templates"
+title = "只写一次"
+story = "泵房的仪表板上 largest 写了四遍 —— 升数、分钟、水泵、水泵名字各一遍 —— 第五遍要在潮水转向之前写好。"
+brief = '''
+标准输入是两行：第一行是整数，第二行是单词。
+
+写**一个**对两者都适用的 `largest`，以及一个带 `larger()` 和 `smaller()` 的类模板
+`Pair<T>`。
+
+输出最大的整数、最大的单词，然后是由前两个整数组成的 `Pair` 的
+`PAIR <larger> <smaller>`。相等时算 `a` 是较大的那个。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+初始代码编译不过：`largest` 被钉死在 `long long` 上，所以把单词传给它就是
+*no matching function*。**函数模板**
+`template <typename T> T largest(const std::vector<T>& xs)` 会按它被调用时的每种类型
+各生成一份 —— `T` 从实参推导出来，而函数体对 `T` 的唯一要求就是 `>` 能用在它上面。
+
+`Pair<T>` 是同样的想法，用在类上。它的方法是 `const` 的，因为它们只读不写；它们返回
+`const T&` 而不是副本，因为调用者只想看一眼。两个签名都说明了自己的承诺，编译器会让
+它们说到做到。
+'''
+hints = [
+  "在 largest 前面加 template <typename T>，并在函数里把所有 long long 换成 T。调用不用改；T 会被推导出来。",
+  "std::string 本来就有 operator>，所以同一个模板函数体不加任何东西就能为单词编译。",
+  "Pair<T> 是类模板；你在使用处写出类型 —— Pair<long long> —— 而方法是 const 的，因为它们只做比较。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.advanced.12.lambdas"
+title = "门口计数"
+story = "游艇会的闸机数着谁走进来、谁走出去，而经理只要关门时的那个数，不管中间发生了什么。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行是 `IN` 或 `OUT`。
+
+维护一个永远不会低于零的累计数，每条命令之后输出它。然后输出 `INS <k>` —— 有多少条命令
+是 `IN`，用 `std::count_if` 和一个 lambda 来数 —— 以及 `CLOSED <final>`。
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+计数器是一个闭包：`make_counter` 返回一个拥有自己总数的 lambda。lambda 默认按值捕获，
+而副本在函数体里是 `const` 的 —— 参数列表后面的 `mutable` 才让捕获的总数能在两次调用
+之间改变。**初始化捕获** `[total = 0LL]` 直接在方括号里声明被捕获的变量，而不是在外层
+作用域里声明，所以 lambda 外面没有任何东西可以让别人碰。
+
+另一种捕获 `[&]` 按引用拿走一切。这个任务里两种都写到了；知道自己想要的是哪一种，正是
+面试官在听的东西。
+'''
+hints = [
+  "[total = 0LL](long long delta) mutable { ... } —— 初始化捕获声明了 total，而 mutable 让函数体可以给它赋值。",
+  "没有 mutable，函数体就是闭包类型的一个 const 成员函数，total += delta 是编译错误，而不是悄无声息地什么都不做。",
+  "std::count_if(begin, end, predicate) 返回谓词接受了多少个元素；谓词是一个接收一条命令的 lambda。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.advanced.13.optional-variant"
+title = "不是数字的那一行"
+story = "泵房的抄表员交上来一列数字，中间夹着某人的午餐订单。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行。每一行本该是一个整数。
+
+对每一行，输出翻倍后的值；如果它解析不了，就输出 `BAD <line>`。最后输出 `SUM <total>`，
+总数是你输出过的那些值的和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+答案由两个类型承载。`std::optional<long long> parse(const std::string&)` 是*一个数字，
+或者什么都没有*，由 `std::from_chars` 来填：它返回一个错误码而不是抛异常，并且告诉你它在
+哪里停下，所以 `4x` 和 `xx` 一样都能被拒绝。
+
+`std::variant<long long, std::string> doubled(const std::string&)` 是*要么是翻倍后的值，
+要么是失败的那一行* —— 恰好两种类型之一，从不两者都是，也从不两者都不是。
+`std::get_if<long long>(&result)` 在里面装的是数字时给你一个指向它的指针，不是时给你
+`nullptr`，这正是 `main` 需要的两路分支。整个程序里没有任何异常；失败是一个值，它去值
+该去的地方。
+'''
+hints = [
+  "std::from_chars(first, last, value) 返回一个带 ptr 和 ec 的结构体；成功是 ec == std::errc() 并且 ptr == last，否则像 4x 这样的行会只解析一半。",
+  "optional 装着值时为真，所以 if (auto v = parse(text)) 就是整个分支，而 *v 就是那个数字。",
+  "同一个函数既返回 long long 又返回 std::string 是合法的，因为返回类型是一个两者都能装的 variant；在 main 里由 get_if 选择分支。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.advanced.14.exceptions"
+title = "你自己的错误"
+story = "泊位收费服务的四层各自抛出不同的东西，而它们上面没有任何一层接住其中任何一个。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行本该是以 km 计的距离。
+
+`fare(text)` 用 `std::stoll` 解析 —— 它遇到 `xx` 会**抛出** `std::invalid_argument` ——
+并通过抛出你自己的 `NegativeDistance` 来拒绝负距离；这是一个派生自 `std::runtime_error`
+的类，它的 `what()` 内容是 `negative distance: <km>`。否则它返回 `500 + 100 * km`。
+
+每个输入行输出一行：票价；解析不了时输出 `not a number`；距离为负时输出
+`NegativeDistance` 的 `what()`。然后输出 `ERRORS <k>`，即有多少行失败了。
+
+解析失败时输出的是你的话而不是异常的话，因为 `std::invalid_argument::what()` 是库想说
+什么就说什么 —— 在 libstdc++ 上是 `stoll`，在 libc++ 上是 `stoll: no conversion` ——
+而期望输出不能依赖于这个。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+初始代码能编译，然后在 `xx` 上死掉：一个没人接住的异常到达 `main` 的顶部，运行时调用
+`std::terminate`，这就是你看到的 abort。一个带两个 `catch` 分支的 `try` 块就能修好它 ——
+更具体的类型放在前面，因为分支是按顺序尝试的，如果 `std::runtime_error` 在前，它就会把
+`NegativeDistance` 吞掉。永远按 `const&` 捕获：按值捕获会把派生的异常切割成它的基类，
+丢掉你抛出的消息。
+'''
+hints = [
+  "把调用包进 try { ... }，然后加上 catch (const NegativeDistance& e)，再加 catch (const std::invalid_argument&) —— 就按这个顺序。",
+  "e.what() 就是你在构造函数里构建的消息；std::runtime_error 替你把它存着。",
+  "未捕获的异常会调用 std::terminate，它中止进程，除了已经输出的内容之外什么都不会被刷出。初始代码在第二行就是这样。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.advanced.15.iterators"
+title = "你自己的 FOR 循环"
+story = "泵房的仪表从班头到班尾走过每一个读数，却一个都不存下来。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+给 `Stops` 一个迭代器，让对它的范围 `for` 产生 `count` 个值，从 `start` 开始，每次前进
+`step`。每个值各占一行输出，然后输出 `SUM <total>`，由 `std::accumulate` 在同样的
+`begin()`/`end()` 上算出。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+初始代码编译不过：编译器会把范围 `for` 改写成对 `begin()` 和 `end()` 的调用，而 `Stops`
+两个都没有。没有要继承的 trait，也没有要声明的接口；循环按名字要三样东西 —— `operator*`、
+前缀 `operator++`、`operator!=` —— 在 `begin()` 返回的任何东西上，只要它们在，就能用。
+这就是全部的约定，而 `std::accumulate` 和其他所有算法用的也是同一个约定。
+'''
+hints = [
+  "迭代器是它自己的一个小 struct：当前值、步长，以及还剩几个。",
+  "end() 是一个什么都不剩的迭代器；operator!= 只比较倒计数，所以 end() 里面的值是多少无所谓。",
+  "std::accumulate 走的是和 for 循环同样的三个运算符 —— 只要 begin()/end() 存在，两者不用再加一行就都能用。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.advanced.16.raii"
+title = "它自己收拾干净"
+story = "泵房的日志本在交班时自己合上，按正确的顺序，不管有没有人记得去合。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+在 `main` 的**顶部**声明两个 `Guard` 值，分别叫 `first` 和 `second`，它们的析构函数输出
+`DROP <name>`。在一个嵌套的块里，把这些值送进一个 `Tally`，它的析构函数输出
+`TALLY <count> <sum>`。块结束之后输出 `DONE`。`main` 自己不输出别的任何东西。
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+除了 `DONE` 以外的每一行都是析构函数输出的。`Tally` 在它所在块的右大括号处死去，所以
+`TALLY` 出现在 `DONE` 之前；两个 guard 在 `main` 返回时死去，按声明的**相反**顺序，所以
+`second` 在 `first` 之前。这些都不是你安排的。是作用域安排的。
+
+这就是 RAII，而这个名字比这个想法糟糕：资源绑定到一个对象的生命周期上，析构函数就是释放。
+`std::lock_guard` 这样解锁，`std::unique_ptr` 这样释放内存，`std::ofstream` 这样关闭文件，
+而提前的 `return` 或抛出的异常会一模一样地运行它们每一个。这三个你在下一张地图里都会遇到。
+'''
+hints = [
+  "析构函数是 ~Guard() { ... } —— 没有返回类型，没有参数，你也从来不调用它；作用域会调用。",
+  "里面那对大括号就是 TALLY 在 DONE 之前输出的全部原因。去掉它们，它就会在后面输出。",
+  "析构永远是构造的逆序，这就是为什么 second 先走，也是为什么第二个获取的锁先被释放。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.advanced.17.segfault"
+title = "错误的地址"
+story = "12:00:00。午炮朝一个没有主人的地址开火，整个海滨都安静了。"
+brief = '''
+第一行是 `n`。接下来的 `n` 行是开炮表，`<NAME> <SECONDS>`。然后是一行 `q`，以及 `q` 个
+要查询的名字。
+
+对每个名字输出 `<NAME> FIRES AT <seconds>` 或 `<NAME> UNKNOWN`。然后输出
+`LOADED <n> CHECKSUM <sum of every SECONDS in the table>`。
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+初始代码编译得干干净净，然后崩溃两次，原因各不相同，你得把两个都找出来。
+
+第一个是校验和循环。它遍历 `1..n` 并读取 `table.at(i)`，而 `at` 会**检查**：下标 `n` 是
+末尾之后的一个位置，所以它抛出 `std::out_of_range`，没人接住，进程中止。修好这个循环。
+然后想明白 `at` 替你买到了什么：同一个循环如果用 `table[i]` 来写，是不会抛异常的。它会读取
+碰巧在那个地址上的任何东西 —— 堆上的下一个对象，或者什么都没有 —— 并输出一个错了某个
+谁也复现不出来的量的校验和。vector 上的 `[]` 不做检查。这就是这片土地上的交易：它很快，
+而检查是你的工作。
+
+第二个是 `lookup`。它返回一个 `Shell*`，当名字不在表里时它返回 `nullptr` —— 而调用者
+看都不看就在上面写 `->seconds`。通过空指针读取是未定义行为；在所有运行它的机器上它也是
+一次段错误，这是未定义行为最仁慈的形式，因为至少它会停下来。检查这个指针。这就是整个
+boss，也是每一场 C++ 面试真正在问的问题：*那个地址上此刻是什么，又是谁说你可以读它的？*
+'''
+hints = [
+  "把查找结果绑定到一个名字上并检查它：if (Shell* shell = lookup(...)) { ... } else { UNKNOWN }。这个指针同时是答案和问题。",
+  "有效下标从 0 到 size() - 1。从 1 开始跑到 size() 的循环两头都差一，而只有上面那头会崩溃。",
+  "at() 会抛出 std::out_of_range，而 [] 根本不检查；你得到的这次崩溃是好结果。你没得到的那个才是 boss。",
+  "段错误是操作系统拒绝读取一个不属于这个进程的地址。地址 0 永远是其中之一，这就是为什么 nullptr 稳定地崩溃，而指向已释放内存的过期指针却不会。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.advanced.01.threads"
+title = "两台泵，一个集水井"
+story = "维多利亚公园的泵房在中午启动了第二台泵，集水井终于排干了。房间里别的什么都没变。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 `std::thread`，计算它的平方并写进 `out[i]` —— 它自己的槽位，所以没有两个
+线程会碰同一个元素。把它们全部 join，然后每个结果各占一行输出，最后输出 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+线程按调度器喜欢的任何顺序结束。按下标写入、在 join 之后再输出，才是让每次运行的输出都
+一样的原因。一个自己输出的线程做不到这一点；而一个按引用捕获循环变量的线程读到的会是一个
+早已往前走了的变量 —— 按值捕获 `i`，按引用捕获 `out`。
+'''
+hints = [
+  "threads.emplace_back(lambda) 就地构造线程并立即启动它。",
+  "捕获 [i, &nums, &out]：下标按值，这样每个线程保留自己的那一个；vector 按引用，这样写入会落在 main 的那一份里。",
+  "在读取 out 之前 join 每一个线程。join() 会阻塞直到那个线程结束，之后它的写入就是可见的。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.advanced.02.join"
+title = "没签退谁都不许走"
+story = "一个泵线程下了班，工头没给它签退就走出了房间，整栋楼都停电了。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行文本。
+
+每一行启动一个线程，把它转成大写写进它自己的槽位。把它们全部 join，按顺序输出各行，然后
+输出 `DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+初始代码能编译，启动了线程，然后中止。它从来不 join 它们，而一个在析构函数运行时仍然
+**joinable** 的 `std::thread` 会调用 `std::terminate`。这不是库的 bug。一个比启动它的函数
+活得更久的线程，会对着已经不存在的栈变量运行，而标准认定：一次你看得见的中止，好过一次
+你看不见的对已释放内存的读取。
+
+所以每个 `std::thread` 在离开作用域之前都要被 join（或者 detach，而那几乎从来不是你想要的）。
+C++20 有 `std::jthread`，它在析构函数里 join —— 线程的 RAII，和锁的 `lock_guard` 是同一个
+想法 —— 它是默认就该拿来用的类型。两种写法在这里都能通过。
+'''
+hints = [
+  "最小的修法是一个循环：在输出任何东西之前 for (std::thread& t : threads) t.join();。",
+  "更好的修法是换类型：std::vector<std::jthread>，让 vector 离开作用域时由析构函数去 join。",
+  "把 jthread 的 vector 放在它自己的块里，这样 join 发生在右大括号处，在输出循环读取各行之前。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.advanced.03.mutex"
+title = "一个集水井，八台泵"
+story = "每台泵都把自己排掉的量加到墙上的同一个总数上，而一小时结束时，墙上的数和它们每一台都对不上。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个线程，把它加到**同一个共享总数**上。把它们全部 join，然后输出
+`TOTAL <sum>` 和 `THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+初始代码能编译，输出 `TOTAL 0`。lambda 按值捕获 `total` —— 带 `mutable` 的
+`[total, value]` —— 所以每个线程都加到自己的私有副本上，然后扔掉它。改成按引用捕获，你就
+有了另一个 bug，一个在这么小的测试里不会显现的 bug：多个线程同时执行 `total +=
+value` 是一次**数据竞争**，在 C++ 里那是未定义行为，而不仅仅是一个错误的数字。
+
+在总数旁边放一个 `std::mutex`，在每个碰它的线程里放一个 `std::lock_guard`，这就是答案。
+guard 在构造函数里加锁、在析构函数里解锁，所以没有会被忘记的解锁，更新到一半抛出的异常
+也照样会释放它。
+'''
+hints = [
+  "按引用捕获 total —— [&total, &total_mutex, value] —— 并去掉 mutable；线程应该改的是 main 的总数，而不是它自己的。",
+  "std::lock_guard<std::mutex> lock(total_mutex); 就一行，而解锁就是块的结束。",
+  "所有 join 之后读取 total 不加锁也是安全的：join() 是一个同步点，而且已经没有线程还会写了。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.advanced.04.counter"
+title = "自己上锁的计数器"
+story = "维多利亚公园东门的闸机记着两个必须互相对得上的数，而有两个人在同时读它们。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+把 `Counter` 写完：`add` 获取锁，加到总数上并把命中次数加一；`snapshot` 获取锁并把两者
+一起返回。每个值启动一个线程，把它们 join，然后输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+mutex 住在类的**里面**，挨着它守护的字段，而每个碰这些字段的方法都要获取它。这就是
+该有的形状：锁是对象的一部分，而不是指望调用者记得去做的事情。
+
+初始代码编译不过，而原因值得花一分钟想想。`snapshot()` 是 `const` 的 —— 它不改变任何
+调用者看得见的字段 —— 但锁一个 mutex *会改变这个 mutex*，而在 `const` 方法里每个成员都是
+`const` 的。修法是 `mutable std::mutex`：`mutable` 标记一个即使通过 `const` 对象也允许
+改变的成员，正是为了这种不属于值本身的簿记工作。这是 `mutable` 唯一一个经常正确的地方，
+而问起它的面试官想听到的就是这个例子。
+'''
+hints = [
+  "一个词就能修好编译错误：mutable std::mutex mutex_;",
+  "把 snapshot() 的 const 去掉也能编译，而那是错误答案 —— 这个方法确实不改变值，签名就应该这么说。",
+  "std::mutex 不能复制也不能移动，所以持有它的类也不能；按引用传递 Counter，lambda 已经这么做了。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.advanced.05.scoped-lock"
+title = "两把锁，一个顺序"
+story = "喷水池下面两道水闸、两把锁、两个线程，两台泵在同一秒停了下来。"
+brief = '''
+两个水箱 `A` 和 `B`，每个都是一个 `long long`，各有自己的 `std::mutex`。
+
+标准输入第一行是初始水位，第二行是数量 `n`，然后是 `n` 行 `<FROM> <TO> <AMOUNT>`，
+`FROM`/`TO` 属于 `{A, B}`。
+
+每次转移都在它自己的线程上运行，把它们全部 join，然后输出 `A <level>`、`B <level>`、
+`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+初始代码有两处错，而只有一处会在输出里显现。它从来源扣减，却从不给目标加上 —— 这是看得见
+的 bug。另一处是形状：*先锁来源*意味着两个方向相反的转移可以各持有一把锁、等待另一把，
+永远等下去。这就是死锁，它不会在测试里出现；它会在某个星期二的 12:00 出现。
+
+按**一个全局顺序**获取两把锁，环就形成不了。C++17 免费给你这个顺序：
+`std::scoped_lock lock(a_mutex, b_mutex)` 用一种避免死锁的算法获取任意数量的 mutex，并在
+析构函数里把它们全部释放。两个永远先 `A` 后 `B` 获取的 `lock_guard`，是手写出来的同一个答案。
+'''
+hints = [
+  "在碰任何一个水位之前先把两个水箱都锁上。std::scoped_lock lock(a.mutex, b.mutex); 一行搞定，并且顺序安全。",
+  "水流的方向决定哪个水位被减，而不是决定先拿哪把锁。",
+  "两个 std::lock_guard 对象，永远先 A 的 mutex 再 B 的，是同一个答案；规则是每个线程都同意这个顺序。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.advanced.06.condition-variable"
+title = "舱口"
+story = "一台泵往水箱里灌，一台泵往外排，而排水那台从 11:40 起就一直在轮询一个空水箱。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+一个生产者线程把每个值压进一个由 mutex 守护的 `std::queue`；一个消费者线程一次弹出一个，
+把每个翻倍后输出。生产者压完所有东西后设置 `done` 并唤醒消费者，消费者在队列为空**并且**
+`done` 已设置时停下。把两个都 join，然后输出 `CONSUMED <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+队列是 FIFO，所以无论调度器怎么做，顺序都是输入的顺序。`std::condition_variable` 让消费者
+睡到有事可做为止，而不是在锁上空转：`cv.wait(lock, predicate)` 释放 mutex、睡眠，每次
+被唤醒时重新检查谓词 —— 这替你处理了虚假唤醒，也是为什么带谓词的形式是唯一该写的形式。
+
+初始代码会挂住。生产者压完所有东西就返回了，从来没有设置 `done`，也没有通知，所以消费者
+为最后一个值醒来，排空队列，然后等待一个永远不会来的信号。每一对生产者/消费者都需要一种
+方式来说*不会再有了* —— 这就是 `done`。
+'''
+hints = [
+  "在生产者的循环之后：加锁，设置 done = true，解锁，cv.notify_all()。四行，程序就会结束。",
+  "done 是在 wait 的谓词里、在 mutex 保护下被读的，所以它也必须在 mutex 保护下被写 —— 不加锁写的标志就是数据竞争。",
+  "cv.wait 接收的是 std::unique_lock 而不是 lock_guard，因为 wait 必须对它解锁再重新加锁；每次唤醒都会重新检查谓词。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.advanced.07.atomic"
+title = "一个字，不加锁"
+story = "闸机的计数不需要锁。泵房里别的一切都需要，而分清两者就是这份工作。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个线程。每个线程把自己的值加到一个共享的 `std::atomic<long long>` 上，并把
+一个共享的 `std::atomic<int>` 加一 —— 任何地方都没有 mutex。把它们全部 join，然后输出
+`TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+初始代码编译不过：lambda **按值**捕获了两个原子变量，而 `std::atomic` 没有拷贝构造函数。
+这是故意的。原子变量是多个线程约定一次一条指令地更新的同一个位置；它的副本会是另一个位置，
+共享就没了。按引用捕获它们。
+
+原子变量不是更便宜的 mutex；它是另一种工具，用于在一条指令里完成读-改-写的一个机器字。
+`fetch_add` 就是那条指令。一旦有两个字段必须彼此对得上，锁就回来了 —— 没有表示“这两样
+东西，一起”的原子变量，这就是为什么上一个任务的 `Counter` 有 mutex，而这一个没有。
+
+这里用 `std::memory_order_relaxed` 就够了，因为没有任何东西依赖这些自增相对于其他写入
+*何时*变得可见，只依赖它们一个都不丢。这句话就是接下来的追问。
+'''
+hints = [
+  "错误信息说 std::atomic 的拷贝构造函数是被删除的。捕获 [&total, &hits, value] 并去掉 mutable。",
+  "fetch_add 返回之前的值，并原子地完成加法；没有锁，也没有 guard。",
+  "在原子变量上 total += value 同样是原子的，也没问题；total = total + value 就不是 —— 那是一次读取和一次写入，中间有空隙。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.advanced.08.parallel-sum"
+title = "把集水井分开"
+story = "一万二千个读数，四台泵。房间要每台泵的份额和总数，而总数每次运行都必须一样。"
+brief = '''
+第一行是 `k n`：`k` 个线程和 `n` 个值。第二行是这 `n` 个值。
+
+把这些值分成 `k` 个连续的块 —— 第 `i` 块覆盖从 `i * n / k` 开始、到 `(i + 1) * n / k`
+为止（不含）的下标，用整数运算 —— 让线程 `i` 把它那一块的和写进 `partial[i]`。把它们全部
+join，然后按顺序为每一块输出 `CHUNK <i> <sum>`，再输出 `TOTAL <sum of partials>`。
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+这是真正会因为线程而变快的形状，也是这张地图里唯一的一个：每个线程读自己的范围、写自己的
+槽位，所以没有锁，没有原子变量，除了输入之外没有任何共享的东西。块边界的公式让切分精确 ——
+最后一块总是在 `n` 结束，而当 `k > n` 时某一块可能是空的，有一个隐藏用例就是这样安排的。
+'''
+hints = [
+  "在 main 里算出两个边界，并按值捕获它们；线程不应该需要知道切分是怎么决定的。",
+  "在线程里用一个局部的和，最后只写一次 partial[i]，这样每个线程恰好碰共享 vector 一次。",
+  "k > n 会让一些块是空的 —— begin == end —— 循环就是不执行。不需要特殊处理。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.advanced.09.async"
+title = "答应我那个数"
+story = "绞车操作员派一个小伙子去取每一个数字，自己并不站在那里等；数字什么时候回来就什么时候回来。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+每个值用 `std::launch::async` 启动一个 `std::async` 任务，返回这个值的平方。把这些
+`std::future` 收集进一个 vector，**按顺序** `get()` 它们，输出每一个。然后把一个
+`std::promise<int>` 交给另一个线程，让它把值设为 `n`，再从对应的 future 输出 `READY <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+future 是一个还没到的值。`std::async` 为一个函数的返回值给你一个 future；`get()` 阻塞到
+这个值存在，然后把它交出来，只交一次。按顺序调用这些 future，输出就是有序的 —— 任务本身
+什么时候完成就什么时候完成。
+
+`std::promise` 是同一根管子的另一端，用于没有返回值可以包装的时候：一边调用 `set_value`，
+另一边 `get` 它。这就是一个线程不用 mutex、队列或标志就能报告一个结果的方式。
+
+把 `std::launch::async` 明明白白地写出来。没有它，实现可以选择 `deferred`，那会在调用
+线程上、在 `get()` 里面惰性地运行任务 —— 在这里仍然正确，但不是任何读到 `async` 的人
+所期待的。
+'''
+hints = [
+  "std::async(std::launch::async, lambda) 返回一个 std::future，类型是 lambda 返回的类型；把它压进 vector。",
+  "每个 future 的 get() 只能调用一次，它会阻塞到值到达为止；按顺序遍历 vector，输出就是有序的。",
+  "promise 被移动或以引用传进线程，在那里调用 set_value(n)，而 main 里的 ready.get() 等待它。在 main 返回之前 join 这个线程。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.advanced.10.unique-ptr"
+title = "编译器叫得出的大小"
+story = "避风塘里的系泊链：每一环都拉着下一环，一直到锚，而没有哪一环被拉住两次。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个以分计的金额。
+
+把它们放在一条链里，每个金额一个节点，按到达的顺序：
+
+```
+struct Entry {
+    long long cents;
+    std::unique_ptr<Entry> next;
+};
+```
+
+输出三行：
+
+1. 按顺序排列的金额，空格分隔，没有时输出 `-`
+2. `SUM <total>`，来自一个在链上**递归**的函数
+3. `LAST <cents>` —— 最后一个节点上的金额 —— 或者 `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+初始代码编译不过，而这个错误正是指针存在的原因。写 `Entry next;`，编译器就得在内存里
+摆放 `Entry`：`cents` 占八个字节，再加上一个 `Entry` 有多大 —— 而这正是它想算出来的东西。
+*Field has incomplete type.*
+
+`std::unique_ptr<Entry>` 是一个指针，而指针的大小编译器早就知道。它**拥有**它所指的东西：
+恰好一个拥有者，在析构函数里被 `delete`，不能复制，可以移动。裸 `Entry*` 是另一种指针 ——
+它只看不拥有 —— 而遍历链条来输出正是裸指针该干的事。`nullptr` 既是链的结尾，也是空链，
+所以哪里都没有单独的空情况。
+'''
+hints = [
+  "一行就修好编译错误：std::unique_ptr<Entry> next; —— 现在这个 struct 是十六个字节，不管它指向什么。",
+  "从后往前构建：head = std::make_unique<Entry>(Entry{value, std::move(head)})。std::move 是必需的；unique_ptr 不能复制，只能移交。",
+  "用一个从 head.get() 得到的 const Entry* 来遍历，每步走到 walk->next.get()。裸指针只是借用；unique_ptr 仍然拥有，没有东西会被释放两次。",
+  "递归求和就两行：nullptr 是 0，否则是 cents 加上其余部分的和。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.advanced.11.shared-ptr"
+title = "还有谁拿着它"
+story = "两个仪表通过一根管子读同一个水箱，这根管子必须留到最后一个仪表走了为止，多一秒都不行。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+把这些值放进一个由 `std::shared_ptr` 拥有的 `std::vector<long long>`，再拿**第二个**
+指向同一个 vector 的 `shared_ptr`，以及一个监视它的 `std::weak_ptr`。输出四行：
+
+1. `REF <sum>` —— 和，通过第二个句柄读取
+2. `SHARED <k>` —— 两个句柄都活着时的 `use_count()`
+3. `ALIVE yes` —— 它们活着时的 `!watch.expired()`
+4. `ALIVE no` —— 两个句柄都被 `reset()` 之后
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+`unique_ptr` 是一个拥有者。`shared_ptr` 是拥有者的计数，保存在对象旁边，计数归零时对象
+就被释放 —— 由碰巧最后离开的那个句柄释放。复制句柄让计数加一；重置或销毁它让计数减一。
+计数是原子的，所以两个线程可以各自安全地持有一个句柄；但*对象*并不因此变得线程安全，要碰
+它仍然需要前面几张地图里的 mutex。
+
+`weak_ptr` 是一个**不**计数的句柄。它能看到对象是否还在，如果在，可以用 `lock()` 把它
+提升为 `shared_ptr`；它不能让对象继续活着。这就是打破环的东西 —— 两个互相持有
+`shared_ptr` 的对象永远到不了零 —— 也是这条路最后一张地图要讲的内容。
+'''
+hints = [
+  "std::shared_ptr<...> mirror = ledger; 复制句柄，把计数加到 2。mirror->begin() 访问的是同一个 vector。",
+  "weak_ptr 直接从 shared_ptr 构造，从不改变计数；expired() 就是你要问它的全部问题。",
+  "对两个句柄都调用 reset() 会把计数降到零；只有第一次 reset 什么都不会释放，而房间里的一条提示就是要你说出原因。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.advanced.12.move"
+title = "带走它"
+story = "港务长把每张单据交给送货员之前都要复印一份，而复印机是避风塘里最慢的东西。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行文本。
+
+为每一行在一个 `std::vector<Docket> pile` 里建一个 `Docket`，然后把每张单据移交到第二个
+vector `sent`，从 `sent` 里把每张的文本转成大写输出，然后输出 `SENT <n>`、`COPIES <c>`、
+`MOVES <m>`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` 自己数它的复制和移动：它的拷贝构造函数让一个全局变量加一，移动构造函数让另一个
+加一。两个 vector 都预先 `reserve` 好，这样重新分配不会复制或移动任何东西 —— 发生的复制
+和移动只有你写出来的那些。
+
+初始代码报告 `COPIES 2`。用左值调用 `sent.push_back(d)` 会复制单据，连同字符串一起。
+`sent.push_back(std::move(d))` 把 `d` 转换成一个**右值**，于是选中移动构造函数，它偷走
+字符串的缓冲区而不是复制一份。`std::move` 本身什么都不移动；它是一个转换，意思是*这个我
+用完了*，接下来发生什么由接收的构造函数决定。
+
+之后的 `d` 是什么？*有效但未指定。*你可以销毁它，也可以给它赋值。你不能读它并指望得到
+任何特定的东西 —— 这就是为什么这个程序从 `sent` 输出，再也不回头看 `pile`。
+'''
+hints = [
+  "只改一个调用：sent.push_back(std::move(d))。程序里的其他部分都已经支持移动了。",
+  "移动构造函数故意标记为 noexcept：std::vector 只有在移动不会抛异常时才在重新分配期间移动元素，否则为了异常安全会复制它们。",
+  "两个 vector 上的 reserve(n) 让计数精确。没有它，重新分配会移动（或复制）每一个已经存着的元素，数字就会取决于增长策略。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.advanced.13.template-class"
+title = "什么货都能装的环"
+story = "仪表留着最近几个读数，港务长留着最近几个船名，而 Alex 把同一个环形缓冲区写了两遍。"
+brief = '''
+第一行是容量 `cap`。第二行是一串整数；第三行是一串单词。
+
+写**一个**类模板 `Ring<T>`：一个固定容量的缓冲区，保留最近压进来的 `cap` 个元素，覆盖
+最旧的那个，并且能按到达顺序遍历。把整数压进一个 `Ring<long long>`，把单词压进一个
+`Ring<std::string>`，每个环的内容各输出一行，然后输出 `DROPPED <k>` —— 总共有多少个元素
+被挤了出去。
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+初始代码编译不过：`Ring` 是为 `long long` 写的，单词没地方去。类模板是按每种类型实例化
+一次的一个定义，和基础路上的函数模板完全一样，而整个 `Ring<T>` 是在不知道 `T` 是什么的
+情况下写出来的 —— 只知道它能被默认构造、复制和输出。
+
+也给它 `begin()`/`end()`。环不是按到达顺序存储的 —— 最旧的元素在写指针即将覆盖的那个
+位置 —— 所以迭代器得做这笔算术，而那正是值得自己写而不是光读的部分。
+'''
+hints = [
+  "类上面写 template <typename T>，槽位用 std::vector<T>，push 用 const T&。然后在两个使用处写 Ring<long long> 和 Ring<std::string>。",
+  "最旧的元素在 (head + cap - count) % cap；按到达顺序的第 k 个元素在 (oldest + k) % cap。迭代器只需要带着 k。",
+  "函数模板 print(const Ring<T>&) 从实参推导 T，所以一个输出函数就能服务两个环。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "cpp.advanced.14.invalidation"
+title = "边走边删"
+story = "港务长一边往下读泊位名单一边划掉舢舨，每划掉一条就跳过下一条。"
+brief = '''
+第一行是 `n t`。第二行是 `n` 个整数。
+
+**原地**从 vector 里删掉每一个小于 `t` 的值，把剩下的输出在一行上（什么都不剩时输出 `-`），
+然后输出 `REMOVED <k>`。
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+初始代码是每个人都会写一次的 bug：它按下标遍历，在 `i` 处删除，然后执行 `++i` —— 而滑进
+槽位 `i` 的那个元素从来没被看过。两个相邻的小值，第二个就活了下来。这个 bug 至少是有明确
+定义的。它的迭代器孪生兄弟就不是了：`erase(it)` 会让 `it` 以及它之后的每个迭代器失效，
+所以里面带 `erase` 的 `for (auto it = v.begin(); ...; ++it)` 是**未定义行为** —— 它
+通常会走出末尾，有时看起来能用，而那更糟。
+
+`erase` 返回指向被删元素之后那个元素的迭代器。用它：命中时 `it = v.erase(it)`，没命中时
+`++it`，永远不要两个都做。C++20 还有 `std::erase_if(v, predicate)`，一次调用就做完整件事，
+是应该先给出的答案；而这个循环，是他们问你 `erase_if` 做了什么时要给的答案。
+'''
+hints = [
+  "别在 for 的头部写自增。只在没有删除的分支里用 ++it 前进；在另一个分支里，it = erase(it) 已经前进了。",
+  "下标版本也能修 —— 删除之后不要 ++i —— 但迭代器形式才是要掌握的，因为它在 std::list 和 std::map 上是一样的。",
+  "std::erase_if(vector, pred) 返回它删了多少个，正好就是 REMOVED 那一行。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "cpp.advanced.15.undefined-behaviour"
+title = "编译器早就假定了"
+story = "泵房的升数计数器是一个 int，而在 2147483647 升的时候，编译器早就假定它永远到不了那里。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数，每个都装得进 `long long`。它们的累计和也装得进
+`long long`。
+
+输出两行：如果一路上每个累计和都装得进 32 位的 `int`，输出 `INT32 OK`；否则输出
+`INT32 OVERFLOW <i>`，其中是第一个会把它推出范围的值的 0 基下标；然后输出 `INT64 <total>`。
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+初始代码把总数放在 `int` 里，不管发生什么都输出 `INT32 OK`。加上那个显而易见的检查 ——
+`if (total + v < total)` —— 修不好它，因为这个检查是用它要找的溢出本身来写的，而
+**有符号溢出是未定义行为**。编译器有权假定 UB 不会发生，所以在它看来，`v` 为正时
+`total + v < total` *永远为假*，在 `-O2` 下 gcc 和 clang 都会把这个测试删掉。错误的数字
+不是优化器的 bug。这是契约。
+
+这片土地运行的规则：未定义行为不是“某个值”。它是编译器假定某件事不可能发生，然后从那里
+开始推理。所以你永远不要靠引发溢出来检测溢出。你要在加法*之前*检测它，用一个更宽的类型，
+或者与极限值比较 —— `std::numeric_limits<int>` —— 而这个程序的期望输出不依赖任何未定义
+的东西。
+'''
+hints = [
+  "把总数放在 long long 里，每次加完之后与 std::numeric_limits<int>::min() 和 max() 比较。从头到尾不发生任何 int 运算。",
+  "只记录第一个离开范围的下标；后面的值可能又把总数带回范围内，而题目问的是它第一次在哪里离开。",
+  "如果你必须把两个 int 相加，又想知道是否安全：在加之前检查 v > INT_MAX - total，而不是加完之后看和的符号。前者是有定义的；后者正是编译器会删掉的东西。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "cpp.advanced.16.jthread"
+title = "叫停就停"
+story = "夜班的泵一直跑到有人叫它停为止，而在这一班之前，谁也叫不停它。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+启动两个 `std::jthread`。第一个对这些值求和并保存结果。第二个接收一个 `std::stop_token`，
+在上面注册一个设置标志的 `std::stop_callback`，然后循环直到 `stop_requested()`。在 `main`
+里对第二个线程调用 `request_stop()`，把两个都 join，然后输出：
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std::jthread` 就是加了两样东西的 `std::thread`，两样都是 RAII。它的析构函数会 **join**，
+所以初始代码的中止 —— 一个仍然 joinable 就被销毁的 `std::thread` —— 不可能发生。它还带着
+一个 `std::stop_source`：如果线程函数的第一个参数是 `std::stop_token`，`jthread` 就会传一个
+进去，`request_stop()` 会翻转它，而析构函数在 join 之前会调用 `request_stop()`。一个检查
+自己 token 的线程是你随时都能关掉的线程；不检查的，就是初始代码。
+
+`stop_callback` 是被阻塞的线程得知消息的方式 —— 它在请求停止的那一刻、在发出请求的线程上
+运行，它通常的工作是唤醒工作线程正睡在上面的条件变量。
+'''
+hints = [
+  "把 summer 的 std::thread 换成 std::jthread，即使还没加 join，中止也消失了 —— 但还是要 join 它，在读取 sum 之前。",
+  "第一个参数是 std::stop_token 的 lambda，会自动从运行它的 jthread 那里得到一个；接上就这么简单。",
+  "std::stop_callback on_stop(token, fn) 是一个对象：它在构造函数里注册，在析构函数里注销，所以它和循环活得一样长，不多也不少。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "cpp.advanced.17.dangling"
+title = "悬空"
+story = "维多利亚公园的泵房，在喷水池下面两层。一个泵线程还在读一个缓冲区，而房间在交班时已经把它释放了。"
+brief = '''
+第一行是 `w n`：`w` 台泵和 `n` 个读数。第二行是这些读数。
+
+`pump(w, buffer)` 启动 `w` 个线程；线程 `i` 把从 `i * n / w` 到 `(i + 1) * n / w` 的读数
+加起来写进 `partial[i]`，然后 `pump` 返回这些部分和。`main` 为每一个输出 `PUMP <i> <sum>`，
+再输出 `TOTAL <sum>`，然后如果在一切完成时缓冲区已经被释放，就输出 `FREED yes` —— 通过一个
+`std::weak_ptr` 观察到。
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+初始代码会中止。`pump` 在一个局部 vector 里建立它的线程，在它们还 joinable 时就返回了，
+所以 vector 的析构函数调用了 `std::terminate`。去读一读它本来要做的事：那些线程持有
+`buffer` 的一个**引用**，而 `pump` 的调用者正要让 `buffer` 死掉。一个在 vector 的析构函数
+运行之后还读它的线程，读的是已释放的内存。有时它拿到旧的数字。有时它拿到下一次分配的东西。
+有时分配器已经把这些页还回去了，它就段错误。这是未定义行为，而且是最昂贵的那一种，因为它
+不在出错的地方失败。
+
+修的是所有权，而不是症状。缓冲区是一个
+`std::shared_ptr<const std::vector<long long>>`，每个线程捕获**它自己的一份句柄副本**，
+而缓冲区恰好活到最后一个持有它的线程为止 —— 不管 `pump` 怎么返回，也不管线程按什么顺序
+结束。返回之前 join。`main` 留着一个 `weak_ptr`，在 `pump` 返回并丢掉它自己的句柄之后，
+`expired()` 就是证明：读数被释放了，只释放了一次，由最后完成的那台泵释放，而且已经没有人
+还在读。
+
+这就是整片土地，浓缩在一个程序里。没有任何东西替你检查。是你让生命周期与使用相吻合，而做到
+这一点的工具 —— 会计数的智能指针，会等待的 join —— 就是你在基础路上遇到的同一个 RAII。
+'''
+hints = [
+  "pump 里改两处：按值捕获 buffer（那个 shared_ptr），而不是按引用捕获 readings；并在返回前 join 每一个线程 —— 放在自己块里的 std::vector<std::jthread> 会在右大括号处完成 join。",
+  "lambda 里的那份 shared_ptr 副本就是让 vector 活着的东西；它在线程函数返回时被释放，而不是在 pump 返回时。这就是引用和拥有者之间的区别。",
+  "partial 仍然按引用捕获，这是对的：pump 拥有它，pump 在返回它之前 join，而且每个线程只写自己的槽位。",
+  "main 故意把它的句柄移进 pump。如果它留了一个，FREED 就会是 no —— 缓冲区活着是因为 main 还拿着它，而能解释这一点，是这个 boss 接受的另一个答案。",
+]

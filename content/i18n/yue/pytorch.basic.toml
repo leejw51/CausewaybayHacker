@@ -1,0 +1,539 @@
+# PYTORCH LAND — BASIC, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/basic.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong practitioners actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "pytorch.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.basic.01.night-shift"
+title = "夜更"
+story = "機房，23:00。控制台吐出一行讀數，係文字，而樓下每件工具都要張量。"
+brief = '''
+標準輸入會嚟一行用空白分隔嘅數字。將佢變做一個 **float** 張量，印出佢嘅形狀（一個 tuple）同埋總和。
+
+`input().split()` 畀你一個字串 list；`float(t)` 轉換一個。一個 list comprehension 將兩樣砌埋就係成個轉換，`torch.tensor` 接嗰個 list。
+
+總和用 `.item()` 印，佢會由一個 0 維張量攞出個 Python 數字，四捨五入到四個位，咁循環小數就唔會同自己唔啱數。
+
+```
+input: 1 2 3 4
+output: (4,) 10.0
+```
+'''
+hints = [
+  "torch.tensor([float(t) for t in input().split()]) — 拆開、轉換、包起。",
+  "一維嘅形狀印出嚟尾有個逗號：(4,)，唔係 (4)。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.basic.02.the-batch"
+title = "六個變兩行"
+story = "六個數字平平哋由條線傳過嚟。個模型係寫嚟收兩個樣本、每個三個特徵嘅，唔肯收一條平線。"
+brief = '''
+模型差唔多永遠都唔要一條平線；佢要 `(batch, features)`。`reshape` 將同一批數字變做新形狀，而喺其中一個位寫 `-1` 即係 *由其他位計返呢個出嚟*。
+
+將條平嘅讀數 reshape 做每行三個，有幾多行就幾多行，然後印出形狀同第一行最後嗰個數字。
+
+```
+input: 1 2 3 4 5 6
+output: (2, 3) 3.0
+```
+'''
+hints = [
+  "flat.reshape(-1, 3) — 三個 column，行數自己推出嚟。",
+  "reshape(3, -1) 會係三行、每行唔知幾多個，即係反轉咗。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.basic.03.normalise"
+title = "冇人傾好嘅尺度"
+story = "一個特徵用度數量，下一個用瓦。個模型訓練嘅每一步都用嚟學識瓦數比較大。"
+brief = '''
+標準化一個特徵，即係減走佢嘅平均值再除以佢嘅標準差，咁每個 column 出嚟都係以零為中心、離散度係一。
+
+`dim=0` 上面嘅平均值係每個 column 一個數字 —— 形狀 `(features,)` —— 由一個 `(batch, features)` 減佢就會沿住啲行 broadcast 落去。標準差都係一樣。
+
+之後印出四捨五入咗嘅每個 column 平均值；照做法佢哋一定係零。
+
+```
+input: 1 10 2 20 3 30
+output: [0.0, 0.0] [1.0, 1.0]
+```
+'''
+hints = [
+  "(x - x.mean(dim=0)) / x.std(dim=0) — dim=0 將啲行壓埋，每個 column 剩返一個數字。",
+  "冇 dim=0 你會攞到成個張量嘅平均值，將兩個特徵撈埋一齊。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.basic.04.split-xy"
+title = "標籤嗰個 column"
+story = "個擷取檔將標籤黐咗喺最後一個 column，個模型一直都喺用答案嚟訓練。"
+brief = '''
+一張原始表通常將標籤同特徵放埋一齊。拆開佢係兩個 slice：最後一個 column 之前嘅所有嘢，同埋最後一個 column 自己。
+
+`x[:, :-1]` 係每一行、除咗最後嗰個之外嘅每個 column。`x[:, -1]` 係每一行嘅最後一個 column，而 column 嗰條軸會消失，所以出嚟係每行一個數字。
+
+印出兩個形狀，然後印標籤。
+
+```
+input: 1 2 0 3 4 1
+output: (2, 2) (2,) [0.0, 1.0]
+```
+'''
+hints = [
+  "table[:, :-1] 同 table[:, -1] — slice 會留住條軸，單一個 index 就會掉咗佢。",
+  "table[:, -1:] 會留住 column 嗰條軸，畀你 (2, 1)，唔係同一個形狀。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.basic.05.layer-by-hand"
+title = "一層，逐步寫出嚟"
+story = "一層未變做 class 之前係兩個運算，夜更想睇一次冇嘢遮住嘅佢哋。"
+brief = '''
+一個線性層就係一個矩陣乘法加一個 bias，冇其他嘢。一個形狀 `(batch, in)` 嘅 batch `x`，同一個形狀 `(out, in)` 嘅權重 `W` —— torch 就係咁樣儲佢 —— 輸出係 `x @ W.t() + b`。
+
+`W.t()` 係 `(in, out)`，所以內側嘅維度對得上，而形狀 `(out,)` 嘅 `b` 會喺成個 batch 度 broadcast。
+
+寫出嚟，然後印形狀同四捨五入咗嘅結果。
+
+```
+output: (2, 2) [[1.0, 2.0], [3.0, 6.0]]
+```
+'''
+hints = [
+  "x @ W.t() + b — 個轉置先令內側維度對得埋。",
+  "x @ W 喺度都行得到，因為個矩陣係正方形，但計出嚟係錯嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.basic.06.relu"
+title = "疊埋都係平"
+story = "三個線性層一個接一個，成疊畫出嚟嘅直線同一層畫嘅一模一樣。"
+brief = '''
+兩個線性層中間乜都冇，就等於一個線性層。activation 先令深度有意義，而 ReLU 係差唔多所有嘢都用嗰個：正數留低，其他變零。
+
+用佢落嗰層嘅輸出度，然後報告有幾多個數字生存落嚟。
+
+```
+output: [0.0, 0.0, 1.0, 3.0] 2
+```
+'''
+hints = [
+  "torch.relu(z) 留低正數，其他嘢全部壓到零。",
+  "(a > 0).sum() 數緊 boolean，因為加埋嗰陣 True 係 1。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.basic.07.sigmoid"
+title = "係咪著咗火"
+story = "個熱力模型輸出 4.2，而夜更問嘅係個機架係咪就快跳掣。"
+brief = '''
+一個單一輸出神經元出一個喺 `(-∞, ∞)` 上面嘅原始分數。sigmoid 將佢壓落 `(0, 1)`，喺度可以當係一個機率嚟睇，而決策邊界 —— 分數 0、機率 0.5 —— 就係「係」變做「唔係」嘅地方。
+
+將啲分數變做機率，再喺 0.5 變做係／唔係嘅決定。
+
+```
+output: [0.0474, 0.5, 0.9526] [0, 1, 1]
+```
+'''
+hints = [
+  "torch.sigmoid(scores) — 分數 0 出嚟啱啱好係 0.5。",
+  "(probs >= 0.5).int() 將啲 boolean 變做 0 同 1，咁印出嚟先係數字。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.basic.08.softmax-rows"
+title = "每行自己計"
+story = "一個 batch 四個樣本，每個三個類別，啲信心數字係成個 batch 加埋等於一，而唔係每行加埋等於一。"
+brief = '''
+喺一個形狀 `(batch, classes)` 嘅 logits batch 上面，softmax 一定要沿住**類別**嗰條軸做 —— `dim=1` —— 咁每行先會自己加埋等於一。`dim=0` 會令每個 *column* 加埋等於一，嗰個係講緊成個 batch，冇意義。
+
+沿住類別對個 batch 做 softmax，然後印出每行嘅總和。
+
+```
+output: [1.0, 1.0] (2, 3)
+```
+'''
+hints = [
+  "torch.softmax(logits, dim=1) — 喺一個 (batch, classes) 張量上面，dim=1 就係類別嗰條軸。",
+  "dim=-1 喺度意思一樣，而且之後加多條 batch 軸都仲啱用。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.basic.09.predict"
+title = "要答案，唔要分數"
+story = "個 dashboard 每個樣本出三條信心 bar，操作員要用眼睇邊個類別贏，一晚睇四百次。"
+brief = '''
+一個分類器嘅預測，就係每行最大嗰個 logit 嘅 index：沿住類別軸做 `argmax`。softmax 唔會改變邊個最大，所以個預測可以直接由 logits 讀出嚟。
+
+印出個 batch 每一行預測嘅類別。
+
+```
+output: [2, 0, 1]
+```
+'''
+hints = [
+  "logits.argmax(dim=1) — 每行一個 index，所以結果係 (batch,)。",
+  "冇 dim 嘅話佢會將成個 batch 攤平，畀你一個指向全部嘢嘅 index。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.basic.10.accuracy"
+title = "幾耐啱一次"
+story = "stand-up 入面話個模型做得唔錯。成間房冇一個人有個數字。"
+brief = '''
+準確率係預測同標籤吻合嘅比例。兩個張量逐個元素比較會畀你 boolean；boolean 唔可以攞平均，所以要先轉做 float，然後 `mean()` 就係個比例。
+
+印出四捨五入到四個位嘅準確率，同埋命中嘅數目。
+
+```
+output: 0.75 3
+```
+'''
+hints = [
+  "(pred == want).float().mean() — 轉做 float 先令 mean 合法。",
+  "直接喺 bool 張量上面 mean() 會 raise；torch 唔會幫你揀 dtype。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.basic.11.mse-by-hand"
+title = "錯幾多，自己計"
+story = "條損失曲線係平嘅，冇人信個 library。將個數字自己寫一次出嚟，睇佢郁。"
+brief = '''
+均方誤差就正正係佢個名：差，平方，攞平均。寫出嚟係 `((pred - want) ** 2).mean()`，而 `nn.MSELoss()(pred, want)` 係同一個數字。
+
+兩種方法都計一次，然後印出嚟。
+
+```
+output: 1.5 1.5
+```
+'''
+hints = [
+  "((pred - want) ** 2).mean() — 攞平均之前先平方，唔係啲正負號會抵銷咗。",
+  "nn.MSELoss() 係先整出嚟，再用嗰對嘢 call：nn.MSELoss()(pred, want)。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.basic.12.cross-entropy"
+title = "食 logits 嘅損失"
+story = "有人將個輸出 softmax 咗，再交畀分類損失，個模型就停咗學嘢，一次 error 都冇出過。"
+brief = '''
+`nn.CrossEntropyLoss` 收**原始 logits**，唔係機率 —— softmax 喺佢入面。目標係類別 **index**，dtype 係 `int64`，每行一個，唔係 one-hot 行。
+
+餵佢 logits 同 index，然後印出損失。一個有信心又啱嘅 batch，損失會接近零。
+
+```
+output: 0.0659
+```
+'''
+hints = [
+  "nn.CrossEntropyLoss()(logits, want) — logits 原封不動咁入；唔好先 softmax。",
+  "目標係 index，所以一定要係 int64 —— float 目標會 raise。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.basic.13.the-gradient"
+title = "呢一點嘅斜率"
+story = "個參數係 4.0，損失係佢嘅平方，而一個訓練步驟永遠只問一條問題：邊個方向係落斜。"
+brief = '''
+將個參數標做可以學嘅，行 forward pass，然後喺損失上面 call `backward()`。`w * w` 嘅梯度係 `2w`，所以喺 `4.0` 佢會以 `8.0` 落入 `w.grad`。
+
+未行過 backward pass 之前 `.grad` 係 `None` —— 第一個訓練 loop 印出 `None` 就停，通常就係因為咁。
+
+```
+output: 8.0
+```
+'''
+hints = [
+  "loss.backward() — 喺個 graph 嘅尾度 call，永遠唔係喺參數上面。",
+  "梯度落入 w.grad；backward() 本身乜都唔 return。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.basic.14.accumulate"
+title = "佢留住咗上一個"
+story = "兩次 backward pass，個梯度係算術話嘅兩倍。中間乜都冇清過。"
+brief = '''
+`backward()` 係**加**入 `.grad`；唔係取代佢。所以同一個參數行兩次，會留低兩個梯度嘅總和，亦即係點解每個訓練 loop 都喺 backward pass 之前清走啲梯度。
+
+行第二次之前先清走啲梯度，咁印出嚟嘅數字就係一次嘅份量：喺 `3.0` 係 `2w`。
+
+```
+output: 12.0 6.0
+```
+'''
+hints = [
+  "w.grad = None 清走佢；下一次 backward pass 由零開始。",
+  "優化器會幫你做 —— opt.zero_grad() 係同一個諗法，套落佢揸住嘅每個參數。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.basic.15.step-by-hand"
+title = "落斜，一次"
+story = "優化器未變做 object 之前係一個減數，夜更想睇吓個減數。"
+brief = '''
+梯度下降係 `w ← w - lr * w.grad`，成個演算法就係咁。佢一定要喺個 graph 熄咗嘅時候做 —— 個更新係記數，唔係模型嘅一部分 —— 所以要放喺 `torch.no_grad()` 入面。
+
+`w` 由 `5.0` 開始，`w * w` 嘅梯度係 `10.0`，`lr` 係 `0.1`。
+
+```
+output: 4.0
+```
+'''
+hints = [
+  "w -= lr * w.grad — 係減，因為梯度指住上斜。",
+  "一定要喺 no_grad block 入面，唔係 torch 唔肯就地改一個 requires grad 嘅 leaf。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.basic.16.optimiser"
+title = "嗰三行"
+story = "世上寫過嘅每個訓練 loop 都係同樣三行、同樣次序，而夜更抄嗰個嘅次序係亂嘅。"
+brief = '''
+優化器揸住啲參數，負責做更新。loop 嘅內容永遠係同樣三個 call，順序係咁：清走舊梯度、行 backward pass、做 step。
+
+喺 `w * w` 上面由 `5.0` 開始、用 `lr=0.1` 行二十步 SGD，會將 `w` 推向零。
+
+```
+output: 0.0576
+```
+'''
+hints = [
+  "zero_grad、backward、step — 清、計、用。",
+  "喺 backward() 之前 call step()，會用咗上次留喺 .grad 入面嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.basic.17.fit-a-line"
+title = "二 X 加一"
+story = "風扇曲線係一條直線，冇人記低佢個斜率。機架門上面用膠紙貼住四個量度數字。"
+brief = '''
+呢個係世上最細嘅真正訓練：一個 `Linear(1, 1)`，四個啱啱好喺 `y = 2x + 1` 上面嘅點，同埋足夠步數嘅 Adam 去搵出嗰兩個數字。
+
+loop 嘅內容係你已經識嘅三個 call，前面加 forward pass 同損失。
+
+```
+output: 2.0 1.0
+```
+'''
+hints = [
+  "model(x) 行 forward pass；永遠唔好直接 call model.forward(x)。",
+  "loss = loss_fn(model(x), y)，然後 zero_grad、backward、step。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.basic.18.sequential"
+title = "兩層加一個彎"
+story = "第一個有 hidden layer 嘅網絡，佢要先砌好，先有得錯。"
+brief = '''
+`nn.Sequential` 將 module 串埋：每個嘅輸出就係下一個嘅輸入。四個特徵入、八個 hidden、中間 ReLU、三個類別出 —— 係真係有人會 ship 嘅最細網絡。
+
+參數數目係 `(8*4 + 8) + (3*8 + 3) = 67`。
+
+```
+output: (2, 3) 67
+```
+'''
+hints = [
+  "nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3)) — hidden 闊度出現兩次，先做 out 再做 in。",
+  "nn.ReLU() 係一個 module，要加括號砌出嚟；torch.relu 係 function 版本。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.basic.19.module"
+title = "自己嘅網絡"
+story = "一有嘢發生兩次 Sequential 就唔夠用，而地庫嗰樣嘢根本就係同一個 block 重複又重複。"
+brief = '''
+真正嘅模型係一個 class。兩條規則，亦正正係人哋會犯嗰兩條：喺 `__init__` 入面將啲層賦值去 `self`，咁佢哋先會註冊做參數；同埋喺咁做之前先 call `super().__init__()`。
+
+`forward` 講明發生乜嘢；call 個模型就係 call `forward`。
+
+```
+output: (2, 1) 21
+```
+'''
+hints = [
+  "self.fc1 = nn.Linear(3, 4) 同 self.fc2 = nn.Linear(4, 1) — 個 4 係 hidden 闊度，先 out 後 in。",
+  "放喺普通 list 而唔係 self 上面嘅層，永遠唔會出現喺 parameters() 入面，亦永遠唔會訓練。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.basic.20.train-classifier"
+title = "兩團點"
+story = "由兩個數字分冷通道定熱通道。兩團點隔到十萬八千里，個模型仲係錯一半，因為冇人訓練過佢。"
+brief = '''
+第一個分類器：兩團分得好開嘅點、兩個類別、cross-entropy，同埋二百步。所有嘢都砌好；淨係缺咗 loop 嘅內容。
+
+cross-entropy 收模型 return 嘅原始 logits 同整數標籤 —— 冇 softmax，冇 one-hot。
+
+```
+output: 1.0
+```
+'''
+hints = [
+  "loss = loss_fn(model(x), y)，然後按次序三個 call。",
+  "啲標籤已經係 int64；cross-entropy 要 index，唔要 one-hot 行。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.basic.21.eval-mode"
+title = "仲喺訓練緊"
+story = "每次同一個 validation set 攞嚟評分，啲 validation 數字都郁。dropout 仲開住。"
+brief = '''
+有啲層喺訓練嗰陣表現唔同。dropout 喺訓練時隨機將 activation 變零，評估時就乜都唔做，而 `model.eval()` 就係撥個掣嗰個。`model.train()` 撥返轉頭。
+
+喺 eval mode 評兩次分會畀同一個答案兩次；喺 train mode 評兩次就唔會。
+
+```
+output: True
+```
+'''
+hints = [
+  "model.eval() — 佢會 return 個模型，但 call 佢係為咗佢撥嘅嗰個掣。",
+  "no_grad 只係停止記錄個 graph；佢唔會熄 dropout。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.basic.22.state-dict"
+title = "模型係乜，存低"
+story = "地庫度訓練咗四個鐘，而個 process 就快因為維修時段俾人 kill 咗。"
+brief = '''
+存低嘅模型唔係啲 code；係啲數字。`state_dict()` 係一個有次序嘅 dict，裝住每個參數，而 `load_state_dict()` 將佢哋放入另一個同形狀嘅模型 —— 所以 load 入一個形狀唔同嘅模型會大大聲咁失敗，而唔係靜靜雞。
+
+將訓練好嘅權重抄入一個新模型，然後檢查佢哋而家係咪一致。
+
+```
+output: True
+```
+'''
+hints = [
+  "fresh.load_state_dict(trained.state_dict()) — 由一個讀，load 入另一個。",
+  "fresh = trained 會令佢哋變做同一個 object，咁乜都證明唔到。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.basic.23.minibatch"
+title = "唔好一次過"
+story = "成個擷取用一個張量一次過入，allocator 放棄，個 job 行咗四分鐘就死。"
+brief = '''
+一個 mini-batch 就係一個 slice。行 `range(0, n, bs)`、攞 `x[i:i + bs]`，就會畀你一個個 `bs` 大嘅 batch，而 `n` 除唔盡嘅時候最後會有一個短啲嘅 —— 就係呢個 batch 會搞爛假設每個 batch 都滿嘅 code。
+
+十個樣本，每個 batch 四個：印出每個 batch 嘅行數。
+
+```
+output: [4, 4, 2]
+```
+'''
+hints = [
+  "x[i:i + bs] — slice 過咗尾唔係錯；佢只係畀返剩低嘅嘢。",
+  "最後一個 batch 係短嘅。下游任何地方 hard-code 咗 bs 嘅 code，正正喺呢個 batch 爛。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.basic.24.dataloader"
+title = "個 Loader"
+story = "自己寫嘅分 batch loop 有四十行，個 shuffle 仲有 bug。torch 由第一日開始已經有呢樣嘢。"
+brief = '''
+`TensorDataset` 將特徵同標籤配成對，一個 index 就攞到兩樣；`DataLoader` 將佢哋分 batch 同 shuffle。iterate 佢會出 `(features, labels)` 對，已經切好。
+
+`shuffle=False` 嘅話次序就係啲張量原本嘅次序，所以每次行都一樣。
+
+```
+output: 3 [4, 4, 2] 10
+```
+'''
+hints = [
+  "TensorDataset(x, y) 然後 DataLoader(ds, batch_size=4, shuffle=False)。",
+  "len(dl) 係 batch 嘅數目；len(ds) 係樣本嘅數目。兩個係唔同嘅數字。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.basic.25.holdout"
+title = "佢從來冇見過嗰部分"
+story = "個模型喺佢訓練過嘅數據上面攞一百分，而呢個正正係從來冇預測過任何嘢嘅嗰個數字。"
+brief = '''
+訓練準確率唔係結果。訓練之前留起一截，永遠唔好畀優化器見到，然後用嗰截嚟評分。
+
+四十個樣本：頭三十個訓練，最後十個係測試集。印出兩個形狀同留起嗰截嘅準確率。
+
+```
+output: (30, 2) (10, 2) 1.0
+```
+'''
+hints = [
+  "x[:30] 同 x[30:] — 標籤都要用同一個切法，唔係每一行都會標錯。",
+  "shuffle 喺切開之前做；將一個按類別排好嘅數據集切開，會畀你一個得一個類別嘅測試集。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.basic.26.loss-goes-down"
+title = "究竟有冇學緊"
+story = "個 loop 行緊，風扇轉起，四個鐘之後冇人講得出有冇嘢發生過。乜都冇記錄低。"
+brief = '''
+一個訓練 loop 可以有嘅最平嘅測試：喺開頭同結尾記低損失，然後 assert 佢跌咗。一個行緊但冇學嘢嘅 loop，睇落同一個學緊嘢嘅 loop 一模一樣，直到印出呢個為止。
+
+記低第一個同最後一個損失，然後印出第二個係咪細啲。
+
+```
+output: True True
+```
+'''
+hints = [
+  "第 0 步將 loss.item() 記落 first，每一步都記落 last。",
+  "留住個 float，唔好留個張量：揸住個張量就會連成個 graph 都揸住唔放。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.basic.27.xor"
+title = "嗰條直線"
+story = "四個點、兩個類別，一個訓練咗一個鐘嘅模型仍然四個錯兩個。訓練幾耐都醫唔好；冇一條直線分得開佢哋。"
+brief = '''
+XOR 係呢門學問入面最古老嘅證明，證明深度唔係裝飾。`(0,0)` 同 `(1,1)` 係一個類別；`(0,1)` 同 `(1,0)` 係另一個，而冇一條直線可以將呢兩對放喺兩邊。單一個 `Linear` 無論咩 learning rate、幾多步都做唔到。
+
+中間有個 nonlinearity 嘅 hidden layer 就做得到，而呢個就係地庫嗰個網絡濃縮喺一個 node 入面：砌一個 `2 → 8 → 1`，中間有個彎。
+
+訓練 loop 已經寫好。砌個模型，然後用 0.5 做門檻印出佢嘅四個預測。
+
+```
+output: [0, 1, 1, 0] True
+```
+'''
+hints = [
+  "nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1)) — 兩個入、八個 hidden、一個出。",
+  "冇 activation 嘅話兩個 Linear 會縮埋做一個，四個入面有兩個會永遠錯。",
+  "喺咁細嘅問題上面 Tanh 比 ReLU 順滑，而一個細嘅 ReLU 層可能一開始就死咗，永遠翻唔返生。",
+]

@@ -189,6 +189,11 @@ export class AiScene implements Scene {
         const empty = emptyDrill(this.mode, this.context);
         this.notice = { head: empty.head, body: empty.body, tone: "empty" };
       } else {
+        // `next` refuses while `busy` is up, and this call is what raised it:
+        // left up, the first street was never fetched, the plan said "1 OF 5"
+        // over nothing, and GO IN had no quest to go into. Handed over, not
+        // dropped — `next` raises it again for its own request.
+        this.busy = false;
         await this.next();
       }
     } catch (e) {

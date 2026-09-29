@@ -1,0 +1,1120 @@
+# LUA LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/lua/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "lua.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.advanced.01.conversions"
+title = "三种形态，一个名字"
+story = "浣纱街的香档在一本记事本里，把价钱既记成文字，又记成数字，又记成元，都在同一个名字底下。"
+brief = '''
+读取一行：一个以分为单位的金额，全是数字。
+
+输出三行：
+
+1. 去掉首尾空白后的文本有多少个字符
+2. 这个金额作为数字
+3. 这个金额换算成元，精确到两位小数
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+金额非负。用**一个名字**来做，重新绑定三次——先是字符串，然后是数字，然后又是字符串。Lua 的局部变量什么都能装，一赋值就改主意；代价是，除了读上面那一行，没有任何东西告诉你 `cents` 此刻是什么。
+
+算元的时候不要经过除法。`1234 / 100` 今天是 `12.34`，而 `0.1 + 0.2` 打印出来是 `0.3`，比较起来却不是。`math.floor` 和 `%` 精确地给你两个部分，`string.format("%02d", ...)` 给第二部分补零。`tonumber` 是转换；在 `cents` 还是字符串的时候，`#cents` 是字符串的长度。
+'''
+hints = [
+  "在 cents 还是字符串的时候取 #cents，就是第一行。",
+  "cents = tonumber(cents) 不是原地转换；它是把一个新值绑定到旧名字上。在那之后字符串就没了。",
+  "string.format 里的 %02d 是宽度二、补零、十进制。5 分是 0.05，不是 0.5。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.advanced.02.control-flow"
+title = "哪条巷子"
+story = "巷子的编号用粉笔写在火龙要走的路上，莲花宫前指挥的牌子本该写明每条巷子里有什么。它每次都只写编号，而且从零开始。"
+brief = '''
+读取一个整数 `n`。对从 `1` 到 `n` 的每个 `i`，输出一行：
+
+* 如果 `i` 能同时被 3 和 5 整除，输出 `FISHVEG`
+* 如果 `i` 能被 3 整除，输出 `FISH`
+* 如果 `i` 能被 5 整除，输出 `VEG`
+* 否则输出 `i` 本身
+
+然后继续读取整数，每行一个，直到读到 `0` 为止，再输出 `SKIPPED <k>`，即途中读到的非零行数。
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+两个循环，两种写法。第一个在开始之前就知道要跑多少次：`for i = 1, n do`。第二个不知道：`while true do` 加 `break`，因为次数由你读到的内容决定。Lua 的数值 `for` 两端都是**包含**的——`for i = 1, n` 跑 `n` 次——而起始代码从 `0` 开始，这正是这片土地得名的那个差一错误。
+'''
+hints = [
+  "先检查两者都满足的情况，否则它永远不会触发。能被 3 和 5 整除就是能被 15 整除。",
+  "for i = 0, n - 1 早一步开始，也早一步结束。起始代码就有这个 bug；它输出的第一行是 FISHVEG，因为 0 能被任何数整除。",
+  "while true do ... break 是 Lua 表达“出口在中间的循环”的方式。还有 repeat ... until，它在底部检查。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.advanced.03.lists"
+title = "火龙的中段"
+story = "六十七米长的稻草扛在一排舞龙者的肩上，龙头的指挥看得见第一个和最后一个舞龙者，中间的一个也看不见。"
+brief = '''
+标准输入第一行是一个数量 `n`，第二行是 `n` 个整数，用空格分隔。`n` 至少为 `1`，所以总有第一个值和最后一个值可以输出。
+
+输出三行：第一个值、最后一个值，以及严格位于它们之间所有值的和。少于三个值时，这个和为 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+Lua 的列表是一张键为 `1..n` 的表，`#nums` 就是 `n`。第一个元素是 `nums[1]`；最后一个是 `nums[#nums]`。没有 `nums[-1]`——负数键只是一个没存过东西的键，读它会毫无怨言地得到 `nil`——也没有切片：中间部分是一个从 `2` 到 `#nums - 1` 的循环，没有中间部分时它跑零次，所以其他语言需要的那道保护在这里是免费的。
+
+起始代码打印 `nums[0]`。这在 Lua 里不是错误。它是 `nil`，`print` 写出 `nil` 这个词，程序以 0 退出。这片土地正是因此得名。
+'''
+hints = [
+  "nums[#nums] 是最后一个元素；nums[#nums - 1] 是它前面那个。负数都不管用。",
+  "for i = 2, #nums - 1 是除去首尾之后的全部，只有一个值时它就是 for i = 2, 0，自己就会跑零次。",
+  "io.read(\"*a\") 一次读完全部内容，gmatch(\"%S+\") 逐个走过各个记号，于是换行在哪里就不再重要。第一个记号是数量；跳过它。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.advanced.04.strings"
+title = "字节不是字"
+story = "维多利亚公园灯笼摊的订货单把 銅鑼灣 截到三个字节，打出一个字和一个问号。"
+brief = '''
+读取一行。输出三行：
+
+1. 它以 UTF-8 编码的**字节**长度
+2. 它的**字符**长度
+3. 字符顺序反转后的这一行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+这一行可能含有 ASCII 以外的字符，那时前两个数字就不一样。Lua 的字符串是一串**字节**，此外什么也不知道：`#s` 是字节数，`s:reverse()` 反转的是字节，会把每个多字节字符切成两半。字符是你自己定义的东西。在 UTF-8 里，一个字符是一个首字节后面跟着任意多个后续字节——写成模式就是 `[^\128-\191][\128-\191]*`——所以数首字节就是字符数，用 `gmatch` 走过各个字符再把它们叠起来就是反转。
+
+起始代码把字节数打印两次，这一行原样打印。不要用 `line:reverse()` 去修第三行：对 `causeway` 它是对的，而对大家真正会输入的样例，它打印出的字节在任何编码下都不是字符串。
+'''
+hints = [
+  "#line 是字节数。字符必须自己数：gsub 的第二个返回值是匹配的次数，每个字符匹配一次，就是字符的个数。",
+  "后续字节是 128..191（10xxxxxx）。一个字符是一个不属于它的字节，后面跟着零个或多个属于它的字节：\"[^\\128-\\191][\\128-\\191]*\"。",
+  "table.insert(reversed, 1, ch) 压到最前面，所以最后一个字符最后排在第一。table.concat 不带分隔符地连接。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.advanced.05.dicts"
+title = "巷子在喊什么"
+story = "九点的浣纱街：每个摊位都在喊着什么，书馆街那头的牌子想要一个排名。"
+brief = '''
+读取全部标准输入，按空白切分。
+
+每个不同的单词输出一次，格式为 `<word> <count>`，按次数降序排列，次数相同时按单词升序。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+以单词为键的表就是计数器，而第一次时 `counts[word] + 1` 是错误——`attempt to perform arithmetic on a nil value`——因为没人写过的键是 `nil`。`(counts[word] or 0) + 1` 补上那个零。
+
+`pairs` 遍历键时**完全没有顺序**，而且顺序每次运行都会变。把键复制进一个列表，用一个说明“次数降序、然后单词升序”的比较函数 `table.sort` 它，再从列表输出。比较函数在第一个参数应排在前面时返回 `true`。
+'''
+hints = [
+  "起始代码在第一个单词上就死了：counts[word] + 1 在写之前先读，而没有东西可读。(counts[word] or 0) 补上那个零。",
+  "用 pairs 把键收进一个列表，然后 table.sort 这个列表。表本身没有顺序可修。",
+  "function(a, b) if counts[a] ~= counts[b] then return counts[a] > counts[b] end return a < b end — 次数降序，然后单词升序，对相等的参数永远不返回 true。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.advanced.06.sets"
+title = "两个档口都有的"
+story = "两个灯笼摊，一个在安庶庇街这边，一个在那边，一位顾客想知道哪些东西两边都买得到，免得横穿火龙的路线两次。"
+brief = '''
+两行标准输入，每行是一个摊位的货品，用空格分隔。一个摊位可能把同一样东西列两次；那只算一次。
+
+输出三行：
+
+1. `BOTH` 后面跟着两个列表上都有的所有东西，排好序，用空格分隔——没有的话输出 `BOTH -`
+2. `ONLY_A <k>`：在第一个列表上而不在第二个列表上的东西有多少
+3. `ALL <k>`：两个列表上一共有多少不同的东西
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+Lua 没有集合类型。集合是一张以成员为**键**、值为 `true` 的表：把 `tofu` 写两次就是把同一个键写两次，重复在进门时就消失了。成员判断是 `a[x]`，它是 `true` 或 `nil`。交集、差集和并集是三个循环，遍历一个集合的键去问另一个——把它们写成函数，三行就是三次调用。
+
+`#` 不数集合的键；它数的是列表部分，而列表部分是空的。用一个 `pairs` 循环来数，并在输出之前把成员排好序放进一个列表，因为 `pairs` 没有顺序。
+'''
+hints = [
+  "对每个记号 set[word] = true 就建好了集合；重复的 tofu 是同一个键写了两次。",
+  "交集是一个遍历 pairs(a) 的循环，保留 b[key] 为 true 的键。差集保留它为 nil 的键。并集把两个集合的键都写进一张表。",
+  "只有字符串键的表 #set 是 0。用 pairs 把键复制进一个列表，table.sort 它，#list 就是数量，table.concat(list, \" \") 就是那一行。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.advanced.07.functions"
+title = "每斤"
+story = "浣纱街上每张价签都是按斤算的，除非另有写明，而香档的价签打印机坚持每次都要被告知。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>` 或 `<NAME> <CENTS> <UNIT>`。
+
+写一个 `tag(name, cents, unit)`，返回 `<NAME> $<dollars>/<unit>`，保留两位小数，缺少 `unit` 时表示 `catty`，每行输出一个价签。
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+Lua 没有默认参数。调用者漏掉的参数是 `nil`，而起始代码的 `tag` 把它拿去拼接：`attempt to concatenate local 'unit'
+(a nil value)`。惯用写法是函数的第一行——`unit = unit or "catty"`——因为 `or` 除非左边是 `nil` 或 `false`，否则返回左边。这就是 Lua 默认参数机制的全部，而它和一行 `def` 一样，是函数契约的一部分。
+
+把这一行切成一个记号列表，转换好分数之后用 `tag(unpack(parts))` 把各部分交过去。`unpack` 把列表展开成参数，所以两个元素的列表和三个元素的列表都适合同一个签名。
+'''
+hints = [
+  "在 tag 的第一行写 unit = unit or \"catty\"。这就是全部修复。",
+  "`x or default` 是 Lua 的默认参数。它对一个值失效：如果调用者故意传 false，或者也替换它，这就是追问的问题。",
+  "tag(unpack(parts)) 展开列表；只有两个部分时第三个参数是 nil，由 or 补上。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.advanced.08.exceptions"
+title = "不是数字的那一行"
+story = "柚子档的秤打印出一列重量，中间夹着某人的电话号码。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行。每一行本应是一个整数。
+
+对每一行，输出值的两倍，或者在它无法解析时输出 `BAD <line>`。最后输出 `SUM <total>`，其中总数是你输出的那些值的和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`tonumber("xx")` 是 `nil`，悄无声息；`tonumber("1.5")` 是 `1.5`，它不是整数；而起始代码的 `double` 对两者都用 `error` 抛出。`error` 是 Lua 函数拒绝的方式——没有 `Result`，函数本身也不返回 `(value, ok)`——而期待一个数字的调用者必须用 `pcall` 说明它怎么处理：`pcall` 替你调用函数，返回 `true, result` 或 `false, message`，而不是让错误往上爬。
+
+让 `pcall` 只包住那一个可能失败的调用。把整个循环体都包起来，也会把你自己 `print` 里的笔误吞掉，程序就是这样学会悄悄失败的。
+'''
+hints = [
+  "起始代码在 xx 上以 main.lua:3: not an integer: xx 死掉。这条消息就是 pcall 不崩溃时作为第二个结果交给你的东西。",
+  "local ok, value = pcall(double, line) — pcall 把函数和它的参数分开接收；pcall(double(line)) 会先调用 double，在 pcall 运行之前就崩溃。",
+  "ok 为 false 时，value 就是消息。输出 BAD 然后继续；坏的那一行不往总数里加任何东西。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.advanced.09.comprehensions"
+title = "浣纱街一趟走完"
+story = "Alex 说你可以用三个 for 循环来做。巷子只有一条火龙那么宽，香已经点上；你只有一趟。"
+brief = '''
+标准输入是一行整数，用空格分隔。
+
+输出三行：
+
+1. 偶数值的和（没有偶数时为 `0`）
+2. 每个大于 `10` 的值乘以二，保持顺序，用单个空格连接——没有的话输出 `-`
+3. 一共有多少个不同的值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Lua 没有推导式；最接近的是一个从表构造表的函数，而这一关教的就是它们。把 `filter(list, keep)` 和 `map(list, f)` 各写一次——每个都是一个填充新表的循环——三行就变成了调用：`sum(filter(nums, even))`、`map(filter(nums,
+big), double)`，以及一个由这些值构造、再数一数的集合。谓词和变换是作为参数传进去的函数，也就是推导式里的 `if` 和那个表达式。
+
+`table.concat` 既接受字符串也接受数字，所以第二行不需要转换；但列表为空时它确实需要那个 `-`，因为 `table.concat({}, " ")` 是空字符串。
+'''
+hints = [
+  "filter(nums, function(v) return v % 2 == 0 end) 留下偶数；对它求和就是第一行。",
+  "map(filter(nums, big), double) — 先过滤，再变换，就和推导式后面的 if、前面的表达式一样。",
+  "集合是一张以这些值为键的表；#set 不数键，pairs 循环才数。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.advanced.10.dict-comprehensions"
+title = "同样的一遍，按键"
+story = "香档的价钱写在一张张红纸条上，按写下的顺序排着。阿姨想要一块完整的牌子，而且要两次。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<ITEM> <PRICE>`。`PRICE` 是以分为单位的整数。一种货品最多出现一次，`n` 至少为 `1`——总有一个最便宜的货品可以说出来。
+
+输出三行：
+
+1. 每个价格**严格大于 100** 的货品，格式为 `ITEM=PRICE`，按货品排序，用单个空格连接——没有的话输出 `-`
+2. 每个货品，价格**用整数除法减半**，格式相同，按货品排序
+3. `CHEAPEST <item>`——价格最低的，平局时按货品升序
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+上一关的按键版本。Lua 没有字典推导式；最接近的是 `filter_pairs(t, keep)` 和 `map_values(t, f)`，每个都是一个 `pairs` 循环，用同样的键填充一张新表。第一行保留值大于 100 的键值对；第二行用 `math.floor(v / 2)` 变换每个值并保留所有键。两者都不是推导式，而且各自就是一个函数，写一次。
+
+`pairs` 没有顺序，所以 `sorted_keys(t)`——把键放进列表并排好序——是第三个辅助函数，每一行输出都经过它。至于最便宜的，走过排好序的键，只在价格严格更低时才替换：因为键是按字母顺序来的，相同价格中的第一个就是平局的胜者。
+'''
+hints = [
+  "当 keep(key, value) 为 true 时 filter_pairs 保留那个键；map_values 在每个键上写 f(value)。两者都填充一张新表——永远不要写进你正在遍历的那张。",
+  "sorted_keys(t) 是以固定顺序输出一张按键组织的表的唯一办法。这里每一行都经过它，包括最便宜的那一行。",
+  "走过排好序的键，只在价格严格更低时才替换最优值：相同价格中的第一个按字母排在最前，平局自己就解决了。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.advanced.11.sorting"
+title = "排名榜"
+story = "火龙委员会每晚把最便宜的香钉上榜，莲花宫的文员拿着两个列表和一支铅笔手工给摊位排名。"
+brief = '''
+两行标准输入：第一行是摊位名，第二行是它们以分为单位的价格，顺序相同。至少有一个摊位。
+
+按最便宜在前的顺序输出摊位排名，格式为 `<rank>. <NAME> <cents>`，排名从 `1` 开始，平局时按名字升序。然后输出 `CHEAPEST <NAME>`。
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+把两个列表拉链合成一个记录列表——`{ name = ..., price = ... }`——然后用一个按价格排序、按名字打破平局的比较函数 `table.sort` 它，再由 `ipairs` 给结果编号。比较函数是一个闭包；对两个相等的记录它必须返回 `false`，否则 `table.sort` 会抛出 `invalid order function for sorting`。只用一个下标循环、不排序的那种写法，会在第三个摊位把平局判错。
+'''
+hints = [
+  "每个摊位一条记录，用同一个下标同时走过两个列表来构造。价格要 tonumber，否则作为字符串 1200 会排在 900 前面。",
+  "function(a, b) if a.price ~= b.price then return a.price < b.price end return a.name < b.name end — 先价格，后名字，对相等的记录返回 false。",
+  "for rank, stall in ipairs(stalls) 免费把排名交给你，从 1 开始。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.advanced.12.classes"
+title = "档口的记事本"
+story = "浣纱街的每个摊位都有自己记今晚生意的记事本，而香档那本里的每一行，都写进了委员会桌上那本公用的里。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<ITEM> <CENTS>`。
+
+构造一个收集货品的 `Notebook` 类，然后按到达顺序把每个货品以 `<ITEM> <CENTS>` 输出回来，然后输出 `TOTAL <sum>`，最后通过 `print(book)` 输出记事本本身——它的 `__tostring` 元方法必须产生 `Notebook(items=<n>, total=<sum>)`。
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` 可能是 `0`，那时输出的行是 `TOTAL 0` 和 `Notebook(items=0, total=0)`。
+
+Lua 的类是一张方法表，设为每个实例的元表，并且 `__index` 指回它自己：实例没有的键会到类里去找。这个查找就是这一关得名的那个 bug。起始代码把 `items = {}` 放在了**类表**里，所以任何记事本上的 `self.items` 都会落到每本记事本共用的那一个列表上，草稿本的 `PENCIL` 就出现在了正式的那本里。在 `new` 里创建并存在实例上的东西属于这个实例；类上的东西属于将来所有的实例。
+
+`print(book)` 调用 `tostring`，而 `tostring` 在元表里找 `__tostring`。没有它你会得到 `table: 0x...`，这就是起始代码的最后一行。
+'''
+hints = [
+  "运行起始代码，看输出的第一行：PENCIL 0，来自一本谁也没往里写过它的记事本。那就是通过 __index 找到的共用列表。",
+  "setmetatable({ items = {} }, Notebook) — 列表按实例创建，在 new 里，放在将成为 self 的那张表上。",
+  "print(book) 调用 tostring(book)，它使用元表的 __tostring。Notebook 就是元表，所以 function Notebook:__tostring() 就是要写的那一个方法。让它看起来像能重新构造出它的那个构造调用；这是惯例。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.advanced.13.dataclasses"
+title = "谁在买"
+story = "莲花宫旁的米铺对每张票都收全价，包括那些不是成人的，以及那张根本不是票的。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<TYPE> <KG>`。
+
+基本价格是 `500 + 100 * KG` 分。对每一行输出以下之一：
+
+* `ADULT`——基本价格
+* `STUDENT`——基本价格的一半，整数除法
+* `SENIOR`——永远是 `200`
+* 其他任何情况——`UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+把一行建模成一条记录——`Order.new(kind, kg)`——并用**一张分派表**决定价格：一张以种类为键、值为函数的表，查一次，键不存在时落到兜底。Lua 没有 `match`；一张以标签为键的分支表是它最接近的东西，而 `arms[order.kind]` 为 `nil` 就是通配的情况。
+
+起始代码的表只有一个分支，其他每一种——包括它本该认识的那三种——都落到了 `UNKNOWN`。每个分支都是一个接受订单的函数；每个都返回字符串，因为 `450` 和 `"450"` 打印出来一样，而 `UNKNOWN` 那一行反正是文本。
+'''
+hints = [
+  "ARMS 里每种一项：STUDENT = function(order) ... end，以此类推。键是标签，值是分支。",
+  "math.floor(x / 2) 是整数除法；x / 2 对 900 给出 450，对 501 却给出 250.5，而测试要的是整数的分。",
+  "没有分支的种类 ARMS[order.kind] 是 nil，if 就落到 UNKNOWN——和 match 最后一个分支做的是同样的事，只是由表来做。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.advanced.14.generators"
+title = "你自己的 for 循环"
+story = "香档的报价器从开张价起按固定步长列出每一个价格，而且在哪里都不保留它们的列表。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+把 `ticker(start, step, count)` 写成一个**协程**——`coroutine.wrap` 包住一个函数，这个函数从 `start` 开始、每次前进 `step`，yield 出 `count` 个值。每个值单独输出一行，然后输出 `SUM <total>`，它是把第二个 ticker 交给 `sum` 算出来的。
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+最后一行是 `main` 对 `ticker` 返回的东西的称呼——表叫 `list`，`coroutine.wrap` 返回的函数叫 `generator`——由起始代码的 `main` 原样打印。现在它说的是 `list`，就在 `for value in ticker(...)` 已经以 `attempt to call a
+table value` 失败之后的一行：泛型 `for` 会调用它的第一个操作数，而列表是不能调用的。
+
+`coroutine.wrap(f)` 不运行 `f`。它返回一个函数，每次调用这个函数都会运行 `f` 直到下一个 `coroutine.yield(value)`，并把那个值交回来。当 `f` 返回时，这个函数什么也不返回，`for` 看到 `nil` 就停下。这就是为什么 `for` 能用它，为什么 `sum` 能用它，也是为什么它能产生一百万个值，而一百万个值的列表从未存在过。
+
+起始代码构造列表并返回它。把追加换成 `yield`，并删掉那个列表。
+'''
+hints = [
+  "return coroutine.wrap(function() ... end) — 函数体 yield；wrap 把它变成 for 可以调用的函数。",
+  "coroutine.yield(value)，然后前进。函数体在 yield 处暂停，下一次调用时从它后面继续。",
+  "包装过的协程只能被消费一次，死掉之后再调用它就是错误。这就是为什么 main 为求和构造一个新的 ticker，而不是重用循环已经耗尽的那一个。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.advanced.15.decorators"
+title = "包起来"
+story = "火龙委员会想知道今晚价格函数被调用了多少次，而函数不想知道自己正被盯着。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个以公斤为单位的重量。
+
+`price(kg)` 是 `500 + 100 * kg`。用 `counted` 把它包起来，让每次调用都被计数，而 `price` 并不知道。每个重量输出一个价格，然后输出 `CALLS <n>`，再输出 `NAME <price.name>`——它必须说 `price`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+Lua 没有装饰器；最接近的是一个接受函数、返回某个可调用的东西来顶替它的函数，而这一关教的就是它。`price = counted(price, "price")` 把名字重新绑定到 `counted` 返回的东西上——这正是 `def` 上方的 `@counted` 所做的事。
+
+计数放在哪里？Lua 的函数不能带字段，所以包装器是一张**表**——`{ calls = 0 }`——用一个 `__call` 元方法让它可调用，这个元方法把计数加一并调用原函数。于是 `price(kg)` 经过 `__call`，而 `price.calls` 就是一次普通的字段读取。
+
+Lua 的函数也没有自己的名字。包装器必须被告知它所顶替的那个名字；起始代码从没告诉它，最后一行就说 `NAME wrapper`。这就是手工完成的 `functools.wraps`：被包装的东西的身份，复制到顶替它的东西上。
+'''
+hints = [
+  "price = counted(price, \"price\") — 第二个参数是包装器带着的名字。这就是全部修复。",
+  "在函数之后写 price = counted(price)，和把装饰器写在它上方一样：名字被重新绑定到 counted 返回的东西上，原函数只作为闭包里的上值 func 存活下来。",
+  "__call 里的 ... 转发任意参数而无需知道它们是什么，这正是包装器能用于任何函数的原因。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.advanced.16.duck-typing"
+title = "会叫就是鸭子"
+story = "书馆街蛋档的一个红色塑料袋。没人问它是什么；他们问里面有几个、有没有咸蛋，再一个一个翻一遍。"
+brief = '''
+标准输入是一行用空格分隔的货品，然后是一行只有一个要查找的单词。
+
+把货品放进一个 `Bag` 并输出：
+
+1. `LEN <k>`——来自 `bag:len()`
+2. 货品，每行一个——来自 `for item in bag:iter()`
+3. `HAS <WORD> YES` 或 `HAS <WORD> NO`——来自 `bag:has(word)`
+4. `LONGEST <item>`——来自 `longest(bag)`，平局时取第一个
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` 没有包装任何列表类型，也不需要。`bag:len()` 是在调用那一刻、经过元表对键 `len` 的一次查找，找到什么就调用什么。Lua 从不问一个东西*是*什么；它只在需要时问那个键在不在。起始代码三个方法一个都没有，第一个错误是 `attempt to call method 'len' (a nil
+value)`。
+
+`longest` 是一个自由函数，接受任何带 `iter()` 的东西——它从不提到 `Bag`。这就是契约的全部：一个名字和一次调用。（LuaJIT 不理会表上的 `__len` 元方法，所以这里长度是一个方法，而不是 `#bag`；`__index` 是唯一在干活的元方法。）
+'''
+hints = [
+  "function Bag:len() return #self.goods end — 三个方法，没有一个是长的。",
+  "iter 返回一个捕获计数器的闭包：每次调用把计数加一并返回 self.goods[i]，过了末尾它就是 nil，而 nil 正是让泛型 for 停下的东西。",
+  "longest 保留等长货品中的第一个，因为它只在严格更长时才替换，这就是样例说 duckegg 而不是后面某个的原因。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.advanced.17.none"
+title = "20:59 的价格牌"
+story = "20:59，浣纱街，鼓还没响。价格牌向记事本询问一个还没开张的摊位，记事本以“什么都没有”作答，价格牌就打印出那个“什么都没有”的价钱。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <CENTS>`——已经开张的摊位——然后是一个数量 `q` 和 `q` 个要查的摊位名。
+
+对每次查询输出 `<STALL> <cents>`，如果那个摊位没开则输出 `<STALL> NONE`。然后输出 `MISSING <k>` 和 `CHEAPEST <STALL>`——已开张摊位中价格最低的，平局按名字——如果什么都没开则输出 `CHEAPEST NONE`。
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+起始代码在 `CHAN` 上崩溃：
+
+```
+attempt to index local 'stall' (a nil value)
+```
+
+这一行是这段路的 boss。它从不指向 bug。它指向的是 `nil` 最终被*跟进*的地方，而那里离它被*造出来*的地方可以隔着任意远——在起始代码里它是在两个不同的地方造出来的。`lookup` 返回 `board[name]`，对不存在的摊位它按设计就是 `nil`，而调用者不问一声就从它身上读 `.cents`。而 `cheapest` 在出口处没有 `return`，所以它什么也不返回，调用者收到的是 `nil`，并对它做了同样的事。
+
+没人写过的键是 `nil`。从末尾掉出去的函数返回 `nil`。两者在当时都不是错误；两者后来都会变成错误。两次的修复是一样的：可能收到 `nil` 的代码在索引之前用 `== nil` 检查它。（在 Lua 里只有 `nil` 和 `false` 是假，所以这里 `if not stall` 也是对的——价格为 `0` 的摊位仍然是一张表——但 `== nil` 说的就是你的意思。）
+
+让 `lookup` 和 `cheapest` 有意地返回一个摊位**或 nil**，在注释里写明，并在 `nil` 落地的地方处理它。
+'''
+hints = [
+  "读一读回溯：错误在 print 上，但 nil 是在前一行从 lookup 里出来的，而在那之前是从 board[name] 里出来的。",
+  "if stall == nil then 就是检查。cents = 0 的表既不是 nil 也不是 false；在 Lua 里只有 nil 和 false 是假。",
+  "cheapest 走过整块牌子，然后没有 return 就结束了。Lua 不会为此警告；调用者拿到 nil，之后才发现。返回 best，而空牌子返回 nil，因为 best 从没被设置过。",
+  "pairs 以无序的方式遍历牌子，这就是为什么比较必须自己解决平局：价钱更低的，然后名字更小的，永远不要相信哪个摊位先来。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.advanced.01.threads"
+title = "十二个跑腿，一条巷"
+story = "21:00，浣纱街。十二个上香跑腿同时接下自己的龙节，而收集计数的指挥在他们任何一个写上去之前就读了牌子。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值创建一个**协程**，计算它的平方并存进 `results[i]`——它自己的槽位，所以没有两个跑腿会写同一个地方。把它们每一个都 resume，然后**按下标顺序**输出结果，每行一个，再输出 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Lua 没有线程；它有协程，而对其中一个做 `type(co)` 得到的是字符串 `thread`，这就是最后一行的那个计数。`coroutine.create(f)` 不运行 `f`。`coroutine.resume(co, ...)` 运行它——在**第一次** resume 时参数成为 `f` 的参数——直到它 yield 或返回；而 `square` 从不 yield，所以一次 resume 就是全部工作。结果必须写在 `main` 之后能读到的地方；每个跑腿一个槽位的表就是最简单的那种地方。
+
+起始代码的跑腿一开始就全部崩溃，而程序照样跑完并打印。不带参数的 `coroutine.resume(co)` 调用的是 `square(nil, nil)`，对 `nil` 的算术发生在协程内部，而 `resume` 把它作为返回值报告出来——`false` 和消息——被起始代码扔掉了。`results` 一直是空的，每一行都说 `nil`。死掉的协程只带走它自己——读一读 `resume` 的第二个结果，否则你永远不会知道。
+'''
+hints = [
+  "coroutine.resume(co, i, nums[i]) — 第一次 resume 的参数就是 square 收到的东西，而起始代码一个都没传。",
+  "resume 返回 ok, ...——协程死掉时是 false 和错误消息。检查它；起始代码的跑腿全都在 `value * value` 上因 value 为 nil 而悄悄死掉了。",
+  "results 是 square 的上值：嵌套函数看到的是和 main 看到的同一张表，这就是为什么之后能看到那些写入。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.advanced.02.lock"
+title = "一个抽屉，八只手"
+story = "巷子里的每个摊位都往委员会桌上那唯一一个钱箱里交钱，巡游结束时，抽屉里只有一个摊位的钱，而每个摊位都发誓自己交了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+为每个值创建一个协程，把它加到**一个共享的总数**上，并给一个共享的次数加一，然后以轮转的方式驱动它们全部——每个跑腿都轮到一次，直到每个跑腿都死掉。然后输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+起始代码在样例上确定地输出 `TOTAL 4`。每个跑腿读抽屉，**yield**，然后把读到的值加上自己的值写回去。等到第一个写入时，四个都已经读到了 `0`，最后一次写入胜出：一个摊位的钱，四次命中。这就是丢失的更新，而它发生在一个线程上，语言里也没有锁可忘。
+
+Lua 里没有 `Lock`，因为没有抢占。协程一直运行到它说 `coroutine.yield()` 为止，中间没有别的东西运行。临界区就是任何一段里面没有 yield 的代码，而 bug 是读和写之间的一个 yield。把 yield 从中间移出去——先等轮到自己，然后在一段里读、加、写——抽屉就对了。当更新确实必须在中间 yield 时（比如等一个 socket），锁就是一个标志：`while busy do
+coroutine.yield() end`，设置它，干活，清除它。这就是一把拼写出来的互斥锁。
+
+调度器写在程序里：一个遍历跑腿的循环，resume 每个不是 `dead` 的，直到整整一轮都找不到活着的。
+'''
+hints = [
+  "运行起始代码：TOTAL 4，HITS 4。四个跑腿读到 0，yield，然后各自写入 0 加上自己的值。最后一次写入就是总数。",
+  "total = total + value，读和写之间没有 yield。yield 可以留在 pay 里；只是不能夹在更新中间。",
+  "不要写 local total = total + value：那会造出一个新的局部变量遮住上值，外层的 total 永远不动。闭包只有在你给那个变量赋值时才共享它。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.advanced.03.queue"
+title = "谁来关窗口"
+story = "安庶庇街的饺子档把每张单都从窗口递进厨房，最后一张之后，柜台还站在那里，等着一个永远不会来的下一张。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+一个生产者协程把每个值乘以十压进一个队列，每压一个就 yield 一次，然后压进一个**哨兵**。主循环从队列里取值，直到看到哨兵为止，输出每个值并累计总数，然后输出 `SUM <total>` 和 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+队列是一张有头有尾的表，而表没有 `close`。它身上没有任何东西能告诉消费者不会再有了；那必须是一个项目。而这个项目不能是 `nil`，因为表里的 `nil` 就是没有项目。哨兵是一个独立的值——`local CLOSED
+= {}`，一张别人都没拿着的表——而 `value == CLOSED` 只对那一张表为真，因为表上的 `==` 比较的是身份。
+
+起始代码从没压进它。`take` 一直 resume 厨房，直到队列里有东西为止，而当厨房已经死掉、队列又是空的时，它就放弃并返回 `nil`；循环打印出 `nil` 这个词，然后把它加到总数上，死掉了。在一门有阻塞队列的语言里这会是挂起。在 Lua 里它是一个被跟进的 `nil`。
+
+哨兵由生产者压进去。永远不是消费者——知道流已经结束的那一方，就是结束它的那一方。
+'''
+hints = [
+  "一行，在厨房函数的末尾：push(hatch, CLOSED)。",
+  "消费者已经在检查 value == CLOSED。它一直在等生产者从没发出的东西，结果拿到的是 nil。",
+  "哨兵是一张新表，因为 nil 不能存在表里，也因为表只和它自己相等。就算值也可能是表，哨兵仍然安全：没有别人能拿到这一张。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.advanced.04.thread-pool"
+title = "八个搬运工"
+story = "莲花街那头有四十箱香，八个搬运工。没人想要四十个搬运工；他们要的是这八个永远不闲着。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+运行一个有 `w` 个搬运工的**池**：同时最多有 `w` 个协程在进行，每个搬一个任务，途中 yield 一次，然后返回 `(index, value * value)`。在任务**完成**时收集结果，按下标排序，每行输出一个 `<index> <value>`，然后输出 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+协程不是结果。`coroutine.resume(co)` 返回 `true`，后面跟着任务 yield 或返回的东西——那是值出来的唯一一扇门，而它在让任务完成的那次 resume 上打开，那碰巧是池的哪一轮就是哪一轮。起始代码收集的是完成了的协程本身——`thread: 0x...` 这样的值——而排序试图对其中一个做索引。
+
+把下标带在结果里，才让每次运行的输出都一样；按它排序是答案的最后一行，而不是第一行。池就是抽屉那一关的调度器加一个上限：补满到 `w` 个在运行，每个给一轮，把死掉的退休，重复，直到任务和在运行的都空了。
+'''
+hints = [
+  "起始代码死在排序或打印上：attempt to index local 'a' (a thread value)。协程是任务，不是它的答案。",
+  "local ok, index, value = coroutine.resume(co) — 在把任务运行到返回的那次 resume 上，返回值跟在 ok 后面。状态为 dead 时保留 { index, value }。",
+  "池按它自己的顺序完成任务，结果里的下标是每个任务从哪里来的唯一记录。输出之前按它排序。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.advanced.05.asyncio"
+title = "async 到底在哪里跑"
+story = "阿美写了四年 async 代码，却从没亲眼见过驱动它的那个东西。今晚这个循环是一个她读得懂的 while 循环，巷子里的每个跑腿轮流在上面跑。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+写一个 `double(value)`，让它向调度器 yield 一次——`coroutine.yield()`——然后返回值的两倍。为每个值做一个协程，用 `gather` 把它们全部运行起来，按输入顺序输出每个结果，然后输出 `SUM <total>` 和 `TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`coroutine.create(f)` 不运行 `f`。它构造一个**协程对象**并把它交回来，在有东西 resume 它之前，里面什么也不会发生。起始代码的 `run` 返回三个这样的对象，没有 resume 过，输出是三行 `thread: 0x...`，接着是 `attempt to perform arithmetic on a
+thread value`。
+
+`gather` 就是事件循环，而在这里由你来写：一个遍历任务的 `while`，按顺序 resume 每个没有死掉的任务，一轮接一轮，直到一个不剩，并把每个任务的**返回值**存在那个任务的槽位里。结果按你传入任务的顺序出来，不管它们以什么顺序完成。这就是选择它、而不选择一个把一个任务 resume 到死再碰下一个的循环的全部理由：那种循环是正确而顺序执行的，而 `gather` 是正确而交错执行的。
+
+这里只有恰好一个线程。`coroutine.yield()` 是任务把线程交还给循环、好让另一个任务使用它的那个点。没有任何东西并行运行；东西是**轮流**运行的，在它们说自己可以停下的地方。
+'''
+hints = [
+  "用 return gather(tasks) 代替 return tasks——而 gather 就是你要写的那个循环：resume 每个没死的任务，一遍又一遍，直到一个都不剩。",
+  "让任务死掉的那次 resume，它的第二个返回值就是任务的返回值。把它存在任务自己的下标上；这就是保持结果按输入顺序的原因。",
+  "如果你需要结果按完成顺序出来，那就是上一关的池，那时下标得由你自己带着。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.advanced.06.async-queue"
+title = "谁说它做完了"
+story = "三个跑腿在维多利亚公园灯会入口清理排队的票，指挥等着队列说它空了。它从来不说，因为没人告诉它哪张票处理完了。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+把 `{ index, value }` 任务放进一个会计算待处理数的队列。启动 `w` 个消费者协程，它们永远循环：取一个任务，把 `value * 10` 写进 `results[index]`，再调用 `task_done`。主函数运行 `join`——那个调度器一直 resume 消费者，直到每个 `put` 都有了它的 `task_done`——然后取消消费者，再按下标顺序输出结果和 `CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+待处理数为 `0` 时 `join` 返回，而只有 `task_done` 能让它减少。起始代码的消费者从不调用它，所以每个任务都处理了，计数仍然说 `4`，每个消费者都停在空队列的 `get` 里，再也没有任何东西能改变任何事。没有检测的循环会在那里空转，直到运行器杀掉程序。这一个会检测：整整一轮都没有消费者让计数减少，就是死锁，`join` 用 `error` 把它说出来。和窗口那一关是同样的挂起，拼法不同——而修复又是一行，在消费者那一边。
+
+消费者是 `while true` 循环。它们之所以结束，是因为 main 在 join 之后取消了它们，而这里的取消就是**带着一个信号去 resume**：队列为空时 `get` 会 yield，当唤醒它的那次 resume 传入 `"cancel"` 时，`get` 返回 `nil`，消费者就返回了。停在 yield 上的协程，是被它醒来时收到的那个值停下的。
+'''
+hints = [
+  "每个任务处理完后 task_done(queue)。join 只拿 put 的次数和 task_done 的次数相比，别的都不管。",
+  "coroutine.create 什么也不调度；消费者在 join 第一次 resume 它时才运行，而发现队列为空的消费者会从 get 里面 yield 出 \"idle\"。",
+  "被 \"cancel\" 唤醒的消费者从 get 拿到 nil 并返回，这就结束了 while true。什么也不带去 resume 它，只会让它再次停下。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.advanced.07.context-managers"
+title = "卷闸门照样落下"
+story = "浣纱街的一个摊位每来一张单就拉开卷闸门，做完再拉下。21:40 收到一张坏单的那个摊位从那时起一直开着，因为关门那一行写在失败的那一行后面。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <CENTS>`，其中 `CENTS` 本应是一个整数。
+
+写一个 `opened(stall, body)`——一个把代码块作为函数接收的函数——进门时输出 `OPEN <STALL>`，运行 `body`，出门时输出 `SHUT <STALL>`，**不管函数体有没有抛出错误**。在函数体里，解析分数并加到总数上。分数无法解析的那一行，在卷闸门关上之后报告为 `BAD <STALL>`。最后输出 `TOTAL <sum>` 和 `REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+Lua 没有 `with`，也没有 `finally`；最接近的是一个把函数体当作闭包接收的函数，外加包住那次调用的 `pcall`。`pcall` 之前的一切是进入，之后的一切是退出，而退出在两条路径上都会运行，因为 `pcall` 把错误变成一个返回值，而不是让它爬过 `SHUT`。起始代码直接调用 `body()`，`WONG` 的卷闸门就永远关不上。
+
+卷闸门落下之后，错误再往上走：`error(err, 0)` 重新抛出它——那个 `0` 防止 `error` 在消息前面再加一个位置——而调用者自己的 `pcall` 看到它并输出 `BAD`。不要在 `opened` 里把它吞掉：调用者想知道。
+'''
+hints = [
+  "local ok, err = pcall(body)，然后 print(SHUT)，然后 if not ok then error(err, 0) end。pcall 就是 finally。",
+  "错误穿过 opened 到达 main 的 pcall，所以 main 的 BAD 照样打印——在 SHUT 之后，因为 SHUT 在重新抛出之前就打印了。",
+  "total = total + parse_cents(cents) 先求右边的值；parse_cents 抛出时什么也没被赋值，所以坏的那一行什么也不加。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.advanced.08.pipeline"
+title = "流水线厨师"
+story = "大坑饺子档阿波师傅的流水线：一个工位把单子平方，下一个记着累计数，没人等整批做完。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+用**协程迭代器**构造一条两段的流水线：
+
+1. `squares(values)` yield 出每个值的平方
+2. `running(stream)` 接受任何数字迭代器，记着累计总数，并 yield 出 `value, total` 对
+
+`main` 把每一对输出为 `<square> <total>`，然后输出 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+两段都不构造列表。每个 `coroutine.yield` 把一个项目交给下一段并暂停；`main` 拉取，`running` 从 `squares` 拉取，`squares` 从输入拉取。在被需要之前什么也不计算，整条流水线同一时刻只有一个项目在途。这就是同样三个函数能用在一亿行的文件上的原因。
+
+起始代码的第二段在该写 `yield` 的地方写了 `return`，所以它是一个返回最终总数——一个数字——的普通函数，而 `main` 的 `for` 试图调用它：`attempt to call a number value`。
+'''
+hints = [
+  "错误是 attempt to call a number value——running 返回了一个总数，而不是一个 for 可以调用的迭代器。",
+  "用 coroutine.wrap 把循环包起来，在里面 coroutine.yield(value, total)。一次 yield 可以带多个值，for 把它们作为自己的多个变量接收。",
+  "running(squares(nums)) 能组合，是因为包装过的协程是 for 可以调用的函数；running 从不知道也不关心它的输入是另一个协程。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.advanced.09.itertools"
+title = "架子上的工具箱"
+story = "莲花宫委员会的桌上有一架没人打开的工具，文员每晚都手工数一串串相同的票。"
+brief = '''
+标准输入是一行整数。
+
+输出三行，每一行都用程序顶部的 `tools` 表构造，不要手写：
+
+1. `SUMS` 后面跟着累计和——`tools.accumulate`
+2. `RUNS` 后面跟着每一段**相邻**的相等值，格式为 `<v>x<k>`——`tools.groupby`
+3. `PAIRS <k>`：**不同**的值组成的无序对有多少个——对排好序的不同值用 `tools.combinations`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Lua 没有 `itertools`；模块就是一张函数表，而 `tools` 是写在文件顶部的一个，而不是用 `require` 加载的。它的三个函数已经在那里——那个没人打开的架子——每个都返回一个协程迭代器，所以它们可以直接放进 `for`。
+
+`groupby` 只把**相邻**的相等项分成一组。它不是计数器，而样例特意选得让两者不一致：`1` 出现了四次，分在两段里。起始代码第二行用了一张计数表，恰好在那个输入上是错的——而且按 `pairs` 的顺序输出计数，那根本没有顺序。
+
+每个迭代器都是惰性的：`accumulate` 每拉取一次 yield 一个累计和，`groupby` yield 出值和它那一段组成的列表，所以 `#run` 就是长度。需要 `table.concat` 时，把迭代器收集成列表；只需要个数时，用循环数一数。
+'''
+hints = [
+  "tools.accumulate(nums) 在每个元素之后 yield 出累计总数；把它收集成列表给 table.concat 用。",
+  "for value, run in tools.groupby(nums) do — run 是那一段成员组成的列表，#run 是它的长度。",
+  "tools.combinations(distinct, 2) 把每个无序对 yield 一次。数出来是 n*(n-1)/2，手工核对它，你就知道自己的 n 对不对。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.advanced.10.functools"
+title = "记住你算过的"
+story = "火龙经过之前，香档用同样的两个数字把同一晚的价钱算了一万一千次，每次都从头算。"
+brief = '''
+标准输入是 `n k bits`：两个整数和一串二进制数字。
+
+输出四行：
+
+1. `FIB <fib(n)>`——来自一个被 `memoize` 包装的**递归** `fib`
+2. `PRODUCT <k!>`——对 `1..k` 用乘法做 `reduce`，带一个初始值，这样 `k = 0` 给出 `1`
+3. `BIN <value>`——`bits` 由一个接受进制的解析器的 `partial` 解析，进制绑定为 `2`
+4. `MISSES <m>`——`fib.misses`，递归实际运行函数体的次数
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最多为 `400`，这对 LuaJIT 的栈来说不算什么。没有缓存，`fib(35)` 大约是三千万次调用，`fib(90)` 跑不完。有了它，每个 `fib(i)` 只运行一次，`MISSES` 是 `n + 1`。`memoize` 就是“包起来”那一关的包装器，闭包里多了一个缓存：一张可调用的表，所以 `fib.misses` 是一个字段，并且 `fib =
+memoize(function ... end)`，这样里面的递归也经过缓存。起始代码的 `fib` 是一个普通函数，它的最后一行死在 `fib.misses` 上。
+
+`fib(90)` 和 `20!` 超过了 2^53，而 Lua 的数字是 double：超过那里，数字会悄悄丢失。起始代码带了 `big`，一个以 10^7 为基的分段列表表示的数字，附带 `add`、`mul_small` 和 `tostring`；`fib` 把 big 相加，乘积则把一个 big 乘以一个小数字。`partial` 冻结函数开头的几个参数，给你一个新函数；`reduce` 把一个二元函数折叠过一个迭代器。两者都不巧妙。两者都会被问到。
+'''
+hints = [
+  "local fib; fib = memoize(function(n) ... end) — 先声明名字，这样函数体里的 fib 就是最终装着包装器的那个上值。起始代码死在最后一行，因为普通函数没有 misses 字段。",
+  "reduce(big.mul_small, range(1, k), big.from(1)) — 第三个参数是起始值，正是它让空范围给出 1。",
+  "partial(parse, 2) 返回一个自己提供进制、接受文本的函数。unpack(bound, 1, count) 把绑定的参数放在前面；select(\"#\", ...) 即使其中一个是 nil 也会把它们数进去。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.advanced.11.protocol"
+title = "只要能画出来"
+story = "维多利亚公园灯会的名录列出摊位和柜台，由两个不同的程序构造，而牌子只想知道它们每一个都能把自己画出来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每一行是以下之一
+
+* `STALL <NAME> <AISLE>`——渲染为 `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>`——渲染为 `COUNTER <NUMBER>`
+
+把协议 `Sign` 声明为一个方法名列表——`{ "render" }`——再写 `implements(object, protocol)`，当对象在每一个名字上都有一个函数时它为真。把 `Stall` 和 `Counter` 写成普通的类——**不提 `Sign`**——再写一个函数 `show(sign)` 输出渲染结果。输出每个牌子，然后输出用 `implements(x, Sign)` 数出来的 `SIGNS <n>`，再输出用 `is_a(x, Stall)` 数出来的 `STALLS <k>`，后者比较的是元表。
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+协议是一种**结构化**类型：一个类满足它，靠的是拥有那些方法，而不是声明自己满足。Lua 没有给这个起名字，因为这是 Lua 唯一有的那种类型。检查是在运行时按名字查找，而且它必须是**和调用所做的同一次查找**：`object[name]`，它经过 `__index` 到达方法所在的类。起始代码用 `rawget` 检查，它只看实例本身，在任何一个上都找不到 `render`，于是报告 `SIGNS 0`。
+
+`show` 在运行时通过那次查找来分派——`sign:render()` 找到元表链上的那个 `render`，不管是哪一个。没有静态分派可以另选；Lua 只有一种机制，就是这个。
+'''
+hints = [
+  "用 object[name] 代替 rawget(object, name)。这就是全部修复：rawget 跳过元表，而方法在 __index 背后的类上。",
+  "Stall 和 Counter 都没有在任何地方提到 Sign。它们靠拥有 render() 来满足它；这就是“结构化”的意思。",
+  "implements 检查那个名字上有没有函数，不检查它的参数个数或返回什么。Lua 里从来没有东西检查这些；调用时才会发现。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.advanced.12.frozen"
+title = "它不会变"
+story = "今晚印好的价目表 18:00 发到每个摊位，到 21:30，有三个摊位在上面写了字，还有一个加了一栏本来没有的。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>`。
+
+把每一行构造成一条**冻结**的记录 `Price.new(name, cents)`。然后，对每个价格，尝试覆盖它的 `cents`，在尝试抛出错误时输出 `FROZEN <NAME>`。接着，一个声明了一个槽位 `count` 的 `Tally` 类：设置 `tally.count`，然后尝试设置拼错的 `tally.cuont`，在*那次*抛出错误时输出 `SLOTS YES`。最后输出 `IN_SET <k>`——一个按**值**作键的价格集合的大小——和 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+Lua 的表永远是可写的；冻结一张表是元表的把戏。把字段放在一张调用者永远看不到的表里，交回一个**空的代理**，它的 `__index` 就是那些字段——每次读都会落过去——而它的 `__newindex` 会抛出错误：对代理没有的键的每一次写都会去那里，而代理一个键都没有。用 `pcall` 包住赋值，就是在不死掉的情况下做出尝试的方法。
+
+集合是另一半。表作为键是**按身份**的：字段相同的两条记录是两个键，起始代码的 `IN_SET` 说 `3`。冻结的记录只有在键由字段构造——`price:key()`——时才能代表它的值，而这之所以安全，恰恰是因为字段不能在它底下改变。
+
+`Tally` 的槽位又是 `__newindex`，只允许声明过的名字：`count` 用 `rawset`，其他任何名字都报错。属性名里的笔误就变成了赋值处的错误，而不是一个没人读的、悄悄多出来的新字段。
+'''
+hints = [
+  "Price.new 返回一张空表，它的元表有 __index = 字段，还有一个会报错的 __newindex。读会落过去；写除了元方法没有地方可落。",
+  "用 price:key() 给集合作键，它是由字段构造的字符串。表本身只对它自己是一个键。",
+  "TOTAL 是原始分数的和，这只在赋值失败时才成立。在起始代码里，到那时每个价格都已是 0，TOTAL 就是 0——修改不仅被允许了，而且生效了。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.advanced.13.exceptions"
+title = "自己的错误"
+story = "米铺定价的四层各自抛出自己的东西，而柜台的前端只接住了其中一种，被其他几种撂倒了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每一行本应是一个以公斤为单位的重量。
+
+定义一个由**表**构成的错误层级：`PriceError` 作为基类，`NotANumber` 和 `Negative` 由 `class(PriceError)` 从它派生。`Negative` 带着重量，它的消息是 `negative weight: <kg>`；`NotANumber` 的消息是 `not a number`。`price(text)` 转换文本，抛出 `NotANumber` 时把解析失败保存为它的 `cause`，拒绝负重量，否则返回 `500 + 100 * kg`。
+
+输出每个价格或错误的消息，然后输出 `ERRORS <k>`。用 `is_a` 捕获**基类**，一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+`error` 能抛出任何值，而表是唯一能带着消息、原因和类的那一种。类就是它的元表；`is_a(err, cls)` 从它开始沿着 `parent` 链接往上走，一个 `if is_a(err, PriceError)` 就能捕获层级里的每一个成员。起始代码只捕获 `Negative`，所以 `xx` 那一行用一张未被捕获的表把程序撂倒了：`(error object is not a string)`。
+
+`print(err)` 打印 `tostring(err)`，而 `tostring` **直接在元表里**找 `__tostring`——元方法不会经过 `__index` 链去找——所以 `class` 必须给它造出的每个类都放上一个。`cause` 是 `pcall` 从失败的解析中交回的字符串；这里没有东西打印它，而调试器会把两者一上一下都显示出来。那条链就是保留它的理由。
+'''
+hints = [
+  "elseif is_a(result, PriceError) then — 基类捕获两个子类，这正是有基类的意义。",
+  "print(result) 打印 tostring(result)，那就是错误自己的类上的 __tostring。不需要在处理程序里格式化。",
+  "测试好几个类时顺序很重要：放在基类测试之后的子类测试是死代码，而 Lua 不会警告你。认不出的就重新抛出——error(result, 0)——而不是把它吞掉。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "lua.advanced.14.iterator"
+title = "下一个，直到停下"
+story = "维多利亚公园灯会入口的取票机从一个起点按固定步长发号，不保留任何列表，而排队牌想像遍历任何列表那样遍历它。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+写一个 `Tickets` 类，**手工实现迭代器协议**：`next` 返回下一个值，或者在已经发出 `count` 个值时返回 `nil`，而 `iter` 返回泛型 `for` 需要的东西。每个值单独输出一行，然后输出 `SUM <total>`，它是把第二个 `Tickets` 交给 `sum` 算出来的。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+这就是 `coroutine.wrap` 替你写的东西。泛型 `for` 接受三样东西——一个函数 `f`、一个状态 `s` 和一个控制值——在每一轮之前调用 `f(s, control)`，第一个结果为 `nil` 时停下。`Tickets.next` 已经是这个形状：它的 `self` 就是状态，第二个参数是一个它可以忽略的控制值。所以 `iter` 就是一行：`return Tickets.next, self`。`sum`、`collect` 和 `for` 都跳同样的舞，没有一个在乎状态是什么。
+
+起始代码有 `next` 而没有 `iter`，`for` 说 `attempt to call
+method 'iter' (a nil value)`。`next` 返回的 `nil` 在这里就是 `StopIteration`；这就是为什么票号永远不能是 `nil`，也是为什么 `0` 是一张好票——`0` 不是 `nil`。
+
+`iter` 把 `self` 作为状态返回，是**迭代器**的标志：它只能被走一遍，然后就用完了。**容器**每次从 `iter` 返回一个新的状态，可以被反复遍历；这条路早些时候的 `Bag` 就是一个。说明你写的是哪一种；这个区别会在有人第二次循环时显现出来。
+'''
+hints = [
+  "function Tickets:iter() return Tickets.next, self end。两个值，for 就开始工作了。",
+  "nil 是被返回的，不是被抛出的。for 循环在它上面停下；你永远看不到它。在前进之前先保存你将要返回的那个值，否则你会差一步。",
+  "for value in obj:iter() 就是 for value in Tickets.next, obj——方法调用只是产生这一对。返回一个捕获 self 的闭包也行；这一对就是不带额外函数的协议。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "lua.advanced.15.collections"
+title = "对的容器"
+story = "委员会的桌子把今晚的票存在一个长长的列表里，对它们的每个问题都从头读一遍来回答。"
+brief = '''
+三行标准输入：一行单词，一行已经**升序排好**的整数，以及一个整数 `x`。
+
+输出四行：
+
+1. `TOP <word> <count>`——出现最多的单词，平局按单词升序——来自一张计数表
+2. `BISECT <l> <r>`——`x` 在排好序的整数中的 `bisect_left` 和 `bisect_right`：有多少个值小于 `x`，有多少个值不大于它
+3. `SMALLEST3` 后面跟着最小的三个整数——从一个**堆**里弹出——不足三个就少一些
+4. `GROUPS` 后面跟着单词的每个首字母对应的 `<letter>:<k>`，字母升序——来自一张以首字母为键、其 `__index` **在第一次访问时创建列表**的表
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+Lua 只自带一种容器，其他每一种都是一张表加一套规矩。起始代码的 `TOP` 保留第一个达到最高次数的单词，按**插入顺序**那是 `tofu`，而题目说的是 `egg`：把单词排好序，说出你的意思。它的 `BISECT` 扫描 `x` 的下标，`x` 不存在时就摔倒了；在排好序的列表上做二分查找永远不会抛出错误，而 `left` 和 `right` 相差的正是 `x` 的副本数。它的 `SMALLEST3` 把整个列表排序，只为从前面读出三个值，而这正是 `k` 小、`n` 不小时堆存在所要避免的事。它的 `GROUPS` 按 `pairs` 的顺序遍历一张计数表，那根本没有顺序。
+
+`setmetatable({}, { __index = function(t, k) local v = {}; rawset(t, k,
+v); return v end })` 就是 Lua 的 `defaultdict(list)`：第一次读一个缺失的键时造出列表并存起来，所以 `groups[letter][#... + 1]` 永远不需要检查。
+'''
+hints = [
+  "遍历 sorted_keys(counts) 而不是 words，只在次数严格更大时才替换最高者；平局就归按字母排在最前的那个，也就是 egg。",
+  "bisect_left 和 bisect_right 永远不会抛出错误；起始代码的 index_of 在 x 不存在时返回 nil，而隐藏用例中正有一个是这样。两者是同一个循环，只是把 < 换成 <=。",
+  "堆是一个列表，其中 i 的父节点是 floor(i / 2)：push 追加并上浮，pop 把最后一项移到顶上再下沉。弹出三次就是最小的三个，不管 n 是多少。",
+  "__index 元方法只在键缺失时运行；在它里面 rawset 把新列表存起来，下一次读就是普通的命中。输出之前把键排好序——带元表的表仍然没有顺序。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "lua.advanced.16.timeouts"
+title = "别再等了"
+story = "指挥的牌子向巷子里的每个摊位询问等候时间，而读卡机坏了的那个摊位从不回答，所以牌子永远不重画。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<STALL> <SECONDS>`，其中立即回答的摊位 `SECONDS` 为 `0`，来不及回答的为 `1`。
+
+这里的时间是**刻**：十分之一秒就是一次 `coroutine.yield()`，`fetch(stall, seconds)` 每秒 yield 十次，然后返回 `<STALL> OK`。对每个摊位，在 `wait_for(task, 2)` 下以协程运行它的 `fetch`——两刻的期限，0.2 秒——并按输入顺序输出 `<STALL> OK` 或 `<STALL> TIMEOUT`。然后启动一个永远循环的 `watch()` 协程，给它一轮，**用 `"cancel"` resume 它**来取消它，让它从处理程序里输出 `CANCELLED`，从每条路径都会运行的代码里输出 `CLEANUP`。最后输出 `TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` 最多 resume 任务 `ticks` 次，并报告它是否完成；如果最后一轮之后它仍然是 `suspended`，那就是超时，而这个任务就再也不会被 resume。起始代码却把 `fetch` 一直 resume 到结束，所以 `WONG` 用完了全部十刻，然后说 `OK`。
+
+取消一个协程，就是把一个值送到它停着的那个 yield 上。`watch` 在一个 `pcall` 里面 yield，当 yield 返回 `"cancel"` 时它抛出错误；`pcall` 接住它——那就是输出 `CANCELLED` 的处理程序——然后清理那一行运行，然后错误被再次抛出，于是送来取消的那次 resume 拿回 `false, "cancelled"`。起始代码创建了监视者，给了它一轮，然后把它丢下：一个再也没人 resume 的协程永远什么也不运行，两行都不会打印。处理之后要重新抛出——把取消吞掉，就是一个任务变得无法取消的方式。
+'''
+hints = [
+  "wait_for(task, 2)：最多 resume 两次，如果任务死了就返回 true 和结果，否则返回 false。超时的任务只是再也不被 resume。",
+  "coroutine.resume(watcher, \"cancel\") — 这个字符串就是监视者的 yield 返回的东西，它自己的代码把它变成一个错误。把变量设为 nil 什么也没取消；它只是忘掉了这个协程。",
+  "create 之后的第一次 resume 给监视者一轮去启动并停在 yield 上，这样取消才有一个 yield 可落，而不是落在一个还没开始的函数上。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "lua.advanced.17.coroutine"
+title = "协程"
+story = "浣纱街，火龙全身展开，每一节一个上香跑腿。其中一个从不交出场地，整条火龙停在一节上，鼓声还在响，而总数回来时什么都没有。"
+brief = '''
+标准输入是两个整数 `k` 和 `n`。
+
+把 `1..n` 分成 `k` 个连续的块——第 `i` 块是 `floor(n*i/k) + 1` 到 `floor(n*(i+1)/k)`（含两端）——并把每一块交给它自己的**协程**，它计算自己范围内的平方和：一个普通的循环，不调用库函数，每 100 000 个数 yield 一次，好让别的协程轮到。每个跑腿在一段不含 yield 的代码里把自己的结果加到**一个共享的总数**上，同时也记录在自己的槽位里。以轮转方式驱动它们，直到全部死掉。按下标顺序为每一块输出 `CHUNK <i> <sum>`，然后输出 `TOTAL <sum>`，再输出 `THREADS <k>`——协程的类型名是 `thread`，那就是这个计数。
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+起始代码失败的原因和时序毫无关系。`local part = coroutine.resume(co, lo, hi)` 保留的是 `resume` 的**第一个**结果，也就是 `true`，而跟在它后面的答案被扔在了地上；第一行 `CHUNK` 是 `attempt to concatenate local 'part'
+(a boolean value)`。这是那个小 bug。按抽屉那一关的方式修它：一个共享的总数，在读和写之间没有 yield 地更新；每块的槽位只由一个跑腿写入；再加上锁那一关的调度器——每个没死的跑腿都轮到一次，直到一个不剩。
+
+在大用例上这些和超过 2^53，而 Lua 的数字是 double：超过那一点 `+` 就会舍入。把每个和作为两段来带着——低段小于 10^9，高段是其余部分——并以 `%d%09d` 输出。
+
+那件大事才是 boss，而它不是一个你能修的 bug。用 `k = 4` 和 `n = 4000000` 运行它并计时，然后用 `k = 1` 运行。它们花的时间一样。然后把循环里的 yield 删掉再运行一次：同样的输出，同样的时间，没有错误。协程一直占着场地，直到它说 `yield`；一个从不说的跑腿会一直跑到结束，其他三个等着，而没有任何东西告诉你，因为没有别的东西需要场地。这就是火龙停在一节上、鼓声还在响。四个核上的四个协程轮流计算平方和，其实在一个核上，还要加上切换的代价。LuaJIT 没有线程。协程是一个可以停下的地方，不是第二个核；运行是**轮流**的，在每个跑腿说自己可以暂停的地方。并行的工作是第二个进程——`io.popen`——或者 LÖVE 客户端的 `love.thread`，那是一个独立的 Lua 状态，什么也不共享，通过一个通道来通信。
+
+输出是确定的，因为各块按下标输出，而总数是各块之和，与跑腿完成的顺序无关。用共享的总数输出 `TOTAL`，而不是把槽位加起来——那段不含 yield 的更新正是这张地图要讲的东西，两者必须一致。
+'''
+hints = [
+  "resume 先返回 ok，值在它后面。更好的做法：给工作一个下标和一个要写的槽位，再给一个要往里加的共享总数，让调度器一直 resume 到死；那样就根本不需要从 resume 里拿出任何东西。",
+  "全部 resume，一轮又一轮，然后再输出。在跑腿里面输出会交错；在循环之后从槽位输出则不会。",
+  "两段：lo 小于 10^9，每次相加都把进位移到 hi。41666791666750000 就是 hi 41666791 和 lo 666750000，以 %d%09d 输出。",
+  "n*(n+1)*(2n+1)/6 是总数的闭式公式。用它核对一次 TOTAL，你就知道块的边界是对的。然后在一个大 n 上把 k=1 和 k=4 的时间比一比：当它们一样时，你就见到了协程。",
+]

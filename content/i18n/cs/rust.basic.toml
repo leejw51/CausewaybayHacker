@@ -1,0 +1,1017 @@
+# RUST LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/rust/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.basic.01.the-move"
+title = "Jeden vlastník"
+story = "06:40 nad Jardine's Bazaar. Na pultu jedna účtenka a na ní pravidlo celé ulice: věc má jednoho vlastníka, a kdo ji předá, ten ji předal."
+brief = '''
+`String` má právě jednoho vlastníka. `let kept = receipt;` ho nekopíruje:
+**přesune** ho, a od toho řádku `receipt` není jméno, které smíš použít —
+kompilátor odmítne s E0382, borrow of moved value. Hodnota je tam, kam
+odešla, pod novým jménem.
+
+```
+let kept = receipt;
+```
+
+Účtenka je vytvořená a oba `println!` jsou napsané. Napiš přesun na místo
+komentáře `// FILL`, aby `kept` vlastnil ten řetězec.
+
+```
+output: one receipt, one owner
+        22
+```
+'''
+hints = [
+  "let kept = receipt; — let se starým jménem vpravo.",
+  "Žádný clone: řetězec se nekopíruje, mění majitele. Použít receipt za tímhle řádkem je E0382.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.basic.02.borrow"
+title = "Jen se dívám"
+story = "Tramvajová zastávka na Percival Street. Průvodčí přečte každé jméno ze seznamu a seznam hned vrátí; nikdy ho nevlastnil nikdo jiný než kancelář."
+brief = '''
+`&` půjčuje. Funkce, která bere `name: &str`, se na řetězec jen *dívá*;
+volající si ho nechá a může ho použít i potom. `&names[i]` je výpůjčka
+jednoho prvku a `&String` se při volání sám změní na `&str`.
+
+```
+total += width(&names[i]);
+```
+
+`width` i oba `println!` jsou napsané. Napiš volání na místo komentáře
+`// FILL` a každé jméno půjč přes `&`. Druhý řádek dokazuje, že jména jsou
+po cyklu pořád tvoje.
+
+```
+input:  MEI
+        BO
+        ALEX
+output: 9
+        MEI,BO,ALEX
+```
+'''
+hints = [
+  "total += width(&names[i]); — ampersand patří k argumentu.",
+  "width chce &str; &String se na něj při volání převede sám, takže &names[i] stačí.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.basic.03.mut-borrow"
+title = "Půjčeno ke změně"
+story = "Kiosek Lucky Mac zvedne každou cenu na tabuli o stejnou částku. Tabule nikdy neopustí zeď; ruka, která ji mění, je vypůjčená."
+brief = '''
+`&mut` půjčuje ke změně. Funkce, která bere `prices: &mut Vec<i64>`, může
+měnit vektor volajícího na místě; volající při volání napíše `&mut prices`
+a samo `prices` musí být `let mut`. Uvnitř `iter_mut()` rozdává `&mut i64`
+a `*p` je číslo za jedním z nich.
+
+```
+*p += by;
+bump(&mut prices, by);
+```
+
+`bump` i výpis jsou napsané. Napiš ty dva řádky na místa komentářů
+`// FILL`: změnu uvnitř `bump` a volání, které vektor půjčí.
+
+```
+input:  3
+        10 20 30
+output: 13 23 33
+```
+'''
+hints = [
+  "*p += by; uvnitř cyklu, pak bump(&mut prices, by); v main.",
+  "p je &mut i64: hvězdička sahá skrz něj. Volání potřebuje &mut, ne &, a prices bylo deklarováno jako mut právě kvůli tomu.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.basic.04.clone"
+title = "Druhá kopie"
+story = "Dva seznamy v Hysan Place: ten, který si vede vrátný v pořadí příchodu, a ten, který řadí vedoucí. Řazení toho vedoucího se nesmí dotknout toho vrátného."
+brief = '''
+Přesun nechá jednoho vlastníka. Když potřebuješ dva, `.clone()` udělá
+hlubokou kopii a od té chvíle jsou obě nezávislé. Malé obyčejné hodnoty —
+`i64`, `bool`, `char`, `f64`, n-tice z nich — jsou `Copy`: `let b = a;`
+je zkopíruje a `a` zůstane použitelné bez jakéhokoli clone.
+
+```
+let mut sorted = names.clone();
+```
+
+Jména jsou načtená, `sorted.sort()` i oba `println!` jsou napsané. Napiš
+clone na místo komentáře `// FILL`, aby původní pořadí přežilo.
+
+```
+input:  MEI BO ALEX
+output: MEI BO ALEX
+        ALEX BO MEI
+```
+'''
+hints = [
+  "let mut sorted = names.clone(); — mut, protože sort() ho mění na místě.",
+  "let mut sorted = names; by se zkompilovalo taky, a pak je names pryč a první println! je E0382.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.basic.05.exchange"
+title = "Výměna"
+story = "Dvě pokladny v Jardine's Bazaar si při střídání směn vymění zásuvky a stará zásuvka se vytáhne a na její místo se zasune prázdná. Nic se nekopíruje; věci mění majitele."
+brief = '''
+`std::mem` vyměňuje hodnoty, aniž by je kopíroval. `swap(&mut a, &mut b)`
+prohodí, co drží dvě jména. `take(&mut a)` hodnotu přesune ven a nechá
+na jejím místě výchozí hodnotu typu — prázdný `String`, prázdný `Vec`, `0` —
+takže můžeš vlastnit něco, co žije uvnitř `&mut`. `replace(&mut a, v)` je
+totéž, jen na místě zůstane hodnota podle tvé volby.
+
+```
+std::mem::swap(&mut a, &mut b);
+let taken = std::mem::take(&mut a);
+```
+
+Do `a` a `b` se načtou dva řádky. Napiš swap a take na místa komentářů
+`// FILL`.
+
+```
+input:  LEFT
+        RIGHT
+output: RIGHT LEFT
+        [RIGHT] []
+```
+'''
+hints = [
+  "std::mem::swap(&mut a, &mut b); pak let taken = std::mem::take(&mut a);",
+  "Obojí bere &mut: hodnoty zůstanou, kde jsou, a přesouvá se jen obsah. Po take je a prázdný String, ne přesunutý pryč — pořád se dá použít.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.basic.06.slices"
+title = "Prostředek fronty"
+story = "Fronta před Hysan Place bez prvního a posledního: lidé, kteří opravdu čekají."
+brief = '''
+`&v[a..b]` je řez: vypůjčené okno na část `Vec`, od `a` až po `b`, ale bez
+něj, a nic se nekopíruje. Jeho typ je `&[i64]` a funkce, která bere
+`&[i64]`, přijme celý vektor (`&nums`) nebo kterékoli jeho okno úplně
+stejně. Samotné `..` je všechno; `a..` běží až do konce.
+
+```
+let middle = &nums[1..nums.len() - 1];
+```
+
+`total` a tři `println!` jsou napsané. Napiš řez na místo komentáře
+`// FILL`.
+
+```
+input:  5 1 2 3 9
+output: 6
+        20
+        3
+```
+'''
+hints = [
+  "let middle = &nums[1..nums.len() - 1];",
+  "Konec rozsahu je vyloučený, takže len() - 1 se zastaví těsně před posledním prvkem. & vpředu z toho dělá výpůjčku, ne přesun ven z vektoru.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.basic.07.string-str"
+title = "Vlastněný a vypůjčený text"
+story = "Štít obchodu v Jardine's Bazaar je namalovaný jednou a patří obchodu. Každý, kdo ho čte, si ho půjčuje; transparent udělaný pro dnešek je nová věc."
+brief = '''
+`String` svůj text vlastní a může růst; `&str` si půjčuje text, který žije
+jinde. Funkce, která jen čte, bere `&str`; funkce, která staví nový text,
+vrací `String`. `format!` staví `String` tak, jak `println!` staví řádek,
+a `&name` (nebo `name.as_str()`) půjčí `String` jako `&str`.
+
+```
+format!("** {} **", name)
+let line = banner(&name);
+```
+
+Napiš ty dva řádky na místa komentářů `// FILL`: tělo `banner` a volání
+v `main`.
+
+```
+input:  mei
+output: ** mei **
+        9
+```
+'''
+hints = [
+  "format!(\"** {} **\", name) bez středníku je hodnota funkce; let line = banner(&name); v main.",
+  "banner(name) bez & se pokusí předat String tam, kde se chce &str: E0308. Ten ampersand je celá lekce.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.basic.08.chars-bytes"
+title = "Písmena a číslice"
+story = "Kód skříňky ve Victoria Parku: písmena a číslice vperemíchané. Obsluha sečte číslice a vykřikne první písmeno."
+brief = '''
+`&str` jsou bajty; `.chars()` ho prochází jako znaky a `.bytes()` /
+`.as_bytes()` jako `u8`. `c.to_digit(10)` promění znak číslice v
+`Some(number)` a cokoli jiného v `None`, takže `filter_map` si nechá jen
+číslice. Bajty jsou čísla: `b'a'` je 97 a aritmetika s písmeny je
+`(byte - b'a' + b'A') as char`.
+
+```
+let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+let first = (code.as_bytes()[0] - b'a' + b'A') as char;
+```
+
+Napiš ty dva řádky na místa komentářů `// FILL`. Kód vždycky začíná malým
+písmenem.
+
+```
+input:  a1b2c3
+output: 6
+        A
+```
+'''
+hints = [
+  "code.chars().filter_map(|c| c.to_digit(10)).collect() — pak (code.as_bytes()[0] - b'a' + b'A') as char.",
+  "to_digit vrací Option<u32>; filter_map zahodí ty None. Bajt minus b'a' je pro a nula a přičtení b'A' přistane na velkém písmenu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.basic.09.option"
+title = "Možná nic"
+story = "Nástěnka v Times Square za klidného rána. Nejvyšší nabídka tam být nemusí a sudé číslo lístku taky ne; tabule to musí říct, ne hádat."
+brief = '''
+`Option<T>` je `Some(value)` nebo `None` a kompilátor tě donutí říct, co se
+stane při `None`. `if let Some(m) = …` spustí blok jen tehdy, když hodnota
+je. `.unwrap_or(0)` dá výchozí hodnotu. `.find(…)` vrátí první shodu jako
+`Option<&T>` a `.copied()` promění `Option<&i64>` v `Option<i64>`.
+
+```
+if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
+```
+
+Napiš ty dva řádky na místa komentářů `// FILL`. Při prázdném vstupu první
+nevypíše nic a druhý vypíše `0`.
+
+```
+input:  3 5 8 1
+output: MAX 8
+        8
+```
+'''
+hints = [
+  "if let Some(m) = nums.iter().max() { println!(\"MAX {}\", m); } a pak find(...).copied().unwrap_or(0).",
+  "max() na prázdném iterátoru je None a if let prostě přeskočí. find vrací Option<&i64>; copied() z toho udělá Option<i64>, aby unwrap_or(0) sedělo typově.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.basic.10.result"
+title = "Řádek, který není číslo"
+story = "Pokladna na Percival Street bere řádek cen. Jedna z nich je slovo. Pokladna nespadne; řekne, který řádek byl špatně a proč."
+brief = '''
+`Result<T, E>` je `Ok(value)` nebo `Err(error)`. Uvnitř funkce, která vrací
+`Result`, operátor `?` rozbalí `Ok` a `Err` na místě **vrátí** volajícímu —
+jeden znak místo `match`. `"12".parse::<i64>()` je
+`Result<i64, ParseIntError>`.
+
+```
+out.push(tok.parse::<i64>()?);
+```
+
+`parse_all` vrací vektor nebo první chybu a `main` na to dělá `match`.
+Napiš řádek s `?` na místo komentáře `// FILL`.
+
+```
+input:  1 2 3
+output: 6
+```
+'''
+hints = [
+  "out.push(tok.parse::<i64>()?);",
+  "? funguje jen ve funkci, jejíž návratový typ je Result (nebo Option) se sedícím typem chyby — tady ParseIntError, což je přesně to, co dává parse.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.basic.11.match"
+title = "Tvar čísla"
+story = "Brána ve Victoria Parku třídí čísla lístků: nula, jedna číslice, sudé, liché. Čtyři ramena a nic nepropadne."
+brief = '''
+`match` musí pokrýt každý případ a jeho ramena jsou vzory: literál, rozsah
+`1..=9`, vazba s podmínkou `x if x % 2 == 0` a `_` pro zbytek. Vyhraje
+první rameno, které sedí, takže na pořadí záleží. Je to výraz: hodnota
+každého ramene se stane hodnotou celého `match`.
+
+```
+0 => "ZERO",
+1..=9 => "ONE DIGIT",
+x if x % 2 == 0 => "EVEN",
+_ => "ODD",
+```
+
+`match` je pro tebe otevřený s jedním ramenem, které říká `TODO`. Nahraď ho
+těmi čtyřmi rameny, v tomhle pořadí.
+
+```
+input:  12
+output: EVEN
+```
+'''
+hints = [
+  "0 => \"ZERO\", 1..=9 => \"ONE DIGIT\", x if x % 2 == 0 => \"EVEN\", _ => \"ODD\",",
+  "Rameno s podmínkou dej před _, jinak se nikdy nespustí. 1..=9 je uzavřené na obou koncích; 1..9 by devítku nechalo na podmínku.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.basic.12.iterator-chain"
+title = "Jedním průchodem po Yee Wo Street"
+story = "Yee Wo Street, jedna procházka: nech si sudé výlohy, umocni jejich čísla na druhou a sečti všechno nad deset. Žádný index, žádný druhý cyklus."
+brief = '''
+Řetězec iterátorů se čte zleva doprava: `.iter()` prochází vektor,
+`.filter(|&&x| …)` si nechá, k čemu closure řekne ano, `.map(|x| …)`
+transformuje a závěrečné `.collect()` nebo `.sum()` z toho udělá hodnotu.
+Dokud nepřijde to poslední volání, nic neběží. `iter()` dává `&i64`
+a `filter` vidí referenci na to, proto vzor `&&x`, který dosáhne na číslo.
+
+```
+let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
+```
+
+Napiš ty dva řádky na místa komentářů `// FILL`.
+
+```
+input:  1 2 3 4 11 20
+output: 4 16 400
+        31
+```
+'''
+hints = [
+  "nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect() — a .filter(|&&x| x > 10).sum() pro ten druhý.",
+  "Typ u let je to, co říká collect() a sum(), co mají postavit; bez Vec<i64> a i64 je kompilátor neodvodí.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.basic.13.fold-zip-windows"
+title = "Dvojice, běhy a průběžný součet"
+story = "Počítadlo tramvají na Percival Street čte den počtů: kolik hodin stouplo oproti hodině předtím, součin všech a každý počet s hodinou vedle sebe."
+brief = '''
+Tři adaptéry, na které se pohovor pořád ptá. `.windows(2)` na řezu dává
+každou dvojici sousedů jako dvouprvkový řez. `.fold(start, |acc, x| …)`
+provleče jeden akumulátor celou posloupností. `.zip(…)` prochází dvě
+posloupnosti vedle sebe a `(0..).zip(&nums)` je `enumerate` napsaný ručně.
+
+```
+let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
+```
+
+Napiš ty tři řádky na místa komentářů `// FILL`.
+
+```
+input:  1 3 2 5
+output: 2
+        30
+        0:1 1:3 2:2 3:5
+```
+'''
+hints = [
+  "windows(2).filter(|w| w[1] > w[0]).count() — fold(1i64, |acc, &x| acc * x) — (0..).zip(&nums).map(|(i, x)| format!(\"{}:{}\", i, x)).collect()",
+  "windows je metoda řezu, takže se volá přímo na nums, ne na nums.iter(). 1i64 ve fold určuje typ akumulátoru; holá 1 by byla nejednoznačná.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.basic.14.entry"
+title = "Co křičí tržnice"
+story = "Každé slovo, které se za jedno dopoledne rozlehne přes Jardine's Bazaar, spočítané. Nejhlasitější první; při shodě podle abecedy."
+brief = '''
+Entry API mapy `HashMap` je jednořádkové počítadlo. `counts.entry(key)`
+najde místo pro klíč, ať už existuje nebo ne; `.or_insert(0)` tam dá `0`,
+když neexistuje, a v obou případech vrátí `&mut` na hodnotu; `*… += 1` ji
+zvýší. Jedno vyhledání, žádné `contains_key` předem.
+
+```
+*counts.entry(w.to_string()).or_insert(0) += 1;
+```
+
+Mapa, cyklus, řazení i výpis jsou napsané. Napiš řádek s entry na místo
+komentáře `// FILL`.
+
+```
+input:  a b a c b a
+output: a 3
+        b 2
+        c 1
+```
+'''
+hints = [
+  "*counts.entry(w.to_string()).or_insert(0) += 1;",
+  "Klíč je String, takže w (&str) se na něj převede přes to_string(). Hvězdička vpředu dereferencuje &mut usize, které vrací or_insert.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.basic.15.sort-by"
+title = "Tabulka výsledků"
+story = "Herna v Times Square vyvěsí den: nejvyšší skóre první, a když dva remizují, ten, jehož jméno je dřív. Druhá tabule je podle délky jména."
+brief = '''
+`sort_by` bere porovnávací closure, která vrací `Ordering`. `b.cmp(&a)` je
+sestupně; `.then_with(|| …)` rozhodne shodu druhým porovnáním.
+`sort_by_key` řadí podle toho, co closure vytáhne, vzestupně, a obojí je
+**stabilní**: stejné klíče si zachovají pořadí. Pro floaty, které `cmp`
+nemají, je to `a.partial_cmp(b).unwrap()`.
+
+```
+rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+by_len.sort_by_key(|r| r.0.len());
+```
+
+Napiš ta dvě řazení na místa komentářů `// FILL`. `by_len` je clone
+udělaný před prvním řazením, takže jeho shody jsou v pořadí vstupu.
+
+```
+input:  MEI 90
+        BO 95
+        ALEX 90
+output: BO ALEX MEI
+        BO MEI ALEX
+```
+'''
+hints = [
+  "rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))); a by_len.sort_by_key(|r| r.0.len());",
+  "b před a v cmp je to, co dělá řazení sestupným. cmp bere referenci, proto &a.1. then_with se spustí jen tehdy, když první porovnání dá Equal.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.basic.16.heap-reverse"
+title = "Nejmenší první"
+story = "Okénko s dim sum v Times Square vyvolává nejnižší lístek první. Hromádka je halda a halda v Rustu vydává největší, pokud jí neřekneš jinak."
+brief = '''
+`BinaryHeap` je max-halda: `pop()` dá největší. Když každou hodnotu obalíš
+do `std::cmp::Reverse`, pořadí se otočí, takže `BinaryHeap<Reverse<i64>>`
+vydává nejmenší — min-haldu, kterou chce každá otázka na nejkratší cestu
+a na k nejmenších. `while let Some(Reverse(x)) = heap.pop()` rozbaluje,
+zatímco vyprazdňuje.
+
+```
+heap.push(Reverse(x));
+while let Some(Reverse(x)) = heap.pop() { out.push(x); }
+```
+
+Napiš push a vyprázdnění na místa komentářů `// FILL`.
+
+```
+input:  5 1 9 3
+output: 1 3 5 9
+```
+'''
+hints = [
+  "heap.push(Reverse(x)); pak while let Some(Reverse(x)) = heap.pop() { out.push(x); }",
+  "Reverse je n-ticová struktura, takže Reverse(x) při push obaluje a ve vzoru rozkládá. Bez ní by výstup šel od největšího.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.basic.17.derive-ord"
+title = "Porovnáno pole po poli"
+story = "Jízdné na tabuli na Percival Street, seřazené podle zóny a pak podle ceny. Porovnání nikdo nepíše; kompilátor dostane pokyn, ať ho napíše sám."
+brief = '''
+`sort()`, `max()`, `BinaryHeap` i `==` potřebují, aby typ implementoval
+porovnávací traity. `#[derive(…)]` je pro strukturu napíše a porovnává
+**pole po poli v pořadí deklarace**: `PartialEq, Eq` pro `==`,
+`PartialOrd, Ord` pro `<` a řazení, `Clone` pro `.clone()`, `Debug`
+pro `{:?}`.
+
+```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+```
+
+Napiš ten atribut na místo komentáře `// FILL`, na řádek nad
+`struct Fare`. Bez něj se `fares.sort()` nezkompiluje.
+
+```
+input:  2 5 BUS
+        1 9 TRAM
+        1 3 FERRY
+output: FERRY TRAM BUS
+        BUS
+```
+'''
+hints = [
+  "#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)] přímo nad struct Fare.",
+  "Ord vyžaduje Eq a PartialOrd a PartialOrd vyžaduje PartialEq, takže tam patří všechny čtyři. Pořadí polí ve struktuře je pořadí řazení.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.basic.18.fast-input"
+title = "Přečti to všechno najednou"
+story = "První řádek každé úlohy na HackerRanku: n a k, pak n čísel. Kiosek to přečte celé naráz a bere tokeny svrchu."
+brief = '''
+Přečti stdin jednou přes `read_to_string` a pak ber tokeny z jednoho
+iterátoru: `split_ascii_whitespace()` dává `&str`, `.next().unwrap().parse()`
+z jednoho z nich udělá číslo a `it.by_ref().take(n)` vezme dalších `n`,
+aniž by iterátor spotřeboval. Typ u `let` určuje, na co se parsuje.
+
+```
+let n: usize = it.next().unwrap().parse().unwrap();
+let k: usize = it.next().unwrap().parse().unwrap();
+let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+```
+
+Napiš ty tři řádky na místa komentářů `// FILL`. Program vypíše součet
+prvních `k` z těch `n` čísel.
+
+```
+input:  5 2
+        3 4 5 6 7
+output: 7
+```
+'''
+hints = [
+  "let n: usize = it.next().unwrap().parse().unwrap(); dvakrát, pak it.by_ref().take(n).map(|t| t.parse().unwrap()).collect()",
+  "parse() odvodí cílový typ z typu u let, takže : usize a : Vec<i64> dělají skutečnou práci. by_ref() dovolí take(), aby si iterátor půjčil, místo aby ho snědl.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.basic.19.formatting"
+title = "Šest desetinných míst"
+story = "Váha na mokrém trhu tiskne průměr na šest míst, rovná naměřené hodnoty do sloupce a razítkuje počet s úvodními nulami."
+brief = '''
+Složené závorky v `println!` berou za dvojtečkou formátovací specifikaci.
+`{:.6}` je šest desetinných míst. `{:<5}` zarovná doleva na pět sloupců
+(`>` doprava, `^` na střed). `{:03}` doplní číslo nulami na šířku tři.
+`{:?}` je ladicí tvar, který vypíše celý `Vec`.
+
+```
+println!("{:.6}", mean);
+println!("{:<5}|", x);
+println!("{:03}", nums.len());
+```
+
+Napiš ty tři `println!` na místa komentářů `// FILL`.
+
+```
+input:  1 2 4
+output: 2.333333
+        1    |
+        2    |
+        4    |
+        003
+```
+'''
+hints = [
+  "println!(\"{:.6}\", mean); — println!(\"{:<5}|\", x); — println!(\"{:03}\", nums.len());",
+  "Specifikace sedí za dvojtečkou uvnitř závorek: .6 je přesnost, <5 je zarovnání a šířka, 03 je doplnění nulami a šířka.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.basic.20.overflow"
+title = "Kde i64 končí"
+story = "Dvě velká čísla u směnárníka na Hennessy Road. Široká pokladna řekne skutečný součin; úzká místo lži řekne NONE; a třetí přeteče dokola, protože jí to tak bylo řečeno."
+brief = '''
+Součin `i64`, který se nevejde, v debug režimu **zpanikaří** a v release
+přeteče dokola — tak či tak je špatně. `as i128` rozšíří typ před
+násobením. `a.checked_mul(b)` vrátí `None`, když by se výsledek nevešel.
+`a.wrapping_mul(b)` přetéká schválně, modulo 2⁶⁴, a to je to, co chce
+otázka na hashování.
+
+```
+let wide = a as i128 * b as i128;
+let narrow = a.checked_mul(b);
+println!("{}", a.wrapping_mul(b));
+```
+
+Napiš ty tři řádky na místa komentářů `// FILL`.
+
+```
+input:  3000000000 4000000000
+output: NONE
+        12000000000000000000
+        -6446744073709551616
+```
+'''
+hints = [
+  "let wide = a as i128 * b as i128; — let narrow = a.checked_mul(b); — println!(\"{}\", a.wrapping_mul(b));",
+  "Přetypuj oba operandy před násobením: (a * b) as i128 nejdřív přeteče a pak rozšíří trosky. checked_ a wrapping_ existují pro add, sub i mul.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.basic.21.lifetime-fn"
+title = "Jak dlouho to platí"
+story = "Dva štíty obchodů na Yee Wo Street a funkce, která ukáže na ten delší. Vrací výpůjčku a kompilátor chce vědět čí."
+brief = '''
+Funkce, která vrací referenci, musí říct, ze kterého vstupu si půjčuje.
+`<'a>` deklaruje lifetime, `&'a str` k němu přiváže parametr a `-> &'a str`
+slibuje, že výsledek žije stejně dlouho. Dva vstupy na stejném `'a`
+znamenají, že výsledek platí tak dlouho jako **kratší** z nich.
+
+```
+fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+```
+
+Tělo je napsané. Nahraď řádek se signaturou označený `// FILL` tím
+anotovaným; bez lifetime se to nezkompiluje (E0106).
+
+```
+input:  TRAM
+        FERRY
+output: FERRY
+```
+'''
+hints = [
+  "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
+  "S jedním referenčním parametrem ti kompilátor lifetime doplní sám (elision). Se dvěma nemůže vědět, ze kterého si výsledek půjčuje, tak to řekneš ty.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.basic.22.lifetime-struct"
+title = "Lístek, který si půjčuje jméno"
+story = "Celodenní lístek z tramvajové vozovny nese jméno, které nevlastní: ukazuje do rejstříku. Lístek nesmí přežít stránku, do které ukazuje."
+brief = '''
+Struktura, která drží referenci, potřebuje parametr lifetime, a stejně tak
+každý blok `impl` pro ni. `struct Ticket<'a>` s polem `name: &'a str`
+říká, že `Ticket` nesmí přežít text, na který ukazuje; `impl<'a> Ticket<'a>`
+nese stejné jméno do metod.
+
+```
+struct Ticket<'a> {
+impl<'a> Ticket<'a> {
+```
+
+Nahraď ty dva řádky označené `// FILL`. Pole i metoda jsou napsané
+a nemění se.
+
+```
+input:  MEI 2
+output: MEI@2
+```
+'''
+hints = [
+  "struct Ticket<'a> { a impl<'a> Ticket<'a> {",
+  "'a na poli už tam je; musí se deklarovat na struktuře, a impl ho deklaruje znovu přes impl<'a> a pak ho použije v Ticket<'a>.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.basic.23.trait"
+title = "Vlastní trait"
+story = "Každá jízda v Causeway Bay má jízdné a každé jízdné má popisek. Tramvaj je paušálně tři; autobus dva za kilometr. Popisek se píše jednou, pro oba."
+brief = '''
+`trait` pojmenovává chování: sadu metod, které typ slibuje.
+`impl Trait for Type { … }` ten slib plní, a metoda, pro kterou trait dává
+výchozí tělo — tady `label` — přijde s ním zadarmo a volá tu, kterou jsi
+napsal.
+
+```
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+```
+
+Trait, obě struktury i `main` jsou napsané. Napiš ty dva `impl` na místa
+komentářů `// FILL`.
+
+```
+input:  7
+output: 3 HKD
+        14 HKD
+```
+'''
+hints = [
+  "impl Fare for Tram { fn fare(&self) -> i64 { 3 } } a stejný tvar pro Bus s 2 * self.km.",
+  "Napsat je třeba jen fare: label má v traitu výchozí tělo a dědí se. Signatura metody musí přesně sedět s traitem, včetně &self.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.basic.24.generics"
+title = "Napiš to jednou"
+story = "Jedna funkce u pultu v Hysan Place, která najde největší, ať dostane čísla, nebo písmena. Je napsaná jednou a chce jen to, aby se ty věci daly porovnat."
+brief = '''
+`<T: Bound>` dělá funkci generickou: `T` zastupuje jakýkoli typ, který
+implementuje to omezení. `PartialOrd` dovolí tělu použít `>`; `Copy` mu
+dovolí kopírovat prvky z řezu přes `let mut best = xs[0]`. Kompilátor pak
+postaví jednu kopii funkce pro každý typ, se kterým se volá.
+
+```
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+```
+
+Nahraď řádek se signaturou označený `// FILL`. Tělo je napsané a `main`
+ji volá s `&[i64]` a s `&[char]`.
+
+```
+input:  3 9 2
+        b z a
+output: 9
+        z
+```
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {",
+  "Vynech Copy a xs[0] je přesun z vypůjčeného řezu (E0507). Vynech PartialOrd a > nemá co volat. Omezení jsou to, co tělo potřebuje, nic víc.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.basic.25.box-dyn"
+title = "Velikost, kterou kompilátor zná"
+story = "Jeden podnos v pokladně jízdného, na něm tramvajový a autobusový lístek vedle sebe. Mají různé velikosti, takže podnos drží krabičky a každá krabička ví, co drží."
+brief = '''
+`Vec` potřebuje, aby každý prvek měl stejnou velikost, a dvě struktury ji
+nemají. `Box<dyn Fare>` je jedna hodnota velikosti ukazatele, která na
+haldě vlastní *něco*, co implementuje `Fare`; která metoda poběží, se
+rozhodne za běhu (dynamic dispatch). `&dyn Fare` je vypůjčený tvar.
+
+```
+let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
+```
+
+Trait i oba `impl` jsou napsané. Napiš vektor na místo komentáře
+`// FILL`.
+
+```
+input:  7
+output: 17
+        2
+```
+'''
+hints = [
+  "let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];",
+  "Typ u let je to, co z každého Box<Tram> a Box<Bus> udělá Box<dyn Fare>; bez něj by vec! odmítl dva různé typy prvků.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.basic.26.rc-refcell"
+title = "Změna přes sdílenou rukojeť"
+story = "Jedna provozní kniha ve strojovně v Times Square a drží ji dva úředníci. Ani jeden ji nevlastní sám a kontrola výpůjček se stěhuje z kompilátoru do knihy samotné."
+brief = '''
+`Rc<T>` je vlastník s počítáním referencí: `Rc::clone(&log)` udělá druhou
+rukojeť na **tutéž** hodnotu, ne kopii. `RefCell<T>` dovolí měnit hodnotu
+přes sdílenou rukojeť — `.borrow_mut()` kontroluje pravidlo výpůjček za
+běhu a zpanikaří, když je porušené. `Rc<RefCell<…>>` je jednovláknová
+sdílená měnitelná hodnota.
+
+```
+let writer = Rc::clone(&log);
+```
+
+`log` je vytvořený a cyklus píše přes `writer`. Napiš druhou rukojeť na
+místo komentáře `// FILL`.
+
+```
+input:  1 2 3
+output: 2
+        [2, 4, 6]
+```
+'''
+hints = [
+  "let writer = Rc::clone(&log);",
+  "log.clone() dělá totéž; Rc::clone(&log) je zápis, který nahlas říká, že se zvedl jen počet. strong_count 2 je důkaz.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.basic.27.closures"
+title = "Tři druhy closure"
+story = "Servisní poplatek v kiosku Lucky Mac: closure, která přičte poplatek a mimochodem počítá, kolikrát se jí kdo zeptal. Druhá se předá funkci, která chce jen něco, co jde zavolat."
+brief = '''
+Closure zachytí, co používá. Ta, která jen čte, je `Fn`; ta, která
+zachycenou proměnnou **mění**, je `FnMut` a musí se svázat přes `let mut`;
+ta, která hodnotu přesune ven, je `FnOnce`. Funkce může kteroukoli z nich
+přijmout přes omezení: `f: impl Fn(i64) -> i64`. `move` vpředu vynutí
+zachycení hodnotou, a to je to, co potřebuje vlákno.
+
+```
+let mut charge = |x: i64| { seen += 1; x + fee };
+println!("{}", apply(|x| x * fee, 10));
+```
+
+`apply` je napsaná. Napiš closure `FnMut` a volání na místa komentářů
+`// FILL`.
+
+```
+input:  1 2 3
+output: 3 4 5
+        3
+        20
+```
+'''
+hints = [
+  "let mut charge = |x: i64| { seen += 1; x + fee }; a pak apply(|x| x * fee, 10)",
+  "charge si seen půjčuje měnitelně, dokud se používá, takže println! se seen musí přijít až po posledním volání — a to přichází. Closure předaná do apply jen čte fee, takže je to obyčejné Fn.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.basic.28.threads"
+title = "Čtyři pokladny"
+story = "Jardine's Bazaar otevře čtyři pokladny naráz a každá zpracovává svou účtenku. Vedoucí je sbírá v pořadí pokladen a podnos se vrátí prázdný."
+brief = '''
+`thread::spawn` spustí vlákno, které běží closure, a vrátí `JoinHandle`.
+`move` dá closure vlastní kopii toho, co používá, takže si vlákno nepůjčuje
+z rámce zásobníku, který už může být pryč. `.join()` na vlákno počká
+a vrátí, co vrátila closure, jako `Result`.
+
+```
+handles.push(thread::spawn(move || x * x));
+squares.push(h.join().unwrap());
+```
+
+Oba cykly jsou napsané. Napiš první řádek na místo prvního komentáře
+`// FILL` a druhý na místo druhého.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "handles.push(thread::spawn(move || x * x)); — pak squares.push(h.join().unwrap());",
+  "Join v pořadí, v jakém se rukojeti přidávaly, je to, co drží výstup v pořadí vstupu; vlákna sama doběhnou, kdy se jim zachce.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.basic.29.arc-mutex"
+title = "Jedna zásuvka, mnoho rukou"
+story = "Jedna zásuvka s penězi v Times Square a ruka od každé pokladny, která se po ní natahuje. Každá ruka dostane vlastní rukojeť k zásuvce a zásuvka se otevře vždy jen jedné ruce."
+brief = '''
+`Arc<T>` je `Rc` pro vlákna: `Arc::clone(&total)` dá každému vláknu vlastní
+rukojeť k jedné hodnotě. `Mutex<T>` ji hlídá: `.lock().unwrap()` čeká na
+zámek a vrátí strážce, který se dereferencuje na hodnotu, a zámek se uvolní,
+když strážce opustí rozsah. `*guard += x` přes něj zapisuje.
+
+```
+let total = Arc::clone(&total);
+*total.lock().unwrap() += x;
+```
+
+Napiš clone před `spawn` a zamčené přičtení uvnitř něj, na místa komentářů
+`// FILL`. Zastínit jméno je idiom.
+
+```
+input:  1 2 3 4
+output: 10
+        1
+```
+'''
+hints = [
+  "let total = Arc::clone(&total); před spawn, pak *total.lock().unwrap() += x; uvnitř.",
+  "Bez clone vezme move ten jediný Arc do prvního vlákna a druhá iterace je E0382. Počet vypsaný na konci je 1, protože každý clone zanikl se svým vláknem.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.basic.30.atomics-rwlock"
+title = "Jedno slovo, žádný zámek"
+story = "Počítadlo turniketu ve Victoria Parku, které každá brána zvýší bez čekání ve frontě, a nástěnka, kterou mnozí čtou a málokdo píše."
+brief = '''
+Na jedno celé číslo je atomic lepší než mutex: `AtomicUsize::fetch_add(1,
+Ordering::SeqCst)` ho zvýší z kteréhokoli vlákna úplně bez zámku
+a `.load(Ordering::SeqCst)` ho přečte. Na větší hodnotu, která se čte mnohem
+víc, než se píše, dává `RwLock` mnoho čtenářů naráz (`.read()`) a jednoho
+pisatele (`.write()`), a oba vracejí strážce jako `Mutex`.
+
+```
+hits.fetch_add(1, Ordering::SeqCst);
+board.write().unwrap().push(x);
+```
+
+Klony i spawn jsou napsané. Napiš zvýšení a zápis uvnitř vlákna, na místa
+komentářů `// FILL`.
+
+```
+input:  4 2 9
+output: 2 4 9
+        3
+```
+'''
+hints = [
+  "hits.fetch_add(1, Ordering::SeqCst); a board.write().unwrap().push(x);",
+  "fetch_add bere &self, a proto atomic nepotřebuje Mutex ani mut. Strážce zápisu je tu dočasná hodnota, takže se zámek uvolní na konci příkazu.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.basic.31.channel"
+title = "Jedno okénko"
+story = "Výdejní okénko vzadu v kuchyni v Times Square: jeden kuchař posílá, výdej přijímá, a výdej ví, že kuchař skončil, protože se okénko za ním zavře."
+brief = '''
+`mpsc::channel()` vrátí odesílatele a příjemce. Odesílatel se přesune do
+vlákna a `tx.send(v)` předá hodnotu na druhou stranu; `rx.iter()` na druhé
+straně dává všechno odeslané, v pořadí, a **skončí, když je každý odesílatel
+zahozený** — tady když vlákno producenta doběhne a jeho `tx` odejde s ním.
+
+```
+let (tx, rx) = mpsc::channel::<i64>();
+let got: Vec<i64> = rx.iter().collect();
+```
+
+Vlákno producenta je napsané. Napiš kanál a sbírající příjem na místa
+komentářů `// FILL`.
+
+```
+input:  1 2 3
+output: 10 20 30
+```
+'''
+hints = [
+  "let (tx, rx) = mpsc::channel::<i64>(); a let got: Vec<i64> = rx.iter().collect();",
+  "rx.iter() blokuje, dokud se kanál nezavře, a kanál se zavře, když se tx zahodí na konci closure producenta — takže collect skončí přesně tehdy, kdy producent.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.basic.32.producers"
+title = "Mnoho kuchařů, jeden výdej"
+story = "Každý kuchař v kuchyni v Times Square posílá stejným okénkem a výdej má vlastní klíč od okénka, o kterém zapomněl, že ho drží. Dokud ho neodloží, čeká výdej na kuchaře, který nikdy nepřijde."
+brief = '''
+*mpsc* je multi-producer: `tx.clone()` dá každému vláknu vlastního
+odesílatele do jednoho kanálu. Přijímací cyklus skončí, teprve až je pryč
+**každý** odesílatel — a původní `tx` pořád sedí v `main`. `drop(tx)` ho
+odloží; bez toho řádku program nikdy neskončí.
+
+```
+let tx = tx.clone();
+drop(tx);
+```
+
+Napiš clone před `spawn` a drop za cyklus, na místa komentářů `// FILL`.
+Výsledky jsou seřazené podle indexu, takže na pořadí, v jakém vlákna
+běží, nezáleží.
+
+```
+input:  1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+'''
+hints = [
+  "let tx = tx.clone(); uvnitř cyklu, drop(tx); za ním.",
+  "Bez clone vezme move toho jediného odesílatele do prvního vlákna a druhé kolo cyklu je E0382. Bez drop čeká rx.iter() navždy na odesílatele samotného main — běh vyprší na čas, místo aby selhal.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.basic.33.worker-pool"
+title = "Okénko"
+story = "12:30 v Times Square. Jeden blok objednávek, tři kuchaři, jedno okénko zpátky na výdej. Blok je sdílený pod zámkem, kuchař ho drží jen tak dlouho, aby utrhl jeden lístek, a když je blok prázdný, kuchaři jdou domů a výdej spočítá talíře."
+brief = '''
+Worker pool jsou dva kanály a zámek. Úlohy jdou dolů po `job_tx`;
+pracovníci sdílejí jeden `job_rx` za `Arc<Mutex<…>>` a každý si vezme úlohu
+přes `job_rx.lock().unwrap().recv()` — zámek je dočasná hodnota, takže se
+uvolní na konci toho příkazu a vaří se **mimo** něj. `recv()` vrátí `Err`,
+jakmile je každý `job_tx` zahozený, a tak pracovník pozná, že má skončit.
+Výsledky se vracejí po `done_tx` a výdej sbírá, dokud není pryč každý
+`done_tx` — klony pracovníků *i* ten vlastní z main.
+
+```
+let job = job_rx.lock().unwrap().recv();
+drop(job_tx);
+drop(done_tx);
+```
+
+Pool, cyklus i sběr jsou napsané. Napiš zamčený příjem uvnitř pracovníka
+a dva dropy v `main`, na místa komentářů `// FILL`. Chybí-li kterýkoli
+z dropů, je to deadlock.
+
+```
+input:  1 2 3
+output: 0 2
+        1 5
+        2 10
+```
+'''
+hints = [
+  "let job = job_rx.lock().unwrap().recv(); v pracovníkovi; drop(job_tx); a drop(done_tx); po odeslání.",
+  "Strážce z lock() je v tom let dočasná hodnota, takže se zahodí u středníku a ostatní pracovníci si můžou vzít další úlohu, zatímco tenhle vaří. Držet ho přes cook() by pool seřadilo za sebe.",
+  "drop(job_tx) je to, co pracovníkům promění recv() v Err; drop(done_tx) je to, co nechá done_rx.iter() skončit, jakmile pracovníci zahodí ty své. Zapomeň na kterýkoli a program čeká navždy.",
+]

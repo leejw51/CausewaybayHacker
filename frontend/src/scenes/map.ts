@@ -43,7 +43,14 @@ import {
   landName,
 } from "../ui/chrome";
 import { motionScale, reducedMotion, seconds, Tween } from "../engine/motion";
-import { LANDS, roadsOf, type Category, type Land, type MapNode } from "../net/protocol";
+import {
+  mapLands,
+  nextLand,
+  roadsOf,
+  type Category,
+  type Land,
+  type MapNode,
+} from "../net/protocol";
 import { LandsScene } from "./lands";
 import { PlaygroundScene } from "./playground";
 import { QuestScene } from "./quest";
@@ -71,9 +78,10 @@ const PLATE: Record<Land, string> = {
 /**
  * The maps, laid out the way the switcher shows them: the lands across, and
  * each land's roads. The order is the order of the bar and the order the keys
- * cycle in (`LANDS` and `roadsOf` come from the protocol so every screen
+ * cycle in (`mapLands` and `roadsOf` come from the protocol so every screen
  * agrees), and there is one of each so the player can see every place from
- * any one of them — but only the roads a land has: REMIX LAND has two.
+ * any one of them — but only the lands the server reported, and only the
+ * roads a land has: REMIX LAND has two.
  */
 
 /**
@@ -506,7 +514,7 @@ export class MapScene implements Scene {
       ];
     }
     return [
-      ...LANDS.map((l) => ({
+      ...this.lands().map((l) => ({
         id: `land:${l}`,
         label: t(`map.${l}` as "map.rust"),
         lit: l === this.land,
@@ -726,8 +734,18 @@ export class MapScene implements Scene {
     void this.refresh();
   }
 
+  /**
+   * The lands the chips and TAB offer: the ones the server reported in its
+   * last `world.lands` (§4.6, kept by the client from the lands screen), or
+   * every land this client knows before it has heard. Walking the static list
+   * asked a server without ZIG for a ZIG map it could not serve.
+   */
+  private lands(): readonly Land[] {
+    return mapLands(this.app.client.lands);
+  }
+
   private cycleLand(): void {
-    this.switchTo(LANDS[(LANDS.indexOf(this.land) + 1) % LANDS.length], this.category);
+    this.switchTo(nextLand(this.lands(), this.land), this.category);
   }
 
   private cycleCategory(step: number): void {
@@ -1194,7 +1212,7 @@ export class MapScene implements Scene {
     this.sheet.row(
       f,
       [x + pad, y + pad, w - pad * 2, 0],
-      LANDS.map((l) => ({
+      this.lands().map((l) => ({
         id: `land:${l}`,
         label: t(`map.${l}` as "map.rust"),
         primary: l === this.land,
@@ -1460,8 +1478,23 @@ export class MapScene implements Scene {
    * a button people use and a button people avoid.
    */
   private async resetRoad(): Promise<void> {
+    if (this.resetting) return;
+    // Pressed before `world.map` has answered — the button is on the bar from
+    // the first frame, the tally only once the road is read — the press used
+    // to be dropped without a word: a lit button that did nothing. The road
+    // is read first, and the question asked once there is a count to put in
+    // it. Held under `resetting` so a second press meanwhile is not a second
+    // question.
+    if (!this.tally) {
+      this.resetting = true;
+      try {
+        await this.refresh();
+      } finally {
+        this.resetting = false;
+      }
+    }
     const tally = this.tally;
-    if (!tally || this.resetting) return;
+    if (!tally) return;
     const road = `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`;
     const yes = await this.app.ask({
       title: t("map.resetTitle"),

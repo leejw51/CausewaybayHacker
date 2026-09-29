@@ -9,6 +9,7 @@ import {
   login,
   logout,
   pickCategory,
+  receivedFrames,
   run,
   sourceThatPrints,
   scene,
@@ -111,11 +112,24 @@ test("the seed never crosses the wire", async ({ page }) => {
       /"(mnemonic|private_key|privkey|seed|passphrase)"/,
     );
 
-  // §3.1 says not in localStorage unencrypted either. A session token is
-  // fine and expected there; key material is not.
-  const stored = await page.evaluate(() => JSON.stringify(window.localStorage));
-  expect(stored).not.toContain(account.privateKey.replace(/^0x/, ""));
-  expect(stored).not.toContain("abandon");
+  // The browser's own storage. This used to say "no key material in
+  // localStorage at all"; docs/decisions.md 2026-09-18 "WEB: the key is kept
+  // in the browser, and the token is one per browser" changed that on
+  // purpose, and SPEC §3.1 with it: the *derived private key* is kept under
+  // `cwbhacker.key.<address>` from an accepted login until logout, so a
+  // reload or a poster can sign without the phrase. What still holds is
+  // narrower and is pinned exactly: that one slot, for this account, holds
+  // the key; no other slot holds it; and the mnemonic is never written.
+  const store = await page.evaluate(() => ({ ...window.localStorage }));
+  const hex = account.privateKey.replace(/^0x/, "").toLowerCase();
+  const holding = Object.entries(store)
+    .filter(([, v]) => v.toLowerCase().includes(hex))
+    .map(([k]) => k);
+  expect(holding, "the key is in its own slot and nowhere else").toEqual([
+    `cwbhacker.key.${account.lower}`,
+  ]);
+  expect(store[`cwbhacker.key.${account.lower}`].replace(/^0x/, "").toLowerCase()).toBe(hex);
+  expect(JSON.stringify(store)).not.toContain("abandon");
 
   // And the field is emptied the moment it is submitted.
   await expect(page.locator("textarea.cwb-field")).toHaveCount(0);
@@ -445,100 +459,170 @@ test("the compiler's output paints while it is still compiling", async ({
 }, info) => {
   // **Nobody has ever seen this work.** FE unit-tested the console and could
   // not confirm it visually — headless RAF starvation defeated its timing
-  // attempts — so `run.log` painting *while* rustc thinks has been believed
-  // rather than known, in both clients, since it was written.
+  // attempts — so `run.log` painting *while* the run is still going has been
+  // believed rather than known, in both clients, since it was written.
   //
   // SPEC §5.4 is explicit about why it matters: "so the player watches
   // `rustc` think instead of a spinner". A console that only fills in once
   // the verdict lands is a spinner with extra steps, and every unit test on
   // both sides still passes.
   //
-  // Two things make it testable now. RUN keeps its keyboard shortcut
-  // (`Ctrl/Cmd+Enter`) while SUBMIT does not, and a run streams `run.stage`
-  // and `run.log` exactly as a submit does (§4.9b) — so this drives the
-  // button a player actually presses while iterating, which is when they look
-  // at the console. And `settle()` + `png()` give a deterministic frame,
-  // which is the only way to compare two moments of a canvas.
+  // **How this used to look, and why it could not work.** It pressed RUN and
+  // compared 24 `settle(0.2)` captures to one taken before. That failed on
+  // every run, for two reasons that had nothing to do with the console:
+  //   - the capture hook painted the overlay's full-screen effect canvases
+  //     as opaque text boxes, so every capture of the quest screen was the
+  //     same flat dark rectangle (fixed in `dev/capture.ts`); and
+  //   - with that fixed, it would pass *vacuously*: `settle` moves the game
+  //     clock, so any two captures differ by whatever is animating, before,
+  //     during and long after the run. And on a warm cache the whole run —
+  //     compile, run, one stdout chunk, verdict — is over in ~300 ms, before
+  //     the first sample.
   //
-  // The assertion is coarse on purpose: the console's text is canvas-drawn,
-  // so there is no DOM to read and no view model to ask. What can be said is
-  // that **the screen changed during the compile while still being the quest
-  // screen** — and a screen that does not change during a five-second
-  // compile is exactly the bug.
+  // So this brackets the thing itself, on the wire and on the screen:
+  //   1. A program that prints, **sleeps**, prints, sleeps, and only then
+  //      gives its (wrong) answer — so there is a real interval in which
+  //      output has arrived and the verdict has not.
+  //   2. Every frame the page receives is timestamped by the `ready` fixture,
+  //      so "the chunk arrived before the reply" is a fact, not a race.
+  //   3. `redraw()` draws a frame at `dt = 0`. With the loop frozen and the
+  //      socket not, two redraws differ **only** if a message changed the
+  //      scene's state in between. A second redraw in the same evaluation,
+  //      where nothing can arrive, is the control: it must be identical, or
+  //      the comparison is noise.
+  // rustc on a warm cache is ~130 ms and says nothing about a clean program,
+  // so what is observable is the program's own stdout — the same `run.log`
+  // stream, the same console, the same repaint (§4.18).
   const account = freshAccount();
   const wire = await Wire.as(test.info().project.use.baseURL!, account);
   try {
     await login(page, account);
     await enterRustQuest(page, wire);
 
-    // Deliberately slow to compile and slow to run: deep generic nesting
-    // costs rustc real time, and the loop keeps the program alive long
-    // enough that "during" is a genuine interval rather than a race. It is
-    // also a *wrong* answer, which is what a player is usually running.
+    // Well inside the quest's 5 s run limit. A *wrong* answer, which is what
+    // a player is usually running.
     await setSource(
       page,
       `
-struct W<T>(T);
-trait Go { fn go(&self) -> usize; }
-impl Go for u8 { fn go(&self) -> usize { *self as usize } }
-impl<T: Go> Go for W<T> { fn go(&self) -> usize { self.0.go() + 1 } }
-type A = W<W<W<W<W<W<W<W<u8>>>>>>>>;
-type B = W<W<W<W<W<W<W<W<A>>>>>>>>;
+use std::{thread, time::Duration};
 fn main() {
-    let b: B = W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(W(1u8)))))))))))))))); 
-    let mut n = 0usize;
-    for _ in 0..40_000_000 { n = n.wrapping_add(b.go()); }
-    println!("not the answer: {n}");
+    for i in 1..=3 {
+        println!("line {i} of 3, then a pause");
+        thread::sleep(Duration::from_millis(900));
+    }
+    println!("not the answer");
 }
 `,
     );
 
-    const frame = async () =>
+    type Frame = { at: number; type: string; payload: Record<string, unknown> };
+    const since = Date.now();
+    const frames = (): Frame[] =>
+      receivedFrames()
+        .filter((f) => f.at >= since)
+        .map((f) => {
+          try {
+            const m = JSON.parse(f.text) as { type: string; payload: Record<string, unknown> };
+            return { at: f.at, type: m.type, payload: m.payload };
+          } catch {
+            return { at: f.at, type: "", payload: {} };
+          }
+        });
+    const logs = () => frames().filter((f) => f.type === "run.log");
+    const replied = () => frames().find((f) => f.type === "quest.run.ok");
+    // Two redraws in one evaluation: nothing can be handled between them (the
+    // page is single-threaded), so `again` is the determinism control — if it
+    // ever differs from `png`, the capture is noisy and no comparison of two
+    // pictures means anything.
+    const redraw = () =>
       page.evaluate(() => {
         const api = window.__cwbCapture!;
-        api.settle(0.2); // a short, fixed advance — enough to redraw, not to skip
+        api.redraw();
         const png = api.png();
-        const name = api.scene();
-        api.resume();
-        return { png, name };
+        api.redraw();
+        return { png, again: api.png(), name: api.scene() };
       });
-
-    const before = await frame();
-    expect(before.name, "should still be on the quest screen").toBe("quest");
 
     await run(page); // Ctrl/Cmd+Enter — the reflex key
 
-    // Sample while it works. A run does not navigate (§4.9b), so the screen
-    // staying `quest` is expected; what is being looked for is the picture
-    // changing underneath.
-    let changedDuring = false;
-    let sampled = 0;
-    for (let i = 0; i < 24; i++) {
-      await page.waitForTimeout(400);
-      const now = await frame();
-      sampled++;
-      if (now.name !== "quest") break; // it finished and moved on
-      if (now.png !== before.png) {
-        changedDuring = true;
-        await info.attach(`console-mid-run-${info.project.name}.png`, {
-          body: Buffer.from(now.png.split(",")[1], "base64"),
-          contentType: "image/png",
-        });
-        break;
+    // The first chunk, and the verdict not yet in: freeze right there.
+    await expect
+      .poll(() => logs().length, {
+        timeout: 60_000,
+        message: "no `run.log` arrived for the run at all",
+      })
+      .toBeGreaterThan(0);
+
+    // A picture of exactly the state the first `n` frames made. Taken again
+    // if anything lands while it is being drawn, so `n` is never a guess.
+    const still = async () => {
+      for (;;) {
+        const n = frames().length;
+        const pic = await redraw();
+        if (frames().length === n) return { ...pic, n };
       }
+    };
+    let a = await still();
+    expect(
+      replied(),
+      "the verdict arrived together with the first output chunk: `run.log` " +
+        "is buffered and flushed at the end of the run (§5.4), which is a " +
+        "spinner with extra steps",
+    ).toBeUndefined();
+    expect(a.name, "a run does not leave the quest screen (§4.9b)").toBe("quest");
+
+    // Still frozen. Wait for the next thing the server says. If it is a
+    // chunk of output and nothing else, that chunk is the only difference
+    // between `a` and the next picture. Anything else (an `edit.push.ok`
+    // from the editor, say) moves the baseline up to include it and waits
+    // again — never attributing someone else's change to the console.
+    let b: Awaited<ReturnType<typeof still>> | null = null;
+    const deadline = Date.now() + 10_000;
+    while (!b && Date.now() < deadline) {
+      await expect
+        .poll(() => frames().length, { timeout: 10_000 })
+        .toBeGreaterThan(a.n);
+      const fresh = frames().slice(a.n);
+      expect(
+        fresh.some((f) => f.type === "quest.run.ok"),
+        "the verdict arrived before a second chunk of output could be seen " +
+          "on its own: the program's lines are not reaching the page as they " +
+          "are printed (§5.4)",
+      ).toBe(false);
+      const next = await still();
+      if (next.n === a.n + 1 && fresh[0].type === "run.log") b = next;
+      else a = next;
     }
+    expect(b, "no chunk of output arrived on its own mid-run").not.toBeNull();
+    const between = frames().slice(a.n, b!.n);
+    expect(
+      between.map((f) => f.type),
+      "only output arrived between the two pictures, so only output can tell them apart",
+    ).toEqual(["run.log"]);
+    expect(
+      replied(),
+      "the verdict landed before the second picture was taken",
+    ).toBeUndefined();
 
     expect(
-      changedDuring,
-      `the quest screen was pixel-identical across ${sampled} samples spanning ` +
-        `a real compile and run. SPEC §5.4 exists so the player watches rustc ` +
-        `think instead of a spinner — if nothing moves, \`run.log\` is being ` +
-        `buffered and flushed at the end, which is a spinner with extra steps. ` +
-        `(This is a coarse check: the console is canvas-drawn, so a changing ` +
-        `picture is the strongest available evidence.)`,
+      a.again === a.png && b!.again === b!.png,
+      "two redraws at dt = 0 with nothing arriving between them differ — the " +
+        "capture is not deterministic, so no comparison below means anything",
     ).toBe(true);
+    expect(
+      b!.png !== a.png,
+      "a `run.log` chunk arrived mid-run and the quest screen did not change: " +
+        "the console is not repainting from the stream. SPEC §5.4 exists so " +
+        "the player watches the run think instead of a spinner.",
+    ).toBe(true);
+    await info.attach(`console-mid-run-${info.project.name}.png`, {
+      body: Buffer.from(b!.png.split(",")[1], "base64"),
+      contentType: "image/png",
+    });
 
-    // And the run really did happen — the server saw it, with mode "run".
+    await page.evaluate(() => window.__cwbCapture!.resume());
+    // The run finishes, and it really did happen — the server saw it.
+    await expect.poll(() => replied() !== undefined, { timeout: 60_000 }).toBe(true);
     await expect
       .poll(async () => (await wire.history()).length, { timeout: 120_000 })
       .toBeGreaterThan(0);

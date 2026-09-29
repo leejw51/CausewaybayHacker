@@ -1,4 +1,5 @@
--- CATEGORY SELECT. The three rows of one land, from `world.lands`.
+-- CATEGORY SELECT. The roads of one land (four, or REMIX's two), from
+-- `world.lands`.
 --
 -- `open` is the server's word (§4.6: "false when the category's first node is
 -- still locked"), so a locked row is drawn locked and refuses to open. The
@@ -102,24 +103,41 @@ end
 ---     band gives way, because a name wrapped one letter to a line is not a
 ---     name;
 ---   * the row is as tall as the name, one line of blurb and the plates
----     need, and taller when the screen has the room;
+---     need, and taller when the screen has the room — the blurb line is
+---     given up when the rows would not otherwise fit (below);
 ---   * the counts plate is as wide as `NN / NN` at its size, and the right
 ---     margin follows it.
-function Categories.metrics(vw, vh, rows)
+---   * **every row above the PLAYGROUND band.** Four roads at the largest
+---     step in a 720-tall window need more than the screen has, and the
+---     fourth was drawn under the button and the footer. So the title
+---     gives way first (it names the land the player just picked), then the
+---     blurb, and then the names and the counts step down together until
+---     the rows fit — the type gives way, never the rows.
+local TITLE_SIZE, NAME_SIZE, COUNT_SIZE, BLURB_SIZE = 16, 13, 10, 7
+local TITLE_FLOOR, SIZE_FLOOR = 8, 5
+
+local function measure(vw, vh, rows, title_step, step, blurb)
+  local title_size = math.max(TITLE_FLOOR, TITLE_SIZE - title_step)
+  local name_size = math.max(SIZE_FLOOR, NAME_SIZE - step)
+  local count_size = math.max(SIZE_FLOOR, COUNT_SIZE - step)
   local title_y = 22
-  local title_h = UI.lineHeight(16)
+  local title_h = UI.lineHeight(title_size)
   local y0 = title_y + title_h + 18
   local pad = Layout.isPortrait() and 12 or 60
   local w = vw - pad * 2
 
-  local name_h, blurb_h = UI.lineHeight(13), UI.lineHeight(7)
+  local name_h, blurb_h = UI.lineHeight(name_size), UI.lineHeight(BLURB_SIZE)
   local plate_h = name_h + 8
-  local count_h = UI.lineHeight(10) + 4 + 7 + 10
+  local count_h = UI.lineHeight(count_size) + 4 + 7 + 10
+  -- The name as it is drawn — `VERY BASIC`, in the player's language — not
+  -- the id: `VERYBASIC` is a space narrower, and the gutter sized from it
+  -- wrapped VERY over BASIC and printed it through the blurb.
   local widest = 0
   for _, cat in ipairs(rows) do
-    widest = math.max(widest, UI.textWidth(tostring(cat.category or ""):upper(), 13))
+    widest = math.max(widest,
+      UI.textWidth(I18n.t(Land.category_label(cat.category)), name_size))
   end
-  local count_w = math.max(76, UI.textWidth("00 / 00", 10) + 16)
+  local count_w = math.max(76, UI.textWidth("00 / 00", count_size) + 16)
   local right = count_w + 20
 
   local gutter = math.max(math.floor(math.min(150, w * 0.28)), widest + 28)
@@ -138,7 +156,7 @@ function Categories.metrics(vw, vh, rows)
   -- Rows: what the type needs, stretched to what the screen has.
   local n = math.max(1, #rows)
   local bottom = Categories.band_top(vh) - 10
-  local need = 12 + name_h + 4 + blurb_h + 14
+  local need = 12 + name_h + 4 + (blurb and blurb_h or 0) + 14
   need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
   if stacked then need = math.max(need, count_y + count_h + 10) end
   local avail = math.floor((bottom - y0) / n) - 12
@@ -151,7 +169,7 @@ function Categories.metrics(vw, vh, rows)
   local blurb_lh = blurb_h + 2
   local blurb_lines = math.max(0, math.floor((rh - blurb_y - 12) / blurb_lh))
   -- Stacked, the blurb would run under the counts plate: it goes.
-  if stacked then blurb_lines = 0 end
+  if stacked or not blurb then blurb_lines = 0 end
 
   return {
     title_y = title_y, title_h = title_h, y0 = y0,
@@ -160,7 +178,28 @@ function Categories.metrics(vw, vh, rows)
     blurb_y = blurb_y, blurb_lh = blurb_lh, blurb_lines = math.min(blurb_lines, 3),
     count_w = count_w, count_h = count_h, count_y = count_y,
     stacked = stacked, widest = widest,
+    title_size = title_size, name_size = name_size, count_size = count_size,
+    blurb_size = BLURB_SIZE, bottom = bottom,
+    fits = y0 + n * (rh + 12) - 12 <= bottom,
   }
+end
+
+function Categories.metrics(vw, vh, rows)
+  rows = rows or {}
+  local title_step = 0
+  local m = measure(vw, vh, rows, title_step, 0, true)
+  while not m.fits and title_step < TITLE_SIZE - TITLE_FLOOR do
+    title_step = title_step + 1
+    m = measure(vw, vh, rows, title_step, 0, true)
+  end
+  if m.fits then return m end
+  m = measure(vw, vh, rows, title_step, 0, false)
+  local step = 0
+  while not m.fits and step < NAME_SIZE - SIZE_FLOOR do
+    step = step + 1
+    m = measure(vw, vh, rows, title_step, step, false)
+  end
+  return m
 end
 
 --- The band under the rows: one button, PLAYGROUND — the same desk the
@@ -208,7 +247,7 @@ function Categories:draw()
   -- land it is without reading.
   Assets.sprite(Land.mascot(self.land), 40, m.title_y + m.title_h * 0.9 + Anim.bob(t, { amount = 2 }),
     math.max(44, m.title_h * 1.4))
-  UI.text(I18n.t("%s LAND", Land.name(self.land)), 72, m.title_y, 16, tint)
+  UI.text(I18n.t("%s LAND", Land.name(self.land)), 72, m.title_y, m.title_size, tint)
 
   local rows = self.categories or {}
   local pad, w, rh = m.pad, m.w, m.rh
@@ -274,7 +313,7 @@ function Categories:draw()
     -- The gutter plate's width, not the whole row: to its right is the
     -- mascot, and a blurb given the row would be drawn underneath it.
     local blurb_w = m.label_w
-    UI.text(I18n.t(Land.category_label(cat.category)), pad + 14, ry + 12, 13, color, "left", blurb_w)
+    UI.text(I18n.t(Land.category_label(cat.category)), pad + 14, ry + 12, m.name_size, color, "left", blurb_w)
     -- Only the blurb lines the row has room for, and none when it has room
     -- for none: a blurb wrapped to eight lines is drawn through the plate
     -- under it, and one clipped mid-sentence says less than nothing.
@@ -294,9 +333,9 @@ function Categories:draw()
     local cy = ry + m.count_y
     love.graphics.rectangle("fill", pad + w - 14 - pw, cy, pw, m.count_h)
     love.graphics.setColor(1, 1, 1, 1)
-    UI.text(progress, pad + w - 14 - pw + (pw - UI.textWidth(progress, 10)) / 2,
-      cy + 4, 10, color)
-    UI.bar(pad + w - 14 - pw + 6, cy + 4 + UI.lineHeight(10) + 4, pw - 12, 7,
+    UI.text(progress, pad + w - 14 - pw + (pw - UI.textWidth(progress, m.count_size)) / 2,
+      cy + 4, m.count_size, color)
+    UI.bar(pad + w - 14 - pw + 6, cy + 4 + UI.lineHeight(m.count_size) + 4, pw - 12, 7,
       cat.total > 0 and cat.cleared / cat.total or 0,
       cat.open and Theme.admit or Theme.dim)
 

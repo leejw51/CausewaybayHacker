@@ -1,0 +1,845 @@
+# C++ LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/cpp/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "cpp.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.basic.01.first-light"
+title = "První světlo"
+story = "12:00 na nábřeží Gloucester Road. Polední dělo vystřelí, protože něco zapsalo na správnou adresu, a deska vedle něj je prázdná."
+brief = '''
+Vypiš přesně:
+
+```
+hello, causewaybay
+```
+
+Malá písmena, jedna čárka, jedna mezera, jeden řádek. Nic jiného.
+
+`std::cout` žije v `<iostream>` a `'\n'` je konec řádku. `std::endl` funguje
+také a také vyprázdní buffer, což tady nepotřebuješ a později nebudeš chtít.
+'''
+hints = [
+  "std::cout << \"...\" je celý program. Include už tam je.",
+  "Řetězec musí být přesný: malá písmena, jedna čárka, za ní jedna mezera.",
+  "main vrací int; dojít na konec main bez return je v pořádku a znamená 0.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.basic.02.bindings"
+title = "Mosazná deska"
+story = "Deska vedle děla ukazuje jedno číslo a pak dvě prázdná místa tam, kde býval počet dní a rok."
+brief = '''
+Proměnná se v C++ deklaruje s typem napřed: `long long n = 0;` vytvoří
+64bitové celé číslo jménem `n`. `std::cin >> n` do něj načte další číslo
+ze standardního vstupu a `std::cout << n << '\n'` ho vypíše s koncem řádku.
+Aritmetika na tom jméně je prostě aritmetika: `n * 2`, `n * n`.
+
+```
+std::cout << n * n << '\n';
+```
+
+Program načte `n` a vypíše ho a jeho dvojnásobek. Napiš ten řádek na
+`// FILL`: třetí výpis, `n * n`.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "std::cout << n * n << '\\\\n'; — stejný tvar jako řádek nad ním.",
+  "long long udrží 3000000000 na druhou; int by neudržel, a proto deska říká long long.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.basic.03.types"
+title = "Tabulka přílivu"
+story = "Tabulka přílivu správce přístavu dělí hloubku útočiště počtem sampanů a odpověď vychází jako celé číslo, vždycky, i když celá není."
+brief = '''
+Dvě celá čísla dělená dají celé číslo: `7 / 2` je `3` a `7 % 2` je zbytek,
+`1`. Aby vyšlo `3.5`, musí být jedna strana napřed číslo s plovoucí čárkou,
+a `static_cast<double>(a)` je explicitní způsob, jak to říct. K výpisu
+s pevným počtem desetinných míst má `<iomanip>` `std::fixed`
+a `std::setprecision(2)`.
+
+```
+std::cout << a / b << '\n';
+std::cout << a % b << '\n';
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
+```
+
+Celočíselné dělení a zbytek se vypisují. Napiš třetí řádek na `// FILL`:
+dělení jako `double` se dvěma desetinnými místy.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
+  "Přetypování potřebuje jen jeden operand: double dělený long long je double.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.basic.04.int-types"
+title = "Šířky registrů"
+story = "Registr výstřelů děla je široký 32 bitů a registr přístavních hodin 64; počet zkopírovaný z jednoho do druhého si zachová hodnotu, jen když to někdo řekne."
+brief = '''
+`<cstdint>` pojmenovává celá čísla podle šířky: `int32_t` a `int64_t` jsou
+se znaménkem, `uint32_t` a `uint64_t` bez znaménka. Hodnota přechází mezi
+šířkami pomocí `static_cast<...>`, který nahlas říká, že se děje převod.
+`std::numeric_limits<T>::max()` z `<limits>` je největší hodnota, kterou
+šířka udrží.
+
+```
+uint64_t b = static_cast<uint64_t>(a);
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';
+```
+
+`a` se načte jako `int32_t`. Napiš řádek s přetypováním na první `// FILL`
+a druhý řádek s výpisem na druhý.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "uint64_t b = static_cast<uint64_t>(a); — přetypování jmenuje šířku, do které jde.",
+  "std::numeric_limits<uint64_t>::max() je 18446744073709551615; řádek s int32_t nad ním je stejné volání s druhým typem.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.basic.05.big-int"
+title = "Třicet dva bajtů"
+story = "Klíče ke kotvištím jachtklubu jsou 32bajtová čísla a naviják je čte po bajtu od velkého konce; buffer jsou samé nuly, dokud se bajty nevloží."
+brief = '''
+32bajtové celé číslo — hash, klíč, adresa — nemá vestavěný typ, takže žije
+v `std::array<uint8_t, 32>`: 32 bajtů, big-endian, nejvýznamnější bajt
+první. `uint64_t` vyplní posledních osm z nich. Posun doprava o `8 * i`
+bitů stáhne bajt `i` (počítáno od malého konce) dolů a přetypování si nechá
+jen ten bajt.
+
+```
+buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
+```
+
+Smyčka přes `i` a hexadecimální výpis jsou napsané. Napiš ten řádek jako
+tělo smyčky na `// FILL`.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = static_cast<uint8_t>(v >> (8 * i)); — poslední index dostane nejnižší bajt.",
+  "v >> (8 * i) posune bajt i dolů; static_cast<uint8_t> zbytek zahodí.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.basic.06.floats"
+title = "Vodočet"
+story = "Vodočet v útočišti zapisuje v double a zobrazovací tabule je v jednoduché přesnosti, a ty dvě se neshodnou na desátém desetinném místě."
+brief = '''
+`double` je 64bitový float a `float` ten 32bitový. `std::stod` naparsuje
+text do `double`; jeho zúžení na `float` je `static_cast<float>` a právě
+v tom přetypování se ztrácí přesnost — `0.1` nemá přesný binární tvar
+a float si z jeho číslic nechá méně než double.
+
+```
+double x = std::stod(s);
+float y = static_cast<float>(x);
+```
+
+`s` je načtený řádek a oba výpisy používají deset desetinných míst. Napiš
+ty dva řádky na `// FILL`.
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "double x = std::stod(s); — z řetězce na double, ze <string>.",
+  "float y = static_cast<float>(x); — zúžení je vypsané; y se vypíše s méně pravými číslicemi.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.basic.04.strings"
+title = "Jméno sampanu"
+story = "Jméno sampanu je na přídi namalované velkými písmeny a na zádi pozpátku, a v záznamu správce přístavu není ani tak, ani tak."
+brief = '''
+`std::string` zná svou délku (`size()`), dá se projít pomocí `<algorithm>`
+a dá se postavit z libovolné dvojice iterátorů. `std::transform` aplikuje
+funkci na každý znak a výsledek zapíše zpět; tou funkcí je `::toupper`
+z `<cctype>`. `rbegin()` a `rend()` procházejí řetězec pozpátku, takže
+řetězec z nich postavený je ten obrácený.
+
+```
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());
+```
+
+`upper` je kopie řádku a `rev` je zástupný. Napiš ty dva řádky na
+`// FILL`, místo zástupného `rev`.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper); — zdroj, konec zdroje, cíl, funkce.",
+  "std::string rev(line.rbegin(), line.rend()); — řetězec postavený ze dvou reverzních iterátorů je ten obrácený.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.basic.08.string-slices"
+title = "Krátké jméno"
+story = "Tabule správce přístavu má místo na čtyři písmena jména sampanu a značku za nimi, a písař opisuje celé jméno."
+brief = '''
+`s.substr(pos, n)` je řez řetězce: `n` znaků od `pos`, a je to **kopie** —
+nový `std::string`, který s `s` nesdílí paměť. Připojení k řetězci je `+=`,
+nebo `append(...)`, a řetězec roste na místě.
+
+```
+std::string t = s.substr(0, 4);
+t += "...";
+```
+
+`s` je načtený řádek (nejméně čtyři znaky). Napiš ty dva řádky na
+`// FILL`, místo zástupného `t`.
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "std::string t = s.substr(0, 4); — začni na 0, vezmi 4; výsledek je vlastní řetězec.",
+  "t += \"...\"; — připojení na místě; t.append(\"...\") je totéž.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.basic.09.int-slices"
+title = "Dva z prostředka"
+story = "Záznam skluzu chce druhý a třetí odečet opsané zvlášť a za nimi připojené celé dopoledne, a kopie je celé dopoledne dvakrát."
+brief = '''
+`std::vector` nemá syntaxi pro řez; řez je nový vektor postavený ze dvou
+iterátorů — `begin() + 1` až po `begin() + 3`, bez něj — a je to **kopie**
+(`std::span` ze `<span>` je pohled, který nekopíruje).
+`insert(where, first, last)` připojí celý rozsah, když `where` je `end()`.
+
+```
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());
+```
+
+`v` drží celá čísla z řádku (nejméně tři). Napiš ty dva řádky na
+`// FILL`, místo zástupného `part`.
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "std::vector<long long> part(v.begin() + 1, v.begin() + 3); — rozsahový konstruktor; konec je o jedna za posledním vzatým prvkem.",
+  "part.insert(part.end(), v.begin(), v.end()); — vložit rozsah na konec je připojení.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.basic.10.byte-slices"
+title = "První tři bajty"
+story = "Drát děla nese jméno jako bajty, přijímač si nechá první tři a poslední dva přilepí na konec, a buffer, který vypíše, je celé jméno."
+brief = '''
+Bajty jsou `uint8_t` a pole bajtů je `std::vector<uint8_t>`. Platí stejné
+dva idiomy jako u vektoru celých čísel: řez je nový vektor postavený ze
+dvou iterátorů (kopie) a `insert(end(), first, last)` připojí rozsah.
+`bytes.end() - 2` je iterátor dva od konce.
+
+```
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());
+```
+
+`bytes` drží znaky řádku (nejméně tři). Napiš ty dva řádky na `// FILL`,
+místo zástupného `head`. Hexadecimální řádek a textový řádek se vypisují
+za tebe.
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3); — tři bajty, nový vektor.",
+  "head.insert(head.end(), bytes.end() - 2, bytes.end()); — poslední dva, připojené.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.basic.05.loops"
+title = "Počítání salvy"
+story = "Dělo vystřelí jednou za každý den měsíce a deska chce průběžný součet, a které z ran padly na třetí den."
+brief = '''
+Počítaná smyčka je v C++ `for` se třemi částmi: kde počítadlo začíná, jak
+dlouho pokračuje a jak se posouvá. `for (long long i = 1; i <= n; ++i)`
+navštíví `1` až `n` včetně. Tělo proběhne jednou na návštěvu a `%` je
+zbytek, takže `i % 3 == 0` říká „násobek 3“.
+
+```
+for (long long i = 1; i <= n; ++i) {
+```
+
+Tělo je napsané: přičítá `i` do `sum` a počítá násobky 3. Napiš ten řádek
+`for` na `// FILL`, místo zástupného.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (long long i = 1; i <= n; ++i) { — začni na 1, pokračuj, dokud i <= n, krok po jedné.",
+  "<= n, ne < n: salva počítá i samotné n.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.basic.06.functions"
+title = "Sazba za skluz"
+story = "Naviják jachtklubu účtuje pět za vytažení za prvních deset vytažení dne a tři za každé další, a tabule se sazbou říká jen fare."
+brief = '''
+Funkce pojmenovává kus práce: její návratový typ, jméno, parametry a tělo,
+které končí na `return`. `long long fare(long long rides)` bere jedno číslo
+a jedno vrací. Funkce může udělat `return` předčasně zevnitř `if` a cokoli
+za tím řádkem je ten druhý případ.
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+Sazba: prvních 10 jízd stojí po 5, každá další jízda stojí 3. `main` načte
+`n` a vypíše `fare(n)`. Napiš ty dva řádky jako tělo `fare` na `// FILL`,
+místo `return 0;`.
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; — a pak, na dalším řádku, return 50 + (rides - 10) * 3;",
+  "Deset jízd po 5 je 50 a každá jízda za desátou přidá 3 navrch.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.basic.07.structs"
+title = "Jeden stánek, tři pole"
+story = "Rybí stánek v tajfunovém útočišti píše své jméno, cenu a počet na tři různé tabule a nikdo je nedal na jednu."
+brief = '''
+`struct` sdružuje pojmenovaná pole do jedné hodnoty a může nést členské
+funkce, které s těmi poli pracují. Složené závorky ji staví pole po poli,
+v pořadí, v jakém jsou pole deklarovaná: `Stall s{"fish", 12, 3};`. Uvnitř
+členské funkce jsou pole holá jména.
+
+```
+return price * qty;
+Stall s{name, price, qty};
+```
+
+`Stall` má jméno, cenu a množství a `main` vypíše `name: total`. Napiš ty
+dva řádky na dvě značky `// FILL`: první je tělo `total()`, druhý staví `s`
+v `main`.
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "return price * qty; uvnitř total() a Stall s{name, price, qty}; v main.",
+  "Inicializace složenými závorkami plní pole v pořadí deklarace: name, pak price, pak qty.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.basic.08.enums"
+title = "Barvy linek"
+story = "Cedule na přestupu nad zastávkou autobusu u útočiště jmenuje tři linky MTR a barevný proužek vedle každé z nich někdo zatřel."
+brief = '''
+`enum class` je uzavřená množina pojmenovaných hodnot: `Line::Island`,
+`Line::TsuenWan`, `Line::KwunTong` a nic jiného. `switch` nad ní vybere
+větev pro hodnotu, kterou drží, a každý `case` jmenuje enumerátor s typem
+vpředu. Překladač varuje, když nějaký case chybí, což je smysl uzavřené
+množiny.
+
+```
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";
+```
+
+`parse` promění slovo v `Line` a case pro `Island` je napsaný. Napiš ty dva
+řádky `case` na `// FILL`, pod ten pro `Island`.
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  "case Line::TsuenWan: return \"red\"; a case Line::KwunTong: return \"green\"; — stejný tvar jako řádek pro Island.",
+  "Enumerátor enum class se vždy píše s typem vpředu: Line::TsuenWan, nikdy samotné TsuenWan.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.basic.09.vector"
+title = "Úlovek, v pořadí"
+story = "Každý sampan volá svůj úlovek přes vodu po jednom čísle a správce přístavu je nemá kam dát, dokud není poslední loď doma."
+brief = '''
+`std::vector<long long>` je rostoucí pole a čtyři věci, které s ním děláš,
+jsou přidat, odebrat, upravit a seřadit. `push_back(x)` připojí na konec;
+`erase(v.begin() + i)` odebere prvek na indexu `i` a mezeru zavře;
+`v[i] = x` přepíše, co už tam je; `std::sort` z `<algorithm>` dá celou věc
+do vzestupného pořadí. Index `0` je začátek.
+
+```
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());
+```
+
+`xs` drží celá čísla z řádku. Napiš ty čtyři řádky na čtyři značky
+`// FILL`: přidej `99` na konec, odeber první prvek, nastav nový první
+prvek na `700`, pak seřaď. Vypíše se vektor a pak jeho velikost.
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); — přidat, odebrat, upravit, seřadit.",
+  "erase a sort berou iterátory (xs.begin(), xs.end()); [] bere index.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.basic.16.list"
+title = "Dopředu, nebo dozadu"
+story = "Sampany se sudým číslem se vážou vzadu v útočišti a liché vpředu, a seznam kotvišť prostě pořád přidává dozadu."
+brief = '''
+`std::list` z `<list>` je obousměrně zřetězený seznam: přidání nebo
+odebrání na kterémkoli konci je konstantní čas, což vektor na začátku
+neumí. `push_front(x)` přidá na začátek, `pop_back()` odebere poslední
+prvek, `front()` je reference — přiřaď do ní a první prvek se změní —
+a seznam se řadí vlastním členem `sort()`, protože `std::sort` potřebuje
+náhodný přístup a zřetězený seznam žádný nemá.
+
+```
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();
+```
+
+`l` už drží celá čísla z řádku v pořadí. Napiš ty čtyři řádky na značky
+`// FILL`: přidej `0` na začátek, odeber poslední prvek, přepiš začátek na
+`99`, pak seřaď. Seznam se vypíše.
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "l.push_front(0); l.pop_back(); l.front() = 99; l.sort(); — po jednom řádku, v tomto pořadí.",
+  "std::sort neumí seřadit std::list (žádný náhodný přístup); vlastní l.sort() seznamu ano.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.basic.10.maps"
+title = "Sčítací tabule"
+story = "Sčítací tabule útočiště vypisuje každou rybu, kterou flotila vyložila, jedno slovo na rybu, a kupec chce jeden řádek na druh s počtem."
+brief = '''
+`std::map<std::string, int>` je slovník držený v pořadí klíčů. `m[k] = v`
+přidá klíč (nebo přepíše existující); `erase(k)` klíč odebere a nedělá nic,
+když chybí; `at(k)` je záznam pro klíč, který už musí existovat — přiřaď do
+něj a upravíš ho, a vyhodí výjimku, místo aby si klíč vymyslel. Průchod
+mapou navštíví klíče seřazené — `std::map` je vždy v pořadí klíčů, takže
+tu žádný řádek s řazením není.
+
+```
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;
+```
+
+`counts` už sčítá každé slovo na řádku a každý řádek má na sobě `fish`.
+Napiš ty tři řádky na značky `// FILL`: přidej `crab` s `1`, odeber `rice`,
+pak nastav `fish` na `9`. Seřazený výpis je napsaný.
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; — přidat, odebrat, upravit.",
+  "[] chybějící klíč vytvoří; at() to odmítne. Použij at(), když klíč už musí být přítomný.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.basic.18.hashtable"
+title = "Neuspořádaný součet"
+story = "Výdej počítá každé jídlo na hashovací tabulce a pak ji čte zpátky v pořadí, v jakém se zrovna nacházejí buckety, a žádné dva výpisy se neshodnou."
+brief = '''
+`std::unordered_map` je hashovací tabulka: stejné `[]`, `erase` a `at` jako
+`std::map`, v průměru rychlejší, a při průchodu v **žádném konkrétním
+pořadí** — a proto se klíče před výpisem řadí. `count(k)` nebo `find(k)` se
+zeptá, jestli klíč existuje, aniž by ho vytvořil.
+
+```
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;
+std::sort(keys.begin(), keys.end());
+```
+
+`counts` už sčítá každé slovo na řádku a každý řádek má na sobě `mai`;
+`keys` je vektor jeho klíčů, zkopírovaných v tom pořadí, jaké buckety daly.
+Napiš ty čtyři řádky na značky `// FILL`: přidej `gun` s `12`, odeber
+`siu`, nastav `mai` na `0`, pak seřaď klíče, aby byl výpis pokaždé stejný.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "counts[\"gun\"] = 12; counts.erase(\"siu\"); counts.at(\"mai\") = 0; pak std::sort(keys.begin(), keys.end()); — přidat, odebrat, upravit, seřadit.",
+  "Tabulka nemá vlastní pořadí: klíče jsou zkopírované za tebe; jejich seřazení je čtvrtý řádek, před výpisem.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.basic.11.sets"
+title = "Čísla kotvišť"
+story = "Seznam kotvišť má číslo sampanu jednou za každé jeho připlutí a správce přístavu chce vědět, kolik je to doopravdy lodí."
+brief = '''
+`std::set<long long>` drží každou hodnotu jednou, ve vzestupném pořadí.
+`insert(x)` hodnotu přidá (duplicita se ignoruje) a `erase(x)` ji odebere
+(chybějící hodnota se ignoruje). Množina nemá úpravu: hodnota je sama sobě
+klíčem, takže proměnit `1` v `-1` je erase a za ním insert. A nemá řádek
+s řazením: `std::set` je vždy ve vzestupném pořadí.
+
+```
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);
+```
+
+`seen` už drží různé hodnoty z řádku. Napiš ty tři řádky na značky
+`// FILL`: přidej `100`, odeber `3`, pak proměň `1` v `-1`. Velikost
+a seřazený průchod jsou napsané.
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); — poslední dvě volání sdílejí řádek.",
+  "erase(3) na množině bez 3 nedělá nic a insert(-1), když tam -1 už je, nedělá nic: obojí je bezpečné.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.basic.12.stack-queue"
+title = "Poslední dovnitř, první dovnitř"
+story = "Sampany se u zdi útočiště vážou k sobě v pořadí, v jakém připlouvají: ten poslední dovnitř je první, který může odplout, a ten první dovnitř je první, kterého kupec obslouží."
+brief = '''
+`std::stack` je poslední dovnitř, první ven: `push(x)` přidá nahoru,
+`pop()` odebere vršek (a nic nevrací) a `top()` je reference na něj —
+přiřaď do ní a upravíš vršek na místě. `std::queue` má stejný tvar na
+druhém konci: `push` vzadu, `front()` a `pop()` vpředu.
+
+```
+st.push(0);
+st.pop();
+st.top() = 99;
+```
+
+Každé číslo je už vložené do `st` i do `q`. Napiš ty tři řádky na značky
+`// FILL`: přidej `0` nahoru, zase ho sundej, pak přepiš vršek na `99`.
+Zásobník se pak vyprázdní a vypíše a z fronty se vezmou první dva.
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "st.push(0); st.pop(); st.top() = 99; — přidat, odebrat, upravit na zásobníku; fronty se nic nedotkne.",
+  "top() je reference, takže st.top() = 99 změní prvek, který by pop() odebral jako další.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.basic.13.sorting"
+title = "Podle hloubky"
+story = "Hloubky podél zdi útočiště byly zapsané v pořadí, v jakém je loď měřila, a mapa je chce od mělkých k hlubokým a pak od hlubokých k mělkým."
+brief = '''
+`std::sort` z `<algorithm>` uspořádá rozsah na místě. Se dvěma konci
+vektoru řadí vzestupně; s komparátorem jako třetím argumentem řadí podle
+něj a `std::greater<>{}` je „větší první“.
+
+```
+std::sort(v.begin(), v.end());
+std::sort(v.begin(), v.end(), std::greater<>{});
+```
+
+Čísla se načtou do `v` a vypíšou dvakrát. Napiš první řádek na první
+`// FILL` a druhý na druhý.
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std::sort(v.begin(), v.end()); a pak std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort bere rozsah, ne kontejner: begin() a end().",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.basic.22.reverse"
+title = "Odzadu dopředu"
+story = "Poslední sampan dovnitř má být první ven a tabule skluzu čte frontu tak, jak byla napsaná, a jméno navijáku na zádi je taky obráceně."
+brief = '''
+`std::reverse(first, last)` z `<algorithm>` otočí rozsah na místě, na
+jakémkoli kontejneru. Řetězec se otáčí tím druhým způsobem, který tahle
+cesta už použila: postav nový od `rbegin()` po `rend()`.
+
+```
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());
+```
+
+`v` drží celá čísla z prvního řádku a `s` druhý řádek. Napiš ty dva řádky
+na `// FILL`, místo zástupného `r`.
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std::reverse(v.begin(), v.end()); — na místě; nic se nevrací.",
+  "std::string r(s.rbegin(), s.rend()); — reverzní iterátory postaví obrácenou kopii.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.basic.14.sort-by-key"
+title = "Žebříček"
+story = "Závodní tabule jachtklubu vypisuje každou loď s jejími body v pořadí, v jakém se přihlásily, a komodor chce první místo nahoře."
+brief = '''
+`std::sort` bere komparátor: funkci dvou prvků, která říká, jestli první
+patří před druhý. Obvyklým komparátorem je lambda napsaná na místě
+a „podle skóre sestupně, pak podle jména vzestupně“ je jeden výraz: když
+se skóre liší, jde první to vyšší; když jsou stejná, jde první menší jméno.
+
+```
+std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) {
+    return a.score != b.score ? a.score > b.score : a.name < b.name;
+});
+```
+
+Řádky se načtou a vypíšou. Napiš ten `std::sort` na `// FILL`.
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });",
+  "Komparátor odpovídá na otázku „jde a před b“: vyšší skóre první a při shodě menší jméno.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.basic.15.closures"
+title = "Přílivová korekce"
+story = "Každá hloubka na mapě byla změřená za odlivu a správce přístavu je chce všechny opravit o dnešní příliv, který si jednou přečetl z vodočtu."
+brief = '''
+Lambda je funkce napsaná na místě: `[capture](params) { body }`. Seznam
+zachycení je to, co vidí z okolního rozsahu — `[k]` dovnitř zkopíruje `k`
+a lambda si tu kopii nechá, dokud žije. `auto` ji pojmenuje a volání je
+`add(x)`.
+
+```
+auto add = [k](long long v) { return v + k; };
+```
+
+`k` a čísla se načtou a smyčka aplikuje `add` na každé. Napiš ten řádek na
+`// FILL`, místo zástupného `add`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "auto add = [k](long long v) { return v + k; };",
+  "[k] zkopíruje k do lambdy; [] nezachytí nic a k vůbec nevidí.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.basic.16.lambdas"
+title = "Sudá kotviště na druhou"
+story = "Sudě číslovaná kotviště podél zdi platí druhou mocninou svého čísla a lichá neplatí nic, a v účetní knize je jeden řádek na součet."
+brief = '''
+Algoritmy v `<numeric>` a `<algorithm>` berou lambdy jako poslední
+argument. `std::accumulate` složí rozsah do jedné hodnoty: začne od
+počáteční hodnoty a volá lambdu s dosavadním součtem a každým prvkem,
+a nechá si to, co lambda vrátí. Začátek na `0LL` dělá ze součtu
+`long long`.
+
+```
+long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+```
+
+Čísla jsou v `xs` a `total` se vypíše. Napiš ten řádek na `// FILL`, místo
+zástupného `total`: lambda přičte druhou mocninu `v`, když je `v` sudé,
+a jinak vrátí `acc` beze změny.
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
+  "Lambda dostane průběžný součet a jeden prvek a vrátí nový součet.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.basic.17.threads"
+title = "Každému naviják"
+story = "Každý sampan na skluzu dostane vlastní naviják, všechny tahají najednou a součet se čte, až když se poslední zastavil."
+brief = '''
+`std::thread` spustí funkci na vlastním vlákně ve chvíli, kdy vznikne;
+`join()` počká, až skončí. Vektor vláken se staví pomocí `emplace_back`
+a lambdy. Zachycení `[&, i]` si půjčí všechno referencí kromě `i`, které
+se zkopíruje — smyčka jde dál, kopie ne. Každé vlákno zapisuje jen do
+vlastního slotu, takže se nic nesdílí, a nic se nevypíše, dokud se každý
+`join()` nevrátil.
+
+```
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+for (auto& t : threads) t.join();
+```
+
+`results` má jeden slot na číslo a výpis je napsaný. Napiš první řádek na
+`// FILL` uvnitř smyčky, místo zástupného, a druhý na `// FILL` za ní.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; }); ve smyčce, pak for (auto& t : threads) t.join(); za ní.",
+  "Vlákno nepřipojené do konce main ukončí program; před výpisem je připoj všechna.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.basic.18.binary-tree"
+title = "Segfault"
+story = "12:00 u Poledního děla. Tabulka výstřelů je strom časů a dělo sledovalo levou větev, která nikdy neexistovala — nullptr, dereferencovaný, na té jediné adrese v Causeway Bay, která nesmí být špatně."
+brief = '''
+Binární vyhledávací strom jsou uzly s hodnotou a dvěma ukazateli na děti:
+menší hodnoty žijí pod `left`, větší pod `right`. Vkládání je rekurzivní:
+z prázdného podstromu (`nullptr`) se stane nový uzel a jinak hodnota jde
+dolů jednou stranou — a to, co se z té strany stane, se uloží zpět, protože
+ta strana mohla být před chvílí `nullptr`. To uložení je celý trik
+a kontrola na `nullptr` před ním je celý boss.
+
+```
+if (!n) return new Node{v};
+if (v < n->val) n->left = insert(n->left, v);
+else n->right = insert(n->right, v);
+return n;
+```
+
+`Node`, případ `nullptr`, `inorder`, `height` a `main` jsou napsané. Napiš
+dva sestupové řádky na dvě značky `// FILL`: levý v `if`, pravý v `else`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n->left = insert(n->left, v); vlevo, n->right = insert(n->right, v); vpravo.",
+  "Výsledek ulož zpět: dítě mohlo být nullptr a nový uzel je to, co insert vrátí.",
+]

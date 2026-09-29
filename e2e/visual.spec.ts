@@ -2,6 +2,7 @@ import {
   atScreen,
   expect,
   freshAccount,
+  LANDS,
   login,
   pickLand,
   test,
@@ -238,7 +239,7 @@ test.describe("the capture hook tells the truth about the screen", () => {
     expect(backing!.fx).toEqual(backing!.game);
   });
 
-  test("every land plate is on screen and none is off the bottom", async ({
+  test("every land plate can be brought on screen, whole, by the land cursor", async ({
     page,
     ready,
   }) => {
@@ -248,23 +249,55 @@ test.describe("the capture hook tells the truth about the screen", () => {
     await atScreen(page, "lands");
     await page.evaluate(() => window.__cwbCapture?.settle(2.5));
 
-    const virtual = await page.evaluate(() => window.__cwbCapture?.virtual());
-    const rects = await page.evaluate(() =>
-      (window.__cwbCapture?.buttons() ?? [])
-        .filter((b) => b.id.startsWith("land:"))
-        .map((b) => ({ id: b.id, rect: b.rect })),
-    );
+    const virtual = (await page.evaluate(() =>
+      window.__cwbCapture?.virtual(),
+    ))!;
+    const landRects = (): Promise<Array<{ id: string; rect: number[] }>> =>
+      page.evaluate(() =>
+        (window.__cwbCapture?.buttons() ?? [])
+          .filter((b) => b.id.startsWith("land:"))
+          .map((b) => ({ id: b.id, rect: b.rect })),
+      );
 
-    expect(rects).toHaveLength(4);
-    for (const { id, rect } of rects) {
-      const [x, y, w, h] = rect;
-      // A plate whose hit box starts below the screen is a land the player
+    // Nine lands do not fit the column, and that is allowed: it scrolls, the
+    // arrow keys walk it, and the column follows the cursor. What is not
+    // allowed is a land that walking does not bring into view. The plates are
+    // all one height and a hit box is cut to the column, so the tallest box
+    // on a fresh screen is a whole plate — and a plate whose box comes back
+    // shorter than that is one the column has half hidden.
+    const first = await landRects();
+    expect(first.length, "no land plates on screen").toBeGreaterThan(0);
+    const whole = Math.max(...first.map((r) => r.rect[3]));
+
+    // Start the walk from the first plate, so the cursor's position is known
+    // rather than remembered from whatever the account last chose.
+    await pickLand(page, LANDS[0]);
+    for (let i = 0; i < LANDS.length; i++) {
+      if (i > 0) await page.keyboard.press("ArrowRight");
+      await page.evaluate(() => window.__cwbCapture?.settle(1.5));
+      const id = `land:${LANDS[i]}`;
+      const hit = (await landRects()).find((r) => r.id === id);
+      // A land the cursor is on but that has no hit box is a land the player
       // cannot reach — the state this screen was in when four lands first
       // arrived and two of them fell off the bottom of the column.
-      expect(y, `${id} starts below the screen`).toBeLessThan(virtual![1]);
-      expect(y + h, `${id} ends above the screen`).toBeGreaterThan(0);
-      expect(x + w, `${id} is off the left edge`).toBeGreaterThan(0);
-      expect(x, `${id} is off the right edge`).toBeLessThan(virtual![0]);
+      expect(
+        hit,
+        `${id} has no plate on screen with the cursor on it`,
+      ).toBeTruthy();
+      const [x, y, w, h] = hit!.rect;
+      expect(y, `${id} starts above the screen`).toBeGreaterThanOrEqual(0);
+      expect(y + h, `${id} runs off the bottom`).toBeLessThanOrEqual(
+        virtual[1],
+      );
+      expect(x, `${id} is off the left edge`).toBeGreaterThanOrEqual(0);
+      expect(x + w, `${id} is off the right edge`).toBeLessThanOrEqual(
+        virtual[0],
+      );
+      expect(
+        h,
+        `${id} is only partly scrolled into view`,
+      ).toBeGreaterThanOrEqual(whole - 1);
     }
+    await page.evaluate(() => window.__cwbCapture?.resume());
   });
 });

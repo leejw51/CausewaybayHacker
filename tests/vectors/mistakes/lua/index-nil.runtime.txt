@@ -1,4 +1,1 @@
 luajit: main.lua:3: attempt to index field 'left' (a nil value)
-stack traceback:
-	main.lua:3: in main chunk
-	[C]: at 0x<pc>

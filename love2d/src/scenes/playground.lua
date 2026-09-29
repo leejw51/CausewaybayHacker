@@ -422,7 +422,7 @@ function Playground:toggle_lang()
     self.editor:set_text(STARTER[self.lang])
     self.editor.dirty = false
   end
-  self.note = self.lang:upper()
+  self.note = Land.name(self.lang)
   SFX.play("move")
 end
 
@@ -575,7 +575,7 @@ end
 --- How wide the header's strip of buttons wants to be, so the title can be
 --- fitted into what is left of the line rather than under it.
 function Playground:header_strip_w()
-  local total = math.max(64, UI.textWidth(self.lang:upper(), UI.CHIP_SIZE) + 28)
+  local total = math.max(64, UI.textWidth(Land.name(self.lang), UI.CHIP_SIZE) + 28)
     + 12 + self:header_tab_reserve()
   for _, label in ipairs({ I18n.t("CODE"), I18n.t("AGENT"), I18n.t("RENAME"),
     I18n.t("POSTER"), I18n.t("DISK READER") }) do
@@ -663,10 +663,10 @@ function Playground:draw()
   -- set at the display controls' height, with its key to the left of it —
   -- measured, so `TAB` is next to the button and not under it.
   local lh = UI.chipHeight()
-  local lw = math.max(64, UI.textWidth(self.lang:upper(), UI.CHIP_SIZE) + 28)
+  local lw = math.max(64, UI.textWidth(Land.name(self.lang), UI.CHIP_SIZE) + 28)
   local lx = vw - lw - 12
   local ly = math.floor((head - lh) / 2)
-  UI.button(lx, ly, lw, lh, self.lang:upper(), "normal", UI.CHIP_SIZE)
+  UI.button(lx, ly, lw, lh, Land.name(self.lang), "normal", UI.CHIP_SIZE)
   self.lang_rect = { x = lx, y = ly, w = lw, h = lh }
 
   -- CODE and RENAME, left of the language. Laid right to left so they sit
@@ -736,6 +736,24 @@ end
 ---
 --- The display chips are the footer's, which every screen draws, so
 --- fullscreen and orientation are here without this screen owning them.
+--- Every label the CODE screen's language button can wear: each language's
+--- name (`Land.LANGS`, the list TAB walks), so the button is as wide as the
+--- longest of them and every language is drawn at the same size.
+function Playground.lang_labels()
+  local out = {}
+  for i, lang in ipairs(LANGS) do out[i] = Land.name(lang) end
+  return out
+end
+
+--- How wide a CODE button is at type size `at`: its widest label, measured
+--- in the face `UI.button` draws it in, plus the padding. `draw_big` lays the
+--- band out with this, and `tests/test_playground.lua` asks it too.
+function Playground.button_w(labels, at)
+  local w = 0
+  for _, label in ipairs(labels) do w = math.max(w, UI.textWidth(label, at) + 16) end
+  return w
+end
+
 function Playground:draw_big()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick(
@@ -805,7 +823,12 @@ function Playground:draw_big()
       state = self.postering and "disabled" or "normal" },
     { id = "reader", label = I18n.t("DISK READER"), every = { I18n.t("DISK READER") },
       state = "normal" },
-    { id = "lang", label = self.lang:upper(), every = { "PYTHON" }, state = "normal" },
+    -- Measured from every language's name, not from one: sized for
+    -- "PYTHON", TYPESCRIPT only fitted by drawing a step smaller than the
+    -- rest. The name is `Land.name`'s (C++, never CPP), the same on the
+    -- button as in the list it is measured from.
+    { id = "lang", label = Land.name(self.lang), every = Playground.lang_labels(),
+      state = "normal" },
   }
   -- **Wrapped, not truncated.** The row used to stop at the first button that
   -- did not fit and simply never draw the rest: at eleven controls that is
@@ -816,12 +839,17 @@ function Playground:draw_big()
   -- the code: the drive measured it giving the editor no more room than the
   -- framed screen did. So the labels shrink a step at a time until the band
   -- is two rows, exactly as the bench sheds buttons.
+  -- **Down to the floor `UI.button` already fits a label to, not 5.** Sizes
+  -- snap to the 8 px grid (`Assets.snap8`), so at the default step (1.5×)
+  -- 6, 5 and 4 all draw at 16 px, and sixteen controls at 16 px are three
+  -- rows on a 1000-wide window whatever the loop does: the drive measured
+  -- CODE handing the editor 11 rows against the framed screen's 12. Only 3
+  -- reaches the 8 px face — the size step 1 already ends on here.
   local size, rows = 8, {}
   local function lay(at)
     local out, line, bx = {}, {}, pad
     for _, item in ipairs(items) do
-      local w = 0
-      for _, label in ipairs(item.every) do w = math.max(w, UI.textWidth(label, at) + 16) end
+      local w = Playground.button_w(item.every, at)
       -- The first row keeps clear of DONE in the corner; the rest have it all.
       local limit = (#out == 0) and (dx - pad) or (vw - pad)
       if #line > 0 and bx + w > limit then
@@ -835,7 +863,7 @@ function Playground:draw_big()
     return out
   end
   rows = lay(size)
-  while #rows > 2 and size > 5 do
+  while #rows > 2 and size > 3 do
     size = size - 1
     rows = lay(size)
   end
@@ -863,7 +891,7 @@ function Playground:draw_big()
   -- Which file, what it is called, and whether it is safe on the server.
   local name = self.name and tostring(self.name) or I18n.t("unsaved")
   if self.focus == "name" then name = (self.name_edit or "") .. "_" end
-  local info = ("%s   %s%s"):format(self.lang:upper(), name,
+  local info = ("%s   %s%s"):format(Land.name(self.lang), name,
     self.editor.dirty and "   ·" or "")
   local hot = self.focus == "name"
   -- The key field and the path field take this line while they are open:

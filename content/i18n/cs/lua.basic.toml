@@ -1,0 +1,929 @@
+# LUA LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/lua/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "lua.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.basic.01.first-incense"
+title = "První tyčinka"
+story = "21:00 na Wun Sha Street. Bubny ještě nezačaly, drak leží potmě v uličce a první vonná tyčinka ještě nehoří."
+brief = '''
+Vypiš přesně:
+
+```
+hello, causewaybay
+```
+
+Malá písmena, jedna čárka, jedna mezera, jeden řádek. Nic jiného.
+
+`print` přidá konec řádku za tebe. Mezi argumenty ale dává **tabulátor**,
+a to je první věc, kterou na něm lidé udělají špatně: `print("hello,",
+"causewaybay")` má v sobě tabulátor, ne mezeru. Jeden řetězec, jeden argument.
+'''
+hints = [
+  "print(\"hello, causewaybay\") je celý program.",
+  "Řetězec musí být přesný: malá písmena, jedna čárka, za ní jedna mezera.",
+  "Nech volání `main()` dole tak, jak je. Funkce, kterou nikdo nezavolá, nic nevypíše — a přesně to starter dělá.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.basic.02.segment-count"
+title = "Počet článků"
+story = "Nosič u dračí hlavy křičí do uličky počet článků a počítací tabule pod banyánem ukazuje nulu tam, kde má být počet, dvojnásobek a druhá mocnina."
+brief = '''
+`io.read("*l")` přečte jeden řádek ze standardního vstupu bez konce řádku
+a vrátí ho jako **řetězec**. `tonumber()` udělá z textu číslo (a `nil`,
+pokud to číslo není). Lua by ti `"12" * 2` potichu převedla, ale
+`"12" .. 1` je `"121"` a `"12" < 1` je chyba, takže se číslo převede hned
+u dveří a dál zůstane číslem.
+
+```
+local n = tonumber(io.read("*l"))
+```
+
+Tři řádky `print` jsou napsané. Napiš první řádek `main` tak, jak je
+ukázán, aby `n` bylo číslo z řádku, a ne `0`, kterým začíná.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "Starter vypíše třikrát 0: n se nikdy nepřečetlo. Řádek pořád leží ve standardním vstupu.",
+  "local n = tonumber(io.read(\"*l\")) přečte a převede najednou. tonumber za tebe ignoruje mezery kolem číslic.",
+  "Záporné n na druhou je kladné. Test to ví.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.basic.03.types"
+title = "Tyčinky napůl"
+story = "Dva nosiči si na rohu Lily Street dělí svazek vonných tyčinek a v účetní knize jsou tyčinky na každého, tyčinky navíc a podíl, který se má číst na dvě desetinná místa, a čte se jako otazník."
+brief = '''
+Lua má jeden číselný typ, 64bitový double, a jedno dělení: `7 / 2` je
+`3.5` a `6 / 2` je `3` a vypíše se jako `3`. Celočíselné dělení je
+`math.floor(a / b)` a `%` je zbytek. Chceš-li vypsat číslo s pevným počtem
+desetinných míst, dej ho `string.format` s `%.2f` — dvě číslice za
+tečkou — a vypiš řetězec, který se vrátí. (Kde Python píše f-string, Lua
+píše `string.format` s hodnotami za vzorem.)
+
+```
+print(math.floor(a / b))
+print(a % b)
+print(string.format("%.2f", a / b))
+```
+
+`a` a `b` se čtou přes `io.read("*n", "*n")` — dvě čísla ze vstupu — a první
+dva printy jsou napsané. Napiš třetí řádek `print` přesně tak, jak je ukázán.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "print(string.format(\"%.2f\", a / b)) — nejdřív vzor, pak hodnota, kterou formátuje.",
+  "%.2f je formát z C: f pro float, .2 pro dvě číslice za tečkou. Samotné print(a / b) by vypsalo 3.5, o číslici méně.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.basic.04.int-types"
+title = "Čtyři bajty široké"
+story = "Ovladač bubnů na náklaďáku drží každý počet úderů ve čtyřech bajtech a na malé obrazovce ukazuje největší číslo, které se tam vejde, a obrazovka je tmavá."
+brief = '''
+Číslo v Lua nemá celočíselnou šířku, ale knihovna `bit` ano: každá její
+operace pracuje s **32 bity**. `bit.tohex(n, 8)` ukáže `n` jako ty čtyři
+bajty, osm hexadecimálních číslic, nejvýznamnější první, takže
+`bit.tohex(-1, 8)` je `ffffffff`. Největší 32bitová hodnota se znaménkem je
+`2^31 - 1` (`^` je operátor mocniny; `<<` neexistuje, to je `bit.lshift`).
+Přesné počítání v double končí u `2^53`; za tím má LuaJIT 64bitové literály
+s příponou `LL` nebo `ULL`, které se vypíšou i s příponou.
+
+```
+print(bit.tohex(n, 8))
+print(2^31 - 1)
+```
+
+`n` se přečte a neznaménkové 64bitové maximum se vypíše jako poslední,
+z literálu `ULL` se sundanou příponou. Napiš dva řádky výše místo dvou
+značek `-- FILL`.
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "print(bit.tohex(n, 8)) — druhý argument je počet hexadecimálních číslic; 8 číslic jsou 4 bajty.",
+  "2^31 - 1 je 2147483647: double ho drží přesně a print ho ukáže bez desetinné tečky.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.basic.05.big-int"
+title = "Třicet dva bajtů"
+story = "Každý lampion ve Victoria Park má vyražené třicetidvoubajtové číslo, které nikdo nepřečte, a tiskárna v kanceláři parku ho ukazuje jako desítkové číslo, které přeteče přes štítek."
+brief = '''
+Hash, klíč, adresa: čísla, na kterých tahle hra běží, jsou 256 bitů
+široká — třicet dva bajtů. Číslo v Lua je double a pojme padesát tři
+z těch bitů, takže 256bitové číslo zůstane tím, čím přišlo, **řetězcem
+číslic**, a `hex_of` ho převede do hexadecimální soustavy dlouhým dělením,
+číslici po číslici (Lua nemá velká celá čísla; ta funkce je napsaná za
+tebe). Zbývá doplnění: šedesát čtyři hexadecimálních znaků, nuly zleva.
+`#h` je délka `h`, `string.rep("0", k)` je `k` nul a `..` spojí dva řetězce.
+
+```
+print(string.rep("0", 64 - #h) .. h)
+```
+
+`s` se přečte jako desítkové číslo a `h` je jeho hex, nedoplněný. Napiš ten
+jeden řádek výše místo značky `-- FILL`.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "print(string.rep(\"0\", 64 - #h) .. h) — tolik nul, kolik chybí, pak hex.",
+  "#h je délka řetězce; string.rep s počtem 0 je prázdný řetězec, takže maximum o 64 znacích nedostane žádné doplnění.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.basic.06.floats"
+title = "Tři desetinná místa"
+story = "Váha na tyčinky u chrámové brány měří na tři desetinná místa, ta levná na náklaďáku drží jen jednoduchou přesnost a účetní kniha ukazuje stejnou váhu dvakrát, pokaždé špatně."
+brief = '''
+Číslo v Lua je 64bitový double — v jiných zemích `f64`. Typ 32bitového
+floatu neexistuje, ale `ffi` z LuaJIT ho umí udělat: `ffi.new("float[1]", x)`
+je pole v C o jednom `float`, které drží `x`, a přečtení `[0]` z něj vrátí
+`x` zaokrouhlené na nejbližší `f32`. `string.format` s `%.3f` vypíše tři
+desetinná místa; `%.10f` vypíše dost na to, aby bylo zaokrouhlení vidět.
+(Kde Python balí a rozbaluje `struct`, jde Lua přes typ z C.)
+
+```
+local x = tonumber(s)
+local y = ffi.new("float[1]", x)[0]
+```
+
+`ffi` je načtené, `s` se přečte a oba printy jsou napsané. Napiš dva řádky
+výše místo dvou zástupných míst.
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "local x = tonumber(s), pak local y = ffi.new(\"float[1]\", x)[0] — pole se vytvoří a přečte v jednom výrazu.",
+  "\"float[1]\" je jednoduchá přesnost; \"double[1]\" by mělo stejnou šířku jako x a nic by nezměnilo.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.basic.04.strings"
+title = "Jméno draka"
+story = "Malíř praporů chce jméno nosiče u hlavy změřené, vykřičené a napsané pozpátku pro zrcadlo za chrámovým oltářem, a účetní kniha ho má jednou, správně otočené."
+brief = '''
+Řetězec zná svou délku přes `#s`, velkou kopii udělá přes `s:upper()`
+a obrácenou přes `s:reverse()`. Dvojtečka je volání metody: `s:upper()` je
+`string.upper(s)`, kde se `s` předá jako první argument za tebe. Řetězec se
+nikdy nemění na místě — každé z toho je nový řetězec a `s` je tím, čím bylo.
+
+```
+print(#s)
+print(s:upper())
+print(s:reverse())
+```
+
+`s` se přečte a vypíše se jeho délka. Napiš druhý a třetí řádek `print`
+přesně tak, jak jsou ukázané.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "print(s:upper()) pak print(s:reverse()) — dvě volání metod, dvojtečka a prázdné závorky.",
+  "s.upper() s tečkou nepředá nic a string.upper si stěžuje na nil tam, kde má být řetězec.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.basic.08.string-slices"
+title = "Prvních pár písmen"
+story = "Tiskárna štítků na lampiony bere na krátký štítek první písmena názvu ulice, přidá značku a plné jméno na směrové tabuli musí nechat přesně tak, jak bylo."
+brief = '''
+`s:sub(1, n)` je podřetězec: prvních `n` znaků `s` jako nový řetězec —
+pozice se počítají od 1 a oba konce jsou zahrnuté. Řetězec se změnit nedá,
+takže podřetězec je vždy kopie a `s` zůstane netknuté, ať se s kusem děje
+cokoli. `..` spojí dva řetězce do nového a přiřazení zpátky do `head` je
+způsob, jak přidávat na konec.
+
+```
+local head = s:sub(1, n)
+head = head .. "!"
+```
+
+`s` a `n` se přečtou a dva printy jsou napsané. Napiš dva řádky výše místo
+dvou zástupných míst.
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "local head = s:sub(1, n), pak head = head .. \"!\" — sub kopíruje, .. udělá další.",
+  "s:sub(0, n) je totéž co s:sub(1, n); 0 se ořízne na začátek. V Lua není +=: napiš jméno na obě strany.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.basic.09.int-slices"
+title = "Dva shora"
+story = "Směrová tabule chce opsat druhé a třetí číslo článku, za ně připnout poslední dvě a původní seznam nechat přesně tak, jak je napsaný."
+brief = '''
+Lua nemá řezy; nejblíž je `unpack(v, i, j)`, které vrátí hodnoty od `i`
+do `j` jako samostatné hodnoty, a `{ ... }` kolem nich je posbírá do
+**nové tabulky** — její změna nikdy nezmění `v`. Pozice se počítají od 1
+a oba konce jsou zahrnuté, takže druhá a třetí hodnota jsou `2, 3`.
+`table.insert(t, x)` přidá `x` na konec; `#v` je poslední pozice, takže
+`v[#v - 1]` a `v[#v]` jsou poslední dvě.
+
+```
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])
+```
+
+`v` drží celá čísla z řádku a oba printy jsou napsané. Napiš dva řádky výše
+místo dvou zástupných míst.
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "local part = { unpack(v, 2, 3) }, pak table.insert(part, v[#v - 1]); table.insert(part, v[#v]) — dva příkazy na jednom řádku, mezi nimi středník.",
+  "unpack je v LuaJIT globální (table.unpack je Lua 5.2). Bez složených závorek kolem by ty dvě hodnoty nešly nikam.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.basic.10.byte-slices"
+title = "První tři bajty"
+story = "Tiskárna štítků na lampiony chce první tři bajty jména nosiče a za nimi značku a bajty ukáže hexadecimálně, než je vytiskne jako písmena."
+brief = '''
+Řetězec v Lua **jsou** jeho bajty: žádný samostatný typ pro bajty není, `#s`
+počítá bajty a `s:sub` řeže bajty. `s:byte(i, j)` vrátí bajty od `i` do `j`
+jako čísla, každý jako jednu návratovou hodnotu, a `{ ... }` je posbírá do
+tabulky; `-1` znamená poslední pozici, takže `s:byte(1, -1)` je každý bajt.
+`string.char(...)` je opačný směr — čísla dovnitř, řetězec ven — a
+`unpack(t)` rozloží tabulku do argumentů, které chce.
+
+```
+local bytes = { head:byte(1, -1) }
+print(string.char(unpack(bytes)))
+```
+
+`head` jsou první tři bajty `s` s `"!"` na konci a hexadecimální řádek se
+vypíše z `bytes`. Napiš dva řádky výše místo dvou zástupných míst.
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "local bytes = { head:byte(1, -1) }, pak print(string.char(unpack(bytes))) — byte jde jedním směrem, char druhým.",
+  "head:byte() bez argumentů je jen první bajt; 1, -1 žádá všechny.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.basic.05.loops"
+title = "Počítání článků"
+story = "Články draka jsou od hlavy očíslované 1 až n a součet čísel článků i toho, které z nich nesou každé třetí místo buben, je prázdný řádek pod počtem."
+brief = '''
+Číselný `for` počítá za tebe: `for i = 1, n do` začne `i` na `1` a spustí
+tělo jednou pro každou hodnotu až po `n` **včetně** — poslední hodnota patří
+do počtu, a to je první věc, kterou Lua dělá jinak než `range`. Tělo končí
+u `end`.
+
+```
+for i = 1, n do
+  total = total + i
+  if i % 3 == 0 then threes = threes + 1 end
+end
+```
+
+`n` se přečte, `total` a `threes` začínají na `0` a tělo smyčky je napsané.
+Napiš řádek `for` nad tělo přesně tak, jak je ukázán.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for i = 1, n do — druhé číslo je poslední hodnota i, ne o jednu dál.",
+  "for i = 1, 0 proběhne nulakrát: smyčka, jejíž začátek je za koncem, nemá co spustit.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.basic.06.functions"
+title = "Sazba pro běžce"
+story = "Stánek s tyčinkami platí běžci za každou cestu k náklaďáku, po desáté levněji, a stránka účetní knihy, která to spočítala, je jméno a pod ním nic."
+brief = '''
+`function` udělá funkci: jméno, parametry v závorkách, tělo a `end`.
+`return` vrátí hodnotu tomu, kdo ji zavolal. Tělo může být jediný `return`
+s celou odpovědí jako jedním výrazem; `math.min` a `math.max` jsou menší
+a větší z jejich argumentů.
+
+```
+local function fare(rides)
+  return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3
+end
+```
+
+Prvních deset jízd stojí `5` každá a každá jízda potom stojí `3`. `main`
+přečte `n` a vypíše `fare(n)`. Napiš řádek `return` ve `fare` přesně tak,
+jak je ukázán.
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3 — min omezí drahé jízdy na deset, max nenechá zbytek jít do záporu.",
+  "Práce funkce končí u return; nic za ním v těle neběží a return musí být posledním příkazem svého bloku.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.basic.07.structs"
+title = "Jeden stánek, tři pole"
+story = "Na kartě stánku s tyčinkami je jméno, cena a počet a pokladna čte kartu jako tři volná slova a nic nesečte."
+brief = '''
+Lua nemá `class`; objekt je tabulka a metatabulka za ní říká, kde hledat,
+když klíč chybí. `Stall.__index = Stall` zařídí, že každý stánek hledá své
+metody ve `Stall`, `setmetatable({...}, Stall)` ji připojí a
+`function Stall:total()` definuje metodu se skrytým prvním parametrem
+jménem `self` — dvojtečka v definici i ve volání. Uvnitř se pole čtou přes
+`self`.
+
+```
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  return setmetatable({ name = name, price = price, qty = qty }, Stall)
+end
+
+function Stall:total()
+  return self.price * self.qty
+end
+```
+
+`Stall`, jeho `new` a `main` jsou napsané. Napiš řádek `return` metody
+`total` přesně tak, jak je ukázán.
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return self.price * self.qty — pole žijí v tabulce a self je uvnitř metody s dvojtečkou ta tabulka.",
+  "Samotné price není v total() žádné jméno; byla by to globální proměnná a globální proměnná, kterou nikdo nenastavil, je nil.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.basic.08.enums"
+title = "Tři linky, tři barvy"
+story = "Na mapě MTR připíchnuté u chrámové brány jsou tři linky, chlapec prodavače lampionů má říct, která barva odveze dav domů, a tabule pod ní je prázdná."
+brief = '''
+Lua nemá `enum`; nejblíž je tabulka pojmenovaných konstant — `Line.ISLAND`
+je `1` a hodnota může být klíčem v jiné tabulce jako kterákoli jiná.
+Indexování řetězcem hledá jméno: `Line["ISLAND"]` je totéž co
+`Line.ISLAND`, takže slovo ze vstupu se stane členem, když ho převedeš na
+velká písmena a indexuješ jím. Jméno, které tam není, dá `nil`, ne chybu —
+dokud se po něm nejde.
+
+```
+local Line = { ISLAND = 1 }
+
+local line = Line[word:upper()]
+```
+
+`Line`, tabulka `COLOUR` ze člena na barvu a print jsou napsané. Napiš
+řádek `local line = ...` přesně tak, jak je ukázán.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "local line = Line[word:upper()] — hranaté závorky hledají klíč podle řetězce a jména jsou velkými písmeny.",
+  "Line.word by hledalo klíč hláskovaný w-o-r-d; řetězec, který jsi přečetl, bere jen tvar se závorkami.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.basic.09.vector"
+title = "Seznam článků"
+story = "Nosič u hlavy vyvolává váhy článků jednu po druhé a účetní kniha má místo seznamu čtyři prázdná místa: po přidání, po odebrání, po výměně a po seřazení."
+brief = '''
+Tabulka s hodnotami na `1, 2, 3, ...` je seznam a upravuje se na místě.
+`table.insert(t, x)` přidá hodnotu na konec, `table.remove(t, i)` vyjme
+hodnotu na pozici (ty za ní se posunou dolů), `t[i] = x` nahradí hodnotu na
+pozici a `table.sort(t)` seřadí hodnoty vzestupně, na místě. Čtyři operace,
+čtyři řádky a seznam je po každé z nich jiný seznam.
+
+```
+table.insert(xs, 100)
+table.remove(xs, 1)
+xs[1] = 7
+table.sort(xs)
+```
+
+`xs` drží celá čísla z řádku a vypíše se po každém kroku. Napiš čtyři řádky
+místo čtyř zástupných míst `-- FILL`, v tomhle pořadí.
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "table.insert(xs, 100), pak table.remove(xs, 1), pak xs[1] = 7, pak table.sort(xs) — jeden na každé zástupné místo, v tomhle pořadí.",
+  "První pozice je 1, ne 0: xs[0] = 7 by dalo 7 pod klíč, který seznam nepočítá. table.sort nic nevrací, tak ho nepřiřazuj.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.basic.16.list"
+title = "Řetěz objednávek"
+story = "Běžec připne každou objednávku tyčinek na konec řetězu na náklaďáku, pak připne číslo lístku na začátek, a řetěz tam visí prázdný."
+brief = '''
+Lua nemá deque; tabulka se upravuje na obou koncích stejnými dvěma
+funkcemi a pozicí. `table.insert(t, 1, x)` — tři argumenty — dá `x` na
+pozici 1 a zbytek posune nahoru; `table.remove(t)` bez pozice sundá
+**poslední** hodnotu; `t[1] = x` nahradí začátek; a `table.sort(t)` řadí na
+místě, takže čtvrtý řádek je stejný jako u seznamu.
+
+```
+table.insert(chain, 1, 0)
+table.remove(chain)
+chain[1] = 9
+table.sort(chain)
+```
+
+`chain` drží celá čísla z řádku a vypíše se po každém kroku. Napiš čtyři
+řádky místo čtyř zástupných míst `-- FILL`, v tomhle pořadí.
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "table.insert(chain, 1, 0), pak table.remove(chain), pak chain[1] = 9, pak table.sort(chain) — jeden na každé zástupné místo, v tomhle pořadí.",
+  "Se dvěma argumenty table.insert přidává na konec; pozice patří doprostřed. table.remove bez pozice je konec, table.remove(chain, 1) by byl začátek.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.basic.10.maps"
+title = "Sešit s čárkami"
+story = "Každý prodej u stánku s měsíčními koláči jde do sešitu jako slovo a při prvním víření bubnů chce stánkař jeden řádek na koláč s počtem, a na stránce jsou jen slova v pořadí, v jakém se vykřikla."
+brief = '''
+Tabulka se upravuje podle klíče. `counts[k] = v` uloží hodnotu pod klíč —
+nový klíč se přidá, existující se přepíše — `counts[k] = nil` klíč odstraní
+(žádné delete není; nil je nepřítomnost) a
+`counts[k] = counts[k] + n` přečte hodnotu pod klíčem, změní ji a zapíše
+zpátky. Tabulka
+**nedrží** žádné pořadí: `pairs` ji prochází v pořadí, jaké se jí zlíbí,
+takže starter si pořadí prvního výskytu drží ve vlastním seznamu, a chceš-li
+vypsat klíče seřazené, posbíráš je do seznamu a dáš na něj `table.sort`.
+
+```
+counts["tofu"] = 1
+counts[first] = nil
+counts["tofu"] = counts["tofu"] + 4
+table.sort(ks)
+```
+
+`counts` drží počet pro každé slovo, `first` je první slovo řádku, `order`
+jsou slova v pořadí prvního výskytu s `"tofu"` na konci a
+`show(counts, order)` po každé úpravě vypíše součty v tom pořadí a klíč,
+který zmizel, přeskočí. Napiš tři úpravy místo prvních tří zástupných míst
+`-- FILL`, pak `table.sort(ks)` na čtvrté, před poslední smyčku.
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts[\"tofu\"] = 1, pak counts[first] = nil, pak counts[\"tofu\"] = counts[\"tofu\"] + 4, pak table.sort(ks) před poslední smyčkou.",
+  "Přiřazení nil je jediný způsob, jak klíč odstranit. += není: přečti hodnotu, přičti a zapiš ji zpátky pod stejný klíč.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.basic.18.hashtable"
+title = "Čísla stánků"
+story = "Kancelář parku vede tabulku ze jména stánku na číslo stánku a každé hledání u pultu s lampiony se vrátí s ničím."
+brief = '''
+Tabulka v Lua je hashovací tabulka: klíč se zahashuje na pozici, takže
+uložení, odebrání i vyhledání stojí stejně, ať je klíčů kolik chce.
+`numbers[k] = v` ukládá (nový klíč se přidá), `numbers[k] = nil` klíč
+odstraní a `numbers[k] = numbers[k] + n` upraví hodnotu pod klíčem na místě.
+Chybějící klíč je `nil` a `nil or -1` je `-1`: `numbers[w] or -1` je
+vyhledání s výchozí hodnotou — a `0 or -1` je `0`, protože nepravdivé jsou
+tu jen `nil` a `false`.
+
+```
+numbers["bread"] = 99
+numbers[first] = nil
+numbers[last] = numbers[last] + 10
+print(numbers[w] or -1)
+```
+
+`numbers` mapuje každé jméno stánku z prvního řádku na jeho pozici,
+počítanou od 0, jak je čísluje kancelář; `first` a `last` jsou první
+a poslední jméno. Jména z druhého řádku se po úpravách vyhledají a vypíšou,
+`-1`, když chybí; pak se vypíše celá tabulka seřazená podle klíče. Napiš
+čtyři řádky místo čtyř zástupných míst `-- FILL`, v tomhle pořadí.
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "numbers[\"bread\"] = 99, pak numbers[first] = nil, pak numbers[last] = numbers[last] + 10, pak print(numbers[w] or -1) uvnitř smyčky.",
+  "or vrátí svou levou stranu, pokud to není nil nebo false; stánek s číslem 0 je pořád 0. Řádek s += potřebuje, aby klíč existoval, a last existuje.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.basic.11.sets"
+title = "Různé ceny"
+story = "Stánek s lampiony vykřikuje celou noc tytéž tři ceny a tabule chce vědět, kolik různých jich bylo, ne kolik výkřiků."
+brief = '''
+Lua nemá množinu; tabulka, jejíž hodnoty jsou `true`, je množina, klíčovaná
+samotnými hodnotami. `seen[x] = true` hodnotu vloží (dvakrát je jednou),
+`seen[x] = nil` ji vyjme (a nedělá nic, pokud tam nebyla) a žádné „změň
+tuhle hodnotu“ není — množina se upravuje odebráním jednoho klíče a přidáním
+jiného. `#seen` je pro množinu **0**, protože `#` počítá jen pozice
+`1, 2, 3, ...`; množina se počítá a vypisuje přes `pairs`, které projde
+každý klíč v žádném zvláštním pořadí.
+
+```
+seen[100] = true
+seen[first] = nil
+seen[100] = nil; seen[101] = true
+for v in pairs(seen) do vals[#vals + 1] = v end
+```
+
+`seen` drží různá celá čísla z řádku, `first` je první z nich, `size(seen)`
+se vypíše po každé úpravě a `vals` se na konci seřadí a vypíše. Napiš čtyři
+řádky místo čtyř zástupných míst `-- FILL`, v tomhle pořadí.
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen[100] = true, pak seen[first] = nil, pak seen[100] = nil; seen[101] = true, pak for v in pairs(seen) do vals[#vals + 1] = v end.",
+  "pairs dává nejdřív klíč; s jedním jménem ve for dostaneš právě ten. Pořadí je vlastní pořadí tabulky, a proto se vals před vypsáním řadí.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.basic.12.stack-queue"
+title = "Hromada lampionů"
+story = "Lampiony se u stánku skládají na hromadu a berou se z vrchu; kupci stojí frontu na boku a berou se zepředu; účetní kniha vypíše oba řádky prázdné."
+brief = '''
+Seznam je zásobník, upravovaný na vrchu: `t[#t + 1] = x` hodnotu přidá
+(jedna za poslední pozicí je nová poslední), `table.remove(t)` sundá vrchní
+a `t[#t] = x` nahradí vrchní na místě. Tatáž tabulka je fronta, když se
+místo toho bere zepředu, `table.remove(t, 1)` — tahle strana je napsaná
+za tebe.
+
+```
+stack[#stack + 1] = 100
+table.remove(stack)
+stack[#stack] = 9
+```
+
+`stack` a `queue` drží celá čísla z řádku; zásobník se vypíše po každém
+kroku, pak se vezme a vypíše začátek fronty. Napiš tři řádky místo tří
+zástupných míst `-- FILL`, v tomhle pořadí.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack[#stack + 1] = 100, pak table.remove(stack), pak stack[#stack] = 9 — jeden na každé zástupné místo, v tomhle pořadí.",
+  "table.remove bez pozice bere konec, což je vrchol; #stack pojmenuje tutéž pozici pro přiřazení.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.basic.13.sorting"
+title = "Cenový žebříček"
+story = "Kancelář parku chce noční ceny lampionů na tabuli od nejlevnější a do daňového formuláře od nejdražší a stánek je zapsal v pořadí, v jakém se křičelo."
+brief = '''
+`table.sort(t)` seřadí tabulku na místě, vzestupně, a nic nevrací.
+Seřazená kopie neexistuje: chceš-li zachovat originál, nejdřív zkopíruješ,
+`{ unpack(xs) }`, a seřadíš kopii. Druhý argument je komparátor — funkce
+dvou hodnot, která říká, jestli první patří před druhou — a
+`function(a, b) return a > b end` pořadí otočí.
+
+```
+table.sort(asc)
+table.sort(desc, function(a, b) return a > b end)
+```
+
+`xs` se přečte, `asc` a `desc` jsou jeho kopie a oba printy jsou napsané.
+Napiš dva řádky přesně tak, jak jsou ukázané, místo dvou zástupných míst.
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "table.sort(asc) a table.sort(desc, function(a, b) return a > b end) — komparátor je celá funkce, včetně end.",
+  "asc = table.sort(asc) by nastavilo asc na nil: sort nic nevrací. Komparátor musí být ostrý: >= by byla neplatná řadicí funkce.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.basic.22.reverse"
+title = "Odzadu dopředu"
+story = "Cenový žebříček se má pro závěrečný list číst odshora dolů a jméno stánku je na skle lampionu namalované zrcadlově, a účetní kniha má obojí správně otočené."
+brief = '''
+`table.reverse` neexistuje; seznam se otočí **na místě** prohazováním konců
+směrem dovnitř a prohození je v Lua jedno přiřazení se dvěma jmény na každé
+straně: `a, b = b, a` nejdřív vyhodnotí pravou stranu, pak ukládá. Polovina
+délky prohození, `math.floor(#v / 2)`, a `v[#v - i + 1]` je zrcadlem
+`v[i]`. Řetězec se změnit nedá, takže se obrací přes `s:reverse()`, což je
+nový řetězec.
+
+```
+for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end
+local r = s:reverse()
+```
+
+`v` a `s` se přečtou a oba printy jsou napsané. Napiš dva řádky výše místo
+dvou zástupných míst.
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end na samostatném řádku, pak local r = s:reverse().",
+  "Kdybys šel až do #v místo poloviny, prohodil bys každý pár dvakrát a seznam by se vrátil do původního stavu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.basic.14.sort-by-key"
+title = "Žebříček"
+story = "Chrám Lin Fa Kung vyvěšuje stánky podle nočních darů, nejlepší první, a dva stánky se stejnou částkou jdou nahoru abecedně; nástěnka je ukazuje tak, jak přišly."
+brief = '''
+`table.sort` bere komparátor: funkci dvou řádků, která vrátí `true`, když
+první patří před druhý. Řazení podle jednoho pole a rozhodování shod podle
+druhého jsou v něm dva řádky — pokud se skóre liší, větší jde první; jinak
+jde první menší jméno. Dva řádky, které se porovnají jako rovné oběma směry,
+musí dát `false`, jinak si řazení stěžuje na neplatnou řadicí funkci.
+
+```
+table.sort(rows, function(a, b)
+  if a.score ~= b.score then return a.score > b.score end
+  return a.name < b.name
+end)
+```
+
+`rows` je seznam tabulek `{ name = ..., score = ... }`, volání `table.sort`
+s prázdným komparátorem a print jsou napsané. Napiš dva řádky komparátoru
+přesně tak, jak jsou ukázané, tam, kde je komentář `FILL`.
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "if a.score ~= b.score then return a.score > b.score end, pak return a.name < b.name — rozhodnutí shody běží jen tehdy, když jsou skóre stejná.",
+  "~= je v Lua nerovnost. Vrátit a.score >= b.score by říkalo, že dva stejné řádky patří každý před ten druhý, a sort to odmítne.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.basic.15.closures"
+title = "Přirážka"
+story = "Stánek s lampiony přidává ke každé velkoobchodní ceně na večerním listu stejnou přirážku a funkce, která si ji měla pamatovat, se vrátí jako nil."
+brief = '''
+Funkce definovaná uvnitř jiné funkce může používat lokální proměnné vnější
+funkce a používá je dál i poté, co se vnější funkce vrátila. To je uzávěr:
+vnitřní funkce si nese `k` s sebou jako upvalue. Vnější funkce vrací tu
+vnitřní — samotnou funkci, hodnotu jako každou jinou, ne její volání.
+
+```
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  return add
+end
+```
+
+`make_adder` a jeho vnitřní `local function add(x)` jsou napsané a `main`
+použije výsledek na každé číslo. Napiš dva řádky `return` přesně tak, jak
+jsou ukázané, místo dvou zástupných míst.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return x + k uvnitř add, pak return add (bez závorek) jako poslední řádek make_adder.",
+  "return add() by ji zavolalo bez argumentu a spadlo by na nil + k; holé jméno je ta funkce. Kvůli return nil ve starteru main umře s attempt to call local 'add' (a nil value).",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.basic.16.lambdas"
+title = "Sudé na druhou"
+story = "Kancelář parku účtuje stánkům se sudými čísly druhou mocninu jejich čísla a na úředníkově listu je nula tam, kde má být součet."
+brief = '''
+Lua nemá klíčové slovo `lambda`; malá funkce bez jména se vypíše celá,
+`function(x) return x * x end`, přímo tam, kde se používá.
+`filter(f, xs)` nechá hodnoty, kterým `f` řekne `true`, `map(f, xs)`
+nahradí každou hodnotu za `f(value)` a `sum(xs)` sečte, co zbylo — žádná
+z těch tří není vestavěná, takže jsou napsané za tebe nad `main`. Čti to
+zevnitř ven.
+
+```
+local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))
+```
+
+`xs` se přečte a print je napsaný. Napiš řádek `local total = ...` přesně
+tak, jak je ukázán.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs))) — nejdřív filter, pak map, pak sum.",
+  "Anonymní funkce potřebuje svůj return a svůj end: function(x) x * x end je syntaktická chyba. % v Lua zaokrouhluje dolů, takže -4 % 2 je 0 a záporná čísla se počítají.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.basic.17.threads"
+title = "Dvanáct běžců najednou"
+story = "Při prvním víření bubnů umocňuje každý běžec s tyčinkami podél draka počet svého článku pro chrámovou účetní knihu, všichni najednou, a kniha se vrátí samé nuly, protože nikdo nepočkal, až doběhnou."
+brief = '''
+LuaJIT nemá vlákna; korutina je to nejbližší — funkce s vlastním zásobníkem,
+která běží, když je obnovená, a zastaví se u každého `yield`.
+`coroutine.create(f)` ji vytvoří a nic nespustí. `coroutine.resume(co)` ji
+spustí, nebo v ní pokračuje od posledního yield, a vrátí se, když znovu
+udělá yield nebo skončí. `coroutine.status(co)` je `"dead"`, jakmile skončila,
+takže join je obnovování, dokud není. Nejdřív spusť každého běžce, pak
+každého dokonči — dokončení uvnitř spouštěcí smyčky by je pustilo jednoho
+po druhém.
+
+```
+for _, co in ipairs(workers) do
+  coroutine.resume(co)
+end
+for _, co in ipairs(workers) do
+  while coroutine.status(co) ~= "dead" do coroutine.resume(co) end
+end
+```
+
+`square(i)` jednou udělá yield a pak vyplní `results[i]`, seznam workerů je
+sestavený a dva printy běží po druhé smyčce. Napiš `resume` jako tělo první
+smyčky a řádek `while` jako tělo druhé, přesně tak, jak jsou ukázané.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "coroutine.resume(co) v první smyčce, while coroutine.status(co) ~= \"dead\" do coroutine.resume(co) end ve druhé.",
+  "Korutina, kterou nikdy neobnovíš, nikdy neběží; ta, kterou obnovíš jednou, se zastaví u svého yield s druhou mocninou ještě nezapsanou. Status ti řekne, která to je.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.basic.18.binary-tree"
+title = "Nil"
+story = "23:59 u chrámové tabule s lampiony: strom čísel lampionů je jeden kořen a pod ním nic a první vyhledání umře s attempt to index a nil value (field 'left')."
+brief = '''
+Binární vyhledávací strom drží menší hodnoty v levém podstromu uzlu a větší
+v pravém. Vkládání je rekurzivní: prázdný podstrom (`nil`) se stane novým
+`Node`; jinak hodnota jde dolů jednou stranou a cokoli se vrátí, se znovu
+uloží jako to dítě, protože dítě mohlo být před chvílí `nil` — chybějící
+klíč je nil a nil není chyba, dokud se po něm nejde. Jít po `.left` na
+`nil` je pád, po kterém je celá tahle cesta pojmenovaná; kontrola `nil`
+přijde první a je napsaná.
+
+```
+if v < n.val then
+  n.left = insert(n.left, v)
+else
+  n.right = insert(n.right, v)
+end
+```
+
+`Node`, případ `nil` v `insert` a jeho kostra `if v < n.val then` / `else`,
+`inorder`, `height` a `main` jsou napsané. Napiš dva rekurzivní řádky přesně
+tak, jak jsou ukázané, místo dvou zástupných míst.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v) pod if, n.right = insert(n.right, v) pod else.",
+  "Přiřazení je celá pointa: insert vrací kořen podstromu, a to je úplně nový Node, když bylo dítě nil. Nový Node nemá klíč left ani right vůbec — jeho přečtení dá nil, a to je v pořádku, dokud do něj neindexuješ.",
+]

@@ -1,0 +1,807 @@
+# C++ LAND — BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/cpp/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "cpp.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.basic.01.first-light"
+title = "第一道光"
+story = "12:00，告士打道海旁。午炮會響，係因為有嘢寫啱咗個地址，而佢旁邊塊牌係空白嘅。"
+brief = '''
+一隻字都唔可以差，印出：
+
+```
+hello, causewaybay
+```
+
+全部細楷，一個逗號，一個空格，一行。其他乜都唔要。
+
+`std::cout` 喺 `<iostream>` 入面，`'\n'` 就係換行。`std::endl` 都得，而且佢仲會
+flush — 呢度你唔需要，之後你亦都唔會想要。
+'''
+hints = [
+  "std::cout << \"...\" 就係成個程式。個 include 已經幫你寫好。",
+  "個字串一隻字都唔可以差：細楷，一個逗號，後面一個空格。",
+  "main 回傳 int；行到 main 嘅尾都冇 return 係冇問題嘅，意思就係 0。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.basic.02.bindings"
+title = "銅牌"
+story = "午炮旁邊塊牌得一個數，跟住兩格空白，本來寫住日數同年份嘅。"
+brief = '''
+C++ 嘅變數宣告時型別行先：`long long n = 0;`
+整出一個叫 `n` 嘅 64 位整數。`std::cin >> n` 由標準輸入讀下一個數入去，
+`std::cout << n << '\n'` 就連換行一齊印佢出嚟。對個名做算術就係普通算術：
+`n * 2`、`n * n`。
+
+```
+std::cout << n * n << '\n';
+```
+
+個程式讀入 `n`，印佢同佢嘅兩倍。喺 `// FILL` 打嗰一行：第三個 print，`n * n`。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "std::cout << n * n << '\\\\n'; — 同上面嗰行一樣嘅樣。",
+  "long long 裝得落 3000000000 嘅平方；int 就裝唔落，所以塊牌寫住 long long。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.basic.03.types"
+title = "潮汐表"
+story = "港務長張潮汐表將避風塘嘅水深除以舢舨數目，出嚟嘅答案永遠係整數，就算其實唔係都一樣。"
+brief = '''
+兩個整數相除得出整數：`7 / 2` 係 `3`，而 `7 % 2` 係餘數 `1`。想得到 `3.5`，
+其中一邊要先變做浮點數，`static_cast<double>(a)` 就係明確噉講出嚟嘅寫法。想印
+固定小數位，`<iomanip>` 有 `std::fixed` 同 `std::setprecision(2)`。
+
+```
+std::cout << a / b << '\n';
+std::cout << a % b << '\n';
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
+```
+
+整數除法同餘數已經印咗。喺 `// FILL` 寫第三行：以 `double` 計嘅除法，兩個小數位。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
+  "淨係一個運算元需要轉型：double 除 long long 出嚟係 double。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.basic.04.int-types"
+title = "Register 嘅闊度"
+story = "午炮個發射 register 係 32 位闊，海港個鐘嘅係 64 位；一個數由一個抄去另一個，要有人講明先會保住佢個值。"
+brief = '''
+`<cstdint>` 用闊度幫整數改名：`int32_t` 同 `int64_t` 有正負號，
+`uint32_t` 同 `uint64_t` 冇。一個值喺唔同闊度之間搬，就用
+`static_cast<...>`，佢大聲講明呢度有轉換發生緊。
+`<limits>` 嘅 `std::numeric_limits<T>::max()` 係某個闊度裝得落嘅最大值。
+
+```
+uint64_t b = static_cast<uint64_t>(a);
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';
+```
+
+`a` 係以 `int32_t` 讀入嘅。喺第一個 `// FILL` 打轉型嗰行，喺第二個打第二句
+print。
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "uint64_t b = static_cast<uint64_t>(a); — 個轉型講明要轉去邊個闊度。",
+  "std::numeric_limits<uint64_t>::max() 係 18446744073709551615；上面 int32_t 嗰行係同一個呼叫，換咗另一個型別。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.basic.05.big-int"
+title = "三十二個 byte"
+story = "遊艇會嘅泊位鑰匙係 32 byte 嘅數，絞盤由大嗰頭一次讀一個 byte；啲 byte 未放入去之前，個 buffer 全部係零。"
+brief = '''
+一個 32 byte 嘅整數 — 一個 hash、一條鑰匙、一個地址 — 冇內建型別，所以佢住喺
+`std::array<uint8_t, 32>` 入面：32 個 byte，big-endian，最高位嘅 byte 行先。
+一個 `uint64_t` 填滿最後嗰八個。向右 shift `8 * i` 位，就將 byte `i`（由細嗰頭
+數起）拉落最底，而個轉型就淨係留低嗰一個 byte。
+
+```
+buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
+```
+
+`i` 嘅迴圈同 hex 輸出已經寫好。喺 `// FILL` 打嗰一行做迴圈主體。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = static_cast<uint8_t>(v >> (8 * i)); — 最後嗰個 index 攞最低嗰個 byte。",
+  "v >> (8 * i) 將 byte i 滑落最底；static_cast<uint8_t> 將其餘嘅掉走。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.basic.06.floats"
+title = "水位計"
+story = "避風塘個水位計用 double 記錄，顯示板係單精度，兩個喺第十個小數位對唔埋。"
+brief = '''
+`double` 係 64 位嘅浮點數，`float` 係 32 位嗰個。`std::stod` 將文字解析做
+`double`；收窄做 `float` 就係 `static_cast<float>`，而精度就喺個轉型度流失 —
+`0.1` 冇準確嘅二進制寫法，float 留低嘅位數比 double 少。
+
+```
+double x = std::stod(s);
+float y = static_cast<float>(x);
+```
+
+`s` 係讀入嘅嗰行，兩句 print 都用十個小數位。喺 `// FILL` 打嗰兩行。
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "double x = std::stod(s); — 字串變 double，喺 <string> 入面。",
+  "float y = static_cast<float>(x); — 收窄要明寫出嚟；y 印出嚟真確嘅位數少啲。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.basic.04.strings"
+title = "舢舨個名"
+story = "舢舨個名喺船頭用大楷髹，喺船尾倒轉髹，而港務長本記錄簿兩樣都冇。"
+brief = '''
+`std::string` 知道自己嘅長度（`size()`），可以用 `<algorithm>` 行一次，亦可以
+由任何一對 iterator 砌出嚟。`std::transform` 對每個字元套用一個函數，再將結果
+寫返入去；`<cctype>` 嘅 `::toupper` 就係嗰個函數。`rbegin()` 同 `rend()` 倒轉咁
+行個字串，所以由佢哋砌出嚟嘅字串就係倒轉嘅。
+
+```
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());
+```
+
+`upper` 係嗰行嘅 copy，`rev` 係個佔位。喺 `// FILL` 打嗰兩行，取代佔位嘅 `rev`。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper); — 來源、來源尾、目的地、函數。",
+  "std::string rev(line.rbegin(), line.rend()); — 由兩個反向 iterator 砌出嚟嘅字串就係倒轉嘅。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.basic.08.string-slices"
+title = "短名"
+story = "港務長塊板淨係夠位寫舢舨個名嘅四個字母，後面加個記號，而個文員將成個名抄晒入去。"
+brief = '''
+`s.substr(pos, n)` 係字串嘅一截：由 `pos` 開始嘅 `n` 個字元，而且佢係
+**copy** — 一個新嘅 `std::string`，唔同 `s` 共用記憶體。接駁字串用 `+=`，或者
+`append(...)`，佢會就地將個字串加長。
+
+```
+std::string t = s.substr(0, 4);
+t += "...";
+```
+
+`s` 係讀入嘅嗰行（最少四個字元）。喺 `// FILL` 打嗰兩行，取代佔位嘅 `t`。
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "std::string t = s.substr(0, 4); — 由 0 開始，攞 4 個；結果係佢自己一個字串。",
+  "t += \"...\"; — 就地接駁；t.append(\"...\") 係一樣。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.basic.09.int-slices"
+title = "中間抽兩個"
+story = "船排記錄想將第二同第三個讀數獨立抄出嚟，然後將成個朝早接喺後面，而抄出嚟嘅係成個朝早兩次。"
+brief = '''
+`std::vector` 冇切片語法；一截就係由兩個 iterator 砌出嚟嘅新 vector —
+由 `begin() + 1` 到 `begin() + 3` 為止、唔包尾嗰個 — 而且佢係
+**copy**（`<span>` 嘅 `std::span` 先係唔 copy 嘅 view）。
+`where` 係 `end()` 嘅時候，`insert(where, first, last)` 就係接駁成段範圍。
+
+```
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());
+```
+
+`v` 裝住嗰行嘅整數（最少三個）。喺 `// FILL` 打嗰兩行，取代佔位嘅 `part`。
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "std::vector<long long> part(v.begin() + 1, v.begin() + 3); — 範圍 constructor；尾係攞嘅最後一個元素再後一個。",
+  "part.insert(part.end(), v.begin(), v.end()); — 喺尾度 insert 一段範圍就係接駁。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.basic.10.byte-slices"
+title = "頭三個 byte"
+story = "午炮條線以 byte 傳送一個名，接收器留低頭三個，再將最後兩個駁喺尾，而佢印出嚟嘅 buffer 係成個名。"
+brief = '''
+byte 係 `uint8_t`，byte array 就係 `std::vector<uint8_t>`。同整數 vector 一樣
+嘅兩個寫法都用得：一截係由兩個 iterator 砌出嚟嘅新 vector（一個 copy），而
+`insert(end(), first, last)` 接駁一段範圍。`bytes.end() - 2` 係離尾兩格嘅 iterator。
+
+```
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());
+```
+
+`bytes` 裝住嗰行嘅字元（最少三個）。喺 `// FILL` 打嗰兩行，取代佔位嘅 `head`。
+hex 嗰行同文字嗰行已經幫你印好。
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3); — 三個 byte，一個新 vector。",
+  "head.insert(head.end(), bytes.end() - 2, bytes.end()); — 最後兩個，接喺尾。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.basic.05.loops"
+title = "數禮炮"
+story = "一個月每一日午炮都響一次，塊牌想要累計總數，同埋邊幾炮係落喺每第三日。"
+brief = '''
+C++ 嘅計數迴圈係一個有三部分嘅 `for`：計數器由邊度開始、行到幾時、點樣郁。
+`for (long long i = 1;
+i <= n; ++i)` 由 `1` 行到 `n`，頭尾都包埋。每行到一個，主體就行一次，`%` 係
+餘數，所以 `i % 3 == 0` 即係話「3 嘅倍數」。
+
+```
+for (long long i = 1; i <= n; ++i) {
+```
+
+主體已經寫好：佢將 `i` 加落 `sum`，同埋數 3 嘅倍數。喺 `// FILL` 打嗰行 `for`，
+取代佔位嗰行。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (long long i = 1; i <= n; ++i) { — 由 1 開始，i <= n 就繼續，每次行一步。",
+  "係 <= n，唔係 < n：禮炮要數埋 n 本身。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.basic.06.functions"
+title = "船排收費"
+story = "遊艇會嘅絞盤一日頭十次每次收五蚊，之後每次三蚊，而收費板上面淨係寫住 fare。"
+brief = '''
+函數幫一份工作改個名：佢嘅回傳型別、佢個名、佢嘅參數，同一個以 `return` 收尾
+嘅主體。`long long fare(long long
+rides)` 收一個數，畀返一個數。函數可以喺 `if` 入面提早 `return`，嗰行之後嘅
+嘢就係另一個情況。
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+收費：頭 10 次每次 5，之後每次 3。`main` 讀入 `n` 再印 `fare(n)`。喺 `// FILL`
+打嗰兩行做 `fare` 嘅主體，取代 `return 0;`。
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; — 跟住下一行 return 50 + (rides - 10) * 3;",
+  "十次每次 5 係 50，第十次之後每多一次就再加 3。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.basic.07.structs"
+title = "一個檔口，三個欄位"
+story = "避風塘個魚檔將佢個名、價錢同數量寫喺三塊唔同嘅板上面，冇人將佢哋放埋一塊。"
+brief = '''
+`struct` 將有名嘅欄位組成一個值，仲可以帶住處理嗰啲欄位嘅 member function。
+大括號按欄位宣告嘅次序逐個欄位砌一個出嚟：`Stall s{"fish", 12, 3};`。喺
+member function 入面，啲欄位直接用名。
+
+```
+return price * qty;
+Stall s{name, price, qty};
+```
+
+`Stall` 有名、價錢同數量，`main` 印 `name: total`。喺兩個 `// FILL` 記號打嗰兩行：
+第一行係 `total()` 嘅主體，第二行喺 `main` 入面砌 `s`。
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "total() 入面 return price * qty;，main 入面 Stall s{name, price, qty};。",
+  "大括號初始化按宣告次序填欄位：先 name，再 price，再 qty。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.basic.08.enums"
+title = "路線顏色"
+story = "避風塘巴士站上面個轉車指示牌寫住三條港鐵線，而每條旁邊嗰條色帶都被人髹走咗。"
+brief = '''
+`enum class` 係一組封閉嘅有名值：`Line::Island`、
+`Line::TsuenWan`、`Line::KwunTong`，冇其他。對佢做 `switch` 會揀佢裝住嗰個值
+嘅分支，每個 `case` 都連型別寫個 enumerator。漏咗一個 case，編譯器會警告，
+呢個正正就係封閉集合嘅意義。
+
+```
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";
+```
+
+`parse` 將個字變做 `Line`，`Island` 嗰個 case 已經寫好。喺 `// FILL` 打嗰兩行
+`case`，放喺 `Island` 嗰行下面。
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  "case Line::TsuenWan: return \"red\"; 同 case Line::KwunTong: return \"green\"; — 同 Island 嗰行一樣嘅樣。",
+  "enum class 嘅 enumerator 永遠都要連型別寫：Line::TsuenWan，永遠唔好淨係寫 TsuenWan。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.basic.09.vector"
+title = "漁獲，照次序"
+story = "每隻舢舨隔住水一個數一個數咁嗌佢嘅漁獲，而最後一隻船未返到之前，港務長冇地方放佢哋。"
+brief = '''
+`std::vector<long long>` 係一個可以增長嘅 array，對佢做嘅四樣嘢係加、刪、改同
+排序。`push_back(x)` 加喺尾；`erase(v.begin() + i)` 移走 index `i` 嘅元素，再
+埋返個窿；`v[i] = x` 覆寫原本嘅嘢；`<algorithm>` 嘅 `std::sort` 將成個嘢由細到大
+排好。index `0` 係最前面。
+
+```
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());
+```
+
+`xs` 裝住嗰行嘅整數。喺四個 `// FILL` 記號打嗰四行：喺尾加 `99`，移走第一個元素，
+將新嘅第一個元素設做 `700`，然後排序。會先印個 vector，再印佢嘅大細。
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); — 加、刪、改、排。",
+  "erase 同 sort 收 iterator（xs.begin()、xs.end()）；[] 收 index。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.basic.16.list"
+title = "頭定尾"
+story = "雙數號碼嘅舢舨泊喺避風塘後面，單數嘅泊前面，而泊位名單就只係不停加喺尾。"
+brief = '''
+`<list>` 嘅 `std::list` 係雙向 linked list：喺任何一頭加或者刪都係常數時間，
+vector 喺前面就做唔到。`push_front(x)` 加喺前面，`pop_back()` 移走最後一個元素，
+`front()` 係一個 reference — 賦值畀佢，第一個元素就會變 — 而 list 用自己嘅
+`sort()` member 排序，因為 `std::sort` 需要隨機存取，而 linked list 冇。
+
+```
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();
+```
+
+`l` 已經按次序裝住嗰行嘅整數。喺 `// FILL` 記號打嗰四行：喺前面加 `0`，移走
+最後一個元素，將最前面嗰個覆寫做 `99`，然後排序。個 list 會印出嚟。
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "l.push_front(0); l.pop_back(); l.front() = 99; l.sort(); — 每樣一行，照呢個次序。",
+  "std::sort 排唔到 std::list（冇隨機存取）；list 自己嘅 l.sort() 就得。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.basic.10.maps"
+title = "點算板"
+story = "避風塘塊點算板列住船隊上岸嘅每一條魚，一條魚一個字，而買家想每種一行，連埋數目。"
+brief = '''
+`std::map<std::string, int>` 係一本按 key 排好嘅字典。`m[k] = v`
+加一個 key（或者覆寫已經有嘅）；`erase(k)` 移走一個 key，唔存在就乜都唔做；
+`at(k)` 係一個一定已經存在嘅 key 嘅項目 — 賦值畀佢就係改，而且佢會拋例外，
+唔會作一個 key 出嚟。行一次個 map 會按排好嘅次序行啲 key — `std::map` 永遠都係
+按 key 排好，所以呢度冇排序嗰行。
+
+```
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;
+```
+
+`counts` 已經數好嗰行每個字，而每行都有 `fish`。喺 `// FILL` 記號打嗰三行：
+加 `crab` 做 `1`，移走 `rice`，再將 `fish` 設做 `9`。排好序嘅印出已經寫好。
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; — 加、刪、改。",
+  "[] 會整一個唔存在嘅 key 出嚟；at() 唔肯。個 key 一定要已經喺度嘅時候就用 at()。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.basic.18.hashtable"
+title = "冇次序嘅點算"
+story = "出菜口將每碟餸記喺一個 hash table，然後按啲 bucket 啱啱好嘅次序讀返出嚟，而冇兩次印出嚟係一樣嘅。"
+brief = '''
+`std::unordered_map` 就係 hash table：同 `std::map` 一樣有 `[]`、`erase` 同 `at`，
+平均快啲，而行佢嘅時候係**冇特定次序**嘅
+— 所以印之前要先將啲 key 排序。`count(k)` 或者 `find(k)` 問一個 key 喺唔喺度，
+唔會整佢出嚟。
+
+```
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;
+std::sort(keys.begin(), keys.end());
+```
+
+`counts` 已經數好嗰行每個字，而每行都有 `mai`；`keys` 係佢啲 key 嘅 vector，按
+bucket 畀出嚟嘅隨便咩次序抄出嚟。喺 `// FILL` 記號打嗰四行：加 `gun` 做
+`12`，移走 `siu`，將 `mai` 設做 `0`，然後將啲 key 排序，咁每次印出嚟都一樣。
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "counts[\"gun\"] = 12; counts.erase(\"siu\"); counts.at(\"mai\") = 0; 跟住 std::sort(keys.begin(), keys.end()); — 加、刪、改、排。",
+  "個表自己冇次序：啲 key 已經幫你抄咗出嚟；將佢哋排序就係第四行，喺印之前。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.basic.11.sets"
+title = "泊位號碼"
+story = "泊位名單上面，一隻舢舨每入嚟一次就有佢個號碼一次，而港務長想知其實係幾多隻船。"
+brief = '''
+`std::set<long long>` 每個值留一次，由細到大排。
+`insert(x)` 加一個值（重複嘅唔理）而 `erase(x)` 移走一個（唔存在嘅唔理）。
+set 冇得改：一個值就係佢自己嘅 key，所以將 `1` 變做 `-1` 係一個 erase 跟住一個
+insert。佢亦都冇排序嗰行：`std::set` 永遠都係由細到大。
+
+```
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);
+```
+
+`seen` 已經裝住嗰行唔同嘅值。喺 `// FILL` 記號打嗰三行：加 `100`，移走 `3`，
+然後將 `1` 變做 `-1`。大細同排好序嘅行一次已經寫好。
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); — 最後兩個呼叫共用一行。",
+  "對冇 3 嘅 set 做 erase(3) 乜都唔做，-1 已經喺度嘅時候做 insert(-1) 都乜都唔做：兩個都安全。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.basic.12.stack-queue"
+title = "最後入，最先入"
+story = "舢舨按到達次序喺避風塘牆邊埋排：最後入嗰隻係第一隻走得嘅，而第一隻入嘅係買家第一個招呼嘅。"
+brief = '''
+`std::stack` 係後入先出：`push(x)` 加喺頂，`pop()` 移走頂嗰個（乜都唔回傳），
+`top()` 係佢嘅 reference — 賦值畀佢就可以就地改頂嗰個。`std::queue` 喺另一頭
+有同樣嘅樣：`push` 喺後面，`front()` 同 `pop()` 喺前面。
+
+```
+st.push(0);
+st.pop();
+st.top() = 99;
+```
+
+每個數都已經 push 咗入 `st` 同 `q`。喺 `// FILL` 記號打嗰三行：喺頂加 `0`，再
+pop 返佢出嚟，然後將頂嗰個覆寫做 `99`。之後個 stack 會被清空同印出，queue 就攞
+頭兩個。
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "st.push(0); st.pop(); st.top() = 99; — 喺 stack 上面加、刪、改；queue 唔使郁。",
+  "top() 係 reference，所以 st.top() = 99 改嘅係 pop() 下一個會移走嗰個元素。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.basic.13.sorting"
+title = "按深度排"
+story = "避風塘牆邊嘅水深讀數係按隻船量嘅次序寫低，而張海圖想要由淺到深，再由深到淺。"
+brief = '''
+`<algorithm>` 嘅 `std::sort` 就地將一段範圍排好。畀佢一個 vector 嘅兩頭，佢就
+由細到大排；第三個參數畀一個 comparator，佢就按嗰個排，而 `std::greater<>{}`
+就係「大嘅行先」。
+
+```
+std::sort(v.begin(), v.end());
+std::sort(v.begin(), v.end(), std::greater<>{});
+```
+
+啲數讀入咗 `v`，印兩次。喺第一個 `// FILL` 打第一行，喺第二個打第二行。
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std::sort(v.begin(), v.end()); 跟住 std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort 收一段範圍，唔係一個容器：begin() 同 end()。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.basic.22.reverse"
+title = "由尾到頭"
+story = "最後入嗰隻舢舨應該最先出，而船排塊板照寫落去嘅次序讀條隊，船尾個絞盤名都係倒轉咗。"
+brief = '''
+`<algorithm>` 嘅 `std::reverse(first, last)` 就地將一段範圍倒轉，任何容器都得。
+字串就用呢條路已經用過嘅另一個方法倒轉：由 `rbegin()` 到 `rend()` 砌一個新嘅。
+
+```
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());
+```
+
+`v` 裝住第一行嘅整數，`s` 係第二行。喺 `// FILL` 打嗰兩行，取代佔位嘅 `r`。
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std::reverse(v.begin(), v.end()); — 就地；乜都唔回傳。",
+  "std::string r(s.rbegin(), s.rend()); — 反向 iterator 砌出倒轉咗嘅 copy。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.basic.14.sort-by-key"
+title = "排行榜"
+story = "遊艇會嘅賽事板按報名次序列住每隻船同佢嘅分數，而會長想第一名喺最頂。"
+brief = '''
+`std::sort` 收一個 comparator：一個收兩個元素嘅函數，講第一個應唔應該排喺第二個
+前面。就地寫嘅 lambda 係最常見嘅 comparator，而「分數由高到低，再按名由細到大」
+係一個表達式：分數唔同，高嗰個行先；打和，名細嗰個行先。
+
+```
+std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) {
+    return a.score != b.score ? a.score > b.score : a.name < b.name;
+});
+```
+
+啲行已經讀入同印出。喺 `// FILL` 打嗰個 `std::sort`。
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });",
+  "個 comparator 答嘅係「a 係咪排喺 b 前面」：分數高嘅行先，打和就名細嘅行先。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.basic.15.closures"
+title = "潮汐修正"
+story = "海圖上面每個水深讀數都係喺低潮時量嘅，而港務長想全部用今日嘅潮水修正，佢喺水位計度讀過一次。"
+brief = '''
+lambda 係就地寫嘅函數：`[capture](params) { body }`。
+capture 清單係佢喺周圍 scope 睇得到嘅嘢 — `[k]` 將 `k` copy 入去，而個 lambda
+活幾耐，就留住嗰個 copy 幾耐。`auto` 幫佢改名，呼叫佢就係 `add(x)`。
+
+```
+auto add = [k](long long v) { return v + k; };
+```
+
+`k` 同啲數已經讀入，個迴圈對每個數套用 `add`。喺 `// FILL` 打嗰一行，取代佔位嘅
+`add`。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "auto add = [k](long long v) { return v + k; };",
+  "[k] 將 k copy 入個 lambda；[] 乜都唔 capture，完全睇唔到 k。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.basic.16.lambdas"
+title = "雙數泊位，平方"
+story = "牆邊雙數號碼嘅泊位按號碼嘅平方交錢，單數嘅唔使交，而本帳簿得一行寫總數。"
+brief = '''
+`<numeric>` 同 `<algorithm>` 入面嘅演算法最後一個參數收 lambda。
+`std::accumulate` 將一段範圍摺埋做一個值：佢由一個初始值開始，用目前嘅總數同
+每個元素去呼叫個 lambda，留低 lambda 回傳嘅嘢。由 `0LL` 開始，個總數就係
+`long long`。
+
+```
+long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+```
+
+啲數喺 `xs`，`total` 會印出嚟。喺 `// FILL` 打嗰一行，取代佔位嘅 `total`：`v` 係
+雙數嘅時候，個 lambda 加上 `v` 嘅平方，否則原封不動畀返 `acc`。
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
+  "個 lambda 收到累計總數同一個元素，回傳新嘅總數。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.basic.17.threads"
+title = "每隻一部絞盤"
+story = "船排上面每隻舢舨都有自己一部絞盤，全部一齊拉，而要等最後一部停咗先會讀點算。"
+brief = '''
+`std::thread` 一整出嚟就喺自己條 thread 上面行一個函數；`join()` 等佢做完。
+一個 thread 嘅 vector 用 `emplace_back` 加一個 lambda 砌出嚟。capture `[&, i]`
+除咗 `i` 之外全部以 reference 借用，而佢係 copy 嘅 — 個迴圈會行落去，個 copy
+唔會。每條 thread 只係寫自己嗰格，所以冇嘢共用，而要等每個 `join()` 都返咗先會
+印任何嘢。
+
+```
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+for (auto& t : threads) t.join();
+```
+
+`results` 每個數一格，印出已經寫好。喺迴圈入面嘅 `// FILL` 打第一行，取代佔位，
+喺佢後面嘅 `// FILL` 打第二行。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "迴圈入面 threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });，之後 for (auto& t : threads) t.join();。",
+  "main 完結時仲未 join 嘅 thread 會令程式終止；印之前全部 join 晒。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.basic.18.binary-tree"
+title = "SEGFAULT"
+story = "12:00，午炮。發射表係一棵時間嘅樹，而支炮跟住一條從來都唔存在嘅左枝行 — nullptr，被 dereference，喺銅鑼灣唯一一個唔可以錯嘅地址度。"
+brief = '''
+二元搜尋樹係一堆 node，每個有一個值同兩個子節點指標：細啲嘅值住喺 `left` 下面，
+大啲嘅住喺 `right` 下面。插入係遞迴嘅：一棵空嘅子樹（`nullptr`）變做一個新
+node，否則個值就沿住一邊落去 — 而嗰邊變成乜，就要儲返入去，因為嗰邊一陣之前
+可能仲係 `nullptr`。嗰下儲存就係成個竅門，而佢之前 check `nullptr` 就係成個
+boss。
+
+```
+if (!n) return new Node{v};
+if (v < n->val) n->left = insert(n->left, v);
+else n->right = insert(n->right, v);
+return n;
+```
+
+`Node`、`nullptr` 嘅情況、`inorder`、`height` 同 `main` 已經寫好。喺兩個
+`// FILL` 記號打兩行落去嘅行：左邊嗰行喺 `if` 入面，右邊嗰行喺 `else` 入面。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "左邊 n->left = insert(n->left, v);，右邊 n->right = insert(n->right, v);。",
+  "將結果儲返入去：個子節點可能係 nullptr，而新 node 就係 insert 回傳嘅嘢。",
+]

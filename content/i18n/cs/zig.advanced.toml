@@ -1,0 +1,1498 @@
+# ZIG LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/zig/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "zig.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.advanced.01.lines"
+title = "Kniha budky"
+story = "Záznam směny budky 1 uvádí každé vozidlo jako jeden řádek: jméno, které úředník zaslechl, a pak cokoli, co zaplatilo, ať to vyjde na kolik mincí chce. Tiskárna je starší než tunel a pořád končí stránku slovem trajektové společnosti."
+brief = '''
+Na prvním řádku je počet `n`. Každý z dalších `n` řádků je jméno následované
+žádným nebo více celými čísly, oddělenými mezerami.
+
+Vypiš jeden řádek na vozidlo jako `<NAME> <how many numbers> <their sum>`, pak
+`BOATS <n>` — řádek se součtem, kterým tiskárna mýtnice končí každou stránku
+od dob, kdy patřila trajektové společnosti.
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+Jednotkou je tu řádek, ne token. Jeden `std.mem.tokenizeAny` přes celý
+vstup se zastaví na bílých znacích a o konce řádků se nestará, takže ti
+neřekne, kde jedno vozidlo končí a další začíná. Napřed vstup rozřež
+na řádky — `std.mem.splitScalar(u8, input, '\n')` ti dá iterátor,
+jehož `next()` je `?[]const u8`, jeden řádek po druhém — a pak tokenizuj
+**uvnitř** řádku.
+
+Každý z těch řezů ukazuje do `input`. Nic se nekopíruje: řádek je okno
+do bajtů, které už vlastníš, a proto musí `input` zůstat naživu,
+dokud s nimi se všemi neskončíš, a proto je `defer gpa.free(input)`
+poslední věc, která se spustí.
+'''
+hints = [
+  "splitScalar na '\\n' ti dá jeden řádek na každé next(); tokenizeAny na tom řádku, s \" \\r\\t\" jako oddělovači, projde jeho tokeny a nic za jeho koncem.",
+  "Jméno je první token, takže ho vezmi jedním fields.next() před smyčkou; while (fields.next()) |tok| pak vidí jen čísla.",
+  "Řádek jen se jménem dá 0 0 bez zvláštního případu: smyčka while se prostě nikdy nespustí.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.advanced.02.pointers"
+title = "Kopie není ta věc"
+story = "Vedoucí budek zapisuje každou misku mincí do kopie listu a list na zdi za ní se nikdy nezmění."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Vlož každou hodnotu do jednoho `std.ArrayList(i64)` přes funkci `load`,
+pak vypiš tři řádky: `LOADED <how many>`, `TOTAL <sum>` z funkce
+`total`, která jen čte, a `FIRST <value>` — nebo `FIRST NONE`, když
+nic není.
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+Startovní kód se přeloží a vypíše `LOADED 0`. `load` bere seznam **hodnotou**
+a parametr v Zigu je neměnný, takže startovní kód udělá to, co lidé
+udělají pak: `var mine = sheet;` — kopii hlavičky seznamu — a
+připojuje do ní. Kopie roste, kopie při návratu umře a list na
+zdi zůstane netknutý.
+
+Řekni, co myslíš, pomocí `*`: parametr typu `*std.ArrayList(i64)` je
+adresa volajícího seznamu a `sheet.append(gpa, value)` přes něj přistane
+ve volajícího seznamu. `total` má brát `[]const i64` — `.items` seznamu —
+protože se potřebuje dívat a nepotřebuje sahat, a `const`
+v typu je způsob, jak tě u toho překladač drží.
+
+`FIRST` je volitelný ukazatel: `?*const i64` je buď adresa
+prvního prvku, nebo `null`, a `null` je jediná hodnota, přes kterou tě Zig
+nenechá číst, aniž by ses napřed zeptal — `if (first) |p|` je to ptaní. To je
+celá tahle země v jednom řádku.
+'''
+hints = [
+  "load opraví dva znaky: sheet: *std.ArrayList(i64) v signatuře a &sheet při volání. Volání metody přes ukazatel nepotřebuje šipku; sheet.append(gpa, v) je tentýž řádek.",
+  "total má brát []const i64 a volat se se sheet.items — const je slib a překladač ho kontroluje.",
+  "&sheet.items[0] je adresa prvního prvku a dává smysl, jen když nějaký je; if (first) |p| rozbalí volitelnou hodnotu a p.* je hodnota za ní.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.advanced.03.slices"
+title = "Uprostřed fronty"
+story = "Před šestou se u budky 4 nahromadilo čtyřicet vozidel. Vedoucí vidí přední nárazník a poslední koncové světlo a nic mezi nimi."
+brief = '''
+Standardní vstup je počet `n` na prvním řádku a pak `n` celých čísel na
+druhém, oddělených mezerami. `n` je nejméně `1`.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho
+striktně mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+Řez je ta posloupnost. `nums[0]` a `nums[nums.len - 1]` jsou konce;
+`nums[1 .. nums.len - 1]` je prostředek, **nový řez** na tytéž bajty
+bez jakékoli kopie, a `for` přes něj je součet. Řezání se kontroluje jako
+indexování: `nums[1..0]`, což vyjde jako prostředek jednoprvkové fronty,
+je `panic: start index 1 is larger than end index 0`, takže
+podmínka na `nums.len` jde před řez, ne za něj.
+
+Sčítej v `i64`. Jeden ze skrytých případů má prostředek, který se do
+`i32` nevejde, a v `-O Debug` `i32`, který přeteče, nepřetočí — zpanikaří.
+'''
+hints = [
+  "nums[1 .. nums.len - 1] je řez mezi konci; for přes něj ho sečte. Sdílí paměť s nums.",
+  "S jednou nebo dvěma hodnotami je ten rozsah prázdný nebo obrácený a obrácený řez je v Debug panika — ohlídej ho pomocí if na nums.len dřív, než ho napíšeš.",
+  "Prostředek je i64: široký případ sčítá dvě hodnoty po třech miliardách a akumulátor i32 by zpanikařil s integer overflow.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.advanced.04.strings"
+title = "Bajty nejsou písmena"
+story = "Cedule nad mýtnicí ořízne 銅鑼灣 na tři bajty a ukáže jeden znak."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**
+2. jeho délku ve **znacích** — kódových bodech UTF-8
+3. řádek s obráceným pořadím znaků
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII a pak první dvě čísla
+nejsou stejná. Řetězec v Zigu je `[]const u8`: řez bajtů, a
+`.len` jsou bajty. Vždycky byly. Jazyk o kódováních na této úrovni
+nic neví; `u8` je bajt.
+
+UTF-8 se dá spočítat bez dekódování: každý kódový bod začíná
+bajtem, který **není** tvaru `10xxxxxx`, a každý pokračovací bajt jím je.
+Bajt `c` tedy začíná znak právě tehdy, když `(c & 0xC0) != 0x80`. Obracej
+znaky, ne bajty — `std.mem.reverse(u8, line)` by rozsekal `銅`
+na tři kusy a vypsal je pozpátku.
+'''
+hints = [
+  "for (line, 0..) |c, i| projde bajty s jejich indexem; (c & 0xC0) != 0x80 vybere první bajt každého znaku.",
+  "Posbírej počáteční index každého znaku do std.ArrayList(usize); jeho délka je počet znaků bez jakéhokoli dekódování.",
+  "Projdi počáteční indexy pozpátku a appendSlice bajty každého znaku — line[from..to] — do std.ArrayList(u8), pak vypiš jeho .items pomocí {s}.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.advanced.05.structs"
+title = "Kniha budky 2"
+story = "Budka 2 účtuje každou nápravu a vede řádky na jednom formuláři knihy, nebo vedla, než návrh nahradil funkce struktury komentářem."
+brief = '''
+Na prvním řádku je `<NAME> <n>`. Dalších `n` řádků je `<ITEM> <CENTS>`.
+
+Postav pro to jméno `Ledger`, který sbírá položky, pak vypiš každou položku
+zpátky jako `<ITEM> <CENTS>` v pořadí, v jakém přišla, pak `TOTAL <sum>`, pak
+`BOAT <name> <count>` — formulář knihy je trajektové společnosti a jeho pole
+se jménem pořád říká `BOAT`.
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` může být `0`, a pak jsou výstupem jen poslední dva řádky.
+
+Zig nemá `class`; nejbližší je `struct` s funkcemi deklarovanými
+uvnitř, a to je celé. Není žádný konstruktor, který běží
+za tvými zády: `init` je obyčejná funkce, kterou napíšeš a která vrátí
+hodnotu. Není žádné skryté `this`: `self` je první parametr, vypsaný —
+`*Ledger`, když funkce do knihy zapisuje, `*const Ledger`, když
+jen čte — a to je `const` na metodě, zviditelněné. Není ani
+`private:`; pole je dosažitelné odkudkoli v souboru a to, co
+drží `main` mimo `items`, je, že struktura nabízí `total()` a
+`count()` a není důvod je obcházet.
+'''
+hints = [
+  "std.ArrayList(Item) stačí; struktura je tu proto, aby kniha vlastnila své řádky. add je jedno append: self.items.append(gpa, .{ .name = name, .cents = cents }).",
+  "self: *Ledger pro add, protože zapisuje; self: *const Ledger pro total a count, protože jen čtou. ledger.add(...) je tak či tak totéž volání — Zig za tebe vezme adresu.",
+  "Jména položek jsou řezy input, takže plnění knihy nic nestojí a input ji musí přežít — což pořadí defer v main už zaručuje.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.advanced.06.tagged-union"
+title = "Kdo je u volantu"
+story = "Pruh autotoll účtuje každému štítku členskou sazbu, včetně těch, které členy nejsou, a toho, který štítkem není."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<TYPE> <HOURS>`.
+
+Základní sazba je `500 + 100 * HOURS` centů. Pro každý řádek vypiš jedno z:
+
+* `MEMBER` — základní sazbu
+* `CREW` — polovinu základní sazby, celočíselným dělením
+* `JUNIOR` — vždy `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+Vymodeluj štítek jako `union(enum)` se čtyřmi případy, jedním z nich `other`.
+`enum class` v C++ nemůže nést data a nerozpoznaný text musel
+cestovat vedle něj; tagovaný union v Zigu ho nese **uvnitř** případu:
+`other: []const u8`, a ostatní tři případy nenesou vůbec nic. Případ
+`union(enum)` se za tvými zády nepřevede na celé číslo a
+nevypustí svá jména do okolního rozsahu, což jsou ty dva důvody,
+proč `enum class` existoval.
+
+Rozhodni o jízdném jedním `switch`. `switch` na tagovaném unionu musí pokrýt
+každý případ — vynech jeden a nepřeloží se to, žádný přepínač varování není potřeba —
+a `.other => |raw|` je způsob, jak data vyjdou z případu, ve kterém jsou.
+'''
+hints = [
+  "other: []const u8 je čtvrtý případ a .{ .other = raw } ho postaví; tři případy void se staví jako .member, .crew, .junior.",
+  "std.mem.eql(u8, raw, \"MEMBER\") porovná dva řezy; == na řezech porovnává ukazatele, což nikdy není, co myslíš.",
+  "@divTrunc(base, 2) je vypsané celočíselné dělení; holé / na znaménkových celých číslech se nepřeloží, když by výsledek mohl být nepřesný.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.advanced.07.maps"
+title = "Co křičí mýtnice"
+story = "Mýtnice v 06:30: každá budka něco volá přes pruhy a vedoucí chce pořadí."
+brief = '''
+Načti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou, jako `<word> <count>`, seřazené podle počtu
+sestupně a při shodě podle slova vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std.StringHashMap(i64)` není seřazená podle ničeho — ani podle klíče, ani podle počtu,
+ani podle příchodu — takže pořadí je samostatný krok: zkopíruj položky do
+`std.ArrayList` malých struktur a `std.mem.sort` ho s porovnávačem.
+`getOrPut(word)` najde místo, nebo ho vloží, a řekne ti které pomocí
+`found_existing`, což je přesně to, co počítací smyčka chce; `value_ptr`
+čerstvého místa je neinicializovaný, dokud do něj nezapíšeš.
+
+Zig nemá lambdu. Porovnávač je obyčejná funkce, předaná jménem,
+s prvním parametrem pro kontext, který by zachytila — tady `{}`,
+typu `void`, protože nic nezachytává. Klíče jsou řezy `input`,
+takže mapa musí dostat `deinit` dřív, než se uvolní `input`: `defer` ve správném
+pořadí to udělá bez jediné myšlenky.
+'''
+hints = [
+  "getOrPut(word) vrátí místo s found_existing a value_ptr; nastav value_ptr.* = 0, když je nové, pak přičti jedna. To je celá počítací smyčka.",
+  "counts.iterator() prochází položky; každá má key_ptr a value_ptr. Připoj Row za každou položku do std.ArrayList(Row).",
+  "Porovnávač je fn byRank(_: void, a: Row, b: Row) bool — napřed počet sestupně, pak std.mem.order(u8, a.word, b.word) == .lt — a std.mem.sort(Row, rows.items, {}, byRank) ho použije.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.advanced.08.hashtable"
+title = "Žádné pořadí"
+story = "Prezence mýtnice se vrací v jakémkoli pořadí, jaké se hašovací tabulce zachtělo, a vedoucí ji chce v pořadí, v jakém budky doopravdy odpověděly."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků, na každém jméno budky. `n` je
+nejméně `1` a jméno je jeden úsek znaků, které nejsou mezerou. Jméno se může
+objevit víckrát.
+
+Vypiš každé různé jméno jednou, jako `<name> <count>`, **v pořadí, v jakém se
+jméno poprvé objevilo**. Pak vypiš `DISTINCT <k>`.
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+Kontejner ti tohle sám od sebe nedá a o tom je celý
+úkol.
+
+`std.StringHashMap` je hašovací tabulka: vyhledání je v průměru O(1), ale
+`iterator()` vrací položky v **pořadí košů** — ne seřazeně, ne podle
+vložení, a jinak ve chvíli, kdy tabulka naroste. Nic žádné pořadí
+neslibuje, takže program, který vypisuje hašovací mapu jejím procházením, je program, jehož
+výstup závisí na hašovací funkci. Startovní kód dělá přesně to a dokonce
+projde případy jen s jedním různým jménem — což je to prozrazení: test,
+který pořadí nerozliší, není důkaz, že je pořadí správně.
+
+Drž ty dvě práce ve dvou kontejnerech: `std.ArrayList([]const u8)` si pamatuje
+pořadí, v jakém bylo jméno poprvé viděno, a `std.StringHashMap(i64)` počítá.
+Pro výpis projdi seznam.
+'''
+hints = [
+  "Hašovací tabulka je na rychlé vyhledávání. Seznam je na pamatování pořadí. Potřebuješ obojí.",
+  "found_existing je false právě jednou na jméno — při vložení — a to je chvíle připojit jméno do seznamu pořadí.",
+  "Vypisuj procházením seznamu a ptej se mapy na každý počet pomocí count.get(name).?, nikdy procházením mapy.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.advanced.09.set-and-sort"
+title = "Kdo parkuje kde"
+story = "Tabule odstavného pruhu pod estakádou uvádí tutéž dodávku na tomtéž stání dvakrát a nikdo nedokáže říct, které z řádků jsou duplikáty."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<BERTH> <NAME>`.
+
+Vypiš každou různou dvojici `<BERTH> <NAME>` jednou, seřazenou podle stání a pak
+podle jména, pak `DISTINCT <k>` a `DUPES <n - k>`.
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+Zig nemá seřazenou množinu dvojic; nejbližší jsou dva nástroje, každý na jednu
+práci. `std.StringHashMap(void)` je množina — mapa, jejíž hodnoty nezabírají
+místo — a když je klíčem **řádek sám**, `2 KWAN`, odmítne druhou kopii
+jakékoli dvojice, která v ní už je. `std.ArrayList` malé struktury
+`{ berth, name }` posbírá ty, které množina propustila, a `std.mem.sort`
+s porovnávačem je dá do pořadí stání-pak-jméno. Žádná strukturovaná
+vazba na rozebrání dvojice není; pole struktury už jména mají.
+'''
+hints = [
+  "std.StringHashMap(void) je množina; getOrPut(line).found_existing je true u druhé kopie řádku a false u první.",
+  "Do seznamu jdou jen řádky, které množina propustila, takže délka seznamu je DISTINCT a n minus ona je DUPES.",
+  "Porovnávač řadí napřed podle stání a při shodě podle std.mem.order(u8, a.name, b.name) == .lt; std.mem.sort(Mooring, moorings.items, {}, byBerthThenName) ho použije.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.advanced.10.comptime-fn"
+title = "Jedním průchodem po pruhu"
+story = "Záznam náprav je sloupec počtů. Alex říká čtyři smyčky for. Mei říká čtyři smyčky for se jmény a ta jména jsou funkce."
+brief = '''
+Standardní vstup je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš čtyři řádky:
+
+1. součet sudých hodnot (`0`, když žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednou mezerou —
+   nebo `-`, když žádné nejsou
+3. kolik je různých hodnot
+4. `FIRST_BIG <i>` — index od 0 první hodnoty větší než `10`,
+   nebo `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+Zig nemá `<algorithm>` ani lambdu a to nejbližší je blíž, než
+to zní: funkce, která bere **jinou funkci jako parametr `comptime`**.
+`fn sumIf(xs: []const i64, comptime keep: fn (i64) bool) i64`
+je `accumulate` s predikátem; `isEven` předáš jménem, překladač
+vyrazí verzi `sumIf` s vloženým voláním a za běhu není žádný
+ukazatel na funkci. Napiš `sumIf`, `keepDoubled`, počet různých hodnot
+ze `std.mem.sort` na kopii plus jeden průchod přes sousední dvojice a
+`indexOfFirst`. Nejde o to, že by smyčka byla těžká na napsání; jde o to, že
+jméno říká, k čemu smyčka je, a predikát je hodnota, kterou umíš
+přečíst.
+'''
+hints = [
+  "comptime keep: fn (i64) bool je typ parametru; uvnitř těla je keep(x) obyčejné volání a v místě volání předáš isEven bez závorek.",
+  "keepDoubled potřebuje kam psát: vrať std.ArrayList(i64), na který volající zavolá deinit, a uvnitř na jeho deinit dej errdefer, aby selhání append neuniklo.",
+  "gpa.dupe(i64, xs) je kopie k seřazení; seřazený řez má duplikáty vedle sebe, takže hodnota je nová právě tehdy, když se liší od té před ní.",
+  "indexOfFirst vrací ?usize; if (indexOfFirst(...)) |i| vypíše zásah a větev else vypíše -1.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.advanced.11.generics"
+title = "Napiš to jednou"
+story = "Tabule měřidel mýtnice má largest napsané čtyřikrát — pro nápravy, pro minuty, pro pruhy a pro jména pruhů — a páté má přijít před první tramvají."
+brief = '''
+Standardní vstup jsou dva řádky: celá čísla na prvním, slova na druhém.
+
+Napiš **jedno** `largest`, které funguje na obojím, a typ `Pair(T)` s
+`larger()` a `smaller()`.
+
+Vypiš největší celé číslo, největší slovo, pak
+`PAIR <larger> <smaller>` pro `Pair` prvních dvou celých čísel. Při shodě se
+za větší považuje `a`.
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+Startovní kód se nepřeloží: `largest` je přibité k `i64`, takže předat mu
+slova je *expected type '[]const i64', found '[][]const u8'*.
+Generická funkce v Zigu je funkce s parametrem **`comptime T: type`**:
+`fn largest(comptime T: type, xs: []const T) T` se vyrazí
+jednou pro každý typ, se kterým se volá, a `T` se vypíše při volání —
+`largest([]const u8, words)` — místo aby se odvodilo.
+
+Slova nemají `>`; řezy se porovnávají pomocí `std.mem.order`. Uvnitř
+generické funkce `if (comptime T == []const u8)` vybere porovnání při
+překladu — větev, která neplatí, se ani neanalyzuje, což je
+tatáž myšlenka jako specializace šablony, jen bez celé té mašinérie.
+
+`Pair(T)` je týž trik pro typ: funkce, která bere `type` a
+**vrací struct**. Žádná zvláštní syntaxe šablony třídy není; typ je
+hodnota při překladu a funkce ho umí vyrobit.
+'''
+hints = [
+  "comptime T: type jako první parametr, T všude uvnitř místo i64, a z volání se stanou largest(i64, nums.items) a largest([]const u8, words.items).",
+  "x > best se pro řezy nepřeloží; if (comptime T == []const u8) std.mem.order(u8, x, best) == .gt else x > best vybere správné porovnání pro každou instanci.",
+  "fn Pair(comptime T: type) type { return struct { ... }; } — uvnitř const Self = @This() pojmenuje stavěný struct a Pair(i64){ .a = ..., .b = ... } jeden postaví.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.advanced.12.function-values"
+title = "Počítání u závory"
+story = "Závora u budky 5 počítá, kdo vjede a kdo vycouvá, a vedoucí chce číslo na konci směny, ať se mezitím stalo cokoli."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků, každý `IN` nebo `OUT`.
+
+Veď průběžný počet, který nikdy neklesne pod nulu, a vypiš ho po každém
+příkazu. Pak vypiš `INS <k>` — kolik příkazů bylo `IN`, spočítané
+generickým `countIf` a predikátovou funkcí — a `CLOSED <final>`.
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+Zig nemá uzávěry — žádnou lambdu, žádné zachycení — a to nejbližší je
+vypsané tam, kde to vidíš. Počítadlo je **struktura, která drží svůj
+vlastní součet**, a `add` je metoda na `*Counter`: stav, který by lambda v C++
+zachytila pomocí `[total = 0LL]` a označila `mutable`, je pole,
+a volání, které ho mění, bere strukturu přes ukazatel. Nic mimo
+strukturu se k součtu nedostane jinak než přes `add`.
+
+Predikát je **funkce předaná jako parametr `comptime`**:
+`countIf(commands, isIn)` jmenuje `isIn` a překladač ho vloží. Není
+co zachytit, takže se nic nezachytí, a otázka, kterou by se pohovorující
+zeptal na `[&]` proti `[=]`, se tu nemá kde schovat.
+'''
+hints = [
+  "add jsou tři řádky: self.total += delta, ořízni na nule, return self.total. Bere *Counter, protože zapisuje; count.add(...) za tebe předá adresu.",
+  "Counter deklarovaný jako var count = Counter{} začíná na nule díky výchozí hodnotě pole; do const by se přičítat nedalo.",
+  "fn countIf(items: []const []const u8, comptime pred: fn ([]const u8) bool) usize projde řez a spočítá položky, které pred přijme; isIn předej jménem.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.advanced.13.optional-union"
+title = "Řádek, který není číslo"
+story = "Čtečka počítadla náprav předá sloupec čísel a uprostřed něj něčí objednávku snídaně."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků. Každý řádek má být
+celé číslo.
+
+Pro každý řádek vypiš buď zdvojenou hodnotu, nebo `BAD <line>`, když se
+nedá rozparsovat. Nakonec vypiš `SUM <total>`, kde součet je součet hodnot,
+které jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+Odpověď nesou dva typy. `fn parse(text: []const u8) ?i64` je *číslo,
+nebo nic*: `std.fmt.parseInt` vrací chybové sjednocení a `catch return
+null` promění chybu v polovinu `null` volitelné hodnoty. Odmítne
+celý řetězec, nebo nic, takže `4x` se zamítne stejně jako `xx`.
+
+`fn doubled(text: []const u8) Doubled` vrací `union(enum) { value: i64,
+bad: []const u8 }` — *buď zdvojenou hodnotu, nebo řádek, který selhal*,
+jeden z přesně dvou případů, nikdy oba, nikdy žádný. `switch` na něm vytáhne
+data z toho případu, který tam je: `.value => |v|`, `.bad => |line|`.
+Nikde v `main` žádné `try`; selhání je hodnota a jde tam, kam jdou
+hodnoty. `main` startovního kódu už je ten switch; `parse` a `doubled` jsou
+kostry, a dokud nejsou napsané, vyjde každý řádek jako `BAD`.
+'''
+hints = [
+  "std.fmt.parseInt(i64, text, 10) catch return null je celé parse: při úspěchu hodnota propadne jako obsah volitelné hodnoty, při jakékoli chybě funkce vrátí null.",
+  "Volitelná hodnota se rozbalí pomocí if (parse(text)) |value|; cesta else je ten null a tam se staví případ .bad.",
+  "Vrátit .{ .value = v } nebo .{ .bad = text } z téže funkce je legální, protože návratový typ je union, který drží jedno či druhé; switch v main vybere větev, s obsahem zachyceným v |v| nebo |text|.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.advanced.14.error-sets"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy mýtné služby vrací každá něco jiného a nic nad nimi nic z toho nechytá."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků, každý má být vzdálenost
+v km.
+
+`fare(text)` parsuje pomocí `std.fmt.parseInt` — které **selže** s
+`error.InvalidCharacter` na `xx`, uvnitř `fare` přeloženým na vlastní
+`error.NotANumber` — a zápornou vzdálenost odmítne druhou vlastní
+chybou, `error.NegativeDistance`. Obě pocházejí z jedné pojmenované množiny chyb,
+`FareError`. Jinak vrátí `500 + 100 * km`.
+
+Vypiš jeden řádek na každý vstupní řádek: jízdné, nebo `not a number`, když se
+nedá rozparsovat, nebo `negative distance: <km>`, když je vzdálenost záporná. Pak
+vypiš `ERRORS <k>`, kolik řádků selhalo.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+Startovní kód se přeloží a na `xx` umře: `try fare(text)` v `main` předá
+chybu nahoru a nad `main` nikdo není — program vypíše `error:
+NotANumber` a trasu a skončí s `1`. To je celý příběh chyb v Zigu:
+chyba je hodnota v návratovém typu, `!i64`, a každé místo volání
+ji buď pomocí `try` pošle výš, nebo ji `catch` chytí. Nic se neodvíjí přes
+funkci, která neřekla, že může selhat.
+
+Chyba v Zigu je **jméno**, ne objekt: nenese žádnou zprávu ani žádná
+data, a proto `negative distance: <km>` staví volající, který
+text pořád drží. `catch |e| switch (e) { ... }` je dvouramenný catch
+a switch musí jmenovat každou chybu v množině — `catch (const
+std::runtime_error&)` z C++, který by potichu spolkl tu odvozenou, nemá
+obdobu, protože tu není žádná hierarchie, kterou by šlo oříznout.
+'''
+hints = [
+  "if (fare(text)) |cents| { ... } else |e| switch (e) { ... } je blok try se dvěma rameny catch; obsah úspěchu je cents, chyba je e.",
+  "Zprávu si postavíš sám: chyba nenese nic, ale text je pořád v rozsahu a vypíše se jako km, které zpráva chce.",
+  "Chyba, která dojde až na vrchol main, vypíše error: <Name> a trasu a skončí s 1. To dělá startovní kód na druhém řádku a je to ten dobrý výsledek — program řekl, kde se zastavil.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.advanced.15.iterators"
+title = "Tvoje vlastní smyčka while"
+story = "Měřič náprav mýtnice proťuká každý odečet od začátku do konce směny a žádný z nich nikam neuloží."
+brief = '''
+Standardní vstup jsou tři celá čísla: `start`, `step`, `count`.
+
+Dej `Stops` iterátor, aby smyčka `while` přes něj vydala `count`
+hodnot začínajících na `start` a postupujících o `step`. Vypiš každou na
+samostatný řádek, pak `SUM <total>` spočítaný funkcí `total` nad čerstvým
+iterátorem z téhož `Stops`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Startovní kód se nepřeloží: `main` volá `stops.iter()` a `Stops` žádnou
+takovou funkci nemá. Zig nemá žádný protokol iterátorů ani trait, ze kterého
+by se dědilo. Iterátor je **struktura s metodou `next`, která vrací
+volitelnou hodnotu** — tady `?i64` — a smyčka, která ho prochází, je `while
+(it.next()) |value| { ... }`, která skončí na prvním `null`. To je
+celá smlouva a drží ji `std.mem.tokenizeAny` i každý iterátor ze `std`,
+který jsi na této cestě použil.
+
+`total` prochází touž smlouvu týmž `while`; dej mu čerstvý
+iterátor, protože iterátor, který došel na `null`, tam zůstane.
+'''
+hints = [
+  "Iterátor je vnořená struktura: const Iter = struct { value, step, left, fn next(self: *Iter) ?i64 }. next bere *Iter, protože iterátor posouvá.",
+  "next vrátí null, když je left 0; jinak si zapamatuje současnou hodnotu, posune se, odečte jedna a vrátí, co si zapamatoval.",
+  "Proměnná smyčky musí být var — var walk = stops.iter() — jinak next nemůže vzít její adresu; total si postaví vlastní druhým stops.iter().",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.advanced.16.defer"
+title = "Uklidí po sobě"
+story = "Kniha mýtnice se na konci směny zavře sama, ve správném pořadí, ať si na to někdo vzpomněl, nebo ne."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Deklaruj dvě hodnoty `Guard` na **začátku** `main`, jménem `first` a
+`second`, a na `drop` každé z nich dej `defer`; `drop` vypíše `DROP <name>`. Uvnitř
+vnořeného bloku nasyp hodnoty do `Tally`, jehož odložený `report` vypíše
+`TALLY <count> <sum>`. Za blokem vypiš `DONE`. Nic jiného `main`
+sám nevypisuje.
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+Každý řádek kromě `DONE` vypíše nějaký `defer`. Zig nemá destruktor;
+nejbližší je `defer` a je v tom poctivější: řádek, který
+uvolňuje, se píše vedle řádku, který získává, a spustí se, když skončí
+**blok** — u zavírací složené závorky, při `return`, při chybě odcházející
+přes `try` — v **obráceném** pořadí `defer`ů. `defer` od `Tally` je
+ve vnitřním bloku, takže `TALLY` přijde před `DONE`; `defer`y obou strážců
+jsou v bloku `main` a `second` byl odložen poslední, takže běží první.
+Nic z toho neplánuješ ty. Plánuje to rozsah.
+
+Jedna věc, kterou je třeba udělat správně: `defer w.flush()` je první `defer` v `main`, takže
+běží **poslední** — až strážci zapíšou své řádky do bufferu.
+Dej ho za ně a řádky `DROP` se zapíšou do bufferu, který nikdo nevyprázdní.
+`defer gpa.free(input)`, `defer list.deinit(gpa)`, `defer m.unlock(io)` na
+příští mapě: každé uvolnění na této cestě je tatáž myšlenka.
+'''
+hints = [
+  "defer first.drop(w); hned za deklarací first a totéž pro second. drop nikdy nevoláš sám; volá ho konec main.",
+  "Vnitřní složené závorky jsou celý důvod, proč se TALLY vypíše před DONE: defer tally.report(w) uvnitř nich běží u jejich zavírací závorky. Odstraň je a vypíše se až potom.",
+  "Defery běží vždycky obráceně, a proto second jde před first — a proto flush, odložený jako první, běží až po obou.",
+  "tally.report čte stav v okamžiku, kdy defer běží, ne v okamžiku, kdy byl napsán: defer je odložený příkaz a argumenty, které jmenuje, se vyhodnotí až tehdy.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.advanced.17.past-the-end"
+title = "O jedno za poslední budkou"
+story = "06:00:00 u portálu. Signální tabule vedle budky 6 drží tabulku výstřelů pro všechno, co na nábřeží odpálí, a její smyčka kontrolního součtu čte jednu položku za jejím koncem."
+brief = '''
+Na prvním řádku je `n`. Dalších `n` řádků je tabulka výstřelů, `<NAME> <SECONDS>`.
+Pak řádek `q` a `q` jmen k vyhledání.
+
+Pro každé jméno vypiš `<NAME> FIRES AT <seconds>` nebo `<NAME> UNKNOWN`. Pak
+vypiš `LOADED <n> CHECKSUM <sum of every SECONDS in the table>`.
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+Startovní kód se čistě přeloží a zpanikaří dvakrát, ze dvou různých důvodů,
+a ty musíš najít oba.
+
+První je `lookup`. Vrací `?*Shell` — adresu odpovídající
+položky, nebo `null` — a volající na něj napíše `.?`, aniž by se podíval. `.?`
+znamená *vím, že to není null*, a když to null je, `-O Debug` program zastaví
+s `panic: attempt to use null value`. Otestuj volitelnou hodnotu: `if (lookup(...))
+|shell|` je jediný způsob, jak se dostat k tomu, co je za ní, a větev `else`
+je místo, kde žije `UNKNOWN`.
+
+Druhý je smyčka kontrolního součtu. Prochází `1..=n` a čte `table[i]`, a
+index `n` je o jedno za koncem: `panic: index out of bounds: index 2, len 2`.
+Oprav smyčku. Pak pochop, co ti ta panika koupila: verze tohoto úkolu v C++
+čte `table[n]` bez kontroly, dostane cokoli, co zrovna na té
+adrese je — další objekt na haldě, nebo nic — a vypíše kontrolní
+součet, který je špatně o hodnotu, kterou nikdo nezopakuje. Zig v Debug kontroluje každý
+index a každé `.?`, a v `-O ReleaseFast` nekontroluje ani jedno:
+tytéž dva řádky se tam stanou nedefinovaným chováním, přesně jako v C++. To
+je v této zemi dohoda: kontrola je zapnutá, dokud stavíš, a tvoje práce je
+nepotřebovat ji ani jednou do chvíle, kdy je vypnutá.
+'''
+hints = [
+  "Navaž výsledek lookup a otestuj ho: if (lookup(table, name)) |shell| { ... } else { UNKNOWN }. Volitelná hodnota je odpověď i otázka zároveň.",
+  "Platné indexy jdou od 0 do len - 1. Smyčka, která začíná na 1 a běží do len, je o jedno vedle na obou koncích a panikaří jen horní konec. for přes řez nemá žádný index, který by šel splést.",
+  "Obě paniky jsou kontroly režimu Debug. Postav startovní kód s -O ReleaseFast a ani jeden řádek se nezastaví: kontrolní součet čte za konec a null se následuje na adresu nula. Kontrola je to, za co platíš, a oprava je to, čím za ni platíš.",
+  "Panika vypíše zprávu a trasu zásobníku na stderr a skončí s 134; soudce čte stdout, takže všechno vypsané před panikou tam pořád je a pořád je to špatně.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.advanced.18.threads"
+title = "Dva pruhy, jedno počítadlo"
+story = "Estakáda v 07:00 otevře druhý pruh a fronta u portálu konečně odteče. Nic jiného se na mýtnici nezměnilo."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Spusť jedno `std.Thread` na hodnotu, které spočítá její druhou mocninu a zapíše ji do
+`out[i]` — do svého vlastního místa, takže žádná dvě vlákna nesahají na tentýž prvek. Počkej
+na všechna přes join, pak vypiš každý výsledek na samostatný řádek, pak `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+`std.Thread.spawn(.{}, worker, .{ args })` spustí `worker` na novém vlákně
+OS s těmi argumenty a vrátí popisovač, nebo chybu; argumenty
+se zkopírují do vlákna, takže předaný řez je pohled do paměti
+`main` a předaný index je vlastní index toho vlákna. Není tu žádná
+uzávěra, která by zachytila špatnou věc odkazem: všechno, co vlákno
+vidí, je v n-tici, kde si to můžeš přečíst.
+
+Vlákna skončí v jakémkoli pořadí, jaké se plánovači zlíbí. Zápis podle indexu
+a výpis až po joinech je to, co dělá výstup při každém běhu stejný.
+Vlákno, které by vypisovalo samo, by stejné nebylo.
+'''
+hints = [
+  "std.Thread.spawn(.{}, square, .{ nums, out, i }) spustí vlákno hned a vrátí jeho popisovač; drž popisovače v řezu std.Thread, abys na ně mohl zavolat join.",
+  "for (threads, 0..) |*t, i| projde místa pro popisovače s jejich indexem; t.* = try std.Thread.spawn(...) každé vyplní.",
+  "Než přečteš out, počkej přes join na každé vlákno. join() blokuje, dokud to vlákno neskončí, a po něm jsou zápisy vidět.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.advanced.19.join"
+title = "Nikdo neodchází bez odhlášení"
+story = "Vlákno pruhu dokončí směnu a předák odejde z budky, aniž by vzal jeho popisovač, a celé mýtnici vypadne proud."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků textu.
+
+Spusť jedno vlákno na řádek, které ho převede na velká písmena do vlastního místa. Počkej
+na všechna přes join, vypiš řádky v pořadí, pak `DONE`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+Startovní kód se nepřeloží a ta chyba je lekce. `std.Thread.spawn`
+vrací `!std.Thread` — popisovač, nebo chybu — a startovní kód ho upustí
+na zem jako holý příkaz: *error union is ignored*. Zig odmítá
+nechat hodnotu, která může být chybou, bez prozkoumání, a dělá ti tím
+laskavost: popisovač je **jediný** způsob, jak zavolat `join`, a vlákno, na které nikdo nečeká,
+je vlákno, které pořád běží, když `main` vrátí — proces pod ním skončí
+a řádky jsou napůl velkými písmeny, nebo vůbec, podle
+plánovače. C++ zavolá abort na `std::thread` zničené, dokud je joinable; Zig tě nutí
+držet popisovač v ruce a ptá se, co jsi s ním chtěl udělat.
+
+Takže se každý popisovač uchová a na každé vlákno se počká přes join (nebo se
+`detach`ne, což skoro nikdy nechceš), než se přečte jeho práce. Tvar je
+tvar alokátoru: `alloc` řez `std.Thread`, vyplň ho, projdi ho joinem, `free` ho —
+a smyčka s join stojí tam, kde stál destruktor v C++.
+'''
+hints = [
+  "Překladač chce, aby se někdo podíval na návratovou hodnotu spawn. t.* = try std.Thread.spawn(...) popisovač uchová a případnou chybu předá výš, což je poctivé zacházení s oběma polovinami.",
+  "Drž popisovače v řezu std.Thread o velikosti n; for (threads) |t| t.join(); dřív, než se cokoli vypíše.",
+  "Napřed všechna spusť, pak na všechna počkej. Join uvnitř smyčky se spawn tady taky projde — a pouští vlákna jedno po druhém, a na to vlákno není.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.advanced.20.mutex"
+title = "Jedna miska, osm budek"
+story = "Každá budka přičítá, co vybrala, k jednomu součtu na zdi mýtnice, a na konci hodiny zeď nesouhlasí ani s jednou z nich."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Spusť jedno vlákno na hodnotu, které ji přičte k **jednomu sdílenému součtu**. Počkej
+na všechna přes join, pak vypiš `TOTAL <sum>` a `THREADS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+Startovní kód se přeloží a vypíše `TOTAL 0`. Worker bere `total` **hodnotou**
+— `i64` zkopírované do n-tice argumentů vlákna — přičte do své vlastní
+kopie a zahodí ji. Předej ukazatel, `*i64`, a máš jinou
+chybu, tu, která se v tak malém testu neukáže: `total.* += value`
+z několika vláken naráz je **datový závod**. Kontroly Debug v Zigu ho
+nechytí; závod je tu nedefinované chování přesně jako v C++, ne
+jen špatné číslo.
+
+`std.Io.Mutex` vedle součtu, zamčený každým vláknem, které na něj sahá,
+je odpověď: `m.lockUncancelable(io)` ho vezme, `defer m.unlock(io)`
+ho vrátí na konci bloku, ať se mezitím stane cokoli. Worker
+bere `io: std.Io` jako parametr, protože ho mutex potřebuje — v
+0.16 je zámek součástí I/O runtime, ne knihovny vláken, a
+`std.Thread.Mutex` už neexistuje. `defer` je `lock_guard` z C++,
+vypsaný tam, kde se odemkne.
+'''
+hints = [
+  "Předej &total, ne total: z parametru workera se stane total: *i64 a přičtení je total.* += value. Vlákno má měnit součet v main, ne svůj vlastní.",
+  "var total_mutex: std.Io.Mutex = .init; v main, &total_mutex v n-tici a ve workeru m.lockUncancelable(io); defer m.unlock(io); před přičtením.",
+  "Číst total po všech joinech je bezpečné bez zámku: join() je synchronizační bod a žádné vlákno, které by zapisovalo, nezbylo.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.advanced.21.counter"
+title = "Počítadlo, které se zamyká samo"
+story = "Počítadlo náprav u budky 3 drží dvě čísla, která spolu musí souhlasit, a dva lidé je čtou ve stejnou chvíli."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Dokonči `Counter`: `add` vezme zámek, přičte k součtu a zvedne
+počet zásahů; `snapshot` vezme zámek a vrátí obojí zároveň. Spusť jedno
+vlákno na hodnotu, počkej na ně přes join, pak vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Mutex žije **uvnitř** struktury, vedle polí, která hlídá, a
+každá funkce, která na ně sahá, ho bere. To je ten tvar: zámek je
+součástí objektu, ne něčím, co si mají pamatovat volající.
+
+Startovní kód se nepřeloží a ten důvod stojí za minutu. `snapshot`
+bere `self: Counter` — hodnotou, tak jak se metoda, která jen čte,
+obvykle píše — a zamčení mutexu *mění mutex*, takže
+`self.mutex.lockUncancelable(io)` chce `*std.Io.Mutex` a jediné, co může
+dostat z `self` předaného hodnotou, je `*const`. Horší je, že `self` předaný hodnotou je
+**kopie** počítadla: i kdyby se to přeložilo, zamkl by kopii
+zámku, což nezamkne nic. Oprava je `self: *Counter`. Není tu žádné
+klíčové slovo `mutable`, po kterém sáhnout, protože není žádná `const` metoda, kterou by šlo
+obejít: metoda, která musí vzít zámek, to říká ve své signatuře, a
+signatura je celý slib.
+'''
+hints = [
+  "Chybu překladu opraví jeden znak: fn snapshot(self: *Counter, io: std.Io) Snapshot. counter.snapshot(io) se pořád čte stejně; Zig za tebe vezme adresu.",
+  "self předaný hodnotou by byl kopií celého Counter, včetně mutexu. Zamčení kopie nechrání nic, a proto je odmítnutí překladače správná odpověď, a ne nepohodlí.",
+  "Counter.add je obyčejná funkce, jejímž prvním parametrem je *Counter, takže std.Thread.spawn(.{}, Counter.add, .{ &counter, io, value }) je způsob, jak vlákno zavolá metodu.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.advanced.22.lock-order"
+title = "Dva zámky, jedno pořadí"
+story = "Dvě misky na mince pod stříškou, dva zámky, dvě budky a obě závory se zastavily ve stejné vteřině."
+brief = '''
+Dvě misky, `A` a `B`, každá `i64` s vlastním `std.Io.Mutex`.
+
+Standardní vstup jsou počáteční stavy na prvním řádku, počet `n` na druhém
+a pak `n` řádků `<FROM> <TO> <AMOUNT>` s `FROM`/`TO` z `{A, B}`.
+
+Spusť každý převod na vlastním vlákně, počkej na všechna přes join, pak vypiš
+`A <level>`, `B <level>`, `MOVED <n>`.
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+Na startovním kódu jsou špatně dvě věci a ve výstupu se ukáže jen jedna.
+Odečte ze zdroje a nikdy nepřipíše do cíle — to je viditelná
+chyba. Druhá je tvar: zamykat *napřed zdroj* znamená, že dva protisměrné
+převody můžou každý držet jeden zámek a čekat na ten druhý, navždy. To je
+deadlock a v testu se neukáže; ukáže se v úterý v 07:59.
+
+Zig nemá `scoped_lock`, který bere několik mutexů naráz; nejbližší
+je pravidlo, které implementuje, dodržované ručně. Ber oba zámky v **jednom
+globálním pořadí** — mutex `A`, pak `B`, v každém vlákně, ať se mince
+hýbou kterýmkoli směrem — a cyklus nemůže vzniknout. Dva `lockUncancelable`,
+dva `defer unlock` a defery uvolňují obráceně, což je pořadí, které
+by použil i `scoped_lock`.
+'''
+hints = [
+  "Zamkni obě misky dřív, než sáhneš na kterýkoli stav: mutex a, pak b, v tomto pořadí v každém vlákně, každý následovaný svým defer unlock.",
+  "Směr mincí rozhoduje, který stav dostane minus, ne který zámek se vezme první.",
+  "Dva defery uvolňují obráceně: zámek b se vrátí první, pak a. To je pořadí, které by použil scoped_lock v C++, a pravidlo je stejné — každé vlákno souhlasí s pořadím.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.advanced.23.queue"
+title = "Průlez"
+story = "Jedna budka posílá mince průlezem do počítací místnosti a jeden úředník je vybírá, a ten úředník čeká u prázdného průlezu od 06:40."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Producent vloží každou hodnotu do `std.Io.Queue(i64)`; konzument je
+vybírá po jedné a každou vypíše zdvojenou. Když producent vloží
+všechno, `main` frontu **zavře** a konzument skončí, když je
+fronta vyprázdněná a zavřená. Počkej na oba, pak vypiš `CONSUMED <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+C++ to postavilo z `std::queue`, mutexu, podmínkové proměnné a
+příznaku `done`; Zig 0.16 dodává celou věc jako jeden typ. `std.Io.Queue(T)`
+je omezený kanál nad bufferem, který vlastníš: `putOneUncancelable(io, v)`
+blokuje, dokud je plný, `getOneUncancelable(io)` blokuje, dokud je prázdný,
+a po `close(io)` vrátí `get` na vyprázdněné frontě `error.Closed` —
+což je pro konzumenta signál skončit, a smyčka je `while
+(q.getOneUncancelable(io)) |v| { ... } else |_| {}`. Fronta je FIFO, takže
+pořadí je pořadí vstupu, ať plánovač dělá cokoli.
+
+`io.concurrent(func, .{ args })` spustí `func` ve vlastním poolu runtime —
+má zaručenou vlastní jednotku souběhu, jinak volání selže — a vrátí
+future; `.await(io)` na něm je join. Startovní kód se zasekne.
+Producent vloží všechno a vrátí se, nikdo frontu nezavře a
+konzument se probudí pro poslední hodnotu, frontu vyprázdní a čeká na další,
+která nepřijde. Každá dvojice producent/konzument potřebuje způsob, jak říct *už
+nic nebude* — a to je `close`.
+'''
+hints = [
+  "Jeden řádek za feeding.await(io): hatch.close(io). Pak se taking.await(io) vrátí a program skončí.",
+  "close nezahodí, co je ve frontě ještě uvnitř; konzument dostává hodnoty, dokud není prázdná, a teprve pak uvidí error.Closed.",
+  "Konzument je jediný, kdo během běhu vypisuje, a main vypíše CONSUMED až po taking.await(io) — to pořadí drží zapisovač v bezpečí bez zámku.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.advanced.24.atomic"
+title = "Jedno slovo, žádný zámek"
+story = "Počet náprav zámek nepotřebuje. Všechno ostatní v počítací místnosti ano, a rozlišit je je ta práce."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Spusť jedno vlákno na hodnotu. Každé přičte svou hodnotu ke sdílenému
+`std.atomic.Value(i64)` a zvedne sdílený `std.atomic.Value(i64)` o jedna —
+nikde žádný mutex. Počkej na všechna přes join a vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Startovní kód se nepřeloží: worker bere ty dvě atomické hodnoty **hodnotou**,
+a `fetchAdd` potřebuje `*std.atomic.Value(i64)` — jediné, co parametr předaný hodnotou
+nabídne, je `*const`. To je záměr. Atomická hodnota je místo, na kterém se
+několik vláken dohodne, že ho budou měnit po jedné instrukci; její kopie
+by byla jiné místo a sdílení by bylo pryč. Předej
+adresy.
+
+Atomická hodnota není levnější mutex; je to jiný nástroj, pro jedno strojové
+slovo přečtené, změněné a zapsané jedinou instrukcí. `fetchAdd(v, .monotonic)`
+je ta instrukce. Ve chvíli, kdy spolu musí souhlasit dvě pole,
+se zámek vrací — neexistuje atomická hodnota pro „tyhle dvě věci, dohromady“,
+a proto měl `Counter` z předchozích úkolů mutex a tenhle
+nemá.
+
+`.monotonic` tu stačí, protože nic nezávisí na tom, *kdy* se tato
+zvýšení stanou viditelnými vůči jakémukoli jinému zápisu, jen na tom, že se žádné
+neztratí. Ta věta je doplňující otázka.
+'''
+hints = [
+  "Chyba říká, že chce *atomic.Value(i64) a má *const. Udělej z obou parametrů ukazatele a předej &total a &hits v n-tici.",
+  "fetchAdd vrátí předchozí hodnotu a přičtení provede atomicky; _ = návratovou hodnotu zahodí a není tu žádný zámek ani defer.",
+  "total.raw += value by se přeložilo a byl by to závod; fetchAdd je ta jediná instrukce, která jím není.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.advanced.25.parallel-sum"
+title = "Rozděl mýtnici"
+story = "Dvanáct tisíc odečtů náprav a čtyři budky. Vedoucí chce podíl každé budky i celkový součet a ten musí vyjít při každém běhu stejně."
+brief = '''
+Na prvním řádku je `k n`: `k` vláken a `n` hodnot. Na druhém řádku je `n` hodnot.
+
+Rozděl hodnoty na `k` souvislých kusů — kus `i` pokrývá indexy od
+`i * n / k` až po `(i + 1) * n / k`, ale bez něj, v celočíselné aritmetice —
+a nech vlákno `i` sečíst svůj kus do `partial[i]`. Počkej na všechna přes join, pak vypiš
+`CHUNK <i> <sum>` pro každý kus v pořadí a `TOTAL <sum of partials>`.
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+To je tvar, který s vlákny doopravdy zrychlí, a jediný
+na této mapě: každé vlákno čte svůj vlastní podřez a zapisuje do svého vlastního místa, takže
+tu není žádný zámek, žádná atomická hodnota, nic sdíleného kromě vstupu. Dej vláknu
+samotný podřez — `nums[begin..end]` je pohled a pohled je to, co má
+čtenář dostat — a ukazatel na jeho jediné místo. Vzorec pro
+hranice kusů je to, co dělá rozdělení přesným — poslední kus vždy končí na
+`n` a kus může být prázdný, když `k > n`, což zařídí jeden ze skrytých
+případů; prázdný řez má součet `0` bez zvláštního případu.
+'''
+hints = [
+  "Spočítej begin a end v main a tam řež: nums[begin..end] je pohled, který vlákno dostane, a &partial[i] je jediné místo, kam smí zapisovat.",
+  "Lokální součet uvnitř vlákna a jeden zápis do slot.* na konci zajistí, že se na sdílený řez sáhne přesně jednou za vlákno.",
+  "k > n udělá některé kusy prázdné — begin == end — a nums[begin..end] je prázdný řez, jehož smyčka for se prostě nespustí. Žádný zvláštní případ.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.advanced.26.futures"
+title = "Slib mi ten počet"
+story = "Vedoucí posílá běžce pro každé číslo a nestojí u průlezu a nečeká; čísla se vrátí, až se vrátí."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Spusť jednu úlohu `io.concurrent` na hodnotu, která vrátí její druhou mocninu.
+Posbírej futures do seznamu a počkej na ně pomocí `await` **v pořadí**, každou vypiš.
+Pak dej jednomístnou `std.Io.Queue(i64)` ještě jednomu vláknu, které do ní vloží `n`,
+a vypiš `READY <n>` z toho, co vyjde.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+Future je hodnota, která tu ještě není. `io.concurrent(square, .{ v })`
+spustí `square` v poolu runtime a dá ti `std.Io.Future(i64)`
+pro jeho návratovou hodnotu; `.await(io)` blokuje, dokud neexistuje, a pak ji
+předá, jednou. Čekání na futures v pořadí je to, co dá výstup do pořadí —
+samotné úlohy skončí, kdy skončí.
+
+Zig nemá `std::promise`; nejbližší je druhý konec téže
+trubky a 0.16 tu trubku už má. `std.Io.Queue(i64)` nad **jedno-
+prvkovým** bufferem je slib: jedna strana hodnotu vloží, druhá
+ji vybere a ten, kdo vybírá, blokuje, dokud tam není. Tak vlákno
+ohlásí jeden výsledek bez mutexu, příznaku nebo návratové hodnoty k obalení — a
+je to týž typ, jakým byl průlez před třemi úkoly, s bufferem o jednom místě.
+
+`io.concurrent` slibuje, že úloha poběží sama — selže s
+`error.ConcurrencyUnavailable`, když jí runtime nemůže dát vlákno —
+zatímco `io.async` dává slabší slib: funkce *může* být zavolána
+hned tam, dřív než se `async` vrátí, na runtime, který nemá druhé
+vlákno, které by nabídl. Když myslíš `concurrent`, řekni to nahlas.
+'''
+hints = [
+  "try io.concurrent(square, .{v}) vrací std.Io.Future(i64); průběžně ji připojuj do seznamu a future nikdy nekopíruj — čekej na ni přes ukazatel, for (squares.items) |*f|.",
+  "f.await(io) se dá zavolat přesně jednou na každou future a blokuje, dokud tam hodnota není; procházení seznamu v pořadí ti dá výstup v pořadí.",
+  "Hlásící vlákno dostane &ready a n; ready.getOneUncancelable(io) v main blokuje, dokud se put nestalo. Než main vrátí, počkej na vlákno přes join.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.advanced.27.optional-pointer"
+title = "Velikost, kterou kompilátor umí pojmenovat"
+story = "Řetěz mýtných stvrzenek na bodci v budce 2: každá stvrzenka drží tu další, až dolů k první ze směny, a nikdo nedrží žádnou stvrzenku dvakrát."
+brief = '''
+Standardní vstup je počet `n`, pak `n` částek v centech.
+
+Drž je v řetězu, jeden uzel na částku, v pořadí, v jakém přišly:
+
+```
+const Entry = struct {
+    cents: i64,
+    next: ?*Entry,
+};
+```
+
+Vypiš tři řádky:
+
+1. částky v pořadí, oddělené mezerou, nebo `-`, když žádné nejsou
+2. `SUM <total>`, z **rekurzivní** funkce nad řetězem
+3. `LAST <cents>` — částku na posledním uzlu — nebo `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+Startovní kód se nepřeloží a ta chyba je důvod, proč ukazatele existují.
+Napiš `next: Entry` a překladač musí rozložit `Entry` v paměti: osm
+bajtů pro `cents` plus kolik je velké `Entry` — což je právě to, co se
+snaží zjistit. *struct 'Entry' depends on itself.*
+
+`?*Entry` je ukazatel a ukazatel má velikost, kterou překladač už
+zná. Zig nemá `unique_ptr`; nejbližší je pravidlo, které vynucoval,
+dodržované ručně: **vlastníkem je alokátor.** `gpa.create(Entry)` ti dá
+uzel a `gpa.destroy(node)` ho vrátí, přesně jednou, a na
+otázku, *kdo* ho zničí, odpovídá konvence — řetěz vlastní
+své uzly, takže `main` řetěz projde a uvolní ho, než vrátí.
+`?` je ta část, kterou překladač kontroluje: `null` je konec
+řetězu i prázdný řetěz a nic nečte přes `?*Entry`, aniž by ho
+rozbalilo, takže nikde není žádný samostatný prázdný případ.
+'''
+hints = [
+  "Chybu překladu opraví jeden řádek: next: ?*Entry — a teď má struktura šestnáct bajtů, ať ukazuje na cokoli.",
+  "Stav ho odzadu dopředu: node = try gpa.create(Entry); node.* = .{ .cents = v, .next = head }; head = node. Stará hlava se stane ocasem nového uzlu.",
+  "Procházej pomocí while (walk) |node| : (walk = node.next); volitelná hodnota se rozbalí jednou za krok a smyčka skončí na null. Rekurzivní součet jsou dva řádky: null je 0, jinak cents plus součet zbytku.",
+  "defer freeChain(gpa, head) hned za deklarací head: defer čte head, až běží, na konci main, kdy je řetěz hotový.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.advanced.28.refcount"
+title = "Kdo to ještě drží"
+story = "Dvě měřidla čtou tutéž misku mincí přes jednu knihu a ta kniha musí zůstat, dokud nezmizí poslední měřidlo, a ani o vteřinu déle."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Dej hodnoty do řezu, který vlastní `Ledger`, jenž **počítá své držitele**:
+`share()` vydá popisovač a zvedne počet, `release(gpa)` počet sníží
+a uvolní řez, když dojde na nulu. Vezmi dva popisovače a drž
+pozorovatele, který se nepočítá. Vypiš čtyři řádky:
+
+1. `REF <sum>` — součet, přečtený přes druhý popisovač
+2. `SHARED <k>` — počet, dokud jsou oba popisovače naživu
+3. `ALIVE yes` — `watch.alive()`, dokud jsou
+4. `ALIVE no` — poté, co byly oba popisovače uvolněny
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+Zig nemá `shared_ptr`; nejbližší je to, čím `shared_ptr` je
+uvnitř, napsané tam, kde to vidíš. Minulý úkol byl jeden vlastník.
+Tenhle je počet vlastníků, držený vedle objektu, a objekt se
+uvolní, když počet dojde na nulu — tím popisovačem, který zrovna odešel poslední.
+`share()` zvedne počet; `release()` ho sníží. Ani jedno za tebe nic
+nedělá: žádný destruktor neběží u zavírací složené závorky, takže každému `share()` odpovídá
+`release()`, který jsi napsal, jinak řez uteče a alokátor `-O Debug` to
+řekne na stderr, když `main` vrátí.
+
+Pozorovatel je sám `Ledger`, na který se někdo dívá, aniž by se počítal. Vidí,
+jestli tam řez ještě je — `items` je `?[]i64` a `null` po
+posledním uvolnění je **nulová hodnota**, kterou ti typ dává pro „pryč“ — a
+řez naživu udržet nemůže. To je to, co přeruší cyklus, a o tom je
+poslední mapa na této cestě.
+'''
+hints = [
+  "share() jsou dva řádky: self.refs += 1; return self. Dvě volání dají SHARED 2 a mirror.items.? dosáhne na tentýž řez.",
+  "release() sníží počet a teprve když dojde na nulu, uvolní řez a nastaví items na null — ten null je to, co čte alive().",
+  "Uvolni oba popisovače; první uvolnění samo nic neuvolní, druhé ano. Řekni nahlas proč: to je otázka, na kterou se tenhle úkol doopravdy ptá.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.advanced.29.take"
+title = "Vezmi si to s sebou"
+story = "Vedoucí každý lístek před předáním jezdci okopíruje a kopírka je nejpomalejší věc na mýtnici."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků textu.
+
+Postav jeden `Docket` na řádek do seznamu `pile`, pak každý lístek předej
+do druhého seznamu, `sent`, a vypiš text každého velkými písmeny ze `sent`,
+pak `SENT <n>`, `COPIES <c>`, `MOVES <m>`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` vlastní svůj text — `[]u8`, který alokoval — a počítá, co se s ním
+děje: `copy(gpa)` zduplikuje bajty a zvedne jednu globální proměnnou, `take()` zvedne
+druhou. Startovní kód hlásí `COPIES 2`: `sent.append(gpa, try d.copy(gpa))`
+zduplikuje každý lístek, i s bajty.
+
+Zig nemá sémantiku přesunu ani přesouvací konstruktor; nejbližší je
+disciplína a tenhle úkol ji vypisuje. Přiřazení struktury zkopíruje její
+hlavičku — u `Docket` ukazatel a délku textu — takže `sent.append
+(gpa, d)` by nechalo **dva** lístky, které si oba myslí, že vlastní tytéž
+bajty, a druhé `free` z nich je pád. `take()` je poctivé
+předání: vrátí lístek držící text a zdroji nechá
+**prázdný řez**, takže zdroj jde pořád uvolnit — což neuvolní nic
+— a nikdy se nedá číst, jako by text pořád měl. To je stav *platný, ale
+nespecifikovaný* po přesunu v C++, vypsaný jako hodnota, kterou sis
+vybral.
+'''
+hints = [
+  "Změní se jedno volání: sent.append(gpa, d.take()). take potřebuje *Docket, a proto už smyčka prochází hromadu s |*d|.",
+  "Smyčka deinit hromady pořád běží přes každý lístek; po take drží každý prázdný řez a deinit u prázdného free přeskočí. Nic se neuvolní dvakrát.",
+  "sent.append(gpa, d.*) by se přeložilo a vypsalo COPIES 0 MOVES 0 — a pak by oba seznamy na konci main uvolnily tytéž bajty. Počítadla existují proto, aby poctivé předání a dvojité free nevypadaly stejně.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.advanced.30.generic-ring"
+title = "Kruh pro jakýkoli náklad"
+story = "Měřič náprav drží posledních pár odečtů a vedoucí drží posledních pár čísel značek, a Alex napsal tentýž kruhový buffer dvakrát."
+brief = '''
+Na prvním řádku je kapacita `cap`. Na druhém řádku je seznam celých čísel; na třetím
+seznam slov.
+
+Napiš **jeden** `Ring(comptime T: type) type`: buffer s pevnou kapacitou, který
+drží posledních `cap` do něj vložených položek, přepisuje nejstarší
+a dá se procházet v pořadí příchodu. Vlož celá čísla do `Ring(i64)` a
+slova do `Ring([]const u8)`, vypiš obsah každého kruhu na jeden řádek,
+pak `DROPPED <k>` — kolik položek bylo celkem vytlačeno.
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+Startovní kód se nepřeloží: `Ring` je napsaný pro `i64` a slova
+nemají kam jít. Generický typ v Zigu je **funkce, která vrací
+struct**, přesně jako `Pair(T)` dříve na této cestě: `fn Ring(comptime T:
+type) type { return struct { ... }; }`, s `[]T` pro místa a `T` pro
+`push`. Celé je to napsané bez znalosti toho, co je `T` — jen že
+se dá kopírovat — a `Ring(i64)` a `Ring([]const u8)` jsou dva různé
+typy vyražené z jedné definice.
+
+Dej mu i iterátor. Kruh není uložený v pořadí příchodu —
+nejstarší položka je tam, kde se zapisovací hlava chystá přepisovat — takže `next()`
+musí udělat aritmetiku, a to je ta část, kterou stojí za to napsat, a ne
+přečíst. Výpis potřebuje jednu větev `comptime` na `T`, protože slovo je
+`{s}` a číslo je `{d}`.
+'''
+hints = [
+  "fn Ring(comptime T: type) type { return struct { ... }; } kolem struktury, []T pro místa, T pro push a const Self = @This(), abys strukturu pojmenoval zevnitř. Pak Ring(i64).init a Ring([]const u8).init na dvou místech použití.",
+  "Nejstarší položka sedí na (head + cap - count) % cap; položka k v pořadí příchodu je (oldest + k) % cap. Iterátor potřebuje nést jen k a ukazatel na kruh.",
+  "fn printRing(w, comptime T: type, ring: *const Ring(T)) prochází iterátor; if (comptime T == []const u8) vybere {s} místo {d} a druhá větev se pro to T nikdy neanalyzuje.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "zig.advanced.31.invalidation"
+title = "Odebírat za chůze"
+story = "Vedoucí škrtá dodávky ze seznamu odstavného pruhu, zatímco ho čte shora dolů, a po každém škrtu tu další přeskočí."
+brief = '''
+Na prvním řádku je `n t`. Na druhém řádku je `n` celých čísel.
+
+Odeber ze seznamu každou hodnotu menší než `t`, **na místě**, a vypiš, co
+zbylo, na jeden řádek (nebo `-`, když nic), pak `REMOVED <k>`.
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+Startovní kód je ta chyba, kterou každý jednou napíše: prochází podle indexu, zavolá
+`orderedRemove(i)` a pak udělá `i += 1` — a na prvek, který se sesunul na
+místo `i`, se nikdo nepodívá. Dvě sousední malé hodnoty a druhá
+přežije. Ta chyba je aspoň dobře definovaná. Její dvojče s řezem ne: `for
+(list.items) |v|` vezme řez **jednou**, ukazatel a délku, a
+`orderedRemove` uvnitř smyčky seznam pod ní zkrátí. Smyčka
+dál prochází starou délku, čte místo za novým koncem — paměť, kterou
+seznam pořád vlastní a kterou už nic nemyslí — a žádná kontrola Debug se nespustí,
+protože bajty jsou uvnitř alokace. Obvykle to vypadá, že to
+fungovalo, což je horší.
+
+`orderedRemove(i)` posune všechno za `i` o jedno dolů a vrátí,
+co odebralo. Takže: při zásahu odeber a **neposouvej se**; při minutí
+`i += 1`; nikdy obojí. Smyčka `while` s přičtením uvnitř větve
+je ten tvar a je to tentýž tvar na propojeném seznamu i na hašovací mapě.
+'''
+hints = [
+  "Sundej : (i += 1) z while. Posouvej se pomocí i += 1 jen ve větvi, která neodebírala; v druhé větvi už orderedRemove přesunulo další prvek na místo i.",
+  "moorings.items.len se znovu čte při každém testu smyčky, a to dělá while správným: for přes řez by délku zmrazil na začátku.",
+  "Procházení pozpátku od konce je ta druhá správná odpověď — odebrání na i nikdy nenaruší místa pod ním — a je to ta, kterou dát, když se zeptají na verzi bez větve.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "zig.advanced.32.overflow"
+title = "Počítadlo, které se zastavilo"
+story = "Počítadlo litrů na mýtnici je i32 a na 2147483647 litrech spadne závora s panic: integer overflow na obrazovce budky."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel, z nichž se každé vejde do
+`i64`. Jejich průběžný součet se do `i64` vejde také.
+
+Vypiš dva řádky: `INT32 OK`, když se každý průběžný součet po cestě vejde do
+`i32`, nebo `INT32 OVERFLOW <i>` s indexem od 0 první hodnoty,
+která by ho vytlačila ven; pak `INT64 <total>`.
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+Startovní kód drží součet v `i32` a na druhé hodnotě zpanikaří:
+`panic: integer overflow`. To Zig dělá přesně to, co tahle země slíbila
+— v `-O Debug` celé číslo, které přeteče, to řekne a zastaví se, a široký
+případ se zastaví o řádek dřív, na `@intCast`, který by oříznul
+`5000000000`. Čti tu paniku jako dar a pak si přečti zbytek
+smlouvy: `+%` přetáčí, `+|` saturuje a obyčejné `+` v Debug panikaří a je
+**nedefinované chování v `-O ReleaseFast`**, kde je kontrola vypnutá a
+optimalizátor předpokládá, že se to nikdy nestane — takže `total + v < total` s kladným
+`v` je tam *vždy nepravda* a test se smaže, přesně jako ho gcc a
+clang smažou pro C++.
+
+Přetečení tedy nikdy neodhaluješ tím, že ho způsobíš. Odhalíš ho *před*
+úzkým sčítáním, v širším typu nebo porovnáním s mezemi —
+`std.math.minInt(i32)` a `std.math.maxInt(i32)` — a očekávaný výstup tohoto programu
+nezávisí na ničem, co by kterýkoli režim sestavení nechal nedefinované.
+'''
+hints = [
+  "Drž součet v i64 a po každém přičtení ho porovnej se std.math.minInt(i32) a maxInt(i32). Žádná aritmetika v i32 se nikdy nestane, takže nic nemůže zpanikařit a nic není nedefinované.",
+  "Zaznamenej jen první index, který opustí rozsah — ?usize, který se nastaví jednou — protože pozdější hodnota může součet vrátit dovnitř a otázka zněla, kde ho poprvé opustil.",
+  "Když musíš sečíst dvě i32 a chceš vědět, jestli je to bezpečné: @addWithOverflow(a, b) vrátí přetočený součet a bit přenosu, definované v každém režimu sestavení. To je ta kontrola; znaménko obyčejného součtu je to, co optimalizátor smaže.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "zig.advanced.33.stop-flag"
+title = "Zastav se, když tě požádají"
+story = "Noční pruh běží, dokud mu někdo neřekne, ať přestane, a až do téhle směny to nikdo nedokázal."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Spusť dvě vlákna. První sečte hodnoty a uloží výsledek.
+Druhé bere **příznak zastavení**, `*std.atomic.Value(bool)`, a točí se ve smyčce, dokud
+nepřečte `true`; když ho přečte, spustí funkci `onStop`, která nastaví
+druhý příznak, a pak zaznamená, že se zastavilo. Z `main` nastav příznak
+zastavení, počkej na obě přes join a vypiš:
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std.Thread` nemá `stop_token` ani `jthread`; nejbližší je
+to, z čeho jsou udělané, předané ručně. Žádost o zastavení je `bool`, který
+žadatel zapíše a worker čte, a protože na něj sahají dvě vlákna, je to
+atomická hodnota: `stop.store(true, .release)` na jedné straně, `stop.load(.acquire)`
+ve smyčce workera na druhé. Vlákno, které kontroluje svůj příznak, je vlákno,
+které jde vždycky vypnout; to, které nekontroluje, je noční pruh startovního kódu,
+a jeho `join` by se nikdy nevrátil.
+
+`stop_callback` v C++ běží na vlákně žadatele ve chvíli, kdy se o zastavení
+požádá; tady si worker spustí `onStop` sám, když příznak uvidí,
+což je tentýž slib — *něco se stane, protože se požádalo o zastavení*
+— dodržený z druhé strany. `join` za `store` je destruktor `jthread`,
+vypsaný: požádej, pak čekej. `std.Thread.yield()` uvnitř
+smyčky dá jádro komukoli dalšímu, kdo ho chce; holé točení taky projde a
+taky promrhá jádro.
+'''
+hints = [
+  "Vlákno pruhu bere tři příznaky přes ukazatel; jeho smyčka je while (!stop.load(.acquire)) std.Thread.yield() catch {}; a za smyčkou zavolá onStop a uloží stopped.",
+  "Spusť pruh dřív, než nastavíš příznak, a počkej na něj přes join až potom. Příznak nastavený dřív, než vlákno začne, je v pořádku — zastaví se při první kontrole — ale join bez store se nikdy nevrátí.",
+  ".release na store a .acquire na load jsou ta dvojice, která zviditelní, co se stalo před store, po load; .monotonic by tu taky prošlo a pohovorující se zeptá proč.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "zig.advanced.34.unreachable"
+title = "Unreachable"
+story = "07:59 na estakádě Canal Road. Model pruhů označí jednu větev za nedosažitelnou, ranní provoz na ni dosáhne a všechny pruhy se naráz zavřou — zatímco vlákno pruhu pořád čte buffer, který už mýtnice vrátila."
+brief = '''
+Na prvním řádku je `w n`: `w` pruhů a `n` odečtů. Na druhém řádku jsou odečty.
+
+`pump(gpa, w, ledger)` spustí `w` vláken nad odečty, které drží
+`Ledger` s počítáním odkazů (ten z doby před třemi úkoly); vlákno `i` sečte
+odečty od `i * n / w` až po `(i + 1) * n / w` do `partial[i]` a
+`pump` vrátí dílčí součty. `main` vypíše `PUMP <i> <sum>` pro každý,
+`TOTAL <sum>` a pak `FREED yes`, jestli byly odečty uvolněny do
+chvíle, kdy je všechno hotové — pozorováno přes `alive()` knihy.
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+Startovní kód selže dvakrát a ta dvě selhání jsou dvě poloviny této
+země.
+
+První je model pruhů. `pump` spočítá hranice každého pruhu a pak
+řekne `if (begin == end) unreachable;` — *pruh bez provozu se nemůže
+stát*. Tři pruhy nad dvěma odečty, a stane se. `unreachable`
+není komentář ani assert: je to ten jediný řádek v Zigu, který znamená
+**předpokládej**. V `-O Debug` je dosažení `panic: reached unreachable code`
+a mýtnice se zastaví s důvodem na obrazovce. V `-O ReleaseFast` ti
+překladač *uvěří* — větev se smaže a všechno, co mohlo
+vést jen k ní, se smaže s ní — a program, který na ni dosáhne, je
+nedefinovaný, přesně jako je nedefinovaný program v C++, který čte přes visící ukazatel.
+Panika je poctivá verze téže smlouvy. Smaž
+to tvrzení a obsluž ten případ: prázdný pruh má součet `0`.
+
+Druhé je vlastnictví. `pump` startovního kódu **uvolní** knihu
+dřív, než spustí pruhy — *workeři mají svůj řez, popisovač není
+potřeba* — a to uvolnění je poslední, takže se odečty uvolní
+a workeři je stejně čtou. V Debug alokátor natře paměť, kterou
+vzal zpátky, hodnotou `0xAA`, každý bajt, takže každý odečet se vrátí jako
+`-6148914691236517206` a první pruh, který dva z nich sečte, zastaví
+mýtnici s `panic: integer overflow` — to je selhání, které ukazuje viditelný případ,
+kde má každý pruh provoz a na `unreachable` se nikdy nedosáhne:
+součet, který na žádném odečtu ze vstupu přetéct nemůže, a trasa ukazující
+na řádek, který chybou není. V ReleaseFast žádný nátěr ani
+kontrola není:
+pruhy čtou cokoli, co tam dala další alokace, nebo stránku, kterou jádro
+vzalo pryč. To je čtení přes visící ukazatel a je to nejdražší druh
+chyby, protože neselže tam, kde je chyba.
+
+Oprav vlastnictví, ne příznak. Každý pruh si **vezme podíl**
+knihy dřív, než začne, a uvolní ho, když skončí, takže odečty
+žijí přesně tak dlouho jako poslední vlákno, které je drží — ať
+pruhy skončí v jakémkoli pořadí. `pump` počká přes join, než vrátí, a uvolní popisovač,
+který mu `main` dal, jako poslední. Zpátky v `main` je `alive()` `false`: odečty
+byly uvolněny, jednou, posledním uvolněním — vlastním uvolněním `pump`, po joinech —
+a nikdo je pořád nečetl. Počet je atomický, protože uvolnění pruhů
+spolu závodí;
+kniha sama vláknově bezpečná není a být nemusí, protože nikdo
+do odečtů nezapisuje.
+
+To je celá země v jednom programu. Kontroly tě zastavily pokaždé,
+když ses mýlil, a nástroje, které tě dělají správným — počet, který říká, kdo
+tohle drží, join, který čeká, `defer`, který uvolňuje — jsou
+tytéž, které jsi potkal na základní cestě.
+'''
+hints = [
+  "Smaž unreachable a nech prázdný pruh běžet: begin == end je prázdný řez a jeho součet je nula. Tvrzení, které nedokážeš dokázat, není tvrzení, které se má dělat.",
+  "Dej každému pruhu podíl: spusť ho s ledger.share() a nech ho dát defer ledger.release(gpa). Podíl pruhu je to, co drží odečty naživu; uvolní se, když funkce pruhu vrátí, ne když vrátí pump.",
+  "Vlastní uvolnění v pump se přesune do defer na začátku pump, takže běží po joinech — až budou odečty přečtené — a uvolňuje popisovač, který main odevzdal.",
+  "partial se pruhům předává po místech, a to je správně: pump ho vlastní, pump počká přes join, než ho vrátí, a každý pruh zapisuje jen do svého místa. Kdyby si main nechal podíl, FREED by bylo no — odečty by byly naživu, protože je main pořád držel, a to je ta druhá odpověď, u které tenhle boss přijme, že ji umíš vysvětlit.",
+]

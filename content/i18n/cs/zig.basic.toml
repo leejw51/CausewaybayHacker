@@ -1,0 +1,913 @@
+# ZIG LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/zig/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "zig.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.basic.01.first-light"
+title = "První světlo"
+story = "06:00 u portálu v Causeway Bay. Cedule nad budkou 1 se rozsvítí, protože něco zapsalo na správnou adresu, a řádek, který ukazuje, je prázdný."
+brief = '''
+Vypiš přesně:
+
+```
+hello, causewaybay
+```
+
+Malá písmena, jedna čárka, jedna mezera, jeden řádek. Nic jiného.
+
+Výstup jde v Zigu přes zapisovač. `w` je jeden takový, postavený nad
+standardním výstupem s bufferem, a `w.print(fmt, args)` přes něj zapíše
+formátovaný řetězec: formát, pak n-tici argumentů — `.{}`, když žádné nejsou.
+Může selhat, takže má `try`. Buffer se na terminál dostane až při
+vyprázdnění a to udělá `defer w.flush()` nad dírou při odchodu z `main`.
+
+```
+try w.print("hello, causewaybay\n", .{});
+```
+
+Napiš ten řádek na `// your code here`.
+'''
+hints = [
+  "try w.print(\"hello, causewaybay\\n\", .{}); je celý program. Zapisovač i jeho flush už tam jsou.",
+  "Řetězec musí být přesný: malá písmena, jedna čárka, za ní jedna mezera a na konci \\n.",
+  "print vrací chybové sjednocení a Zig nedovolí jedno ignorovat: try vpředu není volitelné.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.basic.02.bindings"
+title = "Tabulka budky"
+story = "Tabulka u budky 1 ukazuje noční počet náprav a pak dvě prázdná místa: počet zdvojený kvůli zpátečním jízdám a počet na druhou pro audit."
+brief = '''
+Vazba je v Zigu `const` nebo `var`: `const n = try std.fmt.parseInt(i64,
+text, 10);` přečte z `text` 64bitové celé číslo a pojmenuje ho `n`, a
+`const` se pak nedá změnit. `try w.print("{d}\n", .{n})` ho vypíše:
+`{d}` je desítkové číslo a n-tice za formátem je to, čím se vyplní.
+Aritmetika na tom jméně je prostě aritmetika: `n * 2`, `n * n`.
+
+```
+try w.print("{d}\n", .{n * n});
+```
+
+Program načte `n` a vypíše ho a jeho dvojnásobek. Napiš ten řádek na
+`// FILL`: třetí výpis, `n * n`.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "try w.print(\"{d}\\n\", .{n * n}); — stejný tvar jako řádek nad ním, s n * n v n-tici.",
+  "i64 udrží 3000000000 na druhou; i32 by přetekl a v Debug je přetečení panika, a proto tabulka říká i64.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.basic.03.types"
+title = "Rozdělená tržba"
+story = "Mýtnice dělí noční tržbu mezi otevřené budky a účetní kniha píše každý podíl jako celé číslo, vždycky, i když celé není."
+brief = '''
+Zig dvě znaménková celá čísla pomocí `/` nevydělí: chce, abys řekl, jaké
+zaokrouhlení myslíš. `@divTrunc(a, b)` zaokrouhluje k nule, takže `7 / 2` je
+`3`, a `@rem(a, b)` je zbytek, `1`. Aby vyšlo `3.5`, musí být obě strany
+napřed desetinná čísla: `@floatFromInt(a)` převede celé číslo a `@as(f64,
+...)` říká, jakým floatem se stane. `{d:.2}` vypíše float s přesně
+dvěma desetinnými místy.
+
+```
+try w.print("{d}\n", .{@divTrunc(a, b)});
+try w.print("{d}\n", .{@rem(a, b)});
+try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});
+```
+
+Celočíselné dělení a zbytek se vypisují. Napiš třetí řádek na `// FILL`:
+dělení jako `f64` se dvěma desetinnými místy.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "try w.print(\"{d:.2}\\n\", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});",
+  "Převod potřebují oba operandy: Zig nedělí f64 číslem i64 a @floatFromInt potřebuje @as, aby věděl, jaký float udělat.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.basic.04.int-types"
+title = "Šířky počítadel"
+story = "Počítadlo náprav v budce 3 je široké 32 bitů a účetní kniha mýtnice 64; počet zkopírovaný z jednoho do druhého si hodnotu udrží, jen když to někdo řekne."
+brief = '''
+Zig pojmenovává celá čísla podle šířky: `i32` a `i64` jsou znaménková,
+`u32` a `u64` bezznaménková. Hodnota se mezi šířkami přesouvá pomocí
+`@intCast`, které si cílový typ vezme z místa, kam výsledek jde — z `: u64`
+na vazbě — a v Debug zpanikaří, když se hodnota nevejde. `std.math.maxInt(T)`
+je největší hodnota, kterou daná šířka udrží.
+
+```
+const b: u64 = @intCast(a);
+try w.print("{d}\n", .{std.math.maxInt(u64)});
+```
+
+`a` se načte jako `i32`. Napiš řádek s přetypováním na první `// FILL` a
+druhý řádek výpisu na druhý.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "const b: u64 = @intCast(a); — přetypování si šířku vezme z vazby, do které dopadne.",
+  "std.math.maxInt(u64) je 18446744073709551615; řádek s i32 nad ním je totéž volání s druhým typem.",
+  "Startovní kód se nepřeloží, dokud je a nepoužité: Zig odmítne jméno, které nic nečte, a to odmítnutí ukazuje na díru.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.basic.05.big-int"
+title = "Třicet dva bajtů"
+story = "Štítky Autotoll jsou 32bajtové klíče a čtečka na rámu je bere po bajtu od velkého konce; buffer je samá nula, dokud se do něj bajty nevloží."
+brief = '''
+32bajtové celé číslo — štítek, klíč, haš — je `[32]u8`: 32 bajtů,
+big-endian, nejvýznamnější bajt první, a `[_]u8{0} ** 32` je takové
+pole, samé nuly. `u64` vyplní posledních osm z nich. Posun doprava o
+`8 * i` bitů přinese bajt `i` (počítáno od malého konce) dolů na
+dno — velikost posunu musí být `u6`, a tím ji udělá `@intCast` —
+a `@truncate` ponechá jen bajt, který se vejde do `u8`.
+
+```
+buf[31 - i] = @truncate(v >> @intCast(8 * i));
+```
+
+Smyčka přes `i` i šestnáctkový výpis (`{x:0>2}` je jeden bajt jako dvě
+šestnáctkové číslice) jsou napsané. Napiš ten řádek jako tělo smyčky na `// FILL`.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = @truncate(v >> @intCast(8 * i)); — poslední index dostane nejnižší bajt.",
+  "v >> @intCast(8 * i) posune bajt i na dno; @truncate zbytek zahodí. Bez posunu dostane každé místo tentýž nejnižší bajt.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.basic.06.floats"
+title = "Měřič vzduchu"
+story = "Monitor vzduchu v tunelu zapisuje v f64 a tabule nad vjezdem je f32, a ty dva se rozcházejí na desátém desetinném místě."
+brief = '''
+`f64` je 64bitový float a `f32` 32bitový. `std.fmt.parseFloat(f64,
+s)` rozparsuje text na `f64`; zúžení na `f32` je `@floatCast`,
+s cílovým typem na vazbě, a právě při přetypování se ztrácí přesnost
+— `0.1` nemá přesný binární tvar a `f32` si z jeho číslic ponechá méně.
+Zig by `f32` vypsal s nejmenším počtem číslic, které se přečtou zpátky jako
+tentýž `f32`, což ztrátu schová, a tak druhý výpis napřed rozšíří `y` zpět
+na `f64`: deset desetinných míst pak ukáže, co float doopravdy drží.
+
+```
+const x = try std.fmt.parseFloat(f64, s);
+const y: f32 = @floatCast(x);
+```
+
+`s` je načtený řádek a oba výpisy používají deset desetinných míst. Napiš
+ty dva řádky na `// FILL`.
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "const x = try std.fmt.parseFloat(f64, s); — text na f64; může selhat, takže má try.",
+  "const y: f32 = @floatCast(x); — zúžení je vypsané a šířka jde z vazby; y se vypíše s méně pravými číslicemi.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.basic.04.strings"
+title = "Značka"
+story = "Značka náklaďáku je namalovaná vpředu velkými písmeny, zadní kamera ji čte pozpátku a záznam mýtnice ji nemá ani jedním způsobem."
+brief = '''
+Řádek ze vstupu je `[]const u8`: řez — ukazatel a délka — který můžeš
+číst, ale ne zapisovat. `line.len` je jeho délka. Chceš-li ho změnit,
+napřed ho zkopíruj: `gpa.dupe(u8, line)` dá `[]u8`, který vlastníš, a
+`defer gpa.free(...)` pod ním bajty vrátí. `for (upper) |*c|`
+projde kopii s ukazatelem na každý bajt, takže `c.* = ...` ho zapíše zpátky
+na místě; `std.mem.reverse(u8, rev)` obrátí řez na místě.
+
+```
+for (upper) |*c| c.* = std.ascii.toUpper(c.*);
+std.mem.reverse(u8, rev);
+```
+
+`upper` i `rev` jsou kopie řádku, uvolněné při odchodu. Napiš ty dva
+řádky na dvě značky `// FILL`.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "for (upper) |*c| c.* = std.ascii.toUpper(c.*); — hvězdička u zachycení je ukazatel na bajt a c.* je bajt sám.",
+  "std.mem.reverse(u8, rev); — na místě, nic se nevrací; funguje to, protože rev je []u8, který vlastníš, ne []const u8, jímž je vstup.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.basic.08.string-slices"
+title = "Krátká značka"
+story = "Tabule nad pruhy má místo na čtyři znaky značky a jednu značku za nimi a úředník tam zkopíruje celou značku."
+brief = '''
+`s[0..4]` je řez řetězce: čtyři bajty od `0`, a je to **pohled** —
+sdílí paměť s `s` a nemůže růst. Řetězec, do kterého se dá přidávat, je
+`std.ArrayList(u8)`: `appendSlice(gpa, bytes)` zkopíruje bajty na jeho
+konec a každé volání jmenuje `gpa`, protože seznam si v 0.16 svůj
+alokátor nepamatuje. `t.items` jsou dosavadní bajty.
+
+```
+try t.appendSlice(gpa, s[0..4]);
+try t.appendSlice(gpa, "...");
+```
+
+`s` je načtený řádek (nejméně čtyři znaky) a `t` je prázdný seznam,
+uvolněný při odchodu. Napiš ty dva řádky na dvě značky `// FILL`.
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "try t.appendSlice(gpa, s[0..4]); — začni na 0, skonči před 4; seznam ty čtyři bajty zkopíruje dovnitř.",
+  "try t.appendSlice(gpa, \"...\"); — řetězcový literál je taky řez a totéž volání ho připojí.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.basic.09.int-slices"
+title = "Dva z prostředka"
+story = "Záznam směny chce druhý a třetí počet z budek zkopírovaný samostatně a za nimi připojenou celou řadu, a kopie je celá řada dvakrát."
+brief = '''
+Obsah seznamu je řez, `v.items`, a řez z něj je `v.items[1..3]` —
+prvky 1 a 2, až po 3, ale bez ní — což je pořád **pohled** na `v` a nic
+nekopíruje. Kopií je připojení: `part.appendSlice(gpa, v.items[1..3])`
+zkopíruje ty dva do tvého vlastního seznamu a totéž volání s celým
+`v.items` připojí všechno.
+
+```
+try part.appendSlice(gpa, v.items[1..3]);
+try part.appendSlice(gpa, v.items);
+```
+
+`v` drží celá čísla z řádku (nejméně tři) a `part` je prázdný seznam.
+Napiš ty dva řádky na dvě značky `// FILL`.
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "try part.appendSlice(gpa, v.items[1..3]); — konec řezu je o jedno za posledním vzatým prvkem.",
+  "try part.appendSlice(gpa, v.items); — celý řez, připojený za ty dva.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.basic.10.byte-slices"
+title = "První tři bajty"
+story = "Drát čtečky štítků nese značku jako bajty, přijímač si nechá první tři a poslední dva přilepí na konec, a buffer, který vypíše, je celá značka."
+brief = '''
+Bajty jsou `u8` a načtený řádek už jeden bajtový řez je,
+`[]const u8`. Platí tytéž dva obraty jako v minulém uzlu: `bytes[0..3]`
+je pohled na první tři, `bytes[bytes.len - 2 ..]` pohled na poslední
+dva — otevřený konec vede až na konec — a `appendSlice` zkopíruje pohled
+do seznamu, který vlastníš. `{x:0>2}` vypíše jeden bajt šestnáctkově; `{s}`
+vypíše seznam jako text.
+
+```
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);
+```
+
+`bytes` drží řádek (nejméně tři bajty) a `head` je prázdný seznam. Napiš
+ty dva řádky na dvě značky `// FILL`. Šestnáctkový i textový řádek se
+vypíšou za tebe.
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "try head.appendSlice(gpa, bytes[0..3]); — tři bajty, zkopírované do seznamu.",
+  "try head.appendSlice(gpa, bytes[bytes.len - 2 ..]); — od dvou před koncem až na konec; nic za .. znamená konec.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.basic.05.loops"
+title = "Počítání náprav"
+story = "Budka 3 počítá jednu nápravu za tik, tabulka chce průběžný součet a to, které z tiků připadly na třetí nápravu."
+brief = '''
+Počítaná smyčka je v Zigu `while` s pokračovacím výrazem: `while (i
+<= n) : (i += 1)` otestuje, provede tělo, pak udělá `i += 1` a testuje
+znovu. Počítadlo je `var` deklarovaná před ní, takže `i` projde `1`
+až `n` včetně. `@rem(i, 3) == 0` říká „násobek 3“ — `%` na
+znaménkových celých číslech tady není.
+
+```
+while (i <= n) : (i += 1) {
+```
+
+Tělo je napsané: přičte `i` do `sum` a počítá násobky 3.
+Napiš ten řádek `while` na `// FILL`, místo toho, který končí o jedno
+dřív.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "while (i <= n) : (i += 1) { — test, tělo, pak pokračovací výraz za dvojtečkou.",
+  "<= n, ne < n: počet zahrnuje n-tou nápravu.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.basic.06.functions"
+title = "Mýtný tarif"
+story = "Mýtnice účtuje pět za nápravu za prvních deset náprav a tři za každou další, a tabule s tarifem říká jen fare."
+brief = '''
+Funkce pojmenovává kus práce: `fn`, její jméno, parametry s jejich
+typy, návratový typ a tělo, které končí `return`. `fn
+fare(rides: i64) i64` bere jedno číslo a jedno vrací. Funkce může
+`return` předčasně zevnitř `if` a všechno za tím řádkem je
+druhý případ. Zig odmítne řádek, o kterém dokáže, že se nikdy nespustí,
+a proto zástupné `return` zmizí, jakmile přijdou dva skutečné řádky.
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+Tarif: prvních 10 jízd stojí 5 za kus, každá další jízda stojí
+3. `main` načte `n` a vypíše `fare(n)`. Napiš ty dva řádky jako tělo
+`fare` na `// FILL`, místo `return rides;`.
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; — pak na dalším řádku return 50 + (rides - 10) * 3;",
+  "Deset jízd po 5 je 50 a každá jízda za desátou k tomu přidá 3.",
+  "Smaž return rides; — se dvěma returny nad ním ho překladač nazve nedosažitelným kódem a zastaví se.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.basic.07.structs"
+title = "Jedna budka, tři pole"
+story = "Budka 5 píše jméno pruhu, mýtné a počet vozidel na tři oddělené tabulky a nikdo je nedal na jednu."
+brief = '''
+`struct` seskupí pojmenovaná pole do jedné hodnoty a `fn` deklarovaná uvnitř
+je metoda: `s.total()` předá `s` jako `self` a pole se čtou přes něj,
+`self.price`. Při sestavení se jmenuje každé pole, v libovolném
+pořadí: `Stall{ .name = name, .price = price, .qty = qty }`. Zig nemá
+poziční tvar; zapomenuté pole je chyba překladu, ne nula.
+
+```
+return self.price * self.qty;
+const s = Stall{ .name = name, .price = price, .qty = qty };
+```
+
+`Stall` má jméno, cenu a množství a `main` vypíše
+`name: total`. Napiš ty dva řádky na dvě značky `// FILL`: první je tělo
+`total()`, druhý staví `s` v `main`.
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "return self.price * self.qty; uvnitř total() a const s = Stall{ .name = name, .price = price, .qty = qty }; v main.",
+  "Každé pole se jmenuje s tečkou na začátku: .name = name. Není tu pořadí, které by šlo splést, jen jméno, které jde vynechat.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.basic.08.enums"
+title = "Barvy linek"
+story = "Přestupní cedule u ústí tunelu jmenuje tři linky MTR pro autobusy, které vyjíždějí, a barevný proužek vedle každé je přetřený."
+brief = '''
+`enum` je uzavřená množina pojmenovaných hodnot: `.island`, `.tsuen_wan`,
+`.kwun_tong` a nic jiného. `switch` nad ním je výraz, který vybere
+větev pro hodnotu, kterou drží, a každá větev je `.name => value,`.
+Switch musí pokrýt každou hodnotu: větev `else` pokryje ty, které jsi
+nejmenoval, a jakmile pojmenuješ všechny, Zig odmítne `else`, na které
+nikdy nedojde — takže `else => "",` zmizí, jakmile přijdou ty dvě větve.
+
+```
+.tsuen_wan => "red",
+.kwun_tong => "green",
+```
+
+`parse` převede slovo na `Line` a větev `.island` je napsaná.
+Napiš ty dvě větve na značky `// FILL`, pod tu pro `.island`,
+a smaž `else`.
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  ".tsuen_wan => \"red\", a .kwun_tong => \"green\", — stejný tvar jako větev .island, i s čárkou.",
+  "Hodnota výčtu se píše s tečkou na začátku, když je typ známý: .tsuen_wan, nikdy Line::TsuenWan.",
+  "Smaž else => \"\", — jakmile jsou pojmenované všechny tři, překladač ohlásí nedosažitelnou větev else a zastaví se.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.basic.09.vector"
+title = "Ráno, v pořadí"
+story = "Každá budka hlásí svůj počet přes mýtnici po jednom čísle a úředník směny je nemá kam dát, dokud se neozve poslední budka."
+brief = '''
+`std.ArrayList(i64)` je rostoucí pole a čtyři věci, které se s ním dělají,
+jsou přidat, odebrat, upravit a seřadit. `append(gpa, x)` přidá na konec;
+`orderedRemove(i)` odebere prvek na indexu `i`, zavře mezeru a
+prvek vrátí — `_ =` ho zahodí, protože Zig nedovolí, aby hodnota
+nevysloveně spadla na zem; `items[i] = x` přepíše, co tam je;
+`std.mem.sort(i64, xs.items, {}, std.sort.asc(i64))` seřadí řez
+vzestupně. Index `0` je začátek.
+
+```
+try xs.append(gpa, 99);
+_ = xs.orderedRemove(0);
+xs.items[0] = 700;
+std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));
+```
+
+`xs` drží celá čísla z řádku. Napiš ty čtyři řádky na čtyři značky
+`// FILL`: přidej `99` na konec, odeber první prvek, nastav nový první
+prvek na `700`, pak seřaď. Vypíše se seznam, pak jeho délka.
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "try xs.append(gpa, 99); _ = xs.orderedRemove(0); xs.items[0] = 700; std.mem.sort(i64, xs.items, {}, std.sort.asc(i64)); — přidat, odebrat, upravit, seřadit.",
+  "append může selhat (může alokovat), takže má try; orderedRemove vrací prvek, takže se přiřadí do _; řazení bere řez, xs.items, ne seznam.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.basic.16.list"
+title = "Dopředu, nebo dozadu"
+story = "Náklaďáky se sudou značkou se řadí na konec pruhu Autotoll a liché na začátek, a seznam pruhu jen přidává na konec."
+brief = '''
+`std.DoublyLinkedList` v Zigu je intruzivní — spojení žije uvnitř tvé
+vlastní struktury — a neumí řadit, takže cvičení na obou koncích se dělá
+na ArrayListu. `insert(gpa, 0, x)` dá hodnotu na začátek a posune
+zbytek; `pop()` sundá poslední a vrátí ho jako volitelnou hodnotu,
+`_ =` ji zahodí; `items[0]` je začátek a přiřazení do něj
+změní první prvek; `std.mem.sort` seřadí řez.
+
+```
+try l.insert(gpa, 0, 0);
+_ = l.pop();
+l.items[0] = 99;
+std.mem.sort(i64, l.items, {}, std.sort.asc(i64));
+```
+
+`l` už drží celá čísla z řádku v pořadí. Napiš ty čtyři řádky na
+značky `// FILL`: přidej `0` na začátek, odeber poslední prvek,
+přepiš začátek na `99`, pak seřaď. Seznam se vypíše.
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "try l.insert(gpa, 0, 0); _ = l.pop(); l.items[0] = 99; std.mem.sort(i64, l.items, {}, std.sort.asc(i64)); — každý na jeden řádek, v tomto pořadí.",
+  "insert bere alokátor, index, pak hodnotu; pop vrací ?i64 a _ = říká, že ho nechceš.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.basic.10.maps"
+title = "Sčítací tabule"
+story = "Sčítací tabule mýtnice uvádí každou třídu vozidel, která v noci projela, jedno slovo na vozidlo, a audit chce jeden řádek na třídu s počtem."
+brief = '''
+Standardní knihovna Zigu nemá mapu seřazenou stromem: `std.StringHashMap(i64)`
+je slovník, vytvořený pomocí `.init(gpa)`, takže si svůj alokátor pamatuje, a
+jeho klíče jsou řezy `input`, který ho přežije. `put(k, v)` přidá klíč (nebo
+přepíše existující); `remove(k)` jeden vyjme a řekne, jestli tam
+byl — `_ =` odpověď zahodí; `getPtr(k)` je ukazatel na hodnotu
+existujícího klíče, nebo `null`, když chybí, takže `.?.* = 9` ho rozbalí
+a zapíše přes něj. Hašovací mapa prochází své klíče v žádném pořadí, a tak
+je kostra zkopíruje ven a před výpisem seřadí; ten řádek budeš psát
+v příštím uzlu.
+
+```
+try counts.put("crab", 1);
+_ = counts.remove("rice");
+counts.getPtr("fish").?.* = 9;
+```
+
+`counts` už sčítá každé slovo na řádku a každý řádek má na sobě
+`fish`. Napiš ty tři řádky na značky `// FILL`: přidej `crab`
+s `1`, odeber `rice`, pak nastav `fish` na `9`. Seřazený výpis je napsaný.
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "try counts.put(\"crab\", 1); _ = counts.remove(\"rice\"); counts.getPtr(\"fish\").?.* = 9; — přidat, odebrat, upravit.",
+  "put chybějící klíč vytvoří; getPtr to odmítne a místo toho vrátí null. getPtr použij, když klíč už tam být musí — .? je slib, že je.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.basic.18.hashtable"
+title = "Neuspořádaný součet"
+story = "Kantýna v tunelu počítá každé jídlo v hašovací tabulce a pak ji čte zpátky v jakémkoli pořadí, v jakém zrovna jsou koše, a žádné dva výpisy se neshodnou."
+brief = '''
+`std.StringHashMapUnmanaged(i64)` je táž hašovací tabulka bez
+alokátoru uvnitř: začíná jako `.empty` a `put(gpa, k, v)` — stejně jako
+`getOrPut(gpa, k)` a `deinit(gpa)` — jmenuje alokátor při každém volání,
+tak jako ArrayList. `remove(k)` a `getPtr(k)` jsou jako předtím. Při
+procházení je v **žádném určitém pořadí**, a proto se klíče před výpisem
+řadí: `std.mem.sort` přes řez klíčů, s porovnávačem řetězců
+`lessStr` napsaným nad `main`.
+
+```
+try counts.put(gpa, "gun", 12);
+_ = counts.remove("siu");
+counts.getPtr("mai").?.* = 0;
+std.mem.sort([]const u8, keys.items, {}, lessStr);
+```
+
+`counts` už sčítá každé slovo na řádku a každý řádek má na sobě `mai`;
+`keys` je seznam jeho klíčů, zkopírovaných ven v pořadí, jaké daly koše.
+Napiš ty čtyři řádky na značky `// FILL`: přidej `gun` s
+`12`, odeber `siu`, nastav `mai` na `0`, pak seřaď klíče, aby byl výpis
+pokaždé stejný.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "try counts.put(gpa, \"gun\", 12); _ = counts.remove(\"siu\"); counts.getPtr(\"mai\").?.* = 0; pak std.mem.sort([]const u8, keys.items, {}, lessStr); — přidat, odebrat, upravit, seřadit.",
+  "Mapa bez vlastního alokátoru bere gpa u put, getOrPut a deinit; remove a getPtr nic nealokují a žádný neberou.",
+  "Tabulka nemá vlastní pořadí: klíče se za tebe zkopírují ven; jejich seřazení pomocí lessStr je čtvrtý řádek, před výpisem.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.basic.11.sets"
+title = "Čísla značek"
+story = "Záznam pruhu má číslo značky jednou za každý průjezd a úředník směny chce vědět, kolik vozidel to doopravdy je."
+brief = '''
+Množina je v Zigu hašovací mapa, jejíž typ hodnoty je `void`:
+`std.AutoHashMap(i64, void)`, a `{}` je jediná hodnota typu `void`.
+`put(x, {})` přidá hodnotu (duplikát se přepíše sám sebou) a
+`remove(x)` jednu vyjme (chybějící hodnota vrátí `false` a `_ =`
+to zahodí). Množina nemá úpravu: hodnota je svým vlastním klíčem, takže
+proměnit `1` v `-1` je `remove` následované `put`. `count()` je velikost a
+seřazený průchod je napsaný, protože hašovací množina nemá pořadí.
+
+```
+try seen.put(100, {});
+_ = seen.remove(3);
+_ = seen.remove(1); try seen.put(-1, {});
+```
+
+`seen` už drží různé hodnoty z řádku. Napiš ty tři řádky na
+značky `// FILL`: přidej `100`, odeber `3`, pak proměň `1` v `-1`.
+Velikost i seřazený průchod jsou napsané.
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "try seen.put(100, {}); _ = seen.remove(3); _ = seen.remove(1); try seen.put(-1, {}); — poslední dvě volání sdílejí řádek.",
+  "remove(3) na množině bez 3 vrátí false a nic nezmění a put(-1, {}), když už tam -1 je, přepíše void voidem: obojí je bezpečné.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.basic.12.stack-queue"
+title = "Poslední dovnitř, první dovnitř"
+story = "Náklaďáky se hromadí v odstavném zálivu v pořadí, v jakém přijedou: poslední dovnitř je první, kdo může odjet, a první v mýtném pruhu je první obsloužený."
+brief = '''
+Standardní knihovna Zigu nemá typ zásobníku, protože ArrayList jím je: `append(gpa,
+x)` je push, `pop()` sundá vršek a vrátí ho jako volitelnou hodnotu,
+a `items[items.len - 1]` je vršek — přiřazením do něj se vršek upraví na
+místě. Fronta je `std.Deque(i64)`: `pushBack(gpa, x)` na konci,
+`popFront()` na začátku, obojí napsané za tebe.
+
+```
+try st.append(gpa, 0);
+_ = st.pop();
+st.items[st.items.len - 1] = 99;
+```
+
+Každé číslo už je vložené do `st` i do `q`. Napiš ty tři
+řádky na značky `// FILL`: přidej `0` nahoru, zase ho sundej, pak
+přepiš vršek na `99`. Zásobník se pak vyprázdní a vypíše a z fronty se
+vezmou první dva.
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "try st.append(gpa, 0); _ = st.pop(); st.items[st.items.len - 1] = 99; — přidat, odebrat, upravit na zásobníku; fronta zůstane netknutá.",
+  "items.len - 1 je vršek, takže přiřazení tam změní prvek, který by vrátil příští pop().",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.basic.13.sorting"
+title = "Podle pruhů"
+story = "Počty náprav podél řady budek byly zapsané v pořadí, v jakém je úředník obešel, a zpráva je chce od nejnižšího k nejvyššímu a pak od nejvyššího k nejnižšímu."
+brief = '''
+`std.mem.sort(T, slice, context, lessThan)` seřadí řez na místě:
+typ prvku, řez, kontext (`{}`, když žádný není) a
+porovnávač. `std.sort.asc(i64)` je ten vzestupný a
+`std.sort.desc(i64)` je „větší první“.
+
+```
+std.mem.sort(i64, v.items, {}, std.sort.asc(i64));
+std.mem.sort(i64, v.items, {}, std.sort.desc(i64));
+```
+
+Čísla se načtou do `v` a vypíšou dvakrát. Napiš první řádek na
+první `// FILL` a druhý na druhý.
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std.mem.sort(i64, v.items, {}, std.sort.asc(i64)); pak std.mem.sort(i64, v.items, {}, std.sort.desc(i64));",
+  "std.mem.sort bere řez, ne seznam: v.items, nikdy v.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.basic.22.reverse"
+title = "Odzadu dopředu"
+story = "Poslední náklaďák dovnitř má jet ven první a tabule zálivu čte frontu tak, jak byla zapsaná, a značka na jeho zádi je taky obráceně."
+brief = '''
+`std.mem.reverse(T, slice)` obrátí řez na místě, ať je typ prvku
+jakýkoli. Řetězec ze vstupu je `[]const u8` a nedá se do něj psát,
+takže se obrátí jinak: projde se pozpátku bez kopie.
+`std.mem.reverseIterator(s)` vydává bajty od konce, `while
+(rit.next()) |c|` je bere po jednom a `w.writeByte(c)` vypíše
+jeden bajt.
+
+```
+std.mem.reverse(i64, v.items);
+var rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.writeByte(c);
+```
+
+`v` drží celá čísla z prvního řádku a `s` druhý řádek. Napiš
+první řádek na první `// FILL` a další dva na druhý, před
+konec řádku, který se vypíše za tebe.
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std.mem.reverse(i64, v.items); — na místě; nic se nevrací.",
+  "var rit = std.mem.reverseIterator(s); pak while (rit.next()) |c| try w.writeByte(c); — iterátor je var, protože ho next() posouvá.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.basic.14.sort-by-key"
+title = "Žebříček"
+story = "Tabule mýtnice uvádí každou budku s její tržbou v pořadí, v jakém začala směna, a vedoucí chce toho, kdo vydělal nejvíc, nahoře."
+brief = '''
+`std.mem.sort` bere porovnávač: funkci kontextu a dvou prvků, která
+říká, jestli první patří před druhý. Zig nemá lambdy, takže porovnávač
+je pojmenovaná `fn` — `fn byScore(_: void, a:
+Row, b: Row) bool` — a „podle skóre sestupně, pak podle jména vzestupně“ jsou
+dva řádky: když se skóre liší, jde vyšší první; když se rovnají,
+`std.mem.lessThan(u8, a.name, b.name)` dá menší jméno první. Zástupné
+`return` pod nimi zmizí: Zig odmítne řádek, který se nikdy nemůže
+spustit.
+
+```
+if (a.score != b.score) return a.score > b.score;
+return std.mem.lessThan(u8, a.name, b.name);
+std.mem.sort(Row, rows.items, {}, byScore);
+```
+
+Řádky se načtou a vypíšou. Napiš ty dva řádky porovnávače na
+`// FILL` uvnitř `byScore` a `std.mem.sort` na ten v `main`.
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "if (a.score != b.score) return a.score > b.score; pak return std.mem.lessThan(u8, a.name, b.name); v byScore a std.mem.sort(Row, rows.items, {}, byScore); v main.",
+  "Porovnávač odpovídá na „jde a před b“: vyšší skóre první a při shodě menší jméno. Zástupné return pod ním smaž.",
+  "Parametr kontextu je _: void, protože žádný kontext není; řazení za něj předá {}.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.basic.15.closures"
+title = "Špičkový příplatek"
+story = "Každé mýtné na ranním seznamu se vybralo v noční sazbě a vedoucí je chce všechna opravit o dnešní příplatek, který jednou přečetla z tabule."
+brief = '''
+Zig nemá uzávěry: funkce nemůže zachytit jméno z okolního
+rozsahu. Nejbližší je struktura, která hodnotu nese, a
+metoda, která ji používá — seznam zachycení vypsaný jako pole.
+`Adder{ .k = k }` si `k` drží, dokud žije, a `add.call(v)`
+ho čte zpátky jako `self.k`.
+
+```
+return v + self.k;
+const add = Adder{ .k = k };
+```
+
+`k` a čísla se načtou a smyčka použije `add.call` na každé.
+Napiš první řádek na `// FILL` uvnitř `call` a druhý na
+ten v `main`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return v + self.k; v call a const add = Adder{ .k = k }; v main.",
+  "Zachycením je struktura: k do ní jde jednou jako pole a každé volání ho čte zpátky přes self.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.basic.16.lambdas"
+title = "Sudé pruhy na druhou"
+story = "Sudé pruhy platí druhou mocninu svého čísla a liché neplatí nic, a účetní kniha má pro celkový součet jeden řádek."
+brief = '''
+`accumulate` ve standardní knihovně Zigu není; skládání je funkce, která
+bere jinou funkci. `fold(xs, start, step)` zavolá `step(acc, v)` pro každý
+prvek a ponechá si, co vrátí, a `step` je parametr `comptime fn`:
+jakákoli funkce správného tvaru, pojmenovaná tam, kde by se psala
+lambda. Krokem je tu `evenSquare` a `if` je v Zigu výraz,
+takže `return if (cond) a else b;` je jeden řádek.
+
+```
+return if (@rem(v, 2) == 0) acc + v * v else acc;
+const total = fold(xs.items, 0, evenSquare);
+```
+
+`fold` je napsaná, čísla jsou v `xs` a `total` se vypíše. Napiš
+první řádek na `// FILL` uvnitř `evenSquare` a druhý na
+ten v `main`: krok přičte druhou mocninu `v`, když je `v` sudé, a jinak
+vrátí `acc` beze změny.
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "return if (@rem(v, 2) == 0) acc + v * v else acc; v evenSquare a const total = fold(xs.items, 0, evenSquare); v main.",
+  "Krok dostane průběžný součet a jeden prvek a vrátí nový součet; @rem(v, 2) == 0 platí pro -2 stejně jako pro 2.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.basic.17.threads"
+title = "Každému budka"
+story = "Každý náklaďák na mýtnici dostane vlastní budku, všechny počítají naráz a součet se čte až poté, co spadne poslední závora."
+brief = '''
+`std.Thread.spawn(.{}, f, .{ args })` spustí `f` na vlastním vlákně
+hned, jak vznikne, a vrátí `std.Thread`; `join()` počká, až
+skončí. Argumenty jsou n-tice, zkopírovaná dovnitř: `x` hodnotou a
+`&results[i]`, ukazatel na vlastní místo toho vlákna, takže se nic nesdílí.
+Vlákna se drží v seznamu, aby se na všechna dalo počkat přes join, a nic se
+nevypíše, dokud se nevrátí každé `join()`.
+
+```
+try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));
+for (threads.items) |t| t.join();
+```
+
+`square`, `results` (jedno místo na číslo) a výpis jsou napsané.
+Napiš první řádek na `// FILL` uvnitř smyčky, místo
+zástupného, a druhý na `// FILL` za ní.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] })); ve smyčce, pak for (threads.items) |t| t.join(); za ní.",
+  "spawn může selhat a append taky, takže jsou na jednom řádku dva try; .{} vpředu je konfigurace spawn, .{ x, &results[i] } je n-tice argumentů.",
+  "Vlákno bez join je vlákno, jehož místo může být při výpisu results ještě prázdné; počkej na všechna před výpisem.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.basic.18.binary-tree"
+title = "Null"
+story = "06:00 u portálu v Causeway Bay. Noční stvrzenky jsou strom částek a úředník rozbalil levého potomka, který tam nikdy nebyl — panic: attempt to use null value, u jediné budky v Causeway Bay, která se nesmí mýlit."
+brief = '''
+Binární vyhledávací strom jsou uzly s hodnotou a dvěma volitelnými
+ukazateli na potomky, `?*Node`, `null`, dokud tam něco nevisí: menší hodnoty
+žijí pod `left`, větší pod `right`. Vkládání je rekurzivní: prázdný
+podstrom (`null`) se stane novým uzlem z `gpa.create`, a jinak jde
+hodnota dolů jednou stranou — a cokoli se z té strany stane, se uloží zpátky,
+protože ta strana mohla být před chvílí `null`. `n orelse { ... }` je
+způsob, jak napřed obsloužit případ null, a `.?` na potomkovi, kterého nikdo
+nezkontroloval, je `panic: attempt to use null value` — to je boss a přesně
+to dělají ty dva zástupné řádky.
+
+```
+cur.left = try insert(gpa, cur.left, v);
+cur.right = try insert(gpa, cur.right, v);
+```
+
+`Node`, případ `null`, `inorder`, `height`, `freeTree` i `main` jsou
+napsané. Napiš ty dva sestupové řádky na dvě značky `// FILL`, místo
+zástupných: levý v `if`, pravý v `else`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "cur.left = try insert(gpa, cur.left, v); vlevo, cur.right = try insert(gpa, cur.right, v); vpravo.",
+  "Ulož výsledek zpátky: potomek mohl být null a nový uzel je to, co insert vrátí. insert může selhat při alokaci, takže volání má try.",
+  "Zástupný řádek rozbalí potomka pomocí .? dřív, než tam něco visí — to je ta panika. Skutečný řádek předá null do insert, jehož orelse je kontrolou.",
+]

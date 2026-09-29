@@ -1,0 +1,767 @@
+# LUA LAND — BASIC, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/lua/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "lua.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.basic.01.first-incense"
+title = "第一枝香"
+story = "21:00，浣紗街。鼓仲未響，條龍喺黑麻麻嘅巷仔度瞓住，第一枝香仲未點。"
+brief = '''
+一隻字都唔可以差，印出：
+
+```
+hello, causewaybay
+```
+
+全部細楷，一個逗號，一個空格，一行。其他乜都唔要。
+
+`print` 會自動幫你加換行。佢仲會喺參數之間加一個 **tab**，呢樣係大家第一個會搞錯嘅地方：`print("hello,", "causewaybay")` 入面係一個 tab，唔係空格。一個字串，一個參數。
+'''
+hints = [
+  "print(\"hello, causewaybay\") 就係成個程式。",
+  "個字串一隻字都唔可以差：細楷，一個逗號，後面一個空格。",
+  "最底嗰句 `main()` 唔好郁佢。冇人叫過嘅 function 乜都唔會印，而個 starter 正正就係咁。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.basic.02.segment-count"
+title = "龍節數目"
+story = "擔龍頭嗰個沿住條巷大叫有幾多節，榕樹頭下面塊數板本來寫住節數、節數兩倍同節數平方嗰三格就顯示住零。"
+brief = '''
+`io.read("*l")` 由標準輸入讀一行，剪走換行，以**字串**形式畀返。`tonumber()` 將文字變做數字（唔係數字就畀 `nil`）。Lua 會靜靜雞幫你將 `"12" * 2` 轉型，但係 `"12" .. 1` 係 `"121"`，`"12" < 1` 係錯誤，所以數字一入門口就轉好，之後一直係數字。
+
+```
+local n = tonumber(io.read("*l"))
+```
+
+三個 `print` 已經寫好。照住寫 `main` 嘅第一行，咁 `n` 就係嗰行上面個數，唔係佢一開始嗰個 `0`。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "起始碼印三次 0：n 從來冇讀過。嗰行仲擺喺標準輸入度。",
+  "local n = tonumber(io.read(\"*l\")) 一邊讀一邊轉。tonumber 仲會幫你唔理數字周圍嘅空格。",
+  "負數 n 嘅平方係正數。測試係知嘅。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.basic.03.types"
+title = "分香"
+story = "兩個擔龍嘅喺蓮花街街角分一紮香，本簿寫住每人幾多枝、剩幾多枝，仲有一個應該讀到兩個小數位嘅份額，而佢寫住個問號。"
+brief = '''
+Lua 得一種數字型別，64 位 double，同埋一種除法：`7 / 2` 係 `3.5`，`6 / 2` 係 `3`，印出嚟都係 `3`。整數除法係 `math.floor(a / b)`，`%` 係餘數。想印一個固定小數位嘅數字，就將佢交畀 `string.format` 加個 `%.2f` — 小數點後兩位 — 再印佢畀返嘅字串。（Python 寫 f-string 嘅地方，Lua 就寫 `string.format`，啲值跟喺個 pattern 後面。）
+
+```
+print(math.floor(a / b))
+print(a % b)
+print(string.format("%.2f", a / b))
+```
+
+`a` 同 `b` 用 `io.read("*n", "*n")` 讀咗 — 由輸入攞兩個數字 — 頭兩個 print 已經寫好。照住寫第三個 `print`。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "print(string.format(\"%.2f\", a / b)) — pattern 先，跟住係佢要格式化嘅值。",
+  "%.2f 係 C 嘅格式：f 係 float，.2 係小數點後兩位。單獨 print(a / b) 會印 3.5，少咗一個位。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.basic.04.int-types"
+title = "四個位元組闊"
+story = "貨車上面個鼓控制器將每個鼓點數目儲喺四個位元組入面，喺佢塊細螢幕度印佢裝得落嘅最大數字，而塊螢幕係黑嘅。"
+brief = '''
+Lua 嘅數字冇整數闊度，但 `bit` library 有：佢每個運算都係喺 **32 位**上面做。`bit.tohex(n, 8)` 將 `n` 顯示做嗰四個位元組，八個 hex 位，最高位先，所以 `bit.tohex(-1, 8)` 係 `ffffffff`。最大嘅有號 32 位值係 `2^31 - 1`（`^` 係次方運算子；冇 `<<`，嗰個係 `bit.lshift`）。double 準確計數去到 `2^53` 為止；過咗嗰度，LuaJIT 有帶 `LL` 或者 `ULL` 後綴嘅 64 位 literal，印出嚟會連個後綴。
+
+```
+print(bit.tohex(n, 8))
+print(2^31 - 1)
+```
+
+`n` 已經讀咗，無號 64 位嘅最大值最後印，係由一個 `ULL` literal 剷走後綴得嚟。打上面兩行，代替兩個 `-- FILL` 標記。
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "print(bit.tohex(n, 8)) — 第二個參數係幾多個 hex 位；8 個位就係 4 個位元組。",
+  "2^31 - 1 係 2147483647：double 裝得準，print 顯示佢嗰陣唔會有小數點。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.basic.05.big-int"
+title = "三十二個位元組"
+story = "維園每盞燈籠都印住一個冇人睇得明嘅三十二位元組數字，公園辦事處部打印機將佢印做十進位，長到出晒張牌。"
+brief = '''
+一個 hash、一條 key、一個地址：呢個遊戲靠嘅數字係 256 位闊 — 三十二個位元組。Lua 嘅數字係 double，只裝得落其中五十三位，所以一個 256 位嘅數字就保持佢到嗰陣嘅樣，一條**數字字串**，而 `hex_of` 用長除法逐個位將佢變做 hex（Lua 冇大整數；嗰個 function 已經幫你寫好）。剩返嘅就係補位：六十四個 hex 字元，左邊補零。`#h` 係 `h` 嘅長度，`string.rep("0", k)` 係 `k` 個零，`..` 駁埋兩個字串。
+
+```
+print(string.rep("0", 64 - #h) .. h)
+```
+
+`s` 以十進位讀入，`h` 係佢未補位嘅 hex。打上面嗰一行，代替 `-- FILL` 標記。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "print(string.rep(\"0\", 64 - #h) .. h) — 差幾多個就補幾多個零，然後係個 hex。",
+  "#h 係個字串嘅長度；次數係 0 嘅 string.rep 係空字串，所以 64 字元嘅最大值完全唔使補。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.basic.06.floats"
+title = "小數點後三個位"
+story = "廟門口個香磅讀到三個小數位，貨車上面嗰個平嘢淨係得單精度，本簿就將同一個重量寫咗兩次，兩次都錯。"
+brief = '''
+Lua 嘅數字係 64 位 double — 即係其他地方嘅 `f64`。冇 32 位 float 型別，但 LuaJIT 嘅 `ffi` 整得出：`ffi.new("float[1]", x)` 係一個裝住 `x` 嘅、得一個 `float` 嘅 C array，由佢讀 `[0]` 出嚟就會畀返捨入到最近 `f32` 嘅 `x`。`string.format` 用 `%.3f` 印三個小數位；`%.10f` 印得夠多睇到捨入。（Python pack 同 unpack 一個 `struct` 嘅地方，Lua 就經一個 C 型別。）
+
+```
+local x = tonumber(s)
+local y = ffi.new("float[1]", x)[0]
+```
+
+`ffi` 已經 require 咗，`s` 已經讀咗，兩個 print 都寫好。打上面兩行，代替兩個佔位。
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "local x = tonumber(s)，跟住 local y = ffi.new(\"float[1]\", x)[0] — 個 array 喺一個 expression 入面整好再讀。",
+  "\"float[1]\" 係單精度；\"double[1]\" 會同 x 一樣闊，乜都冇改變。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.basic.04.strings"
+title = "火龍個名"
+story = "畫橫額嗰個要將擔龍頭嗰個嘅名度長度、大聲讀、再倒轉寫畀廟神枱後面塊鏡，本簿淨係寫咗一次，順住寫。"
+brief = '''
+字串用 `#s` 知道自己嘅長度，用 `s:upper()` 整一個大楷副本，用 `s:reverse()` 整一個倒轉副本。冒號就係 method 呼叫：`s:upper()` 即係 `string.upper(s)`，幫你將 `s` 當第一個參數傳入去。字串永遠唔會原地改 — 呢啲每個都係一個新字串，`s` 仲係原本嗰個。
+
+```
+print(#s)
+print(s:upper())
+print(s:reverse())
+```
+
+`s` 已經讀咗，佢嘅長度已經印咗。照住寫第二同第三個 `print`。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "print(s:upper()) 然後 print(s:reverse()) — 兩個 method 呼叫，冒號加空括號。",
+  "用點嘅 s.upper() 乜都冇傳，string.upper 就會投訴字串個位係 nil。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.basic.08.string-slices"
+title = "頭幾個字母"
+story = "燈籠牌打印機攞條街個名嘅頭幾個字母做短牌，加個記號，而路線牌上面個全名一定要原封不動。"
+brief = '''
+`s:sub(1, n)` 係子字串：`s` 嘅頭 `n` 個字元，一個新字串 — 位置由 1 開始數，兩頭都包埋。字串改唔到，所以子字串永遠係副本，無論你點樣郁嗰段，`s` 都唔會變。`..` 將兩個字串駁埋做一個新嘅，再 assign 返畀 `head` 就係加喺尾嘅做法。
+
+```
+local head = s:sub(1, n)
+head = head .. "!"
+```
+
+`s` 同 `n` 已經讀咗，兩個 print 已經寫好。打上面兩行，代替兩個佔位。
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "local head = s:sub(1, n)，跟住 head = head .. \"!\" — sub 係複製，.. 再整多一個。",
+  "s:sub(0, n) 同 s:sub(1, n) 一樣；0 會被夾返去開頭。Lua 冇 +=：個名兩邊都要寫。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.basic.09.int-slices"
+title = "由頭數兩個"
+story = "路線牌要將第二同第三個龍節號碼抄出嚟，後面駁埋最後兩個，而原本張清單要原封不動。"
+brief = '''
+Lua 冇 slice；最接近嘅係 `unpack(v, i, j)`，佢將 `i` 到 `j` 嘅值當獨立嘅值回傳，外面包個 `{ ... }` 就將佢哋收埋做一個**新 table** — 改佢永遠唔會改到 `v`。位置由 1 開始數，兩頭都包埋，所以第二同第三個值係 `2, 3`。`table.insert(t, x)` 將 `x` 加喺尾；`#v` 係最後嘅位置，所以 `v[#v - 1]` 同 `v[#v]` 係最後兩個。
+
+```
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])
+```
+
+`v` 裝住嗰行嘅整數，兩個 print 都寫好。打上面兩行，代替兩個佔位。
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "local part = { unpack(v, 2, 3) }，跟住 table.insert(part, v[#v - 1]); table.insert(part, v[#v]) — 一行兩個語句，中間一個分號。",
+  "喺 LuaJIT unpack 係 global（table.unpack 係 Lua 5.2 嘅）。冇外面嗰對大括號，兩個值就唔知去咗邊。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.basic.10.byte-slices"
+title = "頭三個位元組"
+story = "燈籠牌打印機要擔龍嘅個名頭三個位元組，後面加個記號，印做字母之前先用 hex 顯示啲位元組。"
+brief = '''
+Lua 字串**就係**佢嘅位元組：冇另外一個 bytes 型別，`#s` 數位元組，`s:sub` 切位元組。`s:byte(i, j)` 將 `i` 到 `j` 嘅位元組當數字畀返，每個一個回傳值，`{ ... }` 將佢哋收埋做一個 table；`-1` 即係最後一個位置，所以 `s:byte(1, -1)` 係每一個位元組。`string.char(...)` 係反方向 — 數字入，字串出 — 而 `unpack(t)` 將一個 table 攤開做佢要嘅參數。
+
+```
+local bytes = { head:byte(1, -1) }
+print(string.char(unpack(bytes)))
+```
+
+`head` 係 `s` 嘅頭三個位元組，尾加 `"!"`，hex 嗰行由 `bytes` 印。打上面兩行，代替兩個佔位。
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "local bytes = { head:byte(1, -1) }，跟住 print(string.char(unpack(bytes))) — byte 行一個方向，char 行返轉頭。",
+  "冇參數嘅 head:byte() 淨係第一個位元組；1, -1 係要晒全部。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.basic.05.loops"
+title = "數龍節"
+story = "龍節由龍頭起編號 1 到 n，而龍節號碼總數、同埋每隔三個有鼓嘅係邊幾節，喺個數下面淨係得一行空白。"
+brief = '''
+數字 `for` 會幫你數：`for i = 1, n do` 由 `1` 開始 `i`，每個值行一次 body，一路去到 `n`，**包埋** `n` — 最後個值係計埋在內嘅，呢樣係 Lua 同 `range` 第一樣唔同嘅地方。body 喺 `end` 完。
+
+```
+for i = 1, n do
+  total = total + i
+  if i % 3 == 0 then threes = threes + 1 end
+end
+```
+
+`n` 已經讀咗，`total` 同 `threes` 由 `0` 開始，loop body 已經寫好。喺 body 上面照住寫 `for` 嗰行。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for i = 1, n do — 第二個數字係 i 嘅最後一個值，唔係再多一個。",
+  "for i = 1, 0 一次都唔會行：起點過咗終點嘅 loop 冇 body 可以行。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.basic.06.functions"
+title = "跑腿人工"
+story = "香燭檔按跑去貨車嘅次數畀跑腿人工，第十次之後平啲，而計數嗰頁簿得個名，下面乜都冇。"
+brief = '''
+`function` 整一個 function：一個名、括號入面嘅參數、body，同埋 `end`。`return` 將一個值畀返叫佢嗰個。body 可以淨係一句 `return`，成個答案寫做一個 expression；`math.min` 同 `math.max` 係佢哋參數之中較細同較大嗰個。
+
+```
+local function fare(rides)
+  return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3
+end
+```
+
+頭十程每程 `5`，之後每程 `3`。`main` 讀 `n` 再印 `fare(n)`。照住寫 `fare` 入面嘅 `return` 嗰行。
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3 — min 將貴嗰啲封頂喺十程，max 唔畀其餘嗰啲變負數。",
+  "function 嘅工作喺 return 完；body 入面佢後面嘅嘢都唔會行，而 return 一定要係佢個 block 最後一個語句。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.basic.07.structs"
+title = "一個檔，三個欄"
+story = "香燭檔張卡寫住名、價錢同數量，部收銀機將張卡讀做三個散字，乜都冇加埋。"
+brief = '''
+Lua 冇 `class`；物件係一個 table，後面嘅 metatable 話畀佢知搵唔到 key 嗰陣去邊度搵。`Stall.__index = Stall` 令每個檔口去 `Stall` 度搵 method，`setmetatable({...}, Stall)` 將佢掛上去，`function Stall:total()` 定義一個 method，有一個隱藏嘅第一個參數叫 `self` — 定義同呼叫都用冒號。入面，欄位經 `self` 讀。
+
+```
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  return setmetatable({ name = name, price = price, qty = qty }, Stall)
+end
+
+function Stall:total()
+  return self.price * self.qty
+end
+```
+
+`Stall`、佢嘅 `new` 同 `main` 已經寫好。照住寫 `total` 嘅 `return` 嗰行。
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return self.price * self.qty — 啲欄位喺 table 入面，而喺冒號 method 入面 self 就係個 table。",
+  "喺 total() 入面單獨一個 price 唔係一個名；佢會係 global，而冇人設定過嘅 global 係 nil。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.basic.08.enums"
+title = "三條綫，三種顏色"
+story = "廟門口釘住嘅港鐵圖有三條綫，賣燈籠嗰家嘅細路要講邊種顏色送人群返屋企，而下面塊板係空白嘅。"
+brief = '''
+Lua 冇 `enum`；最接近嘅係一個裝住有名常數嘅 table — `Line.ISLAND` 係 `1`，而一個值好似其他值咁可以做另一個 table 嘅 key。用字串做 index 就係查名：`Line["ISLAND"]` 同 `Line.ISLAND` 一樣，所以由輸入嚟嘅字轉做大楷再做 index，就變成一個成員。唔存在嘅名畀你 `nil`，唔係錯誤 — 直至有人跟住佢行落去。
+
+```
+local Line = { ISLAND = 1 }
+
+local line = Line[word:upper()]
+```
+
+`Line`、由成員對應到顏色嘅 `COLOUR` table 同個 print 已經寫好。照住寫 `local line = ...` 嗰行。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "local line = Line[word:upper()] — 方括號用字串查 key，而啲名係大楷。",
+  "Line.word 會搵一個串做 w-o-r-d 嘅 key；淨係方括號嘅寫法先會用你讀到嘅字串。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.basic.09.vector"
+title = "龍節清單"
+story = "擔龍頭嗰個逐個讀出每節嘅重量，本簿冇張清單，得四格空白：加完之後、拎走之後、換完之後、排完之後。"
+brief = '''
+值喺 `1, 2, 3, ...` 嘅 table 就係 list，係原地改嘅。`table.insert(t, x)` 喺尾加一個值，`table.remove(t, i)` 將某個位置嘅值攞走（後面嗰啲向前移），`t[i] = x` 換走某個位置嘅值，`table.sort(t)` 原地將啲值由細到大排好。四個操作，四行，每做完一個，張 list 都變咗另一張。
+
+```
+table.insert(xs, 100)
+table.remove(xs, 1)
+xs[1] = 7
+table.sort(xs)
+```
+
+`xs` 裝住嗰行嘅整數，每步之後都會印。照次序打呢四行，代替四個 `-- FILL` 佔位。
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "table.insert(xs, 100)，跟住 table.remove(xs, 1)，跟住 xs[1] = 7，跟住 table.sort(xs) — 每個佔位一行，照次序。",
+  "第一個位置係 1，唔係 0：xs[0] = 7 會將 7 放喺一個 list 唔數嘅 key。table.sort 乜都唔回傳，所以唔好 assign 佢。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.basic.16.list"
+title = "落單條鏈"
+story = "跑腿嗰個將每張香燭單夾喺貨車上面條鏈嘅尾，再將籌號夾喺頭，而條鏈就空空咁吊喺度。"
+brief = '''
+Lua 冇 deque；table 兩頭都係用同樣兩個 function 加一個位置嚟改。`table.insert(t, 1, x)` — 三個參數 — 將 `x` 放喺位置 1，其餘向後移；冇位置嘅 `table.remove(t)` 攞走**最後**嗰個值；`t[1] = x` 換走最前嗰個；`table.sort(t)` 原地排，所以第四行同 list 嗰個一樣。
+
+```
+table.insert(chain, 1, 0)
+table.remove(chain)
+chain[1] = 9
+table.sort(chain)
+```
+
+`chain` 裝住嗰行嘅整數，每步之後都會印。照次序打呢四行，代替四個 `-- FILL` 佔位。
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "table.insert(chain, 1, 0)，跟住 table.remove(chain)，跟住 chain[1] = 9，跟住 table.sort(chain) — 每個佔位一行，照次序。",
+  "兩個參數嘅 table.insert 係加喺尾；位置放喺中間。冇位置嘅 table.remove 係尾，table.remove(chain, 1) 先係頭。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.basic.10.maps"
+title = "點算簿"
+story = "月餅檔每賣一個都用一個字寫落本簿，鼓第一下響嗰陣，檔主要每款餅一行加個數，而嗰頁淨係按叫嘅次序寫住啲字。"
+brief = '''
+table 係按 key 改嘅。`counts[k] = v` 喺一個 key 下面儲一個值 — 新 key 會加入，已有嘅 key 會被覆蓋 — `counts[k] = nil` 移走一個 key（冇 delete；nil 就係冇），`counts[k] = counts[k] + n` 讀一個 key 下面嘅值，改咗佢，再寫返入去。table **唔會**保持次序：`pairs` 鍾意點行就點行，所以 starter 用自己一張 list 記住第一次見到嘅次序，而想按排好嘅次序印啲 key，就要將佢哋收埋做一張 list 再 `table.sort`。
+
+```
+counts["tofu"] = 1
+counts[first] = nil
+counts["tofu"] = counts["tofu"] + 4
+table.sort(ks)
+```
+
+`counts` 裝住每個字嘅數，`first` 係嗰行第一個字，`order` 係按第一次見到嘅次序排嘅字，尾加 `"tofu"`，`show(counts, order)` 每改一次就按嗰個次序印個數表，冇咗嘅 key 就跳過。喺頭三個 `-- FILL` 佔位度打三個改動，然後喺第四個打 `table.sort(ks)`，喺最後嗰個 loop 之前。
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts[\"tofu\"] = 1，跟住 counts[first] = nil，跟住 counts[\"tofu\"] = counts[\"tofu\"] + 4，跟住喺最後嗰個 loop 之前 table.sort(ks)。",
+  "assign nil 係移走 key 嘅唯一方法。冇 +=：讀個值，加，再寫返同一個 key 下面。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.basic.18.hashtable"
+title = "檔口號碼"
+story = "公園辦事處有個由檔口名對應到檔口號碼嘅 table，而燈籠櫃位每次查都乜都查唔到。"
+brief = '''
+Lua table 就係 hash table：key 會 hash 到一格，所以無論有幾多個 key，儲、移走同查嘅成本都一樣。`numbers[k] = v` 係儲（新 key 會加入），`numbers[k] = nil` 移走一個 key，`numbers[k] = numbers[k] + n` 原地改一個 key 下面嘅值。唔存在嘅 key 係 `nil`，而 `nil or -1` 係 `-1`：`numbers[w] or -1` 就係帶預設值嘅查詢 — 而 `0 or -1` 係 `0`，因為喺呢度淨係 `nil` 同 `false` 係假。
+
+```
+numbers["bread"] = 99
+numbers[first] = nil
+numbers[last] = numbers[last] + 10
+print(numbers[w] or -1)
+```
+
+`numbers` 將第一行每個檔口名對應到佢嘅位置，好似辦事處咁由 0 開始數；`first` 同 `last` 係第一個同最後一個名。第二行啲名喺改完之後查，再印出嚟，搵唔到就印 `-1`；然後成個 table 按 key 排好印出嚟。照次序打呢四行，代替四個 `-- FILL` 佔位。
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "numbers[\"bread\"] = 99，跟住 numbers[first] = nil，跟住 numbers[last] = numbers[last] + 10，跟住喺 loop 入面 print(numbers[w] or -1)。",
+  "or 會畀返佢左邊嗰個，除非佢係 nil 或者 false；號碼係 0 嘅檔口仍然係 0。+= 嗰行需要個 key 存在，而 last 係存在嘅。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.basic.11.sets"
+title = "唔同嘅價錢"
+story = "燈籠檔成晚都嗌嗰三個價錢，塊板想知有幾多個唔同價錢，唔係嗌咗幾多次。"
+brief = '''
+Lua 冇 set；一個值係 `true`、用啲值本身做 key 嘅 table 就係 set。`seen[x] = true` 放一個值入去（兩次即係一次），`seen[x] = nil` 攞佢出嚟（本身唔喺度就乜都唔做），而冇「改呢個值」呢回事 — set 改嘢就係移走一個 key 再加另一個。set 嘅 `#seen` 係 **0**，因為 `#` 淨係數位置 `1, 2, 3, ...`；set 要用 `pairs` 嚟數同列出，佢會冇特定次序咁行過每個 key。
+
+```
+seen[100] = true
+seen[first] = nil
+seen[100] = nil; seen[101] = true
+for v in pairs(seen) do vals[#vals + 1] = v end
+```
+
+`seen` 裝住嗰行嘅唔同整數，`first` 係第一個，每改一次都會印 `size(seen)`，最後 `vals` 排好再印。照次序打呢四行，代替四個 `-- FILL` 佔位。
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen[100] = true，跟住 seen[first] = nil，跟住 seen[100] = nil; seen[101] = true，跟住 for v in pairs(seen) do vals[#vals + 1] = v end。",
+  "pairs 先畀 key；for 入面得一個名，你攞到嘅就係佢。次序係個 table 自己嘅，所以 vals 印之前要排。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.basic.12.stack-queue"
+title = "燈籠堆"
+story = "燈籠喺檔口疊起，由頂攞走；買嘢嘅人喺側邊排隊，由頭行先；本簿印出嚟兩行都係空嘅。"
+brief = '''
+list 就係 stack，喺頂改：`t[#t + 1] = x` 推一個值上去（最後位置再過一格就係新嘅最後），`table.remove(t)` 攞走頂嗰個，`t[#t] = x` 原地換走頂嗰個。同一個 table 改為由頭攞，`table.remove(t, 1)`，就係 queue — 嗰邊已經幫你寫好。
+
+```
+stack[#stack + 1] = 100
+table.remove(stack)
+stack[#stack] = 9
+```
+
+`stack` 同 `queue` 裝住嗰行嘅整數；stack 每步之後都會印，然後攞 queue 最前嗰個出嚟印。照次序打呢三行，代替三個 `-- FILL` 佔位。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack[#stack + 1] = 100，跟住 table.remove(stack)，跟住 stack[#stack] = 9 — 每個佔位一行，照次序。",
+  "冇位置嘅 table.remove 攞尾，即係頂；#stack 指嘅都係同一格，畀你 assign。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.basic.13.sorting"
+title = "價錢梯"
+story = "公園辦事處要今晚啲燈籠價錢最平先，寫上塊板，又要最貴先，填稅表，而檔口係按嗌嘅次序寫落嚟。"
+brief = '''
+`table.sort(t)` 原地將一個 table 由細到大排，乜都唔回傳。冇排好嘅副本：想保留原本嗰個就要先複製，`{ unpack(xs) }`，再排個副本。第二個參數係比較器 — 一個收兩個值嘅 function，話第一個係咪應該排喺第二個前面 — 而 `function(a, b) return a > b end` 就將次序反轉。
+
+```
+table.sort(asc)
+table.sort(desc, function(a, b) return a > b end)
+```
+
+`xs` 已經讀咗，`asc` 同 `desc` 係佢嘅副本，兩個 print 都寫好。照住寫兩行，代替兩個佔位。
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "table.sort(asc) 同 table.sort(desc, function(a, b) return a > b end) — 比較器係成個 function，包埋 end。",
+  "asc = table.sort(asc) 會將 asc 設做 nil：sort 乜都唔回傳。比較器一定要嚴格：>= 會係一個無效嘅 order function。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.basic.22.reverse"
+title = "由尾到頭"
+story = "收檔表要由頂讀落嚟睇價錢梯，檔口個名要反轉畫喺燈籠玻璃上面，而本簿兩樣都係順住寫。"
+brief = '''
+冇 `table.reverse`；list 係**原地**反轉嘅，由兩頭向中間互換，而 Lua 嘅互換係一個 assign，兩邊各有兩個名：`a, b = b, a` 會先計右邊，再儲。互換長度一半次，`math.floor(#v / 2)`，而 `v[#v - i + 1]` 係 `v[i]` 嘅鏡像。字串改唔到，所以用 `s:reverse()` 反轉，佢係一個新字串。
+
+```
+for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end
+local r = s:reverse()
+```
+
+`v` 同 `s` 已經讀咗，兩個 print 都寫好。打上面兩行，代替兩個佔位。
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "自己一行寫 for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end，跟住 local r = s:reverse()。",
+  "行到 #v 而唔係一半，就會將每對換兩次，張 list 又變返原樣。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.basic.14.sort-by-key"
+title = "排行榜"
+story = "蓮花宮按今晚嘅捐款將啲檔口釘上去，多嘅先，兩個檔口同一個數就按字母次序；塊壁報板就按佢哋行入嚟嘅次序擺。"
+brief = '''
+`table.sort` 收一個比較器：一個收兩行嘅 function，第一行應該排喺第二行前面就回傳 `true`。按一個欄位排、打和就用另一個欄位分，喺入面係兩行 — 分數唔同，大嘅排先；否則名細嘅排先。兩行兩個方向比較都相等嘅話一定要畀 `false`，否則 sort 會投訴 invalid order function。
+
+```
+table.sort(rows, function(a, b)
+  if a.score ~= b.score then return a.score > b.score end
+  return a.name < b.name
+end)
+```
+
+`rows` 係一張 `{ name = ..., score = ... }` table 嘅 list，帶住空比較器嘅 `table.sort` 呼叫同個 print 已經寫好。喺 `FILL` 註解嗰度照住寫比較器嗰兩行。
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "if a.score ~= b.score then return a.score > b.score end，跟住 return a.name < b.name — 淨係分數相等先會行打和嗰句。",
+  "~= 係 Lua 嘅唔等於。回傳 a.score >= b.score 會話兩個相等嘅行各自都排喺對方前面，sort 唔會接受。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.basic.15.closures"
+title = "加價"
+story = "燈籠檔喺夜晚張單每個批發價上面加同一個價，而應該記住加幾多嗰個 function 畀返嚟係 nil。"
+brief = '''
+喺另一個 function 入面定義嘅 function 可以用外面嗰個 function 嘅 local，而且外面嗰個 return 咗之後都繼續用得。呢個就係 closure：內部 function 帶住 `k` 做 upvalue。外面嗰個 function 回傳內部嗰個 — function 本身，一個同其他一樣嘅值，唔係呼叫佢。
+
+```
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  return add
+end
+```
+
+`make_adder` 同佢入面嘅 `local function add(x)` 已經寫好，`main` 將結果用喺每個數字上面。照住寫兩個 `return`，代替兩個佔位。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "喺 add 入面 return x + k，跟住 make_adder 最後一行 return add（冇括號）。",
+  "return add() 會冇參數咁呼叫佢，喺 nil + k 度死；淨係個名先係個 function。starter 嘅 return nil 就係 main 死喺 attempt to call local 'add' (a nil value) 嘅原因。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.basic.16.lambdas"
+title = "雙數平方"
+story = "公園辦事處向雙數號碼嘅檔口按號碼平方收錢，文員張紙喺總數個位寫住零。"
+brief = '''
+Lua 冇 `lambda` 關鍵字；冇名嘅細 function 要寫齊，`function(x) return x * x end`，就喺用佢嘅地方寫。`filter(f, xs)` 留低 `f` 話 `true` 嘅值，`map(f, xs)` 將每個值換做 `f(value)`，`sum(xs)` 將剩低嘅加埋 — 三個都唔係內建，所以喺 `main` 上面幫你寫好。由入面讀出嚟。
+
+```
+local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))
+```
+
+`xs` 已經讀咗，個 print 已經寫好。照住寫 `local total = ...` 嗰行。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs))) — 先 filter，再 map，再 sum。",
+  "匿名 function 要有 return 同 end：function(x) x * x end 係語法錯誤。Lua 嘅 % 係向下取整嘅，所以 -4 % 2 係 0，負數都計。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.basic.17.threads"
+title = "十二個跑腿一齊嚟"
+story = "鼓第一下響，沿住條龍每個跑香人同一時間將自己嗰節嘅數平方，寫落廟嘅本簿，而本簿返嚟全部係零，因為冇人等佢哋做完。"
+brief = '''
+LuaJIT 冇 thread；coroutine 係最接近嘅嘢 — 一個有自己 stack 嘅 function，被 resume 嗰陣先行，每個 `yield` 停低。`coroutine.create(f)` 整一個出嚟，乜都唔行。`coroutine.resume(co)` 開始佢，或者由佢上一個 yield 繼續，佢再 yield 或者做完就返嚟。做完之後 `coroutine.status(co)` 係 `"dead"`，所以 join 就係一路 resume 到佢係為止。先開晒所有跑腿，再逐個做完 — 喺開嗰個 loop 入面做完就會變咗一個一個咁行。
+
+```
+for _, co in ipairs(workers) do
+  coroutine.resume(co)
+end
+for _, co in ipairs(workers) do
+  while coroutine.status(co) ~= "dead" do coroutine.resume(co) end
+end
+```
+
+`square(i)` yield 一次，然後填 `results[i]`，worker 嘅 list 已經砌好，兩個 print 喺第二個 loop 之後行。照住寫，`resume` 做第一個 loop 嘅 body，`while` 嗰行做第二個嘅。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "第一個 loop 入面 coroutine.resume(co)，第二個入面 while coroutine.status(co) ~= \"dead\" do coroutine.resume(co) end。",
+  "你從來冇 resume 嘅 coroutine 從來唔會行；resume 過一次嘅會停喺佢個 yield，個平方仲未寫。個 status 話你知係邊種。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.basic.18.binary-tree"
+title = "NIL"
+story = "23:59，廟嘅燈籠板：燈籠號碼棵樹得一個根，下面乜都冇，第一次查就死喺 attempt to index a nil value (field 'left')。"
+brief = '''
+二元搜尋樹將較細嘅值放喺節點嘅左子樹，較大嘅放喺右子樹。插入係遞迴嘅：空子樹（`nil`）變做一個新 `Node`；否則個值行落其中一邊，而返嚟嘅嘢要再儲做嗰個子節點，因為嗰個子節點頭先可能仲係 `nil` — 唔存在嘅 key 係 nil，而 nil 唔係錯誤，直至有人跟住佢行落去。喺 `nil` 上面跟 `.left` 就係呢條路個名嘅由來嗰個 crash；`nil` 檢查排先，而且已經寫好。
+
+```
+if v < n.val then
+  n.left = insert(n.left, v)
+else
+  n.right = insert(n.right, v)
+end
+```
+
+`Node`、`insert` 嘅 `nil` 情況同佢 `if v < n.val then` / `else` 嘅骨架、`inorder`、`height` 同 `main` 已經寫好。照住寫兩行遞迴，代替兩個佔位。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if 下面 n.left = insert(n.left, v)，else 下面 n.right = insert(n.right, v)。",
+  "重點就係個 assign：insert 回傳子樹嘅根，子節點係 nil 嘅時候就係一個全新嘅 Node。新 Node 根本冇 left 或者 right key — 讀佢係 nil，冇問題，直至你向佢做 index。",
+]

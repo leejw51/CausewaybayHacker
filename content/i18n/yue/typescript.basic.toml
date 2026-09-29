@@ -1,0 +1,861 @@
+# TYPESCRIPT LAND — BASIC, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/typescript/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "typescript.basic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.basic.01.first-screen"
+title = "開機"
+story = "時代廣場上空，19:00。場雨啱啱停，大電視著咗，今晚第一格畫面係全黑嘅。"
+brief = '''
+一隻字都唔可以差，印出：
+
+```
+hello, causewaybay
+```
+
+全部細楷，一個逗號，一個空格，一行。其他乜都唔要。
+
+`console.log` 會自動幫你加換行。佢仲會喺每個參數之間加一個空格，呢樣係大家第一個
+會搞錯嘅地方：`console.log("hello,", "causewaybay")` 係啱嘅，但係
+`console.log("hello, ", "causewaybay")` 就會有兩個空格。
+'''
+hints = [
+  "console.log(\"hello, causewaybay\"); 就係成個程式。",
+  "個字串一隻字都唔可以差：細楷，一個逗號，後面一個空格。",
+  "最底嗰句 `main();` 唔好郁佢。冇人叫過嘅 function 乜都唔會印，而個 starter 正正就係咁。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.basic.02.number"
+title = "十二十二"
+story = "希慎廣場幅牆要顯示一個數、佢嘅兩倍同佢嘅平方，點知中間嗰行出咗 1212，啲字有三層樓咁高。"
+brief = '''
+標準輸入係成個**字串**咁嚟，連埋換行。睇落似數字嘅字串仍然係字串，而兩個字串用
+`+` 就係駁埋一齊：`"12" + "12"` 係 `"1212"`。`Number()` 將文字變做 `number`，順便
+跳過周圍嘅空白。
+
+個 starter 用 `as unknown as number` 話畀編譯器聽段文字係數字。咁樣係一個承諾，唔係
+轉換：tsc 信咗，擦咗佢，到行嗰陣 `n` 仲係字串 `"12"`。將嗰行換做一行真正做嘢嘅：
+
+```
+const n: number = Number(input);
+```
+
+三個 `console.log` 已經寫好。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "個 starter 第二行印 1212：n + n 駁埋咗兩個字串。個型別話係 number；個值從來都唔係。",
+  "const n: number = Number(input); 一邊讀一邊轉。Number() 會幫你唔理尾嗰個換行。",
+  "負數 n 嘅平方係正數。測試係知嘅。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.basic.03.types"
+title = "分時段"
+story = "兩個廣告商分時代廣場嗰個鐘頭，控制室張時間表有一行寫每人分到幾多個完整分鐘、剩返幾多，同埋一個應該有兩個小數位嘅份額，而嗰格顯示住一個問號。"
+brief = '''
+TypeScript 得一個 `number` 型別，係 64 位元 float，所以 `/` 永遠保留小數：`7 / 2`
+係 `3.5`。整數除法係 `Math.floor(a / b)`，`%` 係餘數。想印一個固定小數位嘅數，就
+喺佢上面叫 `.toFixed(2)`：佢畀返一個**字串**，小數點後面啱啱好兩個位。（Python 寫
+f-string 嘅地方，TypeScript 寫 template literal，`` `${x}` ``，將 `.toFixed` 呼叫
+放入大括號入面。）
+
+```
+console.log(Math.floor(a / b));
+console.log(a % b);
+console.log((a / b).toFixed(2));
+```
+
+`a` 同 `b` 已經讀咗，頭兩個 print 已經寫好。照住打第三行 `console.log`。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "console.log((a / b).toFixed(2)); — 包住 a / b 嘅括號先計，之後先喺結果上面叫 .toFixed(2)。",
+  "a / b.toFixed(2) 只會喺 b 身上叫 toFixed，而 tsc 唔肯將一個數除以佢回傳嘅字串。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.basic.04.int-types"
+title = "四個位元組闊"
+story = "希慎廣場幅牆後面個 LED 控制器用四個位元組存每塊磚嘅光度，仲會喺狀態行印佢裝得落嘅最大數，而條狀態行係空嘅。"
+brief = '''
+`number` 冇整數闊度，但位元運算子有：每一個都係喺 **32 位元** 上面做。`n >>> 0` 將
+`n` 當做無符號 32 位元整數重新解讀，所以 `-1 >>> 0` 係 `4294967295`，而
+`.toString(16).padStart(8, "0")` 將佢四個位元組顯示做八個十六進制數字。同一樣嘅 32
+位元就係 `(1 << 31) - 1` 嘅陷阱：`1 << 31` 已經係負數，所以最大嘅有符號 32 位元整數
+要寫做 `2 ** 31 - 1`。位元運算子去到 32 位元就停；準確數數去到 `2 ** 53` 就停，過咗
+就由 `bigint`（`1n`、`64n`）接手。
+
+```
+console.log((n >>> 0).toString(16).padStart(8, "0"));
+console.log(2 ** 31 - 1);
+```
+
+`n` 已經讀咗，最後會以 bigint 印出無符號 64 位元嘅最大值。喺兩個 `// FILL` 標記
+嗰度打上面兩行。
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "console.log((n >>> 0).toString(16).padStart(8, \"0\")); — >>> 0 令佢變無符號 32 位元，toString(16) 係十六進制，padStart 喺左邊補零。",
+  "(1 << 31) - 1 印 -2147483649：個位移係 32 位元兼有符號。2 ** 31 - 1 係普通算術，印 2147483647。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.basic.05.big-int"
+title = "三十二個位元組"
+story = "時代廣場大電視播嘅每一個廣告都用一個三十二位元組嘅雜湊簽過名，而控制室嘅 log 將啲大嘅印做一個一後面跟住一排零，嗰啲零從來都唔喺個雜湊入面。"
+brief = '''
+雜湊、鎖匙、地址：呢個遊戲靠嘅數字全部都係 256 位元闊 —— 三十二個位元組。`number`
+只可以準確裝 53 個位元，其餘嘅一聲唔出就四捨五入咗，所以用 `Number()` 讀嘅雜湊會
+錯。`bigint` 冇闊度：`BigInt(text)` 解析成個十進制數，而
+`.toString(16).padStart(64, "0")` 將佢排做你喺每個錢包都見過嘅嗰六十四個十六進制
+字元。
+
+```
+const n: bigint = BigInt(input.trim());
+```
+
+個 print 已經寫好，兩種型別都用得。將 `Number` 嗰行換做上面嗰行。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "const n: bigint = BigInt(input.trim()); — BigInt 準確解析段十進制文字，幾長都得。",
+  "個 starter 對 255 係啱，對 2**256 - 1 就錯：Number 只留 53 個位元，其餘變晒零。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.basic.06.floats"
+title = "三個小數位"
+story = "怡和街電車站個光感應器讀到三個小數位，佢餵嘅 LED 驅動器只留單精度，而 log 將兩個都顯示做零。"
+brief = '''
+`number` 係 64 位元 double —— 喺其他 land 叫 `f64`。冇 32 位元 float 型別，但你睇得到
+一個：`Math.fround(x)` 將 `x` 四捨五入到最近嘅單精度值，即係 `Float32Array` 會存嘅
+嗰個。`.toFixed(3)` 印三個小數位；`.toFixed(10)` 印得夠多，睇得出點樣四捨五入。
+
+```
+const x: number = Number(s);
+const y: number = Math.fround(x);
+```
+
+`s` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度打上面兩行。
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "const x: number = Number(s); 然後 const y: number = Math.fround(x); — fround 即係 float-round，四捨五入到單精度。",
+  "new Float32Array([x])[0] 會畀同一個 y；Math.fround 係一個呼叫搞掂嘅寫法。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.basic.04.strings"
+title = "鏡"
+story = "利園個櫥窗螢幕將每間舖嘅名量度一次、大嗌一次，再為咗反射嗰塊玻璃倒轉寫一次，而今晚佢淨係順住顯示一次個名。"
+brief = '''
+字串透過 `.length` 知道自己有幾長，用 `.toUpperCase()` 整一個大楷嘅副本。佢冇
+`reverse`：嗰個係陣列先有。所以將個字串展開做一個逐個字元嘅陣列，倒轉個陣列，再
+駁返埋 —— `[...s].reverse().join("")`。
+
+```
+console.log(s.length);
+console.log(s.toUpperCase());
+console.log([...s].reverse().join(""));
+```
+
+`s` 已經讀咗，佢嘅長度已經印咗。照住打第二同第三行 `console.log`。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "console.log(s.toUpperCase()); 然後 console.log([...s].reverse().join(\"\")); — 一個方法呼叫，之後展開、倒轉、駁埋。",
+  "join() 唔畀參數會喺啲字母之間加逗號；join(\"\") 就乜都唔加。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.basic.08.string-slices"
+title = "頭幾個字母"
+story = "怡和街電車站個到站板淨係有位放目的地嘅頭幾個字母同一個記號，而佢讀嘅 feed 一定要原封不動留住個全名。"
+brief = '''
+`s.slice(0, n)` 係 `s` 頭 `n` 個字元，以一個新字串畀返。字串改唔到，所以 slice 永遠
+係副本 —— 無論你點樣整嗰截，`s` 都唔會郁。喺字串上面用 `+=` 會整一個新字串再將個名
+重新綁定，咁就係駁長，亦都係點解 `head` 要用 `let`。
+
+```
+let head: string = s.slice(0, n);
+head += "!";
+```
+
+`s` 同 `n` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度打上面兩行。
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "let head: string = s.slice(0, n); 然後 head += \"!\"; — slice 係副本，+= 再整多一個。",
+  "slice(start, end) 喺 end 之前停，所以 slice(0, n) 啱啱好 n 個字元。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.basic.09.int-slices"
+title = "頂兩個"
+story = "電車板要將第二同第三個到站時間抄出嚟，後面加埋最尾兩個，而 feed 自己嗰張表要原封不動。"
+brief = '''
+`v.slice(1, 3)` 係陣列嘅 slice：index 1 同 2 嘅項目，裝喺一個**新陣列**入面 —— 改佢
+永遠唔會改到 `v`。`.push(...other)` 將 `other` 每個項目展開加落尾。slice 由 0 數起，
+喺第二個數之前停；負數嘅起點由尾數起，所以 `v.slice(-2)` 係最尾兩個。
+
+```
+const part: number[] = v.slice(1, 3);
+part.push(...v.slice(-2));
+```
+
+`v` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度打上面兩行。
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "const part: number[] = v.slice(1, 3); 然後 part.push(...v.slice(-2)); — slice 抄一份，push 就地加落尾。",
+  "part.push(v.slice(-2)) 冇咗 ... 就係推一個陣列入去，唔係兩個數，tsc 會話你知。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.basic.10.byte-slices"
+title = "頭三個位元組"
+story = "希慎廣場幅牆每塊磚攞一間舖個名嘅頭三個位元組，後面加個記號，用十六進制記低啲位元組，再當字母咁著燈，而今晚每塊磚都係黑嘅。"
+brief = '''
+`Uint8Array` 係一排位元組，每個係 0 到 255 嘅一個數。呢度啲字幕係純 ASCII，所以寫好
+嗰行用 `charCodeAt` 逐個字元砌出啲位元組。（呢個 land 冇 `TextEncoder`：一個 quest
+睇得到嘅 Node 就只有 `node.d.ts`。）`.slice(0, 3)` 係頭三個位元組嘅**副本** ——
+`.subarray` 就會係睇住同一塊記憶體嘅 view。typed array 長度固定，唔可以變長，所以
+駁長即係整一個新嘅：`Uint8Array.of(...head, 0x21)`，`0x21` 就係 `"!"`。
+
+```
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(...head, 0x21);
+```
+
+`s` 同 `bytes` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度打上面兩行。
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "let head: Uint8Array = bytes.slice(0, 3); 然後 head = Uint8Array.of(...head, 0x21); — 抄一份，再砌一個長啲嘅。",
+  "Uint8Array 冇 push：佢嘅長度喺整嗰陣已經定咗。Uint8Array.of 收你想要嘅位元組，展開嘅都得。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.basic.05.loops"
+title = "數格數"
+story = "時代廣場大電視將每個循環嘅畫面由 1 編到 n，操作員想要佢哋嘅總和同埋有幾多格落喺每第三格，而預覽下面個計數器兩次都係零。"
+brief = '''
+數數嘅 `for` 迴圈個括號入面有三部分：起點、每次行之前檢查嘅條件，同埋每步。`for
+(let i = 1; i <= n; i++)` 由 `1` 數上去，包埋 `n` —— 係 `<=` 令 `n` 本身做最後一個值。
+
+```
+for (let i = 1; i <= n; i++) {
+  total += i;
+  if (i % 3 === 0) {
+    threes += 1;
+  }
+}
+```
+
+`n` 已經讀咗，`total` 同 `threes` 由 `0` 開始，迴圈個身已經寫好。照住喺個身上面打
+`for` 嗰行。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (let i = 1; i <= n; i++) { — 起點、條件、每步，用分號分開。",
+  "i < n 會喺 n - 1 停；個總和會少咗 n。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.basic.06.functions"
+title = "時段收費"
+story = "控制室按大電視上面每個時段同廣告商收錢，第十個之後平啲，而三十樓張發票上面個個都係零。"
+brief = '''
+`function` 整一個函數：一個名、佢嘅參數同型別、冒號後面嘅回傳型別，同埋大括號入面
+嘅身。`return` 將一個值交返畀叫佢嗰個。啲型別就係合約 —— tsc 用佢哋檢查每一個呼叫，
+然後擦走佢哋；個身仍然可以淨係一句 `return`，成個答案寫做一條表達式。
+
+```
+function fare(slots: number): number {
+  return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;
+}
+```
+
+頭十個時段每個收 `5`，之後每個收 `3`。`main` 讀 `n` 再印 `fare(n)`。照住喺 `fare`
+入面打 `return` 嗰行。
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3; — min 將平價時段封頂喺十個，max 唔畀其餘嘅變負數。",
+  "個函數嘅工作去到 return 就完；身入面佢後面嘅嘢都唔會行。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.basic.07.structs"
+title = "一個優惠，三個欄位"
+story = "利園 app 張優惠卡有名、價錢同數量，而卡下面嗰行結帳喺排隊嘅每部手機都係零。"
+brief = '''
+`class` 將有型別嘅欄位同處理佢哋嘅方法包埋一齊。啲欄位連型別喺頂度宣告，用 `new`
+整物件嗰陣 `constructor` 會行，將佢哋填好，而方法透過 `this` 讀佢哋。`this` 唔係
+可有可無：喺方法入面淨係寫 `price` 係一個 tsc 搵唔到嘅名。
+
+```
+class Offer {
+  name: string;
+  price: number;
+  qty: number;
+  // constructor(...) { ... } is written
+
+  total(): number {
+    return this.price * this.qty;
+  }
+}
+```
+
+`Offer`、佢嘅欄位同 constructor 已經寫好，`main` 用 template literal 印張卡。照住
+打 `total` 嘅 `return` 嗰行。
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return this.price * this.qty; — 啲欄位住喺個物件上面，所以喺方法入面佢哋係 this.price 同 this.qty。",
+  "喺 total() 入面淨係 price 唔係一個名；tsc 會答 Cannot find name 'price'。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.basic.08.enums"
+title = "三條線，三隻色"
+story = "怡和街出口個港鐵螢幕將每條線塗上自己嘅顏色，而今晚上面每條線都係港島綫藍色。"
+brief = '''
+`enum` 係一組封閉、有名嘅成員，亦係 TypeScript 唯一一個去到執行時仲喺度嘅型別：tsc
+將佢變做一個物件，所以 `Line.TSUENWAN` 係 `1`，而 `Line["TSUENWAN"]` 用名去搵成員。
+編譯器只准你用佢識嘅名做 index，所以由輸入讀到嘅字串要用 `as keyof typeof Line`
+話佢知可以係邊啲名 —— 係對 tsc 嘅承諾，唔係檢查。對啲成員嘅 `switch` 已經寫好。
+
+```
+enum Line {
+  ISLAND,
+}
+
+const line: Line = Line[word.toUpperCase() as keyof typeof Line];
+```
+
+照住打 `const line` 嗰行。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "const line: Line = Line[word.toUpperCase() as keyof typeof Line]; — 方括號用名搵成員，而啲名係大楷。",
+  "冇咗 as keyof typeof Line，tsc 唔肯：普通字串可以係任何名，而個 enum 得三個。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.basic.09.vector"
+title = "播放清單"
+story = "時代廣場個播放清單係一排以秒計嘅廣告長度；操作員加一個、刪走第一個、改多一個再排序，而排好嘅清單將 100 放咗喺 4 前面。"
+brief = '''
+陣列係就地改嘅。`.push(x)` 喺尾加一個值，`.splice(i, 1)` 喺一個 index 刪走一個值
+（佢後面嗰啲會移前），`xs[i] = x` 換走一個 index 上面嘅值，而 `.sort()` 就地將啲值
+排好。**預設嘅排序當文字咁比較**，所以 `[4, 100].sort()` 係 `[100, 4]`：數字要一個
+comparator，即係一個喺 `a` 行先嗰陣回傳負數嘅函數。
+
+```
+xs.push(100);
+xs.splice(0, 1);
+xs[0] = 7;
+xs.sort((a, b) => a - b);
+```
+
+`xs` 裝住嗰行嘅整數，每一步之後都會印出嚟。喺四個 `// FILL` 佔位嗰度順序打呢四行。
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "xs.push(100); 然後 xs.splice(0, 1); 然後 xs[0] = 7; 然後 xs.sort((a, b) => a - b); — 一個佔位一行，順住次序。",
+  "xs.sort() 唔畀 comparator 會印 100 15 4 7：佢當文字咁排啲數字。(a, b) => a - b 當數字咁排。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.basic.16.list"
+title = "跑馬燈"
+story = "希慎廣場幅牆腳嗰條新聞跑馬燈將突發新聞加喺最前，由尾掉走最舊嗰條，而今晚條跑馬燈係空嘅。"
+brief = '''
+標準庫冇 linked list 亦都冇 deque：陣列兩頭都改得。`.unshift(x)` 將一個值放喺最前，
+`.pop()` 拎走最後一個，`chain[i] = x` 換走一個位置上面嘅值。`.toSorted(compare)`
+畀返一個**新**嘅排好嘅陣列，舊嗰個唔郁，所以要將個名指去新嗰個 —— 呢個就係點解
+`chain` 要係 `let`。
+
+```
+chain.unshift(0);
+chain.pop();
+chain[0] = 9;
+chain = chain.toSorted((a, b) => a - b);
+```
+
+`chain` 裝住嗰行嘅整數，每一步之後都會印出嚟。喺四個 `// FILL` 佔位嗰度順序打呢四行。
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "chain.unshift(0); 然後 chain.pop(); 然後 chain[0] = 9; 然後 chain = chain.toSorted((a, b) => a - b); — 一個佔位一行，順住次序。",
+  "toSorted 回傳排好嘅副本，乜都唔改；前面冇 chain = 嘅話，個副本就掉咗。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.basic.10.maps"
+title = "撳咗幾多下"
+story = "利園 app 美食廣場個餐牌每撳一下都會記低道菜個名，20:00 個 kiosk 想要每道菜一行加個數，而佢顯示嘅係啲撳嘅次序。"
+brief = '''
+`Map<string, number>` 係用 key 改嘅。`.set(k, v)` 將一個值存喺一個 key 下面 —— 新
+key 會加入去，已有嘅 key 會被覆蓋 —— 而 `.delete(k)` 刪走一個 key 同佢嘅值。
+`.get(k)` 嘅型別係 `number | undefined`，因為個 key 可能唔喺度，所以你未講明搵唔到
+嘅 key 當幾多之前，tsc 唔會畀你加落去：`?? 0` 即係「係 undefined 就當 0」。Map 跟住
+插入次序；`[...counts.keys()].sort()` 係佢啲 key 由細到大 —— 字串用預設嘅文字排序
+啱啱好。個統計已經幫你砌好；呢四行改佢，然後排序。
+
+```
+counts.set("tofu", 1);
+counts.delete(first);
+counts.set("tofu", (counts.get("tofu") ?? 0) + 4);
+for (const k of [...counts.keys()].sort()) {
+```
+
+`counts` 裝住每個字嘅次數，`first` 係嗰行第一個字，每改一次 `show(counts)` 都會按
+插入次序印個統計。喺三個 `// FILL` 佔位嗰度打三個改動，然後將最後個迴圈個頭換做
+排好序嗰個。
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts.set(\"tofu\", 1); 然後 counts.delete(first); 然後 counts.set(\"tofu\", (counts.get(\"tofu\") ?? 0) + 4); 然後 for (const k of [...counts.keys()].sort()) { 做最後個迴圈個頭。",
+  "counts.keys() 係 iterator，唔係陣列，冇 sort；展開 [...] 令佢變做陣列。迴圈個身已經喺度。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.basic.18.hashtable"
+title = "螢幕號碼"
+story = "三十樓個控制台有張由螢幕名對應螢幕號碼嘅表，而打入去嘅每一個查詢都返 undefined。"
+brief = '''
+普通物件係 JavaScript 最古老嘅 hash table：key 雜湊落一個格，所以存、刪、查嘅價錢
+都一樣，唔理有幾多個 key。`table[k] = v` 係存（新 key 會加入去），`delete table[k]`
+刪走一個 key，而 `table[k] += n` 就地改一個 key 下面嘅值。`Record<string, number>`
+呢個型別承諾**每一個**字串下面都有個數，而呢個承諾會被擦走：搵唔到嘅 key 喺執行時係
+`undefined`，所以查嘅時候用 `?? -1` 講明改為顯示乜。`Object.keys(table).sort()` 係
+啲 key 由細到大 —— 個物件有自己嘅次序，但唔係呢個。
+
+```
+table["bread"] = 99;
+delete table[first];
+table[last] += 10;
+const keys: string[] = Object.keys(table).sort();
+```
+
+`table` 將第一行每個螢幕名對應去佢嘅位置；`first` 同 `last` 係第一個同最後一個名。
+第二行啲名會喺改完之後查出嚟再印，搵唔到就印 `-1`；之後按 `keys` 印成張表。喺四個
+`// FILL` 佔位嗰度順序打呢四行。
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "table[\"bread\"] = 99; 然後 delete table[first]; 然後 table[last] += 10; 然後 const keys: string[] = Object.keys(table).sort(); — 一個佔位一行，順住次序。",
+  "delete 係運算子，唔係方法：delete table[first]。啲 key 係字串，所以呢度用預設排序啱晒。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.basic.11.sets"
+title = "唔同嘅路線"
+story = "怡和街沿路啲電車板成晚報嚟報去都係嗰幾個路線號碼，而控制室想知有幾多條唔同嘅路線，唔係有幾多次報告。"
+brief = '''
+`Set<number>` 每個值只裝一次，用值去改：`.add(x)` 放一個值入去，`.delete(x)` 拎一個
+值出嚟（唔喺度嘅話乜都唔做），而且冇「改呢個值」呢回事 —— set 改嘢係刪一個值再加
+另一個，`.delete(a); .add(b)`。`.size` 係有幾多個。set 跟插入次序，唔係排好嘅次序，
+所以要展開做陣列再排序先顯示 —— 要用 comparator，因為呢啲係數字。
+
+```
+seen.add(100);
+seen.delete(first);
+seen.delete(100); seen.add(101);
+console.log([...seen].sort((a, b) => a - b).join(" "));
+```
+
+`seen` 裝住嗰行唔同嘅整數，`first` 係第一個，每改一次都會印 `seen.size`。喺四個
+`// FILL` 佔位嗰度順序打呢四行。
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen.add(100); 然後 seen.delete(first); 然後 seen.delete(100); seen.add(101); 然後 console.log([...seen].sort((a, b) => a - b).join(\" \")); — 一個佔位一行。",
+  "冇 comparator 嘅話最後一行係 101 3 5：預設排序當文字咁比較啲數字。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.basic.12.stack-queue"
+title = "復原堆"
+story = "操作員個控制台將每個改動疊起，最後嗰個最先拎走，而啲舖頭嘅要求喺側邊排隊；今晚兩塊面板都印出一個冇郁過嘅堆。"
+brief = '''
+陣列就係 stack，喺尾度改：`.push(x)` 將一個值放上頂，`.pop()` 拎走頂嗰個，而
+`stack[stack.length - 1] = x` 就地換走頂嗰個。冇負數 index：`stack[-1] = 9` 編譯到、
+行到，靜靜雞存咗一個叫 `"-1"` 嘅 property，從來冇人讀。陣列亦係 queue，用 `.shift()`
+由前面拎 —— 嗰邊已經幫你寫好。
+
+```
+stack.push(100);
+stack.pop();
+stack[stack.length - 1] = 9;
+```
+
+`stack` 同 `queue` 裝住嗰行嘅整數；每一步之後印個 stack，之後拎走 queue 最前嗰個再印。
+喺三個 `// FILL` 佔位嗰度順序打呢三行。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack.push(100); 然後 stack.pop(); 然後 stack[stack.length - 1] = 9; — 一個佔位一行，順住次序。",
+  "stack.at(-1) 讀得到頂嗰個，但唔可以賦值；最後一個 index 係 stack.length - 1。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.basic.13.sorting"
+title = "價錢階梯"
+story = "利園 app 一個 tab 將今晚啲優惠由平到貴列出，另一個 tab 由貴到平，而兩個 tab 都係按舖頭送嚟嘅次序顯示。"
+brief = '''
+`.toSorted(compare)` 回傳一個新嘅排好嘅陣列，原本嗰個唔郁。comparator 決定次序：
+`(a, b) => a - b` 係由細到大，`(a, b) => b - a` 就反轉。（`.sort` 做同一樣嘢但係就地，
+回傳同一個陣列；冇 comparator 嘅話兩個都當文字咁排數字。）
+
+```
+const asc: number[] = xs.toSorted((a, b) => a - b);
+const desc: number[] = xs.toSorted((a, b) => b - a);
+```
+
+`xs` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度照住打呢兩行。
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "const asc: number[] = xs.toSorted((a, b) => a - b); 同 const desc: number[] = xs.toSorted((a, b) => b - a);",
+  "兩個都用 xs.sort(...) 會排 xs 本身，asc 同 desc 會係同一個陣列：兩個都會印最後嗰個次序。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.basic.22.reverse"
+title = "由尾到頭"
+story = "時代廣場大電視個倒數要由上面數落嚟，贊助商個名要為對面街嗰塊玻璃鏡像顯示，而 feed 兩樣都係順住嘅。"
+brief = '''
+`v.reverse()` **就地**將陣列倒轉 —— `v` 本身而家係倒轉咗（佢亦會回傳 `v`，好易當咗係
+副本）。字串改唔到，亦冇 `reverse`，所以要展開做一個逐個字元嘅陣列，倒轉，再駁返埋做
+一個新字串。
+
+```
+v.reverse();
+const r: string = [...s].reverse().join("");
+```
+
+`v` 同 `s` 已經讀咗，兩個 print 都寫好。喺兩個佔位嗰度打上面兩行。
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "v.reverse(); 自己一行，然後 const r: string = [...s].reverse().join(\"\");",
+  "s.reverse() 係編譯錯誤：Property 'reverse' does not exist on type 'string'。陣列有；字串冇。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.basic.14.sort-by-key"
+title = "排行榜"
+story = "希慎廣場幅牆按今晚 app 上面嘅撳擊次數排啲舖頭，最多嘅行先，兩間撳擊一樣嘅就按字母排；而幅牆係按佢哋加入 feed 嘅次序顯示。"
+brief = '''
+`interface` 為一個值嘅形狀命名 —— 呢度係一個有 `name` 同 `score` 嘅 `Row` —— 去到
+執行時就成個擦走。`sort` 收一個比較兩行嘅 comparator。`b.score - a.score` 令分數大嘅
+行先；係 `0` 嘅時候分數打和，`||` 就落去第二個比較，即係個名，用 `<` 同 `>` 比較
+（唔用 `localeCompare`，佢個答案睇部機嘅 locale）。
+
+```
+rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+```
+
+`rows` 係一個 `Row` 陣列，個 print 已經寫好。喺 `// FILL` 註解嗰度照住打 `sort` 嗰行。
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); — 分數先，反轉；打和先睇名。",
+  "comparator 回傳一個數：負數 a 行先，正數 b 行先，0 即係打和。0 || x 係 x，所以打和就落去比個名。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.basic.15.closures"
+title = "延遲"
+story = "島上每一塊螢幕都慢過控制室個鐘幾秒，而本應記住每塊螢幕延遲嘅嗰個 function 原封不動咁交返啲時間。"
+brief = '''
+喺另一個 function 入面定義嘅 function 可以用外面嗰個 function 嘅名，而且外面嗰個
+return 咗之後都繼續用得。呢個就係 closure：入面嗰個 function 帶住 `k` 走。外面嗰個
+function 回傳入面嗰個 —— 係個 function 本身，唔係叫佢 —— 而佢嘅回傳型別都係咁講：
+`(x: number) => number` 就係一個由 number 去 number 嘅 function 嘅型別。
+
+```
+function makeAdder(k: number): (x: number) => number {
+  function add(x: number): number {
+    return x + k;
+  }
+  return add;
+}
+```
+
+`makeAdder` 同佢入面嘅 `function add` 已經寫好，`main` 將結果用喺每個數上面。喺兩個
+佔位嗰度照住打兩行 `return`。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "add 入面 return x + k;，然後 makeAdder 最後一行 return add;（冇括號）。",
+  "return add() 會唔畀參數咁叫佢，tsc 會話 Expected 1 arguments, but got 0；淨係個名先係個 function。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.basic.16.lambdas"
+title = "雙數平方"
+story = "控制室向雙數號碼嘅螢幕按佢號碼嘅平方收錢，而三十樓部打印機印出嚟張單係零。"
+brief = '''
+arrow function 寫一個冇名嘅細 function：參數、`=>`、一條表達式，冇 `return` 呢個字。
+`.filter(f)` 留低 `f` 話好嘅項目；`.map(f)` 將每個項目換做 `f(item)`；`.reduce(f, 0)`
+將剩低嘅摺埋做一個數，由 `0` 開始。由左睇到右：每個呼叫將自己嘅陣列交畀下一個。
+
+```
+const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);
+```
+
+`xs` 已經讀咗，個 print 已經寫好。照住打 `const total` 嗰行。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0); — filter，然後 map，然後 reduce。",
+  "漏咗 , 0 嘅話，reduce 喺空陣列上面會 throw：Reduce of empty array with no initial value。淨係單數嗰個測試就有一個。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.basic.17.threads"
+title = "所有螢幕一齊嚟"
+story = "23:00 島上每一塊螢幕同一刻向控制室報告負載，而個 dashboard 印出一排零，因為佢一個都冇等。"
+brief = '''
+呢度冇 thread 要開：得一條 thread，加一個 event loop。叫一個 `async` function 會即刻
+開始佢，再交返一個 `Promise` —— 一個話你知件工作遲啲先做完嘅值。`square` 寫之前會
+瞓一陣，所以呼叫返嚟嗰陣佢嘅結果未喺度。每個 promise 都留住，然後
+`await Promise.all(tasks)` 等到佢哋全部做完 —— 先開晒所有嘢，再等一次，好似開 thread
+再 join 咁。
+
+```
+for (let i = 0; i < nums.length; i++) {
+  tasks.push(square(i));
+}
+await Promise.all(tasks);
+```
+
+`square(i)` 會填 `results[i]`，迴圈同兩個 print 已經寫好，而 `main` 係 `async`，所以
+可以 `await`。照住打 `tasks.push(square(i));` 做迴圈個身，下面打 `await` 嗰行。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "迴圈入面 tasks.push(square(i));，之後 await Promise.all(tasks); — 先開晒佢哋，再等一次。",
+  "冇人 await 嘅 promise 都照行，但 main 喺佢做完之前已經印咗；喺迴圈入面 await square(i) 就會一個一個咁行。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.basic.18.binary-tree"
+title = "UNDEFINED"
+story = "23:59，三十樓控制室：螢幕 id 嗰棵樹得一個根，下面乜都冇，第一次查就死咗，報 Cannot read properties of undefined (reading 'left')。"
+brief = '''
+二元搜尋樹將細啲嘅值放喺節點嘅左子樹，大啲嘅放喺右子樹。插入係遞歸嘅：空嘅子樹
+（`undefined`）變做一個新嘅 `TreeNode`；否則個值落去其中一邊，而返嚟嘅嘢要再存做嗰個
+子節點，因為個子節點頭先可能仲係 `undefined`。喺 `undefined` 上面跟 `.left` 走，就係
+成條路以佢命名嘅嗰種死法。`TreeNode | undefined` 呢個型別就係講明子節點可能冇嘅合約，
+strict 嘅 tsc 要過咗 `undefined` 檢查先准你讀 `n.val` —— 嗰個檢查行先，而且已經寫好。
+
+```
+if (v < n.val) {
+  n.left = insert(n.left, v);
+} else {
+  n.right = insert(n.right, v);
+}
+```
+
+`TreeNode`、`insert` 嘅 `undefined` 情況同佢 `if (v < n.val)` / `else` 嘅骨架、
+`inorder`、`height` 同 `main` 都已經寫好。喺兩個 `// FILL` 佔位嗰度照住打兩行遞歸。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if 下面 n.left = insert(n.left, v);，else 下面 n.right = insert(n.right, v);。",
+  "重點係個賦值：insert 回傳子樹嘅根，子節點本來係 undefined 嘅話就係一個全新嘅 TreeNode。",
+]

@@ -158,6 +158,47 @@ return function()
     Layout.font, Layout.mode = was_font, was_mode
   end)
 
+  T.case("the four roads fit above the PLAYGROUND band at every type step and shape", function()
+    if not (love and love.graphics) then
+      T.skip("categories metrics, four roads", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local Land = require("src.land")
+    local I18n = require("src.i18n")
+    local Categories = require("src.scenes.categories")
+    -- Every road a language land has (SPEC §0), VERY BASIC included: at
+    -- step 4 in a 720-tall window the fourth row was drawn under the band
+    -- and the footer, and VERY BASIC was measured as `VERYBASIC`.
+    local rows = {}
+    for i, category in ipairs(Land.CATEGORIES) do
+      rows[i] = { category = category, cleared = 0, total = 27, open = true }
+    end
+    local was_font, was_mode = Layout.font, Layout.mode
+    for _, step in ipairs({ 1, 2, 3, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs({ { "landscape", 1280, 720 }, { "landscape", 1080, 720 },
+          { "portrait", 720, 1000 }, { "portrait", 720, 1280 }, { "portrait", 1080, 1920 } }) do
+        Layout.mode = shape[1]
+        local m = Categories.metrics(shape[2], shape[3], rows)
+        local tag = ("step %d %s %dx%d"):format(step, shape[1], shape[2], shape[3])
+        local widest = 0
+        for _, cat in ipairs(rows) do
+          widest = math.max(widest,
+            UI.textWidth(I18n.t(Land.category_label(cat.category)), m.name_size))
+        end
+        T.ok(m.widest >= widest, tag .. ": the name is measured as it is drawn")
+        T.ok(m.label_w >= m.widest, tag .. ": the label column holds the widest name")
+        T.ok(m.y0 + #rows * (m.rh + 12) - 12 <= Categories.band_top(shape[3]) - 10,
+          tag .. ": four rows end above the PLAYGROUND band")
+        T.ok(m.rh >= 12 + UI.lineHeight(m.name_size) + 14, tag .. ": the row holds its name")
+        T.ok(m.count_w >= UI.textWidth("00 / 00", m.count_size), tag .. ": the counts plate holds NN / NN")
+        T.ok(m.y0 > m.title_y + m.title_h, tag .. ": the first row starts under the title")
+      end
+    end
+    Layout.font, Layout.mode = was_font, was_mode
+  end)
+
   T.case("the quest console is inside the well and clear of the buttons at every step", function()
     if not (love and love.graphics) then
       T.skip("quest console", "needs fonts, so needs LÖVE")

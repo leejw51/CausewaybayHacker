@@ -1,0 +1,1375 @@
+# C++ LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/cpp/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "cpp.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.advanced.01.getline"
+title = "Kniha sampanů"
+story = "Správce přístavu v tajfunovém útočišti zapisuje každý sampan jako jeden řádek: jeho jméno a pak cokoli vyložil, ať z toho vyjde kolik chce čísel."
+brief = '''
+První řádek je počet `n`. Každý z dalších `n` řádků je jméno lodi, za kterým
+následuje nula nebo více celých čísel oddělených mezerami.
+
+Pro každou loď vypiš jeden řádek ve tvaru `<NAME> <how many numbers> <their sum>`
+a nakonec `BOATS <n>`.
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+Jednotkou je tady řádek, ne token. `std::cin >> x` se zastaví na bílém znaku
+a na konce řádků nehledí, takže ti nedokáže říct, kde jedna loď končí a další
+začíná. `std::getline` ti dá celý řádek; `std::istringstream` nad tím řádkem
+ti pak zase dá `>>`, ale jen v jeho rámci.
+
+Jedna věc kousne každého jednou: po `std::cin >> n` na konci prvního řádku
+v proudu pořád čeká znak nového řádku a první `getline` ho přečte jako
+prázdný řádek.
+'''
+hints = [
+  "Jedno std::getline(std::cin, junk) po načtení n zahodí nový řádek, který tam >> nechal.",
+  "std::istringstream fields(line); fields >> name; a pak while (fields >> value) projde zbytek — smyčka skončí, když už není co parsovat.",
+  "Jméno je první token řádku a řádek jen se jménem dá 0 0, žádný zvláštní případ není potřeba.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.advanced.02.references"
+title = "Kopie není ta věc"
+story = "Obsluha navijáku na skluzu jachtklubu zapisuje každý náklad na kopii archu a arch na zdi se nikdy nezmění."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Vlož každou hodnotu do jednoho `std::vector<long long>` přes funkci `load`
+a pak vypiš tři řádky: `LOADED <how many>`, `TOTAL <sum>` z funkce `total`,
+která jen čte, a `FIRST <value>` — nebo `FIRST NONE`, když nic není.
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+Starter se zkompiluje a vypíše `LOADED 0`. `load` bere vektor **hodnotou**,
+takže každé volání dostane vlastní kopii, vloží do ní a při návratu ji zahodí.
+C++ kopíruje, dokud neřekneš jinak.
+
+Jinak se to řekne pomocí `&`: parametr typu `std::vector<long long>&` je
+reference na vektor volajícího, ne jeho kopie. `total` by měla brát
+`const std::vector<long long>&` — potřebuje se dívat, nepotřebuje sahat,
+a `const` je způsob, jak to říct v signatuře, aby tě na tom kompilátor držel.
+
+`FIRST` je ukazatel: `long long* first` je buď adresa prvního prvku, nebo
+`nullptr`, a `nullptr` je ta jediná hodnota, na kterou musíš otestovat, než
+ho následuješ. To je celá tahle země na jednom řádku.
+'''
+hints = [
+  "load opraví jeden znak: std::vector<long long>& sheet. Místo volání se nemění; reference se naváže na argument tak, jak je napsaný.",
+  "total by měla brát const std::vector<long long>& — const je slib a kompilátor ho kontroluje.",
+  "&sheet.front() je adresa prvního prvku a dává smysl, jen když nějaký je; otestuj nullptr, než napíšeš *first.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.advanced.03.vector"
+title = "Uprostřed voru"
+story = "Čtyřicet sampanů svázaných v tajfunovém útočišti. Správce přístavu vidí ten úplně vnější a ten úplně vnitřní a nic mezi nimi."
+brief = '''
+Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
+čísel oddělených mezerami. `n` je nejméně `1`.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho, co leží
+ostře mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`std::vector` je posloupnost. `front()` a `back()` jsou konce;
+`begin() + 1` až `end() - 1` je prostředek a `std::accumulate` přes ten
+rozsah je součet — pokud počáteční hodnota, kterou mu předáš, je
+`long long`. `std::accumulate(first, last, 0)` sčítá v `int`, protože `0` je
+`int`, a jeden ze skrytých případů má prostředek, který se do něj nevejde.
+'''
+hints = [
+  "nums.begin() + 1 a nums.end() - 1 jsou iterátory a dvojice iterátorů je způsob, jak <numeric> a <algorithm> pojmenovávají rozsah.",
+  "S jednou nebo dvěma hodnotami je ten rozsah prázdný nebo obrácený — ohlídej ho pomocí if na nums.size(), než ho sestavíš.",
+  "Na 0LL záleží: accumulate odvozuje typ výsledku z počáteční hodnoty a obyčejná 0 je int.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.advanced.04.strings"
+title = "Bajty nejsou písmena"
+story = "Nástěnka tajfunového útočiště ořízne 銅鑼灣 na tři bajty a dostane jeden znak."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**
+2. jeho délku ve **znacích** — kódových bodech UTF-8
+3. ten řádek se znaky v obráceném pořadí
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII, a pak si první dvě čísla nejsou
+rovna. `std::string::size()` jsou bajty. Vždycky byly. `std::string`
+o kódováních nic neví; je to posloupnost `char` a `char` je bajt.
+
+UTF-8 se dá snadno spočítat bez dekódování: každý kódový bod začíná bajtem,
+který **není** tvaru `10xxxxxx`, a každý pokračovací bajt tvaru `10xxxxxx` je.
+Bajt `c` tedy začíná znak právě tehdy, když `(c & 0xC0) != 0x80`. Obracej
+znaky, ne bajty — `std::reverse` na samotném řetězci by rozsekl `銅` na tři
+kusy a vypsal je pozpátku.
+'''
+hints = [
+  "Procházej bajty jako unsigned char; obyčejný char může být se znaménkem a pak bitový test na čemkoli nad 0x7F vyjde špatně.",
+  "Posbírej každý znak jako vlastní malý std::string, obrať vektor těch znaků a spoj ho.",
+  "Počet bajtů, pro které platí (c & 0xC0) != 0x80, je počet znaků bez jakéhokoli dekódování.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.advanced.05.classes"
+title = "Kniha skluzu"
+story = "Skluz jachtklubu účtuje každé vytažení lodi a drží řádky na jednom místě, nebo držel, než návrh nahradil třídu komentářem."
+brief = '''
+První řádek je `<BOAT> <n>`. Dalších `n` řádků je `<ITEM> <CENTS>`.
+
+Sestav pro loď `Ledger`, který posbírá položky, a pak vypiš každou položku
+zpátky jako `<ITEM> <CENTS>` v pořadí, v jakém přišla, potom `TOTAL <sum>`
+a potom `BOAT <name> <count>`.
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` může být `0` a pak výstup tvoří jen poslední dva řádky.
+
+`class` je `struct`, jehož členy jsou soukromé, dokud neřekneš `public:`.
+Konstruktor proběhne dřív, než se k tomu dostane tělo, takže členy se
+nastavují v **inicializačním seznamu** —
+`Ledger(std::string boat) : boat_(std::move(boat)) {}` — a ne přiřazením
+uvnitř složených závorek. `total()` nic nemění, takže je deklarovaná jako
+`const`, a to je jediný důvod, proč se dá zavolat na `const Ledger&`.
+'''
+hints = [
+  "Stačí std::vector<std::pair<std::string, long long>>. Třída je tu proto, aby kniha vlastnila své řádky.",
+  "Inicializační seznam — : boat_(std::move(boat)) — nastaví člen už při jeho konstrukci; přiřazení uvnitř závorek napřed postaví prázdný řetězec a pak ho přepíše.",
+  "Vracej položky jako const referenci, aby je main mohl projít bez kopírování vektoru, a každou metodu, která knihu nemění, označ const.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.advanced.06.enum-class"
+title = "Kdo je u kormidla"
+story = "Brána jachtklubu účtuje každé kartě členskou sazbu, včetně těch, které nejsou členské, a té jedné, která není karta."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků `<TYPE> <HOURS>`.
+
+Základní sazba je `500 + 100 * HOURS` centů. Pro každý řádek vypiš jedno z:
+
+* `MEMBER` — základní sazbu
+* `CREW` — polovinu základní sazby, celočíselným dělením
+* `JUNIOR` — vždy `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+Modeluj kartu jako `enum class Card` se čtyřmi hodnotami, z nichž jedna je
+`Other`. Hodnota `enum class` se za tvými zády nepřevede na `int` a nepouští
+svá jména do obklopujícího rozsahu — obojí obyčejný `enum` dělá a obojí je
+důvod, proč psát právě tenhle.
+
+Enum v C++ nemůže nést data, takže nerozpoznaný tag cestuje vedle něj: malá
+`struct Tag { Card card; std::string raw; }`. Jízdné rozhodni jedním
+`switch`. Pokryj každý enumerátor a kompilátor nemá před čím varovat; jeden
+vynech a `-Wall` ti řekne který.
+'''
+hints = [
+  "Card::Other je čtvrtý enumerátor; řetězec, který nerozpoznal, žije hned vedle v Tag::raw.",
+  "switch (tag.card) s case pro každý enumerátor a return uvnitř každého case — když každá větev vrací, break není potřeba.",
+  "std::to_string udělá z čísla std::string; řádek UNKNOWN je spojení řetězců pomocí +.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.advanced.07.maps"
+title = "Co křičí útočiště"
+story = "Tajfunové útočiště v poledne: každý sampan na něco volá a správce přístavu chce pořadí."
+brief = '''
+Načti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou jako `<word> <count>`, seřazené podle počtu
+sestupně, při shodě podle slova vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std::map<std::string, long long>` je seřazená podle klíče,
+`std::unordered_map` podle ničeho a ani jedna podle počtu — takže pořadí je
+samostatný krok: zkopíruj záznamy do `std::vector` dvojic a seřaď ho
+`std::sort` s komparátorem. `counts[word]++` na klíči, který tam není, ho
+nejdřív vloží s hodnotou `0`, což je přesně to, co počítací smyčka chce.
+'''
+hints = [
+  "while (std::cin >> word) čte každý token oddělený bílými znaky, dokud vstup neskončí; counts[word]++ je celá počítací smyčka.",
+  "Vektor se dá postavit rovnou z begin() a end() mapy; každý prvek je std::pair<const std::string, long long>.",
+  "Komparátor je lambda, která vrací true, když a musí být před b: nejdřív počet sestupně, při shodě slovo vzestupně.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.advanced.08.hashtable"
+title = "Žádné pořadí"
+story = "Apel v útočišti se vrátí seřazený podle abecedy a správce přístavu ho chce v pořadí, v jakém lodě skutečně odpověděly."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, na každém jedno jméno
+lodi. `n` je nejméně `1` a jméno je jeden úsek znaků bez mezer. Jméno se
+může objevit víckrát.
+
+Vypiš každé různé jméno jednou jako `<name> <count>`, **v pořadí, v jakém se
+jméno poprvé objevilo**. Pak vypiš `DISTINCT <k>`.
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+Ani jeden kontejner ti to sám nedá, a o tom je celý quest.
+
+`std::map` je strom: při procházení vrací jména **seřazená**, což není pořadí,
+v jakém odpovídala. `std::unordered_map` je hashovací tabulka: vyhledávání je
+v průměru O(1) místo O(log n), ale při procházení je vrací **v žádném
+určeném pořadí** — ne seřazená, ne v pořadí vložení a ani nutně dvakrát
+stejně. Standard žádné neslibuje, takže program, který vypisuje
+`unordered_map` jejím procházením, je program, jehož výstup závisí na
+knihovně, se kterou byl sestaven. Starter dělá přesně tohle a dokonce projde
+případy s jediným různým jménem — a to je to prozrazení: test, který pořadí
+nerozliší, není důkaz, že je pořadí správně.
+
+Drž ty dvě práce ve dvou kontejnerech: `std::vector<std::string>` si pamatuje
+pořadí, v jakém bylo jméno poprvé viděno, a `std::unordered_map<std::string,
+long long>` počítá. Pro výpis procházej vektor.
+'''
+hints = [
+  "Hashovací tabulka je na rychlé vyhledávání. Vektor je na pamatování pořadí. Potřebuješ obojí.",
+  "`count[name]++ == 0` platí pro každé jméno právě jednou — při vložení — protože operator[] hodnotu výchozím způsobem zkonstruuje na 0.",
+  "Vypisuj procházením vektoru a u každého jména se zeptej mapy na počet, nikdy procházením mapy.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.advanced.09.set-and-pair"
+title = "Kdo kotví kde"
+story = "Tabule kotvišť uvádí stejný sampan u stejného stání dvakrát a nikdo nedokáže říct, které řádky jsou ty duplicitní."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků `<BERTH> <NAME>`.
+
+Vypiš každou různou dvojici `<BERTH> <NAME>` jednou, seřazenou podle stání
+a pak podle jména, potom `DISTINCT <k>` a `DUPES <n - k>`.
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+`std::set<std::pair<int, std::string>>` udělá všechny tři práce naráz:
+odmítne druhou kopii čehokoli, co už v něm je, udržuje se seřazený
+a `std::pair` se už porovnává tak, jak výstup chce — první prvek, pak druhý.
+Projdi ho range-`for` a každou dvojici rozeber **strukturovaným navázáním**,
+`const auto& [berth, name]`, místo `.first` a `.second`.
+'''
+hints = [
+  "Změň kontejner: std::set<std::pair<int, std::string>>. Vložení duplikátu není chyba, je to operace, která nic neudělá.",
+  "Set je seřazený podle operator< svého typu prvku a std::pair porovnává první, pak druhý — což je pořadí stání, pak jméno, které výstup chce.",
+  "for (const auto& [berth, name] : moorings) rozbalí každou dvojici do dvou jmen; n minus velikost setu je počet duplikátů.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.advanced.10.algorithms"
+title = "Jedním průchodem po skluzu"
+story = "Kniha navijáku je sloupec nákladů. Alex říká tři smyčky for. Mei říká, že standardní knihovna je už napsala."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš čtyři řádky:
+
+1. součet sudých hodnot (`0`, pokud žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednou mezerou —
+   nebo `-`, pokud žádné nejsou
+3. kolik je různých hodnot
+4. `FIRST_BIG <i>` — index (od 0) první hodnoty větší než `10`, nebo `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+Použij `<algorithm>` a `<numeric>`, ne smyčky přes indexy: `std::accumulate`
+s lambdou pro první řádek, `std::copy_if` a `std::transform` pro druhý,
+`std::sort` a pak `std::unique` pro třetí, `std::find_if` pro čtvrtý. Každý
+z nich bere dvojici iterátorů a tam, kde potřebuje rozhodnutí, lambdu. Nejde
+o to, že by se smyčka těžko psala; jde o to, že jméno říká, k čemu smyčka je.
+'''
+hints = [
+  "Čtvrtý argument accumulate je binární funkce (acc, x) -> acc; ať přičte x, jen když je x sudé.",
+  "copy_if potřebuje kam psát — std::back_inserter(big) vektor za pochodu zvětšuje. transform může psát zpátky přes tentýž rozsah.",
+  "std::unique přesune duplikáty na konec a vrátí iterátor na místo, kde začínají; vzdálenost od begin() je počet různých. Vidí jen sousední duplikáty, takže napřed seřaď kopii.",
+  "find_if při neúspěchu vrátí end() a při zásahu je iterátor minus begin() index.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.advanced.11.templates"
+title = "Napiš to jednou"
+story = "Tabule měřidel ve strojovně čerpadel má largest napsanou čtyřikrát — pro litry, pro minuty, pro čerpadla a pro jména čerpadel — a pátá má přijít dřív, než se otočí příliv."
+brief = '''
+Na standardním vstupu jsou dva řádky: na prvním celá čísla, na druhém slova.
+
+Napiš **jednu** `largest`, která funguje na obojí, a šablonu třídy `Pair<T>`
+s `larger()` a `smaller()`.
+
+Vypiš největší celé číslo, největší slovo a pak `PAIR <larger> <smaller>`
+pro `Pair` prvních dvou celých čísel. Při shodě se za větší počítá `a`.
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+Starter se nezkompiluje: `largest` je přibitá k `long long`, takže předat jí
+slova je *no matching function*. **Šablona funkce**,
+`template <typename T> T largest(const std::vector<T>& xs)`, se vyrazí
+jednou pro každý typ, se kterým je zavolána — `T` se odvodí z argumentu
+a jediné, co tělo od `T` požaduje, je, aby na něm fungovalo `>`.
+
+`Pair<T>` je stejná myšlenka pro třídu. Její metody jsou `const`, protože
+čtou a nezapisují, a vracejí `const T&` místo kopie, protože volající se chce
+jen podívat. Obě signatury říkají, co slibují, a kompilátor je na tom drží.
+'''
+hints = [
+  "template <typename T> před largest a T místo long long všude uvnitř. Volání se nemění; T se odvodí.",
+  "std::string už operator> má, takže totéž tělo šablony se pro slova zkompiluje, aniž bys cokoli přidal.",
+  "Pair<T> je šablona třídy; typ pojmenuješ v místě použití — Pair<long long> — a metody jsou const, protože jen porovnávají.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.advanced.12.lambdas"
+title = "Počítání u dveří"
+story = "Turniket jachtklubu počítá, kdo vejde a kdo odejde, a vedoucí chce číslo při zavírání, ať se mezitím stalo cokoli."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý `IN` nebo `OUT`.
+
+Veď průběžný počet, který nikdy neklesne pod nulu, a vypiš ho po každém
+příkazu. Pak vypiš `INS <k>` — kolik příkazů bylo `IN`, spočítáno pomocí
+`std::count_if` a lambdy — a `CLOSED <final>`.
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+Počítadlo je uzávěr: `make_counter` vrací lambdu, která vlastní svůj součet.
+Lambda ve výchozím stavu zachytává kopií a kopie je uvnitř těla `const` —
+`mutable` za seznamem parametrů je to, co zachycenému součtu dovolí měnit se
+mezi voláními. **Init-capture**, `[total = 0LL]`, deklaruje zachycenou
+proměnnou přímo v hranatých závorkách místo v obklopujícím rozsahu, takže
+mimo lambdu není nic, na co by mohl sáhnout někdo jiný.
+
+Druhé zachycení, `[&]`, bere všechno referencí. V tomhle questu jsou napsaná
+obě; vědět, které jsi myslel, je to, na co u pohovoru poslouchají.
+'''
+hints = [
+  "[total = 0LL](long long delta) mutable { ... } — init-capture deklaruje total a mutable je to, co tělu dovolí do něj přiřadit.",
+  "Bez mutable je tělo const členskou funkcí typu uzávěru a total += delta je chyba kompilace, ne tichá operace, která nic neudělá.",
+  "std::count_if(begin, end, predicate) vrací, kolik prvků predikát přijal; predikát je lambda, která bere jeden příkaz.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.advanced.13.optional-variant"
+title = "Řádek, který není číslo"
+story = "Odečítač měřidel ze strojovny čerpadel odevzdá sloupec čísel a uprostřed něj něčí objednávku oběda."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků. Každý řádek má být celé
+číslo.
+
+Pro každý řádek vypiš buď zdvojenou hodnotu, nebo `BAD <line>`, pokud se
+nedá naparsovat. Nakonec vypiš `SUM <total>`, kde součet je součet hodnot,
+které jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+Odpověď nesou dva typy. `std::optional<long long> parse(const std::string&)`
+je *číslo, nebo nic*, a `std::from_chars` ho vyplní: místo vyhození výjimky
+vrací chybový kód a říká ti, kde se zastavil, takže se dá odmítnout `4x`
+stejně jako `xx`.
+
+`std::variant<long long, std::string> doubled(const std::string&)` je *buď
+zdvojená hodnota, nebo řádek, který selhal* — jeden z přesně dvou typů,
+nikdy oba, nikdy žádný. `std::get_if<long long>(&result)` ti dá ukazatel na
+číslo, pokud je uvnitř právě ono, a `nullptr`, pokud ne, což je přesně to
+dvoucestné větvení, které `main` potřebuje. V celém programu žádné výjimky;
+selhání je hodnota a jde tam, kam jdou hodnoty.
+'''
+hints = [
+  "std::from_chars(first, last, value) vrací strukturu s ptr a ec; úspěch je ec == std::errc() A ZÁROVEŇ ptr == last, jinak se řádek jako 4x naparsuje napůl.",
+  "Optional je pravdivý, když drží hodnotu, takže if (auto v = parse(text)) je celé větvení a *v je to číslo.",
+  "Vracet z jedné funkce long long nebo std::string je legální, protože návratový typ je variant, který udrží obojí; get_if vybere větev v main.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.advanced.14.exceptions"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy služby pro kotevní poplatky vyhazují každá něco jiného a nic nad nimi nic z toho nechytá."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků, každý má být vzdálenost
+v km.
+
+`fare(text)` parsuje pomocí `std::stoll` — která na `xx` **vyhodí**
+`std::invalid_argument` — a zápornou vzdálenost odmítne vyhozením tvé vlastní
+`NegativeDistance`, třídy odvozené od `std::runtime_error`, jejíž `what()`
+zní `negative distance: <km>`. Jinak vrací `500 + 100 * km`.
+
+Pro každý vstupní řádek vypiš jeden řádek: jízdné, nebo `not a number`, když
+se nedá naparsovat, nebo `what()` výjimky `NegativeDistance`, když je
+vzdálenost záporná. Pak vypiš `ERRORS <k>`, kolik řádků selhalo.
+
+Selhání parsování vypisuje tvoje slova, a ne slova výjimky, protože
+`std::invalid_argument::what()` je cokoli, co se knihovně zachtělo říct —
+`stoll` v libstdc++, `stoll: no conversion` v libc++ — a očekávaný výstup na
+tom záviset nemůže.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+Starter se zkompiluje a na `xx` umře: výjimka, kterou nikdo nechytí, dojde až
+na vrchol `main` a runtime zavolá `std::terminate`, což je ten abort, který
+vidíš. Opraví to blok `try` se dvěma větvemi `catch` — konkrétnější typ
+první, protože větve se zkoušejí popořadě a `std::runtime_error` by
+`NegativeDistance` spolkla, kdyby byla první. Chytej vždy přes `const&`:
+chycení hodnotou ořízne odvozenou výjimku na její základ a ztratí zprávu,
+kterou jsi vyhodil.
+'''
+hints = [
+  "Obal volání do try { ... } a přidej catch (const NegativeDistance& e) a pak catch (const std::invalid_argument&) — v tomhle pořadí.",
+  "e.what() je zpráva, kterou jsi sestavil v konstruktoru; std::runtime_error ti ji uloží.",
+  "Nechycené výjimky volají std::terminate, který ukončí proces a nevyprázdní žádný výstup nad rámec toho, co už odešlo. Přesně to dělá starter na druhém řádku.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.advanced.15.iterators"
+title = "Tvoje vlastní smyčka for"
+story = "Měřidlo ve strojovně čerpadel odtiká každý údaj od začátku do konce směny a žádný si nikam neuloží."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Dej `Stops` iterátor, aby range-`for` přes něj vydal `count` hodnot
+začínajících na `start` a postupujících o `step`. Každou vypiš na vlastní
+řádek a pak `SUM <total>` spočítaný pomocí `std::accumulate` přes tytéž
+`begin()`/`end()`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Starter se nezkompiluje: range-`for` kompilátor přepíše na volání `begin()`
+a `end()` a `Stops` nemá ani jedno. Není žádný trait, od kterého by se dalo
+dědit, a žádné rozhraní k deklarování; smyčka si jménem řekne o tři věci —
+`operator*`, prefixový `operator++`, `operator!=` — na čemkoli, co vrátí
+`begin()`, a když tam jsou, funguje to. To je celá smlouva a je to tatáž
+smlouva, kterou používá `std::accumulate` a každý jiný algoritmus.
+'''
+hints = [
+  "Iterátor je malá samostatná struktura: aktuální hodnota, krok a kolik jich zbývá.",
+  "end() je iterátor, kterému nic nezbývá; operator!= porovnává jen odpočet, takže na hodnotě uvnitř end() nezáleží.",
+  "std::accumulate prochází tytéž tři operátory jako smyčka for — jakmile existují begin()/end(), funguje obojí bez dalšího řádku.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.advanced.16.raii"
+title = "Uklidí po sobě"
+story = "Deník strojovny čerpadel se zavře sám, když směna skončí, ve správném pořadí, ať si na to někdo vzpomněl, nebo ne."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Deklaruj na **začátku** `main` dvě hodnoty `Guard` jménem `first` a `second`,
+jejichž destruktor vypíše `DROP <name>`. Uvnitř vnořeného bloku naplň
+hodnotami `Tally`, jehož destruktor vypíše `TALLY <count> <sum>`. Za blokem
+vypiš `DONE`. Nic jiného `main` sám nevypisuje.
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+Každý řádek kromě `DONE` vypisuje destruktor. `Tally` umírá na uzavírací
+závorce svého bloku, takže `TALLY` přijde před `DONE`; oba strážci umírají,
+když `main` vrátí, v **obráceném** pořadí deklarace, takže `second` jde před
+`first`. Nic z toho neplánuješ ty. Plánuje to rozsah.
+
+To je RAII a to jméno je horší než ta myšlenka: prostředek je svázaný
+s životností objektu a destruktor je jeho uvolnění. `std::lock_guard` takhle
+odemyká, `std::unique_ptr` takhle uvolňuje, `std::ofstream` takhle zavírá
+a předčasný `return` nebo vyhozená výjimka spustí každý z nich úplně stejně.
+Se všemi třemi se setkáš na další mapě.
+'''
+hints = [
+  "Destruktor je ~Guard() { ... } — žádný návratový typ, žádné parametry a nikdy ho nevoláš ty; volá ho rozsah.",
+  "Vnitřní závorky jsou celý důvod, proč se TALLY vypíše před DONE. Odstraň je a vypíše se až po něm.",
+  "Destrukce je vždycky obrácená konstrukce, proto jde second první a proto se zámek vzatý jako druhý uvolní jako první.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.advanced.17.segfault"
+title = "Špatná adresa"
+story = "12:00:00. Polední dělo vystřelí na adresu, která nikomu nepatří, a celé nábřeží ztichne."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je tabulka výstřelů, `<NAME> <SECONDS>`.
+Pak řádek `q` a `q` jmen k vyhledání.
+
+Pro každé jméno vypiš `<NAME> FIRES AT <seconds>` nebo `<NAME> UNKNOWN`. Pak
+vypiš `LOADED <n> CHECKSUM <sum of every SECONDS in the table>`.
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+Starter se čistě zkompiluje a dvakrát spadne, ze dvou různých důvodů, a ty
+musíš najít oba.
+
+První je smyčka kontrolního součtu. Prochází `1..n` a čte `table.at(i)`
+a `at` **kontroluje**: index `n` je jeden za koncem, takže vyhodí
+`std::out_of_range`, nic ji nechytí a proces skončí. Oprav smyčku. Pak
+pochop, co ti `at` koupilo: tatáž smyčka napsaná s `table[i]` by nic
+nevyhodila. Přečetla by, cokoli na té adrese zrovna bylo — další objekt na
+haldě, nebo nic — a vypsala kontrolní součet, který by byl špatně o částku,
+kterou by nikdo nedokázal zopakovat. `[]` na vektoru nekontroluje. To je
+dohoda v téhle zemi: je to rychlé a je to tvoje práce.
+
+Druhý je `lookup`. Vrací `Shell*` a když jméno v tabulce není, vrací
+`nullptr` — a volající na něm napíše `->seconds`, aniž by se podíval. Čtení
+přes nulový ukazatel je nedefinované chování; na každém stroji, kde tohle
+běží, je to zároveň chyba segmentace, což je ta nejlaskavější podoba
+nedefinovaného chování, protože se aspoň zastaví. Otestuj ukazatel. To je
+celý boss a je to otázka, kterou se ve skutečnosti ptá každý pohovor na C++:
+*co je na té adrese právě teď a kdo ti řekl, že to smíš číst?*
+'''
+hints = [
+  "Navaž výsledek vyhledání na jméno a otestuj ho: if (Shell* shell = lookup(...)) { ... } else { UNKNOWN }. Ukazatel je odpověď i otázka zároveň.",
+  "Platné indexy jdou od 0 do size() - 1. Smyčka, která začíná na 1 a běží do size(), je o jedna vedle na obou koncích a spadne jen na horním.",
+  "at() vyhodí std::out_of_range a [] nekontroluje vůbec nic; pád, který jsi dostal, je ten dobrý výsledek. Ten, který jsi nedostal, je boss.",
+  "Chyba segmentace je operační systém, který odmítá čtení adresy, jež procesu nepatří. Adresa 0 mezi ně patří vždycky, a proto nullptr spadne spolehlivě a zastaralý ukazatel do uvolněné paměti ne.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.advanced.01.threads"
+title = "Dvě čerpadla, jedna jímka"
+story = "Strojovna čerpadel ve Victoria Parku v poledne spustí druhé čerpadlo a jímka se konečně vyprázdní. Nic jiného se v místnosti nezměnilo."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jedno `std::thread`, které spočítá její druhou
+mocninu a zapíše ji do `out[i]` — do svého vlastního slotu, takže žádná dvě
+vlákna nesahají na stejný prvek. Všechna je připoj pomocí join, pak vypiš
+každý výsledek na vlastní řádek a nakonec `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Vlákna skončí v pořadí, jaké se zlíbí plánovači. Zápis podle indexu a výpis
+až po joinech je to, co dělá výstup při každém běhu stejný. Vlákno, které by
+vypisovalo samo, by takové nebylo, a vlákno, které by zachytilo proměnnou
+smyčky referencí, by četlo proměnnou, která se už posunula dál — zachyť `i`
+hodnotou a `out` referencí.
+'''
+hints = [
+  "threads.emplace_back(lambda) zkonstruuje vlákno na místě a hned ho spustí.",
+  "Zachyť [i, &nums, &out]: index hodnotou, aby si každé vlákno drželo svůj, vektory referencí, aby zápisy dopadly do kopie v main.",
+  "Připoj každé vlákno dřív, než čteš out. join() blokuje, dokud to vlákno neskončí, a po něm jsou zápisy vidět.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.advanced.02.join"
+title = "Nikdo neodchází bez odhlášení"
+story = "Vlákno čerpadla dokončí směnu, mistr odejde z místnosti, aniž by ho odhlásil, a celé budově vypadne proud."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků textu.
+
+Spusť pro každý řádek jedno vlákno, které ho převede na velká písmena do
+svého vlastního slotu. Všechna je připoj, vypiš řádky v pořadí a pak `DONE`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+Starter se zkompiluje, spustí vlákna a skončí abortem. Nikdy je nepřipojí
+a `std::thread`, které je v okamžiku, kdy běží jeho destruktor, pořád
+**joinable**, zavolá `std::terminate`. To není chyba v knihovně. Vlákno,
+které přežije funkci, jež ho spustila, by běželo nad proměnnými na zásobníku,
+které už neexistují, a standard rozhodl, že abort, který vidíš, je lepší než
+čtení z uvolněné paměti, které nevidíš.
+
+Takže každé `std::thread` se připojí (nebo odpojí pomocí detach, což skoro
+nikdy nechceš), než vyjde z rozsahu. C++20 má `std::jthread`, které se
+připojí ve svém destruktoru — RAII pro vlákna, stejná myšlenka jako
+`lock_guard` pro zámky — a je to typ, po kterém sáhnout ve výchozím stavu.
+Tady projdou oba zápisy.
+'''
+hints = [
+  "Nejmenší oprava je smyčka: for (std::thread& t : threads) t.join(); dřív, než se cokoli vypíše.",
+  "Lepší oprava je typ: std::vector<std::jthread> a nech destruktor udělat připojení, až vektor vyjde z rozsahu.",
+  "Dej vektor jthread do vlastního bloku, aby se joiny staly na uzavírací závorce, dřív, než výpisová smyčka čte řádky.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.advanced.03.mutex"
+title = "Jedna jímka, osm čerpadel"
+story = "Každé čerpadlo přičte, co vyčerpalo, k jednomu součtu na zdi, a na konci hodiny zeď nesouhlasí ani s jedním z nich."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jedno vlákno, které ji přičte k **jednomu sdílenému
+součtu**. Všechna je připoj a pak vypiš `TOTAL <sum>` a `THREADS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+Starter se zkompiluje a vypíše `TOTAL 0`. Lambda zachytává `total` hodnotou
+— `[total, value]` s `mutable` — takže každé vlákno přičítá do své vlastní
+soukromé kopie a zahodí ji. Zachyť ho referencí a máš jinou chybu, tu, která
+se v tak malém testu neukáže: `total += value` z několika vláken naráz je
+**datový závod**, což je v C++ nedefinované chování, ne jen špatné číslo.
+
+Odpovědí je `std::mutex` vedle součtu a `std::lock_guard` v každém vlákně,
+které na něj sahá. Strážce zamyká ve svém konstruktoru a odemyká ve svém
+destruktoru, takže není žádné odemčení, na které by se dalo zapomenout,
+a výjimka vyhozená uprostřed aktualizace ho stejně uvolní.
+'''
+hints = [
+  "Zachyť total referencí — [&total, &total_mutex, value] — a vyhoď mutable; vlákno má měnit součet v main, ne svůj vlastní.",
+  "std::lock_guard<std::mutex> lock(total_mutex); je jeden řádek a odemčení je konec bloku.",
+  "Číst total po všech joinech je bezpečné i bez zámku: join() je synchronizační bod a nezbylo žádné vlákno, které by zapisovalo.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.advanced.04.counter"
+title = "Počítadlo, které se zamyká samo"
+story = "Turniket u východní brány Victoria Parku drží dvě čísla, která spolu musí souhlasit, a dva lidé je čtou ve stejnou chvíli."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Dokonči `Counter`: `add` vezme zámek, přičte k součtu a zvýší počet zásahů;
+`snapshot` vezme zámek a vrátí obojí dohromady. Spusť pro každou hodnotu
+jedno vlákno, připoj je a pak vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Mutex žije **uvnitř** třídy, vedle polí, která hlídá, a každá metoda, která na
+ně sahá, ho bere. To je ten tvar: zámek je součástí objektu, ne něco, co si
+volající mají pamatovat.
+
+Starter se nezkompiluje a ten důvod za minutu stojí. `snapshot()` je `const`
+— nemění žádné pole, které volající vidí — ale zamčení mutexu *mění mutex*
+a uvnitř `const` metody je každý člen `const`. Oprava je
+`mutable std::mutex`: `mutable` označuje člen, který se smí měnit i přes
+`const` objekt, přesně pro evidenci, jako je tahle, která není součástí
+hodnoty. Je to jediné místo, kde je `mutable` běžně správně, a kdo se na něj
+ptá u pohovoru, chce slyšet tenhle příklad.
+'''
+hints = [
+  "Chybu kompilace opraví jedno slovo: mutable std::mutex mutex_;",
+  "Odebrat const ze snapshot() se taky zkompiluje a je to špatná odpověď — metoda hodnotu opravdu nemění a signatura to má říkat.",
+  "std::mutex se nedá kopírovat ani přesunout, takže třída, která ho drží, taky ne; předávej Counter referencí, což lambda už dělá.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.advanced.05.scoped-lock"
+title = "Dva zámky, jedno pořadí"
+story = "Dvě stavidla pod fontánou, dva zámky, dvě vlákna a obě čerpadla se zastavila v téže vteřině."
+brief = '''
+Dvě nádrže, `A` a `B`, každá je `long long` s vlastním `std::mutex`.
+
+Na standardním vstupu jsou na prvním řádku počáteční hladiny, na druhém
+počet `n` a pak `n` řádků `<FROM> <TO> <AMOUNT>`, kde `FROM`/`TO` je
+z `{A, B}`.
+
+Proveď každý převod ve vlastním vlákně, všechna je připoj a pak vypiš
+`A <level>`, `B <level>`, `MOVED <n>`.
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+Se starterem jsou špatně dvě věci a ve výstupu se ukáže jen jedna. Zdroji
+odečte a cíli nikdy nepřičte — to je ta viditelná chyba. Ta druhá je tvar:
+zamykat *nejdřív zdroj* znamená, že dva opačné převody můžou každý držet
+jeden zámek a čekat na ten druhý, navždy. To je deadlock a v testu se
+neukáže; ukáže se ve 12:00 v úterý.
+
+Ber oba zámky v **jednom globálním pořadí** a cyklus nemůže vzniknout. C++17
+ti to pořadí dá zadarmo: `std::scoped_lock lock(a_mutex, b_mutex)` získá
+libovolný počet mutexů algoritmem, který se deadlocku vyhýbá, a ve svém
+destruktoru je všechny uvolní. Dva `lock_guard`y brané vždy `A` a pak `B`
+jsou tatáž odpověď napsaná ručně.
+'''
+hints = [
+  "Zamkni obě nádrže dřív, než sáhneš na kteroukoli hladinu. std::scoped_lock lock(a.mutex, b.mutex); to udělá na jednom řádku a v bezpečném pořadí.",
+  "Směr vody rozhoduje o tom, která hladina dostane minus, ne o tom, který zámek se vezme první.",
+  "Dva objekty std::lock_guard, vždy mutex A a pak mutex B, jsou tatáž odpověď; pravidlo je, že se na pořadí shodne každé vlákno.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.advanced.06.condition-variable"
+title = "Průlez"
+story = "Jedno čerpadlo nádrž plní a jedno ji vypouští, a výpusť od 11:40 dokola kontroluje prázdnou nádrž."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Vlákno producenta vkládá každou hodnotu do `std::queue` hlídané mutexem;
+vlákno konzumenta je jednu po druhé vybírá a každou vypíše zdvojenou. Když
+producent vloží všechno, nastaví `done` a konzumenta probudí, a konzument
+skončí, když je fronta prázdná **a** `done` je nastavené. Připoj obě a pak
+vypiš `CONSUMED <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+Fronta je FIFO, takže pořadí je pořadí vstupu, ať dělá plánovač cokoli.
+`std::condition_variable` je způsob, jak konzument spí, dokud není co dělat,
+místo aby se točil na zámku: `cv.wait(lock, predicate)` uvolní mutex, usne
+a predikát znovu zkontroluje při každém probuzení — což za tebe vyřeší
+falešná probuzení, a proto je tvar s predikátem jediný, který psát.
+
+Starter se zasekne. Producent vloží všechno a vrátí se, aniž by kdy nastavil
+`done` nebo cokoli oznámil, takže konzument se probudí pro poslední hodnotu,
+vyprázdní frontu a čeká na signál, který nepřijde. Každá dvojice
+producent/konzument potřebuje způsob, jak říct *už nic nepřijde* — a to je
+`done`.
+'''
+hints = [
+  "Po smyčce producenta: zamkni, nastav done = true, odemkni, cv.notify_all(). Čtyři řádky a program skončí.",
+  "done se čte uvnitř predikátu wait pod mutexem, takže se pod mutexem musí i zapisovat — příznak zapsaný bez zámku je datový závod.",
+  "cv.wait bere std::unique_lock, ne lock_guard, protože wait ho musí odemknout a znovu zamknout; predikát se znovu kontroluje při každém probuzení.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.advanced.07.atomic"
+title = "Jedno slovo, žádný zámek"
+story = "Počet na turniketu zámek nepotřebuje. Všechno ostatní ve strojovně čerpadel ano, a rozeznat je od sebe je ta práce."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jedno vlákno. Každé přičte svou hodnotu ke sdílenému
+`std::atomic<long long>` a zvýší sdílený `std::atomic<int>` o jedna — nikde
+žádný mutex. Všechna je připoj a vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Starter se nezkompiluje: lambda zachytává oba atomiky **hodnotou**
+a `std::atomic` nemá kopírovací konstruktor. To je záměr. Atomik je místo
+v paměti, na kterém se několik vláken dohodne, že ho budou aktualizovat po
+jedné instrukci; jeho kopie by byla jiné místo a sdílení by bylo pryč.
+Zachyť je referencí.
+
+Atomik není levnější mutex; je to jiný nástroj, pro jedno strojové slovo
+přečtené, upravené a zapsané jedinou instrukcí. `fetch_add` je ta instrukce.
+Ve chvíli, kdy spolu musí souhlasit dvě pole, zámek se vrací — není žádný
+atomik pro „tyhle dvě věci dohromady“, a proto `Counter` z předchozího
+questu měl mutex a tenhle ho nemá.
+
+`std::memory_order_relaxed` tu stačí, protože nic nezávisí na tom, *kdy* se
+tyhle přírůstky stanou viditelnými vůči jakémukoli jinému zápisu, jen na tom,
+že se žádný neztratí. Ta věta je doplňující otázka.
+'''
+hints = [
+  "Chyba říká, že kopírovací konstruktor std::atomic je smazaný. Zachyť [&total, &hits, value] a vyhoď mutable.",
+  "fetch_add vrací předchozí hodnotu a sčítání provede atomicky; žádný zámek a žádný strážce.",
+  "total += value na atomiku je taky atomické a taky v pořádku; total = total + value není — to je načtení a uložení s mezerou mezi nimi.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.advanced.08.parallel-sum"
+title = "Rozděl jímku"
+story = "Dvanáct tisíc údajů a čtyři čerpadla. Místnost chce podíl každého čerpadla a součet, a součet musí vyjít při každém běhu stejně."
+brief = '''
+První řádek je `k n`: `k` vláken a `n` hodnot. Druhý řádek je těch `n` hodnot.
+
+Rozděl hodnoty na `k` souvislých kusů — kus `i` pokrývá indexy od
+`i * n / k` až po `(i + 1) * n / k`, to už ne, v celočíselné aritmetice —
+a nech vlákno `i` sečíst svůj kus do `partial[i]`. Všechna je připoj a pak
+vypiš `CHUNK <i> <sum>` pro každý kus v pořadí a `TOTAL <sum of partials>`.
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+Tohle je tvar, který s vlákny opravdu zrychlí, a jediný takový na téhle mapě:
+každé vlákno čte svůj rozsah a zapisuje do svého slotu, takže žádný zámek,
+žádný atomik, nic sdíleného kromě vstupu. Vzorec pro hranice kusů je to, co
+dělá rozdělení přesným — poslední kus vždycky končí na `n` a kus může být
+prázdný, když `k > n`, což jeden ze skrytých případů zařídí.
+'''
+hints = [
+  "Spočítej obě hranice v main a zachyť je hodnotou; vlákno by nemělo muset vědět, jak se o rozdělení rozhodlo.",
+  "Lokální součet uvnitř vlákna a jeden zápis do partial[i] na konci zajistí, že se na sdílený vektor sáhne právě jednou za vlákno.",
+  "k > n udělá některé kusy prázdné — begin == end — a smyčka prostě neproběhne. Žádný zvláštní případ.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.advanced.09.async"
+title = "Slib mi ten počet"
+story = "Obsluha navijáku pošle kluka pro každý údaj a nestojí tam a nečeká; údaje se vrátí, až se vrátí."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jednu úlohu `std::async` s `std::launch::async`,
+která vrátí druhou mocninu hodnoty. Posbírej `std::future` do vektoru
+a zavolej na ně `get()` **v pořadí** a každý výsledek vypiš. Pak předej
+`std::promise<int>` ještě jednomu vláknu, které ho nastaví na `n`, a vypiš
+`READY <n>` z odpovídajícího future.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+Future je hodnota, která tu ještě není. `std::async` ti ji dá pro návratovou
+hodnotu funkce; `get()` blokuje, dokud neexistuje, a pak ji předá, jednou.
+Volat futures v pořadí je to, co dá výstup do pořadí — samotné úlohy skončí,
+kdy skončí.
+
+`std::promise` je druhý konec téže roury, pro případ, kdy není žádná
+návratová hodnota k obalení: jedna strana zavolá `set_value`, druhá si ji
+vezme přes `get`. Je to způsob, jak vlákno ohlásí jeden výsledek bez mutexu,
+fronty nebo příznaku.
+
+Řekni `std::launch::async` nahlas. Bez něj si implementace smí vybrat
+`deferred`, které úlohu spustí líně na volajícím vlákně uvnitř `get()` —
+tady to pořád funguje správně, a není to to, co kdokoli čtoucí `async`
+očekává.
+'''
+hints = [
+  "std::async(std::launch::async, lambda) vrací std::future čehokoli, co lambda vrací; vlož ho do vektoru.",
+  "get() se dá na každý future zavolat právě jednou a blokuje, dokud tam hodnota není; procházení vektoru v pořadí ti dá výstup v pořadí.",
+  "Promise se do vlákna přesune nebo předá referencí, tam se zavolá set_value(n) a ready.get() v main na něj počká. Připoj vlákno dřív, než main vrátí.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.advanced.10.unique-ptr"
+title = "Velikost, kterou kompilátor umí pojmenovat"
+story = "Kotevní řetěz v tajfunovém útočišti: každý článek drží ten další, až dolů ke kotvě, a nikdo nedrží žádný článek dvakrát."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` částek v centech.
+
+Drž je v řetězu, jeden uzel na částku, v pořadí, v jakém přišly:
+
+```
+struct Entry {
+    long long cents;
+    std::unique_ptr<Entry> next;
+};
+```
+
+Vypiš tři řádky:
+
+1. částky v pořadí, oddělené mezerou, nebo `-`, pokud žádné nejsou
+2. `SUM <total>` z **rekurzivní** funkce nad řetězem
+3. `LAST <cents>` — částku na posledním uzlu — nebo `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+Starter se nezkompiluje a ta chyba je důvod, proč ukazatele existují.
+Napiš `Entry next;` a kompilátor musí `Entry` rozložit v paměti: osm bajtů
+pro `cents` plus kolik je velký `Entry` — což je právě ta věc, kterou se snaží
+zjistit. *Field has incomplete type.*
+
+`std::unique_ptr<Entry>` je ukazatel a ukazatel má velikost, kterou
+kompilátor už zná. **Vlastní** to, na co ukazuje: právě jeden vlastník,
+uvolněný pomocí `delete` v destruktoru, nedá se kopírovat, dá se přesunout.
+Holý `Entry*` je ten druhý druh ukazatele — dívá se a nevlastní nic —
+a procházet řetěz kvůli výpisu je přesně to, k čemu holý ukazatel je.
+`nullptr` je zároveň konec řetězu i prázdný řetěz, takže nikde není žádný
+samostatný prázdný případ.
+'''
+hints = [
+  "Chybu kompilace opraví jeden řádek: std::unique_ptr<Entry> next; — a struktura má teď šestnáct bajtů, ať ukazuje na cokoli.",
+  "Stav ho odzadu: head = std::make_unique<Entry>(Entry{value, std::move(head)}). std::move je nutné; unique_ptr se nedá kopírovat, jen předat.",
+  "Procházej s const Entry* z head.get() a krokuj na walk->next.get(). Holý ukazatel si půjčuje; unique_ptr pořád vlastní a nic se neuvolní dvakrát.",
+  "Rekurzivní součet jsou dva řádky: nullptr je 0, jinak cents plus součet zbytku.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.advanced.11.shared-ptr"
+title = "Kdo to ještě drží"
+story = "Dvě měřidla čtou tutéž nádrž jednou trubkou a trubka musí zůstat, dokud nezmizí poslední měřidlo, a ani o vteřinu déle."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Dej hodnoty do `std::vector<long long>` vlastněného `std::shared_ptr`, vezmi
+si **druhý** `shared_ptr` na tentýž vektor a `std::weak_ptr`, který ho
+sleduje. Vypiš čtyři řádky:
+
+1. `REF <sum>` — součet, čtený přes druhý handle
+2. `SHARED <k>` — `use_count()`, dokud jsou oba handly naživu
+3. `ALIVE yes` — `!watch.expired()`, dokud jsou
+4. `ALIVE no` — poté, co byly oba handly resetovány pomocí `reset()`
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+`unique_ptr` byl jeden vlastník. `shared_ptr` je počet vlastníků, držený
+vedle objektu, a objekt se uvolní, když počet klesne na nulu — tím handlem,
+který zrovna odešel poslední. Kopírování handlu počet zvýší; reset nebo
+zničení ho sníží. Počet je atomický, takže dvě vlákna můžou každé bezpečně
+držet handle; *objekt* tím bezpečný pro vlákna není a mutexy z předchozích
+map jsou pořád potřeba, abys na něj mohl sáhnout.
+
+`weak_ptr` je handle, který se **nepočítá**. Vidí, jestli tam objekt pořád je,
+a pokud ano, dá se pomocí `lock()` povýšit na `shared_ptr`; objekt naživu
+udržet nedokáže. To je to, co rozbije cyklus — dva objekty, které na sebe
+navzájem drží `shared_ptr`, nikdy na nulu nedojdou — a o tom je poslední mapa
+na téhle cestě.
+'''
+hints = [
+  "std::shared_ptr<...> mirror = ledger; zkopíruje handle a zvýší počet na 2. mirror->begin() dosáhne na tentýž vektor.",
+  "weak_ptr se zkonstruuje rovnou ze shared_ptr a počet nikdy nemění; expired() je celá otázka, kterou mu kladeš.",
+  "reset() na obou handlech sníží počet na nulu; samotný první reset by nic neuvolnil a jedna z nápověd v místnosti je říct proč.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.advanced.12.move"
+title = "Vezmi si to s sebou"
+story = "Správce přístavu každý lístek okopíruje, než ho předá jezdci, a kopírka je to nejpomalejší v celém tajfunovém útočišti."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` řádků textu.
+
+Postav pro každý řádek jeden `Docket` ve `std::vector<Docket> pile`, pak každý
+lístek předej do druhého vektoru, `sent`, a vypiš text každého z nich velkými
+písmeny ze `sent`, potom `SENT <n>`, `COPIES <c>`, `MOVES <m>`.
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` počítá své vlastní kopie a přesuny: jeho kopírovací konstruktor
+zvýší jednu globální proměnnou, jeho přesunový konstruktor tu druhou. Oba
+vektory mají předem `reserve`, aby se nic nekopírovalo ani nepřesouvalo kvůli
+realokaci — jediné kopie a přesuny, které se stanou, jsou ty, které napíšeš.
+
+Starter hlásí `COPIES 2`. `sent.push_back(d)` s lvalue lístek zkopíruje,
+i s řetězcem. `sent.push_back(std::move(d))` přetypuje `d` na **rvalue**, což
+vybere přesunový konstruktor, který řetězci ukradne buffer, místo aby ho
+zdvojil. `std::move` samo nic nepřesouvá; je to přetypování, které říká
+*s tímhle jsem skončil*, a co se stane dál, je na přijímajícím konstruktoru.
+
+Co je `d` potom? *Platné, ale neurčené.* Smíš ho zničit nebo do něj
+přiřadit. Nesmíš ho číst a čekat cokoli konkrétního — a proto tenhle program
+vypisuje ze `sent` a na `pile` se už nikdy nepodívá.
+'''
+hints = [
+  "Mění se jedno volání: sent.push_back(std::move(d)). Všechno ostatní v programu už s přesuny počítá.",
+  "Přesunový konstruktor je záměrně označený noexcept: std::vector při realokaci přesouvá prvky jen tehdy, když přesun nemůže vyhodit výjimku, a jinak je kopíruje, aby zůstal bezpečný vůči výjimkám.",
+  "reserve(n) na obou vektorech je to, co dělá počty přesnými. Bez něj by realokace přesunula (nebo zkopírovala) každý už uložený prvek a čísla by závisela na strategii růstu.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.advanced.13.template-class"
+title = "Kruh pro jakýkoli náklad"
+story = "Měřidlo si drží posledních pár údajů a správce přístavu posledních pár jmen lodí, a Alex napsal tentýž kruhový buffer dvakrát."
+brief = '''
+První řádek je kapacita `cap`. Druhý řádek je seznam celých čísel; třetí
+řádek je seznam slov.
+
+Napiš **jednu** šablonu třídy `Ring<T>`: buffer s pevnou kapacitou, který
+drží posledních `cap` do něj vložených položek, přepisuje ty nejstarší a dá
+se projít v pořadí příchodu. Vlož celá čísla do `Ring<long long>` a slova do
+`Ring<std::string>`, vypiš obsah každého kruhu na jeden řádek a pak
+`DROPPED <k>` — kolik položek bylo celkem vytlačeno.
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+Starter se nezkompiluje: `Ring` je napsaný pro `long long` a slova nemají kam
+jít. Šablona třídy je jedna definice instanciovaná pro každý typ, přesně jako
+šablona funkce na základní cestě, a celý `Ring<T>` je napsaný bez znalosti
+toho, co je `T` — jen že se dá výchozím způsobem zkonstruovat, zkopírovat
+a vypsat.
+
+Dej mu taky `begin()`/`end()`. Kruh není uložený v pořadí příchodu —
+nejstarší položka je tam, kde se zapisovací hlava chystá přepisovat — takže
+aritmetiku musí dělat iterátor, a to je ta část, kterou stojí za to napsat,
+ne jen přečíst.
+'''
+hints = [
+  "template <typename T> nad třídu, std::vector<T> pro sloty, const T& pro push. Pak Ring<long long> a Ring<std::string> v obou místech použití.",
+  "Nejstarší položka sedí na (head + cap - count) % cap; položka k v pořadí příchodu je (oldest + k) % cap. Iterátor si musí nést jen k.",
+  "Šablona funkce print(const Ring<T>&) odvodí T z argumentu, takže jeden výpis poslouží oběma kruhům.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "cpp.advanced.14.invalidation"
+title = "Mazat za chůze"
+story = "Správce přístavu škrtá sampany ze seznamu kotvišť, zatímco ho čte shora dolů, a po každém škrtu jeden přeskočí."
+brief = '''
+První řádek je `n t`. Druhý řádek je `n` celých čísel.
+
+Odstraň z vektoru každou hodnotu menší než `t`, **na místě**, a vypiš, co
+zbylo, na jeden řádek (nebo `-`, pokud nezbylo nic), pak `REMOVED <k>`.
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+Starter je chyba, kterou každý jednou napíše: prochází podle indexu, smaže na
+`i` a pak udělá `++i` — a na prvek, který sklouzl do slotu `i`, se nikdo
+nepodívá. Dvě sousední malé hodnoty a ta druhá přežije. Tahle chyba je
+aspoň dobře definovaná. Její dvojče s iterátory ne: `erase(it)` zneplatní
+`it` a každý iterátor za ním, takže `for (auto it = v.begin(); ...; ++it)`
+s `erase` uvnitř je **nedefinované chování** — obvykle vyjde za konec
+a někdy se zdá, že funguje, což je horší.
+
+`erase` vrací iterátor na prvek za tím odstraněným. Použij ho:
+`it = v.erase(it)` při zásahu, `++it` při minutí, a nikdy obojí. C++20 má
+taky `std::erase_if(v, predicate)`, které celou práci udělá jedním voláním
+a je to odpověď, kterou dát jako první; smyčka je odpověď, kterou dát, když
+se zeptají, co `erase_if` dělá.
+'''
+hints = [
+  "Vynech inkrement z hlavičky for. Posouvej pomocí ++it jen ve větvi, která nemazala; v té druhé větvi už it = erase(it) posunulo.",
+  "Verze s indexem se dá taky opravit — po erase nedělej ++i — ale znát je potřeba tvar s iterátorem, protože je stejný na std::list i std::map.",
+  "std::erase_if(vector, pred) vrací, kolik odstranilo, což je přesně řádek REMOVED.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "cpp.advanced.15.undefined-behaviour"
+title = "Kompilátor předpokládal"
+story = "Počítadlo litrů ve strojovně čerpadel je int a u 2147483647 litrů už kompilátor předpokládal, že se tam nikdy nedostane."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel, z nichž se každé
+vejde do `long long`. Jejich průběžný součet se do `long long` vejde taky.
+
+Vypiš dva řádky: `INT32 OK`, pokud se každý průběžný součet po cestě vejde do
+32bitového `int`, nebo `INT32 OVERFLOW <i>` s indexem (od 0) první hodnoty,
+která by ho vytlačila ven; pak `INT64 <total>`.
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+Starter drží součet v `int` a vypíše `INT32 OK`, ať se stane cokoli. Nedá se
+opravit přidáním té zřejmé kontroly — `if (total + v < total)` — protože ta
+kontrola je napsaná pomocí přetečení, které hledá, a **přetečení se znaménkem
+je nedefinované chování**. Kompilátor smí předpokládat, že k UB nedochází,
+takže `total + v < total` s kladným `v` je z jeho pohledu *vždy nepravda*
+a pod `-O2` gcc i clang ten test smažou. Špatné číslo není chyba
+v optimalizátoru. Je to smlouva.
+
+Pravidlo, na kterém tahle země běží: nedefinované chování není „nějaká
+hodnota“. Je to kompilátor, který předpokládá, že je nějaká věc nemožná,
+a uvažuje od toho dál. Takže přetečení nikdy neodhaluješ tím, že ho
+způsobíš. Odhaluješ ho *před* sčítáním, v širším typu nebo porovnáním
+s mezemi — `std::numeric_limits<int>` — a očekávaný výstup tohoto programu
+nezávisí na ničem, co je nedefinované.
+'''
+hints = [
+  "Drž součet v long long a po každém přičtení ho porovnej s std::numeric_limits<int>::min() a max(). Žádná aritmetika v int se nikdy nestane.",
+  "Zaznamenej jen první index, který opustí rozsah; pozdější hodnota může součet vrátit zpátky dovnitř a otázka se ptala, kde ho poprvé opustil.",
+  "Když už musíš sečíst dva int a chceš vědět, jestli je to bezpečné: zkontroluj v > INT_MAX - total před sčítáním, ne znaménko součtu po něm. To první je definované; to druhé je ta věc, kterou kompilátor smaže.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "cpp.advanced.16.jthread"
+title = "Zastav se, když tě požádají"
+story = "Noční čerpadlo běží, dokud mu někdo neřekne, ať přestane, a až do téhle směny to nikdo nedokázal."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť dvě `std::jthread`. První sečte hodnoty a výsledek uloží. Druhé vezme
+`std::stop_token`, zaregistruje na něm `std::stop_callback`, který nastaví
+příznak, a pak se točí ve smyčce, dokud neplatí `stop_requested()`. Z `main`
+zavolej `request_stop()` na druhém vlákně, připoj obě a vypiš:
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std::jthread` je `std::thread` se dvěma přidanými věcmi, obě jsou RAII.
+Jeho destruktor **připojuje**, takže abort ze starteru — `std::thread`
+zničené, dokud je joinable — se nemůže stát. A nese `std::stop_source`:
+pokud funkce vlákna bere jako první parametr `std::stop_token`, `jthread` jí
+ho předá, `request_stop()` ho přepne a destruktor zavolá `request_stop()`
+dřív, než připojí. Vlákno, které kontroluje svůj token, je vlákno, které se
+dá vždycky vypnout; to, které ho nekontroluje, je starter.
+
+`stop_callback` je způsob, jak se o tom dozví zablokované vlákno — spustí se
+ve chvíli, kdy je zastavení vyžádáno, na vlákně, které o ně žádá, a jeho
+obvyklá práce je probudit podmínkovou proměnnou, na které pracovník spí.
+'''
+hints = [
+  "Změň std::thread na std::jthread pro summer a abort zmizí dřív, než vůbec přidáš join — ale stejně ho připoj, než přečteš sum.",
+  "Lambda, jejíž první parametr je std::stop_token, ho automaticky dostane od jthread, které ji spouští; to je celé propojení.",
+  "std::stop_callback on_stop(token, fn) je objekt: registruje se ve svém konstruktoru a odregistruje ve svém destruktoru, takže žije po dobu smyčky a ne déle.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "cpp.advanced.17.dangling"
+title = "Visící reference"
+story = "Strojovna čerpadel ve Victoria Parku, dvě patra pod fontánou. Vlákno čerpadla pořád čte buffer, který místnost uvolnila, když skončila směna."
+brief = '''
+První řádek je `w n`: `w` čerpadel a `n` údajů. Druhý řádek jsou údaje.
+
+`pump(w, buffer)` spustí `w` vláken; vlákno `i` sečte údaje od `i * n / w`
+až po `(i + 1) * n / w` do `partial[i]` a `pump` vrátí dílčí součty. `main`
+vypíše `PUMP <i> <sum>` pro každý, `TOTAL <sum>` a pak `FREED yes`, pokud byl
+buffer uvolněn ve chvíli, kdy je všechno hotovo — pozorováno přes
+`std::weak_ptr`.
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+Starter skončí abortem. `pump` postaví svá vlákna v lokálním vektoru a vrátí
+se, dokud jsou pořád joinable, takže destruktor vektoru zavolá
+`std::terminate`. Přečti si, co se místo toho chystalo udělat: ta vlákna
+drží **referenci** na `buffer` a volající `pump` se chystá nechat `buffer`
+umřít. Vlákno, které čte vektor poté, co proběhl jeho destruktor, čte
+uvolněnou paměť. Někdy dostane stará čísla. Někdy dostane další alokaci.
+Někdy už alokátor stránky vrátil a ono spadne na chybu segmentace. Je to
+nedefinované chování a je to ten nejdražší druh, protože neselže tam, kde je
+chyba.
+
+Oprav vlastnictví, ne příznak. Buffer je
+`std::shared_ptr<const std::vector<long long>>`, každé vlákno si zachytí
+**vlastní kopii handlu** a buffer žije přesně tak dlouho jako poslední
+vlákno, které ho drží — ať `pump` vrátí jakkoli a ať vlákna skončí v jakémkoli
+pořadí. Připoj před návratem. `main` si drží `weak_ptr` a poté, co
+`pump` vrátila a zahodila svůj vlastní handle, je `expired()` důkaz: údaje
+byly uvolněny, jednou, tím čerpadlem, které skončilo poslední, a nikdo už je
+nečetl.
+
+To je celá země v jednom programu. Nic tě nekontrolovalo. Sladil jsi
+životnost s použitím a nástroje, které to dělají — chytrý ukazatel, který
+počítá, join, který čeká — jsou totéž RAII, které jsi potkal na základní
+cestě.
+'''
+hints = [
+  "Dvě změny v pump: zachyť buffer (ten shared_ptr) hodnotou místo readings referencí a před return připoj každé vlákno — std::vector<std::jthread> ve vlastním bloku připojí na uzavírací závorce.",
+  "Kopie shared_ptr v lambdě je to, co drží vektor naživu; uvolní se, když funkce vlákna vrátí, ne když vrátí pump. To je rozdíl mezi referencí a vlastníkem.",
+  "partial je pořád zachycený referencí, a to je správně: pump ho vlastní, pump před jeho vrácením připojí a každé vlákno zapisuje jen do svého slotu.",
+  "main svůj handle do pump přesouvá záměrně. Kdyby si jeden nechal, FREED by bylo no — buffer by byl naživu, protože ho main pořád drží, a to je ta druhá odpověď, u které tenhle boss přijímá, že ji umíš vysvětlit.",
+]

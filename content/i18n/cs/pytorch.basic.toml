@@ -1,0 +1,535 @@
+# PYTORCH LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/pytorch/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim.
+
+pack   = "pytorch.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.basic.01.night-shift"
+title = "Noční směna"
+story = "23:00 ve strojovně. Z konzole přijde řádek měření jako text a každý nástroj o patro níž chce tenzor."
+brief = '''
+Na standardní vstup přijde jeden řádek čísel oddělených mezerami. Udělej z něj **float** tenzor a vypiš jeho tvar jako n-tici a jeho součet.
+
+`input().split()` dá seznam řetězců; `float(t)` převede jeden z nich. List comprehension nad těmi dvěma je celý převod a `torch.tensor` ten seznam vezme.
+
+Součet se vypíše přes `.item()`, které vytáhne pythonové číslo z 0-rozměrného tenzoru, zaokrouhlené na čtyři místa, aby periodické desetinné číslo nemohlo nesouhlasit samo se sebou.
+
+```
+input: 1 2 3 4
+output: (4,) 10.0
+```
+'''
+hints = [
+  "torch.tensor([float(t) for t in input().split()]) — rozdělit, převést, zabalit.",
+  "Jednorozměrný tvar se vypíše s čárkou na konci: (4,), ne (4).",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.basic.02.the-batch"
+title = "Šest na dvě"
+story = "Šest čísel přijde po drátě naplocho. Model byl napsaný pro dva vzorky po třech příznacích a plochý řádek odmítá."
+brief = '''
+Model skoro nikdy nechce plochý řádek; chce `(batch, features)`. `reshape` dá stejným číslům nový tvar a `-1` na jedné pozici znamená *tohle dopočítej z ostatních*.
+
+Přetvaruj ploché měření na řádky po třech, ať to vyjde na kolik řádků chce, a vypiš tvar a poslední číslo prvního řádku.
+
+```
+input: 1 2 3 4 5 6
+output: (2, 3) 3.0
+```
+'''
+hints = [
+  "flat.reshape(-1, 3) — tři sloupce a počet řádků se odvodí.",
+  "reshape(3, -1) by byly tři řádky po kolika chceš, což je obráceně.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.basic.03.normalise"
+title = "Měřítko, na kterém se nikdo nedohodl"
+story = "Jeden příznak se měří ve stupních a další ve wattech. Model tráví každý krok tréninku tím, že se učí, že watty jsou větší."
+brief = '''
+Standardizovat příznak znamená odečíst jeho průměr a vydělit jeho směrodatnou odchylkou, takže každý sloupec vyjde vycentrovaný na nulu s rozptylem jedna.
+
+Průměr přes `dim=0` je jedno číslo na sloupec — tvar `(features,)` — a jeho odečtení od `(batch, features)` se broadcastuje dolů přes řádky. Totéž pro směrodatnou odchylku.
+
+Nakonec vypiš zaokrouhlené průměry sloupců; z principu jsou nulové.
+
+```
+input: 1 10 2 20 3 30
+output: [0.0, 0.0] [1.0, 1.0]
+```
+'''
+hints = [
+  "(x - x.mean(dim=0)) / x.std(dim=0) — dim=0 sbalí řádky a nechá jedno číslo na sloupec.",
+  "Bez dim=0 dostaneš průměr celého tenzoru, který oba příznaky smíchá dohromady.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.basic.04.split-xy"
+title = "Sloupec s labelem"
+story = "Soubor se záznamem má label přilepený jako poslední sloupec a model se celou dobu trénoval na odpovědi."
+brief = '''
+Surová tabulka obvykle nese label spolu s příznaky. Rozdělit ji jsou dva řezy: všechno až po poslední sloupec a poslední sloupec samotný.
+
+`x[:, :-1]` je každý řádek, každý sloupec kromě posledního. `x[:, -1]` je poslední sloupec každého řádku a osa sloupců zmizí, takže vyjde jedno číslo na řádek.
+
+Vypiš oba tvary a pak labely.
+
+```
+input: 1 2 0 3 4 1
+output: (2, 2) (2,) [0.0, 1.0]
+```
+'''
+hints = [
+  "table[:, :-1] a table[:, -1] — řez osu nechá, jediný index ji zahodí.",
+  "table[:, -1:] by osu sloupců nechal a dal (2, 1), což není stejný tvar.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.basic.05.layer-by-hand"
+title = "Vrstva, rozepsaná"
+story = "Než je vrstva třída, jsou to dvě operace, a noční směna je chce jednou vidět, aniž by je cokoli schovávalo."
+brief = '''
+Lineární vrstva je maticové násobení a přičtení biasu, a nic jiného. Pro dávku `x` tvaru `(batch, in)` a váhu `W` tvaru `(out, in)` — v tomhle tvaru ji torch ukládá — je výstup `x @ W.t() + b`.
+
+`W.t()` je `(in, out)`, takže vnitřní rozměry sedí, a `b` tvaru `(out,)` se broadcastuje přes dávku.
+
+Rozepiš to a vypiš tvar a zaokrouhlený výsledek.
+
+```
+output: (2, 2) [[1.0, 2.0], [3.0, 6.0]]
+```
+'''
+hints = [
+  "x @ W.t() + b — transpozice je to, co nechá vnitřní rozměry potkat se.",
+  "x @ W by tady taky proběhlo, protože matice je čtvercová, a spočítá to špatnou věc.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.basic.06.relu"
+title = "Na sobě a naplocho"
+story = "Tři lineární vrstvy za sebou a celý stoh kreslí přesně tu samou přímku, jakou kreslila jedna vrstva."
+brief = '''
+Dvě lineární vrstvy, mezi kterými nic není, jsou jedna lineární vrstva. Až aktivace dává hloubce nějaký smysl a ReLU je ta, kterou používá skoro všechno: kladné nechat, zbytek vynulovat.
+
+Použij ji na výstup vrstvy a pak oznam, kolik čísel přežilo.
+
+```
+output: [0.0, 0.0, 1.0, 3.0] 2
+```
+'''
+hints = [
+  "torch.relu(z) nechá kladné a všechno ostatní srazí na nulu.",
+  "(a > 0).sum() počítá booleany, protože True je při sčítání 1.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.basic.07.sigmoid"
+title = "Hoří to"
+story = "Tepelný model vypíše 4.2 a noční směna se ptala, jestli rack za chvíli nevypadne."
+brief = '''
+Jediný výstupní neuron vyrobí surové skóre na `(-∞, ∞)`. Sigmoida ho zmáčkne do `(0, 1)`, kde se dá číst jako pravděpodobnost, a rozhodovací hranice — skóre 0, pravděpodobnost 0.5 — je místo, kde se ano mění v ne.
+
+Udělej ze skóre pravděpodobnosti a z nich rozhodnutí ano/ne při 0.5.
+
+```
+output: [0.0474, 0.5, 0.9526] [0, 1, 1]
+```
+'''
+hints = [
+  "torch.sigmoid(scores) — skóre 0 vyjde jako přesně 0.5.",
+  "(probs >= 0.5).int() udělá z booleanů 0 a 1, aby se vypsaly jako čísla.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.basic.08.softmax-rows"
+title = "Každý řádek zvlášť"
+story = "Dávka čtyř vzorků, každý se třemi třídami, a čísla jistoty dávají dohromady jedničku přes celou dávku místo přes každý řádek."
+brief = '''
+Na dávce logitů tvaru `(batch, classes)` se softmax musí brát přes osu **tříd** — `dim=1` — aby se každý řádek sám sečetl na jedničku. `dim=0` by na jedničku sečetl každý *sloupec*, což je výrok o dávce a neznamená nic.
+
+Udělej softmax dávky přes její třídy a vypiš součty jednotlivých řádků.
+
+```
+output: [1.0, 1.0] (2, 3)
+```
+'''
+hints = [
+  "torch.softmax(logits, dim=1) — dim=1 je na tenzoru (batch, classes) osa tříd.",
+  "dim=-1 tu znamená totéž a funguje dál, i když se později přidá osa dávky.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.basic.09.predict"
+title = "Odpověď, ne skóre"
+story = "Dashboard ukazuje u každého vzorku tři sloupce jistoty a operátor musí od oka odečíst, která třída vyhrála, čtyři stovky krát za noc."
+brief = '''
+Predikce klasifikátoru je index největšího logitu v každém řádku: `argmax` přes osu tříd. Softmax nemění, který je největší, takže predikci jde vyčíst rovnou z logitů.
+
+Vypiš predikovanou třídu pro každý řádek dávky.
+
+```
+output: [2, 0, 1]
+```
+'''
+hints = [
+  "logits.argmax(dim=1) — jeden index na řádek, takže výsledek je (batch,).",
+  "Bez dim zploští celou dávku a dá jeden index do ní celé.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.basic.10.accuracy"
+title = "Jak často má pravdu"
+story = "Na stand-upu se o modelu říká, že si vede dobře. Nikdo v místnosti nemá číslo."
+brief = '''
+Přesnost je podíl predikcí, které se shodují s labelem. Porovnání dvou tenzorů po prvcích dá booleany; booleany se nedají průměrovat, takže se nejdřív převedou na float a pak je `mean()` ten podíl.
+
+Vypiš přesnost zaokrouhlenou na čtyři místa a počet zásahů.
+
+```
+output: 0.75 3
+```
+'''
+hints = [
+  "(pred == want).float().mean() — převod na float je to, co dělá mean přípustným.",
+  "mean() rovnou na bool tenzoru vyhodí chybu; torch za tebe dtype nevybere.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.basic.11.mse-by-hand"
+title = "Jak moc vedle, ručně"
+story = "Křivka ztráty je plochá a nikdo knihovně nevěří. Napiš to číslo jednou sám a uvidíš, jak se hýbe."
+brief = '''
+Střední kvadratická chyba je přesně to, co říká její jméno: rozdíl, umocněný na druhou, zprůměrovaný. Rozepsaná je to `((pred - want) ** 2).mean()` a `nn.MSELoss()(pred, want)` je totéž číslo.
+
+Spočítej ji oběma způsoby a obě vypiš.
+
+```
+output: 1.5 1.5
+```
+'''
+hints = [
+  "((pred - want) ** 2).mean() — umocni před průměrováním, jinak se znaménka vyruší.",
+  "nn.MSELoss() se nejdřív postaví a pak zavolá na dvojici: nn.MSELoss()(pred, want).",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.basic.12.cross-entropy"
+title = "Ztráta, která bere logity"
+story = "Někdo udělal na výstupu softmax a pak ho předal klasifikační ztrátě, a model se přestal učit, aniž by kdy spadl na chybě."
+brief = '''
+`nn.CrossEntropyLoss` bere **surové logity**, ne pravděpodobnosti — softmax je uvnitř. Cíle jsou **indexy** tříd s dtype `int64`, jeden na řádek, ne one-hot řádky.
+
+Podej jí logity a indexy a vypiš ztrátu. Sebejistá, správná dávka má ztrátu blízko nuly.
+
+```
+output: 0.0659
+```
+'''
+hints = [
+  "nn.CrossEntropyLoss()(logits, want) — logity jdou dovnitř surové; nedělej na nich předem softmax.",
+  "Cíle jsou indexy, takže musí být int64 — float cíl vyhodí chybu.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.basic.13.the-gradient"
+title = "Sklon v tomhle bodě"
+story = "Parametr je 4.0, ztráta je jeho druhá mocnina a jediná otázka, kterou krok tréninku kdy klade, je, kterým směrem je z kopce."
+brief = '''
+Označ parametr jako učitelný, spusť dopředný průchod a zavolej `backward()` na ztrátě. Gradient `w * w` je `2w`, takže při `4.0` přistane jako `8.0` ve `w.grad`.
+
+`.grad` je `None`, dokud neproběhne zpětný průchod — to je obvyklý důvod, proč první trénovací smyčka vypíše `None` a skončí.
+
+```
+output: 8.0
+```
+'''
+hints = [
+  "loss.backward() — volá se na konci grafu, nikdy na parametru.",
+  "Gradient přistane ve w.grad; backward() sám nevrací nic.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.basic.14.accumulate"
+title = "Nechal si ten minulý"
+story = "Dva zpětné průchody a gradient je dvojnásobek toho, co říká aritmetika. Mezi nimi se nic nesmazalo."
+brief = '''
+`backward()` do `.grad` **přičítá**; nenahrazuje ho. Dva průchody přes stejný parametr tedy nechají součet obou gradientů, a proto každá trénovací smyčka gradienty před zpětným průchodem maže.
+
+Spusť druhý průchod až po smazání gradientů, aby vypsané číslo bylo za jeden průchod: `2w` při `3.0`.
+
+```
+output: 12.0 6.0
+```
+'''
+hints = [
+  "w.grad = None ho smaže; další zpětný průchod začne od ničeho.",
+  "Optimalizátor to udělá za tebe — opt.zero_grad() je stejný nápad, přes každý parametr, který drží.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.basic.15.step-by-hand"
+title = "Z kopce, jednou"
+story = "Než je optimalizátor objekt, je to jedno odečtení, a noční směna to odečtení chce vidět."
+brief = '''
+Gradientní sestup je `w ← w - lr * w.grad` a to je celý algoritmus. Musí se to stát s vypnutým grafem — aktualizace je účetnictví, ne součást modelu — takže to patří dovnitř `torch.no_grad()`.
+
+`w` začíná na `5.0`, gradient `w * w` je `10.0` a `lr` je `0.1`.
+
+```
+output: 4.0
+```
+'''
+hints = [
+  "w -= lr * w.grad — minus, protože gradient ukazuje do kopce.",
+  "Musí to být uvnitř bloku no_grad, jinak torch odmítne měnit na místě list, který vyžaduje grad.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.basic.16.optimiser"
+title = "Ty tři řádky"
+story = "Každá kdy napsaná trénovací smyčka jsou tytéž tři řádky v tomtéž pořadí, a ta, kterou noční směna opsala, je má v jiném pořadí."
+brief = '''
+Optimalizátor drží parametry a dělá aktualizaci. Tělo smyčky jsou vždycky tatáž tři volání, v tomhle pořadí: smazat staré gradienty, spustit zpětný průchod, udělat krok.
+
+Dvacet kroků SGD s `lr=0.1` na `w * w` od `5.0` dožene `w` k nule.
+
+```
+output: 0.0576
+```
+'''
+hints = [
+  "zero_grad, backward, step — smazat, spočítat, aplikovat.",
+  "Zavolat step() před backward() aplikuje, co v .grad zůstalo z minula.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.basic.17.fit-a-line"
+title = "Dvakrát x plus jedna"
+story = "Křivka ventilátoru je přímka a nikdo si nezapsal její sklon. Na dveřích racku jsou páskou přilepená čtyři měření."
+brief = '''
+Tohle je nejmenší skutečný trénink, jaký existuje: jeden `Linear(1, 1)`, čtyři body, které leží přesně na `y = 2x + 1`, a dost kroků Adamu, aby ta dvě čísla našel.
+
+Tělo smyčky jsou ta tři volání, která už znáš, a před nimi dopředný průchod a ztráta.
+
+```
+output: 2.0 1.0
+```
+'''
+hints = [
+  "model(x) spustí dopředný průchod; nikdy nevolej přímo model.forward(x).",
+  "loss = loss_fn(model(x), y), pak zero_grad, backward, step.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.basic.18.sequential"
+title = "Dvě vrstvy a ohyb"
+story = "První síť se skrytou vrstvou a musí se postavit, než může být špatně."
+brief = '''
+`nn.Sequential` řetězí moduly: výstup každého je vstupem dalšího. Čtyři příznaky dovnitř, osm skrytých, ReLU mezi, tři třídy ven — nejmenší síť, jakou kdo opravdu nasazuje.
+
+Počet parametrů je `(8*4 + 8) + (3*8 + 3) = 67`.
+
+```
+output: (2, 3) 67
+```
+'''
+hints = [
+  "nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3)) — skrytá šířka se objeví dvakrát, jako out a pak jako in.",
+  "nn.ReLU() je modul a staví se se závorkami; torch.relu je verze jako funkce.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.basic.19.module"
+title = "Vlastní síť"
+story = "Sequential nestačí ve chvíli, kdy se cokoli děje dvakrát, a ta věc v suterénu není nic než ten samý blok, pořád dokola."
+brief = '''
+Skutečný model je třída. Dvě pravidla, a jsou to ta dvě, která lidé porušují: vrstvy přiřaď na `self` v `__init__`, aby se zaregistrovaly jako parametry, a předtím zavolej `super().__init__()`.
+
+`forward` říká, co se děje; zavolání modelu zavolá `forward`.
+
+```
+output: (2, 1) 21
+```
+'''
+hints = [
+  "self.fc1 = nn.Linear(3, 4) a self.fc2 = nn.Linear(4, 1) — 4 je skrytá šířka, out a pak in.",
+  "Vrstva uložená v obyčejném seznamu místo na self se nikdy neobjeví v parameters() a nikdy se netrénuje.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.basic.20.train-classifier"
+title = "Dva shluky"
+story = "Studená, nebo horká ulička, ze dvou čísel. Shluky jsou od sebe na míle daleko a model stejně polovinu splete, protože ho nikdo netrénoval."
+brief = '''
+První klasifikátor: dva dobře oddělené shluky, dvě třídy, cross-entropy a dvě stě kroků. Všechno je postavené; chybí tělo smyčky.
+
+Cross-entropy bere surové logity, které model vrací, a celočíselné labely — žádný softmax, žádný one-hot.
+
+```
+output: 1.0
+```
+'''
+hints = [
+  "loss = loss_fn(model(x), y), pak ta tři volání v jejich pořadí.",
+  "Labely už jsou int64; cross-entropy chce indexy, ne one-hot řádky.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.basic.21.eval-mode"
+title = "Pořád v tréninku"
+story = "Validační čísla se hýbou pokaždé, když se ohodnotí ta samá validační sada. Dropout je pořád zapnutý."
+brief = '''
+Některé vrstvy se při tréninku chovají jinak. Dropout během tréninku náhodně nuluje aktivace a během evaluace nedělá vůbec nic, a `model.eval()` je to, co přepne vypínač. `model.train()` ho vrátí zpátky.
+
+Dvakrát ohodnotit v režimu eval dá dvakrát stejnou odpověď; dvakrát ohodnotit v režimu train ne.
+
+```
+output: True
+```
+'''
+hints = [
+  "model.eval() — vrací model, ale volá se kvůli vypínači, který přepne.",
+  "no_grad jen zastaví zaznamenávání grafu; dropout nevypne.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.basic.22.state-dict"
+title = "Co je model, uložený"
+story = "Čtyři hodiny tréninku v suterénu a proces se chystá zabít kvůli servisnímu oknu."
+brief = '''
+Uložený model není kód; jsou to čísla. `state_dict()` je uspořádaný slovník všech parametrů a `load_state_dict()` je nahraje do jiného modelu stejného tvaru — a proto načtení do modelu jiného tvaru selže nahlas, a ne potichu.
+
+Zkopíruj natrénované váhy do čerstvého modelu a ověř, že se teď shodují.
+
+```
+output: True
+```
+'''
+hints = [
+  "fresh.load_state_dict(trained.state_dict()) — z jednoho číst, do druhého nahrát.",
+  "fresh = trained by z nich udělalo ten samý objekt, což nic nedokazuje.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.basic.23.minibatch"
+title = "Ne všechno najednou"
+story = "Celý záznam projde v jednom tenzoru, alokátor to vzdá a úloha po čtyřech minutách umře."
+brief = '''
+Minibatch je řez. Projít `range(0, n, bs)` a brát `x[i:i + bs]` dá dávky po `bs` a na konci jednu kratší, když `n` nejde vydělit beze zbytku — a to je ta dávka, která rozbije kód, jenž předpokládá, že každá dávka je plná.
+
+Deset vzorků v dávkách po čtyřech: vypiš počet řádků každé dávky.
+
+```
+output: [4, 4, 2]
+```
+'''
+hints = [
+  "x[i:i + bs] — řez za konec není chyba; prostě dá, co zbylo.",
+  "Poslední dávka je kratší. Kód, který má bs kdekoli dál natvrdo, se rozbije přesně na téhle dávce.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.basic.24.dataloader"
+title = "Loader"
+story = "Ručně psaná smyčka na dávkování má čtyřicet řádků a chybu v míchání. Torch tohle dodává od začátku."
+brief = '''
+`TensorDataset` spáruje příznaky a labely, takže jeden index dá obojí; `DataLoader` je dávkuje a míchá. Iterace přes něj vydává dvojice `(features, labels)`, už nařezané.
+
+Se `shuffle=False` je pořadí takové, v jakém byly tenzory, takže běh jde zopakovat.
+
+```
+output: 3 [4, 4, 2] 10
+```
+'''
+hints = [
+  "TensorDataset(x, y) a pak DataLoader(ds, batch_size=4, shuffle=False).",
+  "len(dl) je počet dávek; len(ds) je počet vzorků. Jsou to různá čísla.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.basic.25.holdout"
+title = "Část, kterou nikdy neviděl"
+story = "Model má sto procent na datech, na kterých se trénoval, a to je jediné číslo, které nikdy nic nepředpovědělo."
+brief = '''
+Přesnost na trénovacích datech není výsledek. Před tréninkem odlož řez stranou, nikdy ho optimalizátoru neukaž a hodnoť na něm.
+
+Čtyřicet vzorků: prvních třicet trénuje, posledních deset je testovací sada. Vypiš oba tvary a přesnost na odložených datech.
+
+```
+output: (30, 2) (10, 2) 1.0
+```
+'''
+hints = [
+  "x[:30] a x[30:] — stejné rozdělení se musí použít i na labely, jinak má každý řádek špatný label.",
+  "Míchání se dělá před rozdělením; rozdělení datasetu seřazeného podle tříd dá testovací sadu jedné třídy.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.basic.26.loss-goes-down"
+title = "Učí se to vůbec"
+story = "Smyčka běží, ventilátory se roztočí a o čtyři hodiny později nikdo neumí říct, jestli se něco stalo. Nic se nezaznamenalo."
+brief = '''
+Nejlevnější test, jaký trénovací smyčka může mít: zaznamenej ztrátu na začátku a na konci a ověř, že klesla. Smyčka, která běží a neučí se, vypadá přesně jako smyčka, která se učí, dokud se tohle nevypíše.
+
+Zaznamenej první a poslední ztrátu a vypiš, jestli je ta druhá menší.
+
+```
+output: True True
+```
+'''
+hints = [
+  "Zaznamenej loss.item() v kroku 0 do first a v každém kroku do last.",
+  "Drž si float, ne tenzor: kdo drží tenzor, drží s ním naživu celý graf.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.basic.27.xor"
+title = "Přímka"
+story = "Čtyři body, dvě třídy a model, který se trénoval hodinu a pořád dva ze čtyř plete. Žádné množství tréninku to nespraví; žádná přímka je neoddělí."
+brief = '''
+XOR je nejstarší důkaz v oboru, že hloubka není ozdoba. `(0,0)` a `(1,1)` jsou jedna třída; `(0,1)` a `(1,0)` jsou ta druhá, a žádná přímka ty dvě dvojice nedá na opačné strany. Jediný `Linear` to nedokáže při žádné rychlosti učení, za žádný počet kroků.
+
+Skrytá vrstva s nelinearitou mezi to dokáže, a to je celá síť ze suterénu v jednom uzlu: postav `2 → 8 → 1` s ohybem uprostřed.
+
+Trénovací smyčka je napsaná. Postav model a vypiš jeho čtyři predikce při prahu 0.5.
+
+```
+output: [0, 1, 1, 0] True
+```
+'''
+hints = [
+  "nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1)) — dva dovnitř, osm skrytých, jeden ven.",
+  "Bez aktivace se ty dva Lineary slijí v jeden a dva ze čtyř zůstanou špatně navždy.",
+  "Tanh je na tak malém problému hladší než ReLU a malá vrstva s ReLU může začít mrtvá a už se nevzpamatovat.",
+]

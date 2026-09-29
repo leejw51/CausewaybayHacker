@@ -1,0 +1,619 @@
+# ZIG LAND — VERY BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/zig/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "zig.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.verybasic.01.print"
+title = "收費亭第一句"
+story = "06:00，紅隧銅鑼灣出口。1 號收費亭個顯示屏本應用一行字開更，而嗰一行唔見咗。"
+brief = '''
+個程式要一隻字唔差咁印出 `hello, causewaybay` 加一個換行。`w` 係有 buffer
+嘅 stdout writer；佢個 `print` 收一個格式字串同一個參數 tuple — 冇參數就係空
+tuple `.{}` — 而且佢可能會失敗，所以個呼叫要 `try`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  (nothing)
+output: hello, causewaybay
+```
+'''
+hints = [
+  'try w.print("hello, causewaybay\n", .{}); — 個 try、個格式字串、個空 tuple。',
+  "print 永遠收兩個參數；而一個可能失敗嘅呼叫，唔准將佢個 error 掉咗。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.verybasic.02.int-types"
+title = "I32 裝唔落嘅數"
+story = "收費廣場嘅年報以十億為單位數過海車次，而裝住個數嘅 register 得 32 位闊。"
+brief = '''
+讀入 `a`，一個 `i32`。個程式需要 `big`：一個 `i64`，裝住 `a` 乘十億 — `a` 一過
+2，呢個值 `i32` 就裝唔落。Zig 用運算元嘅型別嚟計數，喺 `-O Debug` 入面裝唔落就會
+停低，印出 `panic: integer overflow`；所以 `a` 要喺乘之前擴闊做 `i64`，唔係乘完先。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+output: 3000000000
+```
+'''
+hints = [
+  "const big: i64 = @as(i64, a) * 1000000000; — 先擴闊 a，然後喺 64 位入面乘。",
+  "a * 1000000000 係一個 i32 乘一個裝得落 i32 嘅常數，所以個積都係 i32，而三十億裝唔落：panic: integer overflow。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.verybasic.03.floats"
+title = "小數車費"
+story = "更報將成朝嘅收入除以過咗嘅車數，主管想要角同仙，佢就印咗個整數蚊出嚟。"
+brief = '''
+讀入兩個正整數 `a` 同 `b`。個程式需要 `q`：以 `f64` 計嘅商。Zig 永遠唔會幫你
+轉數字嘅型別：兩個整數相除仍然係整數，而 `@floatFromInt` 要有人話佢知係邊種
+float — 外面包住 `@as(f64, ...)` — 先會將整數變做 float。用 `{d:.2}` 嘅 print
+已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "const q: f64 = @as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b)); — 除之前兩邊都各自變做 f64。",
+  "@floatFromInt(a) / @floatFromInt(b) 編譯唔到：喺一條算式中間，個 builtin 冇 result type 可以變。@divTrunc(a, b) 未變做 float 之前已經係 3。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.verybasic.04.strings"
+title = "個名有幾長"
+story = "一個快易通戶口名係登記冊入面嘅一行，核數想要佢有幾多個字元。"
+brief = '''
+`s` 係剪走咗換行嘅輸入行 — 一個 `[]const u8`，即係一個 byte slice。個程式要印出
+佢有幾多個 byte。Slice 嘅長度係一個欄位，唔係 method。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: 8
+```
+'''
+hints = [
+  'try w.print("{d}\n", .{s.len}); — len 係 slice 嘅欄位，所以冇括號。',
+  "@sizeOf([]const u8) 係個 slice 本身嘅大細 — 一個指標加一個長度，16 byte — 唔係佢指住嗰段文字嘅。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.verybasic.05.bool-if"
+title = "雙數定單數"
+story = "收費廣場將雙數車軸嘅車送去左邊啲車道，單數嘅去右邊，而話邊邊嘅點算表從來唔會改主意。"
+brief = '''
+讀入 `n`，一個 `i64`。個程式需要 `even`：一個 `bool`，`n` 除二冇餘數嘅時候係
+true。有符號整數用 `%`，Zig 係唔肯嘅 — 餘數嘅正負號有歧義 — 佢要你指名用 `@mod`
+或者 `@rem`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "const even = @mod(n, 2) == 0; — 指名攞餘數，然後比較。",
+  "n % 2 喺 i64 上面編譯唔到：有符號整數一定要用 @rem 或者 @mod。而 @divTrunc(n, 2) 係個商，唔係剩低嗰啲。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.verybasic.06.loops"
+title = "數車軸"
+story = "n 架車經過 2 號收費亭，記錄要將佢哋嘅號碼加埋，但佢用嗰個迴圈早一個開始、早一個收工。"
+brief = '''
+讀入 `n`。個程式要將 `1 + 2 + … + n` 加入 `sum`。迴圈主體已經寫好；令 `i` 由 1
+行到 `n` 嘅 `for` 頭就係個窿。行一個範圍 `a..b` 嘅 `for` 由 `a` 開始，喺 `b` 之前
+停，而個值係喺括號後面用 `|i|` capture 嘅。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  10
+output: 55
+```
+'''
+hints = [
+  "for (1..n + 1) |i| { — 範圍嘅尾係唔包嘅，所以要去到 n 再過一個。",
+  "1..n 喺 n - 1 停；Zig 冇 ..=；而行範圍嘅 for 一定要 capture 個值，唔係就編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.verybasic.07.functions"
+title = "佢嘅平方"
+story = "車道感應器報一個讀數，顯示屏想要佢嘅平方，而本應做呢件事嘅函數將個讀數原封不動交返出嚟。"
+brief = '''
+`square` 攞一個 `i64`，要回傳嗰個數乘佢自己。佢個 return 係個窿；`main` 讀入 `x`
+再印 `square(x)`。Zig 每句 statement 都以分號結尾，而 `^` 唔係次方。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7
+output: 49
+```
+'''
+hints = [
+  "return x * x; — 乘，然後回傳結果。",
+  "^ 喺 Zig 入面係 bitwise XOR，唔係次方：7 ^ 2 係 5。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.verybasic.08.structs"
+title = "一張單，兩個欄位"
+story = "收費亭職員嘅飯堂單每樣嘢記一個名同一個價錢，而新嗰張單嘅記錄從來冇砌出嚟。"
+brief = '''
+`Item` 有 `name` 同 `price`。個程式已經讀咗兩樣，需要 `s`：一個由佢哋砌出嚟嘅
+`Item` — struct 係用大括號初始化嘅，每個欄位都要用一點指名，`.field = value`；
+漏咗一個欄位係編譯錯誤，唔係零。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40
+output: fish 40
+```
+'''
+hints = [
+  "const s = Item{ .name = name, .price = price }; — 大括號，每個欄位前面一點、指名。",
+  "Item{ name, price } 唔係 struct：按位置排嘅欄位係 tuple 嘅。Item{ .name = name } 漏咗 price，而 Zig 唔會幫你估。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.verybasic.09.struct-method"
+title = "張單自己個總數"
+story = "每張飯堂單都知道自己嘅價錢同數量，而佢個 `total()` 淨係答個價錢。"
+brief = '''
+`Item.total` 要回傳 `price` 乘 `qty`。Method 係一個宣告喺 struct 入面、第一個參數
+係個 struct 本身嘅函數，啲欄位要經嗰個參數先掂到 — 冇隱形嘅 `this`。個 return
+就係個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40 3
+output: fish: 120
+```
+'''
+hints = [
+  "return self.price * self.qty; — 兩個欄位都經 self，相乘。",
+  "喺 total 入面，淨係寫 price 唔係編譯器識得嘅名：欄位只可以經個參數掂到。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.verybasic.10.enums"
+title = "兩條線，兩種顏色"
+story = "隧道銅鑼灣出口嘅指示牌寫住兩條港鐵線，而揀 enumerator 嗰條線被人剪咗。"
+brief = '''
+讀一個字，`island` 或者 `tsuenwan`。個程式需要 `line`：一個由呢個字揀出嚟嘅
+`Line`；印顏色嘅 `switch` 已經寫好。喺 Zig 入面 `if` 係一個 expression，所以可以
+擺喺宣告嘅右邊；而兩個 slice 要用 `std.mem.eql` 比較，永遠唔係 `==`。個型別
+宣告咗嘅話，enum 值可以淨係寫 `.island`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  'const line: Line = if (std.mem.eql(u8, word, "island")) .island else .tsuen_wan; — 一個 if expression，兩個 slice 按內容比較。',
+  'word == "island" 係將一個 slice 同一個指標比較，編譯唔到；Zig 冇 ? : 運算子，if/else 就係個 expression。',
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.verybasic.11.vector"
+title = "啲硬幣，一個一個嚟"
+story = "硬幣一個一個跌落 4 號收費亭個錢盤，而點算用嗰張 list 一直冇大過。"
+brief = '''
+讀一行整數。每個值 `x` 一讀入就要加落 `std.ArrayList` `xs` 嘅尾；個迴圈同印出嚟
+嗰段已經寫好。ArrayList 自己冇 allocator：每個可能令佢變大嘅呼叫都要交 `gpa`
+畀佢，而且可能失敗，所以要 `try`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3 4
+```
+'''
+hints = [
+  "try xs.append(gpa, x); — allocator 先，然後個值，前面一個 try。",
+  "淨係 append(x) 少咗一個參數：張 list 唔會記住 allocator。冇 try 嘅話，一個 error union 就冇人理，而咁係編譯錯誤。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.verybasic.12.vector-edit"
+title = "第一架過"
+story = "閘杆條隊係一張車號 list，第一架已經過咗，但佢仲喺張 list 上面。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要移走第一個元素，然後照次序印出其餘嘅。ArrayList
+有一個保持剩低嗰啲次序嘅 remove，同一個用最後一個元素填個窿嘅；兩個都會回傳
+被移走嘅值，而一個值 Zig 係唔准你隨手掉喺地下嘅 — 一定要賦值，冇人要就賦畀 `_`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 2 3 4
+```
+'''
+hints = [
+  "_ = v.orderedRemove(0); — index 0，其餘嘅向前移，回傳嘅值刻意掉咗。",
+  "swapRemove(0) 將最後一個元素搬去 0 號位，次序就冇咗；pop() 攞最後一個；而冇 _ = 嘅 orderedRemove 係一個冇人理嘅值，編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.verybasic.13.list"
+title = "排隊嘅最前面"
+story = "故障車道將佢嘅召喚記錄放喺一條 linked list，每個新嘅本應由前面入。"
+brief = '''
+讀一行整數。每個 `item` 都要連落 `std.DoublyLinkedList` `l` 嘅最前面，咁最後讀入
+嗰個就會最先印。呢條 list 係 intrusive 嘅：佢連住嵌喺每個 `Item` 入面嘅 `node`
+欄位，用指標連；行一次印出嚟嗰段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "l.prepend(&item.node); — 條 list 連嘅係嵌入嘅 node，用指標。",
+  "append 保持輸入次序；由前面入先會倒轉。而條 list 收嘅係 *Node，所以個 & 唔可以慳。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.verybasic.14.maps"
+title = "點算板"
+story = "收費廣場嘅點算板數住每一類過咗嘅車，而個數一直冇郁過。"
+brief = '''
+讀一行字。對每個 `word`，`counts`（一個 `std.StringHashMap(i64)`）入面嘅計數要加
+一。`get` 答嘅係一個 optional — 未見過嘅字係 `null`，`orelse` 將佢變做零 — 而
+`put` 將新嘅計數存入去。個迴圈同排咗序嘅印出段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish crab fish
+output: crab 1
+        fish 2
+```
+'''
+hints = [
+  "try counts.put(word, (counts.get(word) orelse 0) + 1); — 帶預設值咁讀，加一，存返。",
+  "counts.get(word) + 1 編譯唔到：get 回傳 ?i64，一個 optional 未經 orelse 拆開之前唔可以加。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.verybasic.15.hashtable"
+title = "查到，或者查唔到"
+story = "收費表係一個以車種做 key 嘅 hash map，查一個冇人聽過嘅車種一定要答負一，唔係作一個零出嚟。"
+brief = '''
+`table` 將名對應去價錢，由第一行砌出嚟。讀一個名 `q`。個程式需要 `price`：個
+key 喺度嘅話係表入面嘅值，唔喺度就係 `-1`。`get` 交返一個 optional，而一個
+optional 未拆開之前唔係一個數 — `orelse` 畀個預設值，`.?` 遇到 `null` 會 panic。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40 crab 120
+        fish
+output: 40
+```
+'''
+hints = [
+  "const price = table.get(q) orelse -1; — 個 optional，同埋佢係 null 嘅時候用乜。",
+  "table.get(q).? 遇到唔存在嘅 key 就係 panic: attempt to use null value；而一個淨嘅 ?i64 唔可以用 {d} 印。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.verybasic.16.sets"
+title = "每個車牌得一次"
+story = "車牌號碼由鏡頭送出嚟有重複，而登記冊應該每個得一個，照次序。"
+brief = '''
+讀一行整數。每個 `x` 都要放入 `seen`，一個 set。Zig 嘅 std 冇 set 型別；一個值
+型別係 `void` 嘅 hash map 就係一個 set，而 `void` 值寫做 `{}`。印個數同排咗序嘅
+值嗰段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 3 2 1
+output: 3
+        1 2 3
+```
+'''
+hints = [
+  "try seen.put(x, {}); — 個 key，同埋 void 型別唯一嗰個值。",
+  "put 收一個 key 同一個值，就算個值乜都唔係；append 係 list 嘅講法，map 冇「尾」可以加。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.verybasic.17.stack"
+title = "後入先出"
+story = "收據插落 5 號收費亭嘅單插上面，由頂攞落嚟，而文員係由底讀上去。"
+brief = '''
+讀一行整數。佢哋全部推上 `st`，一個當 stack 用嘅 `ArrayList`；個程式之後要由頂
+逐個攞落嚟，最後入嗰個最先印。`pop` 回傳一個 optional — 頂嗰個，或者個 stack
+空咗就係 `null` — 而一個 `while` 可以每轉拆開一個，遇到 `null` 就停。迴圈頭就係
+個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "while (st.pop()) |top| { — pop，capture 個值，遇到 null 停。",
+  "for (st.items) 由頭行到尾，乜都冇攞走；popOrNull 係舊版 std 嘅名。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.verybasic.18.queue"
+title = "先入先出"
+story = "啲車喺 6 號收費亭排隊，先到先處理，但條隊一架都唔收。"
+brief = '''
+讀一行整數。每個 `x` 都要推入 `q`（一個 `std.Deque(i64)`）嘅尾；個程式之後會按
+嚟到嘅次序由前面逐個攞走。同 ArrayList 一樣，每個可能令 Deque 變大嘅呼叫都要交
+`gpa` 畀佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4
+```
+'''
+hints = [
+  "try q.pushBack(gpa, x); — 由尾入，用 popFront 由前面攞。",
+  "pushFront 將每個擺喺上一個前面，條隊就倒轉咗；Deque 冇淨係叫 push 嘅，而且佢永遠唔會記住 allocator。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.verybasic.19.heap"
+title = "最輕嗰架下一個"
+story = "地磅每次都攞最輕嗰架貨車下一個上，而本應交佢出嚟嘅 heap 係倒轉咗嘅。"
+brief = '''
+讀一行整數。個程式將佢哋全部推入 `pq`（一個 `std.PriorityQueue`）再逐個 pop
+出嚟，而佢哋一定要由最細開始出。條 queue 嘅次序就係宣告佢嗰陣畀嘅函數：
+`byValue` 對兩個元素答一個 `std.math.Order`，佢話細嗰個就先出。佢個 return 就係
+個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "return std.math.order(a, b); — a 細過 b 就 a 排先：一個 min-heap。",
+  "order(b, a) 係同一個比較倒轉咗，即係 starter 嗰個 max-heap；a < b 係一個 bool，而條 queue 要嘅係 Order。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.verybasic.20.sorting"
+title = "按車費排"
+story = "車費係按車到嘅次序記錄嘅，而份報告想要最細嘅先。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要就地將 `v.items` 升序排好。`std.mem` 入面個 sort 收
+元素型別、個 slice、一個 context（冇就係 `{}`）同個排序方法 — `std.sort` 係一個
+namespace，唔係函數，`asc` 同 `desc` 就住喺嗰度。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "std.mem.sort(i64, v.items, {}, std.sort.asc(i64)); — 型別、slice、空 context、排序方法。",
+  "std.sort.desc 係降序排；std.sort(...) 係叫一個 namespace；而個 sort 要一個型別同一個排序方法，唔係淨係個 slice。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.verybasic.21.sort-by-key"
+title = "最旺嘅收費亭先"
+story = "收入表列出每個收費亭嘅名同總數，而塊板想最大嗰個排最頂。"
+brief = '''
+`rows` 裝住 `Row{name, score}` 記錄。個程式要按 `score` 排序，最高嘅先。Zig 冇
+lambda：comparator 係一個有名嘅函數 `byScoreDesc`，用名傳畀 `std.mem.sort`，而
+`a` 排喺 `b` 前面嘅時候佢答 `true`。佢個 return 就係個窿。啲分數冇重複。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+        mei 40
+        alex 90
+        sam 65
+output: alex 90
+        sam 65
+        mei 40
+```
+'''
+hints = [
+  "return a.score > b.score; — comparator 答嘅係「a 係咪排先？」。",
+  "< 會將最細嘅排先，即係 starter 做緊嘅嘢；兩個成個 Row 唔可以用 > 比較。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.verybasic.22.reverse"
+title = "由尾到頭"
+story = "車軸讀數係最新嘅先記錄，而份報告係由最舊嘅開始讀。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要就地將 `v.items` 倒轉 — 用 `std.mem` 入面一個行成個
+slice 嘅函數，先畀佢元素型別。ArrayList 自己冇 reverse。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "std.mem.reverse(i64, v.items); — 元素型別，然後個 slice。",
+  "v.items[1..] 令第一個元素留喺原位；而且冇 v.reverse() 可以叫。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.verybasic.23.closures"
+title = "附加費"
+story = "每個車費都要加同一個附加費，而本應記住個附加費嗰樣嘢唔記得咗。"
+brief = '''
+讀入 `k`，然後一行整數。每個值都加 `k`，結果印出嚟。Zig 冇 closure — 函數睇唔到
+佢周圍嘅 local 變數 — 所以最接近嘅寫法喺度：`Adder`，一個喺欄位入面帶住 `k` 嘅
+struct，有一個經 `self` 掂到佢嘅 method `call`。個 method 嘅 return 就係個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return x + self.k; — 個 k 係個 struct 帶住嗰個，經 self 掂到。",
+  "x + k 編譯唔到：main 入面個 k 喺 call 入面睇唔到，因為 Zig 乜都唔 capture。個 struct 欄位就係個 capture。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.verybasic.24.lambdas"
+title = "數雙數車道"
+story = "收費廣場沿住嘅車道號碼係一張 list 送到嘅，辦公室想知有幾多個係雙數。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式需要 `evens`：入面有幾多個係雙數，用 `countIf` 數出嚟；
+佢收個 slice 同一個 predicate — 一個函數指標，`*const fn (i64) bool`。Zig 對
+lambda 嘅答案，係一個宣告喺匿名 struct 入面、再用名揀出嚟嘅函數，全部寫喺一行：
+`struct { fn f(...) ... }.f`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4 6
+output: 3
+```
+'''
+hints = [
+  "const evens = countIf(v.items, struct { fn f(x: i64) bool { return @mod(x, 2) == 0; } }.f); — 個函數，宣告喺一個 struct 入面，再用名攞出嚟。",
+  "冇 .f 嘅話個參數係一個型別，唔係函數；一個淨嘅 fn 係宣告，唔可以擺喺呼叫入面；== 1 數嘅係單數。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.verybasic.25.threads"
+title = "一個收費亭，一條 thread"
+story = "7 號收費亭喺第二條 thread 加總收入，主 thread 就等，而嗰條 thread 從來冇開始過。"
+brief = '''
+`v` 裝住嗰行嘅整數，`sumInto(xs, out)` 將佢哋加埋入 `out`。個程式需要 `t`：一條
+spawn 出嚟嘅 OS thread，用 `v.items` 同一個指向 `result` 嘅指標行 `sumInto`；
+`main` join 佢然後印。`std.Thread.spawn` 收一個 config（預設就係 `.{}`）、個函數、
+同以 tuple 包住嘅參數，而且可能失敗。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+hints = [
+  "const t = try std.Thread.spawn(.{}, sumInto, .{ v.items, &result }); — config、函數、tuple 入面嘅參數。",
+  "sumInto 要一個 *i64，所以個參數係 &result，唔係 result；而 spawn 可能失敗，冇 try 就冇嘢可以 join。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.verybasic.26.mutex"
+title = "四隻手，一個計數器"
+story = "四個收費亭喺廣場辦公室加落同一個計數器，而個 mutex 每轉都被交返，但從來冇人攞過。"
+brief = '''
+四條 thread 各自將 `counter` 加一，加十萬次。每次行迴圈加嘅時候都一定要揸住
+mutex `mu`。喺收尾大括號 unlock 嘅 `defer` 已經寫好；攞 lock 嗰行就係個窿。
+`std.Io.Mutex` 要手上有 `io` 先 lock 得 — `lock` 可以被取消，會回傳一個 error
+union，而唔可以取消嘅普通版本乜都唔回傳。Unlock 一個冇人揸住嘅 mutex 就係
+`unreachable`，喺 `-O Debug` 入面就係 panic。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  (nothing)
+output: 400000
+```
+'''
+hints = [
+  "mu.lockUncancelable(io); — 即刻 lock；已經喺度嗰個 defer 會喺呢轉完嗰陣 unlock。",
+  "mu.lock(io) 回傳一個 error union，而 work 唔可以唔理佢，亦唔可以 return 佢；喺冇人揸住嘅 mutex 上面 mu.unlock(io) 就係 reached unreachable code。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.verybasic.27.binary-tree"
+title = "OVERFLOW"
+story = "06:00，3 號收費亭。車軸計數器係一個 `u8`，今朝第二百五十六條車軸過嘅時候變成 `panic: integer overflow`，閘杆落咗；半夜到而家嘅收據要人手重新索引，放入一棵夠闊裝得落佢哋嘅搜尋樹。"
+brief = '''
+今次 `val` 係 `i64`：夠闊。`insert` 將 `v` 放入以 `n` 為根嘅搜尋樹，`n` 係一個
+optional 指標：`null` 嘅情況已經寫好，會由 arena 整一個新節點。個窿係將 `v` 送落
+正確嗰邊嘅嗰一行 — 細過 `node.val` 就落左邊，否則落右邊 — 並且將遞歸回傳嘅嘢
+存返去；個呼叫會 allocate，所以要 `try`。子節點係 `?*Node`，照原樣傳落去 — 未有
+人睇過之前永遠唔好用 `.?` 拆開。Inorder 遍歷之後會按升序印出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+```
+'''
+hints = [
+  "if (v < node.val) node.left = try insert(alloc, node.left, v) else node.right = try insert(alloc, node.right, v); — 遞歸入其中一邊，再將結果存返去。",
+  "node.left.? 係未有人睇過就將個 null 子節點拆開 — 第二次 insert 就 panic: attempt to use null value。子節點以佢本來嘅 optional 傳落去；而細嘅落左邊。",
+]

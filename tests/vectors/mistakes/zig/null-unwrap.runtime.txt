@@ -1,7 +1,4 @@
 thread <tid> panic: attempt to use null value
-<work>/main.zig:6:36: 0x<pc> in main (main)
+<work>/main.zig:6:36: 0x<pc> in main
     std.debug.print("{d}\n", .{left.?});
                                    ^
-<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)
-    if (fn_info.params.len == 0) return wrapMain(root.main());
-                                                          ^

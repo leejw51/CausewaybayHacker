@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
  * | `Ctrl/Cmd+Enter` | submit — the login field and the editor both. A bare Enter in either inserts a newline, deliberately, so a phrase pasted across two lines does not fire a login halfway through |
  * | `F1` | pin the orientation |
  * | `F3` | log out, from anywhere, including mid-quest |
- * | `←` `→` | lands: cycle RUST / GO / C++ / PYTHON. `pickLand` clicks the land button instead |
+ * | `←` `→` | lands: cycle every land in the order the plates are drawn, and the scrolling column follows. `pickLand` walks with `→` until the plate is on screen, then clicks it |
  * | `←` `→` `↑` `↓` | map: move between nodes |
  * | `Enter` | map: open the selected node; result: back to the map |
  * | `Escape` | back one screen |
@@ -77,6 +77,8 @@ export interface CaptureApi {
   frozen(): boolean;
   step(n?: number): number;
   settle(secs?: number): number;
+  /** Freeze and draw one frame at `dt = 0`: the state's picture, clock unmoved. */
+  redraw(): void;
   orient(mode: "landscape" | "portrait"): void;
   png(): string;
   scene(): string | null;
@@ -349,10 +351,72 @@ export async function pickCategory(
   await atScreen(page, "map");
 }
 
-/** Choose the land. `land:rust`, `land:cpp`, … — a click, not a blind toggle. */
+/**
+ * Choose the land. `land:rust`, `land:cpp`, … — a click, not a blind toggle.
+ *
+ * **Walked to first when it is not on screen.** Nine lands do not fit the
+ * column two across, so it scrolls, and a plate scrolled out of the column
+ * has no hit box at all — `land:zig` is simply not among the buttons on a
+ * fresh screen. A player gets there with `→`, which cycles the land cursor in
+ * the order the plates are drawn, and the column follows the cursor on the
+ * frame it moves. So this does the same: press `→` until the plate has a
+ * button, then click it — the click is still what chooses, and it also drags
+ * a half-shown plate fully into view. Bounded at one lap of the cycle; a land
+ * that one lap does not bring on screen is a land a player cannot reach.
+ */
 export async function pickLand(page: Page, land: Land): Promise<void> {
   await atScreen(page, "lands");
-  await clickButton(page, `land:${land}`);
+  const id = `land:${land}`;
+  const offered = (): Promise<{ at: [number, number] | null; ids: string[] }> =>
+    page.evaluate((wanted) => {
+      const api = window.__cwbCapture;
+      return {
+        at: api?.buttonAt(wanted) ?? null,
+        ids: (api?.buttons() ?? []).map((b) => b.id),
+      };
+    }, id);
+  // Let the scene draw one frame, which is when the hit boxes are rebuilt:
+  // stepped by hand if a test left the loop frozen after a `settle()`, or two
+  // real frames if it is running.
+  const drawn = (): Promise<void> =>
+    page.evaluate(
+      () =>
+        new Promise<void>((done) => {
+          const api = window.__cwbCapture;
+          if (api?.frozen()) {
+            api.step(1);
+            done();
+          } else
+            requestAnimationFrame(() => requestAnimationFrame(() => done()));
+        }),
+    );
+
+  // The plates arrive on a tween, and until the first of them has a hit box
+  // an arrow press would walk a cursor nobody has drawn yet.
+  let found = await offered();
+  for (let t = Date.now(); !found.ids.some((b) => b.startsWith("land:"));) {
+    if (Date.now() - t > 30_000)
+      throw new Error(
+        `no land plates on the lands screen. It offers: ` +
+          `${found.ids.join(", ") || "(none)"}.`,
+      );
+    await drawn();
+    await page.waitForTimeout(100);
+    found = await offered();
+  }
+  for (let i = 0; !found.at && i < LANDS.length; i++) {
+    await page.keyboard.press("ArrowRight");
+    await drawn();
+    found = await offered();
+  }
+  if (!found.at)
+    throw new Error(
+      `no button \`${id}\` after one lap of the land cursor (${LANDS.length} ` +
+        `presses of →). A land the arrow keys cannot bring on screen is a ` +
+        `land a player cannot reach. The screen offers: ` +
+        `${found.ids.join(", ") || "(none)"}.`,
+    );
+  await page.mouse.click(found.at[0], found.at[1]);
 }
 
 /**
@@ -781,6 +845,21 @@ export const BLOCKED = {
     "Build with `npm run build:e2e` and serve `frontend/dist-e2e`.",
 } as const;
 
+/** One websocket frame the page received, and the wall-clock ms it arrived. */
+export interface Received {
+  at: number;
+  text: string;
+}
+
+/**
+ * Every frame the page has received so far, in arrival order — collected by
+ * the `ready` fixture from before the first navigation, so the boot socket is
+ * in it. Live: it keeps growing while the test runs.
+ */
+export function receivedFrames(): Received[] {
+  return (test.info() as unknown as { _received?: Received[] })._received ?? [];
+}
+
 export const test = base.extend<{ ready: void }>({
   ready: [
     async ({ page, baseURL }, use) => {
@@ -802,16 +881,25 @@ export const test = base.extend<{ ready: void }>({
       // It cost one confusing red before it was caught, and it would have
       // cost far more as a silent green.
       const sent: string[] = [];
-      page.on("websocket", (ws) =>
-        ws.on("framesent", (f) => sent.push(String(f.payload))),
-      );
+      // And every frame it receives, stamped with when it arrived, for the
+      // same reason: a test that wants to know *when* the server said
+      // something (a `run.log` chunk mid-compile) cannot attach late either.
+      const received: Received[] = [];
+      page.on("websocket", (ws) => {
+        ws.on("framesent", (f) => sent.push(String(f.payload)));
+        ws.on("framereceived", (f) =>
+          received.push({ at: Date.now(), text: String(f.payload) }),
+        );
+      });
 
       const info = test.info() as unknown as {
         _errors: string[];
         _sent: string[];
+        _received: Received[];
       };
       info._errors = errors;
       info._sent = sent;
+      info._received = received;
 
       await page.goto("/");
       await page
@@ -835,3 +923,52 @@ export const test = base.extend<{ ready: void }>({
 });
 
 export { expect };
+
+/**
+ * Press a bench button once the bench has stopped moving under it.
+ *
+ * The bench's button rows reflow with the pad's state: SAVE reads `SAVE *`
+ * while the pad has unsaved edits, the wider label pushes everything after it
+ * along the row, and POSTER and DISK READER are after it. `buttons()` reports
+ * the rects of the last frame *drawn*, so a press straight after `setSource`
+ * aimed at a layout the next frame replaced — traced landing on WINDOW (the
+ * fullscreen toggle) in portrait and on AGENT in landscape, and the picker or
+ * the download never came. The autosave 2.5 s later flips the label back and
+ * reflows the row again, so "wait a moment" only moves the race.
+ *
+ * So: save now (Ctrl/Cmd+S, the player's own key), wait until the drawn SAVE
+ * says the pad is clean, and until two frames drawn apart agree on every
+ * button, then press. Nothing is left to relabel it before the press — the
+ * press's own blur saves a pad that is already saved, which is a no-op.
+ */
+export async function pressWhenStill(page: Page, id: string): Promise<void> {
+  await page.keyboard.press("ControlOrMeta+S");
+  const drawn = () =>
+    page.evaluate(
+      () =>
+        new Promise<string>((done) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              done(
+                JSON.stringify(
+                  window.__cwbCapture!.buttons().map((b) => [b.id, b.label, b.client]),
+                ),
+              ),
+            ),
+          ),
+        ),
+    );
+  await expect
+    .poll(
+      async () => {
+        const a = await drawn();
+        const clean = !(JSON.parse(a) as Array<[string, string]>).some(
+          ([b, label]) => b === "save" && label.trim().endsWith("*"),
+        );
+        return clean && a === (await drawn());
+      },
+      { timeout: 30_000, message: "the bench never settled: SAVE still dirty, or the rows still moving" },
+    )
+    .toBe(true);
+  await clickButton(page, id);
+}

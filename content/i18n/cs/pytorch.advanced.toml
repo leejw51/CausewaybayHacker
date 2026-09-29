@@ -1,0 +1,692 @@
+# PYTORCH LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/pytorch/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim.
+
+pack   = "pytorch.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.advanced.01.view-contiguous"
+title = "View, který odmítl"
+story = "Dávka se cestou dovnitř transponuje a zploštění, které rok fungovalo, hází chybu o souvislosti paměti."
+brief = '''
+`view` vyžaduje, aby paměť tenzoru už byla rozložená tak, jak to nový tvar potřebuje. Transpozice žádnou paměť nepřesouvá — mění jen strides — takže `view` na transponovaném tenzoru vyhodí `RuntimeError`, a to je jedna z těch dvou tří chyb, na které se pohovor na PyTorch ptá vždycky.
+
+`reshape` kopíruje, když musí, a funguje tak či tak. `contiguous()` udělá kopii explicitně, a tím je `view` zase přípustný.
+
+Vypiš, jak `view` na transponovaném tenzoru selže, a pak oba způsoby, jak zploštění stejně dostat.
+
+```
+output: RuntimeError True True
+```
+'''
+hints = [
+  "x.reshape(6) kopíruje, když musí; x.contiguous().view(6) nejdřív udělá kopii a pak view.",
+  "Transpozice mění strides, ne paměť — a přesně to view nesnese.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.advanced.02.in-place"
+title = "Podtržítko"
+story = "Někdo ušetřil paměť tím, že přidal podtržítko, a zpětný průchod teď hází chybu, že proměnná potřebná pro gradient byla změněna."
+brief = '''
+Podtržítko na konci znamená *na místě*: `relu_`, `add_`, `mul_`. Operace na místě ušetří alokaci a zničí hodnotu, kterou zpětný průchod bude potřebovat, a autograd to chytí — v čase `backward()`, daleko od řádku, který to způsobil.
+
+Udělej tu samou aritmetiku mimo místo, aby zpětný průchod přežil, a vypiš gradient.
+
+`y = w * 2`, pak `y = y + 1`, pak `loss = y.sum()`: gradient ztráty podle `w` je `2` pro každý prvek.
+
+```
+output: [2.0, 2.0, 2.0] caught
+```
+'''
+hints = [
+  "y = y + 1 převáže jméno na nový tenzor; y += 1 by měnilo na místě a rozbilo graf.",
+  "Přičtení konstanty gradient nemění — d(2w + 1)/dw je pořád 2.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.advanced.03.detach-clone"
+title = "Kopie a řez"
+story = "Logovací kód si nechal tenzor ztráty místo jeho čísla a ve 04:00 jsou čtyři hodiny grafů pořád v paměti."
+brief = '''
+`clone()` zkopíruje data a **zůstane v grafu** — gradienty jím protékají. `detach()` data sdílí a **graf opustí** — zpátky nic neteče. Nejsou to alternativy; odpovídají na různé otázky.
+
+`x.detach().clone()` je to, co chceš na snímek: nová paměť, žádný graf.
+
+Pro každou ze tří možností vypiš, jestli vyžaduje grad a jestli sdílí úložiště s originálem.
+
+```
+output: clone True False detach False True snapshot False False
+```
+'''
+hints = [
+  "x.clone(), x.detach(), x.detach().clone() — v tomhle pořadí.",
+  "detach sdílí tu samou paměť, takže zápis do něj zapisuje i do originálu.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.advanced.04.dtype-promotion"
+title = "Dělení, které zaokrouhlilo"
+story = "Normalizace dělí počty součtem a každý rack vyjde na nule, kromě toho jednoho, který vyjde na jedničce."
+brief = '''
+`/` na dvou celočíselných tenzorech dá float tenzor — torch povyšuje. `//` celé číslo nechá a zaokrouhlí dolů, a `int_tensor /= 2` vyhodí chybu, místo aby potichu ořezal, protože dtype výsledku se nevejde zpátky do zdroje.
+
+Vypiš dtype a hodnoty skutečného dělení, celočíselného dělení a explicitního převodu na float.
+
+```
+output: torch.float32 [0.5, 1.0, 1.5] torch.int64 [0, 1, 1] torch.float32 [0.5, 1.0, 1.5]
+```
+'''
+hints = [
+  "n / 2, n // 2, n.float() / 2 — to první už povyšuje, to druhé ne.",
+  "Tenzor float32 neudrží přesně velký int64; povýšení je rozhodnutí, ne pohodlí.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.advanced.05.gather"
+title = "Skóre, které dal správné odpovědi"
+story = "Jistota pro správnou třídu u každého vzorku, z dávky logitů, a smyčka, která to dělá, je nejpomalejší řádek celé evaluace."
+brief = '''
+`gather` vybere z každého řádku jeden prvek podle indexu, bez smyčky. Na tenzoru pravděpodobností `(batch, classes)` a tenzoru labelů `(batch,)` je `probs.gather(1, labels.unsqueeze(1)).squeeze(1)` pravděpodobnost, kterou model dal správné třídě, pro každý vzorek.
+
+`unsqueeze` není ozdoba: index pro `gather` musí mít stejný počet rozměrů jako zdroj.
+
+```
+output: [0.7, 0.2, 0.9]
+```
+'''
+hints = [
+  "probs.gather(1, want.unsqueeze(1)).squeeze(1) — dim 1 je osa tříd.",
+  "probs[want] indexuje řádky, ne sloupce, a dá úplně jiné tři řádky.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.advanced.06.masked-fill"
+title = "Minus nekonečno"
+story = "Na vyplňovací místa v dávce se dává attention, jako by to byla slova, a model se naučil předpovídat padding."
+brief = '''
+Chceš-li pozici vyřadit ze softmaxu, nastav její skóre na `-inf` **před** softmaxem, ne její pravděpodobnost na nulu po něm: `exp(-inf)` je 0 a zbylé pravděpodobnosti se pořád sečtou na jedničku. Vynulování potom nechá řádek, který dává dohromady méně než jedna.
+
+`scores.masked_fill(mask, float("-inf"))` vyplní místa, kde je booleovská maska `True`.
+
+Zamaskuj poslední pozici a vypiš zaokrouhlené pravděpodobnosti a součet řádku.
+
+```
+output: [0.7311, 0.2689, 0.0] 1.0
+```
+'''
+hints = [
+  "scores.masked_fill(keep_out, float(\"-inf\")) — vyplnit tam, kde je maska True.",
+  "Zamaskovaná položka měla největší skóre; maskování po softmaxu by ji nechalo dominovat.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.advanced.07.keepdim"
+title = "Osa, která zmizela"
+story = "Odečtení maxima každého řádku od řádku udělá z obdélníkového tenzoru čtvercový a nic nevyhodí chybu."
+brief = '''
+Redukce odstraní osu, kterou redukovala. `x.max(dim=1).values` na `(2, 3)` dá `(2,)` a jeho odečtení od `(2, 3)` se broadcastuje podél **špatné** osy — postaví tu 2 na místo té 3, a když čísla náhodou sedí, potichu spočítá nesmysl.
+
+`keepdim=True` nechá osu na místě s velikostí 1, a to je to, co broadcasting chce.
+
+Vypiš tvar bez keepdim, s ním a maxima řádků po odečtení, která jsou nulová.
+
+```
+output: (2,) (2, 1) [0.0, 0.0]
+```
+'''
+hints = [
+  "x.max(dim=1).values a x.max(dim=1, keepdim=True).values — max vrací pojmenovanou n-tici, ne tenzor.",
+  "Přesně tohle odečtení je první řádek numericky stabilního softmaxu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.advanced.08.batched-matmul"
+title = "Jedno násobení na hlavu"
+story = "Čtyři attention hlavy a kód přes ně jede smyčkou v Pythonu. Profiler říká, že ta smyčka je celý model."
+brief = '''
+`@` na tenzorech s víc než dvěma rozměry je **dávkové** maticové násobení: poslední dvě osy jsou matice, všechno před nimi je dávka a osy dávky se broadcastují.
+
+`(B, H, T, d) @ (B, H, d, T)` dá `(B, H, T, T)` — a to je přesně tenzor attention skóre, každá hlava každé sekvence najednou, bez smyčky.
+
+Postav ho a vypiš tvar a jestli sedí s odpovědí ze smyčky.
+
+```
+output: (2, 4, 5, 5) True
+```
+'''
+hints = [
+  "q @ k.transpose(-2, -1) — záporné osy, takže stejný řádek funguje bez ohledu na počet os dávky.",
+  "k.t() funguje jen na 2-D tenzoru a na 4-D vyhodí chybu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.advanced.09.stop-gradient"
+title = "Cíl, který se učil nazpátek"
+story = "Cílová síť má stát na místě, zatímco ji online síť dohání, a hýbou se obě."
+brief = '''
+Když se ztráta počítá proti něčemu, co vyrobil model, gradient teče do **obou** stran, pokud ho nezastavíš. `detach()` na cíli je stop-gradient, a zapomenout na něj je ta chyba, kdy se model trénuje proti sobě samému a zkolabuje.
+
+Trénuj `a` směrem k `b` s odpojeným `b` a vypiš, který z nich dostal gradient.
+
+```
+output: True False
+```
+'''
+hints = [
+  "target = b.detach() — cíl je teď číslo, ne něco, co se má učit.",
+  "Bez detach se naplní i b.grad a cíl se posouvá směrem k predikci.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.advanced.10.retain-graph"
+title = "Pokus o backward dvakrát"
+story = "Dvě ztráty na jednom dopředném průchodu a druhý backward hází chybu, že buffery už byly uvolněné."
+brief = '''
+`backward()` graf uvolňuje, jak jím prochází. Druhý `backward()` přes tentýž dopředný průchod proto vyhodí chybu — buffery jsou pryč — a `retain_graph=True` je to, co je zachová.
+
+Poctivá oprava je obvykle ztráty sečíst a zavolat `backward()` jednou; `retain_graph` je pro případ, kdy opravdu potřebuješ dva samostatné průchody, a stojí paměť.
+
+Spusť druhý průchod se zachovaným grafem a vypiš nasčítaný gradient: `d(w²)/dw + d(3w)/dw` při `w = 2` je `4 + 3`.
+
+```
+output: caught 7.0
+```
+'''
+hints = [
+  "first.backward(retain_graph=True) — pak má druhý průchod pořád graf, kterým může projít.",
+  "Gradienty se sčítají, takže vypsané číslo je součet obou derivací.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.advanced.11.freeze"
+title = "Vrstvy, které zůstanou"
+story = "Fine-tuning jen poslední vrstvy a celý backbone se hýbe, protože optimalizátor dostal všechno."
+brief = '''
+Zmrazení jsou dvě samostatné věci a potřeba jsou obě. `requires_grad = False` zastaví výpočet gradientu; předat optimalizátoru jen nezmrazené parametry zastaví jejich krokování. Udělat jedno bez druhého je obvyklá chyba napůl zmrazeného modelu.
+
+Zmraz první vrstvu, dej optimalizátoru jen to, co se ještě učí, a vypiš, kolik tenzorů kdo vidí a jestli se zmrazená váha pohnula.
+
+```
+output: 2 4 True False
+```
+'''
+hints = [
+  "p.requires_grad = False ve smyčce, pak model.parameters() vyfiltrovat podle requires_grad.",
+  "model.parameters() pořád vydává i zmrazené tenzory; kratší je jen seznam optimalizátoru.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.advanced.12.clip-grad"
+title = "Špička"
+story = "Jedna špatná dávka ve 03:40, jeden obrovský gradient a ve 03:41 je každá váha v modelu NaN."
+brief = '''
+Ořezávání přeškáluje celý vektor gradientu tak, aby jeho norma byla nejvýš `max_norm`: směr zachová a krok zkrátí. Patří **za** `backward()` a **před** `step()` — kdekoli jinde nedělá nic.
+
+`clip_grad_norm_` vrací normu, kterou viděl, před ořezáním.
+
+Gradient tady má normu `sqrt(3² + 4²) = 5`; po ořezání na `1.0` z něj bude jednotkový vektor ve stejném směru.
+
+```
+output: 5.0 1.0 [0.6, 0.8]
+```
+'''
+hints = [
+  "nn.utils.clip_grad_norm_([w], max_norm=1.0) — podtržítko na konci, protože upravuje .grad na místě.",
+  "Vrací normu před ořezáním, a to je to číslo, které stojí za to logovat.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.advanced.13.custom-function"
+title = "Vlastní derivace"
+story = "Straight-through estimátor: dopředný průchod, který zaokrouhluje, a zpětný průchod, který dělá, že nezaokrouhloval."
+brief = '''
+`torch.autograd.Function` tě nechá napsat obě poloviny sám: `forward` spočítá hodnotu, `backward` řekne, jaký gradient poslat zpátky. Zaokrouhlení má derivaci všude nulovou, a to trénink zabije; straight-through estimátor místo toho gradient propustí beze změny.
+
+Implementuj backward jako identitu a vypiš zaokrouhlený forward a gradient, který dorazí ke vstupu.
+
+```
+output: [0.0, 1.0, 1.0] [1.0, 1.0, 1.0]
+```
+'''
+hints = [
+  "return g — příchozí gradient rovnou zase ven, jedna návratová hodnota na každý vstup forwardu.",
+  "Funkce se volá přes .apply(x), nikdy přímým voláním forward.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.advanced.14.log-sum-exp"
+title = "Logaritmus nuly"
+story = "Ztráta vypíše `inf` na jedné dávce z tisíce. Logity na té dávce jsou velké a něco vzalo logaritmus pravděpodobnosti, která podtekla."
+brief = '''
+`log(softmax(x))` přeteče: `exp(1000)` je `inf` a `log(0)` je `-inf`. `log_softmax` spočítá tutéž veličinu tak, že nejdřív odečte maximum řádku, a zůstane konečný pro jakýkoli vstup.
+
+Proto `nn.CrossEntropyLoss` bere logity a ne pravděpodobnosti — stabilní verze je uvnitř.
+
+Vypiš, jestli je naivní cesta konečná, jestli je konečná ta stabilní, a stabilní hodnoty.
+
+```
+output: False True [-1000.0, 0.0]
+```
+'''
+hints = [
+  "torch.log_softmax(big, dim=0) — jedno volání a nikdy nebere logaritmus podteklého čísla.",
+  "Trik uvnitř je odečíst maximum řádku před umocněním; keepdim je to, co nechá to odečtení broadcastovat.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.advanced.15.init"
+title = "Kde váhy začínají"
+story = "Každý neuron ve skryté vrstvě se učí totéž, navždy. Všechny začaly na nule a nic je od sebe neodliší."
+brief = '''
+Vrstva inicializovaná na konstantu je symetrická: každá jednotka dostane stejný gradient a zůstane celý běh stejná jako její sousedé. Náhodná inicializace symetrii rozbije a *měřítko* té náhodnosti rozhoduje, jestli signál přežije hloubku — na to jsou Kaiming a Xavier.
+
+Inicializuj váhy přes Kaiming normal a bias na nulu a pak vypiš, jestli se skryté řádky po jednom kroku liší.
+
+```
+output: True True
+```
+'''
+hints = [
+  "nn.init.kaiming_normal_(layer.weight, nonlinearity=\"relu\") a nn.init.zeros_(layer.bias).",
+  "Inicializační funkce všechny končí podtržítkem: zapisují do tenzoru, který dostanou.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.advanced.16.batchnorm"
+title = "Klouzavý průměr"
+story = "Model má v tréninku dobré skóre a špatné ve chvíli, kdy se nasadí, na stejných datech. Nikdo nezavolal eval a statistiky dávky se přepočítávají z dávek o jednom."
+brief = '''
+`BatchNorm` při tréninku normalizuje statistikami aktuální dávky a v eval klouzavým průměrem, který během tréninku nasbíral. Model, který při nasazení zůstal v `train()`, normalizuje každý požadavek sám sebou, a proto dávka o jednom vyjde jako nuly.
+
+Pusť pár trénovacích dávek, přepni do eval a vypiš, jestli se klouzavý průměr pohnul a jestli teď dávka o jednom přežije.
+
+```
+output: True True False
+```
+'''
+hints = [
+  "bn.eval() — v režimu train má dávka o jednom nulový rozptyl a BatchNorm1d vyhodí chybu.",
+  "running_mean je buffer, ne parametr: je ve state dictu a gradient nedostává.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.advanced.17.layernorm"
+title = "Po tokenech, ne po dávce"
+story = "Transformer v racku normalizuje každý token sám o sobě a verze napsaná tady normalizuje podle dávky a ujíždí, kdykoli se dávka změní."
+brief = '''
+LayerNorm normalizuje přes osu **příznaků**, token po tokenu, takže je mu jedno, co dalšího je v dávce — a proto ho transformery používají, a ne BatchNorm.
+
+Rozepsaný je to `(x - mean) / sqrt(var + eps)`, s průměrem a rozptylem přes poslední osu s `keepdim=True`, a nevychýlený rozptyl je `False`.
+
+Napodob `nn.LayerNorm` ručně a vypiš shodu a průměr a směrodatnou odchylku jednoho řádku.
+
+Průměr je z principu nula, ale ve float32 přistane o chlup vedle na jednu nebo druhou stranu — a `round(-1e-8, 4)` je `-0.0`, což není stejný text jako `0.0`. Na kterou stranu přistane, je věc stroje, ne tvoje. Rozhodne to `+ 0.0` ve výpisu: podle IEEE 754 je `-0.0 + 0.0` rovno `0.0`.
+
+```
+output: True 0.0 1.0
+```
+'''
+hints = [
+  "dim=-1 s keepdim=True a unbiased=False u rozptylu — LayerNorm dělí n, ne n-1.",
+  "eps je výchozí 1e-5 a patří dovnitř odmocniny, ne ven.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.advanced.18.scheduler"
+title = "Pomaleji, ke konci"
+story = "Ztráta hodinu klesá a pak skáče kolem dna, pod které se nikdy nedostane. Velikost kroku, která ji tam dostala, je teď moc velká na to, aby přistála."
+brief = '''
+Plán rychlosti učení s postupem tréninku zmenšuje krok. `StepLR(opt, step_size=2, gamma=0.1)` vynásobí rychlost `0.1` každé dvě epochy a `sched.step()` se volá **jednou za epochu**, po kroku optimalizátoru — volat ho za každou dávku ji utlumí stovkykrát rychleji, než bylo zamýšleno.
+
+Pusť šest epoch a na začátku každé vypiš rychlost.
+
+```
+output: [0.1, 0.1, 0.01, 0.01, 0.001, 0.001]
+```
+'''
+hints = [
+  "torch.optim.lr_scheduler.StepLR(opt, step_size=2, gamma=0.1).",
+  "Aktuální rychlost se dá přečíst v opt.param_groups[0][\"lr\"]; scheduler zapisuje přesně tam.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.advanced.19.weight-decay"
+title = "Stahované zpátky k nule"
+story = "Model se naučil trénovací sadu nazpaměť a jedna váha je čtyřistakrát větší než její sousedé."
+brief = '''
+Weight decay přidá ke každému kroku tah směrem k nule. V obyčejném SGD je to přesně L2 regularizace: ke gradientu se přičte `wd * w`, takže bez jakéhokoli jiného gradientu se váha každým krokem zmenší faktorem `1 - lr * wd`.
+
+Tady je ztráta konstantní, takže jediné, co váhou hýbe, je decay: `2.0` s `lr=0.1`, `wd=0.5` jde na `2.0 * 0.95`.
+
+```
+output: 1.9
+```
+'''
+hints = [
+  "torch.optim.SGD([w], lr=0.1, weight_decay=0.5) — decay je argument optimalizátoru, ne člen ztráty.",
+  "Biasy a parametry normalizace se z decay obvykle vyjímají, a to chce dvě skupiny parametrů.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.advanced.20.momentum"
+title = "Jede to dál"
+story = "Dlouhým mělkým údolím potřebuje obyčejný krok deset tisíc iterací. Něco si musí pamatovat, kterým směrem už to jelo."
+brief = '''
+Momentum si drží průběžnou rychlost: `v ← μv + g`, pak `w ← w - lr·v`. SGD v torchi dělá přesně tohle a rozepsat si to je nejlevnější způsob, jak si být jistý, co `μ` znamená.
+
+S konstantním gradientem `1.0`, `μ = 0.9` a `lr = 0.1` dají tři kroky rychlosti `1`, `1.9`, `2.71`.
+
+Implementuj aktualizaci ručně a vypiš ji vedle té z torche.
+
+```
+output: [-0.1, -0.29, -0.561] True
+```
+'''
+hints = [
+  "v = 0.9 * v + 1.0 a pak mine = mine - 0.1 * v — nejdřív rychlost, pak krok.",
+  "První krok v torchi použije jako počáteční rychlost surový gradient, a to je přesně to, co dá v začínající na 0.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.advanced.21.early-stop"
+title = "Odtud už to bylo horší"
+story = "Trénovací ztráta dolů, validační ztráta nahoru, posledních dvě stě epoch. Na to druhé číslo se nikdo nedíval."
+brief = '''
+Early stopping sleduje validační ztrátu, drží si nejlepší viděné váhy a vzdá to po `patience` epochách bez zlepšení. Nasazené váhy jsou ty nejlepší, ne ty poslední — v tom je celý smysl, a to je ta část, na kterou většina implementací zapomíná.
+
+Projdi zaznamenané validační ztráty a oznam epochu zastavení a tu nejlepší.
+
+```
+output: 2 5
+```
+'''
+hints = [
+  "Při každém zlepšení vynuluj počítadlo špatných epoch; skonči, když přeleze patience.",
+  "best_epoch je tady 2 — 0.7 nikdy nikdo nepřekoná — a běh skončí v epoše 5.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.advanced.22.checkpoint"
+title = "Servisní okno"
+story = "Úloha se obnovila z checkpointu a ztráta hned vyskočila zpátky nahoru. Váhy se obnovily; momentum optimalizátoru ne."
+brief = '''
+Checkpoint, který obnoví jen `model.state_dict()`, ztratí stav optimalizátoru — dva odhady momentů u Adamu, rychlost u SGD — a první krok po obnovení je v podstatě studený start.
+
+Ulož obojí, obnov obojí do čerstvých objektů a ukaž, že další krok přistane na stejném místě jako nepřerušený běh.
+
+```
+output: True True
+```
+'''
+hints = [
+  "resumed.load_state_dict(ckpt[\"model\"]) a resumed_opt.load_state_dict(ckpt[\"opt\"]) — obě poloviny.",
+  "Optimalizátor už musí držet správné parametry, než se do něj nahraje stav.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.advanced.23.generator"
+title = "Ten samý běh dvakrát"
+story = "Dva běhy stejného skriptu, stejný seed, různá čísla. Mezitím z globálního generátoru bralo něco jiného."
+brief = '''
+`torch.manual_seed` nastaví jeden globální proud a cokoli, co z něj bere, ho posune dál — takže jeden `randn` navíc kdekoli předtím posune každé další číslo. Lokální `torch.Generator` je proud sám pro sebe a kód, který ho předává, je reprodukovatelný bez ohledu na to, co dalšího běží.
+
+Postav generátor se seedem, dvakrát z něj vytáhni čísla s novým seedem mezi tím a ukaž, že tahy sedí, zatímco ty globální ne.
+
+```
+output: True False
+```
+'''
+hints = [
+  "torch.Generator().manual_seed(1234) — manual_seed vrací generátor, takže se to dá řetězit.",
+  "DataLoader bere taky generator=, a tak se dělá reprodukovatelné míchání.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.advanced.24.class-weights"
+title = "Devadesát devět procent a k ničemu"
+story = "Doopravdy selže jeden rack ze sta. Model pokaždé předpoví `fine` a má devadesát devět procent."
+brief = '''
+Na nevyváženém problému ve ztrátě dominuje většinová třída. `nn.CrossEntropyLoss(weight=...)` škáluje příspěvek každé třídy, takže vzácná třída má na vzorek větší cenu a model ji přestane moct ignorovat.
+
+Tenzor vah je jedno číslo na třídu, v pořadí tříd, a musí být float.
+
+Dej vzácné třídě váhu 9 a ukaž, že ztráta při chybě na vzácné třídě vzroste.
+
+```
+output: True 9.0
+```
+'''
+hints = [
+  "torch.tensor([1.0, 9.0]) — jedna váha na třídu, floaty, v pořadí tříd.",
+  "S výchozí redukcí váhy také dělí celkový součet, takže ten faktor jasně ukáže až reduction=\"sum\".",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.advanced.25.mnist-shape"
+title = "Dvacet osm krát dvacet osm"
+story = "Číslice přijdou jako hromádka šedých čtverců a první vrstva chce přesně vědět, co dostává, dřív než se stane cokoli jiného."
+brief = '''
+MNIST je 28×28 jednokanálová šedá, deset tříd, a torch chce obrázky jako `(batch, channels, height, width)` — kanály **před** výškou, což je konvence, kterou lidé přicházející z jiných knihoven pletou.
+
+V runneru není síť ani torchvision, takže číslice se tady generují: každá třída dá jasný pruh na své vlastní místo a přes to jde šum. Je to ve tvaru MNIST, ne MNIST samotný, a každý tvar, dtype a vrstva níž jsou skutečné.
+
+Postav dávku a vypiš její tvar, její dtype, dtype labelů a počet tříd.
+
+```
+output: (64, 1, 28, 28) torch.float32 torch.int64 10
+```
+'''
+hints = [
+  "tuple(x.shape) — a osa kanálů je ta druhá, ne poslední.",
+  "Labely pro cross-entropy musí být int64; randint je tak rovnou dává.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.advanced.26.mnist-mlp"
+title = "Zploštělá číslice"
+story = "První klasifikátor na číslicích zahodí obrázek a čte ho jako sedm set osmdesát čtyři čísel v řadě. Funguje to, a to je na tom to překvapivé."
+brief = '''
+MLP na MNIST zploští `(batch, 1, 28, 28)` na `(batch, 784)` a bere to jako obyčejný vektor příznaků. `nn.Flatten()` dělá zploštění jako vrstvu a osu dávky nechá.
+
+Postav `784 → 64 → 10` s ReLU mezi, natrénuj to a vypiš kontrolu přesnosti na odložených datech.
+
+```
+output: (128, 784) True
+```
+'''
+hints = [
+  "nn.Sequential(nn.Flatten(), nn.Linear(784, 64), nn.ReLU(), nn.Linear(64, 10)).",
+  "784 je 1 * 28 * 28; Flatten nechá osu 0 a všechno za ní složí.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.advanced.27.conv-shape"
+title = "Aritmetika konvoluce"
+story = "Lineární vrstva za konvolucemi chce číslo, které nikdo neumí odvodit, a čtyřikrát se špatně uhodne, než ho prozradí traceback."
+brief = '''
+Výstupní strana konvoluce je `floor((H + 2p - k) / s) + 1`. Jádro 3×3 s `padding=1` a `stride=1` nechá velikost být — proto je ta kombinace všude — a 5×5 bez paddingu ubere čtyři.
+
+`Conv2d(in_channels, out_channels, kernel_size)` změní počet kanálů na `out_channels`, ať dělá prostorová velikost cokoli.
+
+Vypiš tvar po každé ze tří konvolucí.
+
+```
+output: (2, 8, 28, 28) (2, 16, 24, 24) (2, 8, 14, 14)
+```
+'''
+hints = [
+  "nn.Conv2d(1, 8, 3, padding=1), nn.Conv2d(1, 16, 5), nn.Conv2d(1, 8, 3, stride=2, padding=1).",
+  "(28 + 2 - 3)/1 + 1 = 28, (28 - 5)/1 + 1 = 24, floor((28 + 2 - 3)/2) + 1 = 14.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.advanced.28.pool-flatten"
+title = "Číslo před klasifikátorem"
+story = "Mezi poslední konvolucí a deseti třídami je jedno číslo a splést ho je nejčastější traceback v místnosti."
+brief = '''
+`MaxPool2d(2)` zmenší obě prostorové osy na polovinu. Po `Conv2d(1, 8, 3, padding=1)` a jednom poolingu je z 28×28 `(batch, 8, 14, 14)` a zploštění dá `8 * 14 * 14 = 1568` příznaků — číslo, které hlava klasifikátoru potřebuje.
+
+Postav stoh tak, aby se vstupní velikost hlavy odvodila, a ne hádala, a vypiš počet příznaků a výstupní tvar.
+
+```
+output: 1568 (2, 10)
+```
+'''
+hints = [
+  "feats = body(x).shape[1] — prožeň jednu zkušební dávku a číslo odečti.",
+  "Odvození porazí aritmetiku: změň jádro a odvozená verze pořád funguje.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.advanced.29.mnist-cnn"
+title = "Číslice, pořádně"
+story = "Konvoluce nechá obrázek obrázkem a přesnost na odložených číslicích stoupne bez jediného vzorku navíc."
+brief = '''
+Celý běh ve tvaru MNIST: konvoluce, ReLU, pooling, zploštění, klasifikace, trénováno po minibatchích přes tři epochy, hodnoceno na číslicích vygenerovaných s jiným seedem.
+
+Tělo smyčky je to z BASIC, obalené dávkováním z uzlu 23.
+
+```
+output: True True
+```
+'''
+hints = [
+  "Nařež oba tenzory stejným i:i + 64, pak ta tři volání.",
+  "8 * 14 * 14 je zploštělá velikost po jedné 3x3 konvoluci se zachovanou velikostí a jednom 2x2 poolingu.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.advanced.30.per-class"
+title = "Na které číslici je špatný"
+story = "Devadesát šest procent celkem a každé jednotlivé selhání je ta samá třída. Jedno číslo to schovalo."
+brief = '''
+Celková přesnost schová třídu, kterou model nikdy netrefí. Počty záměn — pro každou skutečnou třídu, kolik se jich predikovalo správně — jsou to nejmenší, co to ukáže.
+
+`(want == k)` je maska pro třídu `k`; přesnost uvnitř té masky je číslo pro danou třídu.
+
+```
+output: [1.0, 0.5, 0.0] 0.6
+```
+'''
+hints = [
+  "mask = want == k, pak (pred[mask] == k).float().mean() — booleovské indexování vybere řádky.",
+  "Třída bez vzorků tu dá nan, a to stojí za to ošetřit, než to dorazí na dashboard.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "pytorch.advanced.31.embeddings"
+title = "Tabulka, která se učí"
+story = "Ta věc v racku nemá tušení, co je slovo. Má tabulku, v ní řádek na každý token, a ty řádky se naučila."
+brief = '''
+`nn.Embedding(V, D)` je matice `(V, D)` a vyhledání: podej jí id tokenů a vrátí jejich řádky. Je to přesně maticové násobení s one-hot, kde se one-hot přeskočí, a proto id mimo rozsah vyhodí chybu indexu, místo aby vrátilo nuly.
+
+Transformer k embeddingu tokenu přičítá embedding **pozice**, protože attention sama o sobě nerozliší první od posledního. `torch.arange(t)` jsou id pozic.
+
+Postav obojí, sečti to a vypiš tvar a počet parametrů: `16*8 + 4*8 = 160`.
+
+```
+output: (2, 4, 8) 160 True
+```
+'''
+hints = [
+  "tok(idx) + pos(torch.arange(idx.shape[1])) — řádek pozic se broadcastuje přes dávku.",
+  "Token 1 na pozici 0 a token 1 na pozici 3 jsou různé vektory; v tom je celý smysl tabulky pozic.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "pytorch.advanced.32.attention"
+title = "Queries, keys, values"
+story = "Jeden řádek aritmetiky, napsaný v roce 2017, a rack v suterénu jsou čtyři stovky jeho kopií."
+brief = '''
+Scaled dot-product attention je jeden výraz: `softmax(QKᵀ / √d) V`. Škálování tam je, protože skalární součin dvou `d`-rozměrných vektorů roste s `d` a bez něj se softmax nasytí a gradienty zmizí.
+
+Každý řádek matice attention dává dohromady jedničku — je to vážený průměr přes values, a nic víc.
+
+Rozepiš to a vypiš tvary a součty řádků.
+
+```
+output: (2, 5, 5) (2, 5, 4) 1.0
+```
+'''
+hints = [
+  "torch.softmax(q @ k.transpose(-2, -1) / d ** 0.5, dim=-1), pak att @ v.",
+  "dim=-1 u softmaxu: každá query rozdělí svou attention mezi keys, takže poslední osa dává dohromady jedničku.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "pytorch.advanced.33.causal-mask"
+title = "Viděl odpověď"
+story = "Jazykový model má při tréninku dokonalé skóre a když má cokoli dokončit, vyrábí šum. Při předpovídání dalšího tokenu ho četl."
+brief = '''
+Kauzální model smí dávat attention jen pozicím na své vlastní nebo před ní. Bez masky jde trénovací ztráta na nulu — odpověď je ve vstupu — a generování, kde budoucnost opravdu není k dispozici, zkolabuje.
+
+`torch.tril(torch.ones(t, t))` je dolní trojúhelníková matice povolení; skóre se přes `masked_fill` nastaví na `-inf` tam, kde je nula, **před** softmaxem.
+
+Vypiš masku jako celá čísla a řádek attention pro pozici 0, která vidí jen sama sebe.
+
+```
+output: [[1, 0, 0], [1, 1, 0], [1, 1, 1]] [1.0, 0.0, 0.0]
+```
+'''
+hints = [
+  "torch.tril(torch.ones(t, t)), pak scores.masked_fill(mask == 0, float(\"-inf\")).",
+  "Maskování po softmaxu nechá řádky, které nedávají dohromady jedničku, a budoucnost stejně prosákne do gradientu.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "pytorch.advanced.34.completion"
+title = "Dokončení"
+story = "Rack v suterénu je tohle, čtyři sta milionkrát. Tady je to na čtrnácti tisících parametrech, na jednom notebooku, a dokončuje to sekvenci, jejíž konec tomu nikdo nepodal."
+brief = '''
+Všechny díly jsou teď na místě a tenhle uzel je skládá do architektury, kterou ta věc v suterénu opravdu je: embeddingy tokenů a pozic, LayerNorm, vícehlavá kauzální self-attention, reziduální spojení, MLP s GELU, další reziduální spojení a lineární hlava zpátky na slovník.
+
+Rozdělení na více hlav je jediný díl, který jsi ještě neviděl, a je to jen reshape: z `(B, t, D)` se stane `(B, H, t, D/H)`, takže dávkové maticové násobení z uzlu 8 udělá každou hlavu najednou.
+
+Trénuj to na jedné sekvenci osmi tokenů, dokud si ji nezapamatuje, a pak hladově dokonči `[1, 2]` — vezmi argmax **poslední** pozice, připoj, a spusť znovu.
+
+```
+output: 14000 [1, 2, 3, 4, 5, 6, 7, 8] True
+```
+'''
+hints = [
+  "Skóre jsou (q @ k.transpose(-2, -1)) / (D // H) ** 0.5 — škáluje se rozměrem hlavy, ne rozměrem modelu.",
+  "Pak att.masked_fill(mask == 0, float(\"-inf\")).softmax(dim=-1), v tomhle pořadí.",
+  "Hladové generování čte jen poslední pozici: model(torch.tensor([out]))[0, -1].argmax().item().",
+]

@@ -93,6 +93,9 @@ export interface Host {
   fx(): CodeFx | null;
 }
 
+/** What a closed panel offers the screen: nothing. */
+const NONE = new Buttons();
+
 /** Seconds between the coder's own remarks while nobody is typing. */
 const TIP_EVERY: [number, number] = [14, 26];
 /** Idle seconds after a change before the text is read for advice. */
@@ -1406,7 +1409,9 @@ export class Coder {
   }
 
   controls(): Buttons {
-    return this.panel.buttons;
+    // A closed panel keeps the rects it last drew, and `pointer` already
+    // refuses them; the list of what is on the screen must refuse them too.
+    return this.panel.open ? this.panel.buttons : NONE;
   }
 
   /** For the capture hook: where the sprite is and what it is doing. */

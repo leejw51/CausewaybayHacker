@@ -1,0 +1,922 @@
+# TYPESCRIPT LAND — BASIC, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/typescript/basic.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a program
+# must print are the English pack's and are copied verbatim, never translated.
+
+pack   = "typescript.basic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.basic.01.first-screen"
+title = "Zapnutí"
+story = "19:00 nad Times Square. Právě přestalo pršet, velká obrazovka se zapne a první snímek noci je černý."
+brief = '''
+Vypiš přesně:
+
+```
+hello, causewaybay
+```
+
+Malá písmena, jedna čárka, jedna mezera, jeden řádek. Nic jiného.
+
+`console.log` přidá konec řádku za tebe. Přidá také mezeru mezi argumenty,
+a to je první věc, kterou na něm lidé udělají špatně:
+`console.log("hello,", "causewaybay")` je v pořádku, ale
+`console.log("hello, ", "causewaybay")` má v sobě mezery dvě.
+'''
+hints = [
+  "console.log(\"hello, causewaybay\"); je celý program.",
+  "Řetězec musí být přesný: malá písmena, jedna čárka, za ní jedna mezera.",
+  "Nech volání `main();` dole tak, jak je. Funkce, kterou nikdo nezavolá, nic nevypíše — a přesně to starter dělá.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.basic.02.number"
+title = "Dvanáct dvanáct"
+story = "Stěna Hysan Place má ukázat počet, dvojnásobek počtu a jeho druhou mocninu, a prostřední řádek vyjede jako 1212 písmeny vysokými tři patra."
+brief = '''
+Standardní vstup přijde jako jeden **řetězec**, i s koncem řádku. Řetězec,
+který vypadá jako číslo, je pořád řetězec a `+` na dvou řetězcích je spojí:
+`"12" + "12"` je `"1212"`. `Number()` udělá z textu `number` a cestou
+přeskočí okolní bílé znaky.
+
+Starter kompilátoru tvrdí, že text je číslo, pomocí `as unknown as
+number`. To je slib, ne převod: tsc mu věří, vymaže ho a za běhu je `n`
+pořád řetězec `"12"`. Nahraď ten řádek skutečným:
+
+```
+const n: number = Number(input);
+```
+
+Tři řádky `console.log` jsou napsané.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "Starter na druhém řádku vypíše 1212: n + n spojilo dva řetězce. Typ říkal number; hodnota jím nikdy nebyla.",
+  "const n: number = Number(input); převádí rovnou při čtení. Number() za tebe ignoruje konec řádku.",
+  "Záporné n na druhou je kladné. Test to ví.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.basic.03.types"
+title = "Sdílený slot"
+story = "Dva inzerenti si dělí hodinu slotů na Times Square a rozpis ve velínu má řádek pro celé minuty, které každý dostane, pro zbytek a pro podíl, který má ukazovat dvě desetinná místa a ukazuje otazník."
+brief = '''
+TypeScript má jediný typ `number`, 64bitový float, takže `/` zlomek vždy
+ponechá: `7 / 2` je `3.5`. Celočíselné dělení je `Math.floor(a / b)` a `%`
+je zbytek. K výpisu čísla s pevným počtem desetinných míst na něm zavolej
+`.toFixed(2)`: vrátí **řetězec** s přesně dvěma číslicemi za tečkou. (Kde
+Python píše f-string, TypeScript píše template literal, `` `${x}` ``, a
+volání `.toFixed` dá dovnitř složených závorek.)
+
+```
+console.log(Math.floor(a / b));
+console.log(a % b);
+console.log((a / b).toFixed(2));
+```
+
+`a` a `b` jsou načtena a první dva printy jsou napsané. Napiš třetí řádek
+`console.log` přesně tak, jak je ukázán.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "console.log((a / b).toFixed(2)); — nejdřív závorky kolem a / b, pak .toFixed(2) na výsledku.",
+  "a / b.toFixed(2) by zavolalo toFixed jen na b a tsc odmítne dělit číslo řetězcem, který vrátí.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.basic.04.int-types"
+title = "Čtyři bajty"
+story = "LED řadič za stěnou Hysan Place drží úroveň každé dlaždice ve čtyřech bajtech a na stavový řádek vypisuje největší číslo, které se do nich vejde, a stavový řádek je prázdný."
+brief = '''
+`number` nemá celočíselnou šířku, ale bitové operátory ano: každý z nich
+pracuje na **32 bitech**. `n >>> 0` přečte `n` jako 32bitové celé číslo bez
+znaménka, takže `-1 >>> 0` je `4294967295`, a `.toString(16).padStart(8, "0")`
+ukáže jeho čtyři bajty jako osm hexadecimálních číslic. Těch samých 32 bitů
+je past v `(1 << 31) - 1`: `1 << 31` je už záporné, takže největší 32bitové
+celé číslo se znaménkem napiš jako `2 ** 31 - 1`. Bitové operátory končí na
+32 bitech; přesné počítání končí na `2 ** 53` a za tím přebírá `bigint`
+(`1n`, `64n`).
+
+```
+console.log((n >>> 0).toString(16).padStart(8, "0"));
+console.log(2 ** 31 - 1);
+```
+
+`n` je načteno a maximum 64bitového čísla bez znaménka se vypíše jako
+poslední, jako bigint. Napiš dva řádky výše místo dvou značek `// FILL`.
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "console.log((n >>> 0).toString(16).padStart(8, \"0\")); — >>> 0 z toho udělá 32 bitů bez znaménka, toString(16) je hex, padStart doplní zleva nuly.",
+  "(1 << 31) - 1 vypíše -2147483649: posun je 32bitový a se znaménkem. 2 ** 31 - 1 je obyčejná aritmetika a vypíše 2147483647.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.basic.05.big-int"
+title = "Třicet dva bajtů"
+story = "Každá reklama, která se pustí na obrazovce Times Square, je podepsaná třicetidvoubajtovým hashem a log velína vypisuje ty velké jako jedničku a za ní řadu nul, které v hashi nikdy nebyly."
+brief = '''
+Hash, klíč, adresa: čísla, na kterých tahle hra běží, jsou široká 256 bitů
+— třicet dva bajtů. `number` drží přesně 53 bitů a zbytek bez jediného
+slova zaokrouhlí pryč, takže hash přečtený přes `Number()` se vrátí špatně.
+`bigint` žádnou šířku nemá: `BigInt(text)` naparsuje celé desítkové číslo a
+`.toString(16).padStart(64, "0")` ho rozloží na šedesát čtyři hex znaků,
+které jsi viděl na každé peněžence.
+
+```
+const n: bigint = BigInt(input.trim());
+```
+
+Výpis je napsaný a funguje s oběma typy. Nahraď řádek s `Number` tím výše.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "const n: bigint = BigInt(input.trim()); — BigInt naparsuje desítkový text přesně, ať je jakkoli dlouhý.",
+  "Starter je správně pro 255 a špatně pro 2**256 - 1: Number drží 53 bitů a zbytek se změní v nuly.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.basic.06.floats"
+title = "Tři desetinná místa"
+story = "Světelné čidlo na tramvajové zastávce Yee Wo Street měří na tři desetinná místa, LED ovladač, který krmí, drží jen jednoduchou přesnost, a log ukazuje obojí jako nulu."
+brief = '''
+`number` je 64bitový double — v jiných zemích `f64`. 32bitový float tu
+není, ale dá se vidět: `Math.fround(x)` zaokrouhlí `x` na nejbližší hodnotu
+v jednoduché přesnosti, což je to, co by uložilo `Float32Array`. `.toFixed(3)`
+vypíše tři desetinná místa; `.toFixed(10)` vypíše dost, aby bylo vidět
+zaokrouhlení.
+
+```
+const x: number = Number(s);
+const y: number = Math.fround(x);
+```
+
+`s` je načteno a oba výpisy jsou napsané. Napiš dva řádky výše místo dvou
+zástupných značek.
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "const x: number = Number(s); pak const y: number = Math.fround(x); — fround je float-round, na jednoduchou přesnost.",
+  "new Float32Array([x])[0] dá stejné y; Math.fround je způsob, jak to napsat jedním voláním.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.basic.04.strings"
+title = "Zrcadlo"
+story = "Obrazovka ve výloze Lee Garden ukazuje jméno každého obchodu změřené, vykřičené a pozpátku pro sklo, ve kterém se odráží, a dnes večer ukazuje jméno jednou, správně otočené."
+brief = '''
+Řetězec zná svou délku přes `.length` a kopii velkými písmeny udělá přes
+`.toUpperCase()`. `reverse` nemá: ten patří polím. Takže řetězec rozlož do
+pole jeho znaků, pole obrať a spoj ho zpátky — `[...s].reverse().join("")`.
+
+```
+console.log(s.length);
+console.log(s.toUpperCase());
+console.log([...s].reverse().join(""));
+```
+
+`s` je načteno a jeho délka se vypisuje. Napiš druhý a třetí řádek
+`console.log` přesně tak, jak jsou ukázány.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "console.log(s.toUpperCase()); pak console.log([...s].reverse().join(\"\")); — volání metody, pak rozložit, obrátit, spojit.",
+  "join() bez argumentu dá mezi písmena čárky; join(\"\") nedá nic.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.basic.08.string-slices"
+title = "Pár prvních písmen"
+story = "Příjezdová tabule na tramvajové zastávce Yee Wo Street má místo na první písmena cíle a jednu značku, a feed, ze kterého čte, si musí nechat celé jméno přesně tak, jak bylo."
+brief = '''
+`s.slice(0, n)` je prvních `n` znaků `s` jako nový řetězec. Řetězec se
+nedá změnit, takže řez je vždycky kopie — `s` zůstane nedotčené, ať se s
+kouskem udělá cokoli. `+=` na řetězci postaví nový a přiváže k němu jméno
+znovu; tak se připojuje, a proto je `head` `let`.
+
+```
+let head: string = s.slice(0, n);
+head += "!";
+```
+
+`s` a `n` jsou načtena a dva výpisy jsou napsané. Napiš dva řádky výše
+místo dvou zástupných značek.
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "let head: string = s.slice(0, n); pak head += \"!\"; — řez je kopie, += udělá další.",
+  "slice(start, end) se zastaví před end, takže slice(0, n) je přesně n znaků.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.basic.09.int-slices"
+title = "Dva shora"
+story = "Tramvajová tabule chce opsat druhý a třetí čas příjezdu, za ně přilepit poslední dva a vlastní seznam feedu nechat přesně tak, jak přišel."
+brief = '''
+`v.slice(1, 3)` je řez pole: položky na indexech 1 a 2 v **novém poli** —
+jeho změna nikdy nezmění `v`. `.push(...other)` rozloží každou položku
+`other` na konec. Řezy počítají od 0 a zastaví se před druhým číslem;
+záporný začátek počítá od konce, takže `v.slice(-2)` jsou poslední dvě.
+
+```
+const part: number[] = v.slice(1, 3);
+part.push(...v.slice(-2));
+```
+
+`v` je načteno a oba výpisy jsou napsané. Napiš dva řádky výše místo dvou
+zástupných značek.
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "const part: number[] = v.slice(1, 3); pak part.push(...v.slice(-2)); — slice kopíruje, push připojuje na místě.",
+  "part.push(v.slice(-2)) bez ... vloží jedno pole, ne dvě čísla, a tsc to řekne.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.basic.10.byte-slices"
+title = "První tři bajty"
+story = "Každá dlaždice na stěně Hysan Place vezme první tři bajty jména obchodu a za ně značku, zaloguje bajty v hexu a pak je rozsvítí jako písmena, a dnes večer je každá dlaždice tmavá."
+brief = '''
+`Uint8Array` je řada bajtů, každý jedno číslo od 0 do 255. Popisky jsou
+tu obyčejné ASCII, takže napsaný řádek staví bajty po jednom znaku přes
+`charCodeAt`. (V téhle zemi není `TextEncoder`: jediný Node, který quest
+vidí, je `node.d.ts`.) `.slice(0, 3)` je **kopie** prvních tří bajtů —
+`.subarray` by byl pohled do stejné paměti. Typované pole má pevnou délku a
+nemůže růst, takže připojit znamená postavit nové: `Uint8Array.of(...head, 0x21)`,
+kde `0x21` je `"!"`.
+
+```
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(...head, 0x21);
+```
+
+`s` a `bytes` jsou načtena a oba výpisy jsou napsané. Napiš dva řádky
+výše místo dvou zástupných značek.
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "let head: Uint8Array = bytes.slice(0, 3); pak head = Uint8Array.of(...head, 0x21); — zkopírovat, pak postavit delší.",
+  "Uint8Array nemá push: jeho délka je pevná od vytvoření. Uint8Array.of vezme bajty, které chceš, i rozložené.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.basic.05.loops"
+title = "Počítání snímků"
+story = "Obrazovka na Times Square čísluje snímky každé smyčky od 1 do n, operátor chce jejich součet a kolik jich připadlo na každý třetí, a čítač pod náhledem ukazuje dvakrát nulu."
+brief = '''
+Počítací smyčka `for` má v závorkách tři části: začátek, podmínku
+kontrolovanou před každým průchodem a krok. `for (let i = 1; i <= n;
+i++)` počítá od `1` až po `n` včetně — `<=` je to, co z `n` dělá
+poslední hodnotu.
+
+```
+for (let i = 1; i <= n; i++) {
+  total += i;
+  if (i % 3 === 0) {
+    threes += 1;
+  }
+}
+```
+
+`n` je načteno, `total` a `threes` začínají na `0` a tělo smyčky je
+napsané. Napiš řádek `for` nad tělo přesně tak, jak je ukázán.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (let i = 1; i <= n; i++) { — začátek, podmínka, krok, oddělené středníky.",
+  "i < n by skončilo na n - 1; součtu by chybělo n.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.basic.06.functions"
+title = "Sazba za slot"
+story = "Velín účtuje inzerentovi za každý slot na velké obrazovce, po desátém levněji, a faktura ve třicátém patře říká nulu všem."
+brief = '''
+`function` vytvoří funkci: jméno, parametry s jejich typy, návratový typ
+za dvojtečkou a tělo ve složených závorkách. `return` vrátí hodnotu tomu,
+kdo ji zavolal. Typy jsou smlouva — tsc proti nim zkontroluje každé volání
+a pak je vymaže; tělo může pořád být jediný `return` s celou odpovědí jako
+jedním výrazem.
+
+```
+function fare(slots: number): number {
+  return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;
+}
+```
+
+Prvních deset slotů stojí `5` za kus a každý slot potom `3`. `main` načte
+`n` a vypíše `fare(n)`. Napiš řádek `return` ve `fare` přesně tak, jak je
+ukázán.
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3; — min omezí levné sloty na deset, max nedovolí zbytku jít do záporu.",
+  "Práce funkce končí u return; nic za ním v těle neproběhne.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.basic.07.structs"
+title = "Jedna nabídka, tři pole"
+story = "Karta nabídky v aplikaci Lee Garden má jméno, cenu a počet a řádek pokladny pod kartou ukazuje nulu na každém telefonu ve frontě."
+brief = '''
+`class` sdružuje typovaná pole a metody, které s nimi pracují. Pole se
+deklarují s typy nahoře, `constructor` proběhne, když se objekt vytvoří
+přes `new`, a vyplní je, a metoda je čte přes `this`. `this` není
+volitelné: holé `price` uvnitř metody je jméno, které tsc nenajde.
+
+```
+class Offer {
+  name: string;
+  price: number;
+  qty: number;
+  // constructor(...) { ... } is written
+
+  total(): number {
+    return this.price * this.qty;
+  }
+}
+```
+
+`Offer`, jeho pole a konstruktor jsou napsané a `main` vypíše kartu přes
+template literal. Napiš řádek `return` v `total` přesně tak, jak je
+ukázán.
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return this.price * this.qty; — pole žijí na objektu, takže uvnitř metody jsou this.price a this.qty.",
+  "Samotné price není v total() jméno; tsc odpoví Cannot find name 'price'.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.basic.08.enums"
+title = "Tři linky, tři barvy"
+story = "Obrazovka MTR u východu na Yee Wo Street maluje každou linku její vlastní barvou a dnes večer na ní každá linka vyjede modře jako Island."
+brief = '''
+`enum` je uzavřená množina pojmenovaných členů a je to jediný typ
+TypeScriptu, který za běhu pořád existuje: tsc z něj udělá objekt, takže
+`Line.TSUENWAN` je `1` a `Line["TSUENWAN"]` najde člena podle jména.
+Kompilátor ho nechá indexovat jen jménem, které zná, takže řetězci
+načtenému ze vstupu se řekne, jakými jmény smí být, přes `as keyof typeof Line`
+— slib dávaný tsc, ne kontrola. `switch` přes členy je napsaný.
+
+```
+enum Line {
+  ISLAND,
+}
+
+const line: Line = Line[word.toUpperCase() as keyof typeof Line];
+```
+
+Napiš řádek `const line` přesně tak, jak je ukázán.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "const line: Line = Line[word.toUpperCase() as keyof typeof Line]; — hranaté závorky najdou člena podle jména a jména jsou velkými písmeny.",
+  "Bez as keyof typeof Line tsc odmítne: obyčejný řetězec může být jakékoli jméno a enum má jen tři.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.basic.09.vector"
+title = "Playlist"
+story = "Playlist na Times Square je řada délek reklam v sekundách; operátor jednu přidá, první zahodí, další upraví a seřadí je, a seřazený seznam dá 100 před 4."
+brief = '''
+Pole se upravuje na místě. `.push(x)` přidá hodnotu na konec,
+`.splice(i, 1)` odstraní jednu hodnotu na indexu (ty za ní se posunou
+dolů), `xs[i] = x` nahradí hodnotu na indexu a `.sort()` seřadí hodnoty,
+na místě. **Výchozí řazení porovnává jako text**, takže
+`[4, 100].sort()` je `[100, 4]`: čísla potřebují komparátor, funkci, která
+vrátí záporné číslo, když má jít `a` první.
+
+```
+xs.push(100);
+xs.splice(0, 1);
+xs[0] = 7;
+xs.sort((a, b) => a - b);
+```
+
+`xs` drží celá čísla z řádku a vypíše se po každém kroku. Napiš čtyři
+řádky místo čtyř značek `// FILL`, v tomto pořadí.
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "xs.push(100); pak xs.splice(0, 1); pak xs[0] = 7; pak xs.sort((a, b) => a - b); — jeden na každou značku, v tomto pořadí.",
+  "xs.sort() bez komparátoru vypíše 100 15 4 7: seřadilo číslice jako text. (a, b) => a - b je seřadí jako čísla.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.basic.16.list"
+title = "Ticker"
+story = "Zpravodajský pás na úpatí stěny Hysan Place bere horkou zprávu na začátek a nejstarší shazuje z konce, a dnes večer pás běží prázdný."
+brief = '''
+Spojový seznam ani deque ve standardní knihovně nejsou: pole se upravuje
+na obou koncích. `.unshift(x)` dá hodnotu dopředu, `.pop()` sundá tu
+poslední a `chain[i] = x` nahradí hodnotu na pozici.
+`.toSorted(compare)` vrátí **nové** seřazené pole a staré nechá být, takže
+se jméno přesměruje na to nové — proto je `chain` `let`.
+
+```
+chain.unshift(0);
+chain.pop();
+chain[0] = 9;
+chain = chain.toSorted((a, b) => a - b);
+```
+
+`chain` drží celá čísla z řádku a vypíše se po každém kroku. Napiš čtyři
+řádky místo čtyř značek `// FILL`, v tomto pořadí.
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "chain.unshift(0); pak chain.pop(); pak chain[0] = 9; pak chain = chain.toSorted((a, b) => a - b); — jeden na každou značku, v tomto pořadí.",
+  "toSorted vrátí seřazenou kopii a nic nezmění; bez chain = na začátku se kopie zahodí.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.basic.10.maps"
+title = "Počet ťuknutí"
+story = "Každé ťuknutí na menu food hallu v aplikaci Lee Garden se zaloguje jako jméno jídla a ve 20:00 chce kiosek jeden řádek na jídlo s počtem, a ukazuje ťuknutí v pořadí, v jakém přišla."
+brief = '''
+`Map<string, number>` se upravuje podle klíče. `.set(k, v)` uloží hodnotu
+pod klíč — nový klíč se přidá, existující se přepíše — a `.delete(k)`
+odstraní klíč i s hodnotou. `.get(k)` má typ `number | undefined`, protože
+klíč tam nemusí být, takže tsc tě nenechá k němu přičítat, dokud neřekneš,
+za kolik se chybějící klíč počítá: `?? 0` znamená „nebo 0, když je
+undefined“. Map drží pořadí vložení; `[...counts.keys()].sort()` jsou jeho
+klíče vzestupně — pro řetězce je výchozí textové řazení přesně správné.
+Součty jsou postavené za tebe; tyhle čtyři řádky je změní a pak seřadí.
+
+```
+counts.set("tofu", 1);
+counts.delete(first);
+counts.set("tofu", (counts.get("tofu") ?? 0) + 4);
+for (const k of [...counts.keys()].sort()) {
+```
+
+`counts` drží počet pro každé slovo, `first` je první slovo řádku a
+`show(counts)` po každé úpravě vypíše součty v pořadí vložení. Napiš tři
+úpravy místo tří značek `// FILL`, pak nahraď hlavičku poslední smyčky tou
+seřazenou.
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts.set(\"tofu\", 1); pak counts.delete(first); pak counts.set(\"tofu\", (counts.get(\"tofu\") ?? 0) + 4); pak for (const k of [...counts.keys()].sort()) { jako hlavička poslední smyčky.",
+  "counts.keys() je iterátor, ne pole, a sort nemá; rozložení [...] z něj pole udělá. Tělo smyčky už tam je.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.basic.18.hashtable"
+title = "Čísla obrazovek"
+story = "Konzole ve třicátém patře drží tabulku od jména obrazovky k číslu obrazovky a každé vyhledání, které se do ní napíše, se vrátí jako undefined."
+brief = '''
+Obyčejný objekt je nejstarší hashovací tabulka v JavaScriptu: klíč se
+zahashuje do přihrádky, takže uložení, odstranění i vyhledání stojí
+stejně, ať je klíčů kolik chce. `table[k] = v` ukládá (nový klíč se
+přidá), `delete table[k]` odstraní klíč a `table[k] += n` upraví hodnotu
+pod klíčem na místě. Typ `Record<string, number>` slibuje číslo pod
+**každým** řetězcem a ten slib se vymaže: chybějící klíč je za běhu
+`undefined`, takže vyhledání řekne, co ukázat místo něj, přes `?? -1`.
+`Object.keys(table).sort()` jsou klíče vzestupně — objekt má pořadí své
+vlastní a tohle to není.
+
+```
+table["bread"] = 99;
+delete table[first];
+table[last] += 10;
+const keys: string[] = Object.keys(table).sort();
+```
+
+`table` mapuje každé jméno obrazovky z prvního řádku na jeho pozici;
+`first` a `last` jsou první a poslední jméno. Jména z druhého řádku se po
+úpravách vyhledají a vypíšou, `-1`, když chybí; pak se přes `keys` vypíše
+celá tabulka. Napiš čtyři řádky místo čtyř značek `// FILL`, v tomto
+pořadí.
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "table[\"bread\"] = 99; pak delete table[first]; pak table[last] += 10; pak const keys: string[] = Object.keys(table).sort(); — jeden na každou značku, v tomto pořadí.",
+  "delete je operátor, ne metoda: delete table[first]. Klíče jsou řetězce, takže výchozí řazení je tu to správné.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.basic.11.sets"
+title = "Různé linky"
+story = "Tramvajové tabule podél Yee Wo Street hlásí celý večer těch pár stejných čísel linek a velín chce vědět, kolik různých linek to bylo, ne kolik hlášení."
+brief = '''
+`Set<number>` drží každou hodnotu jednou a upravuje se podle hodnoty:
+`.add(x)` hodnotu vloží, `.delete(x)` hodnotu vyjme (a nedělá nic, když
+tam nebyla) a žádné „změň tuhle hodnotu“ neexistuje — množina se upravuje
+tak, že jednu hodnotu odebere a jinou přidá, `.delete(a); .add(b)`. `.size`
+je kolik. Množina drží pořadí vložení, ne seřazené pořadí, takže se ukazuje
+tak, že se rozloží do pole a to se seřadí — s komparátorem, protože jsou to
+čísla.
+
+```
+seen.add(100);
+seen.delete(first);
+seen.delete(100); seen.add(101);
+console.log([...seen].sort((a, b) => a - b).join(" "));
+```
+
+`seen` drží různá celá čísla z řádku, `first` je to první a po každé úpravě
+se vypíše `seen.size`. Napiš čtyři řádky místo čtyř značek `// FILL`, v
+tomto pořadí.
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen.add(100); pak seen.delete(first); pak seen.delete(100); seen.add(101); pak console.log([...seen].sort((a, b) => a - b).join(\" \")); — jeden na každou značku.",
+  "Bez komparátoru je poslední řádek 101 3 5: výchozí řazení porovnává číslice jako text.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.basic.12.stack-queue"
+title = "Hromádka pro undo"
+story = "Konzole operátora skládá každou změnu na hromádku, aby poslední šla dolů první, a požadavky obchodů čekají vedle ve frontě; dnes večer oba panely vypíšou hromádku nedotčenou."
+brief = '''
+Pole je zásobník, upravovaný na svém konci: `.push(x)` dá hodnotu navrch,
+`.pop()` vrchol sundá a `stack[stack.length - 1] = x` nahradí vrchol na
+místě. Záporné indexy nejsou: `stack[-1] = 9` se zkompiluje, proběhne a
+potichu uloží vlastnost jménem `"-1"`, kterou nikdo nikdy nepřečte. Pole je
+taky fronta, braná zepředu přes `.shift()` — ta strana je napsaná za tebe.
+
+```
+stack.push(100);
+stack.pop();
+stack[stack.length - 1] = 9;
+```
+
+`stack` a `queue` drží celá čísla z řádku; zásobník se vypíše po každém
+kroku, pak se vezme a vypíše začátek fronty. Napiš tři řádky místo tří
+značek `// FILL`, v tomto pořadí.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack.push(100); pak stack.pop(); pak stack[stack.length - 1] = 9; — jeden na každou značku, v tomto pořadí.",
+  "stack.at(-1) vrchol přečte, ale přiřadit se do něj nedá; poslední index je stack.length - 1.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.basic.13.sorting"
+title = "Cenový žebříček"
+story = "Aplikace Lee Garden řadí večerní nabídky na jedné záložce od nejlevnější a na druhé od nejdražší, a obě záložky je ukazují v pořadí, v jakém je obchody poslaly."
+brief = '''
+`.toSorted(compare)` vrátí nové seřazené pole a původní nechá být.
+Komparátor rozhoduje o pořadí: `(a, b) => a - b` je vzestupně a
+`(a, b) => b - a` ho otočí. (`.sort` dělá totéž na místě a vrací totéž
+pole, a bez komparátoru oba řadí čísla jako text.)
+
+```
+const asc: number[] = xs.toSorted((a, b) => a - b);
+const desc: number[] = xs.toSorted((a, b) => b - a);
+```
+
+`xs` je načteno a oba výpisy jsou napsané. Napiš dva řádky přesně tak, jak
+jsou ukázány, místo dvou zástupných značek.
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "const asc: number[] = xs.toSorted((a, b) => a - b); a const desc: number[] = xs.toSorted((a, b) => b - a);",
+  "xs.sort(...) pro oba by seřadilo samotné xs a asc i desc by byly totéž pole: oba by vypsaly poslední pořadí.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.basic.22.reverse"
+title = "Odzadu dopředu"
+story = "Odpočet na obrazovce Times Square musí běžet shora dolů a jméno sponzora se ukazuje zrcadlově pro sklo přes ulici, a feed má obojí správně otočené."
+brief = '''
+`v.reverse()` otočí pole **na místě** — samo `v` je teď pozpátku (a taky
+vrací `v`, což se snadno splete s kopií). Řetězec se změnit nedá a
+`reverse` nemá, takže se rozloží do pole znaků, obrátí a spojí zpátky do
+nového řetězce.
+
+```
+v.reverse();
+const r: string = [...s].reverse().join("");
+```
+
+`v` a `s` jsou načtena a oba výpisy jsou napsané. Napiš dva řádky výše
+místo dvou zástupných značek.
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "v.reverse(); na vlastním řádku, pak const r: string = [...s].reverse().join(\"\");",
+  "s.reverse() je chyba kompilace: Property 'reverse' does not exist on type 'string'. Pole ji má; řetězec ne.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.basic.14.sort-by-key"
+title = "Žebříček"
+story = "Stěna Hysan Place řadí večerní obchody podle ťuknutí v aplikaci, nejvíc první, a dva obchody se stejnými ťuknutími jdou nahoru podle abecedy; stěna je ukazuje v pořadí, v jakém se připojily k feedu."
+brief = '''
+`interface` pojmenuje tvar hodnoty — tady `Row` s `name` a `score` — a
+za běhu se úplně vymaže. `sort` bere komparátor nad dvěma řádky.
+`b.score - a.score` dá větší skóre první; když je výsledek `0`, skóre se
+shodují a `||` propadne k druhému porovnání, jménům, porovnaným přes `<` a
+`>` (ne přes `localeCompare`, jehož odpověď závisí na locale stroje).
+
+```
+rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+```
+
+`rows` je pole `Row` a výpis je napsaný. Napiš řádek se `sort` přesně tak,
+jak je ukázán, tam, kde je komentář `// FILL`.
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); — nejdřív skóre, obráceně; jméno jen při shodě.",
+  "Komparátor vrací číslo: záporné dá a první, kladné dá b první, 0 znamená shodu. 0 || x je x, takže shoda propadne ke jménům.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.basic.15.closures"
+title = "Zpoždění"
+story = "Každá obrazovka na ostrově běží pár sekund za hodinami velína a funkce, která si měla pamatovat zpoždění každé obrazovky, vrací časy nezměněné."
+brief = '''
+Funkce definovaná uvnitř jiné funkce může používat jména vnější funkce a
+používá je dál i poté, co vnější funkce skončila. To je closure: vnitřní
+funkce si `k` nese s sebou. Vnější funkce vrací tu vnitřní — samotnou
+funkci, ne její volání — a její návratový typ to říká:
+`(x: number) => number` je typ funkce z čísla na číslo.
+
+```
+function makeAdder(k: number): (x: number) => number {
+  function add(x: number): number {
+    return x + k;
+  }
+  return add;
+}
+```
+
+`makeAdder` a jeho vnitřní `function add` jsou napsané a `main` použije
+výsledek na každé číslo. Napiš dva řádky `return` přesně tak, jak jsou
+ukázány, místo dvou zástupných značek.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return x + k; uvnitř add, pak return add; (bez závorek) jako poslední řádek makeAdder.",
+  "return add() by ji zavolalo bez argumentu a tsc řekne Expected 1 arguments, but got 0; holé jméno je ta funkce.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.basic.16.lambdas"
+title = "Sudé čtverce"
+story = "Velín účtuje sudě číslovaným obrazovkám druhou mocninu jejich čísla a účet z tiskárny ve třicátém patře vyjede s nulou."
+brief = '''
+Arrow funkce zapíše malou funkci bez jména: parametry, `=>`, jeden výraz
+a žádné klíčové slovo `return`. `.filter(f)` si nechá položky, ke kterým
+`f` řekne ano; `.map(f)` nahradí každou položku `f(item)`; `.reduce(f, 0)`
+složí, co zbylo, do jednoho čísla, počínaje `0`. Čti zleva doprava: každé
+volání předá své pole dalšímu.
+
+```
+const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);
+```
+
+`xs` je načteno a výpis je napsaný. Napiš řádek `const total` přesně tak,
+jak je ukázán.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0); — filter, pak map, pak reduce.",
+  "Vynech , 0 a reduce na prázdném poli vyhodí: Reduce of empty array with no initial value. Test jen s lichými ho má.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.basic.17.threads"
+title = "Všechny obrazovky najednou"
+story = "Ve 23:00 hlásí každá obrazovka na ostrově velínu svou zátěž ve stejnou chvíli a dashboard vypíše řadu nul, protože nepočkal na žádnou z nich."
+brief = '''
+Žádná vlákna ke spouštění tu nejsou: jedno vlákno a smyčka událostí.
+Volání `async` funkce ji hned spustí a vrátí `Promise` — hodnotu, která
+říká, že práce skončí později. `square` spí, než zapíše, takže jeho
+výsledek tam ještě není, když se volání vrátí. Nech si každý promise, pak
+`await Promise.all(tasks)` počká, dokud všechny neskončí — nejdřív všechno
+spustit, pak jednou počkat, tak jako se vlákna spustí a pak joinují.
+
+```
+for (let i = 0; i < nums.length; i++) {
+  tasks.push(square(i));
+}
+await Promise.all(tasks);
+```
+
+`square(i)` vyplní `results[i]`, smyčka a dva výpisy jsou napsané a `main`
+je `async`, takže smí použít `await`. Napiš `tasks.push(square(i));` jako
+tělo smyčky a pod ni řádek s `await`, přesně tak, jak jsou ukázány.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "tasks.push(square(i)); ve smyčce, await Promise.all(tasks); za ní — všechny spustit, pak jednou počkat.",
+  "Promise, na který nikdo nečeká, pořád běží, ale main vypisuje dřív, než doběhne; await square(i) uvnitř smyčky by je pouštělo jeden po druhém.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.basic.18.binary-tree"
+title = "Undefined"
+story = "23:59 ve velínu ve třicátém patře: strom id obrazovek je jeden kořen a pod ním nic, a první vyhledání umře na Cannot read properties of undefined (reading 'left')."
+brief = '''
+Binární vyhledávací strom drží menší hodnoty v levém podstromu uzlu a
+větší v pravém. Vkládání je rekurzivní: prázdný podstrom (`undefined`) se
+stane novým `TreeNode`; jinak jde hodnota dolů jednou stranou a cokoli se
+vrátí, se znovu uloží jako ten potomek, protože potomek mohl být před
+chvílí `undefined`. Následovat `.left` na `undefined` je přesně ten pád,
+po kterém se celá tahle cesta jmenuje. Typ `TreeNode | undefined` je
+smlouva, která říká, že potomek může chybět, a striktní tsc nenechá
+přečíst `n.val`, dokud neprojde kontrola na `undefined` — ta kontrola je
+první a je napsaná.
+
+```
+if (v < n.val) {
+  n.left = insert(n.left, v);
+} else {
+  n.right = insert(n.right, v);
+}
+```
+
+`TreeNode`, případ `undefined` v `insert` a jeho kostra `if (v < n.val)` /
+`else`, `inorder`, `height` a `main` jsou napsané. Napiš dva rekurzivní
+řádky přesně tak, jak jsou ukázány, místo dvou značek `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v); pod if, n.right = insert(n.right, v); pod else.",
+  "O to přiřazení jde: insert vrací kořen podstromu, a to je zbrusu nový TreeNode, když byl potomek undefined.",
+]

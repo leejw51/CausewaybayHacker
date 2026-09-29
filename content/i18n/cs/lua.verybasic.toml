@@ -1,0 +1,564 @@
+# LUA LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/lua/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "lua.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.verybasic.01.print"
+title = "První lampion"
+story = "21:00 na Wun Sha Street. Tabule s lampiony nad dračí kůlnou je tmavá a první řádek noci má napsat Mei."
+brief = '''
+Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna vestavěná funkce zapíše své argumenty a konec řádku na standardní výstup.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+output: hello, causewaybay
+```
+'''
+hints = [
+  "print(\"hello, causewaybay\") — závorky a čárka uvnitř řetězce.",
+  "print \"hello causewaybay\" je v Lua platné — řetězcový literál smí následovat volání i bez závorek — ale chybí čárka. io.write nezapíše konec řádku a puts je jméno, které Lua nezná.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.verybasic.02.int-types"
+title = "Rozdělené tyčinky"
+story = "Svazky vonných tyčinek se u brány Lin Fa Kung dělí mezi články draka; počítadlo má říct, kolik dostane každý článek a kolik zbude, a neříká nic."
+brief = '''
+`a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené JEDNOU mezerou. LuaJIT má jediný číselný typ a žádný operátor celočíselného dělení: `/` dá zlomek, `math.floor` ho zahodí a `%` je zbytek. `print` dává mezi své argumenty TABULÁTOR, takže se ty dvě hodnoty nejdřív spojí do jednoho řetězce pomocí `..`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+hints = [
+  "print(math.floor(a / b) .. \" \" .. a % b) — dělení zaokrouhli dolů, pak spoj mezerou.",
+  "a / b je 3.5, ne 3. // v LuaJIT není operátor. A print(x, y) odděluje tabulátorem, ne mezerou.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.verybasic.03.floats"
+title = "Přesná váha"
+story = "Váha u kůlny na School Street ukazuje váhu draka na jednoho nosiče na tři místa a tištěný program chce dvě; řádek programu je prázdný."
+brief = '''
+`x` a `y` jsou čísla. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. `string.format` bere specifikaci ve stylu C: `f` je číslo s pevnou desetinnou čárkou a číslice za tečkou říká, kolik desetinných míst.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "print(string.format(\"%.2f\", x / y)) — tečka před dvojkou určuje desetinná místa.",
+  "math.floor(x / y * 100) / 100 je pořád číslo a číslo se vypíše jako 3.5, ne 3.50; %d je pro celá čísla.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.verybasic.04.strings"
+title = "Směrová cedule"
+story = "Směrová cedule na začátku Lily Street je namalovaná velkými písmeny a v seznamu posádky je malými; malíř cedulí to potřebuje zakřičet zpátky."
+brief = '''
+`s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Řetězcová metoda vrátí kopii s každým písmenem velkým a metoda se volá s dvojtečkou, aby řetězec předal sám sebe.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+hints = [
+  "print(s:upper()) — dvojtečka předá s jako první argument.",
+  "s.upper() s tečkou nepředá nic a upper si stěžuje, že nedostal řetězec; toUpperCase je JavaScript.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.verybasic.05.bool-if"
+title = "Sudé, nebo liché"
+story = "Články draka nesou nalevo sudá čísla a napravo lichá; nosič na Wun Sha Street zná své číslo a potřebuje svou stranu."
+brief = '''
+`n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je hlavička `if`, která porovná zbytek s nulou, a končí slovem `then`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if n % 2 == 0 then — dvě rovnítka porovnávají, jedno přiřazuje.",
+  "n / 2 je zlomek; pro kladné n nikdy není nula.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.verybasic.06.loops"
+title = "Součet"
+story = "Počet vonných tyčinek na tuhle noc je jedna plus dvě plus tři až po poslední článek a počítací tabule u kůlny ukazuje nulu."
+brief = '''
+`n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst k `total`. Číselný `for` bere začátek a konec a konec JE zahrnutý.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for i = 1, n do — konec je včetně, takže je to samotné n.",
+  "for i in ... je ta druhá smyčka, která bere iterační funkci; číslo žádná funkce není.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.verybasic.07.functions"
+title = "Sazba pro nosiče"
+story = "Prvních deset kol po Wun Sha Street platí nosiči pět za kolo a každé další kolo tři; funkce na výplatu nevrací nic."
+brief = '''
+`pay(laps)` musí vrátit výplatu: prvních deset kol po 5, každé kolo po desátém po 3. Funkce vrací hodnotu jedním klíčovým slovem; funkce, která jen vypisuje, vrací `nil`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3
+output: 15
+```
+'''
+hints = [
+  "return math.min(laps, 10) * 5 + math.max(laps - 10, 0) * 3",
+  "math.max s jedním argumentem je ten argument: max(laps - 10) jde při krátké noci do záporu. A print uvnitř pay nechá volajícího vypsat nil.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.verybasic.08.structs"
+title = "Jeden stánek, dvě pole"
+story = "Každý stánek na lampionovém jarmarku ve Victoria Park má na kartě jméno a cenu. Cena karty se nikdy neuloží a štítek vypíše půlku stánku."
+brief = '''
+`Stall.new(name, price)` sestaví tabulku, jejíž metatabulka je `Stall` — třída v Lua. Musí uložit `price` na objekt stejně, jako je uložené `name`, aby ho `s.price` přečetlo zpátky. Pole se zapisuje na `self`; holé jméno je lokální proměnná.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+hints = [
+  "self.price = price — self je ta tabulka; holé jméno je parametr.",
+  "Dvě rovnítka porovnávají a samotné porovnání není příkaz, který by Lua přijala.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.verybasic.09.struct-method"
+title = "Součet řádku"
+story = "Cena krát množství je jeden řádek každé objednávky u stánku s nudlemi na lampionovém jarmarku a metoda, která to má říct, neříká nic."
+brief = '''
+`Stall:total()` musí vrátit cenu krát množství. Metoda deklarovaná s dvojtečkou má skrytý první parametr `self` a na pole objektu se sahá přes něj; samotné `price` je globální proměnná, kterou nikdo nenastavil.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+hints = [
+  "return self.price * self.qty — obě pole přes self.",
+  "Samotné price je globální proměnná, nil, a nil se násobit nedá.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.verybasic.10.enums"
+title = "Barva linky"
+story = "Mapa MTR u východu Tin Hau jmenuje tři linky; posádka má slovo a potřebuje konstantu, kterou znamená."
+brief = '''
+`word` je jedno z `island`, `tsuenwan`, `kwuntong`. Lua nemá enum: `Line` je tabulka pojmenovaných čísel, to nejbližší, a `COLOUR` je klíčovaný těmi čísly. Program musí převést `word` na odpovídající člen `Line`. Tabulka se indexuje klíčem a klíče jsou tady velkými písmeny; tabulka se volat nedá a `Line.word` hledá klíč, který se píše `word`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "local line = Line[word:upper()] — hranaté závorky hledají klíč podle jména a jména jsou velkými písmeny.",
+  "Line[word] se slovem malými písmeny nenajde žádný klíč, dá nil a COLOUR[nil] je taky nil: tabule vypíše nil.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.verybasic.11.vector"
+title = "Seznam článků"
+story = "Každý článek, který sjede z náklaďáku na Tai Hang Road, jde na seznam v pořadí, v jakém přišel, a seznam zůstává prázdný."
+brief = '''
+`xs` začíná jako prázdná tabulka a seznam v Lua je tabulka s klíči 1, 2, 3, ... Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, v pořadí ze vstupu. Knihovna `table` na to má funkci; se dvěma argumenty přidává na konec, se třemi je prostřední pozice.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "table.insert(xs, x) — nejdřív tabulka, jedna hodnota, na konec.",
+  "xs[#xs] = x zapisuje na index 0, dokud je tabulka prázdná, a #xs zůstane 0; pozice 1 dá každé číslo dopředu a obrátí pořadí.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.verybasic.12.vector-edit"
+title = "Hlava jde pryč"
+story = "První článek na seznamu je hlava a hlava se nese na vlastní tyči; musí ze seznamu pryč a všechno za ní se posune o jedno dopředu."
+brief = '''
+`xs` drží celá čísla z řádku, od indexu 1. Program musí odebrat prvek na indexu 1, aby se zbytek posunul dolů. `table.remove` bere pozici a posune, co následuje; nastavit pozici na `nil` nechá díru, ne kratší seznam.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+hints = [
+  "table.remove(xs, 1) — pozice je druhý argument.",
+  "table.remove(xs) bez pozice vezme POSLEDNÍ; xs[1] = nil nechá v seznamu nil a table.concat ho odmítne.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.verybasic.13.list"
+title = "Začátek řetězu"
+story = "Řetěz lampionů visí po celé délce Wun Sha Street a nejnovější lampion se věší na začátek; posádka ho pořád věší na konec."
+brief = '''
+`chain` je tabulka používaná jako seznam. Lua nemá deque; `table.insert` s pozicí je to nejbližší a všechno za tou pozicí posune o jedno nahoru. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, takže poslední přečtené skončí první.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "table.insert(chain, 1, x) — tři argumenty: tabulka, pozice, hodnota.",
+  "Dva argumenty přidávají na konec; chain[1] = x přepíše začátek, místo aby ho posunulo; obyčejná tabulka nemá metodu insert, kterou by šlo zavolat s dvojtečkou.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.verybasic.14.maps"
+title = "Sešit s tyčinkami"
+story = "Jeden sešit na ulici, jeden řádek na každou věc, kterou posádka spálí, a vedle každé počet; když se věc objeví poprvé, není k čemu přičítat."
+brief = '''
+`counts` je tabulka klíčovaná slovem. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. Chybějící klíč se čte jako `nil` a k `nil` se přičítat nedá; `or` dodá výchozí hodnotu a váže volněji než `+`, takže výchozí hodnota potřebuje vlastní závorky.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "counts[w] = (counts[w] or 0) + 1 — závorky zajistí, že výchozí hodnota přijde před sčítáním.",
+  "Bez nich je counts[w] or 0 + 1 totéž co counts[w] or 1: první výskyt je 1 a každý další zůstane 1. counts[w] + 1 na chybějícím klíči je aritmetika s nil.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.verybasic.15.hashtable"
+title = "Vyhledání"
+story = "Tabulka stánků na lampionovém jarmarku mapuje jméno na číslo a dotaz na stánek, který tam není, má říct -1, ne vymazat tabuli."
+brief = '''
+`stalls` mapuje jména na čísla stánků. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. Chybějící klíč je `nil`, ne chyba, a `or` udělá z `nil` výchozí hodnotu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+hints = [
+  "print(stalls[w] or -1) — pravá strana or je výchozí hodnota.",
+  "Samotné stalls[w] vypíše pro chybějící jméno nil; stalls.w hledá stánek, který se doslova jmenuje w.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.verybasic.16.sets"
+title = "Různé ceny"
+story = "Šest stánků s lampiony, tři různé ceny. Tabule chce, kolik různých cen tam je, a vypíše šest."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. Lua nemá množinu: tabulka, jejíž KLÍČE jsou ty hodnoty, je to nejbližší — klíč uložený dvakrát je jeden klíč — a počítací smyčka už klíče prochází přes `pairs`, protože `#` počítá jen pozice od 1. Každé `x` se musí označit v `seen` jako klíč.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+hints = [
+  "seen[x] = true — x je klíč, true je jen něco, co není nil.",
+  "seen.x je klíč, který se píše x, jeden klíč pro všechno; table.insert přidává na konec a nechá duplikáty; seen[x] + 1 je poprvé aritmetika s nil.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.verybasic.17.stack"
+title = "Hromada tyčinek"
+story = "Svazky vonných tyčinek jdou na hromadu u dveří kůlny a berou se z vrchu; běžec pořád bere jeden zespodu."
+brief = '''
+`stack` je tabulka používaná jako zásobník. Program musí sundat VRCHNÍ (poslední) prvek do `top`. `table.remove` odebere a vrátí prvek a bez pozice vezme ten poslední.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+hints = [
+  "local top = table.remove(stack) — žádná pozice znamená ten poslední.",
+  "stack[#stack] vrchní přečte, ale nechá ho na hromadě; pozice 1 vezme spodní.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.verybasic.18.queue"
+title = "Fronta nosičů"
+story = "Nosiči se volají k drakovi v pořadí, v jakém se zapsali v kůlně; pořadatel pořád volá nejnovější jméno."
+brief = '''
+`q` je tabulka, která drží nosiče v pořadí. Lua nemá deque; `table.remove` s pozicí je to nejbližší a všechno za tou pozicí se posune dolů. Program musí sundat PRVNÍHO do `first`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+hints = [
+  "local first = table.remove(q, 1) — pozice 1 a zbytek se posune dolů.",
+  "table.remove(q) bez pozice bere zezadu; q[1] čte, ale neodebírá.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.verybasic.19.heap"
+title = "Nejnižší číslo první"
+story = "Čísla článků přicházejí z uliček v libovolném pořadí a pořadatel chce pokaždé jako další to nejnižší; hromada, na které leží, netuší, které to je."
+brief = '''
+Standardní knihovna Lua nemá haldu, takže starter nese malou třídu `MinHeap`: `push` přidá hodnotu a probublá ji nahoru, `pop` vezme nejmenší. Každé `x` musí jít dovnitř vlastní metodou haldy, zavolanou s dvojtečkou, aby halda předala sama sebe, a `pop` pak vracelo nejmenší jako první. Zápis přímo do `items` probublání přeskočí a rozbije pořadí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heap:push(x) — dvojtečka předá haldu jako self a push probublá x tam, kam patří.",
+  "heap.push(x) s tečkou udělá z x self a číslo nemá žádné items; table.insert(heap.items, x) dá x na konec a probublání přeskočí.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.verybasic.20.sorting"
+title = "Lampionový žebřík"
+story = "Ceny lampionů na tabuli jarmarku jsou v pořadí, v jakém stánky otevřely, a kupec je chce od nejlevnějšího."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí seřadit `xs` na místě, vzestupně, než se vypíše. Knihovna `table` má funkci, která to udělá, ve výchozím stavu vzestupně; druhý argument by byla porovnávací funkce.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "table.sort(xs) — knihovní funkce, tabulka jako její argument.",
+  "Porovnání, které vrací a > b, řadí sestupně; obyčejná tabulka nemá metodu sort a samotné sort není globální jméno.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.verybasic.21.sort-by-key"
+title = "Žebříček"
+story = "Tabule nosičů na stěně kůlny je podle kol od nejvíc po nejmíň a dva nosiči se stejným počtem jdou podle jména; tabule je v pořadí zápisu."
+brief = '''
+`rows` je seznam tabulek s `name` a `score`. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. `table.sort` bere porovnávací funkci, která odpovídá, jestli `a` jde před `b`; rozhoduje skóre, pokud se ty dvě nerovnají, a pak rozhoduje jméno.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+hints = [
+  "table.sort(rows, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.name < b.name end) — větší než na skóre, aby to šlo sestupně, a jméno jen při shodě.",
+  "Porovnání jen podle skóre nechá shodu v pořadí, v jakém na ni řazení zrovna narazilo; table.sort není stabilní.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.verybasic.22.reverse"
+title = "Pozpátku"
+story = "Jméno draka je na ocasním praporu namalované pozpátku, aby se z druhé strany četlo správně, a program ho chce právě tak."
+brief = '''
+`s` je jeden řádek textu. Program ho musí vypsat obráceně. Řetězcová knihovna má metodu přesně na to, volanou s dvojtečkou; `sub` vyřízne kus a neotočí ho.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "print(s:reverse()) — celé jméno metody, s dvojtečkou.",
+  "s:sub(-1, 1) žádá kus od posledního znaku po první, a ten je u čehokoli delšího než jedno písmeno prázdný.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.verybasic.23.closures"
+title = "Přirážka"
+story = "Stánek s lampiony přidává ke každé velkoobchodní ceně stejnou přirážku a funkce, která si ji má pamatovat, ji zapomene."
+brief = '''
+`make_adder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Musí vrátit přímo tu vnitřní funkci — funkce je hodnota jako každá jiná — aby šlo `add(x)` zavolat později a `k` zůstalo zapamatované.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return add — holé jméno, bez závorek.",
+  "add() ji zavolá bez x a přičítá nil; vrátit k znamená vrátit číslo a číslo se volat nedá.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.verybasic.24.lambdas"
+title = "Sudé mocniny"
+story = "Sudé články platí druhou mocninu svého čísla a liché neplatí nic; účetní kniha v kůlně chce jeden součet."
+brief = '''
+`xs` drží celá čísla z řádku. Lua nemá vestavěné `map` ani `filter`, takže starter nese `map(f, xs)`, `filter(f, xs)` a `sum(xs)`. `total` musí být součet druhých mocnin SUDÝCH hodnot, sestavený z těch tří a dvou anonymních funkcí — `function(x) ... end` je lambda v Lua.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))",
+  "filter nechá to, pro co jeho funkce vrátí true; map přetváří. Holé x * x mimo funkci je globální x, nil, vynásobené.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.verybasic.25.threads"
+title = "Všechny články najednou"
+story = "Běžec každého článku umocňuje svůj počet na vlastní korutině a součet se vypíše dřív, než se kterýkoli z nich dostal za první yield."
+brief = '''
+Vlákna tu nejsou: korutina je to nejbližší, funkce, která běží, jen dokud je obnovená, a řízení vrací přes `yield`. Každý worker ve `workers` byl spuštěný — jednou obnovený, až po první yield — a žádný nezapsal svůj výsledek. Než se výsledky vypíšou, hlavní program musí každou `co` doběhnout do konce. Jedna funkce knihovny `coroutine` pokračuje v korutině tam, kde udělala yield.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "coroutine.resume(co) — totéž volání, které ji spustilo, a pokračuje od yield.",
+  "coroutine.status(co) se jen ptá; yield z hlavního programu je chyba, protože není kam předat řízení; korutina není tabulka a nemá metody.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.verybasic.26.mutex"
+title = "Jedno počítadlo, čtyři ruce"
+story = "Čtyři běžci s tyčinkami přičítají k jednomu počítadlu napsanému křídou na stěně kůlny a střídají se u křídy; počítadlo má zámek a nikdo si ho nevezme, než čte."
+brief = '''
+Běží vždy jedna korutina, a přesto je tu souběh: každý worker přečte `counter`, udělá yield a zapíše ho zpátky, a ostatní tři v té mezeře proběhnou. Lua nemá mutex; `lock` je malý kooperativní zámek a jeho `acquire` dělá yield, dokud není volný, a pak si ho vezme. Před čtením si každý worker musí zámek VZÍT touto metodou — s dvojtečkou, aby zámek předal sám sebe; uvolnění je už napsané za zápisem.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  1000
+output: 4000
+```
+'''
+hints = [
+  "lock:acquire() — pak čtení a zápis, pak uvolnění, které tam už je.",
+  "lock.acquire() s tečkou nepředá self a není žádné held, na které by se dalo podívat; uvolnit zámek, který nikdo nedrží, je záměrně chyba.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.verybasic.27.binary-tree"
+title = "Nula"
+story = "21:00 u hlavy draka na Wun Sha Street: čísla článků jdou do stromu, články začínají od 1 a `segments[0]` je `nil` — hlava není nikde, levá větev stromu je totéž nikde a tanec začíná od druhého lampionu."
+brief = '''
+Čísla článků se načtou do `segments`, který začíná od 1 jako každý seznam v Lua — `segments[0]` je `nil`, a stejně tak dítě, které tam ještě není; ani jedno není chyba, dokud se po něm nejde. `insert(n, v)` vrací kořen stromu s `v` uvnitř; případ `nil` a pravá strana jsou napsané. Pro menší `v` se levé dítě musí nahradit výsledkem vložení do něj, aby se z dítěte `nil` stal uzel.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v) — rekurze vrací nový kořen podstromu; ulož ho.",
+  "Volání insert bez uložení výsledku nechá nil tam, kde bylo, a nic si nestěžuje: nil není chyba, dokud se po něm nejde. Když vynecháš v, vloží se hodnota nil, a další porovnání s ní už chyba je.",
+]

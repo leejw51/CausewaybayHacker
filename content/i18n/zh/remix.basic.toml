@@ -1,0 +1,1764 @@
+# REMIX LAND — BASIC, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/remix/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "remix.basic"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.basic.01.numbers-go"
+title = "整数与浮点 — GO"
+story = "一号桌。点菜单上两个数，账要分：每人几份，剩下几份，还有精确到分的每人份额。Gogo 用 Go 点单。"
+brief = '''
+整数和浮点数是不同的类型，两个整数相除得到整数：商向零取整，余数留给 `%`。要得到精确的份额，就先转换、再相除。程序读入 `a` 和 `b`，打印它们的和，然后在一行里打印商和余数，再把 `a / b` 作为浮点数打印，保留两位小数。
+
+在 Go 里，两个 `int64` 之间的 `/` 是整数除法，`%` 是余数。`float64(a)` 是转换——长得像函数调用的类型转换——只有两边都是 `float64` 时，`/` 才做精确除法。`Printf` 里的 `%.2f` 打印两位小数。
+
+```
+q := a / b
+r := a % b
+f := float64(a) / float64(b)
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "q := a / b 然后 r := a % b ——两者都还是 int64；f := float64(a) / float64(b) 先转换再相除。",
+  "float64(a) / b 编译不过：Go 从不在一个表达式里混用 int64 和 float64。",
+  "事后再转换商——float64(a / b)——得到的是 3.00 而不是 3.50；取整已经发生了。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.basic.02.numbers-rust"
+title = "整数与浮点 — RUST"
+story = "一号桌。点菜单上两个数，账要分：每人几份，剩下几份，还有精确到分的每人份额。Ferris 用 Rust 点单。"
+brief = '''
+整数和浮点数是不同的类型，两个整数相除得到整数：商向零取整，余数留给 `%`。要得到精确的份额，就先转换、再相除。程序读入 `a` 和 `b`，打印它们的和，然后在一行里打印商和余数，再把 `a / b` 作为浮点数打印，保留两位小数。
+
+在 Rust 里，两个 `i64` 之间的 `/` 是整数除法，`%` 是余数。`a as f64` 是转换，它比 `/` 绑定得更紧，所以 `a as f64 / b as f64` 是两个浮点数相除。`println!` 里的 `{:.2}` 打印两位小数。
+
+```
+let q = a / b;
+let r = a % b;
+let f = a as f64 / b as f64;
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "let q = a / b; 然后 let r = a % b; ——都是 i64；let f = a as f64 / b as f64; 先转换再相除。",
+  "a as f64 / b 编译不过：f64 不能除以 i64。",
+  "(a / b) as f64 得到 3.00 而不是 3.50；整数除法已经取过整了。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.basic.03.numbers-python"
+title = "整数与浮点 — PYTHON"
+story = "一号桌。点菜单上两个数，账要分：每人几份，剩下几份，还有精确到分的每人份额。那条蟒蛇用 Python 点单。"
+brief = '''
+整数和浮点数是不同的类型，两个整数相除得到整数：商向零取整，余数留给 `%`。要得到精确的份额，就先转换、再相除。程序读入 `a` 和 `b`，打印它们的和，然后在一行里打印商和余数，再把 `a / b` 作为浮点数打印，保留两位小数。
+
+在 Python 里，`/` 总是得到浮点数，哪怕两边都是 int，所以精确份额根本不需要转换。整数商是*另一个*运算符 `//`，`%` 是余数。`f"{f:.2f}"` 打印两位小数。
+
+```
+q = a // b
+r = a % b
+f = a / b
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "整数部分用 q = a // b 然后 r = a % b；f = a / b 本来就是浮点数。",
+  "float(a) / b 也行，写惯 Go 或 Rust 的手会这么敲；在 Python 里没必要。",
+  "留意符号：在 Python 里 -7 // 2 是 -4（向下取整），而 Go 和 Rust 给出 -3（向零取整）。运算符名字一样，取整方式不同——这里的测试都是正数。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.basic.04.strings-go"
+title = "字符串 — GO"
+story = "点菜单是一行名字，中间用逗号隔开，厨房要把它们喊出来、分开，再按字母数一数。Gogo 用 Go 点单。"
+brief = '''
+字符串按分隔符切成几段，几段再用另一个分隔符拼回去，整个字符串用一个调用转成大写。陷阱在长度：带重音的名字字节数比字符数多，而两者之中只有一个是人会去数的。程序读入一行用逗号分隔的名字，打印名字的个数、转成大写并用 ` | ` 拼接的名字，以及这一行的字符数。
+
+在 Go 里，活儿由 `strings` 包来干：`strings.Split` 给出一个 `[]string`，`strings.Join` 把它拼回去，`strings.ToUpper` 返回一个新字符串。`len(s)` 是字节数；字符数是 `utf8.RuneCountInString(s)`，因为 Go 的字符串是字节，而 rune 是它解码出来的东西。
+
+```
+names := strings.Split(line, ",")
+joined := strings.ToUpper(strings.Join(names, " | "))
+chars := utf8.RuneCountInString(line)
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "strings.Split(line, \",\") 然后 strings.ToUpper(strings.Join(names, \" | \"))；字符数是 utf8.RuneCountInString(line)。",
+  "len(line) 是字节数：Zoë 有四个字节、三个字符，隐藏用例知道这一点。",
+  "Split 和 Join 都把分隔符放在最后；ToUpper 接收整个字符串，交回一个新的。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.basic.05.strings-rust"
+title = "字符串 — RUST"
+story = "点菜单是一行名字，中间用逗号隔开，厨房要把它们喊出来、分开，再按字母数一数。Ferris 用 Rust 点单。"
+brief = '''
+字符串按分隔符切成几段，几段再用另一个分隔符拼回去，整个字符串用一个调用转成大写。陷阱在长度：带重音的名字字节数比字符数多，而两者之中只有一个是人会去数的。程序读入一行用逗号分隔的名字，打印名字的个数、转成大写并用 ` | ` 拼接的名字，以及这一行的字符数。
+
+在 Rust 里，`split(',')` 是一个迭代器，所以要 `collect` 成一个 `Vec<&str>`；在这个 vec 上 `join(" | ")` 得到一个 `String`，`to_uppercase()` 再得到另一个。`len()` 是字节数；字符数是 `chars().count()`，因为 `&str` 是 UTF-8 字节，而 `chars()` 把它们解码。
+
+```
+let names: Vec<&str> = line.split(',').collect();
+let joined = names.join(" | ").to_uppercase();
+let chars = line.chars().count();
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "let names: Vec<&str> = line.split(',').collect(); 然后 names.join(\" | \").to_uppercase()；字符数是 line.chars().count()。",
+  "line.len() 是字节数：Zoë 有四个字节、三个字符，隐藏用例知道这一点。",
+  "split 给出一个迭代器，不 collect 就什么都不做；Vec<&str> 注解告诉 collect 要建出什么。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.basic.06.strings-python"
+title = "字符串 — PYTHON"
+story = "点菜单是一行名字，中间用逗号隔开，厨房要把它们喊出来、分开，再按字母数一数。那条蟒蛇用 Python 点单。"
+brief = '''
+字符串按分隔符切成几段，几段再用另一个分隔符拼回去，整个字符串用一个调用转成大写。陷阱在长度：带重音的名字字节数比字符数多，而两者之中只有一个是人会去数的。程序读入一行用逗号分隔的名字，打印名字的个数、转成大写并用 ` | ` 拼接的名字，以及这一行的字符数。
+
+在 Python 里，方法都在字符串上：`line.split(",")` 给出一个列表，`" | ".join(names)` 是在*分隔符*上调用的，`.upper()` 返回一个新字符串。`len(s)` 数的是字符而不是字节，因为 Python 的 `str` 已经解码过了——字节数要用 `len(s.encode())`。
+
+```
+names = line.split(",")
+joined = " | ".join(names).upper()
+chars = len(line)
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "names = line.split(\",\") 然后 \" | \".join(names).upper()；字符数是 len(line)。",
+  "len(line.encode()) 是字节数：Zoë 有四个字节、三个字符，隐藏用例知道这一点。",
+  "join 是分隔符的方法，不是列表的：\" | \".join(names)，绝不是 names.join(\" | \")。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.basic.07.loops-go"
+title = "循环 — GO"
+story = "一位熟客在数：厨房要把一份单子减半或者乘三多少次，它才会变成一，途中又最大涨到多少。Gogo 用 Go 点单。"
+brief = '''
+条件成立时循环就一直跑，分支从两条路里选一条，计数器每转一圈加一。程序读入 `n` 并让它走下去：偶数就减半；奇数就乘三加一；到 1 停下。它打印步数和途中见过的最大值。
+
+Go 只有一个循环关键字。`for cond { }` 就是它的 while 循环，`steps++` 是自增语句——是语句，不是表达式，所以不能放进更大的表达式里。
+
+```
+for n != 1 {
+steps++
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "for n != 1 { ——Go 的 while ——然后把 steps++ 作为里面的第一行。",
+  "Go 里没有 while；只带一个条件的 for 就是它。",
+  "steps++ 是单独占一行的语句；fmt.Println(steps++) 编译不过。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.basic.08.loops-rust"
+title = "循环 — RUST"
+story = "一位熟客在数：厨房要把一份单子减半或者乘三多少次，它才会变成一，途中又最大涨到多少。Ferris 用 Rust 点单。"
+brief = '''
+条件成立时循环就一直跑，分支从两条路里选一条，计数器每转一圈加一。程序读入 `n` 并让它走下去：偶数就减半；奇数就乘三加一；到 1 停下。它打印步数和途中见过的最大值。
+
+Rust 写成 `while cond { }`，自增是 `steps += 1;` ——没有 `++`。里面的 `if` 也是表达式，所以 `n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 };` 也行得通。
+
+```
+while n != 1 {
+steps += 1;
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "while n != 1 { 然后把 steps += 1; 作为里面的第一行。",
+  "steps++ 不是 Rust；+= 1 才是。",
+  "n、steps 和 peak 都是 mut，因为三个都会变。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.basic.09.loops-python"
+title = "循环 — PYTHON"
+story = "一位熟客在数：厨房要把一份单子减半或者乘三多少次，它才会变成一，途中又最大涨到多少。那条蟒蛇用 Python 点单。"
+brief = '''
+条件成立时循环就一直跑，分支从两条路里选一条，计数器每转一圈加一。程序读入 `n` 并让它走下去：偶数就减半；奇数就乘三加一；到 1 停下。它打印步数和途中见过的最大值。
+
+Python 写成 `while cond:`，带一个冒号和缩进的循环体，自增是 `steps += 1` ——没有 `++`。里面的 `if` / `else` 也要冒号；哪里都没有花括号。
+
+```
+while n != 1:
+steps += 1
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "while n != 1: 然后把 steps += 1 缩进写在它下面。",
+  "while 这一行以冒号结尾；花括号是语法错误。",
+  "n //= 2 让 n 保持为 int；n /= 2 会把它变成 float，循环就永远到不了恰好的 1。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.basic.10.closures-go"
+title = "闭包 — GO"
+story = "每张单子都有一个票号。发号的计数器住在创建它的那个函数里面，别人谁也碰不到。Gogo 用 Go 点单。"
+brief = '''
+闭包是一个函数，它捕获了创建它的那个作用域里的变量，并在那个作用域返回之后仍让变量活着。`counter()` 就创建一个：它返回的闭包每被调用一次，就发出下一个号码。程序读入单词，从 1 开始给它们编号，然后打印闭包下一次会发出的号码。
+
+在 Go 里，函数字面量 `func() int { ... }` 按引用捕获 `n`，所以里面的 `n++` 改的是外面的 `n`，而 `counter` 把这个字面量作为 `func() int` 类型的值返回。
+
+```
+return func() int {
+n++
+return n
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "return func() int { n++; return n }，分成四行——字面量捕获了 n。",
+  "counter 的返回类型是 func() int，所以字面量也必须写 int。",
+  "n := 0 在字面量外面：放在里面，每次调用都会被重置。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.basic.11.closures-rust"
+title = "闭包 — RUST"
+story = "每张单子都有一个票号。发号的计数器住在创建它的那个函数里面，别人谁也碰不到。Ferris 用 Rust 点单。"
+brief = '''
+闭包是一个函数，它捕获了创建它的那个作用域里的变量，并在那个作用域返回之后仍让变量活着。`counter()` 就创建一个：它返回的闭包每被调用一次，就发出下一个号码。程序读入单词，从 1 开始给它们编号，然后打印闭包下一次会发出的号码。
+
+在 Rust 里，闭包是 `|| { ... }`，`move` 让它把 `n` 带走——没有 `move`，它借用的就是一个马上要离开作用域的局部变量。它修改了捕获的东西，所以返回类型是 `impl FnMut() -> i64`，调用方要用 `mut` 绑定它。
+
+```
+move || {
+n += 1;
+n
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "move || { n += 1; n }，分成四行—— move 把 n 带进闭包。",
+  "没有 move，闭包借用 n，返回它就是 E0373：n 活得不够长。",
+  "闭包修改了 n，所以它是 FnMut，next 必须写成 let mut next。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.basic.12.closures-python"
+title = "闭包 — PYTHON"
+story = "每张单子都有一个票号。发号的计数器住在创建它的那个函数里面，别人谁也碰不到。那条蟒蛇用 Python 点单。"
+brief = '''
+闭包是一个函数，它捕获了创建它的那个作用域里的变量，并在那个作用域返回之后仍让变量活着。`counter()` 就创建一个：它返回的闭包每被调用一次，就发出下一个号码。程序读入单词，从 1 开始给它们编号，然后打印闭包下一次会发出的号码。
+
+在 Python 里，闭包是一个内层 `def`。从外层作用域读 `n` 不成问题，但给它赋值会造出一个新的局部变量，除非内层函数先写上 `nonlocal n` ——这一个词就是捕获。
+
+```
+def next_id():
+nonlocal n
+n += 1
+return n
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "def next_id(): 下面写 nonlocal n、n += 1、return n ——然后 counter 返回 next_id。",
+  "没有 nonlocal，n += 1 就是 UnboundLocalError：赋值在读取之前造出了一个新的局部 n。",
+  "global n 会去找模块级的 n，而它并不存在。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.basic.13.structs-go"
+title = "结构体 — GO"
+story = "账单上的每一行是一个名字、一个价钱和一个数量，而知道怎么算一行合计的，正是这一行自己。Gogo 用 Go 点单。"
+brief = '''
+结构体把几个有名字的字段组成一个值，方法是挂在这个类型上的函数，手里拿着这个值作为 `self` / 接收者。程序读入 `name price qty` 的若干行，每行打印名字和这一行的合计，最后打印总计。
+
+在 Go 里，方法是名字前面带一个接收者的函数：`func (it Item) Total() int64`。接收者是结构体的一份拷贝；`(it *Item)` 则是一个指针。导出的字段和方法以大写字母开头。
+
+```
+func (it Item) Total() int64 {
+return it.Price * it.Qty
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "func (it Item) Total() int64 { return it.Price * it.Qty } ——接收者放在名字前面单独的括号里。",
+  "func Total(it Item) 是一个普通函数；it.Total() 找不到它。",
+  "Item{Name: f[0], Price: price, Qty: qty} 就是逐个字段构造结构体的写法。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.basic.14.structs-rust"
+title = "结构体 — RUST"
+story = "账单上的每一行是一个名字、一个价钱和一个数量，而知道怎么算一行合计的，正是这一行自己。Ferris 用 Rust 点单。"
+brief = '''
+结构体把几个有名字的字段组成一个值，方法是挂在这个类型上的函数，手里拿着这个值作为 `self` / 接收者。程序读入 `name price qty` 的若干行，每行打印名字和这一行的合计，最后打印总计。
+
+在 Rust 里，方法住在 `impl Item { }` 块里，`&self` 表示方法借用结构体，而不是把它拿走。`self.price * self.qty` 就是函数体；最后一个表达式就是返回值，所以没有 `return`，也没有分号。
+
+```
+impl Item {
+fn total(&self) -> i64 {
+self.price * self.qty
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "impl Item { fn total(&self) -> i64 { self.price * self.qty } } —— &self 是借用，函数体是一个表达式。",
+  "fn total(self) 按值拿走 Item，通过 &items 调用它就是 E0507：不能从借用里移出。",
+  "Item { name: f[0].to_string(), price: .., qty: .. } 构造结构体；&str 必须变成 String 才能放进拥有所有权的字段。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.basic.15.structs-python"
+title = "结构体 — PYTHON"
+story = "账单上的每一行是一个名字、一个价钱和一个数量，而知道怎么算一行合计的，正是这一行自己。那条蟒蛇用 Python 点单。"
+brief = '''
+结构体把几个有名字的字段组成一个值，方法是挂在这个类型上的函数，手里拿着这个值作为 `self` / 接收者。程序读入 `name price qty` 的若干行，每行打印名字和这一行的合计，最后打印总计。
+
+在 Python 里，类持有在 `__init__` 里设置的字段和写在它下面的方法；每个方法都显式地把 `self` 作为第一个参数，`self.price * self.qty` 通过它读取字段。
+
+```
+def total(self):
+return self.price * self.qty
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "def total(self): 下面写 return self.price * self.qty —— self 要写出来，从不隐含。",
+  "没有 self 的 def total(): 在调用时是 TypeError：it.total() 会把这个 item 作为第一个参数传进去。",
+  "Item(f[0], int(f[1]), int(f[2])) 调用 __init__；字段就是 __init__ 赋给 self 的那些。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.basic.16.enums-go"
+title = "枚举 — GO"
+story = "出菜口上方的灯是红、绿或黄，要等几秒取决于是哪一种——一组封闭的情况，以及覆盖每一种的分支。Gogo 用 Go 点单。"
+brief = '''
+枚举是一个带有固定一组命名值的类型，对它做 match 就是逐个点名每种情况，并为它选出一个结果。程序读入灯的名字，把每个转成枚举，然后打印名字和要等的秒数：红 30，绿 25，黄 5。
+
+Go 没有 enum 关键字：一个具名整数类型加上带 `iota` 的 `const` 块就构成一个——`Red`、`Green`、`Yellow` 分别是 0、1、2。分支是一个 `switch`，每个值一个 `case`；不会贯穿，`default` 接住其余的。
+
+```
+case Red:
+return 30
+case Green:
+return 25
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "case Red: return 30，然后 case Green: return 25 ——每个常量一个 case，不需要 break。",
+  "case \"red\" 是拿 Light 和字符串比较，编译不过；switch 针对的是枚举，不是单词。",
+  "iota 在 const 块里从 0 开始，每一行加一。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.basic.17.enums-rust"
+title = "枚举 — RUST"
+story = "出菜口上方的灯是红、绿或黄，要等几秒取决于是哪一种——一组封闭的情况，以及覆盖每一种的分支。Ferris 用 Rust 点单。"
+brief = '''
+枚举是一个带有固定一组命名值的类型，对它做 match 就是逐个点名每种情况，并为它选出一个结果。程序读入灯的名字，把每个转成枚举，然后打印名字和要等的秒数：红 30，绿 25，黄 5。
+
+Rust 有 `enum Light { Red, Green, Yellow }`，对它的 `match` 必须点到每一个变体：`Light::Red => 30,` 是一条分支，每条都是一个表达式，漏掉一条就是编译错误，而这正是用意所在。
+
+```
+Light::Red => 30,
+Light::Green => 25,
+Light::Yellow => 5,
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "Light::Red => 30, Light::Green => 25, Light::Yellow => 5 ——三条分支，每条后面一个逗号。",
+  "漏掉一个变体，rustc 就会报 E0004：non-exhaustive patterns。它在替你检查。",
+  "变体要连同类型一起写：Light::Red，绝不是裸的 Red，除非你 use Light::*。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.basic.18.enums-python"
+title = "枚举 — PYTHON"
+story = "出菜口上方的灯是红、绿或黄，要等几秒取决于是哪一种——一组封闭的情况，以及覆盖每一种的分支。那条蟒蛇用 Python 点单。"
+brief = '''
+枚举是一个带有固定一组命名值的类型，对它做 match 就是逐个点名每种情况，并为它选出一个结果。程序读入灯的名字，把每个转成枚举，然后打印名字和要等的秒数：红 30，绿 25，黄 5。
+
+Python 的 `enum.Enum` 给出 `Light.RED`、`Light.GREEN`、`Light.YELLOW`，`match l:` 配上 `case Light.RED:` 选出其中一个。带点的名字很重要：裸的 `case RED:` 是捕获模式，什么都能匹配并绑定它，当后面的 case 永远到不了时，这就是语法错误。
+
+```
+case Light.RED:
+return 30
+case Light.GREEN:
+return 25
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "case Light.RED: return 30，然后 case Light.GREEN: return 25 ——带点，所以它们是值模式。",
+  "case Red: 会把名字 Red 绑定到任何东西上，Python 拒绝它：它后面的 case 都到不了。",
+  "case _: 是默认分支，match 不需要 break。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.basic.19.errors-go"
+title = "错误 — GO"
+story = "单子上有些数其实不是数。收银机把是数的加起来，把不是的喊出来，而且不会倒下。Gogo 用 Go 点单。"
+brief = '''
+解析可能失败，每种语言交回失败的方式各不相同：作为第二个返回值，作为 `Result`，或者作为异常。程序读入若干记号，把能解析成整数的加起来，对每个不能解析的打印 `bad: <token>`，最后打印总和。
+
+在 Go 里，`strconv.ParseInt` 返回值*和*一个 `error`，而这个检查就是整个语言的惯用法：`if err != nil { ... continue }`。什么都不抛出；错误是一个你在调用之后马上去看的值。
+
+```
+v, err := strconv.ParseInt(t, 10, 64)
+if err != nil {
+fmt.Println("bad:", t)
+continue
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "v, err := strconv.ParseInt(t, 10, 64) 然后 if err != nil { fmt.Println(\"bad:\", t); continue }。",
+  "10 是进制，64 是位宽；v 是一个 int64。",
+  "err == nil 是成功的情况；跳过的分支是另一个。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.basic.20.errors-rust"
+title = "错误 — RUST"
+story = "单子上有些数其实不是数。收银机把是数的加起来，把不是的喊出来，而且不会倒下。Ferris 用 Rust 点单。"
+brief = '''
+解析可能失败，每种语言交回失败的方式各不相同：作为第二个返回值，作为 `Result`，或者作为异常。程序读入若干记号，把能解析成整数的加起来，对每个不能解析的打印 `bad: <token>`，最后打印总和。
+
+在 Rust 里，`t.parse::<i64>()` 返回一个 `Result`，`let Ok(v) = ... else { ... };` 要么取出值，要么运行 `else` ——而它必须离开（`continue`、`return`、`break`）。带 `Ok` 和 `Err` 两条分支的 `match` 是同一件事的长写法。
+
+```
+let Ok(v) = t.parse::<i64>() else {
+println!("bad: {}", t);
+continue;
+};
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "let Ok(v) = t.parse::<i64>() else { println!(\"bad: {}\", t); continue; }; ——注意 else 块后面的分号。",
+  "let-else 的 else 必须发散：continue、break 或 return。直接往下走就是 E0308。",
+  "parse::<i64> 是 turbofish：因为 v 没有注解，由它告诉 parse 要造出什么。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.basic.21.errors-python"
+title = "错误 — PYTHON"
+story = "单子上有些数其实不是数。收银机把是数的加起来，把不是的喊出来，而且不会倒下。那条蟒蛇用 Python 点单。"
+brief = '''
+解析可能失败，每种语言交回失败的方式各不相同：作为第二个返回值，作为 `Result`，或者作为异常。程序读入若干记号，把能解析成整数的加起来，对每个不能解析的打印 `bad: <token>`，最后打印总和。
+
+在 Python 里，`int(t)` 遇到坏记号会抛出 `ValueError`，而 `try:` / `except ValueError:` 正好接住这一种——加法放在 `try` 里，消息放在 `except` 里，循环就接着转下一圈。
+
+```
+try:
+total += int(t)
+except ValueError:
+print("bad:", t)
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "try: total += int(t) 然后 except ValueError: print(\"bad:\", t) ——四行，两个冒号。",
+  "except TypeError: 接不住它；int(\"x\") 抛出的是 ValueError，类写错了它就漏过去。",
+  "光秃秃的 except: 会接住一切，包括 KeyboardInterrupt；要写出类名。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.basic.22.list-go"
+title = "列表 — GO"
+story = "柜台前的队伍：后面又排上一个，前面的已经招呼好，经理想看看谁排第二、第三。Gogo 用 Go 点单。"
+brief = '''
+一个能增长的序列：在末尾追加，从前面取走，索引最后一个，再切出一段子范围。程序把数读进一个列表，追加 100，删掉第一个，然后打印最后一个元素、位置 1 和 2 上的元素，以及长度。
+
+在 Go 里，列表就是切片。`append` 返回增长后的切片，必须赋值回去；`nums[1:]` 通过重新切片去掉最前面的；`nums[len(nums)-1]` 是最后一个——没有负数索引——而 `nums[1:3]` 是和原数组共享的子切片。
+
+```
+nums = append(nums, 100)
+nums = nums[1:]
+last := nums[len(nums)-1]
+mid := nums[1:3]
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums = append(nums, 100); nums = nums[1:]; last := nums[len(nums)-1]; mid := nums[1:3]。",
+  "单独一个 append(nums, 100) 编译不过：结果没被使用，而它返回的切片才是增长后的那个。",
+  "nums[1:3] 是位置 1 和 2 ——终点不包含在内，在这片地方处处如此。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.basic.23.list-rust"
+title = "列表 — RUST"
+story = "柜台前的队伍：后面又排上一个，前面的已经招呼好，经理想看看谁排第二、第三。Ferris 用 Rust 点单。"
+brief = '''
+一个能增长的序列：在末尾追加，从前面取走，索引最后一个，再切出一段子范围。程序把数读进一个列表，追加 100，删掉第一个，然后打印最后一个元素、位置 1 和 2 上的元素，以及长度。
+
+在 Rust 里，列表是 `Vec`。`push` 就地增长它，`remove(0)` 取走最前面的，`nums[nums.len() - 1]` 是最后一个（或者 `*nums.last().unwrap()`），而 `&nums[1..3]` 是从它借来的切片——一个 `&[i64]`，不是拷贝。
+
+```
+nums.push(100);
+nums.remove(0);
+let last = nums[nums.len() - 1];
+let mid = &nums[1..3];
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums.push(100); nums.remove(0); let last = nums[nums.len() - 1]; let mid = &nums[1..3];",
+  "Rust 里的 append 接收另一个 Vec 并把它的元素挪过来；单个值用 push。",
+  "&nums[1..3] 是借用；没有 & 就是 E0277，因为切片没有可以移动的大小。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.basic.24.list-python"
+title = "列表 — PYTHON"
+story = "柜台前的队伍：后面又排上一个，前面的已经招呼好，经理想看看谁排第二、第三。那条蟒蛇用 Python 点单。"
+brief = '''
+一个能增长的序列：在末尾追加，从前面取走，索引最后一个，再切出一段子范围。程序把数读进一个列表，追加 100，删掉第一个，然后打印最后一个元素、位置 1 和 2 上的元素，以及长度。
+
+在 Python 里，列表就是 `list`。`append` 让它增长，`pop(0)` 取走最前面的，`nums[-1]` 是最后一个——负数索引从末尾数起——而 `nums[1:3]` 是一个装着位置 1 和 2 的新列表。
+
+```
+nums.append(100)
+nums.pop(0)
+last = nums[-1]
+mid = nums[1:3]
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums.append(100); nums.pop(0); last = nums[-1]; mid = nums[1:3]。",
+  "nums += 100 是 TypeError：列表上的 += 要的是另一个可迭代对象，而 100 不是。",
+  "nums[1:3] 是拷贝；之后修改 mid 不会影响 nums，这和 Go 的共享数组不同。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.basic.25.map-go"
+title = "映射 — GO"
+story = "收银台旁的记数板：每来一单，就给它那道菜的计数加一，板子随时报出当前的数。Gogo 用 Go 点单。"
+brief = '''
+映射把键对应到值，全部的诀窍在于遇到一个还不存在的键时会发生什么。程序读入单词；对每个单词，给它的计数加一，并打印这个单词和它到目前为止的计数，最后打印一共有多少个不同的单词。
+
+在 Go 里，缺失的键读出来是零值，所以第一次见到 `w` 时 `counts[w]++` 就能用：读出 0，加一，存回 1。`counts[w]` 把它读回来，`len(counts)` 是键的个数。
+
+```
+counts[w]++
+fmt.Println(w, counts[w])
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "counts[w]++ 然后 fmt.Println(w, counts[w]) ——缺失的键是 0，所以自增直接就行。",
+  "map[string]int{} 是一个可以直接写入的空映射；nil 映射（var counts map[string]int）在第一次写入时就 panic。",
+  "counts[w] = 1 永远超不过一。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.basic.26.map-rust"
+title = "映射 — RUST"
+story = "收银台旁的记数板：每来一单，就给它那道菜的计数加一，板子随时报出当前的数。Ferris 用 Rust 点单。"
+brief = '''
+映射把键对应到值，全部的诀窍在于遇到一个还不存在的键时会发生什么。程序读入单词；对每个单词，给它的计数加一，并打印这个单词和它到目前为止的计数，最后打印一共有多少个不同的单词。
+
+在 Rust 里，缺失的键是一个问题，而 entry API 就是答案：`counts.entry(key).or_insert(0)` 给出指向值的 `&mut`，必要时先插入 0，`*... += 1` 通过它写入。键是 `String`，所以要 `w.to_string()`；`counts[w]` 把它读回来。
+
+```
+*counts.entry(w.to_string()).or_insert(0) += 1;
+println!("{} {}", w, counts[w]);
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "*counts.entry(w.to_string()).or_insert(0) += 1; 然后 println!(\"{} {}\", w, counts[w]);",
+  "counts[w] += 1 是 E0594：HashMap 可以用索引来读，永远不能用索引来写。",
+  "* 解引用 or_insert 交回的 &mut i64；没有它，就没有东西可以加。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.basic.27.map-python"
+title = "映射 — PYTHON"
+story = "收银台旁的记数板：每来一单，就给它那道菜的计数加一，板子随时报出当前的数。那条蟒蛇用 Python 点单。"
+brief = '''
+映射把键对应到值，全部的诀窍在于遇到一个还不存在的键时会发生什么。程序读入单词；对每个单词，给它的计数加一，并打印这个单词和它到目前为止的计数，最后打印一共有多少个不同的单词。
+
+在 Python 里，读取缺失的键会得到 `KeyError`，所以加一时要问 `counts.get(w, 0)`，它会改为返回默认值，然后存回多一的数。（`collections.Counter` 和 `defaultdict(int)` 把这一行藏起来了；它们藏的就是这一行。）
+
+```
+counts[w] = counts.get(w, 0) + 1
+print(w, counts[w])
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "counts[w] = counts.get(w, 0) + 1 然后 print(w, counts[w])。",
+  "counts[w] += 1 在第一次见到 w 时就是 KeyError：+= 先读后写。",
+  "get 的第二个参数是默认值；单独的 counts.get(w) 给出 None，而 None + 1 是 TypeError。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.basic.28.comprehension-go"
+title = "推导式 — GO"
+story = "单子上的数里，只有偶数归厨房，而厨房要把每一个都平方，一口气做完。Gogo 用 Go 点单。"
+brief = '''
+从一个旧列表造出一个新列表：留下一部分元素，再把每个变换一下——筛选和变换合在一个表达式里。Python 管它叫推导式，并为它准备了专门的语法；Rust 有一条迭代器链，说的是同一件事；Go 用一个循环来说。程序读入若干数，造出由其中偶数的平方组成的列表，打印它，再打印它的和。
+
+Go 没有推导式。循环*就是*推导式：`for _, x := range nums`，一个 `if` 做筛选，`append` 做变换——Python 一行的事这里要四行，而且每一行都朴朴素素。
+
+```
+for _, x := range nums {
+if x%2 == 0 {
+squares = append(squares, x*x)
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "for _, x := range nums { if x%2 == 0 { squares = append(squares, x*x) } } ——筛选是那个 if，变换是那个 append。",
+  "squares := []int64{} 一开始为空但不是 nil；append 让它增长。",
+  "标准库里故意没有针对切片的 map 或 filter；循环就是惯用法。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.basic.29.comprehension-rust"
+title = "推导式 — RUST"
+story = "单子上的数里，只有偶数归厨房，而厨房要把每一个都平方，一口气做完。Ferris 用 Rust 点单。"
+brief = '''
+从一个旧列表造出一个新列表：留下一部分元素，再把每个变换一下——筛选和变换合在一个表达式里。Python 管它叫推导式，并为它准备了专门的语法；Rust 有一条迭代器链，说的是同一件事；Go 用一个循环来说。程序读入若干数，造出由其中偶数的平方组成的列表，打印它，再打印它的和。
+
+Rust 的推导式是一条迭代器链：`.iter()` 遍历，`.filter(|x| ...)` 保留，`.map(|x| ...)` 变换，`.collect()` 建出 `Vec` ——是惰性的，不到 `collect` 什么都不运行。闭包看到的是 `&i64`，所以要写 `*x`。
+
+```
+let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 0).map(|x| x * x).collect();
+```
+
+把上面这一行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 0).map(|x| x * x).collect();",
+  "filter 的闭包拿到的是引用的引用—— &&i64 ——所以要写 *x % 2 而不是 x % 2。",
+  "collect 需要知道要建出什么：let 上的 Vec<i64> 注解就是在告诉它。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.basic.30.comprehension-python"
+title = "推导式 — PYTHON"
+story = "单子上的数里，只有偶数归厨房，而厨房要把每一个都平方，一口气做完。那条蟒蛇用 Python 点单。"
+brief = '''
+从一个旧列表造出一个新列表：留下一部分元素，再把每个变换一下——筛选和变换合在一个表达式里。Python 管它叫推导式，并为它准备了专门的语法；Rust 有一条迭代器链，说的是同一件事；Go 用一个循环来说。程序读入若干数，造出由其中偶数的平方组成的列表，打印它，再打印它的和。
+
+Python 的列表推导式是一个表达式：`[x * x for x in nums if x % 2 == 0]` ——先是变换，然后是循环，最后是筛选，全都在方括号里。读起来就像一句话："x 的平方，对 nums 里的每个 x，如果 x 是偶数"。
+
+```
+squares = [x * x for x in nums if x % 2 == 0]
+```
+
+把上面这一行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "squares = [x * x for x in nums if x % 2 == 0] ——表达式、for、if，按这个顺序。",
+  "末尾的 if 做筛选；放在 for 前面的 if 会成为条件表达式，还得要一个 else。",
+  "print(*squares) 把列表拆成一个个单独的参数，所以数字会以空格分隔打印出来。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "remix.basic.31.sorting-go"
+title = "排序 — GO"
+story = "收银台上方的排行榜：分数最高的在前，平分时按字母表排在前面的名字优先。Gogo 用 Go 点单。"
+brief = '''
+按不止一个键排序：主键降序，平局时用次键升序来分先后。程序读入 `name score` 的若干行，按分数从高到低、再按名字排序后打印出来。
+
+在 Go 里，`slices.SortFunc` 接收一个返回 int 的比较函数：负数、零或正数。`cmp.Compare(b.Score, a.Score)` 把参数对调，就是降序，而当第一个比较为零时，`cmp.Or` 会接着用名字比较。
+
+```
+slices.SortFunc(people, func(a, b Person) int {
+return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(a.Name, b.Name))
+})
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "slices.SortFunc(people, func(a, b Person) int { return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(a.Name, b.Name)) })。",
+  "比较函数返回 int 而不是 bool：这就是它和老的 sort.Slice 的区别。",
+  "第一个 Compare 里 b 在 a 前面，这就是它降序的原因。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "remix.basic.32.sorting-rust"
+title = "排序 — RUST"
+story = "收银台上方的排行榜：分数最高的在前，平分时按字母表排在前面的名字优先。Ferris 用 Rust 点单。"
+brief = '''
+按不止一个键排序：主键降序，平局时用次键升序来分先后。程序读入 `name score` 的若干行，按分数从高到低、再按名字排序后打印出来。
+
+在 Rust 里，`sort_by` 接收一个返回 `Ordering` 的闭包。`b.score.cmp(&a.score)` 两边对调就是降序，`.then_with(|| a.name.cmp(&b.name))` 是平局时的决胜，只在第一个结果是 `Equal` 时才运行。
+
+```
+people.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.name.cmp(&b.name)));
+```
+
+把上面这一行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "people.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.name.cmp(&b.name)));",
+  "cmp 接收一个引用：b.score.cmp(&a.score)，带着 &。",
+  "sort_by_key(|p| (std::cmp::Reverse(p.score), p.name.clone())) 说的是同一件事，只是用键代替了比较函数。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "remix.basic.33.sorting-python"
+title = "排序 — PYTHON"
+story = "收银台上方的排行榜：分数最高的在前，平分时按字母表排在前面的名字优先。那条蟒蛇用 Python 点单。"
+brief = '''
+按不止一个键排序：主键降序，平局时用次键升序来分先后。程序读入 `name score` 的若干行，按分数从高到低、再按名字排序后打印出来。
+
+在 Python 里，`sort` 接收一个 `key` 函数，而元组形式的键会按它的各个部分依次排序：`(-p.score, p.name)` ——取负让分数降序，名字在平局时按升序决胜。不需要比较函数；键就说明了一切。
+
+```
+people.sort(key=lambda p: (-p.score, p.name))
+```
+
+把上面这一行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "people.sort(key=lambda p: (-p.score, p.name)) ——元组键，靠取负来降序。",
+  "reverse=True 会把名字也反过来；只对分数取负，才能让名字保持升序。",
+  "sort 就地排序并返回 None；sorted(people, key=...) 才是拷贝。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "remix.basic.34.tree-go"
+title = "树 — GO"
+story = "单号按到达的顺序放进一棵树，小的往左，大的往右，按中序读出来就是排好序的。Gogo 用 Go 点单。"
+brief = '''
+二叉搜索树：每个节点有一个值，左子节点的值更小，右子节点的值更大。插入时一路往下走，在什么都没有的地方放一个新节点；中序遍历打印出来就是有序的。程序读入若干数，逐个插入，打印中序遍历，再打印树的高度。
+
+在 Go 里，子节点是 `*Node`，空的子节点是 `nil`。`insert` 的基本情况就是 nil 检查：`if n == nil { return &Node{Val: v} }` ——一个新节点，取它的地址。其余每一步都递归下去并重新接上。
+
+```
+if n == nil {
+return &Node{Val: v}
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if n == nil { return &Node{Val: v} } —— & 取的是这个新结构体的地址。",
+  "return Node{Val: v} 在需要 *Node 的地方给了一个值，编译不过。",
+  "root 一开始是一个 nil 的 *Node；第一次 insert 返回第一个节点，root 接住它。",
+]
+
+# ---------------------------------------------------------------- 35
+[[quest]]
+id    = "remix.basic.35.tree-rust"
+title = "树 — RUST"
+story = "单号按到达的顺序放进一棵树，小的往左，大的往右，按中序读出来就是排好序的。Ferris 用 Rust 点单。"
+brief = '''
+二叉搜索树：每个节点有一个值，左子节点的值更小，右子节点的值更大。插入时一路往下走，在什么都没有的地方放一个新节点；中序遍历打印出来就是有序的。程序读入若干数，逐个插入，打印中序遍历，再打印树的高度。
+
+在 Rust 里，子节点是 `Option<Box<Node>>`：`None` 表示空，节点则放在堆上的 box 里。`insert` 接收这个 option 再把它交回来：`None` 分支造出 `Some(Box::new(Node { val: v, left: None, right: None }))`，`Some(mut node)` 分支递归进其中一边并返回这个节点。
+
+```
+None => Some(Box::new(Node { val: v, left: None, right: None })),
+```
+
+把上面这一行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "None => Some(Box::new(Node { val: v, left: None, right: None })), —— Box 把它放到堆上，Some 把它包起来。",
+  "单独的 Box::new 是 Box<Node>，而这里需要的是 Option<Box<Node>>：E0308。",
+  "node.left.take() 把子节点挪出来并留下 None，这样 insert 就能拥有它再交回来。",
+]
+
+# ---------------------------------------------------------------- 36
+[[quest]]
+id    = "remix.basic.36.tree-python"
+title = "树 — PYTHON"
+story = "单号按到达的顺序放进一棵树，小的往左，大的往右，按中序读出来就是排好序的。那条蟒蛇用 Python 点单。"
+brief = '''
+二叉搜索树：每个节点有一个值，左子节点的值更小，右子节点的值更大。插入时一路往下走，在什么都没有的地方放一个新节点；中序遍历打印出来就是有序的。程序读入若干数，逐个插入，打印中序遍历，再打印树的高度。
+
+在 Python 里，子节点要么是 `Node`，要么是 `None`。`insert` 的基本情况是 `if n is None: return Node(v)` ——造一个并交回去；其余每一步都递归进其中一边并返回 `n`。没有指针，没有 box：每个名字本来就是引用。
+
+```
+if n is None:
+return Node(v)
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if n is None: return Node(v) ——构造函数接收这个值，子节点一开始都是 None。",
+  "Node(v, None, None) 是 TypeError：__init__ 在 self 之后只接收一个参数。",
+  "用 is None，而不是 == None：比的是同一性，这也是每个 Python 审查者都会要求的。",
+]
+
+# ---------------------------------------------------------------- 37
+[[quest]]
+id    = "remix.basic.37.interface-go"
+title = "接口 — GO"
+story = "圆桌和方桌，而平面图只问每张桌子要它的面积。Gogo 用 Go 点单。"
+brief = '''
+给几种类型都提供的某种行为起一个名字，这样调用方可以拿着其中任何一个，要求同一件事。Go 管它叫接口，类型只要有那些方法就满足它；Rust 管它叫 trait，类型要明说才算实现它；Python 管它叫鸭子类型，想检查时就用 `Protocol`。程序读入 `circle r` 和 `rect w h` 的若干行，把面积加起来，打印保留两位小数的总面积和形状的个数。
+
+在 Go 里，`type Shape interface { Area() float64 }` 给方法集起了名，别的什么都不需要：`Circle` 和 `Rect` 只要有 `Area() float64` 方法就满足它。这样一个 `[]Shape` 两者都能装，`s.Area()` 在运行时分派。
+
+```
+type Shape interface {
+Area() float64
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "type Shape interface { Area() float64 } ——方法集，仅此而已。",
+  "哪里都没有 implements 关键字：Circle 一有这个方法就满足了 Shape。",
+  "type Shape struct { Area() float64 } 不是结构体字段，解析不过。",
+]
+
+# ---------------------------------------------------------------- 38
+[[quest]]
+id    = "remix.basic.38.interface-rust"
+title = "接口 — RUST"
+story = "圆桌和方桌，而平面图只问每张桌子要它的面积。Ferris 用 Rust 点单。"
+brief = '''
+给几种类型都提供的某种行为起一个名字，这样调用方可以拿着其中任何一个，要求同一件事。Go 管它叫接口，类型只要有那些方法就满足它；Rust 管它叫 trait，类型要明说才算实现它；Python 管它叫鸭子类型，想检查时就用 `Protocol`。程序读入 `circle r` 和 `rect w h` 的若干行，把面积加起来，打印保留两位小数的总面积和形状的个数。
+
+在 Rust 里，`trait Shape { fn area(&self) -> f64; }` 声明这个行为，每个类型都要明确写出 `impl Shape for Circle { ... }`。一个 `Vec<Box<dyn Shape>>` 把两者都放在指针后面装着，`s.area()` 通过虚表分派。
+
+```
+trait Shape {
+fn area(&self) -> f64;
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "trait Shape { fn area(&self) -> f64; } ——一个带分号的签名，没有函数体。",
+  "impl Shape for Circle 是明说的那一半：Rust 从不去猜一个类型合不合适。",
+  "dyn Shape 是作为运行时类型的 trait；Box<dyn Shape> 是把它放进 Vec 的方式。",
+]
+
+# ---------------------------------------------------------------- 39
+[[quest]]
+id    = "remix.basic.39.interface-python"
+title = "接口 — PYTHON"
+story = "圆桌和方桌，而平面图只问每张桌子要它的面积。那条蟒蛇用 Python 点单。"
+brief = '''
+给几种类型都提供的某种行为起一个名字，这样调用方可以拿着其中任何一个，要求同一件事。Go 管它叫接口，类型只要有那些方法就满足它；Rust 管它叫 trait，类型要明说才算实现它；Python 管它叫鸭子类型，想检查时就用 `Protocol`。程序读入 `circle r` 和 `rect w h` 的若干行，把面积加起来，打印保留两位小数的总面积和形状的个数。
+
+在 Python 里什么都不必声明：任何带 `area()` 方法的对象都行，这就是鸭子类型。要*检查*它，`typing.Protocol` 给这个方法起名，`@runtime_checkable` 让 `isinstance(s, Shape)` 能在运行时发问——程序在加上每个面积之前都会这么做。
+
+```
+@runtime_checkable
+class Shape(Protocol):
+def area(self) -> float: ...
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "class Shape(Protocol): 上面写 @runtime_checkable，下面写 def area(self) -> float: ...。",
+  "不带 Protocol 的 class Shape: 是一个谁也没继承的普通类，isinstance 对每个形状都说不是。",
+  "... 就是函数体：Protocol 的方法只声明名字和签名，不干活。",
+]
+
+# ---------------------------------------------------------------- 40
+[[quest]]
+id    = "remix.basic.40.generics-go"
+title = "泛型 — GO"
+story = "一个 `largest` 给账单上的数用，同一个 `largest` 也给订座名单上的名字用。只写一次。Gogo 用 Go 点单。"
+brief = '''
+一个针对类型参数的函数：只写一次，整数能用，字符串也能用，条件是这个类型可以比较。程序读入一行数和一行单词，通过同一个 `largest` 函数分别打印其中最大的那个。
+
+在 Go 里，类型参数和它的约束写在方括号里：`func largest[T cmp.Ordered](xs []T) T`。`cmp.Ordered` 是允许 `<` 和 `>` 的约束；`any` 不行。调用 `largest(nums)` 会从参数推断出 `T`。
+
+```
+func largest[T cmp.Ordered](xs []T) T {
+```
+
+把上面这一行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "func largest[T cmp.Ordered](xs []T) T { ——方括号里是类型参数和它的约束。",
+  "用 [T any] 的话，函数体里的 x > best 编译不过：any 对 > 什么都不保证。",
+  "cmp.Ordered 涵盖整数、浮点数和 string；结构体需要自己的约束。",
+]
+
+# ---------------------------------------------------------------- 41
+[[quest]]
+id    = "remix.basic.41.generics-rust"
+title = "泛型 — RUST"
+story = "一个 `largest` 给账单上的数用，同一个 `largest` 也给订座名单上的名字用。只写一次。Ferris 用 Rust 点单。"
+brief = '''
+一个针对类型参数的函数：只写一次，整数能用，字符串也能用，条件是这个类型可以比较。程序读入一行数和一行单词，通过同一个 `largest` 函数分别打印其中最大的那个。
+
+在 Rust 里，类型参数和它的约束写在尖括号里：`fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T`。`PartialOrd` 允许 `>`，`Copy` 允许 `best = x` 从切片里拷贝出来，两者都是 trait ——约束就是 trait。`largest(&nums)` 会推断出 `T`。
+
+```
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+```
+
+把上面这一行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T { ——两个约束用 + 连起来。",
+  "没有 PartialOrd，> 就是 E0369；没有 Copy，best = x 就是 E0507。每个约束换来函数体里的一行。",
+  "&str 是 Copy（它就是一个指针加一个长度），所以单词不用 clone 也能用。",
+]
+
+# ---------------------------------------------------------------- 42
+[[quest]]
+id    = "remix.basic.42.generics-python"
+title = "泛型 — PYTHON"
+story = "一个 `largest` 给账单上的数用，同一个 `largest` 也给订座名单上的名字用。只写一次。那条蟒蛇用 Python 点单。"
+brief = '''
+一个针对类型参数的函数：只写一次，整数能用，字符串也能用，条件是这个类型可以比较。程序读入一行数和一行单词，通过同一个 `largest` 函数分别打印其中最大的那个。
+
+在 Python 里，类型参数是一个注解：`def largest[T](xs: list[T]) -> T:` 表示从头到尾是同一个 `T`，检查器会让它说到做到。运行时这是鸭子类型——`>` 要么能用，要么抛异常——所以签名是工具能读的文档，不是关卡。
+
+```
+def largest[T](xs: list[T]) -> T:
+```
+
+把上面这一行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "def largest[T](xs: list[T]) -> T: ——名字后面的 [T] 声明了它（Python 3.12+）。",
+  "这一行和每个 def 一样以冒号结尾；没有冒号，函数体就是语法错误。",
+  "老代码的写法是上面 T = TypeVar(\"T\")，下面 def largest(xs: list[T]) -> T:；意思相同。",
+]
+
+# ---------------------------------------------------------------- 43
+[[quest]]
+id    = "remix.basic.43.ownership-go"
+title = "所有权 — GO"
+story = "点菜单先送到收银台算总数，再送回来；然后就送进厨房，再也不回来了。之后在谁手里，就是全部的问题。Gogo 用 Go 点单。"
+brief = '''
+交给函数的值，要么是借出去的——调用方还留着——要么是送出去的。Rust 把这个区别变成编译器检查的规则：`&orders` 是借出，`orders` 是移动，被移动过的名字就没了。Go 和 Python 没有这样的规则，同样的两次调用看起来一模一样；每道题的说明会讲清楚真正易手的是什么。程序通过一个借用的 `total` 算出订单总数，然后把订单交给 `take`，它数一数并留下它们。
+
+在 Go 里，切片按值传递，但这个值只是一个小小的头部——指针、长度、容量——所以 `total(orders)` 和 `take(orders)` 看到的是同一个数组，而无论调用了哪个，`orders` 之后都还能用。`take` 把拿到的东西清零，调用方也会看到。没有移动这回事。
+
+```
+sum := total(orders)
+n := take(orders)
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "sum := total(orders) 然后 n := take(orders) ——同一个切片，两次，哪里都没有 &。",
+  "&orders 是 *[]int64，而 total 接收 []int64：类型错误。切片本来就是共享的。",
+  "take 之后，orders 仍然是一个能用的名字——只是每个元素现在都是 0。",
+]
+
+# ---------------------------------------------------------------- 44
+[[quest]]
+id    = "remix.basic.44.ownership-rust"
+title = "所有权 — RUST"
+story = "点菜单先送到收银台算总数，再送回来；然后就送进厨房，再也不回来了。之后在谁手里，就是全部的问题。Ferris 用 Rust 点单。"
+brief = '''
+交给函数的值，要么是借出去的——调用方还留着——要么是送出去的。Rust 把这个区别变成编译器检查的规则：`&orders` 是借出，`orders` 是移动，被移动过的名字就没了。Go 和 Python 没有这样的规则，同样的两次调用看起来一模一样；每道题的说明会讲清楚真正易手的是什么。程序通过一个借用的 `total` 算出订单总数，然后把订单交给 `take`，它数一数并留下它们。
+
+在 Rust 里，`total(&orders)` 是借出：`&Vec<i64>` 会强制转换成函数想要的 `&[i64]`，之后 `orders` 仍然归调用方。`take(orders)` 把 `Vec` 移进 `take`，它在返回时丢弃掉它，在那一行之后再用 `orders` 就是 E0382。两次调用的先后顺序就是这个程序。
+
+```
+let sum = total(&orders);
+let n = take(orders);
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "let sum = total(&orders); 然后 let n = take(orders); ——先借出，再送出。",
+  "不带 & 的 total(orders) 会把 Vec 移进 total，下一行的 take 就是 E0382：use of moved value。",
+  "把两行对调，借用就跑到移动之后了，这是从另一边撞上的同一个错误。",
+]
+
+# ---------------------------------------------------------------- 45
+[[quest]]
+id    = "remix.basic.45.ownership-python"
+title = "所有权 — PYTHON"
+story = "点菜单先送到收银台算总数，再送回来；然后就送进厨房，再也不回来了。之后在谁手里，就是全部的问题。那条蟒蛇用 Python 点单。"
+brief = '''
+交给函数的值，要么是借出去的——调用方还留着——要么是送出去的。Rust 把这个区别变成编译器检查的规则：`&orders` 是借出，`orders` 是移动，被移动过的名字就没了。Go 和 Python 没有这样的规则，同样的两次调用看起来一模一样；每道题的说明会讲清楚真正易手的是什么。程序通过一个借用的 `total` 算出订单总数，然后把订单交给 `take`，它数一数并留下它们。
+
+在 Python 里，每个名字都是引用，调用传的就是引用：`total(orders)` 和 `take(orders)` 收到的是同一个列表对象。`take` 把它清空，之后 `main` 里的 `orders` 也是空的——不是移动，不是拷贝，是共享。`orders[:]` 或 `list(orders)` 才会是拷贝。
+
+```
+sum_ = total(orders)
+n = take(orders)
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "sum_ = total(orders) 然后 n = take(orders) ——两次都是同一个对象。",
+  "Python 里没有 &；名字本来就是引用，& 在这里是语法错误。",
+  "take 之后，print(orders) 会显示 []：clear 清空的是大家手里的同一个列表。",
+]
+
+# ---------------------------------------------------------------- 46
+[[quest]]
+id    = "remix.basic.46.lifetimes-go"
+title = "生命周期 — GO"
+story = "每张单子上有两个菜名，出菜口喊出较长的那个。喊出的名字是交给它的两个之一——从来不是拷贝。Gogo 用 Go 点单。"
+brief = '''
+一个返回自己两个字符串参数之一的函数，返回的是指向调用方数据的引用。Rust 会问这个引用能用多久，答案以生命周期 `'a` 的形式写在签名里；Go 和 Python 有垃圾回收器，从来不问，所以同样的函数没有这样的标记。程序读入若干行，每行两个单词，打印每对中较长的那个，平局时取第一个。
+
+在 Go 里，`func longest(a, b string) string` 返回它的参数之一，谁也不必说明能用多久：字符串不可变，只要还有东西能够到它，回收器就留着它。同一类型的两个参数共用一个类型名。
+
+```
+func longest(a, b string) string {
+if len(a) >= len(b) {
+return a
+}
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "func longest(a, b string) string { if len(a) >= len(b) { return a }; return b }。",
+  "没有返回类型的 func longest(a, b string) 不能返回 a；结果类型是签名的一部分。",
+  "用 >= 而不是 >，平局才会归第一个单词。",
+]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "remix.basic.47.lifetimes-rust"
+title = "生命周期 — RUST"
+story = "每张单子上有两个菜名，出菜口喊出较长的那个。喊出的名字是交给它的两个之一——从来不是拷贝。Ferris 用 Rust 点单。"
+brief = '''
+一个返回自己两个字符串参数之一的函数，返回的是指向调用方数据的引用。Rust 会问这个引用能用多久，答案以生命周期 `'a` 的形式写在签名里；Go 和 Python 有垃圾回收器，从来不问，所以同样的函数没有这样的标记。程序读入若干行，每行两个单词，打印每对中较长的那个，平局时取第一个。
+
+在 Rust 里，`fn longest<'a>(a: &'a str, b: &'a str) -> &'a str` 表示返回的引用和两个输入中较短命的那个活得一样久——三处的 `'a` 把它们绑在一起。省掉它，rustc 就报 E0106：它分不清结果借自 `a` 还是 `b`，所以不会去猜。
+
+```
+fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
+if a.len() >= b.len() { a } else { b }
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str { ——在名字后面声明 'a，然后三个引用上都用它。",
+  "fn longest(a: &str, b: &str) -> &str 是 E0106，missing lifetime specifier：两个输入，结果可能来自任何一个。",
+  "只有一个引用参数时，rustc 会自己填上生命周期（省略规则）；是第二个输入让你必须写出来。",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "remix.basic.48.lifetimes-python"
+title = "生命周期 — PYTHON"
+story = "每张单子上有两个菜名，出菜口喊出较长的那个。喊出的名字是交给它的两个之一——从来不是拷贝。那条蟒蛇用 Python 点单。"
+brief = '''
+一个返回自己两个字符串参数之一的函数，返回的是指向调用方数据的引用。Rust 会问这个引用能用多久，答案以生命周期 `'a` 的形式写在签名里；Go 和 Python 有垃圾回收器，从来不问，所以同样的函数没有这样的标记。程序读入若干行，每行两个单词，打印每对中较长的那个，平局时取第一个。
+
+在 Python 里，`def longest(a: str, b: str) -> str:` 返回它的参数之一，只要还有名字指着这个对象，它就活着——调用方的 `f[0]` 和返回的值是同一个字符串。注解是给读者和检查器看的；运行时并不看它们。
+
+```
+def longest(a: str, b: str) -> str:
+return a if len(a) >= len(b) else b
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "def longest(a: str, b: str) -> str: 下面写 return a if len(a) >= len(b) else b。",
+  "a: &str 在 Python 里是语法错误；没有 &，也没有生命周期，因为这份活由回收器来干。",
+  "条件表达式把值放在最前面：a if cond else b，而不是 cond ? a : b。",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "remix.basic.49.threads-go"
+title = "线程 — GO"
+story = "账单太长，于是撕成三条，三位熟客同时各加一条；总数就是三个和加在一起。Gogo 用 Go 点单。"
+brief = '''
+启动几个线程，给每个一份活，等它们全部做完，再把它们的结果合起来。程序读入若干数，切成三块，每块在自己的线程上求和，按块的顺序打印三个和，再打印总和。
+
+在 Go 里，`go func(...) { ... }(args)` 启动一个 goroutine，`sync.WaitGroup` 给它们计数：每次启动之前 `wg.Add(1)`，里面第一件事 `defer wg.Done()`，循环之后 `wg.Wait()`。块和它的下标作为参数传进去，这样每个 goroutine 都有自己的一份。
+
+```
+go func(i int, chunk []int64) {
+defer wg.Done()
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "go func(i int, chunk []int64) { defer wg.Done(); ... }(i, chunk) ——前面的 go 让它成为 goroutine；没有它，字面量只是直接运行，而没有 Done，Wait 永远不会返回。",
+  "不带参数的 go func() { 和末尾的 (i, chunk) 对不上：too many arguments。",
+  "go 之前 Add，里面 Done，循环之后 Wait ——换成别的顺序，计数就不对。",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "remix.basic.50.threads-rust"
+title = "线程 — RUST"
+story = "账单太长，于是撕成三条，三位熟客同时各加一条；总数就是三个和加在一起。Ferris 用 Rust 点单。"
+brief = '''
+启动几个线程，给每个一份活，等它们全部做完，再把它们的结果合起来。程序读入若干数，切成三块，每块在自己的线程上求和，按块的顺序打印三个和，再打印总和。
+
+在 Rust 里，`thread::spawn(move || ...)` 启动一个线程并返回一个 `JoinHandle`；`move` 让闭包拥有自己的那块数据（一个 `Vec`，所以线程拥有它），`h.join().unwrap()` 等待并交回闭包返回的东西——这里是和，所以根本没有共享状态。
+
+```
+let chunk = chunk.to_vec();
+handles.push(thread::spawn(move || chunk.iter().sum::<i64>()));
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "let chunk = chunk.to_vec(); 然后 handles.push(thread::spawn(move || chunk.iter().sum::<i64>()));",
+  "没有 move，闭包借用 chunk，而线程可能比 main 的循环活得更久：E0373。",
+  "join 返回闭包返回的东西，外面包着一个 Result；unwrap 之后就是那个和。",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "remix.basic.51.threads-python"
+title = "线程 — PYTHON"
+story = "账单太长，于是撕成三条，三位熟客同时各加一条；总数就是三个和加在一起。那条蟒蛇用 Python 点单。"
+brief = '''
+启动几个线程，给每个一份活，等它们全部做完，再把它们的结果合起来。程序读入若干数，切成三块，每块在自己的线程上求和，按块的顺序打印三个和，再打印总和。
+
+在 Python 里，`threading.Thread(target=work, args=(i, c))` 造出一个线程——`args` 是元组，所以只有一个参数时 `(i,)` 里要有逗号——`t.start()` 让它运行，`t.join()` 等待它。因为有 GIL，三个线程其实是轮流加的，但形状是一样的。
+
+```
+threads = [threading.Thread(target=work, args=(i, c)) for i, c in enumerate(chunks)]
+for t in threads:
+t.start()
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "threads = [threading.Thread(target=work, args=(i, c)) for i, c in enumerate(chunks)] 然后逐个 start。",
+  "args=(i) 只是括号里的 i，不是元组；Thread 要的是元组，一个元素的写法是 (i,)。",
+  "是 target=work，不是 target=work(i, c)：后者会马上在当前线程上调用 work，再把它的返回值交给 Thread。",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "remix.basic.52.mutex-go"
+title = "互斥锁 — GO"
+story = "墙上只有一个记数，每位熟客都往上加一千次；粉笔必须干干净净地交接，否则数字就错了。Gogo 用 Go 点单。"
+brief = '''
+几个线程往同一个数上加，除非每次加的时候都把这个数锁住，否则就是数据竞争。互斥锁就是那把锁：拿到它，改值，放开它。程序读入若干数，每个数启动一个线程，每个线程在锁的保护下把自己的数往共享计数器上加一千次，最后打印计数器。
+
+在 Go 里，`sync.Mutex` 是一个带 `Lock` 和 `Unlock` 的值，计数器是每个 goroutine 都能看到的普通变量。规矩要你自己守：`mu.Lock()`、加法、`mu.Unlock()`，而没有什么能阻止你忘掉——除了 `go test -race`。
+
+```
+mu.Lock()
+counter += x
+mu.Unlock()
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "mu.Lock() 然后 counter += x 然后 mu.Unlock() ——三行，加法在中间。",
+  "Go 区分大小写，方法叫 Lock；mu.lock() 是未定义的。",
+  "不加锁的话，答案通常是错的，偶尔是对的，这比永远错更糟。",
+]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "remix.basic.53.mutex-rust"
+title = "互斥锁 — RUST"
+story = "墙上只有一个记数，每位熟客都往上加一千次；粉笔必须干干净净地交接，否则数字就错了。Ferris 用 Rust 点单。"
+brief = '''
+几个线程往同一个数上加，除非每次加的时候都把这个数锁住，否则就是数据竞争。互斥锁就是那把锁：拿到它，改值，放开它。程序读入若干数，每个数启动一个线程，每个线程在锁的保护下把自己的数往共享计数器上加一千次，最后打印计数器。
+
+在 Rust 里，计数器*就是*锁：`Arc<Mutex<i64>>`，通过 `Arc::clone` 共享，通过 `.lock().unwrap()` 打开，它返回一个守卫，解引用就是那个数，并在语句结束、守卫被丢弃时解锁。`*guard += x` 通过它写入；不拿锁就没有办法碰到那个数。
+
+```
+let counter = Arc::clone(&counter);
+handles.push(thread::spawn(move || {
+for _ in 0..1000 {
+*counter.lock().unwrap() += x;
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "在 spawn 之前 let counter = Arc::clone(&counter);，然后在循环里 *counter.lock().unwrap() += x;。",
+  "不带 * 的 counter.lock().unwrap() += x 是 E0368：守卫不是数，它解引用之后才是。",
+  "每个线程都需要自己的 Arc；不 clone 的话，第一次 move 就拿走了唯一的那个，第二次迭代就是 E0382。",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "remix.basic.54.mutex-python"
+title = "互斥锁 — PYTHON"
+story = "墙上只有一个记数，每位熟客都往上加一千次；粉笔必须干干净净地交接，否则数字就错了。那条蟒蛇用 Python 点单。"
+brief = '''
+几个线程往同一个数上加，除非每次加的时候都把这个数锁住，否则就是数据竞争。互斥锁就是那把锁：拿到它，改值，放开它。程序读入若干数，每个数启动一个线程，每个线程在锁的保护下把自己的数往共享计数器上加一千次，最后打印计数器。
+
+在 Python 里，`threading.Lock()` 就是互斥锁，`with lock:` 在块的前后拿锁和放锁——这是上下文管理器，所以放锁不会被忘掉。`nonlocal counter` 让工作函数能给外层的计数器赋值。GIL 并不让 `+=` 成为原子操作，所以这把锁是真用得着的。
+
+```
+with lock:
+counter += x
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "with lock: 然后把 counter += x 缩进写在它下面。",
+  "lock() 是在调用 Lock 对象，而它不可调用：TypeError。with lock: 就够了。",
+  "lock.acquire() 和 lock.release() 是长写法；with 两件事都做，而且即使出了异常也会放锁。",
+]
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id    = "remix.basic.55.channel-go"
+title = "一个生产者，多个消费者 — GO"
+story = "THE YUENYEUNG。厨房和出菜口之间只有一个传菜窗口，三个跑堂接走从里面递出来的所有东西，厨房做完时窗口必须关上，不然跑堂们就会永远等下去。Gogo 用 Go 点单。"
+brief = '''
+一个生产者把活放进通道，几个消费者从里面取，每个都记着自己的账，生产者关闭通道时，消费者们收工，各自的账加总起来。难就难在关闭：除非生产者说出来，消费者没法知道活已经干完了。程序读入若干数，把每个数通过同一个通道发给三个消费者，打印总和以及一共消费了多少项。
+
+在 Go 里，`ch <- x` 发送，`for x := range ch` 一直接收到通道关闭为止，而 `close(ch)` 正是结束那些循环的东西。三个 goroutine 对同一个通道做 range，所以每一项只会交给其中一个；生产者把每个数都发出去，然后关闭。
+
+```
+for _, x := range nums {
+ch <- x
+}
+close(ch)
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for _, x := range nums { ch <- x } 然后 close(ch) ——正是 close 让那三个 range 循环能够结束。",
+  "通道没有 close 方法；close 是一个内置函数，就像 len。",
+  "忘了 close，每个消费者都会永远卡在 range 上：fatal error: all goroutines are asleep - deadlock!",
+]
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id    = "remix.basic.56.channel-rust"
+title = "一个生产者，多个消费者 — RUST"
+story = "THE YUENYEUNG。厨房和出菜口之间只有一个传菜窗口，三个跑堂接走从里面递出来的所有东西，厨房做完时窗口必须关上，不然跑堂们就会永远等下去。Ferris 用 Rust 点单。"
+brief = '''
+一个生产者把活放进通道，几个消费者从里面取，每个都记着自己的账，生产者关闭通道时，消费者们收工，各自的账加总起来。难就难在关闭：除非生产者说出来，消费者没法知道活已经干完了。程序读入若干数，把每个数通过同一个通道发给三个消费者，打印总和以及一共消费了多少项。
+
+在 Rust 里，`mpsc::channel()` 给出一个 `Sender` 和一个 `Receiver`；三个消费者通过 `Arc<Mutex<Receiver>>` 共享这个接收端，每个都先锁住它再 `recv()`。`tx.send(x)` 发送，`drop(tx)` 就是关闭：所有发送端都没了之后，`recv` 返回 `Err`，消费者们跳出循环并返回各自的账。
+
+```
+for x in nums {
+tx.send(x).unwrap();
+}
+drop(tx);
+```
+
+把上面这几行敲在 `// FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for x in nums { tx.send(x).unwrap(); } 然后 drop(tx); ——丢弃最后一个 Sender 就是关闭。",
+  "Sender 上没有 close 方法；每个 Sender 都被丢弃时，通道就关闭了。",
+  "让 tx 一直活着，recv 就永远不会返回 Err：三个消费者永远等下去，join 也永远不会返回。",
+]
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id    = "remix.basic.57.channel-python"
+title = "一个生产者，多个消费者 — PYTHON"
+story = "THE YUENYEUNG。厨房和出菜口之间只有一个传菜窗口，三个跑堂接走从里面递出来的所有东西，厨房做完时窗口必须关上，不然跑堂们就会永远等下去。那条蟒蛇用 Python 点单。"
+brief = '''
+一个生产者把活放进通道，几个消费者从里面取，每个都记着自己的账，生产者关闭通道时，消费者们收工，各自的账加总起来。难就难在关闭：除非生产者说出来，消费者没法知道活已经干完了。程序读入若干数，把每个数通过同一个通道发给三个消费者，打印总和以及一共消费了多少项。
+
+在 Python 里，`queue.Queue` 就是通道：`q.put(x)` 发送，`q.get()` 阻塞到有东西为止。`Queue` 没有关闭，所以生产者发送一个哨兵——`None`，每个消费者一个——每个消费者拿到它就跳出。这就是手写出来的关闭。
+
+```
+for x in nums:
+q.put(x)
+for _ in threads:
+q.put(None)
+```
+
+把上面这几行敲在 `# FILL` 注释所在的位置。
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for x in nums: q.put(x) 然后 for _ in threads: q.put(None) ——每个消费者一个哨兵。",
+  "queue.Queue 没有 close；q.close() 是 AttributeError。None 就是关闭。",
+  "一个 None 不够：第一个拿到它的消费者停下了，另外两个会永远等下去。",
+]

@@ -1,0 +1,1525 @@
+# PYTHON LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/python/hacker.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "python.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.hacker.01.two-sum"
+title = "Dvě jízdenky"
+story = "Room 7-32, počtvrté. První otázka je ta, kterou dostane každý, a hodiny se spustí už cestou dovnitř."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` celých čísel.
+
+Vypiš indexy `i j` (**od 1**) dvou různých položek, které dají dohromady
+`target`, jako `i j` s `i < j`. Pokud vyhovuje víc dvojic, dej tu, jejíž
+druhý index je nejmenší; pokud je i tak shoda, nejmenší první index. Pokud
+nevyhovuje žádná dvojice, vypiš `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+Skryté případy jsou tu malé: kontrolují rozhodnutí při shodě a případ bez
+odpovědi, ne tvou rychlost. Otázka je pořád ta lineární — jeden průchod,
+jeden dict — protože skutečné `n` je 200000 a vnořená smyčka je přesně to,
+co má tahle otázka vytřídit. Napiš odpověď, na kterou se otázka ptá, ne tu,
+která náhodou projde těmito čtyřmi případy.
+'''
+hints = [
+  "Jeden průchod. U každé hodnoty se zeptej, jestli už bylo viděno target minus ona.",
+  "seen.setdefault(x, j) si u opakované hodnoty nechá první index, a to je rozhodnutí při shodě, které zadání žádá.",
+  "Vypiš a vrať se v okamžiku, kdy ji najdeš — první zásah při průchodu už má nejmenší druhý index.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.hacker.02.window"
+title = "Bez opakování"
+story = "Druhá otázka je na tabuli dřív, než stihneš odložit fix."
+brief = '''
+Jeden řádek textu, bez mezer.
+
+Vypiš délku nejdelšího úseku znaků, ve kterém se nic neopakuje, pak
+samotný úsek. Pokud je víc úseků stejně dlouhých, vypiš ten nejvíc vlevo.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+Okno se pohybuje jen doprava. Pokud zjistíš, že po opakování procházíš
+znovu od začátku, napsal jsi tu kvadratickou.
+
+Čtyři případy tady mají nanejvýš tucet znaků a hodiny na nich rychlost
+neměří — kvadratická je projde taky. Žádný velký skrytý případ není,
+protože se nedá poctivě postavit: na textu s malou abecedou je nejdelší
+úsek omezený abecedou, takže procházení znovu stojí konstantní faktor, ne
+kvadratický, a vstup, který by ho potrestal, už není text. Napiš
+jednoprůchodovou odpověď, protože je to ta odpověď, ne protože ji tyhle
+čtyři případy vynutí.
+'''
+hints = [
+  "Drž index, kde byl každý znak naposledy viděn, a index, kde začíná okno.",
+  "Opakování se počítá jen tehdy, když jeho poslední pozice leží uvnitř aktuálního okna — to je test `previous >= start`.",
+  "Zaznamenej nejlepší délku *i* to, kde začala, jinak úsek na konci nevypíšeš.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.hacker.03.intervals"
+title = "Rozpis směn"
+story = "Podají ti rozpis směn Lucky Mac a ptají se, které hodiny jsou skutečně pokryté."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je `<start> <end>` se `start <= end`.
+
+Slouč každou dvojici, která se překrývá nebo dotýká, a vypiš výsledek
+vzestupně, jeden `<start> <end>` na řádek, pak `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Dotyk se počítá jako překryv: `1 4` a `4 5` se sloučí do `1 5`.
+
+Čtyři případy tady mají každý tři nebo čtyři intervaly a hodiny na nich
+rychlost neměří. Seřazení a zametení je `O(n log n)`; verze, která pro
+každý interval znovu prochází sloučený seznam, je `O(n²)` a projde těmi
+čtyřmi stejně snadno. Na skutečném rozpisu směn je ta laťka skutečná. Není
+to to, co tyhle případy kontrolují.
+'''
+hints = [
+  "Nejdřív seřaď podle začátku. Pak stačí jeden průchod zleva doprava a nikdy se nedíváš zpátky víc než o jeden interval.",
+  "Když je nový začátek <= konci posledního sloučeného intervalu, prodluž ho; jinak přidej nový. Sloučené intervaly ukládej jako seznamy, ne n-tice, aby se konec dal změnit na místě.",
+  "Prodlužuj na max(last.end, end) — krátký interval pohlcený dlouhým ho nesmí zkrátit.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.hacker.04.grid"
+title = "Ven z budovy"
+story = "Půdorys na tabuli, požární dveře v protějším rohu a tazatel, který sleduje hodiny, a ne fix."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je podlaží: `.` je volno, `#` je zeď.
+
+Začni vlevo nahoře `(0,0)` a dostaň se vpravo dolů `(r-1, c-1)`, pohybem
+nahoru, dolů, doleva nebo doprava jen přes volná políčka.
+
+Vypiš počet **kroků** na nejkratší cestě, nebo `-1`, když žádná není. Pak
+vypiš `REACHED <k>`: kolik volných políček je ze startu dosažitelných,
+včetně samotného startu.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Do šířky, ne do hloubky. Průchod do hloubky najde *nějakou* cestu; otázka
+chce tu nejkratší. A fronta je `collections.deque` — `list.pop(0)` je
+`O(n)` a celé hledání udělá kvadratickým.
+'''
+hints = [
+  "deque.popleft() je tu celý rozdíl mezi BFS a DFS; seznam použitý jako zásobník by byl ten druhý.",
+  "Políčko označ, když ho vkládáš, ne když ho vybíráš, jinak se do fronty dostane několikrát.",
+  "Mřížka vzdáleností zároveň slouží jako množina navštívených: -1 znamená ještě neviděno, takže druhou strukturu nepotřebuješ.",
+  "grid[r - 1] při r rovném 0 výjimku nevyhodí. Přečte poslední řádek a hledání vyteče spodkem mapy ven. Zkontroluj nr < 0 ručně — tohle je jediná chyba mezí, kterou ti Python neohlásí.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.hacker.05.binary-search"
+title = "Jak velká dodávka"
+story = "Depo chce nejmenší dodávku, která zvládne denní zásilky ve dnech, které mají. Neřeknou ti, která dodávka to je; řeknou ti, jestli ta, kterou jmenuješ, je moc malá."
+brief = '''
+První řádek je `n d`. Druhý řádek je `n` hmotností balíků v pořadí, v jakém
+se musí nakládat — pořadí se měnit nesmí.
+
+Najdi nejmenší kapacitu dodávky, která odveze všech `n` balíků nejvýš za
+`d` dní, při nakládání v pořadí a bez dělení balíku.
+
+Vypiš kapacitu, pak `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+Neprohledáváš seznam. Prohledáváš **odpověď**: kapacity od `max(weights)` do
+`sum(weights)`, na kterých je „vejde se to do `d` dní“ nepravda, nepravda,
+nepravda a pak navždy pravda. Na to pusť binární hledání. `bisect` tu
+nepomůže — není tu žádný seznam k půlení, jen predikát — takže tohle se
+píše ručně.
+
+Čtyři případy tady mají nanejvýš deset hmotností a hodiny na nich rychlost
+neměří: procházení kapacit nahoru po jedné od `max(weights)` projde každým,
+protože každá odpověď je pod dvacet. Neprošlo by skutečnými zásilkami, kde
+je mezera mezi `max` a `sum` miliardy široká — a to je vstup, o kterém
+otázka doopravdy je. Tyhle případy kontrolují, že máš hledání správně, ne
+že jsi nějaké napsal.
+'''
+hints = [
+  "Dolní mez je nejtěžší jednotlivý balík — nic menšího ho nikdy neunese.",
+  "Horní mez je celkový součet: jeden den, všechno naráz.",
+  "(low + high) // 2 v Pythonu přetéct nemůže, a při úspěchu posuň `high` dolů na `mid`, abys udržel nejmenší kapacitu, která fungovala.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.hacker.06.stack"
+title = "Další větší"
+story = "Sloupec jízdného na tabuli a jedna otázka: pro každé z nich, které další za ním je větší."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Pro každou položku vypiš první položku **napravo od ní**, která je ostře
+větší, nebo `-1`, když žádná není. Dej je na jeden řádek, oddělené mezerou.
+Pak vypiš `NONE <k>`, kolik z nich bylo `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Drž zásobník pozic, jejichž odpověď je ještě neznámá, a ten zůstává odspodu
+nahoru klesající. Každá pozice se jednou vloží a jednou vyjme, takže celé je
+to jeden průchod, ať to vypadá jakkoli. Pythonní seznam je ten zásobník:
+`append` i `pop` na konci jsou `O(1)`.
+
+Pět případů tady má nanejvýš šest čísel a hodiny na nich rychlost neměří.
+Neměřily by ani na větším, a to stojí za to vědět: naivní odpověď — pro
+každou položku jdi doprava, dokud se neobjeví něco většího — je kvadratická
+jen na vstupu, který je už skoro sestupný. Na náhodném vstupu skončí v
+průměru asi po `ln(n)` krocích. Na 200000 položkách z generátoru, který
+tenhle balíček používá jinde, prošla naivní verze na tomhle stroji za
+**0.09 sekundy** proti **0.05** u zásobníku, takže je neoddělí žádný limit
+běhu. Zásobník je pořád ta odpověď, protože je `O(n)` na každém vstupu
+včetně sestupného — ale v tomhle questu je to tvrzení, které musíš přijmout
+na základě argumentu, a ne hodin.
+'''
+hints = [
+  "Zásobník drží indexy, které ještě čekají na odpověď, ne hodnoty.",
+  "Když nová hodnota přebije hodnotu na vrcholu zásobníku, odpověď toho indexu je nová hodnota — a vybírej dál, může jich přebít několik.",
+  "Ostře větší, takže stejné hodnoty se navzájem nevyřeší; naskládají se a vyřeší se později spolu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.hacker.07.coins"
+title = "Přesně na drobné"
+story = "Pokladna na Percival Street má tři přihrádky na mince a zákazníka, který si bankovku nevezme."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` hodnot mincí. Každá mince je k
+dispozici v neomezeném množství.
+
+Vypiš nejmenší počet mincí, který dá přesně `target`, nebo `-1`, když se to
+složit nedá. Pak vypiš `REACH <k>`: kolik z částek `0..target` se dá složit
+vůbec, včetně `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+Skryté případy jsou malé, takže chytají spíš špatnost než pomalost — a jeden
+z nich chytá obvyklou špatnou odpověď. Hladový algoritmus, který bere
+největší minci, která se vejde, a opakuje, skládá `6` z `3 4` tak, že
+chňapne `4` a pak selže, a na přesně tohle případ je. Druhá špatná odpověď,
+obyčejná rekurze bez tabulky, tu chycená není a pořád to není ta, kterou
+psát: `target` je ve skutečnosti 100000, tatáž částka se přepočítává
+tisíckrát a v Pythonu narazí samotná rekurze na limit rámců dlouho předtím.
+'''
+hints = [
+  "best[0] = 0 a best[a] je o jedna víc než nejlevnější best[a - coin] přes každou minci, která se vejde.",
+  "None je v Pythonu poctivé `unreachable` — žádné i64::MAX, které by přeteklo, a `is not None` se čte tak, jak to myslí. Zkontroluj ho dřív, než přičteš jedničku.",
+  "REACH je prostě to, kolik buněk hotové tabulky už není None.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.hacker.08.top-k"
+title = "Pět nejčastějších"
+story = "Rozehřívací kolo. Chtějí pět slov, která se loni v tiketech objevovala nejčastěji, a stejně to měří."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` slov oddělených mezerami.
+
+Vypiš `k` nejčastějších slov, nejčastější první, při shodě podle slova
+vzestupně, jedno na řádek. Pokud je různých slov méně než `k`, vypiš
+všechna. Pak vypiš `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Počítej přes `Counter`, pak řaď. Rozhodnutí při shodě není ozdoba.
+`Counter.most_common` rozhoduje shody podle **pořadí vložení** — v pořadí,
+v jakém se slova poprvé objevila ve vstupu — což není to, co říká zadání, a
+není to to, co tazatel chce slyšet. Opraví to až **úplné** porovnání —
+počet sestupně, pak slovo vzestupně — a `sorted` s klíčem v podobě n-tice je
+způsob, jak to říct.
+
+Čtyři případy tady jsou hrstka slov a hodiny na nich rychlost neměří:
+počítání, které projde celý seznam jednou pro každé různé slovo, je `O(n²)`
+a projde všemi čtyřmi. Na roce tiketů by neprošlo. Tyhle případy kontrolují
+rozhodnutí při shodě, což je ta část, kterou lidé opravdu kazí.
+'''
+hints = [
+  "Counter(words) je celá počítací smyčka. Nesnaž se při počítání udržovat pořadí aktuální.",
+  "key=lambda item: (-item[1], item[0]) — počet sestupně tím, že ho zneguješ, pak slovo vzestupně.",
+  "ranked[:k] je bezpečné, i když jich je méně než k — řez za koncem se na konci zastaví, místo aby vyhodil výjimku.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.hacker.09.linked-list"
+title = "Řetěz"
+story = "Chtějí to bez seznamu. Uzly, které ukazují na uzly, protože to je tvar, o kterém otázka doopravdy je."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel, v pořadí.
+
+Postav z nich jednosměrně spojový seznam — třídu `Node` s `value` a `next`
+— a pak odpovídej z uzlů. Obrácení, prostředek i délka pocházejí z
+procházení řetězu, ne ze seznamu, do kterého jsi načetl vstup; posbírat
+výstup do seznamu a na konci ho spojit přes `join` je v pořádku. Vypiš tři
+řádky:
+
+1. seznam obráceně, oddělený mezerami
+2. hodnotu v prostředním uzlu (pro sudé `n` ten druhý z těch dvou)
+3. `LEN <n>` spočítané procházením seznamu, ne důvěrou ve vstup
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+Prostředek je běžec: jeden ukazatel po jednom kroku, druhý po dvou, a když
+rychlému dojde cesta, pomalý je tam. Jeden průchod.
+
+Obracej smyčkou, ne rekurzí. Rekurzivní obrácení jsou tři hezké řádky a
+`RecursionError` u tisíce uzlů, a verze téhle otázky se sto tisíci uzly je
+ta, která se ptá.
+'''
+hints = [
+  "Stavět odzadu dopředu je ten snadný směr: každý nový uzel vezme starou hlavu jako svůj next.",
+  "Ulož cursor.next dřív, než ho přepíšeš. Jakmile cursor.next ukazuje dozadu, zbytek starého seznamu je nedosažitelný.",
+  "Pro prostředek posuň slow jen na krocích, kde fast zvládl dva.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.hacker.10.tree-walk"
+title = "Třikrát kolem stromu"
+story = "Strom na tabuli a otázka, nad kterou by nikdo neměl přemýšlet dvakrát: vyjmenuj ta tři pořadí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` hodnot v **pořadí po úrovních**, kde
+`-1` znamená „tady žádný uzel“ — takže strom je uložený tak, jak se ukládá
+halda: potomci indexu `i` jsou `2i+1` a `2i+2`.
+
+Vypiš čtyři řádky: průchody **preorder**, **inorder** a **postorder**, každý
+oddělený mezerami, a pak `DEPTH <d>` — počet uzlů na nejdelší cestě od
+kořene k listu.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder je uzel, levý, pravý. Inorder je levý, uzel, pravý. Postorder je
+levý, pravý, uzel. Rekurze jsou pokaždé tytéž tři řádky a posouvá se jen
+pozice `append`. Rekurze je tu tak hluboká jako strom, což je pro pole ve
+tvaru haldy `log n`, takže limit rámců není starost — řekni to nahlas,
+protože se na to zeptají.
+'''
+hints = [
+  "Jedna rekurzivní funkce s append na třech možných místech je lepší než tři skoro stejné funkce.",
+  "Bázový případ jsou obě podmínky najednou: za koncem pole, nebo na -1.",
+  "Hloubka je 1 + hlubší z obou potomků a 0 pro chybějící uzel.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.hacker.11.bst"
+title = "Je to opravdu BST"
+story = "Doplňující otázka. Každý zkontroluje ty dva potomky a každý se napoprvé mýlí."
+brief = '''
+Stejné kódování po úrovních jako v minulém questu: `-1` je chybějící uzel,
+potomci `i` jsou `2i+1` a `2i+2`.
+
+První řádek je `n q`. Druhý řádek je `n` hodnot stromu. Třetí řádek je `q`
+hodnot dotazů.
+
+Vypiš `VALID` nebo `INVALID` — je to binární vyhledávací strom, kde každá
+hodnota v levém podstromu je ostře menší než uzel a každá v pravém ostře
+větší? Pak jeden řádek na dotaz: `<value> FOUND <depth>`, když je ve stromu,
+`<value> ABSENT`, když není, kde kořen má hloubku 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Kontrola `left < node < right` v každém uzlu **nestačí** — hodnota hluboko v
+levém podstromu může být pořád větší než předek. Nes místo toho dolů
+otevřený interval. Python nemá žádné `i64::MIN`; meze začínají jako `None`,
+což znamená „zatím bez omezení“, a `None` potřebuje vlastní kontrolu,
+protože `x <= None` je `TypeError`.
+
+Dotaz se zodpoví **sestupem**: porovnej s uzlem, jdi doleva, když jsi
+menší, jinak doprava, a ohlas `ABSENT`, když ze stromu spadneš. Na tom
+záleží, protože není slíbeno, že strom je BST, a v takovém, který jím není,
+může hodnota sedět v poli někde, kam se sestup nikdy nepodívá. Je `ABSENT`
+— ptají se tě, co dělá vyhledání, ne co by našlo projití pole.
+'''
+hints = [
+  "Předávej dolů otevřený interval (low, high). Kořen dostane (None, None); levý potomek dostane (low, node), pravý potomek (node, high).",
+  "Chybějící uzel je triviálně platný — to je bázový případ a vrací True, ne False.",
+  "Vyhledání je binární hledání: menší jde doleva, jinak doprava, a hloubka je, kolik skoků to trvalo.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.hacker.12.heap"
+title = "K seřazených front"
+story = "Každá pobočka Lucky Mac posílá své lístky už seřazené. Slouč je do jedné řady, aniž bys to celé řadil znovu."
+brief = '''
+První řádek je `k`. Pak `k` řádků, každý počet a za ním tolik celých čísel,
+už seřazených vzestupně.
+
+Vypiš je všechny sloučené do jednoho vzestupného řádku, oddělené mezerami,
+pak `POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+`heapq` je **min**-halda nad obyčejným seznamem a n-tice řadí tak, jak se
+n-tice porovnávají: nejdřív první prvek. Takže položka je
+`(value, which list, how far into it)` a rozhodnutí při shodě stejných
+hodnot je index seznamu — což je v pořádku, protože to musí být jen
+*nějaké* pořadí.
+
+Halda drží jednu položku na seznam, ne jednu na prvek, takže zůstává
+velikosti `k`, ať jsou seznamy jakkoli dlouhé. `heapq.merge` dělá přesně
+tohle a v produkci je to odpověď na jeden řádek; tady napiš smyčku, protože
+ta smyčka je ta otázka.
+
+Čtyři případy tady jsou hrstka čísel ve dvou nebo třech seznamech a hodiny
+na nich rychlost neměří: vysypat všechno do jednoho seznamu a seřadit ho
+projde všemi čtyřmi, a stejně tak procházení všech `k` hlav v každém kroku.
+Halda je to, co to drží na `O(N log k)`, když je `k` velké, a to je slib o
+vstupu, který tyhle případy neobsahují.
+'''
+hints = [
+  "Položka haldy musí nést, odkud hodnota přišla, jinak po jejím vyjmutí nemůžeš doplnit.",
+  "(value, which, at) se řadí nejdřív podle hodnoty, což je přesně to, co chceš; jedno heapify po osazení je levnější než k vložení.",
+  "Další prvek seznamu vlož jen tehdy, když vyjmeš jeden z jeho prvků — to drží haldu na k.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.hacker.13.backtracking"
+title = "Každá kombinace"
+story = "Vyjmenuj každý způsob, jak by se dal obchod uspořádat. Všechny, v pevném pořadí, a žádný nevypiš dvakrát."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` různých celých čísel **už ve
+vzestupném pořadí**.
+
+Vypiš každou podmnožinu, jednu na řádek, hodnoty oddělené mezerami, prázdnou
+podmnožinu jako `-`. Seřaď je tak, jak je vyrobí ta zřejmá rekurze: na každé
+pozici nejdřív větev, která prvek **bere**, pak větev, která ho vynechá.
+Pak vypiš `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Vložit, zanořit se, **vyjmout**. Vyjmutí je ta část, kterou lidé vynechají,
+a příznakem je, že každý řádek po prvním je moc dlouhý.
+`itertools.combinations` by ti dal podmnožiny v jiném pořadí; pořadí je tu
+rekurzí vlastní a to je to, co se kontroluje.
+'''
+hints = [
+  "Dvě rekurzivní volání na prvek: jedno s ním přidaným, jedno bez. Ber první a pořadí z ukázky vyjde samo.",
+  "chosen.pop() jde mezi ta dvě volání. To je to `undo` v try-recurse-undo.",
+  "Bázový případ je at == len(nums) a prázdný výběr je tam prázdná podmnožina, která se pořád počítá.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.hacker.14.word-search"
+title = "Je to slovo v mřížce"
+story = "Tabulka písmen a jméno. Chtějí vědět, jestli je to jméno v ní napsané, a chtějí počet slepých uliček."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je mřížka malých písmen. Poslední
+řádek je slovo.
+
+Slovo je v mřížce, když ho dokážeš vyhláskovat pohybem nahoru, dolů, doleva
+nebo doprava mezi **sousedními** políčky, bez použití téhož políčka dvakrát
+v jednom pokusu.
+
+Vypiš `FOUND` nebo `ABSENT`, pak `STARTS <k>`: kolik políček drží první
+písmeno slova.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Políčko označ jako použité cestou dovnitř a **odznač ho cestou ven**.
+Políčko, které zůstane označené po neúspěšné větvi, nechá pozdější větve
+selhat z důvodu, který v mřížce není. Pythonní `str` se na místě označit
+nedá — je neměnný — takže mřížka se musí nejdřív stát seznamem seznamů
+znaků.
+'''
+hints = [
+  "Přepiš políčko znakem, který slovo obsahovat nemůže, zanoř se, pak vrať původní.",
+  "Počáteční písmena spočítej v samostatném průchodu před hledáním, jinak počet zmatou značky '#'.",
+  "Bázový případ úspěchu je `at + 1 == len(word)` — kontrolovaný po shodě tohoto políčka, ne před ní.",
+  "Čtyři směry řetěz přes `or` místo čtyř ifů a příznaku `found`: `or` se už zastaví na první větvi, která uspěje, a stejně tak `any` přes počáteční políčka. Pokračovat po zásahu je práce, o kterou tě nikdo nežádal.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.hacker.15.topo-sort"
+title = "V jakém pořadí se to sestaví"
+story = "Jedenáct balíčků a graf závislostí. Jmenuj pořadí instalace, nebo jmenuj cyklus, který znamená, že žádné není."
+brief = '''
+První řádek je `n m`: `n` úloh číslovaných `0..n-1` a `m` hran. Dalších `m`
+řádků je `<a> <b>`, což znamená, že `a` se musí sestavit před `b`.
+
+Vypiš pořadí sestavení na jeden řádek, oddělené mezerami. Když je víc úloh
+připravených najednou, vezmi tu s **nejnižším číslem**, aby byla odpověď
+jednoznačná. Pokud žádné pořadí neexistuje, vypiš místo toho `CYCLE`. Pak
+vypiš `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahnův algoritmus: spočítej, na kolik věcí každá úloha čeká, začni těmi, co
+nečekají na nic, a když úlohu vezmeš, sniž počet jejím závislým. Pokud
+skončíš a úlohy zbydou, ty úlohy jsou ten cyklus. Množina připravených je
+`heapq`, takže „nejnižší číslo“ stojí `log n` místo procházení.
+'''
+hints = [
+  "waiting[b] je vstupní stupeň b — kolik hran na něj ukazuje.",
+  "Obyčejná deque dá *nějaké* pořadí; min-halda dá *to* pořadí, které zadání žádá.",
+  "Cyklus nikdy nedetekuješ přímo. Všimneš si, že vyšlo méně než n úloh, a ty, co zbyly, jsou v něm.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.hacker.16.union-find"
+title = "Kdo je spojený s kým"
+story = "Tramvajová síť, MTR a linky minibusů na jednom listu. Kolik oddělených sítí tam doopravdy je."
+brief = '''
+Na standardním vstupu je `n m seed`: `n` zastávek číslovaných `0..n-1`, `m`
+neorientovaných spojení. Ve vstupu žádná spojení nejsou — postavíš je sám,
+**přesně** tímto generátorem, v 64bitové aritmetice, která přetéká (maskuj
+ručně — pythonní int to za tebe neudělá):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the m links, in order:
+    a = next() % n
+    b = next() % n
+    link a — b
+```
+
+Vypiš tři řádky: kolik je oddělených sítí, velikost té největší a
+`REDUNDANT <k>` — kolik spojení spojilo dvě zastávky, které už spojené byly.
+Spojení zastávky se sebou samou je jedno z nich.
+
+```
+input:  8 5 1
+output: 4
+        5
+        REDUNDANT 1
+```
+
+Pro `8 5 1` je těch pět spojení `6—1`, `4—6`, `2—3`, `2—6`, `1—2`. To
+poslední spojuje dvě zastávky, které už jsou v téže síti, takže je to to
+nadbytečné, a zbude `{1,2,3,4,6}` plus zastávky `0`, `5` a `7` samy o sobě.
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 200000` s
+`m = 200000` spojeními. Zřejmá odpověď, která není union-find — projít síť
+od `a` a podívat se, jestli v ní už je `b`, jednou na každé spojení — je
+správná, a je `O(n)` na spojení, a tedy `O(n·m)` celkem: na tomhle stroji
+nedoběhla ani za **dvě minuty**, proti limitu běhu deset sekund. To je to,
+čím starter je. Union-find s kompresí cesty a spojováním podle velikosti
+zvládne týchž 200000 spojení za **0.24 sekundy**, změřeno tady s řešením,
+které se s tímhle questem dodává.
+
+Stojí za to to vidět jasně, protože je to nejčastější způsob, jak neprojít
+časovaným testem: **starter není špatně.** Na ukázce i na obou malých
+skrytých případech vypíše přesně správnou odpověď. Odmítnut je jen za to,
+že dorazí příliš pozdě.
+
+Union-find: každá zastávka ukazuje na rodiče, `find` dojde ke kořeni,
+`union` nasměruje jeden kořen na druhý. Na cestě ven z `find` cestu
+zkomprimuj a celé je to v praxi konstantní čas na dotaz.
+
+`find` napiš jako smyčku. Rekurzivní je učebnicová verze a na řetězu dlouhém
+tisíc je to `RecursionError` — což je přesně ten tvar, kterému má spojování
+podle velikosti bránit, a přesně ten tvar, který má nepřátelský vstup dřív,
+než ho první `find` vůbec zkomprimuje.
+'''
+hints = [
+  "Oba konce losuj průběžně — každý jeden krok generátoru, v tomhle pořadí — místo abys nejdřív stavěl seznam spojení. Nic tady spojení nepotřebuje dvakrát.",
+  "Začni s každou zastávkou jako vlastním rodičem a n skupinami; každé úspěšné union sníží počet o jedna.",
+  "Spojení, jehož oba konce už mají stejný kořen, je to nadbytečné — započítej ho a jdi dál. Smyčka na sebe, a == b, z toho testu vypadne sama.",
+  "Smysl má jen položka velikosti u kořene, takže největší čti z kořenů, ne z každého indexu. max(..., default=0) pokryje n = 0 bez zvláštního případu.",
+  "parent[x], x = root, parent[x] komprimuje na jednom řádku: pravá strana se vyhodnotí celá dřív, než proběhne kterékoli přiřazení, takže staré parent[x] se přečte dřív, než se přepíše.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.hacker.17.lis"
+title = "Nejdelší rozběh"
+story = "Rok denních tržeb. Chtějí nejdelší úsek zlepšujících se dnů, a nemusí jít po sobě."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš délku nejdelší **ostře rostoucí podposloupnosti** — hodnoty si drží
+pořadí, ale nemusí sousedit. Pak vypiš `TAILS <k>`, kde `k` je tatáž délka,
+odečtená z počtu hromádek patience sortingu.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+Tabulka `O(n²)` je odpověď, kterou bys měl umět napsat zpaměti. Ta
+`O(n log n)` drží pro každou délku nejmenší hodnotu, na které může
+podposloupnost té délky končit — seznam, který je vždycky seřazený, takže
+pozice nové hodnoty je binární hledání, a v Pythonu je to hledání jedno
+volání `bisect_left`. Tady projde obojí; případy jsou malé a říkají to.
+Napiš stejně tu druhou, protože doplňující otázka je vždycky „a rychleji?“.
+'''
+hints = [
+  "tails není podposloupnost. Jeho délka je odpověď; jeho obsah jsou jen nejlepší koncové hodnoty.",
+  "Ostře rostoucí znamená, že nahradíš první tail, který je >= value, a to je přesně to, co najde bisect_left. bisect_right by ti dal místo toho neklesající.",
+  "Doběhnout za konec tails znamená, že tahle hodnota prodlužuje dosud nejdelší rozběh — přidej ji.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.hacker.18.edit-distance"
+title = "Jak daleko od sebe"
+story = "Dva zápisy stejné ulice na dvou různých cedulích. Kolik úprav po jednom znaku mezi nimi."
+brief = '''
+Dva řádky, na každém jedno slovo, malými písmeny. Kterýkoli řádek může být
+**prázdný** a pak je odpovědí délka toho druhého.
+
+Vypiš **editační vzdálenost**: nejmenší počet vložení, smazání nebo záměn po
+jednom znaku, které promění první ve druhé. Pak vypiš `LCS <k>`, délku
+jejich nejdelší společné podposloupnosti.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Dvě tabulky nad týmiž dvěma řetězci a obě jsou tatáž třířádková rekurence
+s jiným rozhodováním. Plň řádek po řádku; odpověď je v protějším rohu.
+Řádek `0` a sloupec `0` nejsou u editační tabulky nulové — jsou to náklady
+na smazání nebo vložení všeho.
+
+Prázdný první řádek znamená, že `sys.stdin.read().split()` by ti podal
+druhé slovo jako první. Tady čti po řádcích, ne po tokenech.
+'''
+hints = [
+  "edit[i][0] = i a edit[0][j] = j: proměnit prefix v nic stojí jedno smazání na znak.",
+  "Shodné znaky nestojí nic a jdou diagonálně; neshoda stojí jedna a vezme nejlevnějšího ze tří sousedů.",
+  "LCS je tentýž průchod s max místo min a bez diagonálního kroku při neshodě. A [[0] * w for _ in range(h)] — nikdy [[0] * w] * h, což je h odkazů na jeden řádek.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.hacker.19.knapsack"
+title = "Co se vejde do tašky"
+story = "Jeden kurýr, jedna taška a tabule objednávek, každá s váhou a spropitným. Hladový algoritmus vybere ty špatné."
+brief = '''
+První řádek je `n cap`. Dalších `n` řádků je `<weight> <value>`. Každou
+položku lze vzít nejvýš **jednou**.
+
+Vypiš nejlepší celkovou hodnotu, která se vejde do `cap`, pak `GREEDY <v>`:
+co bys dostal, kdybys opakovaně bral položku s nejlepší hodnotou na váhu,
+která se ještě vejde. Při stejné hodnotě na váhu jde první lehčí položka.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+To, že se ta dvě čísla liší, je celá pointa questu, a ukázka to předvádí:
+nejlepší hodnota na váhu je položka `6 10` s `1.67` a její vzetí nechá čtyři
+jednotky místa, do kterých se nic nevejde. Vynechat ji a vzít obě položky
+`5 7` má cenu `14`. Skryté případy jsou malé, takže kontrolují, že máš obě
+čísla správně, ne že je tabulka rychlá.
+
+Poměry porovnávej přesně. `fractions.Fraction(value, weight)` je přesné
+racionální číslo a řadí se správně; `value / weight` je float a dva poměry,
+které jsou na papíře stejné, můžou v binárním zápisu vyjít trochu jinak.
+'''
+hints = [
+  "range(cap, weight - 1, -1) prochází kapacity směrem dolů, a to z toho dělá 0/1 místo neomezeného. Nahoru by se táž položka dala použít znovu.",
+  "Fraction(value, weight) se porovnává přesně; v klíči ho zneguj, aby nejlepší poměr šel první.",
+  "Hladový průchod je přímá smyčka přes seřazené položky — žádný návrat, a přesně proto je špatně.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.hacker.20.bits"
+title = "Ten, který je sám"
+story = "Každá zásilka je naskenovaná dvakrát kromě jedné. Nenechají tě použít dict a nenechají tě řadit."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` nezáporných celých čísel, ve kterých
+se každá hodnota objeví přesně dvakrát kromě jedné.
+
+Vypiš čtyři řádky:
+
+1. hodnotu, která se objeví jednou, nalezenou přes **xor** s konstantním
+   místem navíc
+2. kolik bitů `1` je v ní nastaveno
+3. `POW2 YES`, když je mocninou dvojky, jinak `POW2 NO` (`0` jí není)
+4. hodnotu s vynulovaným nejnižším nastaveným bitem, nebo `0`, když žádný
+   nemá
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` a `x ^ 0 == x` a xor je jedno, v jakém pořadí se děje. To je
+celý první řádek. `x & (x - 1)` vynuluje nejnižší nastavený bit, což ti dá
+třetí a čtvrtý řádek zadarmo. Pythonní int nemá žádnou šířku, takže není
+žádný znaménkový bit, o který by ses musel starat, a od verze 3.10 existuje
+`int.bit_count()` — ale napiš tu smyčku jednou, protože právě na ni se ptají.
+
+Čtyři případy tady mají nanejvýš pět čísel a hodiny na nich rychlost neměří:
+`Counter` projde každým a stejně tak řazení. Nezměnil by to ani větší
+případ, protože laťka, kterou tahle otázka klade, je **místo** — jeden
+akumulátor a nic jiného — a žádný limit běhu nerozliší odpověď s
+konstantním místem od dictu. Tohle je na tvé cti, a na tazateli, který se
+zeptá.
+'''
+hints = [
+  "Páry se samy vyruší, ať přijdou v jakémkoli pořadí, takže stačí jedno složení přes seznam. functools.reduce(operator.xor, nums, 0) je tatáž smyčka na jednom řádku.",
+  "Počítání bitů tak, že se pokaždé vynuluje ten nejnižší, proběhne jednou na nastavený bit, ne jednou na šířku v bitech.",
+  "Mocnina dvojky má nastavený přesně jeden bit, takže vynulování nejnižšího nechá nulu — a samotnou nulu je třeba vyloučit ručně.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.hacker.21.matrix"
+title = "Otoč půdorys"
+story = "Plán je vzhůru nohama a na stole není místo na jeho druhou kopii."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je mřížka `n × n` celých čísel.
+
+Vypiš mřížku otočenou o **90° po směru hodinových ručiček**, `n` řádků
+hodnot oddělených mezerami. Pak vypiš její hodnoty ve **spirálovém pořadí**
+— vnější prstenec po směru hodinových ručiček zleva nahoře, dovnitř — na
+jeden řádek.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+Otočení je to, které se dělá na místě: transponovat, pak obrátit každý
+řádek. Říct to nahlas je půlka otázky. Python má i jednořádkovou verzi —
+`zip(*grid[::-1])` obrátí řádky a pak transponuje, což je totéž otočení — a
+měl bys umět vysvětlit, proč funguje, ne ho jen napsat.
+'''
+hints = [
+  "Transponuj prohazováním jen nad diagonálou — c začíná na r + 1 — jinak všechno zase prohodíš zpátky. Přiřazení n-tice prohodí bez pomocné proměnné.",
+  "Spirála chce původní mřížku, takže ji před otočením na místě zkopíruj: [row[:] for row in grid], ne grid[:], které zkopíruje vnější seznam a každý řádek sdílí.",
+  "Dvě stráže `if` uvnitř spirálové smyčky jsou to, co zabrání, aby se jediný prostřední řádek nebo sloupec prošel dvakrát.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.hacker.22.trie"
+title = "Krabička na prefixy"
+story = "Automatické doplňování pro tabuli zastávek — to poctivé, které doplní jen to, co na seznamu opravdu je."
+brief = '''
+První řádek je `n q`. Dalších `n` řádků jsou slova malými písmeny k vložení.
+Dalších `q` řádků jsou dotazy, každý `WORD <s>` nebo `PREFIX <s>`.
+
+Postav trie — strom uzlů, z nichž každý drží mapu z písmene na potomka — a
+odpověz:
+
+* `WORD <s>` → `YES`, když bylo `s` vloženo, jinak `NO`
+* `PREFIX <s>` → kolik z `n` vložených slov začíná na `s`
+
+Není slíbeno, že těch `n` slov je různých, a `PREFIX` počítá **vložení**, ne
+různá slova: vlož `tram` dvakrát a `PREFIX tram` je `2`. `NODES` počítá
+uzly, takže druhé vložení žádný nepřidá.
+
+Pak vypiš `NODES <k>`, počet uzlů v trie včetně kořene.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Drž na každém uzlu počet, kolik vložených slov jím prochází, a `PREFIX` je
+průchod bez počítání na konci. Uzel je malá třída se `__slots__`, nebo
+dict; tak jako tak jsou potomci dict s klíčem podle písmene, protože seznam
+s 26 přihrádkami je odpověď pro C a dict je ta pythonní.
+'''
+hints = [
+  "children.get(letter) vrací pro chybějícího potomka None a None je signál, jak k vytvoření nového při vkládání, tak k zastavení při vyhledávání.",
+  "`through` se zvýší na uzlu, na který *vstoupíš*, takže kořen nikdy nepočítá sám sebe.",
+  "Dotaz, který spadne z trie, nechá `at` jako None a None odpoví NO a 0 bez zvláštního případu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.hacker.23.prefix-sums"
+title = "Kolika způsoby trefit cíl"
+story = "Den tržeb a číslo, které chce auditor vidět. Kolik úseků po sobě jdoucích hodin dá dohromady přesně tohle."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` celých čísel, která můžou být
+záporná.
+
+Vypiš, kolik souvislých úseků má součet přesně `k`, pak `RANGE <s>`, součet
+celého seznamu, odečtený z posledního prefixového součtu, ne dalším
+sčítáním.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Záporné hodnoty zabijí posuvné okno — okno, které je moc velké, se
+zmenšením opravit nedá. Přežijí prefixové součty: úsek `i..j` má součet `k`
+přesně tehdy, když `prefix[j] - prefix[i] == k`, takže spočítej, kolik
+dřívějších prefixů se rovná `prefix[j] - k`. Mapu osaď s `0 → 1` pro úseky,
+které začínají na začátku.
+
+Čtyři případy tady mají nanejvýš pět čísel a hodiny na nich rychlost neměří:
+dvojitá smyčka `O(n²)` přes každý začátek a každý konec projde všemi
+čtyřmi. Ta laťka je skutečná — na dni tržeb jsou to u dvojité smyčky minuty
+— a není to to, co tyhle případy kontrolují. Kontrolují tu část, kterou je
+snadné pokazit: osazení `{0: 1}` a vyhledání před zaznamenáním.
+'''
+hints = [
+  "Dřívější prefix vyhledej *dřív*, než zaznamenáš ten aktuální, jinak se úsek nulové délky při k rovném 0 započítá sám.",
+  "seen = {0: 1} hned na začátku je to, co vůbec umožní najít úsek, který začíná na indexu 0.",
+  "Poslední prefix je celkový součet, takže druhý řádek nestojí nic navíc. collections.defaultdict(int) by ušetřil ta .get(…, 0), a Counter taky.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.hacker.24.inversions"
+title = "Ten, který chytí hodiny"
+story = "První otázka odpoledního kola. Naivní odpověď je správná, a je to špatná odpověď."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné
+pole není — postavíš ho sám, **přesně** tímto generátorem, v 64bitové
+aritmetice, která přetéká:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (mod 2^64)
+    next value = (x >> 33) % 1000000007
+```
+
+Spočítej **inverze**: dvojice `i < j`, kde `a[i] > a[j]`. Vypiš počet, pak
+`MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**Tenhle quest vynucuje svou složitost a je to jediný druh, který to umí.**
+Jeden skrytý případ je `n = 200000`. Dvojitá smyčka `O(n²)` — což je to, čím
+starter je — je `2 × 10^10` porovnání a do limitu běhu deset sekund
+nedoběhne; v Pythonu by nedoběhla ani za hodinu. Počítání inverzí během
+merge sortu je `O(n log n)` a doběhne asi za třetinu sekundy. Změřeno, na
+tomhle stroji, s těmito dvěma programy.
+
+Dvě věci tenhle jazyk rozhoduje jinak. Pythonní celá čísla nepřetékají —
+rostou — takže generátor se musí maskovat ručně: `& 0xFFFFFFFFFFFFFFFF` po
+každém kroku, jinak se z „64bitového“ stavu potichu stane 128bitový a každá
+hodnota po té první je špatně. A odpověď, `9990744366`, by se v žádném jiném
+jazyce do 32bitového `int` nevešla; tady to starost není, a říct, *proč*
+není, je součástí odpovědi.
+'''
+hints = [
+  "Maximum vezmi před řazením, nebo z původního seznamu. Merge sort tu vrací nový seznam a vstup nechá být, ale ve verzi, která řadí na místě, na to nespoléhej.",
+  "Když slučování vyhraje hodnota zprava, každý zbývající prvek levé poloviny je větší než ona — to je `len(left) - i` inverzí naráz, a to je celý trik.",
+  "Rekurze je log2(200000), asi osmnáct rámců hluboko — nikde blízko limitu. Fenwickův strom nad zkomprimovanými hodnotami je ta druhá odpověď O(n log n) a stojí za to ji v místnosti zmínit.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.hacker.25.test-cases"
+title = "Následuje T testovacích případů"
+story = "Tvar, který používá každý test, a chyba, kterou každý kandidát aspoň jednou napíše: druhý případ si pamatuje ten první."
+brief = '''
+První řádek je `T`, počet nezávislých testovacích případů. Každý případ je
+řádek s `n`, pak řádek s `n` celými čísly — a když je `n` rovno `0`, je ten
+druhý řádek prázdný.
+
+Pro každý případ vypiš **druhou největší různou** hodnotu, nebo `NONE`, když
+jsou různé hodnoty méně než dvě. Po všech vypiš `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+Tohle je standardní obal soutěžních testů a kandidáty shazuje z jediného
+důvodu: stav, který měl být pro každý případ zvlášť, byl deklarován před
+smyčkou. Každý akumulátor, každá množina, každé `best` patří **dovnitř**
+`for`.
+
+Čti po tokenech oddělených bílými znaky místo po řádcích a prázdný řádek
+pro `n = 0` přestane být zvláštním případem úplně — což je druhá věc, kterou
+tenhle tvar učí.
+'''
+hints = [
+  "Přesuň množinu dovnitř smyčky. To je celá oprava a je to celý quest.",
+  "Množina odstraní duplikáty a sorted() ji seřadí, takže ranked[-2] je druhá největší různá hodnota.",
+  "ranked[-2] na seznamu s jedním prvkem vyhodí IndexError, a proto jde kontrola délky první; žádné nth(), které by potichu dalo None, tu není.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.hacker.26.statistics"
+title = "Šest desetinných míst"
+story = "Chtějí čísla zaokrouhlená tak, jak říká specifikace, ne tak, jak je tvůj jazyk náhodou vypisuje."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš tři řádky, každý na **šest desetinných míst**: průměr, **populační**
+směrodatnou odchylku (děl `n`, ne `n - 1`) a medián — který je pro sudé `n`
+průměrem dvou prostředních hodnot.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+Tenhle quest se hodnotí s `match = "float:1e-6"`, takže porovnání je
+číselné: `3.8` i `3.800000` projdou a hodnota, která je vedle o `1e-7`,
+projde taky. To je záměr — nejde o tvůj formátovač, jde o to, že
+`sum // n` dá `3` a že medián sudé délky je hranice, kterou lidé pod tlakem
+hodin kazí.
+
+Populační, ne výběrová. Standardní knihovna má obě, pod jmény, která říkají,
+která je která: `statistics.pstdev` dělí `n` a `statistics.stdev` dělí
+`n - 1`. Přečti si zadání dvakrát; na skutečném testu je rozdíl mezi nimi
+celé odevzdání.
+'''
+hints = [
+  "`/` je v Pythonu 3 skutečné dělení a dá float; `//` je celočíselné dělení dolů, které použil starter, a zlomek už zahodilo.",
+  "statistics.pstdev je ta populační; statistics.stdev je ta výběrová a tady je špatně. Napsat smyčku sám — průměr čtverců odchylek, pak math.sqrt — je stejně správné.",
+  "Pro sudý počet je medián průměrem values[n//2 - 1] a values[n//2] a v tom odečítání žije chyba o jedničku. statistics.median to udělá za tebe, a vědět, že to udělá, je taky v pořádku.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.hacker.27.commands"
+title = "Problém je ve vstupu"
+story = "Log pokladny vyjede ze stroje zalomený na osmdesát sloupců a počet nahoře je počet příkazů, ne slov."
+brief = '''
+První řádek je `k`, počet **příkazů**, které následují. Příkazy jsou tokeny
+oddělené bílými znaky, nacpané do zbývajících řádků, jak se zrovna zalomily
+— jakýkoli počet na řádek, jakékoli mezery, možná prázdný řádek na konci.
+
+| příkaz | tokeny | účinek |
+| --- | --- | --- |
+| `ADD <cents>` | dva | vloží položku |
+| `VOID` | jeden | odstraní poslední položku, nebo nic, když žádná není |
+| `TOTAL` | jeden | vypíše aktuální součet |
+| `CLEAR` | jeden | odstraní všechno |
+
+Po `k` příkazech vypiš `COMMANDS <k>` a `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` počítá příkazy a `ADD` je jeden příkaz ze dvou tokenů — takže smyčka,
+která proběhne `k`krát a za každé kolo přečte jeden token, se zastaví na
+špatném místě. Čti `k` příkazů a argument vytáhni jen tehdy, když ho příkaz
+má — a nástroj na „vytáhni další token, až si o něj řeknu“ je **iterátor**
+nad seznamem tokenů, s `next(tokens, "")`, aby byl konec vstupu hodnota, a
+ne výjimka.
+
+`VOID` na prázdné pokladně i `TOTAL` dřív, než se cokoli přidalo, musí
+fungovat. V zadání není řádek, který by říkal, že se to stát nemůže, a na
+skutečném testu je to mlčení specifikací. `list.pop()` na prázdném seznamu
+vyhodí `IndexError`; stráž je na tobě.
+'''
+hints = [
+  "str.split() bez argumentu sloučí každou řadu mezer, tabulátorů a konců řádků, takže zalomení v souboru přestane hrát roli ve chvíli, kdy přestaneš číst po řádcích.",
+  "Argument ADD vytáhni uvnitř větve ADD, z téhož iterátoru. Čítač smyčky počítá příkazy, ne tokeny.",
+  "`if items: items.pop()` — stráž jsou dvě slova a bez ní je VOID na prázdné pokladně IndexError.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.hacker.29.dijkstra"
+title = "Ne každá ulice je stejně dlouhá"
+story = "Každá mapa, kterou jsi dosud prošel, počítala skoky. Tramvaji je jedno, kolik je zastávek; zajímá ji, jak dlouho trvají."
+brief = '''
+Na standardním vstupu je `n m seed`: `n` zastávek, `m` neorientovaných
+ohodnocených hran. Graf si postav sám, **přesně** tímto generátorem, v
+64bitové aritmetice, která přetéká (maskuj ručně — pythonní int to za tebe
+neudělá):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Vypiš součet nejkratších vzdáleností ze zastávky `0` ke každé dosažitelné
+zastávce (včetně samotné `0`, která je `0`), pak `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 100000`,
+`m = 200000`. Dijkstra je správný algoritmus tak jako tak; hodiny rozhodují
+o prioritní frontě. Procházení každého nenavštíveného uzlu kvůli minimu je
+`O(V²)` — `10^10` kroků, a v Pythonu to není šestnáct sekund, to je zbytek
+odpoledne — proti limitu běhu deset sekund. `heapq` z toho udělá
+`O((V + E) log V)` a doběhne asi za třetinu sekundy. Obojí změřeno na
+tomhle stroji, se dvěma programy, které se s tímhle questem dodávají:
+starter je ta procházející verze.
+
+Stojí za to to vidět jasně, protože je to nejčastější způsob, jak neprojít
+časovaným testem: **starter není špatně.** Vypíše přesně správnou odpověď.
+Odmítnut je jen za to, že dorazí příliš pozdě.
+
+`heapq` je min-halda, takže vkládej `(distance, node)` a zbytek zařídí
+pořadí n-tic. Nemá decrease-key a nepotřebuješ ho: vylepšenou vzdálenost
+vlož jako novou položku a každou vyjmutou položku, jejíž vzdálenost je už
+horší než ta zaznamenaná, přeskoč. To přeskočení „zastaralé položky“ je
+řádek, na který lidé zapomínají, a bez něj halda roste bez omezení.
+'''
+hints = [
+  "N-tice (distance, node) v heapq: vzdálenost na prvním místě je to, co položky řadí, a heapq už je min-halda.",
+  "`if d > dist[u]: continue` je přeskočení zastaralé položky. Bez něj je algoritmus pořád správný a halda se plní zastaralými položkami.",
+  "float(\"inf\") je poctivé `unreached`: porovná se jako větší než každý int a v relaxaci nepotřebuje žádnou kontrolu na None. Polovina generátoru s kostrou zaručuje, že každý uzel je dosažitelný, takže závěrečný filtr nikdy nic neodstraní — stejně si ho nech, protože verze téhle otázky s nedosažitelným uzlem je ta doplňující.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.hacker.30.range-queries"
+title = "Součty, které se pořád mění"
+story = "Tři sta tisíc pokladních operací z jednoho dne v celém řetězci, polovina z nich opravy, a někdo chce průběžné součty."
+brief = '''
+Na standardním vstupu je `n q seed`. Postav pole `n` hodnot a pak spusť `q`
+operací, vše z téhož generátoru, v 64bitové aritmetice, která přetéká
+(maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r]) to a running total
+```
+
+Vypiš průběžný součet odpovědí na všechny dotazy, pak `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**Složitost se tu vynucuje.** Naivní odpověď — `sum(values[l:r+1])` pro
+každý dotaz — je `O(n)` na dotaz a řez i součet běží v C, což ji na čemkoli
+malém dělá klamavě rychlou. Takže velký skrytý případ je
+`n = 500000, q = 300000`, kde naivní odpověď sáhne na řádově `2 × 10^10`
+prvků a na tomhle stroji trvala **přes tři minuty**, proti limitu běhu deset
+sekund. Fenwickův strom zvládne celé za méně než sekundu. Obojí změřeno, se
+dvěma programy v tomhle questu.
+
+(Verze tohoto questu v Rustu a Go pouštějí čtyři miliony operací. Python
+pouští tři sta tisíc, protože správný Fenwickův strom v Pythonu by čtyři
+miliony nezvládl v žádném poctivém limitu taky — a pointa je oddělit
+správnou strukturu od špatné, ne Python od C.)
+
+Ponaučení je to, na které tazatel chytá: *bodová aktualizace, součet
+rozsahu* je přesně ten tvar, pro který Fenwickův strom existuje. Tři krátké
+funkce — add, prefix a range jako rozdíl dvou prefixů — a `i & -i` je
+způsob, jak krokovat po nejnižším nastaveném bitu, což na pythonním intu
+funguje přesně jako na čísle ve dvojkovém doplňku.
+'''
+hints = [
+  "Strom postav zavoláním add jednou na každou počáteční hodnotu. Stavba zdola nahoru v O(n) je pěkná optimalizace a není to to, co hodiny testují.",
+  "i & -i izoluje nejnižší nastavený bit — záporné inty se v Pythonu při bitových operacích chovají jako ve dvojkovém doplňku, takže žádné wrapping_neg není potřeba. Přičtení jde stromem nahoru; odečtení dolů.",
+  "range(l, r) je prefix(r + 1) - prefix(l) a trefit tu dvojici chyb o jedničku je většina ladění. Navázat self.tree na lokální proměnnou uvnitř smyček je v CPythonu skutečné zrychlení a je to jediná mikrooptimalizace, kterou tenhle quest potřebuje.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.hacker.31.palindrome"
+title = "Stejně pozpátku"
+story = "Otázka z první dvacítky, v nějaké podobě položená na většině testů, a ta, kterou většina lidí jednou napsala a nikdy nepochopila."
+brief = '''
+Na standardním vstupu je `n alphabet seed`. Řetězec si postav sám, v
+64bitové aritmetice, která přetéká (maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Vypiš délku nejdelšího palindromického podřetězce, pak `AT <index>` —
+začátek (od 0) **nejlevějšího** z té délky.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Rozšiřuj kolem každého středu. Středů je `2n - 1`, ne `n`: každý znak je
+středem pro palindromy liché délky a každá mezera mezi dvěma znaky je
+středem pro ty sudé. Zapomenout na mezery je důvod, proč řešení, které
+vypadá správně, vrátí na `abba` `1` — a je to to, co dělá starter.
+
+**Co testy vynucují a co ne**, na rovinu. Skrytý případ, který dělá tu
+práci, je `n = 8000` nad **jednopísmennou** abecedou. Je to nejhorší případ
+pro rozšiřování kolem středu — každý střed doběhne na konec řetězce — takže
+správná odpověď tam udělá svých plných `O(n²)`, třicet dva milionů
+porovnání znaků v pythonní smyčce, a doběhne asi za **1.3 s**. Taky odmítne
+projít-každý-podřetězec-a-každý-otestovat: `s[i:j] == s[i:j][::-1]` běží v
+C, a právě proto se ta kubická smyčka na malých vstupech zdá rychlá, a při
+`n = 8000` je to pořád asi **čtyřicet sekund** proti limitu deset sekund.
+
+(Rust pouští tenhle případ s `n = 20000`. Python ho pouští s `8000`, protože
+kvadratická odpověď v pythonní smyčce by při rustí velikosti trvala osm
+sekund, a limit, kterým správný program projde o vlásek, není limit.)
+
+Druhý velký případ, `n = 20000` nad dvoupísmennou abecedou, je případ
+**správnosti**, ne rychlosti: na náhodném binárním řetězci test palindromu
+selže po znaku nebo dvou. Kontroluje, že tvůj generátor a tvoje rozhodování
+o nejlevějším indexu souhlasí s našimi ve velkém.
+
+Takže: testy odmítnou kubické a přijmou kvadratické. **Nežádají**
+Manacherův algoritmus, který je odpovědí `O(n)`. Věz, že existuje a co dělá,
+protože „a dokážeš to líp než kvadraticky?“ je doplňující otázka, kterou má
+tahle otázka obvykle připravit.
+'''
+hints = [
+  "Dvě rozšíření na střed: (c, c) pro liché délky a (c, c + 1) pro sudé. Starteru chybí to druhé.",
+  "Když se smyčka zastaví, i a j se oba posunuly o jedno za palindrom — takže začíná na i + 1 a jeho délka je j - i - 1.",
+  "Aktualizuj jen při ostře delším palindromu a nejlevější z každé délky je ten, který si necháš, a na ten se AT ptá. A `i >= 0` se musí kontrolovat ručně: s[-1] je v Pythonu platný index a je to špatný znak.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "python.hacker.32.modular"
+title = "Modulo miliarda sedm"
+story = "Ta fráze se objeví na konci zadání a polovina místnosti neví, co po nich chce."
+brief = '''
+Na standardním vstupu je `n q seed`. Vygeneruj `q` dotazů, v 64bitové
+aritmetice, která přetéká (maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+Pro každý dotaz spočítej kombinační číslo `C(a, b)` **modulo
+1000000007**. Vypiš součet všech `q` odpovědí, sám modulo `1000000007`, pak
+`LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` má při těchto velikostech stovky tisíc číslic. Python by ho
+opravdu spočítal — `math.comb(200000, 100000)` existuje a vrátí celé číslo —
+a to je v tomhle jazyce ta past: je to správně, trvá to desítky milisekund
+na dotaz a není to to, co „modulo prvočíslo“ znamená. Každé násobení se
+redukuje průběžně. Problém je dělení: `a! / (b! (a-b)!)` nemá v modulární
+aritmetice smysl. Nahradí ho **modulární inverze**, a protože `1000000007`
+je prvočíslo, dá ti ji malá Fermatova věta: `inverse(v) = v^(p-2) mod p`.
+Pythonní `pow(v, p - 2, p)` se třemi argumenty je přesně tohle, v C, jedním
+voláním.
+
+Takže: jednou předpočítej `factorial[0..n]` a na každý dotaz odpověz jako
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 200000`,
+`q = 200000`. Počítání každého koeficientu zvlášť — vynásobit `b` členů,
+vydělit `b` členy, na každý jedna modulární inverze — do limitu běhu deset
+sekund nedoběhne; to je starter. Jedna sdílená tabulka faktoriálů doběhne
+asi za půl sekundy. Obojí změřeno na tomhle stroji.
+
+Každý mezivýsledek je součin dvou hodnot pod `2^30`, takže by se vešel do
+`i64`; v Pythonu nepřeteče nic tak jako tak a důvodem redukovat po každém
+násobení je rychlost, ne správnost. V jazyce s 32bitovým `int` by to bylo
+obojí, a to je ta druhá polovina toho, proč se na tuhle otázku ptají.
+'''
+hints = [
+  "Redukuj po každém násobení. Python nepřeteče, ale násobit mezivýsledek s 200000 číslicemi je pomalé a % P drží každé číslo pod 2^30.",
+  "pow(v, P - 2, P) je modulární inverze a funguje jen proto, že P je prvočíslo — to je tu celý obsah malé Fermatovy věty. Python 3.8 a novější přijme i pow(v, -1, P), což je totéž řečené napřímo.",
+  "Předpočítat i inverzní faktoriály, směrem dolů od inverse(factorial[n]), odstraní z každého dotazu obě volání pow(). K projití to potřeba není, a stojí za to to říct nahlas.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "python.hacker.33.grid-paths"
+title = "Přes blok, nikdy zpátky"
+story = "Doručovací mřížka se třemi ulicemi zavřenými kvůli bambusovému lešení. Kolika cestami se dá projít a která je nejlevnější."
+brief = '''
+Na standardním vstupu je `r c pct seed`. Mřížku si postav sám, po řádcích,
+s **dvěma** losovanými hodnotami na každé políčko, v 64bitové aritmetice,
+která přetéká (maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Pohybuj se jen **doprava** nebo **dolů**, přes volná políčka. Vypiš:
+
+1. `PATHS <k>` — kolik různých cest vede z `(0,0)` do `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — nejmenší celkovou cenu cesty, včetně obou koncových bodů,
+   nebo `-1`, když žádná cesta není
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+Jeden průchod po řádcích udělá obojí: cesty do políčka jsou součtem cest do
+něj shora a zleva a jeho nejlepší cena je jeho vlastní cena plus levnější z
+těch dvou. Protože se pohybuješ jen doprava nebo dolů, obě políčka, která
+potřebuješ, jsou vždycky už hotová — a proto to nepotřebuje rekurzi ani
+množinu navštívených. Memoizovaná rekurze by byla taky lineární v počtu
+políček a na případu `1000 × 1000` by byla taky dva tisíce rámců hluboká,
+což je dvojnásobek pythonního limitu; smyčka je tu odpovědí i z tohoto
+důvodu, nejen z toho obvyklého.
+
+Počet `PATHS` se bere modulo `1000000007` z obvyklého důvodu: na skrytém
+případu `1000 × 1000` má skutečné číslo přes šest set číslic. Python by ho
+udržel. Redukuj při sčítání stejně; zadání to řeklo a neredukované číslo je
+špatná odpověď.
+
+**Co velký případ vynucuje:** odmítne každou odpověď, která cesty vyjmenovává.
+Je jich víc, než je v místnosti atomů.
+'''
+hints = [
+  "Losuj obě hodnoty pro každé políčko, včetně dvou rohů — generátor je nepřeskakuje, jen je odmítá zablokovat.",
+  "Volné políčko bez volného souseda shora ani zleva je dosažitelné nula cestami a nemá nejlepší cenu; None je poctivé `unreachable` a `is not None` je stráž, než porovnáš nebo přičteš.",
+  "Cíl může být volný a přesto nedosažitelný, a přesně tehdy je PATHS 0 a MIN -1. Jeden ze skrytých případů je tohle.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "python.hacker.34.stable-sort"
+title = "Shody si drží místo"
+story = "Dva kurýři skončili se stejným skóre a žebříček je při každém překreslení dá v jiném pořadí."
+brief = '''
+Na standardním vstupu je `n buckets seed`. Postav `n` kurýrů, kde kurýr `i`
+má index `i` a skóre, v 64bitové aritmetice, která přetéká (maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Seřaď kurýry podle skóre **sestupně**. Kurýři se stejným skóre si musí
+nechat pořadí, v jakém přišli. Vypiš jejich indexy, oddělené mezerami, pak
+`TIES <k>` — kolik sousedních dvojic ve tvém seřazeném pořadí má stejné
+skóre.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` je malé, takže skoro všechno je shoda a odpověď je skoro celá
+rozhodnutá tím, co se s nimi stane.
+
+**Tohle je quest o tom, vědět, které řazení držíš v ruce.** Pythonní
+`sorted` i `list.sort` jsou **stabilní**, vždycky — Timsort to slibuje — a
+o `reverse=True` je zdokumentované, že ten slib drží: stejné prvky zůstanou
+v původním pořadí, i když je řazení obrácené. Co stabilní *není*, je seřadit
+vzestupně a pak seznam převrátit přes `[::-1]`: to obrátí shody spolu se
+vším ostatním a přesně to dělá starter. Na ukázce je viditelně zamíchá; na
+skutečném vstupu to udělá vždycky.
+
+Správné odpovědi jsou dvě a měl bys umět dát obě. Seřaď sestupně s
+`reverse=True`, nebo se zneguovaným klíčem, a zbytek nech na stabilitě.
+**Nebo** udělej porovnání **úplné** — řaď podle `(-score, index)`, aby se
+žádné dva prvky nikdy neporovnaly jako stejné a stabilita přestala být
+otázkou. To druhé je to, po čem sahat ve výchozím stavu; úplné pořadí nemá
+co dokazovat.
+
+Hodiny tu rychlost neměří a nemají co měřit: `sorted` je `sorted`, ať
+napíšeš kteroukoli z těch dvou. Tyhle čtyři případy rozhoduje výhradně to,
+co se stane se shodami. Tenhle je o tom, vědět, co tvoje řazení slibuje, ne
+o tom, jak rychle ten slib drží.
+'''
+hints = [
+  "Smaž [::-1] a přidej reverse=True. To je ta stabilní odpověď a dokumentace ji slibuje: reverse=True shody neobrací.",
+  "Druhá odpověď řadí podle key=lambda r: (-r[0], r[1]) — úplné pořadí, takže nezbydou žádné shody, u kterých by šlo být nestabilní. Nikdy neřaď holé n-tice: (score, index) při shodě porovná index, vzestupně, a ty jsi chtěl sestupné skóre se vzestupným indexem.",
+  "TIES počítá sousední stejná skóre v hotovém pořadí a ten počet je stejný, ať jsi napsal kteroukoli z těch dvou — prozradí tě pořadí indexů.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "python.hacker.28.lru"
+title = "Limit rekurze"
+story = "Room 7-32, poslední otázka, počtvrté. Tazatel vypne monitor a jazyk na tabuli je ten, který se zastaví na tisíci rámcích."
+brief = '''
+První řádek je `cap q` a pak buď `q` řádků operací, každá
+`PUT <key> <value>` nebo `GET <key>` — nebo, když první řádek nese **třetí**
+číslo `seed`, už žádné další řádky a `q` operací pochází z generátoru níže.
+
+Implementuj cache s pevnou kapacitou, která při zaplnění vyhodí **nejdéle
+nepoužitou** položku. `GET` i `PUT` se počítají jako použití klíče. `PUT`
+klíče, který cache už drží, nahradí jeho hodnotu a udělá z něj ten
+nejčerstvější — nepřidá žádnou položku, takže nic nevyhodí, ať je cache
+jakkoli plná.
+
+Pro každý `GET` vypiš hodnotu, nebo `-1`, když tam není. Na konci vypiš
+přeživší klíče, nejčerstvěji použité první, oddělené mezerami — nebo `-`,
+když je cache prázdná — a pak `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Projdi si ukázku: `GET 1` udělá `1` znovu čerstvým, takže když `PUT 3`
+potřebuje místo, jde pryč `2`. `GET 2` mine. `GET 3` zasáhne a udělá `3`
+nejčerstvějším, a proto se přeživší vypíšou jako `3 1`.
+
+Generovaná forma, v 64bitové aritmetice, která přetéká (maskuj ručně):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q operations:
+    a   = next()
+    key = next() % (2 * cap)
+    if a % 4 == 0:   GET key
+    else:            PUT key (next() % 100)        # the value is a third draw
+```
+
+**Starter je správně.** Spusť ho na ukázce a na každém případu, který
+dokážeš napsat, a pokaždé je správně. Zpracovává operace tak, jak by to
+udělal funkcionální jazyk — obsloužit první, zanořit se na zbytek — a
+Python funkcionální jazyk není. Nemá eliminaci koncových volání, každé
+volání je skutečný rámec a `sys.getrecursionlimit()` je `1000`. Skrytý
+generovaný případ má dva tisíce operací a starter na něm umře s
+
+```
+RecursionError: maximum recursion depth exceeded
+```
+
+To je boss. `sys.setrecursionlimit(10000)` ho nechá zmizet, a je to špatná
+odpověď: ten limit tam je, protože zásobník C pod interpretem je konečný, a
+zvednout ho dost vysoko udělá z čisté výjimky segmentation fault. Rekurze
+nikdy nebyla tvarem tohohle problému. Operace jsou posloupnost; posloupnost
+je smyčka `for`. (A `ops[1:]` při každém volání zkopíruje zbytek seznamu,
+takže rekurzivní verze byla taky kvadratická, čehož si nikdo nevšiml,
+protože se nikdy nedostala dost daleko, aby na tom záleželo.)
+
+Pak samotná cache. Učebnicová odpověď je hashovací mapa do obousměrně
+spojového seznamu a Python ji má ve standardní knihovně se skrytými
+ukazateli: `collections.OrderedDict`. `move_to_end(key)` je ten „dotyk“ a
+`popitem(last=False)` je vyhození ze studeného konce, obojí `O(1)`, takže
+každá operace tady je `O(1)` a můžeš to říct bez vytáček. (Obyčejný `dict`
+drží pořadí vložení od verze 3.7 a chybí mu jen `move_to_end`; smazat klíč a
+znovu ho vložit je tentýž trik napsaný ručně.) Cache starteru je dict
+dvojic `(value, stamp)` s procházením kvůli nejstaršímu razítku při
+vyhazování, což je `O(cap)` — správně, a druhá věc k opravě.
+'''
+hints = [
+  "Přečti si traceback: končí na RecursionError a je to tisíc řádků téže funkce. Oprava téhle poloviny je smyčka for přes ops a nic jiného se nemění.",
+  "OrderedDict: `move_to_end(key)` při každém zásahu a každém přepsání, `popitem(last=False)`, když dorazí nový klíč a cache je plná. Přepsání klíče, který už tam je, není vyhození — zkontroluj členství dřív, než rozhodneš, že je cache plná.",
+  "Přeživší jsou OrderedDict čtený od horkého konce: reversed(cache) je od nejčerstvějšího, takže poslední řádek nepotřebuje žádné řazení ani razítka.",
+  "sys.setrecursionlimit není oprava, a vědět proč je ta odpověď, kterou chtějí: limit posune, neodstraní, a od určitého bodu interpret přestane vyhazovat výjimky a začne padat.",
+]

@@ -1,5 +1,1 @@
 luajit: main.lua:2: no such lantern
-stack traceback:
-	[C]: in function 'error'
-	main.lua:2: in main chunk
-	[C]: at 0x<pc>

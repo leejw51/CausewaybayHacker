@@ -562,7 +562,8 @@ jobs:
       # Every translation file under content/i18n/<locale>/ that EXISTS keeps
       # every rule of SPEC §12.1: real quest ids, matching hint counts, '''
       # strings, and the English brief's fenced code blocks verbatim. A
-      # language nobody has started yet is reported, not failed.
+      # language, and since 2026-09-28 every pack in every language, is
+      # complete: --require-complete fails the job on a quest left untranslated.
       #
       # That split is deliberate. Translating 207 quests into five languages
       # is incremental, and a gate that only goes green on the last one is red
@@ -574,9 +575,10 @@ jobs:
       # `content/i18n` is a directory of translations, not a pack, so the
       # packs are named land by land rather than with `content/*/*.toml`.
       - run: >
-          python3 tests/content/verify_pack.py --i18n
+          python3 tests/content/verify_pack.py --i18n --require-complete
           content/rust/*.toml content/go/*.toml content/cpp/*.toml content/python/*.toml
-          content/pytorch/*.toml content/remix/*.toml content/zig/*.toml content/lua/*.toml
+          content/pytorch/*.toml content/typescript/*.toml content/remix/*.toml
+          content/zig/*.toml content/lua/*.toml
 
   # A dry run of the server tarball, on every push and pull request. It is the
   # whole release path minus signing: the frontend and both binaries are

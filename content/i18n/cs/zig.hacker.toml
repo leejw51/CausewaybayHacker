@@ -1,0 +1,1593 @@
+# ZIG LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/zig/hacker.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "zig.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.hacker.01.two-sum"
+title = "Dvě jízdenky"
+story = "Room 7-32, posedmé. První otázka je ta, kterou dostane každý, a tentokrát je nepoužitá proměnná chybou překladu dřív, než je špatnou odpovědí."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` celých čísel.
+
+Vypiš indexy `i j` (**od 1**) dvou různých položek, které dají dohromady
+`target`, jako `i j` s `i < j`. Pokud vyhovuje víc dvojic, dej tu, jejíž
+druhý index je nejmenší; pokud je i tak shoda, nejmenší první index.
+Pokud nevyhovuje žádná dvojice, vypiš `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+Skryté případy jsou tu malé: kontrolují rozhodnutí při shodě a
+případ bez odpovědi, ne tvou rychlost. Otázka je pořád ta lineární — jeden
+průchod, jedna `std.AutoHashMap(i64, usize)` — protože skutečné `n` je 200000 a
+vnořená smyčka je přesně to, co má tahle otázka vytřídit. Napiš odpověď,
+na kterou se otázka ptá, ne tu, která náhodou projde těmito čtyřmi
+případy.
+
+Přečti celý standardní vstup pomocí `allocRemaining`, projdi ho pomocí
+`std.mem.tokenizeAny` a vypisuj přes bufferovaný zapisovač —
+`defer w.flush() catch {};` je to, co dostane bajty ven, když `main` vrátí
+předčasně při zásahu.
+'''
+hints = [
+  "Jeden průchod. Pro každou hodnotu se zeptej, jestli už bylo viděno target minus ona: seen.get(target - v) ti dá ?usize a if se zachycením ho rozbalí.",
+  "Hodnotu dej do mapy, jen když tam ještě není, což zachová první index opakované hodnoty — rozhodnutí při shodě, které zadání žádá.",
+  "Vypiš a vrať se ve chvíli, kdy ji najdeš — první zásah při procházení už je nejmenší druhý index. Odložený flush při tom předčasném návratu pořád proběhne.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.hacker.02.window"
+title = "Bez opakování"
+story = "Druhá otázka je na tabuli dřív, než je fix zpátky v přihrádce."
+brief = '''
+Jeden řádek textu, bez mezer.
+
+Vypiš délku nejdelšího úseku znaků, ve kterém se nic neopakuje, pak
+úsek samotný. Pokud je víc úseků stejně dlouhých, vypiš ten nejlevější.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+Okno se hýbe jen doprava. Pokud zjistíš, že po opakování procházíš znovu od
+začátku, napsal jsi tu kvadratickou verzi.
+
+Případy jsou tu malé a hodiny neměří rychlost. Ani nemohou:
+na náhodném řetězci nemá verze s opakovaným procházením nikdy víc než pár znaků
+k projití, než narazí na opakování, takže skončí stejně rychle jako okno
+při jakékoli velikosti. Tyto čtyři případy kontrolují délku, rozhodnutí o nejlevějším
+a úsek samotný. Okno napiš stejně. Je `O(n)` na každém vstupu,
+ne jen na většině, a vstup, který ti dá skutečný pohovor, je vybraný
+tak, aby nebyl laskavý.
+
+Text jsou bajty, takže tabulka „naposledy viděn na“ nepotřebuje hašovací mapu: pole
+256 volitelných hodnot, `[_]?usize{null} ** 256`, indexované bajtem, a `null` je
+„nikdy neviděn“. Úsek na konci je řez vstupu,
+`text[start .. start + len]`, ne kopie.
+'''
+hints = [
+  "Pamatuj si index, kde byl každý bajt naposledy viděn, a index, kde okno začíná.",
+  "Opakování má význam, jen když je jeho poslední pozice uvnitř současného okna — to je test previous >= start, uvnitř if, které rozbaluje volitelnou hodnotu.",
+  "Zaznamenej nejlepší délku a kde začala, jinak úsek na konci nevypíšeš; řez textu udělá zbytek.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.hacker.03.intervals"
+title = "Rozpis budek"
+story = "Dají ti rozpis budek z mýtnice a ptají se, ve kterých hodinách v budce doopravdy někdo je."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je `<start> <end>` s `start <= end`.
+
+Slouč každou dvojici, která se překrývá nebo dotýká, a vypiš výsledek vzestupně,
+jeden `<start> <end>` na řádek, pak `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Dotyk se počítá jako překryv: `1 4` a `4 5` se sloučí do `1 5`.
+
+Seřaď řez struktur pomocí `std.mem.sort(Span, spans, {}, byStart)`, kde
+`byStart` je obyčejná `fn (void, Span, Span) bool`. Pak jeden průchod, připojování
+do `std.ArrayList(Span)` a prodlužování jeho posledního prvku na místě přes
+ukazatel do `.items`.
+'''
+hints = [
+  "Napřed seřaď podle začátku — startovní kód už to dělá. Pak stačí jeden průchod zleva doprava.",
+  "Prodluž poslední sloučený interval, když je nový začátek <= jeho konci; jinak připoj nový. Ukazatel do merged.items ti dovolí zapsat konec na místě.",
+  "Prodlužuj na @max(last.end, end) — krátký interval pohlcený dlouhým ho nesmí zkrátit.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.hacker.04.grid"
+title = "Ven z budovy"
+story = "Půdorys na tabuli, požární dveře v protějším rohu a pohovorující, který sleduje hodiny, ne fix."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je patro: `.` je volno, `#` je zeď.
+
+Začni vlevo nahoře `(0,0)` a dojdi vpravo dolů `(r-1, c-1)`, pohybem
+nahoru, dolů, doleva nebo doprava jen přes volná pole.
+
+Vypiš počet **kroků** na nejkratší cestě, nebo `-1`, když žádná není.
+Pak vypiš `REACHED <k>`: kolik volných polí je ze startu dosažitelných,
+včetně startu samotného.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Do šířky, ne do hloubky. Průchod do hloubky najde *nějakou* cestu;
+otázka se ptá na tu nejkratší.
+
+Standardní knihovna má `std.Deque` a tady ho nepotřebuješ:
+`std.ArrayList(usize)` indexů polí s indexem `head`, který se hýbe jen
+dopředu, je fronta, zůstává `O(1)` na push i pop a je to tvar,
+který napsat, když se celá fronta stejně projde jednou. Na jednom tahle
+země trvá: souřadnice souseda sestav v `i64` a hranice zkontroluj
+*dřív*, než uděláš `@intCast` na `usize`. `usize`, který klesne pod nulu,
+není `-1`, je to `panic: integer overflow` a zastaví to program.
+'''
+hints = [
+  "ArrayList s indexem head, který se hýbe jen dopředu, je fronta — připojuj dozadu, čti na head — a to je tady celý rozdíl mezi BFS a DFS.",
+  "Pole označ, když ho vkládáš, ne když ho vybíráš, jinak se do fronty dostane několikrát.",
+  "Mřížka vzdáleností zároveň slouží jako množina navštívených: -1 znamená ještě neviděno, takže druhou strukturu nepotřebuješ.",
+  "Dvě malá pole se čtyřmi posuny jsou lepší než čtyři kopie těla. Kontrolu hranic dělej v i64 dřív, než uděláš @intCast: při r == 0 je soused nahoře -1 a usize, který se snaží držet -1, je panika, ne přetočení.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.hacker.05.binary-search"
+title = "Jak velká dodávka"
+story = "Tunelový sklad chce nejmenší dodávku, která odveze denní pytle mincí za dny, které mají. Dodávku nejmenují; řeknou, jestli ta, kterou jmenuješ ty, je moc malá."
+brief = '''
+První řádek je `n d`. Druhý řádek je `n` vah balíků v pořadí, v jakém se musí
+nakládat — pořadí se měnit nesmí.
+
+Najdi nejmenší kapacitu dodávky, která odveze všech `n` balíků nejvýš za `d`
+dní, při nakládání v pořadí a bez dělení balíku.
+
+Vypiš kapacitu, pak `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+Neprohledáváš seznam. Prohledáváš **odpověď**:
+kapacity od `max(weight)` po `sum(weights)`, na kterých je „vejde se to za `d`
+dní“ nepravda, nepravda, nepravda a pak navždy pravda. Na to binární vyhledávání.
+
+Případy jsou tu malé a hodiny neměří rychlost. Žádný velký
+skrytý případ není: tento vstup je `n`, `d` a seznam a generátor, který by ho vyrobil,
+by si musel vymyslet `d`, což je přesně ten druh volby, kvůli kterému se
+dvě země neshodnou na téže otázce. Tvrzení pořád platí tam, kde na tom
+záleží — při skutečném `n` jdou kapacity od `max(weight)` po
+`sum(weights)`, rozsah řádu `10^14`, a procházení nahoru po něm
+neskončí. Napiš binární vyhledávání, ne procházení.
+
+Střed je `low + @divTrunc(high - low, 2)`: Zig nemá `/` na znaménkových
+celých číslech, protože nebude hádat, jaké zaokrouhlení jsi myslel.
+'''
+hints = [
+  "Dolní mez je nejtěžší jednotlivý balík — nic menšího ho nikdy neunese.",
+  "Horní mez je součet: jeden den, všechno naráz. Sčítej v i64.",
+  "low + @divTrunc(high - low, 2) a při úspěchu posuň high dolů na mid, ať si ponecháš nejmenší kapacitu, která fungovala.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.hacker.06.stack"
+title = "Další větší"
+story = "Sloupec mýtného na tabuli a jedna otázka: pro každé z nich, které další za ním je větší."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Pro každou položku vypiš první položku **napravo od ní**, která je ostře
+větší, nebo `-1`, když žádná není. Dej je na jeden řádek, oddělené mezerou. Pak
+vypiš `NONE <k>`, kolik z nich bylo `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Drž zásobník pozic, jejichž odpověď ještě není známá, a ten zůstává
+klesající odspodu nahoru. Každá pozice se jednou vloží a jednou vybere,
+takže celé je to jeden průchod, ať to vypadá jakkoli.
+
+Případy jsou tu malé a hodiny neměří rychlost, a u této
+otázky by velký případ nepomohl. Procházení doprava od každé pozice, dokud
+se neobjeví něco většího, najde odpověď na náhodných hodnotách během pár kroků
+a porazí jakékoli hodiny při jakékoli velikosti. Velký případ by odmítl
+sestupné pole, což je ten jediný vstup, na kterém je to procházení kvadratické.
+Zásobník je pořád odpověď: je to jeden průchod na *každém* vstupu, ne
+jen na většině.
+
+`std.ArrayList(usize)` je zásobník: `append` vkládá, `pop()` vrací
+`?usize` a vršek je `items[items.len - 1]`.
+'''
+hints = [
+  "Zásobník drží indexy, které pořád čekají na odpověď, ne hodnoty. ArrayList s append a pop je zásobník.",
+  "Když nová hodnota přebije hodnotu na vršku zásobníku, odpověď toho indexu je nová hodnota — a vybírej dál, může jich přebít několik.",
+  "Ostře větší, takže stejné hodnoty se navzájem nevyřeší; naskládají se a vyřeší se spolu později.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.hacker.07.coins"
+title = "Přesně nazpátek"
+story = "Budka 3 má tři misky na mince a řidiče, který nevezme bankovku."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` hodnot mincí. Každá mince je
+k dispozici v neomezeném množství.
+
+Vypiš nejmenší počet mincí, který dá přesně `target`, nebo `-1`, když to
+nejde. Pak vypiš `REACH <k>`: kolik z částek `0..=target`
+se dá složit vůbec, včetně `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+Skryté případy jsou malé, takže chytají spíš chybnost než
+pomalost — a jeden z nich chytá obvyklou špatnou odpověď. Hladový postup, který bere
+největší minci, která se vejde, a opakuje to, skládá `6` z `3 4` tak, že chňapne
+`4` a pak selže, a přesně na to je tu případ. Druhá špatná
+odpověď, obyčejná rekurze bez tabulky, se tu nechytí a pořád to není
+ta, kterou psát: `target` je ve skutečnosti 100000 a táž částka se
+přepočítává tisíckrát.
+
+Značka „nedá se složit“ v tabulce je `std.math.maxInt(i64)`. Přičíst k ní jedna
+tu není nedefinované ani potichu špatně: je to `panic:
+integer overflow` a program se zastaví. Než k poli přičteš, otestuj
+ho. (`unreachable` je v tomto jazyce klíčové slovo, takže se značka jmenuje
+jinak.)
+'''
+hints = [
+  "best[0] = 0 a best[a] je o jedna víc než nejlevnější best[a - coin] přes všechny mince, které se vejdou.",
+  "Ohlídej si čtení pole never dřív, než k němu přičteš jedna — maxInt(i64) + 1 je v Debug panika a program se tam zastaví.",
+  "REACH je prostě počet polí hotové tabulky, která nejsou pořád označená never.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.hacker.08.top-k"
+title = "Pět nejčastějších"
+story = "Zahřívací kolo. Chtějí pět slov, která se nejčastěji objevila na loňských tiketech incidentů, a stejně ti to měří."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` slov oddělených mezerami.
+
+Vypiš `k` nejčastějších slov, nejčastější první, při shodě podle
+slova vzestupně, jedno na řádek. Pokud je různých slov méně než `k`,
+vypiš je všechna. Pak vypiš `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Spočítej hašovací mapou, pak seřaď. Rozhodnutí při shodě není ozdoba.
+`std.StringHashMap` vydává své položky v jakémkoli pořadí, v jakém zrovna
+jsou její místa — v pořadí, které se mění s kapacitou a s vkládáním —
+takže porovnávač, který se dívá jen na počet, nechá slova se stejným počtem v tom
+pořadí a tentýž program vypíše při dalším běhu jinou odpověď.
+Udělat porovnání **úplným** — počet sestupně, pak slovo vzestupně
+pomocí `std.mem.lessThan(u8, a, b)` — je to, co to opraví, a je to odpověď,
+na kterou pohovorující čeká.
+
+Klíče mapy jsou řezy `[]const u8` a mapa je nekopíruje: musí
+mapu přežít, a řezy `input` ji přežijí.
+
+Případy jsou tu malé a hodiny neměří rychlost. U této otázky je to
+správně — počítání a řazení je `O(n log n)`,
+ať ho napíšeš jakkoli, a to, na čem tu kandidát doopravdy selže, je
+porovnávač, který kontroluje případ `ties` a velký případ by nekontroloval.
+'''
+hints = [
+  "Jeden průchod k počítání s getOrPut, jedno řazení k pořadí. Nesnaž se udržovat pořadí aktuální během počítání.",
+  "Porovnávač vrací a.count > b.count, když se počty liší, a std.mem.lessThan(u8, a.word, b.word), když ne — úplné uspořádání, takže pořadí míst v mapě se nemůže projevit.",
+  "@min(k, ranked.items.len) je to, co dělá příliš velké k bezpečným; řezání za konec řezu je tu panika, ne tiché čtení.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.hacker.09.linked-list"
+title = "Řetěz"
+story = "Chtějí to bez řezu. Uzly, které ukazují na uzly, každý zaplacený pomocí create a vrácený pomocí destroy, protože o tom tvaru ta otázka doopravdy je."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel v pořadí.
+
+Postav z nich jednosměrně propojený seznam — `?*Node` na každý článek, každý uzel z
+`gpa.create(Node)`, žádný řez v odpovědi — pak vypiš tři řádky:
+
+1. obrácený seznam, oddělený mezerami
+2. hodnotu prostředního uzlu (pro sudé `n` druhý z těch dvou)
+3. `LEN <n>` spočítané procházením seznamu, ne důvěrou ve vstup
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+Prostředek je běžec: jeden ukazatel po jednom kroku, jeden po dvou
+krocích, a když ten rychlý dojde, je tam ten pomalý. Jeden průchod.
+
+Verze této otázky v C++ se ptá s `unique_ptr`. Zig nemá
+vlastnický typ ukazatele: nejbližší je obyčejný `*Node` z `gpa.create`
+a vlastníkem je ten, kdo si vzpomene na něm zavolat `gpa.destroy`. Nic neběží,
+když ukazatel opustí rozsah. Obrácení je tedy poctivé v tom, co
+přesouvá: uzel se odpojí z jednoho seznamu a napojí do druhého zápisem
+jeho `next` a není chvíle, kdy by si ho oba seznamy myslely, že ho vlastní,
+protože vlastnictví v ukazateli nikdy nebylo. Když je výpis
+hotový, projdi obrácený seznam ještě jednou a vrať každý uzel;
+`DebugAllocator` — kterým `init.gpa` v sestavení Debug je — jmenuje na stderr
+každý, na který zapomeneš.
+
+Holý `?*Node` pro *procházení* je pořád správně — dívá se a nic nevlastní.
+`while (walk) |node| : (walk = node.next)` je ten obrat.
+'''
+hints = [
+  "Stavět odzadu dopředu je ten snadný směr: každý nový uzel dostane starou hlavu jako svůj next. Počítej hodnoty dolů od n, protože usize pod nulu nesestoupí.",
+  "K obrácení: zapamatuj si zbytek (head = node.next), nasměruj uzel na obrácený seznam a udělej z něj novou obrácenou hlavu. Tři zápisy na uzel a žádný uzel není nikdy v obou seznamech.",
+  "Pro prostředek posuň slow jen v krocích, kdy fast zvládl dva.",
+  "Nic za tebe uzel neuvolní. Po výpisu projdi obrácený seznam a na každý uzel zavolej gpa.destroy; v sestavení Debug alokátor ohlásí každý, který vynecháš.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.hacker.10.tree-walk"
+title = "Třikrát kolem stromu"
+story = "Strom na tabuli a otázka, nad kterou by nikdo neměl přemýšlet dvakrát: vyjmenuj ta tři pořadí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` hodnot v **pořadí po úrovních**, kde `-1` znamená
+„tady žádný uzel“ — strom je tedy uložený tak jako halda: potomci
+indexu `i` jsou `2i+1` a `2i+2`.
+
+Vypiš čtyři řádky: průchody **preorder**, **inorder** a **postorder**, každý
+oddělený mezerami, a pak `DEPTH <d>` — počet uzlů na nejdelší
+cestě od kořene k listu.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder je uzel, levý, pravý. Inorder je levý, uzel, pravý. Postorder je
+levý, pravý, uzel. Rekurze jsou pokaždé tytéž tři řádky a hýbe se jen
+pozice `append`.
+
+Průchod sbírá do `std.ArrayList(i64)` předaného přes ukazatel, a protože
+`append` může selhat při alokaci, průchod vrací `!void` a každé rekurzivní
+volání má `try`. Chyby jsou tu hodnoty; funkce, která může selhat, to říká ve
+své signatuře, celou cestu nahoru až do `main`.
+'''
+hints = [
+  "Jedna rekurzivní funkce s append na třech možných místech je lepší než tři skoro stejné funkce.",
+  "Základní případ jsou obě podmínky naráz: za koncem řezu, nebo na -1 — a musí se zkontrolovat dřív, než se index použije, protože index za koncem je tu panika.",
+  "Hloubka je 1 + hlubší z obou potomků a 0 pro chybějící uzel.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.hacker.11.bst"
+title = "Je to opravdu BST"
+story = "Doplňující otázka. Každý zkontroluje ty dva potomky a každý se napoprvé mýlí."
+brief = '''
+Totéž kódování po úrovních jako v minulém úkolu: `-1` je chybějící uzel, potomci
+`i` jsou `2i+1` a `2i+2`.
+
+První řádek je `n q`. Druhý řádek je `n` hodnot stromu. Třetí řádek je `q` hodnot
+dotazů.
+
+Vypiš `VALID` nebo `INVALID` — je to binární vyhledávací strom, kde je každá hodnota v
+levém podstromu ostře menší než uzel a každá hodnota v pravém
+ostře větší? Pak jeden řádek na dotaz: `<value> FOUND <depth>`, když ji
+hledání najde, `<value> ABSENT`, když ne, kde kořen má hloubku 1.
+
+Hledání je to binární vyhledávání, kvůli kterému strom je: začni v kořeni, jdi doleva,
+když je hodnota menší, jinak doprava, a zastav se, když na ni narazíš,
+nebo na chybějící uzel — `-1`, nebo index za koncem řezu. Na
+stromu INVALID může ten průchod minout hodnotu, která v řezu sedí, a
+odpověď je pořád `ABSENT`: dotaz se ptá, co najde vyhledání, ne co
+by našlo projití řezu. Jeden ze skrytých případů je přesně tohle.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Kontrolovat `left < node < right` u každého uzlu **nestačí** — hodnota hluboko
+v levém podstromu může být pořád větší než předek. Nes místo toho dolů
+otevřený interval, začínající na `std.math.minInt(i64)` a
+`std.math.maxInt(i64)`.
+'''
+hints = [
+  "Předávej dolů otevřený interval (low, high). Kořen dostane celý rozsah i64; levý potomek dostane (low, node), pravý potomek (node, high).",
+  "Chybějící uzel je platný triviálně — to je základní případ a vrací true, ne false.",
+  "Vyhledání je binární vyhledávání: menší jde doleva, jinak doprava, a hloubka je, kolik skoků to trvalo.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.hacker.12.heap"
+title = "K seřazených front"
+story = "Každá budka posílá své stvrzenky už seřazené. Slouč je do jedné řady, aniž bys to celé znovu řadil."
+brief = '''
+První řádek je `k`. Pak `k` řádků, každý je počet následovaný tolika celými čísly,
+už seřazenými vzestupně.
+
+Vypiš je všechna sloučená do jednoho vzestupného řádku, oddělená mezerami, pak
+`POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+`std.PriorityQueue(T, Context, compareFn)` je **min**-halda na jakémkoli
+uspořádání, které vrátí `compareFn`, takže směr haldy tu není chyták: dej
+jí `fn (void, Entry, Entry) std.math.Order`, která řadí podle hodnoty, a
+`pop()` vrátí nejmenší jako `?Entry`. Je bez vlastního alokátoru, jako
+`ArrayList` — `.empty` na začátek, `push(gpa, x)`, `deinit(gpa)`.
+To je celá část specifická pro Zig a je to to, co otázka kontroluje.
+
+Halda drží jednu položku na seznam, ne jednu na prvek, takže zůstává na velikosti
+`k`, ať jsou seznamy jakkoli dlouhé.
+
+Případy jsou tu malé a hodiny neměří rychlost, a u této
+otázky by to žádný případ nedokázal. Nasypat všechny seznamy do jednoho řezu a zavolat
+`std.mem.sort` tyhle projde a prošlo by i velkým: `O(N log N)`
+proti `O(N log k)` haldy není rozdíl, který limit běhu uvidí. Kontroluje se
+to, že umíš haldu napsat. Pohovorující čeká na
+invariant jedné položky na seznam, což je ta část, na které záleží, když se
+seznamy nevejdou do paměti naráz.
+'''
+hints = [
+  "Položka haldy musí nést, odkud hodnota přišla, jinak po jejím vybrání nemůžeš doplnit. Řaď položky jen podle hodnoty; zbytek je účetnictví.",
+  "std.PriorityQueue(Entry, void, byValue) s byValue vracející std.math.order(a.value, b.value) — .empty, push(gpa, e), pop() jako ?Entry.",
+  "Další prvek seznamu vlož, jen když vybereš jeden z jeho prvků — to drží haldu na k.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.hacker.13.backtracking"
+title = "Každá kombinace"
+story = "Vyjmenuj všechny způsoby, jak se dají otevřít pruhy. Všechny, v pevném pořadí, a nevypisuj žádný dvakrát."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` různých celých čísel **už ve vzestupném
+pořadí**.
+
+Vypiš každou podmnožinu, jednu na řádek, hodnoty oddělené mezerou, prázdnou podmnožinu jako
+`-`. Seřaď je tak, jak je vyrobí ta zjevná rekurze: na každé pozici
+napřed větev, která prvek **vezme**, pak větev, která ho přeskočí.
+Pak vypiš `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Vlož, zanoř se, **vyjmi**. Vyjmutí je ta část, kterou lidé vynechávají, a příznakem
+je, že každý řádek po prvním je moc dlouhý.
+
+Rekurze vypisuje průběžně — předej jí zapisovač, `*std.Io.Writer`,
+a `*usize` pro počet — místo aby napřed stavěla každý řádek do
+paměti. Není tu žádná skrytá alokace, o kterou se opřít: řádek se buď
+zapíše, nebo uloží, a uložení je volání `gpa`, za které bys musel zaplatit
+a vrátit ho.
+'''
+hints = [
+  "Dvě rekurzivní volání na prvek: jedno s ním připojeným, jedno bez něj. Napřed vezmi a pořadí z ukázky vyjde samo.",
+  "_ = chosen.pop(); jde mezi ta dvě volání. To je vrácení v zkus-zanoř-vrať a _ = je tam proto, že pop vrací ?i64, který se rozhodneš ignorovat.",
+  "Základní případ je at == nums.len a prázdný výběr tam je prázdná podmnožina, která se pořád počítá.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.hacker.14.word-search"
+title = "Je slovo v mřížce"
+story = "Deska s písmeny a jméno. Chtějí vědět, jestli je to jméno v ní napsané, a chtějí počet slepých uliček."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je mřížka malých písmen. Poslední
+řádek je slovo.
+
+Slovo je v mřížce, když ho dokážeš vyhláskovat pohybem nahoru, dolů, doleva nebo doprava
+mezi **sousedními** poli, bez použití téhož pole dvakrát v jednom pokusu.
+
+Vypiš `FOUND` nebo `ABSENT`, pak `STARTS <k>`: kolik polí drží první
+písmeno slova.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Pole označ jako použité na cestě tam a **odznač ho na cestě zpátky**. Pole,
+které zůstane označené po neúspěšné větvi, nechá pozdější větve selhat z důvodu,
+který v mřížce není.
+
+Řádky vycházejí z `input` jako `[]const u8` — řezy, do kterých se značka
+zapsat nedá. `gpa.dupe(u8, row)` koupí měnitelnou kopii každého a každá kopie se
+vrátí pomocí `gpa.free`, když je hledání u konce.
+'''
+hints = [
+  "Přepiš pole bajtem, který slovo obsahovat nemůže, zanoř se, pak vrať originál.",
+  "Počáteční písmena spočítej samostatným průchodem před hledáním, jinak počet zmatou značky '#'.",
+  "Základní případ úspěchu je at + 1 == word.len — kontrolovaný po shodě tohoto pole, ne před ní.",
+  "Řetěz čtyři směry pomocí `or` místo čtyř if a příznaku found: `or` se samo zastaví na první větvi, která uspěje. Podmínky r > 0 a c > 0 jdou první, protože r - 1 na usize s hodnotou 0 je panika.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.hacker.15.topo-sort"
+title = "V jakém pořadí se to staví"
+story = "Jedenáct zdrojových souborů a graf závislostí. Jmenuj pořadí sestavení, nebo jmenuj cyklus, který znamená, že žádné není."
+brief = '''
+První řádek je `n m`: `n` úloh očíslovaných `0..n-1` a `m` hran. Dalších `m`
+řádků je `<a> <b>`, což znamená, že `a` se musí postavit před `b`.
+
+Vypiš pořadí sestavení na jeden řádek, oddělené mezerami. Když je připraveno víc úloh
+naráz, vezmi tu s **nejnižším číslem**, aby byla odpověď jednoznačná. Pokud žádné
+pořadí neexistuje, vypiš místo toho `CYCLE`. Pak vypiš `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahnův algoritmus: spočítej, na kolik věcí každá úloha čeká, začni s
+těmi, které nečekají na nic, a když úlohu vezmeš, sniž počty jejím závislým.
+Pokud skončíš a úlohy zbudou, jsou ty úlohy ten cyklus.
+
+Množina připravených je `std.PriorityQueue(usize, void, cmp)` s
+`std.math.order` jako porovnáním, takže nejmenší připravená úloha je to, co `pop`
+vrátí. Sousednost je jeden `std.ArrayList(usize)` na úlohu, každý založený
+pomocí `.empty` a každý vrácený pomocí `deinit(gpa)`.
+'''
+hints = [
+  "waiting[b] je vstupní stupeň b — kolik hran do něj vede.",
+  "Obyčejná fronta dá *nějaké* pořadí; min-halda dá *to* pořadí, které zadání žádá.",
+  "Cyklus nikdy neodhalíš přímo. Všimneš si, že vyšlo méně než n úloh, a ty, které zbyly, v něm jsou.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.hacker.16.union-find"
+title = "Kdo je s kým spojený"
+story = "Tramvajová síť, MTR a trasy minibusů na jednom listu. Kolik oddělených sítí doopravdy je."
+brief = '''
+První řádek je `n m`: `n` zastávek očíslovaných `0..n-1`, `m` neorientovaných spojení. Dalších
+`m` řádků je `<a> <b>`.
+
+Vypiš tři řádky: kolik je oddělených sítí, velikost
+největší a `REDUNDANT <k>` — kolik spojení spojilo dvě zastávky, které
+už spojené byly.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: každá zastávka ukazuje na rodiče, `find` dojde ke kořeni, `union`
+nasměruje jeden kořen na druhý. Při návratu z `find` zkracuj cestu
+a celé je to v podstatě konstantní čas na dotaz.
+
+Případy jsou tu malé a hodiny neměří rychlost — `find`, který
+prochází bez zkracování, by prošel všemi čtyřmi, a stejně tak opakované procházení
+celého řezu pro každý dotaz. Stejně zkracuj. Odstavec výše je tvrzení
+o stovce tisíc zastávek a stovce tisíc spojení a je to
+tvrzení, které budeš muset obhájit, ne tyhle čtyři řádky.
+
+`parent` začíná jako identita — `for (parent, 0..) |*p, i| p.* = i;` je
+`iota` v Zigu — a `find` bere řez, ne kopii, protože do něj
+zapisuje.
+'''
+hints = [
+  "Začni s každou zastávkou jako vlastním rodičem a n skupinami; každé úspěšné sjednocení sníží počet o jedna.",
+  "Hrana, jejíž oba konce už mají stejný kořen, je ta nadbytečná — započítej ji a pokračuj.",
+  "Smysl má jen velikost u kořene, takže největší čti z kořenů, ne z každého indexu.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.hacker.17.lis"
+title = "Nejdelší cesta vzhůru"
+story = "Denní tržby, kolik jich chtějí jmenovat, a vyrobíš si je sám ze semínka. Chtějí nejdelší úsek zlepšujících se dnů a ty dny nemusí jít po sobě."
+brief = '''
+Standardní vstup jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole není
+— postavíš si ho sám, **přesně** tímto generátorem, v aritmetice `u64` s
+**přetáčejícími** operátory `*%` a `+%`:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Vypiš délku nejdelší **ostře rostoucí podposloupnosti** — hodnoty
+si drží pořadí, ale nemusí sousedit. Pak vypiš
+`TAILS <k>`, kde `k` je tatáž délka, odečtená z počtu hromádek
+patience sortu.
+
+```
+input:  8 1
+output: 3
+        TAILS 3
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`,
+a nejdelší cesta vzhůru v něm je `93944146 392341189 822192870`. Zkontroluj svůj
+generátor proti tomu řádku dřív, než začneš hledat chybu v algoritmu.
+
+**Tento úkol vynucuje svou složitost.** Startovní kód je tabulka `O(n²)` —
+odpověď, kterou bys měl umět napsat zpaměti, a není špatná. Při `n = 200000`
+by vypsala totéž `881`, co vypíše ta rychlá, po `2 × 10^10`
+porovnáních, a v sestavení Debug se zapnutou každou kontrolou mezí se nevrátí
+v limitu běhu pět sekund. Co uvidíš, je překročení času, ne
+špatná odpověď. To je selhání, kvůli kterému tahle otázka existuje.
+
+Ta `O(n log n)` si pro každou délku drží nejmenší hodnotu, na které může
+podposloupnost té délky končit — seznam, který je vždy seřazený, takže pozice
+nové hodnoty je binární vyhledávání a `std.sort.lowerBound` je to hledání.
+Zvládne `n = 200000` za **0.04 s**, měřeno na tomto stroji s programem,
+který se s tímto úkolem dodává.
+
+Jedna poznámka ke generátoru, protože to je ta polovina otázky, kterou přidává Zig.
+Obyčejné `*` nebo `+` na `u64`, které přeteče, tu není přetočení: je to
+`panic: integer overflow`, v Debug, hned v prvním kroku. Generátor myslí
+přetočení, a tak to říká — `x *% 6364136223846793005 +% 1442695040888963407`
+— a překladač tě u toho rozdílu drží. Generuj v `u64`, vezmi
+modulo, pak `@intCast` na `i64`.
+'''
+hints = [
+  "tails není podposloupnost. Jeho délka je odpověď; jeho obsah jsou jen nejlepší koncové hodnoty.",
+  "Ostře rostoucí znamená, že nahradíš první konec, který je >= hodnotě, což je přesně to, co vrací std.sort.lowerBound — jeho kontext je hodnota a jeho porovnání je std.math.order(value, item).",
+  "Pokud velký případ překročí čas, s tvou odpovědí není nic špatně — odpovědí je tu tvar tvé smyčky. Dvě vnořené smyčky přes 200000 hodnot jsou 2 x 10^10 porovnání.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.hacker.18.edit-distance"
+title = "Jak daleko od sebe"
+story = "Dvě hláskování téže ulice na dvou různých cedulích. Kolik úprav po jednom znaku mezi nimi."
+brief = '''
+Dva řádky, na každém jedno slovo, malými písmeny. Kterýkoli řádek může být **prázdný** a pak
+je odpovědí délka toho druhého.
+
+Vypiš **editační vzdálenost**: nejmenší počet vložení, smazání
+nebo záměn jednoho znaku, které promění první ve druhé. Pak vypiš
+`LCS <k>`, délku jejich nejdelší společné podposloupnosti.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Dvě tabulky nad týmiž dvěma řetězci a obě jsou tatáž třířádková
+rekurence s jiným rozhodováním při shodě. Plň po řádcích; odpověď je v protějším
+rohu. Řádek `0` a sloupec `0` nejsou pro editační tabulku nula — jsou to
+cena smazání nebo vložení všeho.
+
+Čti vstup po řádcích pomocí `std.mem.splitScalar(u8, input, '\n')`, ne po
+tokenech: prázdný řádek je tu skutečný vstup a tokenizér by ho přeskočil
+k dalšímu slovu. Z každého řádku ořízni koncové `\r`. Tabulky jsou každá jeden plochý
+řez, dlouhý `(la + 1) * (lb + 1)`, indexovaný jako `i * (lb + 1) + j`.
+'''
+hints = [
+  "edit[i][0] = i a edit[0][j] = j: proměnit prefix v nic stojí jedno smazání na znak.",
+  "Shodné znaky nestojí nic a jdou diagonálně; neshoda stojí jedna a vezme nejlevnějšího ze tří sousedů — dvě vnořená volání @min vezmou všechny tři.",
+  "LCS je tentýž průchod s @max místo @min a bez diagonálního kroku při neshodě.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.hacker.19.knapsack"
+title = "Co se vejde do tašky"
+story = "Jeden jezdec, jedna taška a tabule objednávek, každá s váhou a spropitným. Hladový postup vybere ty špatné."
+brief = '''
+První řádek je `n cap`. Dalších `n` řádků je `<weight> <value>`. Každou položku
+lze vzít nejvýš **jednou**.
+
+Vypiš nejlepší celkovou hodnotu, která se vejde do `cap`, pak `GREEDY <v>`: co bys
+dostal opakovaným braním položky s nejlepší hodnotou na váhu, která
+se ještě vejde.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+To, že se ta dvě čísla liší, je celý smysl úkolu, a
+ukázka to ukazuje: nejlepší hodnota na váhu je položka `6 10` s `1.67` a
+když ji vezmeš, zbudou čtyři jednotky místa, do kterých se nic nevejde. Vynechat ji a
+vzít obě položky `5 7` má hodnotu `14`. Skryté případy jsou malé, takže
+kontrolují, že máš obě čísla správně, ne že je tabulka rychlá.
+
+Kapacity se procházejí **směrem dolů** a smyčka `usize`, která počítá dolů,
+se píše `var room = cap; while (room >= weight) : (room -= 1)` —
+podmínka se kontroluje před snížením, takže `room` se nikdy nepokusí jít pod
+`weight` a nikdy pod nulu.
+'''
+hints = [
+  "Procházení kapacit směrem dolů je to, co z toho dělá 0/1 místo neomezeného. Směrem nahoru se tatáž položka dá použít znovu.",
+  "Porovnávej poměry bez dělení: b.value * a.weight proti a.value * b.weight, takže v odpovědi není žádná plovoucí čárka. Řaď gpa.dupe položek, ne položky samotné.",
+  "Hladový průchod je přímá smyčka přes seřazené položky — žádné vracení, a přesně proto je špatně.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.hacker.20.bits"
+title = "Ten, který je sám"
+story = "Každá náprava se počítá dvakrát kromě jedné. Nedovolí ti použít hašovací mapu a nedovolí ti řadit."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` nezáporných celých čísel, ve kterých se každá hodnota
+objeví přesně dvakrát kromě jedné.
+
+Vypiš čtyři řádky:
+
+1. hodnotu, která se objeví jednou, nalezenou pomocí **xor** a konstantní paměti navíc
+2. kolik bitů `1` je v ní nastavených
+3. `POW2 YES`, když je mocninou dvou, jinak `POW2 NO` (`0` není)
+4. hodnotu s vynulovaným nejnižším nastaveným bitem, nebo `0`, když žádný nemá
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` a `x ^ 0 == x` a xor je jedno, v jakém pořadí se děje.
+To je celý první řádek. `x & (x - 1)` vynuluje nejnižší nastavený bit, což
+ti dá třetí a čtvrtý řádek zadarmo. Dělej všechno v `u64` — a
+to odečtení napiš jako `x -% 1`, protože `0 - 1` na `u64` je v této zemi `panic:
+integer overflow` a `-%` je způsob, jak říct, že jsi myslel
+přetočení. Nulový případ stejně ohlídej; přetočení je tam jen proto, aby byl výraz
+legální.
+
+Případy jsou tu malé a hodiny neměří rychlost. Žádný velký
+skrytý případ není a nemůže být postavený tak, jak tento balík staví ty ostatní:
+pole, které je dvojice-plus-jedna, se *konstruuje*, negeneruje, a dvě země
+by při jeho konstrukci nezkonstruovaly totéž pole. Tyto případy tedy kontrolují
+čtyři řádky a jejich okraje — `0` není mocnina dvou a hodnota bez
+nastavených bitů zůstane `0`, když vynuluješ ten nejnižší. Xor je pořád odpověď;
+počítání výskytů ve vnořené smyčce je `O(n²)` a při skutečném `n` umře.
+'''
+hints = [
+  "Dvojice se vyruší samy, ať přijdou v jakémkoli pořadí, takže stačí jedno složení přes řez.",
+  "Počítání bitů vynulováním nejnižšího pokaždé běží jednou na nastavený bit, ne jednou na šířku v bitech. @popCount je vestavěná jednořádková verze.",
+  "Mocnina dvou má nastavený přesně jeden bit, takže vynulování nejnižšího nechá nulu — a nulu samotnou je třeba vyloučit ručně, jinak se její x -% 1 přetočí na všechny nastavené bity.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.hacker.21.matrix"
+title = "Otoč půdorys"
+story = "Plán je vzhůru nohama a na stole není místo na jeho druhou kopii."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je mřížka `n × n` celých čísel.
+
+Vypiš mřížku otočenou o **90° po směru hodinových ručiček**, `n` řádků hodnot oddělených mezerou.
+Pak vypiš její hodnoty ve **spirálovém pořadí** — vnější prstenec po směru hodinových ručiček zleva
+nahoře, dovnitř — na jeden řádek.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+Otočení je to, které se dělá na místě: transponuj, pak obrať každý řádek.
+Říct to nahlas je polovina otázky.
+
+Drž mřížku jako jeden plochý `[]i64` o `n * n`, řádek `r` je řez
+`grid[r * n .. r * n + n]` — pak je `std.mem.reverse(i64, row)` obrácení
+a `std.mem.swap` je transpozice. Spirála chce originál, takže
+před otočením udělej kopii pomocí `gpa.dupe` a veď jejích čtyři hranice v `i64`:
+spodní hranice jednořádkové mřížky jde na cestě ven na `-1`, což by `usize`
+odmítl panikou.
+'''
+hints = [
+  "Transponuj prohazováním jen nad diagonálou — c začíná na r + 1 — jinak všechno prohodíš zpátky.",
+  "Spirála chce původní mřížku, takže před otočením na místě udělej kopii pomocí gpa.dupe.",
+  "Ty dvě podmínky if uvnitř spirálové smyčky jsou to, co zabrání projít jediný prostřední řádek nebo sloupec dvakrát — a hranice jsou i64, protože right a bottom oprávněně dosáhnou -1.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.hacker.22.trie"
+title = "Krabice s prefixy"
+story = "Automatické doplňování pro tabuli zastávek — ten poctivý druh, který doplní jen to, co na seznamu doopravdy je."
+brief = '''
+První řádek je `n q`. Dalších `n` řádků jsou slova malými písmeny k vložení. Dalších
+`q` řádků jsou dotazy, každý `WORD <s>` nebo `PREFIX <s>`.
+
+Postav trie — strom uzlů, z nichž každý drží až 26 potomků — a odpověz:
+
+* `WORD <s>` → `YES`, když bylo `s` vloženo, jinak `NO`
+* `PREFIX <s>` → kolik z `n` vložených slov začíná na `s`
+
+Není slíbeno, že `n` slov je navzájem různých, a `PREFIX` počítá
+**vložení**, ne různá slova: vlož `tram` dvakrát a `PREFIX tram` je
+`2`. `NODES` počítá uzly, takže druhé vložení žádný nepřidá.
+
+Pak vypiš `NODES <k>`, počet uzlů v trie včetně kořene.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Drž na každém uzlu počet, kolik vložených slov jím prochází, a
+`PREFIX` je průchod bez počítání na konci. Ulož uzly do jednoho
+`std.ArrayList(Node)` a nech potomky držet indexy — `-1` pro žádný — místo
+dvaceti šesti `?*Node` na uzel; je to menší, rychlejší a index se
+růstem nikdy nezneplatní tak, jak by se zneplatnil ukazatel do `.items`. To
+není hypotetické: `append` může přesunout celý seznam a ukazatel vzatý
+před ním je ukazatel do paměti, kterou si alokátor už vzal zpátky.
+Vezmi index, udělej `append`, pak jdi znovu přes `nodes.items[at]`.
+'''
+hints = [
+  "Ulož uzly do jednoho ArrayListu a nech potomky držet indexy. Ukazatel do .items vzatý před append je ukazatel do paměti, kterou seznam možná vrátil.",
+  "through se zvedá na uzlu, na který vstoupíš, takže kořen nikdy nepočítá sám sebe.",
+  "Dotaz, který z trie spadne, nechá at == -1 a -1 odpoví NO a 0 bez zvláštního případu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.hacker.23.prefix-sums"
+title = "Kolika způsoby zasáhnout cíl"
+story = "Den tržeb a číslo, které chce auditor vidět. Kolik úseků po sobě jdoucích hodin dá dohromady přesně tohle."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` celých čísel, která můžou být záporná.
+
+Vypiš, kolik souvislých úseků má součet přesně `k`, pak `RANGE <s>`, součet
+celého seznamu, odečtený z posledního prefixového součtu místo dalšího sčítání.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Záporné hodnoty zabijí posuvné okno — okno, které je moc velké, se nedá
+spravit zmenšením. Přežijí prefixové součty: úsek `i..j` má součet `k`
+přesně tehdy, když `prefix[j] - prefix[i] == k`, takže spočítej, kolik dřívějších prefixů
+se rovná `prefix[j] - k`. Založ mapu s `0 → 1` pro úseky, které začínají na
+začátku.
+
+Případy jsou tu malé a hodiny neměří rychlost a není tu žádný
+případ, který by odmítl dvojitou smyčku `O(n²)` — při skutečném `n` by
+byl. Tatáž dvojitá smyčka přes 200000 hodnot je `2 × 10^10` sčítání,
+což je v sestavení Debug hluboko za limitem běhu pět sekund, proti jedinému
+průchodu hašovací mapy ve zlomku sekundy. Tyhle čtyři kontrolují
+záporné hodnoty a úseky, které začínají na začátku, což jsou ta dvě místa,
+kde se tahle odpověď doopravdy kazí. Složitost je na tvé cti.
+
+Jedna `std.AutoHashMap(i64, i64)` — hodnota prefixu na to, kolikrát se
+vyskytla — a `getOrPut` na zvýšení.
+'''
+hints = [
+  "Dřívější prefix vyhledej dřív, než zaznamenáš ten současný, jinak se úsek nulové délky započítá sám, když je k 0.",
+  "seen.put(0, 1) předem je to, co vůbec dovolí najít úsek, který začíná na indexu 0.",
+  "Poslední prefix je celkový součet, takže druhý řádek nestojí nic navíc.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.hacker.24.inversions"
+title = "Ten, který chytnou hodiny"
+story = "První otázka odpoledního kola. Naivní odpověď je správná a je to ta špatná odpověď — a sestavení Debug ji nedělá o nic méně správnou, jen pomalejší."
+brief = '''
+Standardní vstup jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole není
+— postavíš si ho sám, **přesně** tímto generátorem, v aritmetice `u64` s
+přetáčejícími operátory `*%` a `+%`:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Spočítej **inverze**: dvojice `i < j`, kde `a[i] > a[j]`. Vypiš počet,
+pak `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**Tento úkol vynucuje svou složitost a je to jediný druh, který to umí.**
+Startovní kód je dvojitá smyčka `O(n²)`. Skrytý případ je `n = 1000000`,
+velikost, na které se ustálil pohovor v C++, protože jeho optimalizátor vektorizoval smyčku
+do limitu běhu při čemkoli menším. Tam je dvojitá smyčka `5 × 10^11`
+porovnání a sestavení Debug s kontrolou mezí na každém z nich se
+nevrátí v limitu běhu pět sekund. Počítání inverzí během
+merge sortu je `O(n log n)` a při té velikosti trvá **0.19 s**, měřeno na
+tomto stroji s programem, který se s tímto úkolem dodává.
+
+Dvě další věci za tebe rozhodne velký případ. Odpověď pro `n = 1000000`
+je `250046540838`, což se do 32 bitů nevejde — akumulátor
+špatné šířky tu není potichu špatně, je to `panic: integer overflow`, takže
+počítej v `u64`. A generátor musí přetáčet, ne přetékat: obyčejné `*`
+na `u64`, které přeteče, je tatáž panika v prvním kroku a `*%` je
+operátor, který znamená přetočení.
+'''
+hints = [
+  "Maximum vezmi před řazením, nebo řaď kopii. Merge sort ti řez pod rukama přeuspořádá.",
+  "Když při slučování vyhraje hodnota zprava, každý zbývající prvek levé poloviny je větší než ona — to je mid - left inverzí naráz a je to celý trik.",
+  "Fenwickův strom nad zkomprimovanými hodnotami je ta druhá odpověď O(n log n) a stojí za to ho v místnosti jmenovat; merge sort je méně kódu pod tlakem hodin.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.hacker.25.test-cases"
+title = "Následuje T testovacích případů"
+story = "Tvar, který používá každý pohovor, a chyba, kterou každý kandidát aspoň jednou napíše: druhý případ si pamatuje ten první."
+brief = '''
+První řádek je `T`, počet nezávislých testovacích případů. Každý případ je řádek
+s `n`, pak řádek s `n` celými čísly — a když je `n` rovno `0`, ten druhý řádek
+je prázdný.
+
+Pro každý případ vypiš **druhou největší různou** hodnotu, nebo `NONE`, když
+jsou méně než dvě různé hodnoty. Po všech vypiš `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+To je standardní obal soutěžních pohovorů a kandidáti na něm padají z
+jednoho důvodu: stav, který měl být pro každý případ zvlášť, byl deklarovaný před
+smyčkou. Každý akumulátor, každá množina, každé `best` jde **dovnitř** smyčky —
+a v tomto jazyce `defer`, který ho uvolní, jde hned pod něj, takže
+množina se zaplatí a vrátí jednou za případ.
+
+Čti po tokenech oddělených bílými znaky pomocí `tokenizeAny` místo po řádcích a
+prázdný řádek pro `n = 0` přestane být zvláštním případem úplně — což je
+druhá věc, kterou tenhle tvar učí.
+
+Množina je `std.AutoHashMap(i64, void)` — mapa na nic — a druhý
+největší z jejích klíčů je jeden průchod přes `keyIterator()`, který si drží dva nejvyšší.
+'''
+hints = [
+  "Přesuň množinu dovnitř smyčky, s jejím defer deinit hned pod ní. To je celá oprava a je to celý úkol.",
+  "AutoHashMap(i64, void) je množina: put(value, {}) vkládá a count() je počet různých hodnot.",
+  "Napřed ohlídej count() < 2: s méně než dvěma klíči je druhá největší pořád minInt a vypsat ji je ten špatný druh správně.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.hacker.26.statistics"
+title = "Šest desetinných míst"
+story = "Chtějí čísla zaokrouhlená tak, jak říká specifikace, ne tak, jak je tvůj jazyk náhodou vypíše."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš tři řádky, každý na **šest desetinných míst**: průměr, **populační**
+směrodatnou odchylku (děl `n`, ne `n - 1`) a medián — který je pro
+sudé `n` průměrem dvou prostředních hodnot.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+Tento úkol se hodnotí s `match = "float:1e-6"`, takže porovnání je
+číselné: `3.8` i `3.800000` projdou a hodnota, která je vedle o `1e-7`,
+projde taky. To je záměr — nejde o tvůj formátovač, jde o to, že
+`@divTrunc(sum, n)` v celočíselné aritmetice dá `3` a že medián sudé délky
+je hranice, na které se lidé pod tlakem hodin pletou.
+
+`{d:.6}` je formátovač — `try w.print("{d:.6}\n", .{mean})` vypíše
+`f64` na šest míst. Druhá polovina je, že Zig za tebe nemíchá celá čísla a
+floaty: `@floatFromInt(v)` je způsob, jak se z `i64` stane `f64`, a
+dělení se děje až po něm, ne před ním. Populační, ne výběrová. Přečti si
+zadání dvakrát; na skutečném pohovoru je rozdíl mezi `/ n` a
+`/ (n - 1)` celé odevzdání.
+'''
+hints = [
+  "@floatFromInt před dělením, ne po něm. @divTrunc(sum, n) na dvou celých číslech už zlomek zahodil.",
+  "Populační rozptyl je průměr čtverců odchylek — vyděl součet n.",
+  "Pro sudý počet je medián průměr values[n/2 - 1] a values[n/2] a v tom odečtení žije chyba o jedno.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.hacker.27.commands"
+title = "Problém je ten vstup"
+story = "Záznam budky vyjede ze stroje zalomený na osmdesáti sloupcích a počet nahoře je počet příkazů, ne slov."
+brief = '''
+První řádek je `k`, počet **příkazů**, které následují. Příkazy jsou
+tokeny oddělené bílými znaky, nacpané přes zbývající řádky, jak se zrovna
+zalomily — libovolný počet na řádek, libovolné mezery, možná
+koncový prázdný řádek.
+
+| příkaz | tokeny | účinek |
+| --- | --- | --- |
+| `ADD <cents>` | dva | vloží položku |
+| `VOID` | jeden | odebere poslední položku, nebo nic neudělá, když žádná není |
+| `TOTAL` | jeden | vypíše současný součet |
+| `CLEAR` | jeden | odebere všechno |
+
+Po `k` příkazech vypiš `COMMANDS <k>` a `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` počítá příkazy a `ADD` je jeden příkaz ze dvou tokenů — takže smyčka,
+která běží `k`-krát a čte jeden token za kolo, skončí na špatném místě.
+Čti `k` příkazů a argument vytáhni, jen když ho příkaz má.
+
+`VOID` na prázdné pokladně i `TOTAL` dřív, než se cokoli přidalo, musí
+fungovat. V zadání není řádek, který by říkal, že se to stát nemůže, a na
+skutečném pohovoru je to mlčení specifikací. `pop()` na prázdném
+`std.ArrayList` tu není nedefinované chování — vrátí `null` a
+`.?`, které by ho rozbalilo, je `panic: attempt to use null value`. Takže
+podmínku pořád píšeš ty; jen se píše `_ = items.pop();` nebo
+`if` na volitelné hodnotě, místo kontroly délky.
+'''
+hints = [
+  "tokenizeAny přeskočí každý úsek mezer, tabulátorů a konců řádků, takže zalomení v souboru přestane hrát roli ve chvíli, kdy přestaneš číst řádky.",
+  "Argument ADD vytáhni uvnitř větve ADD, z téhož tokenizéru. Počítadlo smyčky počítá příkazy, ne tokeny.",
+  "pop() vrátí ?i64. Na prázdném seznamu je to null a _ = items.pop(); je celá podmínka — .?, které jsi nenapsal, je panika, kterou jsi nedostal.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.hacker.29.dijkstra"
+title = "Ne každá ulice je stejně dlouhá"
+story = "Každá mapa, kterou jsi zatím prošel, počítala skoky. Tramvaji je jedno, kolik je zastávek; zajímá ji, jak dlouho trvají."
+brief = '''
+Standardní vstup je `n m seed`: `n` zastávek, `m` neorientovaných ohodnocených hran. Postav
+graf sám, **přesně** tímto generátorem, v přetáčejícím `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Vypiš součet nejkratších vzdáleností ze zastávky `0` do každé dosažitelné zastávky
+(včetně `0` samotné, která je `0`), pak `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**Složitost je tu vynucená.** Skrytý případ je `n = 200000`,
+`m = 400000` — velikost, na které se ustálil pohovor v C++, ponechaná tu, aby
+odpověď byla táž odpověď. Dijkstra je správný algoritmus tak či tak; hodiny
+rozhodují o prioritní frontě. Procházet každý nenavštívený uzel kvůli
+minimu je `O(V²)` a při `n = 200000` je to `4 × 10^10` čtení s
+kontrolou mezí na každém z nich, což se nevrátí v limitu běhu pět sekund.
+Binární halda z toho udělá `O((V + E) log V)` a skončí za
+**0.17 s**. Měřeno na tomto stroji, se dvěma programy, které se s tímto
+úkolem dodávají: startovní kód je ta procházející verze.
+
+Stojí za to to jasně vidět, protože je to nejčastější způsob, jak neprojít
+pohovorem na čas: **startovní kód není špatně.** Vypíše přesně správnou odpověď. Je
+odmítnut jen proto, že dorazí příliš pozdě.
+
+Dvě poznámky ve tvaru Zigu. Sousednost není seznam na uzel: při této velikosti
+stojí dvě stě tisíc samostatných `ArrayList` víc než algoritmus, takže
+startovní kód už staví **komprimovanou** sousednost — tři ploché řezy,
+kde hrany `u` jsou `to[start[u] .. start[u + 1]]` — a verze s haldou
+čte tytéž řezy. A `std.PriorityQueue` je min-halda na
+jakémkoli uspořádání, které jí dáš, takže položka `(distance, node)` řazená podle
+vzdálenosti nepotřebuje žádné obrácení. Nemá decrease-key a nepotřebuješ ho:
+vlož zlepšenou vzdálenost jako novou položku a přeskoč každou vybranou položku, jejíž
+vzdálenost je už horší než ta, kterou máš zaznamenanou. To přeskočení
+„zastaralé položky“ je řádek, na který lidé zapomínají, a bez něj halda roste bez omezení.
+'''
+hints = [
+  "std.PriorityQueue(Entry, void, byDistance) s Entry = { d, u } a byDistance vracející std.math.order(a.d, b.d): halda je min-halda na uspořádání, které jí dáš, takže nic není třeba obracet.",
+  "if (top.d > dist[top.u]) continue; je přeskočení zastaralé položky. Bez něj je algoritmus pořád správný a halda se plní zastaralými položkami.",
+  "Polovina generátoru s kostrou zaručuje, že každý uzel je dosažitelný, takže filtr na inf ve skutečnosti nikdy nic neodstraní — stejně ho nech, protože verze této otázky s nedosažitelným uzlem je doplňující otázka.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.hacker.30.range-queries"
+title = "Součty, které se pořád mění"
+story = "Čtyři miliony operací budek z jednoho rána přes celou mýtnici, polovina z nich opravy, a někdo chce průběžné součty."
+brief = '''
+Standardní vstup je `n q seed`. Postav pole `n` hodnot a pak proveď `q`
+operací, všechno z téhož generátoru, v přetáčejícím `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..=r]) to a running total
+```
+
+Vypiš průběžný součet všech odpovědí na dotazy, pak `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**Složitost je tu vynucená.** Naivní odpověď — smyčka přes rozsah
+pro každý dotaz — je `O(n)` na dotaz a malé případy ji nechytí. Proto
+je velký skrytý případ `n = 500000, q = 4000000`, kde naivní odpověď
+sáhne na řádově `10^11` prvků a nedoběhne v limitu běhu pět
+sekund, zatímco Fenwickův strom udělá celou věc za **0.39 s** v
+sestavení Debug. Obojí změřené, se dvěma programy v tomto úkolu.
+
+Lekce je ta, kterou pohovorující loví: *bodová změna, součet rozsahu*
+je přesně ten tvar, pro který Fenwickův strom existuje. Tři krátké funkce — add,
+prefix a range jako rozdíl dvou prefixů — a nejnižší nastavený bit
+je to, čím se kráčí. Na `usize` je ten bit `i & (~i + 1)`: `-i`, které
+píše odpověď v C++, na bezznaménkovém typu tady neexistuje a `~i + 1` jsou tytéž
+bity řečené způsobem, který překladač přijme. Nebo napiš `i & (0 -% i)` —
+přetočení je ten význam, takže to operátor říká.
+'''
+hints = [
+  "Postav strom voláním add jednou pro každou počáteční hodnotu. Stavba O(n) zdola nahoru je pěkná optimalizace a není to, co hodiny testují.",
+  "i & (~i + 1) izoluje nejnižší nastavený bit usize. Jeho přičítání jde stromem nahoru; odečítání dolů.",
+  "range(l, r) je prefix(r + 1) - prefix(l) a trefit tu dvojici chyb o jedno je většina ladění.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.hacker.31.palindrome"
+title = "Pozpátku stejné"
+story = "Otázka z první dvacítky, v nějaké podobě položená na většině pohovorů, a ta, kterou většina lidí jednou napsala a nikdy nepochopila."
+brief = '''
+Standardní vstup je `n alphabet seed`. Postav řetězec sám:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Vypiš délku nejdelšího palindromického podřetězce, pak `AT <index>` —
+začátek (od 0) **nejlevějšího** z té délky.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Rozšiřuj kolem každého středu. Středů je `2n - 1`, ne `n`: každý
+znak je středem pro palindromy liché délky a každá mezera mezi
+dvěma znaky je středem pro ty sudé délky. Zapomenout na mezery je
+důvod, proč správně vypadající řešení vrátí na `abba` `1`, a to dělá
+startovní kód.
+
+**Co testy vynucují a co ne**, na rovinu. Skrytý případ, který odvede
+práci, je `n = 20000` nad **jedno**písmennou abecedou. Je to nejhorší případ
+pro rozšiřování kolem středu — každý střed doběhne až na konec řetězce — takže
+správná odpověď tam udělá celé své `O(n²)` a stejně skončí za **0.64 s** v
+sestavení Debug, měřeno na tomto stroji. Je to také to, co odmítne
+zkontroluj-každý-podřetězec-a-otestuj-každý, což je kubické a nevrátí
+se do pěti sekund.
+
+Druhý velký případ, `n = 20000` nad dvoupísmennou abecedou, je případ
+**správnosti**, ne rychlosti. Na náhodném binárním řetězci test palindromu selže
+po znaku nebo dvou, takže ho projde i kubická odpověď. Kontroluje, že
+tvůj generátor a tvoje rozhodnutí o nejlevějším indexu souhlasí s našimi ve velkém.
+
+Jedna poctivá výhrada, protože je to ten druh věci, na kterou by pohovorující
+tlačil: to, co jednopísmenný případ odmítne, je zkontroluj-*každý*-podřetězec. Přidej jediný
+řádek, který přeskočí každý podřetězec ne delší než dosud nalezený nejlepší, a
+tatáž kubická smyčka projde oběma velkými případy — na tomto vstupu ji to prořezání
+srazí na `O(n²)`. Testy tedy odmítnou naivní kubickou verzi, ne každý program, který je
+v nejhorším případě kubický.
+
+Takže: testy odmítnou kubickou a přijmou kvadratickou. **Nežádají**
+Manacherův algoritmus, což je odpověď `O(n)`. Věz, že existuje a co
+dělá, protože „a zvládneš to líp než kvadraticky?“ je doplňující otázka, kterou
+tahle otázka obvykle připravuje.
+
+Indexy jsou tu `usize` a rozšiřování se zastaví *dřív*, než překročí
+kterýkoli konec: `i > 0` se kontroluje dřív, než se `i - 1` vůbec sestaví, protože
+`0 - 1` na `usize` je panika, ne `-1`. Tvar z C++, který dojde o krok
+dál na každou stranu a pak jedna přičte zpátky, se nepřenese; podmínky jdou první.
+'''
+hints = [
+  "Dvě volání na střed: (c, c) pro liché délky a (c, c + 1) pro sudé. Startovnímu kódu chybí to druhé.",
+  "Než rozšíříš, zkontroluj, že s[left] == s[right], aby sudé volání mohlo skončit na mezeře mezi dvěma různými bajty; pak rozšiřuj, dokud i > 0 a j + 1 < len a další dvojice se shoduje.",
+  "Aktualizuj jen při ostře delším palindromu a nejlevější z každé délky je ten, který si ponecháš, což je to, na co se ptá AT.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "zig.hacker.32.modular"
+title = "Modulo miliarda a sedm"
+story = "Ta fráze se objeví na konci zadání a polovina místnosti neví, co po nich chce."
+brief = '''
+Standardní vstup je `n q seed`. Vygeneruj `q` dotazů, v přetáčejícím `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+Pro každý dotaz spočítej kombinační číslo `C(a, b)` **modulo
+1000000007**. Vypiš součet všech `q` odpovědí, sám modulo `1000000007`,
+pak `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` má při těchto velikostech stovky tisíc číslic, takže se nikdy
+nespočítá a pak nezredukuje — každé násobení se redukuje průběžně.
+Problém je dělení: `a! / (b! (a-b)!)` nemá v modulární
+aritmetice žádný význam. Nahrazuje ho **modulární inverze**, a protože
+`1000000007` je prvočíslo, dá ti ji malá Fermatova věta:
+`inverse(v) = v^(p-2) mod p`, spočítané rychlým umocňováním zhruba ve třiceti
+umocněních na druhou.
+
+Takže: jednou předpočítej `factorial[0..=n]` a každý dotaz odpověz jako
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**Složitost je tu vynucená.** Jeden skrytý případ je `n = 200000`,
+`q = 200000`. Počítat každé kombinační číslo nezávisle — vynásobit `b` členů,
+vydělit `b` členy, jedna modulární inverze za každé — nedoběhne v limitu běhu pět
+sekund; to je startovní kód. Jedna sdílená tabulka faktoriálů skončí za
+**0.07 s** v sestavení Debug. Obojí změřené na tomto stroji.
+
+Každý mezivýsledek je součin dvou hodnot pod `2^30`, takže se vejde do
+`u64` a nic nepřeteče — a tady je to tvrzení, které za tebe kontroluje
+sestavení. Redukuj po každém násobení: součin, který se dostane přes `2^64`,
+není potichu špatně, je to `panic: integer overflow`, což je ta druhá polovina
+důvodu, proč se tahle otázka klade.
+'''
+hints = [
+  "Redukuj po každém násobení, nikdy na konci. u64 udrží součin dvou hodnot pod P; neudrží faktoriál a přetečení je panika.",
+  "inverse(v) je power(v, P - 2) a funguje to jen proto, že P je prvočíslo — to je tady celý obsah malé Fermatovy věty.",
+  "Předpočítat i inverzní faktoriály, pozpátku od inverse(factorial[n]), odstraní dvě volání power() na dotaz. K projití to potřeba není a stojí za to to říct nahlas.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "zig.hacker.33.grid-paths"
+title = "Přes blok, nikdy zpátky"
+story = "Doručovací mřížka se třemi ulicemi zavřenými kvůli bambusu. Kolika způsoby přes ni a která cesta je nejlevnější."
+brief = '''
+Standardní vstup je `r c pct seed`. Postav mřížku sám, po řádcích,
+s vylosováním **dvou** hodnot pro každé pole:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Pohybuj se jen **doprava** nebo **dolů**, přes volná pole. Vypiš:
+
+1. `PATHS <k>` — kolik různých cest vede z `(0,0)` do `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — nejmenší celkovou cenu cesty, včetně obou koncových bodů,
+   nebo `-1`, když žádná cesta není
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+Jeden průchod po řádcích udělá obojí: cesty do pole jsou součet
+cest do něj shora a zleva a jeho nejlepší cena je jeho vlastní cena
+plus levnější z těch dvou. Protože se pohybuješ jen doprava nebo dolů, jsou
+ta dvě pole, která potřebuješ, vždycky už hotová — a proto to nepotřebuje žádnou
+rekurzi ani množinu navštívených.
+
+Počet `PATHS` se bere modulo `1000000007` z obvyklého důvodu: na
+skrytém případu `1000 × 1000` má skutečné číslo přes šest set číslic. Redukuj
+průběžně při sčítání — a na znaménkovém `i64` je to `@mod(x, P)`, protože `%` je
+tu definované jen na bezznaménkových celých číslech; překladač za tebe konvenci
+znaménka hádat nebude.
+
+**Co velký případ vynucuje:** odmítne každou odpověď, která cesty vyjmenovává.
+Je jich víc než atomů v místnosti. Nerozliší tabulku zdola nahoru
+od memoizované rekurze — obě jsou lineární v počtu polí a obě
+projdou s rezervou: tabulka trvá **0.05 s** v
+sestavení Debug.
+'''
+hints = [
+  "Vylosuj obě hodnoty pro každé pole, včetně obou rohů — generátor je nepřeskakuje, jen je odmítá zablokovat.",
+  "Volné pole bez volného souseda nahoře nebo vlevo je dosažitelné nula cestami a nemá žádnou nejlepší cenu; nech inf znamenat nedosažitelné a ohlídej sčítání, protože inf plus cokoli je panika.",
+  "Cíl může být volný, a přesto nedosažitelný, a přesně tehdy je PATHS 0 a MIN -1. Jeden ze skrytých případů je tohle.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "zig.hacker.34.stable-sort"
+title = "Shody drží své místo"
+story = "Dva jezdci skončili se stejným skóre a žebříček je dává při každém překreslení v jiném pořadí."
+brief = '''
+Standardní vstup je `n buckets seed`. Postav `n` jezdců, kde jezdec `i` má
+index `i` a skóre:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Seřaď jezdce podle skóre **sestupně**. Jezdci se stejným skóre si musí ponechat
+pořadí, v jakém přijeli. Vypiš jejich indexy, oddělené mezerou, pak
+`TIES <k>` — kolik sousedních dvojic v tvém seřazeném pořadí má stejné skóre.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` je malé, takže skoro všechno je shoda a odpověď je skoro
+celá rozhodnutá tím, co se s nimi stane.
+
+**Tohle je úkol o tom, vědět, jaké řazení držíš v ruce.** Zig dodává
+dvě a jejich jména říkají, které je které. `std.mem.sortUnstable` je pattern
+defeating quicksort: nedává žádný slib o pořadí stejných prvků
+a na skutečném vstupu ho viditelně nezachová — jeho krok rozdělení prohazuje
+stejné prvky přes pivot jako samozřejmost. `std.mem.sort` je
+block sort, **stabilní**, a slib ho stojí nějakou práci. Startovní kód používá
+`sortUnstable` s porovnávačem, který se dívá jen na skóre, a skryté
+případy jsou dost velké, aby je prokazatelně zpřeházel. (Při `n = 8` se
+nestabilní řazení uchýlí k řazení vkládáním a náhodou pořadí zachová —
+a proto by malý test nic nedokázal a proto je malý případ
+tady ten *viditelný*, a ne ten, který tě hodnotí.)
+
+Správné odpovědi jsou dvě a měl bys umět dát obě. Použij
+`std.mem.sort`. **Nebo** si ponech `sortUnstable` a udělej porovnání
+**úplným** — skóre sestupně, pak index vzestupně — aby se žádné dva prvky nikdy
+nerovnaly a stabilita přestala být otázkou. Ta druhá je to, po čem
+sáhnout ve výchozím stavu; nestabilní řazení nemá co dokazovat, když je pořadí
+plně určené.
+'''
+hints = [
+  "Jedno slovo: ze sortUnstable se stane sort. std.mem.sort je to stabilní a to je ta stabilní odpověď.",
+  "Druhá odpověď si ponechá sortUnstable a porovnává (skóre sestupně, pak index vzestupně) — úplné uspořádání, takže nezbudou žádné shody, u kterých by se dalo být nestabilní.",
+  "TIES počítá sousední stejná skóre v hotovém pořadí a ten počet je stejný, ať napíšeš kteroukoli z těch dvou — prozradí tě pořadí indexů.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "zig.hacker.28.lru"
+title = "Mýtné"
+story = "Room 7-32, sedmý pohovor, poslední otázka. Cache, která musí vyhodit tu správnou věc, každý uzel zaplacený a vrácený, a hodiny."
+brief = '''
+První řádek je `cap q`. Dalších `q` řádků je `PUT <key> <value>` nebo
+`GET <key>`.
+
+Implementuj cache s pevnou kapacitou, která vyhodí **nejdéle nepoužitou** položku,
+když je plná. `GET` i `PUT` se oba počítají jako použití klíče.
+
+Pro každé `GET` vypiš hodnotu, nebo `-1`, když tam není. Na konci vypiš
+přeživší klíče, od naposledy použitého, oddělené mezerou — nebo `-`, když je
+cache prázdná — a pak `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Projdi si ukázku: `GET 1` udělá z `1` znovu nedávný, takže když `PUT 3`
+potřebuje místo, jde pryč `2`. `GET 2` mine. `GET 3` zasáhne a udělá z `3`
+nejnovější, a proto se přeživší vypíšou jako `3 1`.
+
+Učebnicová odpověď je hašovací mapa do **obousměrně propojeného seznamu** a Zig má
+tu skutečnou věc, bez ničeho skrytého: `std.DoublyLinkedList` je **intruzivní**.
+Seznam nealokuje uzly; vložíš `std.DoublyLinkedList.Node` —
+dva ukazatele, `prev` a `next` — do své vlastní struktury, kterou vytvoříš pomocí `create`
+s alokátorem a zničíš pomocí `destroy` sám. `remove` a pak `prepend` na tom
+uzlu je `std::list::splice` na začátek, `pop()` vrátí poslední uzel
+a každé z nich je O(1) bez jediného bajtu alokace, takže můžeš říct
+O(1) na operaci nahlas bez vytáček. Abys se z `*Node` dostal zpátky k
+položce, která drží klíč, `@fieldParentPtr("node", node_ptr)` posune
+ukazatel zpátky o posun pole. Mapa je pak
+`std.AutoHashMap(i64, *Entry)`.
+
+**Startovní kód je boss.** Má mapu, seznam, `create` i
+`destroy` a vypíše `20` pro `GET 2` v ukázce. Nikdy na klíč
+*nesáhne*: `GET` čte hodnotu tam, kde leží, přepis ji zapíše na
+místě a seznam zůstává v pořadí, v jakém klíče přišly. Závora si tedy
+pamatuje, kdo přijel první, a toho pustí ven první — fronta, ne
+cache — a vyhodí `1`, který byl použit před chvílí, místo `2`. Oprava
+jsou ty dva řádky, ke kterým učebnice kreslí šipku: při každém zásahu uzel `remove`
+a `prepend`.
+
+Dvě věci, které je třeba udělat správně a na které se pohovor v Rustu neptal.
+Položka drží klíč **stejně jako** hodnotu, protože vyhazování začíná od
+seznamu a musí vědět, kterou položku mapy odstranit. A na pořadí
+těch tří kroků záleží: `pop()` uzel, přečti klíč přes
+`@fieldParentPtr`, `remove` ho z mapy, *pak* `gpa.destroy` položku
+— obráceně je to čtení přes ukazatel, který si alokátor už
+vzal zpátky, a nic to čtení za tebe nechytí: vrátí cokoli, co
+v té paměti teď je, což je ta jediná chyba v této zemi, která se
+neohlásí. Každá položka, kterou jsi vytvořil, je zničená do chvíle, kdy `main`
+vrátí; co `DebugAllocator` za `init.gpa` *jmenuje*, je každá,
+na kterou zapomeneš, a ten seznam je to mýtné.
+
+Případy jsou tu malé a hodiny neměří rychlost: čtyři operace
+nerozliší propojený seznam od řezu, který procházíš zepředu. To
+`O(1)` v odstavci výše je věta, kterou řekneš nahlas v
+místnosti, takže musí platit o kódu, který jsi napsal, ne o kódu, který
+náhodou prošel čtyřmi případy.
+'''
+hints = [
+  "Projdi ukázku ručně proti startovnímu kódu. GET 1 vypíše 10 a nechá 1 na konci seznamu, takže PUT 3 vyhodí 1 — závora je fronta, ne cache.",
+  "recent.remove(&entry.node) pak recent.prepend(&entry.node) přesune položku na začátek v O(1) a ukazatel mapy na ni je potom pořád platný. Ta dvojice volání jde na každý zásah a každý přepis.",
+  "Přepis klíče, který už tam je, není vyhození — zkontroluj mapu dřív, než rozhodneš, že je cache plná.",
+  "Vyhození: pop() poslední uzel, @fieldParentPtr zpátky k položce, odstraň její klíč z mapy, pak na ni zavolej gpa.destroy. Po destroy je ukazatel, který mapa držela, uvolněná adresa, takže místo v mapě musí jít první.",
+]

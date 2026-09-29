@@ -34,9 +34,6 @@ local Land = require("src.land")
 local Map = {}
 Map.__index = Map
 
--- The lands and the three categories, in SPEC §0's order. TAB walks the
--- lands in this order and wraps.
-local LANDS = Land.ORDER
 
 --- Where the player was, per map, keyed `land.category`.
 ---
@@ -153,11 +150,22 @@ function Map:switch(land, category)
   self:refresh()
 end
 
+--- The lands the switcher offers — the header's buttons and TAB — in SPEC
+--- §0's order: the ones the server reported in `world.lands` (§4.6, kept by
+--- the session from whichever screen asked last), or every land the client
+--- knows when it has not heard yet. A land this client knows and the server
+--- does not is a `world.map` the server cannot answer.
+function Map:lands()
+  local session = self.app and self.app.session
+  return Land.known(session and session.lands)
+end
+
 --- TAB — the other land, **keeping the category**.
 ---
 --- Somebody comparing how Rust and Go do concurrency wants to land on the
 --- concurrency map, not at the top of GO BASIC.
 function Map:cycle_land()
+  local LANDS = self:lands()
   for i, land in ipairs(LANDS) do
     if land == self.land then
       self:switch(LANDS[i % #LANDS + 1], self.category)
@@ -788,6 +796,7 @@ function Map:draw_header()
   self.header_h = h
 
   -- What the row needs if nothing is squeezed, and what it actually has.
+  local LANDS = self:lands()
   local mascot = bh - 10
   local land_w = 0
   for _, land in ipairs(LANDS) do

@@ -326,6 +326,9 @@ function Session:rebind(url)
   self.authed = false
   self.resuming = false
   self.last_error = nil
+  -- Another server has its own lands: TAB on the map must not walk the old
+  -- one's list and ask this one for a map it cannot serve.
+  self.lands = nil
   local stored = self.store.load_session(url)
   self.token = stored and stored.token or nil
   self.remembered = stored and { address = stored.address, name = stored.name } or nil
@@ -414,6 +417,18 @@ end
 --- `cb(ok, payload, classified)`.
 function Session:request(type_name, payload, cb)
   return self.client:request(type_name, payload, function(ok, reply, env)
+    -- §4.6: which lands this server has, kept from whichever screen asked
+    -- last (LAND SELECT, CATEGORY SELECT), so the map's switcher walks the
+    -- server's lands without a second request. Ids only, in the server's
+    -- order; `Land.known` puts them in SPEC §0's.
+    if ok and type_name == "world.lands" and type(reply) == "table"
+      and type(reply.lands) == "table" then
+      local ids = {}
+      for _, row in ipairs(reply.lands) do
+        if type(row) == "table" and row.land ~= nil then ids[#ids + 1] = row.land end
+      end
+      self.lands = ids
+    end
     if cb then
       cb(ok, reply, (not ok) and errors.classify(reply.code) or nil, env)
     end

@@ -315,6 +315,42 @@ hints = [
   "{v for v in nums} 係 set comprehension；set(nums) 係同一樣嘢，喺呢度用邊個都得。",
 ]
 
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.dict-comprehensions"
+title = "同一次行，有 key"
+story = "檔口啲價錢寫喺一張張碎紙上面，照寫落嗰陣嘅次序擺。姨姨想將佢哋變做一塊價錢牌，仲要兩塊。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<ITEM> <PRICE>`。`PRICE` 係整數仙。每樣貨最多出現一次，`n` 最少係 `1` — 永遠有一樣最平嘅貨可以講。
+
+印三行：
+
+1. 每樣價錢**嚴格大過 100** 嘅貨，寫做 `ITEM=PRICE`，按貨名排，
+   用單個空格駁埋 — 冇嘅話就 `-`
+2. 每樣貨，佢嘅價錢**用整數除法除二**，同樣格式，
+   按貨名排
+3. `CHEAPEST <item>` — 最低價錢，打和就按貨名由細到大
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+**dict comprehension** 就係你已經識嘅 list comprehension 加個 key：用 `{k: v for ...}`，唔係 `[v for ...]`。第一行喺最尾用 `if` 過濾，啲值原封不動；第二行喺最前面轉換個值，每個 key 都留低。兩行都係一行搞掂，兩個都唔使先開個空 dict 再用個 loop 慢慢填。
+
+`sorted(d.items())` 會按 key 嘅次序畀返你一對對 `(key, value)`，正正係頭兩行要嘅。第三行嘅話，`min` 收嘅 `key=` 同排序嗰個一樣——而且因為 tuple 係由左至右比較，`min(d, key=lambda k: (d[k], k))` 唔使再行多次就解決咗打和。
+'''
+hints = [
+  "dict comprehension 係 `{key: value for ... }`。`if` 放喺最尾負責過濾；對個值做嘅表達式負責轉換。",
+  "`sorted(d.items())` 按 key 排，畀返一對對，正正係 ITEM=PRICE 要嘅。",
+  "打和嘅話，就用 tuple 嚟排：`min(prices, key=lambda k: (prices[k], k))` 攞最平嗰個，一樣價錢嘅就攞字母排最前嗰個。",
+]
+
 # ---------------------------------------------------------------- 11
 [[quest]]
 id    = "python.advanced.11.sorting"

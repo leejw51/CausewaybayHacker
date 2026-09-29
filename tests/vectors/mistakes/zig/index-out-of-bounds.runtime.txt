@@ -1,7 +1,4 @@
 thread <tid> panic: index out of bounds: index 2, len 2
-<work>/main.zig:7:37: 0x<pc> in main (main)
+<work>/main.zig:7:37: 0x<pc> in main
     std.debug.print("{d}\n", .{lanes[i]});
                                     ^
-<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)
-    if (fn_info.params.len == 0) return wrapMain(root.main());
-                                                          ^

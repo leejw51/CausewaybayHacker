@@ -2107,7 +2107,7 @@
         "run_command": "./prog",
         "run_exit": -6,
         "run_signal": 6,
-        "run_stderr": "thread <tid> panic: index out of bounds: index 2, len 2\n<work>/main.zig:7:37: 0x<pc> in main (main)\n    std.debug.print(\"{d}\\n\", .{lanes[i]});\n                                    ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+        "run_stderr": "thread <tid> panic: index out of bounds: index 2, len 2\n<work>/main.zig:7:37: 0x<pc> in main\n    std.debug.print(\"{d}\\n\", .{lanes[i]});\n                                    ^\n"
       },
       "captured": "zig/index-out-of-bounds.zig.txt",
       "captured_runtime": "zig/index-out-of-bounds.runtime.txt"
@@ -2133,7 +2133,7 @@
         "run_command": "./prog",
         "run_exit": -6,
         "run_signal": 6,
-        "run_stderr": "thread <tid> panic: attempt to use null value\n<work>/main.zig:6:36: 0x<pc> in main (main)\n    std.debug.print(\"{d}\\n\", .{left.?});\n                                   ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+        "run_stderr": "thread <tid> panic: attempt to use null value\n<work>/main.zig:6:36: 0x<pc> in main\n    std.debug.print(\"{d}\\n\", .{left.?});\n                                   ^\n"
       },
       "captured": "zig/null-unwrap.zig.txt",
       "captured_runtime": "zig/null-unwrap.runtime.txt"
@@ -2159,7 +2159,7 @@
         "run_command": "./prog",
         "run_exit": -6,
         "run_signal": 6,
-        "run_stderr": "thread <tid> panic: integer overflow\n<work>/main.zig:6:37: 0x<pc> in main (main)\n    while (i < 10) : (i += 1) axles += 1;\n                                    ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+        "run_stderr": "thread <tid> panic: integer overflow\n<work>/main.zig:6:37: 0x<pc> in main\n    while (i < 10) : (i += 1) axles += 1;\n                                    ^\n"
       },
       "captured": "zig/integer-overflow.zig.txt",
       "captured_runtime": "zig/integer-overflow.runtime.txt"
@@ -2185,7 +2185,7 @@
         "run_command": "./prog",
         "run_exit": -6,
         "run_signal": 6,
-        "run_stderr": "thread <tid> panic: reached unreachable code\n<work>/main.zig:6:20: 0x<pc> in main (main)\n    if (lane == 3) unreachable;\n                   ^\n<zig-std>/start.zig:698:59: 0x<pc> in callMain (main)\n    if (fn_info.params.len == 0) return wrapMain(root.main());\n                                                          ^\n"
+        "run_stderr": "thread <tid> panic: reached unreachable code\n<work>/main.zig:6:20: 0x<pc> in main\n    if (lane == 3) unreachable;\n                   ^\n"
       },
       "captured": "zig/unreachable.zig.txt",
       "captured_runtime": "zig/unreachable.runtime.txt"
@@ -2210,7 +2210,7 @@
         "diagnostics": [],
         "run_command": "./prog",
         "run_exit": 1,
-        "run_stderr": "error: InvalidCharacter\n<zig-std>/fmt.zig:578:24: 0x<pc> in charToDigit (main)\n    if (value >= base) return error.InvalidCharacter;\n                       ^\n<zig-std>/fmt.zig:443:23: 0x<pc> in parseIntWithSign__anon_27139 (main)\n        const digit = try charToDigit(math.cast(u8, c) orelse return error.InvalidCharacter, buf_base);\n                      ^\n<zig-std>/fmt.zig:331:5: 0x<pc> in parseIntWithGenericCharacter__anon_27133 (main)\n    return parseIntWithSign(Result, Character, buf, base, .pos);\n    ^\n<zig-std>/fmt.zig:318:5: 0x<pc> in parseInt__anon_26989 (main)\n    return parseIntWithGenericCharacter(T, u8, buf, base);\n    ^\n<work>/main.zig:4:15: 0x<pc> in main (main)\n    const n = try std.fmt.parseInt(i64, \"x1\", 10);\n              ^\n"
+        "run_stderr": "error: InvalidCharacter\n<work>/main.zig:4:15: 0x<pc> in main\n    const n = try std.fmt.parseInt(i64, \"x1\", 10);\n              ^\n"
       },
       "captured": "zig/error-returned.zig.txt",
       "captured_runtime": "zig/error-returned.runtime.txt"
@@ -2264,7 +2264,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to index field 'left' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to index field 'left' (a nil value)\n"
       },
       "captured": "lua/index-nil.luajit.txt",
       "captured_runtime": "lua/index-nil.runtime.txt"
@@ -2289,7 +2289,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on global 'totl' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on global 'totl' (a nil value)\n"
       },
       "captured": "lua/undefined-global.luajit.txt",
       "captured_runtime": "lua/undefined-global.runtime.txt"
@@ -2314,7 +2314,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to call field 'length' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to call field 'length' (a nil value)\n"
       },
       "captured": "lua/call-nil.luajit.txt",
       "captured_runtime": "lua/call-nil.runtime.txt"
@@ -2339,7 +2339,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on local 'segments' (a table value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to perform arithmetic on local 'segments' (a table value)\n"
       },
       "captured": "lua/arithmetic-type.luajit.txt",
       "captured_runtime": "lua/arithmetic-type.runtime.txt"
@@ -2364,7 +2364,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to compare string with number\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to compare string with number\n"
       },
       "captured": "lua/compare-type.luajit.txt",
       "captured_runtime": "lua/compare-type.runtime.txt"
@@ -2389,7 +2389,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: attempt to concatenate field 'size' (a nil value)\nstack traceback:\n\tmain.lua:3: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:3: attempt to concatenate field 'size' (a nil value)\n"
       },
       "captured": "lua/concatenate-nil.luajit.txt",
       "captured_runtime": "lua/concatenate-nil.runtime.txt"
@@ -2414,7 +2414,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:2: bad argument #2 to 'rep' (number expected, got table)\nstack traceback:\n\t[C]: in function 'rep'\n\tmain.lua:2: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:2: bad argument #2 to 'rep' (number expected, got table)\n"
       },
       "captured": "lua/bad-argument.luajit.txt",
       "captured_runtime": "lua/bad-argument.runtime.txt"
@@ -2434,12 +2434,12 @@
         "compile_command": "luajit -b main.lua main.luac",
         "compile_exit": 0,
         "identities": [
-          "luajit: main.lua:3: stack overflow"
+          "luajit: stack overflow"
         ],
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: stack overflow\nstack traceback:\n\tmain.lua:2: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\t...\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:3: in function 'depth'\n\tmain.lua:5: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: stack overflow\n"
       },
       "captured": "lua/stack-overflow.luajit.txt",
       "captured_runtime": "lua/stack-overflow.runtime.txt"
@@ -2464,7 +2464,7 @@
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:2: no such lantern\nstack traceback:\n\t[C]: in function 'error'\n\tmain.lua:2: in main chunk\n\t[C]: at 0x<pc>\n"
+        "run_stderr": "luajit: main.lua:2: no such lantern\n"
       },
       "captured": "lua/error.luajit.txt",
       "captured_runtime": "lua/error.runtime.txt"

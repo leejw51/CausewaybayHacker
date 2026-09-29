@@ -1,0 +1,1582 @@
+# TYPESCRIPT LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/typescript/advanced.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact strings
+# a program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "typescript.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.advanced.01.conversions"
+title = "Jedno jméno, jeden tvar"
+story = "19:00, velín ve třicátém patře. Feed posílá cenu slotu na Times Square jako text, účtovací obrazovka ji chce jako číslo a velká obrazovka v dolarech."
+brief = '''
+Načti jeden řádek: částku v centech, jako číslice.
+
+Vypiš tři řádky:
+
+1. kolik znaků má oříznutý text
+2. částku jako číslo
+3. částku v dolarech s přesně dvěma desetinnými místy
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+Částka je nezáporná. V Pythonu bys jedno jméno třikrát přeřadil.
+TypeScript tě nenechá: jméno si drží typ, se kterým se narodilo, takže
+
+```ts
+let cents = input.trim();   // string, for the rest of its life
+cents = Number(cents);      // TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+selže dřív, než proběhne jediný řádek. To smlouva dělá svou práci. Dej
+každému tvaru vlastní `const` — text, číslo, dolary — a čtenář nikdy
+nemusí rolovat nahoru, aby zjistil, co jméno právě drží.
+
+Na dolary nechoď přes plovoucí čárku. `(1234 / 100).toFixed(2)` dnes náhodou
+funguje a `0.1 + 0.2` je `0.30000000000000004` každý den.
+`Math.trunc(cents / 100)` a `cents % 100` jsou přesně ty dvě poloviny a
+`String(cents % 100).padStart(2, "0")` doplní tu druhou.
+'''
+hints = [
+  "text.length, dokud máš ještě řetězec, je první řádek.",
+  "const cents: number = Number(text) je nové jméno s novým typem. Použít na to znovu `text` je TS2322, a to ti kompilátor říká, že stará smlouva pořád platí.",
+  "padStart(2, \"0\") doplní zleva na šířku dva: 5 centů je 0.05, ne 0.5.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.advanced.02.control-flow"
+title = "Který slot"
+story = "Obrazovka na Times Square jede v rotaci: každý třetí slot reklama, každý pátý zprávy. Plánovač pokaždé vypíše číslo slotu a obrazovka ukazuje číslo dvanáctimetrovými číslicemi."
+brief = '''
+Načti jedno celé číslo `n`. Pro každé `i` od `1` do `n` vypiš jeden řádek:
+
+* `ADNEWS`, pokud je `i` dělitelné třemi i pěti
+* `AD`, pokud je `i` dělitelné třemi
+* `NEWS`, pokud je `i` dělitelné pěti
+* jinak samotné `i`
+
+Pak čti dál celá čísla, jedno na řádek, dokud nepřečteš `0`, a vypiš
+`SKIPPED <k>`, kolik nenulových řádků jsi cestou přečetl.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        AD
+        4
+        NEWS
+        SKIPPED 2
+```
+
+Dvě smyčky, dva druhy. První ví, kolikrát proběhne, dřív než začne:
+`for (let i = 1; i <= n; i++)`. Druhá to neví: `for (;;)` nebo
+`while (true)` s `break`, protože počet určuje to, co přečteš.
+`i < n` skončí o jedno dřív a je to chyba o jedničku, kterou tu každý jednou
+napíše.
+
+Standardní vstup přijde v jednom kuse. `input.split("\n")` ti dá řádky a
+index, který jimi jde dolů, je to „přečti další řádek“, které bys měl v
+kterémkoli jiném jazyce.
+'''
+hints = [
+  "Nejdřív otestuj případ „obojí“, jinak nikdy nenastane. Dělitelné třemi a pěti je dělitelné patnácti.",
+  "i < n skončí na n - 1. Starter tu chybu má; ukázkový výstup končí o řádek dřív.",
+  "=== ne ==. `\"0\" == 0` je true a `\"\" == 0` je true taky, a tak prázdný řádek ukončí smyčku, kterou ukončit neměl.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.advanced.03.arrays"
+title = "Prostředek tabule"
+story = "Tabule na tramvajové zastávce Yee Wo Street ukazuje první a poslední tramvaj večera a dispečer chce vědět, kolik míst je ve všem mezi nimi."
+brief = '''
+Na standardním vstupu je na prvním řádku počet `n` a na druhém `n` celých
+čísel oddělených mezerami. `n` je nejméně `1`, takže vždycky existuje první
+a poslední hodnota k vypsání.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho, co leží
+ostře mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums.slice(1, -1)` je prostředek: **nové pole**, zkopírované, se záporným
+koncem počítaným odzadu. `nums[nums.length - 1]` je poslední prvek a
+`nums.at(-1)` taky — ale podívej se na jejich typy. Index říká `number`,
+protože ti kompilátor věří; `at` říká `number | undefined`, protože pole
+může být prázdné a kompilátor nevidí, že tvoje není. Za běhu jsou obě
+stejná hodnota. Jen jedna z nich je k tomu upřímná.
+
+`reduce((sum, v) => sum + v, 0)` sečte prostředek. Ta `0` není ozdoba:
+`reduce` na prázdném poli **bez počáteční hodnoty** vyhodí
+`TypeError: Reduce of empty array with no initial value` a vstup s jedním
+prvkem udělá prostředek prázdný.
+'''
+hints = [
+  "nums[nums.length - 1] je poslední prvek. nums.at(-1) taky, a jeho typ přiznává, že tam nemusí být.",
+  "nums.slice(1, -1) je všechno kromě prvního a posledního; s jednou nebo dvěma hodnotami je to [].",
+  "reduce potřebuje 0 jako druhý argument, jinak prázdný prostředek vyhodí výjimku místo součtu na nic.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.advanced.04.strings"
+title = "Tři délky"
+story = "LED stěna na Hysan Place rozpočítává svůj ticker podle `.length`. Emoji tramvaje ji stojí dva, 銅鑼灣 tři a řadič pod ní počítá devět."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**, zakódovanou jako UTF-8
+2. jeho délku ve **znacích** (Unicode code pointech)
+3. řádek s obráceným pořadím znaků
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řetězec v JavaScriptu má tři délky a `.length` není ani jedna z těch dvou
+požadovaných. Počítá **UTF-16 code units**: `"銅鑼灣".length` je `3`, což
+vypadá správně, a `"🚋".length` je `2`, což ne. Znaky jsou to, čím prochází
+`for (const ch of s)` a `[...s]` — iterátor řetězce kráčí po code pointech
+— takže `[...s].length` je druhý řádek.
+
+Bajty jsou třetí číslo. `TextEncoder` ani `Buffer` tu nejsou:
+`node.d.ts` nedeklaruje ani jedno a `tsc` by tě zastavil s `TS2304: Cannot
+find name`. Spočítej je místo toho z code pointů — `ch.codePointAt(0)`
+pod `0x80` je jeden bajt, pod `0x800` dva, pod `0x10000` tři a cokoli
+výš čtyři.
+
+`s.split("").reverse().join("")` je obrácení, po kterém sáhne každý, a
+rozdělí surrogate pair napůl. Obrať `[...s]`.
+'''
+hints = [
+  "[...line] je pole code pointů; jeho délka je počet znaků. line.length jsou UTF-16 jednotky a starter ji vypíše dvakrát.",
+  "for (const ch of line) kráčí taky po code pointech, takže ch.codePointAt(0) je číslo celého znaku, nikdy půlky páru.",
+  "split(\"\") dělí po code unitech a rozbije emoji; obrácení rozloženého pole nechá každý znak celý.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.advanced.05.maps"
+title = "Co říká stěna"
+story = "Stěna Hysan Place řadí slova, která feed dnes večer posílá nahoru, a každý počet na ní ukazuje NaN."
+brief = '''
+Načti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou jako `<word> <count>`, seřazené podle počtu
+sestupně, při shodě podle slova vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+Starter počítá do `Record<string, number>` a typ říká, že každý klíč drží
+`number`. Za běhu drží klíč, který nikdo nezapsal, `undefined` a
+`undefined + 1` je `NaN` — žádná výjimka, žádné varování, jen špatné číslo
+na stěně. Použij `Map<string, number>`: `counts.get(word)` má typ
+`number | undefined`, což je pravda, a `?? 0` je na ni odpověď.
+
+Seřaď položky komparátorem: počet sestupně je `b[1] - a[1]`, a když je to
+`0`, propadni ke slovu. Slova porovnávej přes `<` a `>`, ne přes
+`localeCompare` — `localeCompare` se ptá locale stroje a tabule musí na
+každém stroji vypadat stejně.
+'''
+hints = [
+  "Starter vypíše NaN, protože counts[word] bylo před += undefined. Typ Record sliboval číslo, které tam nikdy nebylo.",
+  "counts.set(word, (counts.get(word) ?? 0) + 1) — get přizná, že klíč chybí, ?? dodá nulu.",
+  "b[1] - a[1] || wordOrder: komparátor, který vrátí 0, předá shodu pravé straně ||.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.advanced.06.sets"
+title = "Co hrají obě obrazovky"
+story = "Dvě obrazovky stojí proti sobě přes Yee Wo Street a inzerentka chce vědět, které klipy platí za to, aby běžely dvakrát na téže křižovatce."
+brief = '''
+Dva řádky standardního vstupu, každý klipy jedné obrazovky oddělené
+mezerami. Obrazovka může mít stejný klip dvakrát; počítá se jednou.
+
+Vypiš tři řádky:
+
+1. `BOTH` a za ním každý klip, který je na obou seznamech, seřazené, oddělené
+   mezerou — nebo `BOTH -`, když žádný není
+2. `ONLY_A <k>`: kolik klipů je na prvním seznamu a ne na druhém
+3. `ALL <k>`: kolik různých klipů je na kterémkoli seznamu
+
+```
+input:  milktea sneakers phone sneakers
+        phone watch
+output: BOTH phone
+        ONLY_A 2
+        ALL 4
+```
+
+`Set` nemá duplikáty. V knihovně `es2023`, proti které se tahle země
+kompiluje, nemá ani `intersection`, `difference` nebo `union` — ty přišly v
+ES2025 a `tsc` by ti to řekl přes `TS2339: Property 'intersection'
+does not exist`. Co existuje, rozhoduje knihovna, proti které kompiluješ, ne
+verze Node, na které běžíš. Tak je vypiš: `[...a].filter((x) => b.has(x))`
+je průnik, totéž s `!b.has(x)` rozdíl a `new Set([...a, ...b])`
+sjednocení.
+
+`.sort()` bez komparátoru řadí řetězce podle UTF-16 code unitů, což je pro
+tyhle přesně správně a pro čísla přesně špatně. Žebříček je o dva questy
+dál.
+'''
+hints = [
+  "new Set(tokens) zahodí duplicitní sneakers už na vstupu. Počet v Set je .size, ne .length.",
+  "[...a].filter((x) => b.has(x)) je průnik; neguj test pro rozdíl; rozlož obě do jednoho Set pro sjednocení.",
+  "both.length > 0 ? both.join(\" \") : \"-\" pokryje prázdný případ jedním výrazem.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.advanced.07.functions"
+title = "Za hodinu"
+story = "Každý slot obrazovky v ceníku je za hodinu, pokud neříká jinak, a tiskárna ceníku píše `/undefined` pod každý, který nic neřekl."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<NAME> <CENTS>` nebo
+`<NAME> <CENTS> <UNIT>`.
+
+Napiš `tag(name, cents, unit = "hour")`, který vrací `<NAME> $<dollars>/<unit>`
+se dvěma desetinnými místy, a vypiš jeden tag na řádek.
+
+```
+input:  3
+        TSQ 1200
+        HYSAN 250 minute
+        LEEGARDEN 800
+output: TSQ $12.00/hour
+        HYSAN $2.50/minute
+        LEEGARDEN $8.00/hour
+```
+
+Starter se zkompiluje, proběhne a vypíše `TSQ $12.00/undefined`. Podívej se
+proč. `const [name, cents, unit] = line.split(" ")` dá všem třem typ
+`string`, protože `split` vrací `string[]` a kompilátor neví, jak je dlouhé.
+Na řádku se dvěma tokeny je `unit` za běhu `undefined` a template literal to
+slovo věrně vypíše. Typ byl slib, který pole nikdy nedalo.
+
+Opravou je **výchozí parametr** a funguje z důvodu, který stojí za to znát:
+výchozí hodnota se použije, když je argument `undefined` — chybí, nebo je
+výslovně předán jako `undefined`, což tu dělá `tag(name, cents, unit)`.
+`null` by ji nespustil. Signatura je smlouva, která říká, co smí volající
+vynechat a co dostane, když to udělá.
+'''
+hints = [
+  "unit: string = \"hour\" v seznamu parametrů. To je celá oprava.",
+  "Výchozí hodnota se použije při undefined, i při undefined předaném schválně. `unit ?? \"hour\"` uvnitř těla je stejný nápad zapsaný v místě volání.",
+  "`$${...}` v template literalu je doslovný znak dolaru a za ním interpolace.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.advanced.08.exceptions"
+title = "Řádek, který není číslo"
+story = "Příjezdová tabule na tramvajové zastávce Yee Wo Street čte z feedu sloupec minut a jeden řádek uprostřed říká `xx`."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků. Každý řádek má být celé
+číslo.
+
+Pro každý řádek vypiš buď hodnotu zdvojenou, nebo `BAD <line>`, když to
+není celé číslo. Nakonec vypiš `SUM <total>`, kde total je součet hodnot,
+které jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`Number("xx")` neselže. Vrátí `NaN`, a `Number("1.5")` je `1.5` a
+`Number("")` je `0`. Proto `double` ve starteru kontroluje text proti vzoru
+a **vyhazuje** `NotANumber` — a proto starter na druhém řádku umře na tu
+výjimku, protože ji nic nechytá.
+
+Obal to jedno volání, které může vyhodit, do `try`/`catch`. Pod `strict` má
+chycená hodnota typ **`unknown`**: `throw` v JavaScriptu může vyhodit
+cokoli, řetězec, číslo nebo `undefined`, a kompilátor nebude předstírat
+opak. Žádné `catch (NotANumber e)` neexistuje. Zúžíš si to sám —
+`if (err instanceof NotANumber)` — a když to není tvoje, znovu `throw err`,
+aby překlep ve tvém vlastním kódu pořád selhal nahlas, místo aby se hlásil
+jako špatný řádek.
+'''
+hints = [
+  "Starter umře s NotANumber: not a whole number: xx. Tahle třída je ta, kterou chytáš.",
+  "Blok try měj malý: dovnitř jde jen volání, které může selhat, a výpis i součet jdou za něj.",
+  "catch (err: unknown), pak `if (err instanceof NotANumber)`. Cokoli jiného se znovu vyhodí přes `throw err`; catch, který spolkne všechno, je způsob, jak se programy učí selhávat potichu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.advanced.09.array-methods"
+title = "Jeden průchod feedem"
+story = "Alex říká, že to jde třemi smyčkami for a třemi čítači. Feed na stěnu Hysan Place už je jinde, když ta třetí doběhne."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš tři řádky:
+
+1. součet sudých hodnot (`0`, když žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednou
+   mezerou — nebo `-`, když žádné nejsou
+3. kolik je různých hodnot
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+TypeScript nemá comprehensions. Má metody pole a ty jsou tentýž nápad
+zapsaný zleva doprava: `filter` nechává, `map` přetváří, `reduce` skládá a
+`new Set(...)` odstraňuje duplikáty. Každá vrací novou hodnotu a žádná z
+nich nepotřebuje index.
+
+`reduce` bere počáteční hodnotu a tady není volitelná: ukázka sudá čísla
+má, ale jeden ze skrytých případů ne a
+`[].reduce((a, b) => a + b)` vyhodí `TypeError: Reduce of empty array with
+no initial value`. `reduce((sum, v) => sum + v, 0)` sečte nic na `0`.
+
+Záporná čísla: `-4 % 2` je v JavaScriptu `-0`. `-0 === 0` je `true`, takže
+test sudosti je v pořádku — ale čísla vypisuj přes template literal, kde
+`` `${-0}` `` je `"0"`, a nikdy nenech holou `-0` dojít do `console.log`.
+'''
+hints = [
+  "nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0) — nechat, pak složit, s 0 jako počátečním součtem.",
+  "Nejdřív filter, pak map: filtruj podle původní hodnoty, pak zdvoj, co přežilo.",
+  "new Set(nums).size je počet různých. Set porovnává čísla podle hodnoty, takže ty dvě 12 jsou jedna.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.advanced.10.from-entries"
+title = "Tentýž průchod, podle klíče"
+story = "Nákupní aplikace Lee Garden dostává dnešní ceny jako seznam dvojic v pořadí, v jakém je obchody napsaly. Banner výprodeje je chce jako jednu tabuli, a chce ji dvakrát."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<ITEM> <PRICE>`. `PRICE`
+je celý počet centů. Každá položka se objeví nejvýš jednou a `n` je nejméně
+`1` — vždycky je co jmenovat jako nejlevnější.
+
+Vypiš tři řádky:
+
+1. každou položku s cenou **ostře nad 100** jako `ITEM=PRICE`, seřazené
+   podle položky, spojené jednou mezerou — nebo `-`, když žádná není
+2. každou položku s cenou **poloviční, zaokrouhlenou dolů**, ve stejném
+   formátu, seřazené podle položky
+3. `CHEAPEST <item>` — nejnižší cena, při shodě podle položky vzestupně
+
+```
+input:  3
+        SCARF 120
+        MUG 80
+        BAG 250
+output: BAG=250 SCARF=120
+        BAG=125 MUG=40 SCARF=60
+        CHEAPEST MUG
+```
+
+`Object.fromEntries(pairs)` postaví objekt podle klíčů z dvojic
+`[key, value]` jedním výrazem a `Object.entries(obj)` ho zase rozebere —
+takže `Object.fromEntries(Object.entries(prices).filter(...))` je
+filtrovaná tabule a totéž s `.map(([k, v]) => [k, Math.floor(v / 2)])` je
+přetvořená. Ani jedno nepotřebuje prázdný objekt a smyčku, která ho plní.
+
+Seřaď položky, než je vypíšeš, i když vypadají seřazené. Objekt drží
+řetězcové klíče v pořadí vložení, **kromě** klíčů, které vypadají jako
+indexy pole — `"7"` před `"10"` před `"SCARF"`, ať přišly v jakémkoli
+pořadí. Tabule s klíči podle čísla produktu by se sama přeházela. Řekni,
+jaké pořadí chceš.
+'''
+hints = [
+  "Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100)) — rozebrat, nechat, složit zpátky.",
+  "Object.entries(obj).sort(byKey) dá dvojice [key, value] v pořadí klíčů, což je přesně to, co chce ITEM=PRICE.",
+  "Pro nejlevnější řaď podle ceny a při shodě cen propadni ke jménu: a[1] - b[1] || byKey(a, b). Vyhrává první položka.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.advanced.11.sorting"
+title = "Žebříček"
+story = "Reklamní kancelář ve třicátém patře řadí dnešní nabídky na obrazovku Times Square a dva inzerenti, kteří nabídli stejně, vyjdou v pořadí, v jakém zavolali."
+brief = '''
+Dva řádky standardního vstupu: na prvním jména inzerentů, na druhém jejich
+nabídky v centech, ve stejném pořadí. Aspoň jeden inzerent tam je.
+
+Vypiš inzerenty seřazené od nejlevnějšího jako `<rank>. <NAME> <cents>`,
+s pořadím od `1`, při shodě podle jména vzestupně. Pak vypiš
+`CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`names.map((name, i) => ({ name, cents: bids[i] }))` spáruje oba seznamy;
+`sort` s komparátorem seřadí dvojice; index, který ti `map` podá, je pořadí.
+Komparátor vrací záporné číslo, nulu nebo kladné číslo a ten ve starteru
+nikdy nevrací nic jiného než rozdíl cen — takže shoda vyjde v pořadí
+vstupu, protože `sort` je stabilní, a stabilní není totéž co správné.
+
+Nikdy nevolej `.sort()` bez komparátoru na čísla. Nejdřív je převede na
+řetězce a `[900, 1200].sort()` je `[1200, 900]`, protože `"1"` je před
+`"9"`.
+'''
+hints = [
+  "a.cents - b.cents je při shodě 0 a 0 || nameOrder propadne ke jménu.",
+  "Jména porovnávej přes < a >. localeCompare by tu fungoval a taky by se ptal locale stroje, a na tom by žebříček záviset neměl.",
+  "sort mění pole na místě a vrací ho. toSorted je kopírující verze a je v es2023.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.advanced.12.classes"
+title = "Operátorův sešit"
+story = "Každý operátor ve velínu si vede sešit klipů, které dnes večer zařadil, a v sešitě noční směny je zkouška tužkou, kterou nikdo z noční směny nenapsal."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<CLIP> <CENTS>`.
+
+Postav třídu `Notebook`, která sbírá klipy, pak každý vypiš zpátky jako
+`<CLIP> <CENTS>` v pořadí, v jakém přišel, pak `TOTAL <sum>` a nakonec
+samotný sešit přes `` console.log(`${book}`) `` — jeho `toString()`
+musí vrátit `Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TRAILER 600
+        PROMO 2800
+output: TRAILER 600
+        PROMO 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` může být `0` a pak jsou řádky `TOTAL 0` a
+`Notebook(items=0, total=0)`.
+
+Starter deklaruje `items` jako **`static`**: jedno pole na třídě, sdílené
+každým `Notebook`, který kdy bude. Pole deklarované bez `static` —
+`items: Entry[] = []` — se inicializuje jednou při každém `new` a patří
+instanci. `main` ve starteru vytvoří pomocný sešit a zapíše do něj zkoušku
+tužkou, a ta zkouška se objeví v tom skutečném.
+
+Template literal volá na objektu `toString()`. Bez něj dostaneš výchozí
+`[object Object]`, což je taky to, co starter vypíše.
+`console.log(book)` je něco jiného — vypíše inspekci polí od Node — a proto
+zadání říká template.
+'''
+hints = [
+  "Spusť starter a podívej se na první řádek výstupu: PENCIL 0, ze sešitu, do kterého to nikdo nenapsal. To je to sdílené statické pole.",
+  "items: Entry[] = [] bez `static` a `this.items` všude, kde starter říká Notebook.items.",
+  "toString(): string { return `Notebook(items=..., total=...)` } — template literal v main ho zavolá za tebe.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.advanced.13.unions"
+title = "Kdo jede"
+story = "Obrazovka jízdného na zastávce minibusu Lee Garden účtuje každé kartě plné jízdné, i těm, které nejsou dospělé, a té jedné, která není karta."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<TYPE> <STOPS>`.
+
+Základní jízdné je `500 + 100 * STOPS` centů. Pro každý řádek vypiš jedno z:
+
+* `ADULT` — základní jízdné
+* `STUDENT` — polovinu základního jízdného, zaokrouhlenou dolů
+* `SENIOR` — vždycky `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Modeluj řádek jako **discriminated union**: jeden objektový typ na každý
+případ, všechny se společným literálovým polem `kind`, a případ `UNKNOWN`,
+který si nechá surový text. `parse` je jediné místo, které se dívá na
+řetězec z drátu; za ním typ říká, jakými čtyřmi věcmi `Order` může být, a
+`switch` na `order.kind` zúží `order` uvnitř každého `case`.
+
+`switch` ve starteru má jednu větev a `default`, který pro všechno ostatní
+vypíše `UNKNOWN` — i pro dva druhy, které má znát. Dej každému druhu jeho
+větev a nech `default` dokázat, že nic nezbylo:
+
+```ts
+default: {
+  const unreachable: never = order;
+  return unreachable;
+}
+```
+
+Když se do unionu někdy přidá pátý druh a do switche ne, ten řádek se
+přestane kompilovat. Samotný union se za běhu vymaže — `node` ho nikdy
+nevidí — takže kontrola musí proběhnout tady, v `tsc`, nebo vůbec.
+'''
+hints = [
+  "Jeden case na každý druh. Uvnitř `case \"STUDENT\":` kompilátor ví, že order má `stops`; uvnitř `case \"UNKNOWN\":` ví, že order má `raw` a žádné `stops`.",
+  "Math.floor(x / 2) je polovina zaokrouhlená dolů. Samotné `/` dá pro liché základní jízdné 450.5 a tabule by to vypsala.",
+  "const unreachable: never = order v default je kontrola úplnosti — stejná práce jako match v Rustu bez větve `_`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.advanced.14.generators"
+title = "Vlastní smyčka for"
+story = "Odpočet na obrazovce Times Square krokuje od jednoho čísla k dalšímu pevnými skoky a řadič za ním nikde nedrží seznam těch čísel."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš **generátorovou funkci** `ticker(start, step, count)`, která vydá
+`count` hodnot počínaje `start` a posouvá se o `step`. Vypiš každou na
+vlastní řádek, pak `SUM <total>` spočítaný průchodem druhým tickerem.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        [object Generator]
+```
+
+Poslední řádek je `Object.prototype.toString.call(ticker(...))`, který
+vypisuje `main` ve starteru tak, jak je. Teď říká `[object Array]`.
+
+`function*` se při zavolání nespustí. Vrátí generátorový objekt a tělo běží
+po jednom kroku, pokaždé, když si něco řekne o další hodnotu — `for...of`,
+rozložení, `Array.from`. Proto může popsat milion hodnot, aniž by kdy
+existovalo pole s milionem hodnot.
+
+Starter postaví pole a vrátí ho, a typová kontrola projde, protože návratový
+typ říká `Iterable<number>` a pole jím je. Smlouva je splněna; otázka ne.
+Pole je každá hodnota najednou; generátor je jedna hodnota na požádání.
+Změň `push` na `yield` a pole smaž.
+'''
+hints = [
+  "Poslední řádek výstupu je tag objektu a test chce [object Generator]. To je to, co vrací function*.",
+  "yield value, pak se posuň. Funkce se u yield zastaví a při další žádosti pokračuje za ním.",
+  "Generátorem se dá projít jednou. Proto main staví pro součet čerstvý ticker, místo aby znovu použil ten, který první smyčka vyčerpala.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.advanced.15.higher-order"
+title = "Zabalené"
+story = "Účtovací obrazovka chce vědět, kolikrát dnes večer proběhla funkce sazby, a funkce sazby nechce vědět, že ji někdo sleduje."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` délek v hodinách.
+
+`price(hours)` je `500 + 100 * hours`. Zabal ji do `counted` tak, aby se
+každé volání počítalo, aniž by o tom `price` věděla. Vypiš jednu cenu na
+každou délku, pak `CALLS <n>`, pak `NAME <price.name>` — což musí pořád
+říkat `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+`@decorators` v TypeScriptu existují, ale jen na třídách a jejich členech;
+volná funkce žádný nosit nemůže. To, čím dekorátor *je*, žádnou syntaxi
+nepotřebuje: funkce, která bere funkci a vrací funkci. Takže
+`const price = counted(function price(hours: number) { ... })` je celý
+mechanismus a generika na `counted` — `<A extends unknown[], R>` — jsou
+to, co mu dovolí zabalit jakoukoli signaturu a vrátit tutéž.
+
+Funkce, kterou `counted` vrací, je closure jménem `wrapper`, a pokud neřekneš
+jinak, její `name` je `"wrapper"`: poslední řádek výstupu starteru. Python
+má `functools.wraps`; tady jméno zkopíruješ sám přes
+`Object.defineProperty(wrapper, "name", { value: fn.name })` — `name` je
+jen pro čtení, takže obyčejné přiřazení by ve striktním režimu vyhodilo
+výjimku.
+
+Počet žije na wrapperu: `wrapper.calls = 0` hned za deklarací funkce. `tsc`
+to přiřazení vidí a přidá do typu funkce `calls: number`, takže
+`price.calls` v `main` projde typovou kontrolou.
+'''
+hints = [
+  "Object.defineProperty(wrapper, \"name\", { value: fn.name }) před return. Jeden řádek.",
+  "wrapper.name = fn.name se zkompiluje a pak vyhodí TypeError: Cannot assign to read only property 'name'. defineProperty je cesta kolem.",
+  "(...args: A) => R s A extends unknown[] je způsob, jak wrapper předá jakoukoli signaturu, aniž by ji znal, a jak si price po zabalení nechá typ (hours: number) => number.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.advanced.16.structural"
+title = "Když má ten tvar"
+story = "Papírová taška z Lee Garden. Nikdo u obrazovky pokladny se neptal, co to je; ptali se, kolik věcí v ní je, jestli jsou v ní ty tenisky, a ať ji projdeš po jedné."
+brief = '''
+Na standardním vstupu je jeden řádek zboží oddělený mezerami, pak jeden
+řádek s jediným slovem k hledání.
+
+Dej zboží do `Bag` a předej ho `report` ze starteru, který vypíše:
+
+1. `LEN <k>` — z `bag.size`
+2. zboží, jedno na řádek — z `for (const item of bag)`
+3. `HAS <WORD> YES` nebo `HAS <WORD> NO` — z `bag.has(word)`
+4. `LONGEST <item>` — nejdelší, při shodě to první
+
+```
+input:  cap sneakers tee
+        sneakers
+output: LEN 3
+        cap
+        sneakers
+        tee
+        HAS sneakers YES
+        LONGEST sneakers
+```
+
+`report` bere `Container<string>` a `Bag` nikde neříká
+`implements Container`. Nemusí. Typy TypeScriptu jsou **strukturální**:
+hodnota pasuje na interface tím, že má jeho členy, ne tím, že ho jmenuje.
+To je duck typing, kontrolovaný přes `tsc` dřív, než program běží, místo
+interpretem, až se tam dostane. `Set<string>` pasuje na `Container<string>`
+taky, a to taky nikdo nenapsal.
+
+`Bag` ve starteru nemá žádného z členů a nezkompiluje se:
+
+```
+error TS2345: Argument of type 'Bag' is not assignable to parameter of type 'Container<string>'.
+```
+
+Dej mu getter `size`, metodu `has` a `[Symbol.iterator]()` — metodu, kterou
+`for...of` hledá podle toho symbolu, stejně jako `for` v Pythonu hledá
+`__iter__`.
+'''
+hints = [
+  "get size(): number { return this.goods.length; } — getter, protože interface říká, že `size` je vlastnost, ne metoda.",
+  "[Symbol.iterator]() může vrátit vlastní iterátor pole: this.goods[Symbol.iterator](). Funguje i generátor `*[Symbol.iterator]() { yield* this.goods; }`.",
+  "report si z položek stejné délky nechá tu první, protože nahrazuje jen ostře delší — > a ne >=.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.advanced.17.undefined"
+title = "Tabule ve 23:59"
+story = "23:59 ve velínu. Tabule sazeb se ptá feedu na obrazovku, která dnes večer nesvítí, feed odpoví ničím a tabule přečte cenu toho ničeho."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<SCREEN> <CENTS>` —
+obrazovky, které dnes večer svítí — pak počet `q` a `q` jmen obrazovek k
+vyhledání.
+
+Pro každý dotaz vypiš `<SCREEN> <cents>`, nebo `<SCREEN> NONE`, když ta
+obrazovka nesvítí. Pak vypiš `MISSING <k>` a `CHEAPEST <SCREEN>` —
+obrazovku s nejnižší sazbou, při shodě podle jména — nebo `CHEAPEST NONE`,
+když nesvítí nic.
+
+```
+input:  2
+        TSQ 1200
+        HYSAN 900
+        3
+        HYSAN
+        YEEWO
+        TSQ
+output: HYSAN 900
+        YEEWO NONE
+        TSQ 1200
+        MISSING 1
+        CHEAPEST HYSAN
+```
+
+Starter se zkompiluje bez jediného varování a spadne na `YEEWO`:
+
+```
+TypeError: Cannot read properties of undefined (reading 'cents')
+```
+
+Ten řádek je boss téhle mapy. Nikdy neukazuje na chybu. Ukazuje na místo,
+kde bylo `undefined` konečně *použito*, a ve starteru vzniklo na dvou
+místech, o která se kompilátor neměl starat.
+
+`lookup` vrací `board[name]` z `Record<string, Screen>` a typ indexu říká
+`Screen` — ne `Screen | undefined` — protože TypeScript předpokládá, že
+index, který čteš, je index, který existuje. Anotace říká `Screen`, `tsc`
+jí věří a za běhu tam klíč není. A `cheapest` nemá na své hlavní cestě
+`return` — spočítá nejlepší obrazovku a spadne z konce — takže implicitně
+vrací `undefined`, což jeho typ dovoluje; volající se pak skrz něj natáhne
+přes `!`, non-null assertion — slib kompilátoru, který nikdo nekontroluje.
+
+Nech obě funkce říkat `Screen | undefined` **schválně** —
+`Map<string, Screen>` má `get`, jehož typ chybějící klíč už přiznává — a
+ošetři `undefined` tam, kam dopadne, přes `=== undefined`. Ne `!screen`:
+pro objekt to funguje, a ten den, kdy bude tahle tabule `Map<string, number>`,
+přestane existovat obrazovka zdarma za `0` centů.
+'''
+hints = [
+  "Čti stack trace odshora: TypeError je na console.log, ale undefined vyšlo z lookup o řádek dřív a z indexu Record ještě předtím.",
+  "Jakmile lookup vrací Screen | undefined, `screen.cents` se přestane kompilovat, dokud nezkontroluješ. Ta chyba je kompilátor, který dělá práci, kterou index Record přeskočil.",
+  "cheapest má dvě cesty a jen jedna z nich vrací. Druhá spadne z konce, což návratový typ `Screen | undefined` potichu dovolí, a `!` u volajícího přísahá, že nespadla. Vrať `best` a `!` u volání zahoď.",
+  "`!` i `as` jsou slibem kompilátoru, který nemůže zkontrolovat. Za běhu se vymažou spolu se všemi ostatními typy a zbude hodnota, která opravdu přišla.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.advanced.18.promise-all"
+title = "Dvanáct obrazovek, jedno vlákno"
+story = "22:00 ve velínu signage. Dvanáct obrazovek je najednou požádáno o počet snímků a hlášení se vytiskne dřív, než kterákoli z nich odpoví."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jednu asynchronní úlohu, která počká jedno kolo
+smyčky událostí, spočítá druhou mocninu hodnoty a uloží ji do `results[i]`
+— do své vlastní přihrádky, takže žádné dvě úlohy nepíšou na stejné místo.
+Počkej na **všechny**, pak vypiš výsledky **v pořadí indexů**, jeden na
+řádek, pak `TASKS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        TASKS 3
+```
+
+Volání `async` funkce ji hned spustí. Běží synchronně až k prvnímu `await`
+a v tu chvíli vrátí `Promise` a volající pokračuje. Vlákno je jedno: úlohy
+mezitím neběží někde jinde, jsou **zaparkované** a čekají, až se k nim
+smyčka událostí vrátí — což může jen tehdy, když kód, který běží teď,
+vlákno pustí.
+
+Starter spustí všechny úlohy a hned vypisuje, takže vypíše přihrádky dřív,
+než se jediná úloha vrátila nějakou vyplnit: `undefined`, `n`krát.
+`await Promise.all(tasks)` je join. Pustí vlákno, dokud se každá úloha
+nevyřídí, a odmítne, jakmile kterákoli z nich vyhodí výjimku — což je druhý
+důvod držet si promisy, místo abys je upustil na zem.
+'''
+hints = [
+  "await Promise.all(tasks) před smyčkou výpisu. Starter už pole tasks postavil; nic na něj nečeká.",
+  "Spusť všechny úlohy, pak počkej na všechny. `for (const t of tasks) await t;` je tu taky správně, protože úlohy byly všechny spuštěny před prvním await.",
+  "results je zachycené closure funkce square; je to totéž pole, které main vypisuje, a proto jsou zápisy po joinu vidět.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.advanced.19.mutex"
+title = "Jeden čítač, osm obrazovek"
+story = "Každá obrazovka na ostrově hlásí svá přehrání do jednoho účtovacího čítače ve třicátém patře a o půlnoci čítač říká jedno přehrání a každá obrazovka přísahá, že hlásila."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Spusť pro každou hodnotu jednu asynchronní úlohu, všechny najednou. Každá
+přečte sdílený čítač, udělá **cestu tam a zpátky** k účtovacímu serveru
+(`roundTrip()` ze starteru, jedno kolo smyčky událostí) a zapíše čítač
+zpátky se svou hodnotou přičtenou k součtu a jedničkou přičtenou k zásahům.
+Počkej na všechny, pak vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+JavaScript má jedno vlákno a lidé ti budou říkat, že to znamená, že nemá
+souběhy. Nemá **datové** souběhy: žádné dva řádky nikdy neběží ve stejném
+okamžiku. Má všechny ostatní. Úlohy ve starteru všechny přečtou čítač,
+všechny zaparkují na cestě tam a zpátky a všechny se vrátí a zapíšou
+`co jsem přečetla + moje` — a co každá z nich přečetla, byla `0`. Vyhraje
+ta, která zapíše poslední: `TOTAL 4`, `HITS 1`, deterministicky, při každém
+běhu. `await` mezi čtením a zápisem jsou dveře a projít jimi může cokoli.
+
+Cestu tam a zpátky nech; to je ta práce. Dej zámek kolem čtení, cesty a
+zápisu. Starter má třídu `Mutex` se správnou signaturou a bez zámku — `run`
+jen zavolá kritickou sekci. Udělej ho skutečným, jen z Promisů: drž promise
+`tail`; každý volající se napojí na tail, nahradí ho vlastním promisem,
+počká na ten starý, proběhne a svůj vyřeší ve `finally`, aby výjimka
+nemohla nechat zámek zamčený.
+'''
+hints = [
+  "Spusť starter: TOTAL je poslední hodnota a HITS je 1. Každá úloha přečetla čítač dřív, než ho kterákoli zapsala; cesta tam a zpátky je místo, kde se všechny minuly.",
+  "Zámek je fronta promisů. `const ahead = this.tail; this.tail = <a new promise you can resolve>; await ahead;` — pak proběhnout, pak vyřešit ten svůj.",
+  "Vyřeš ve `finally` a uvnitř try dej `return await critical()`, aby uvolnění proběhlo až po skončení kritické sekce, a ne ve chvíli, kdy byl její promise pouze vytvořen.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.advanced.20.channel"
+title = "Kdo zavře feed"
+story = "Velín posílá feedem každý čas příjezdu na tabuli na Yee Wo Street a po posledním tabule sedí a čeká na další, který nikdy nepřijde, a pak zhasne."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Jedna producentská úloha posílá každou hodnotu vynásobenou deseti do
+`Channel`, jednu za kolo smyčky událostí, a pak ho **zavře**. Hlavní úloha
+přijímá, dokud kanál neřekne, že je zavřený, vypisuje každou hodnotu a drží
+součet, pak vypíše `SUM <total>` a `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+`Channel` ve starteru je hotový: `send`, `receive` a `close`, který probudí
+každého čekajícího příjemce s `undefined`. Producent nikdy nezavolá
+`close`, takže po poslední hodnotě příjemce čeká na promise, který nikdo
+nikdy nevyřeší.
+
+V Go je to `fatal error: all goroutines are asleep - deadlock!`. V Pythonu
+je to zaseknutí, dokud to runner nezabije. Node nedělá ani jedno. Když ve
+smyčce událostí nezbude nic, co by kdy mohlo cokoli probudit — žádné
+časovače, žádné I/O, žádné immediates — proces prostě **skončí**, se
+stavem `0`, uprostřed tvého `for (;;)`. Řádek `SUM` ani řádek `CLOSED`
+nikdy neproběhnou a zvenku to vypadá jako úspěch. To je horší než pád, a
+přesně to starter dělá.
+
+Kanál zavírá producent. Nikdy konzument — strana, která ví, že proud
+skončil, je strana, která ho ukončí.
+'''
+hints = [
+  "Jeden řádek, na konci control: feed.close().",
+  "Příjemce už kontroluje `=== undefined`. Čekal na něco, co producent nikdy neposlal. `if (!value) break` by se taky zastavilo — na první 0, kterou jeden skrytý případ posílá.",
+  "Kdyby undefined mohlo být v kanálu skutečnou hodnotou, receive by vracel { done: true } | { done: false, value: T } — tentýž tvar, jaký vrací next() iterátoru, a ze stejného důvodu.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.advanced.21.worker-pool"
+title = "Osm enkodérů"
+story = "Čtyřicet klipů k vyrenderování pro stěnu Hysan Place a osm enkodérů v racku. Nikdo nechce čtyřicet enkodérů; chtějí, aby těch osm nikdy nestálo."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `w` a `n`, pak `n` hodnot.
+
+Spusť pool `w` workerů. Každý worker ve smyčce: vezme další nezabraný index,
+`await render(index, value)` — což vrátí `[index, value * value]` po pár
+kolech smyčky událostí, jejichž počet závisí na indexu — a vloží dvojici do
+`results`, dokud žádný index nezbývá. Počkej na každého workera, seřaď
+výsledky podle indexu, vypiš `<index> <value>` jeden na řádek, pak
+`WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+Dvojice přicházejí v pořadí, v jakém úlohy **skončí**, což není pořadí, v
+jakém začaly; nést index ve výsledku je to, co dělá výstup při každém běhu
+stejným, a řazení podle něj je poslední řádek odpovědi.
+
+`const i = next++` žádný zámek nepotřebuje, a po posledním questu stojí za
+to vědět proč: mezi čtením `next` a jeho zvýšením není žádné `await`, takže
+se mezi ně žádný jiný worker nedostane. Zámek byl vždycky potřeba jen přes
+`await`.
+
+Starter čeká na workery přes `workers.forEach(async (w) => {
+await w; })`. Zkompiluje se a nečeká na nic: `forEach` zavolá asynchronní
+callback, dostane zpátky promise a zahodí ho. Každý z callbacků čeká;
+`main` nečeká na žádný z nich a vypíše prázdný výsledek.
+'''
+hints = [
+  "await Promise.all(pool) místo forEach. forEach nikdy nečeká na nic, co jeho callback vrátí, asynchronní nebo ne.",
+  "Výsledky přicházejí v pořadí dokončení; index v každé dvojici je jediný záznam o tom, odkud přišla, a řazení ji vrátí na místo.",
+  "`for (const running of pool) await running;` funguje taky. Nefunguje žádná metoda pole, která bere callback — map, forEach, filter — použitá, jako by za tebe na callback čekala.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.advanced.22.async-await"
+title = "Kde async vlastně běží"
+story = "Mei píše `await` čtyři roky a ještě nikdy neviděla tu věc, která ho pohání. Velín má jednu smyčku a každá obrazovka na ostrově se na ní střídá."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+`async function double(value)` jednou ustoupí — `await null` — a vrátí
+hodnotu zdvojenou. Spusť všech `n` přes `Promise.all`, vypiš každý výsledek
+v pořadí vstupu, pak `SUM <total>` a `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`run` ve starteru prožene hodnoty přes `double` a dostane pole **promisů** —
+a pak kompilátoru řekne, že je to pole čísel:
+
+```ts
+const results = nums.map((v) => double(v)) as unknown as number[];
+```
+
+`tsc` to přijme, protože `as unknown as` je způsob, jak mu říct, ať přestane
+kontrolovat. Přetypování se vymaže se všemi ostatními typy a za běhu je pole
+pořád plné promisů: výstup je třikrát `[object Promise]` a `SUM`, který je
+řetězcem z nich přilepených k nule. Přetypování není převod. Mění, čemu
+kompilátor věří, a nic na hodnotě.
+
+`Promise.all` vezme promisy a vyřeší se na jejich výsledky **v pořadí, v
+jakém jsi je předal**, ať skončily v jakémkoli pořadí.
+
+Kde to všechno běží? Na tom jednom vlákně, na střídačku. `await null` dá
+zbytek funkce do fronty **microtasků**, kterou Node úplně vyprázdní, než
+sáhne na časovač, immediate nebo jakékoli I/O — macrotasky.
+`setTimeout(..., 0)` naplánovaný před tisícem awaitů pořád proběhne až po
+všech. Nic tu není paralelní; věci běží na střídačku, na místech, kde
+řekly, že se můžou zastavit.
+'''
+hints = [
+  "Smaž přetypování a podívej se, co řekne tsc: Type 'Promise<number>[]' is not assignable to type 'number[]'. Ta chyba byla pravda, kterou přetypování skrývalo.",
+  "return Promise.all(nums.map((v) => double(v))) — await je u volajícího, kde se čeká na run(nums).",
+  "Promise.all drží pořadí argumentů. Kdybys chtěl výsledky tak, jak končí, nesl bys index sám, přesně jako v poolu workerů.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.advanced.23.work-queue"
+title = "Kdo řekne, že je hotovo"
+story = "Tři operátoři vyřizují frontu aktualizací obrazovek a vedoucí směny čeká, až fronta řekne, že je prázdná. Nikdy to neřekne, protože jí nikdo neřekl, že je aktualizace hotová, a ve 23:10 zhasne celá konzole."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `w` a `n`, pak `n` hodnot.
+
+Dej dvojice `[index, value]` do `WorkQueue` ze starteru. Spusť `w`
+konzumentských úloh, které ve smyčce berou dvojici, počkají jedno kolo,
+zapíšou `value * 10` do `results[index]` a zavolají `taskDone()`. Hlavní
+úloha čeká na `queue.join()`, pak frontu zavře, aby `get()` konzumentů
+vrátilo `undefined` a oni skončili, počká na ně, pak vypíše výsledky v
+pořadí indexů a `CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`join()` se vyřeší, když každá položka, která kdy prošla `put`, měla
+odpovídající `taskDone()`. Konzumenti ve starteru ho nikdy nevolají. Takže
+`main` čeká na `join`, konzumenti čekají v `get` na položky, které nikdy
+nepřijdou, a ve smyčce událostí nezbylo nic, co by kohokoli probudilo.
+
+To je **deadlock** — všichni čekají, nikdo se nehne — a nepotřebuje žádná
+vlákna ani zámky: stačí dva promisy, z nichž každý čeká, až se pohne ten
+druhý. Dva asynchronní mutexy vzaté dvěma úlohami v opačném pořadí jsou
+totéž s větším obřadem. Odpověď Node na to je ta z minulé mapy: smyčka
+vyschne a proces skončí, se stavem `0`, aniž by vůbec něco vypsal.
+
+Oprava je zase jeden řádek, na straně konzumenta.
+'''
+hints = [
+  "queue.taskDone() po zpracování každé položky. join počítá puty proti taskDone a nic jiného.",
+  "Spusť starter a nevypíše nic a skončí s 0. Ne pád, ne zaseknutí: smyčce událostí došly věci, které by se kdy mohly stát.",
+  "close() probudí každého konzumenta zaparkovaného v get() s undefined, což ukončí jejich smyčky; proto na ně main může po joinu počkat.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.advanced.24.finally"
+title = "Zámek se zamkne stejně"
+story = "Velín pro každou aktualizaci odemkne slot inzerenta a potom ho zase zamkne. Ten, který ve 22:40 dostal špatnou aktualizaci, je od té doby odemčený, protože zamykací kód byl za řádkem, který selhal."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<NAME> <CENTS>`, kde
+`CENTS` má být celé číslo.
+
+Napiš generátor `opened(name)`, který vypíše `OPEN <NAME>`, jednou vydá a
+vypíše `SHUT <NAME>` — **ať tělo vyhodilo výjimku, nebo ne**. Tělo je smyčka
+`for (const _ of opened(name))`, která naparsuje centy a přičte je k
+součtu. Řádek, jehož centy se naparsovat nedají, se ohlásí jako `BAD <NAME>`
+až poté, co se slot zavřel. Nakonec vypiš `TOTAL <sum>` a `REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+`for...of` přes generátor je strážce zdroje, a tady je proč: když tělo
+smyčky skončí předčasně — `break`, `return` nebo výjimka — `for...of`
+zavolá `return()` generátoru, který ho obnoví **u `yield`**, jako by
+`yield` byl příkaz `return`. Kód za `yield` neproběhne. Kód ve `finally`
+kolem `yield` ano. Starter žádné `finally` nemá a slot `WONG` se nikdy
+nezavře.
+
+TypeScript 5.2 má přesně na tohle `using` a `Symbol.dispose`, a tady nejsou:
+knihovna `es2023` nemá `Symbol.dispose`, takže `using` se nezkompiluje.
+`try`/`finally` je to, z čeho je `using` postavené.
+
+Nechytej chybu uvnitř generátoru. Volající chce vypsat `BAD` a generátor,
+který by ji spolkl, by vypsal `TOTAL`, jako by se nic nestalo.
+'''
+hints = [
+  "try { yield; } finally { console.log(`SHUT ${name}`); } — finally je ta část, která proběhne na každé cestě.",
+  "Výjimka projde ven skrz for...of poté, co return() spustil finally, takže ji catch v main pořád uvidí — proto se BAD vypíše za SHUT.",
+  "Generátor není jediná cesta: funkce `withSlot(name, body)` s try/finally kolem `body()` dělá stejnou práci. Generátorová forma je ta, která ukazuje, co dělá for...of na cestě ven.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.advanced.25.pipeline"
+title = "Stupně feedu"
+story = "Feed pro tabule na Yee Wo Street prochází ve třicátém patře dvěma stupni: jeden umocní odečet na druhou, další drží průběžný součet, a tabule má vidět každý, jak přijde, ne celou noc ve 23:59."
+brief = '''
+Na standardním vstupu je počet `n` a pak `n` celých čísel.
+
+Postav dvoustupňovou pipeline z **generátorů**:
+
+1. `squares(values)` vydá každou hodnotu na druhou
+2. `running(stream)` bere jakýkoli `Iterable<number>`, drží průběžný součet
+   a vydává dvojice `[value, total]`
+
+`main` vypíše každou dvojici jako `<square> <total>`, pak `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Ani jeden stupeň nestaví pole. Každý `yield` předá jednu položku dalšímu
+stupni a zastaví se; `main` tahá, `running` tahá ze `squares`, `squares`
+tahá ze vstupu. Nic se nespočítá dřív, než je to potřeba, a celá pipeline
+drží v letu jednu položku.
+
+Druhý stupeň ve starteru je generátor jen podle jména. Projde celý proud a
+pak vydá **jednou**, na konci, s poslední hodnotou a konečným součtem — což
+projde typovou kontrolou dokonale, protože `Generator<[number, number]>`
+říká, jak každá položka vypadá, a nic o tom, kolik jich je. Tabule dostane
+jeden řádek o půlnoci.
+'''
+hints = [
+  "Přesuň yield dovnitř smyčky: yield [value, total] jednou na každou hodnotu.",
+  "Výstup starteru je jeden řádek a PIPE 1. Stupeň, který vydává až za svou smyčkou, je pole s kroky navíc.",
+  "running(squares(nums)) jde skládat, protože generátor je Iterable; running nikdy neví ani ho nezajímá, že jeho vstup je další generátor.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.advanced.26.toolbox"
+title = "Nářadí, které není na polici"
+story = "Manuál velína říká počítat běhy stejných snímků pomocí iterator helpers. Kompilátor ve třicátém patře o nich nikdy neslyšel a noční operátor počítá ručně."
+brief = '''
+Na standardním vstupu je jeden řádek celých čísel.
+
+Vypiš tři řádky, každý postavený vlastním generátorem:
+
+1. `SUMS` a za ním průběžné součty — `accumulate(values)`
+2. `RUNS` a za ním každý běh **sousedních** stejných hodnot jako `<v>x<k>` —
+   `runs(values)`
+3. `PAIRS <k>`: kolik je neuspořádaných dvojic **různých** hodnot —
+   `pairs(items)` přes seřazené různé hodnoty
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Python má na polici `itertools`. JavaScript má iterator helpers —
+`Iterator.prototype.map`, `.filter`, `.take` — v Node od verze 22, a na
+téhle polici **nejsou**: knihovna `es2023` je nedeklaruje, takže `tsc` řekne
+`TS2339: Property 'map' does not exist`, ať je `node` pod tím jakkoli nový.
+Použít můžeš to, co knihovna deklaruje, a to, co importuješ. Tenhle soubor
+importuje `readFileSync` z `"fs"` přes ES `import` — což ze souboru dělá
+**modul** a `tsc` ho zkompiluje na `require`, protože cíl je CommonJS.
+Všechno ostatní napíšeš sám.
+
+`runs` seskupuje jen **sousední** stejné položky. Není to počet a ukázka je
+vybraná tak, aby se ty dva rozcházely: `1` se objeví čtyřikrát, ve dvou
+bězích. Starter pro druhý řádek počítá do `Map` a na přesně tom vstupu je
+špatně.
+'''
+hints = [
+  "accumulate drží součet a vydá ho po každé hodnotě; poslední, co vydá, je celkový součet.",
+  "runs drží rozpracovaný běh. Když se další hodnota liší, vydej hotový běh a začni nový — a za smyčkou vydej poslední běh, protože nic jiného to neudělá.",
+  "pairs jsou dvě vnořené smyčky s j začínajícím na i + 1. Počet je n*(n-1)/2 a ruční kontrola je způsob, jak zjistit, že máš správné n.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.advanced.27.memo"
+title = "Pamatuj si, co jsi spočítal"
+story = "Plánovač obrazovky na Times Square počítá tutéž rotaci ze stejných dvou čísel jedenáct tisíckrát před půlnocí, pokaždé od nuly."
+brief = '''
+Na standardním vstupu je `n k bits`: dvě celá čísla a řetězec binárních
+číslic.
+
+Vypiš čtyři řádky:
+
+1. `FIB <fib(n)>` — z **rekurzivní** `fib`, zabalené do vlastního
+   memoizujícího `memo(...)`
+2. `PRODUCT <k!>` — `reduce` s násobením přes `1..k`, s počáteční hodnotou,
+   aby `k = 0` dalo `1`
+3. `BIN <value>` — `bits` přečtené v základu 2 funkcí `fromBinary`,
+   jednoargumentovou funkcí se základem pevně uvnitř
+4. `MISSES <m>` — kolikrát memo doopravdy spustilo tělo
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` je nejvýš `400`. Wrapper ve starteru počítá volání a nepamatuje si nic,
+takže `fib(10)` je 177 volání, `fib(35)` třicet milionů a `fib(90)`
+nedoběhne. S cache proběhne každé `fib(i)` jednou a `MISSES` je `n + 1`.
+
+Čísla se do `number` nevejdou. `fib(90)` je `2880067194370816120`, za
+`Number.MAX_SAFE_INTEGER`, a `number` by ho bez jediného slova vypsal
+špatně. Použij **`bigint`**: `0n`, `1n`, `BigInt(i)`. Template literal
+vypíše bigint jako jeho číslice; samotné `console.log(5n)` vypíše `5n`.
+
+`parseInt(bits)` bez základu přečte `1010` jako tisíc deset. Starter to
+dělá. Zafixuj základ uvnitř closure —
+`(text: string) => parseInt(text, 2)` — což je to, čím je v Pythonu
+`functools.partial`: funkce, u které jsou některé argumenty už rozhodnuté.
+`bind` dělá totéž jen pro **počáteční** argumenty a základ je ten druhý.
+'''
+hints = [
+  "memo drží ve své closure Map z argumentu na výsledek; zásah vrací z Map, minutí spustí tělo, uloží výsledek a započítá se.",
+  "fib musí ve své rekurzi volat memoizovanou fib, jinak se cachuje jen nejvnější volání. Deklarace fib s typem předem je to, co arrow funkci dovolí se na ni odkázat.",
+  "reduce((a, b) => a * b, 1n) — druhý argument je počáteční hodnota a je to, co dá prázdnému rozsahu 1n. Musí to být taky bigint: 1 * 1n je TS2365, ne tichý převod.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.advanced.28.type-guard"
+title = "Stačí, když se vykreslí"
+story = "Obrazovka s adresářem v Lee Garden vypisuje obchody a servisní přepážky, které přicházejí tímtéž feedem ze dvou různých systémů, a chce jen vědět, že se každý z nich umí vykreslit."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků, každý buď
+
+* `SHOP <NAME> <LEVEL>` — vykreslí se jako `<NAME> / L<LEVEL>`
+* `COUNTER <NUMBER>` — vykreslí se jako `COUNTER <NUMBER>`
+
+`parse` ve starteru udělá z každého řádku to, co by poslal feed: instanci
+`Shop` pro obchod a **obyčejný objekt** s metodou `render` pro přepážku.
+Předá je jako `unknown[]`, protože to je upřímný typ čehokoli, co přišlo po
+drátě. Vypiš každou položku, která je `Sign`, přes `show`, pak `SIGNS <k>` a
+`SHOPS <k>` — to druhé spočítané přes `instanceof Shop`.
+
+```
+input:  3
+        SHOP LAM 4
+        COUNTER 2
+        SHOP WONG 1
+output: LAM / L4
+        COUNTER 2
+        WONG / L1
+        SIGNS 3
+        SHOPS 2
+```
+
+`Sign` je interface a interfaces se **vymažou**. Za běhu není žádný `Sign`,
+kterého by ses mohl zeptat — `x instanceof Sign` se nezkompiluje, protože na
+pravé straně není nic, co by to mohlo znamenat. Abys se dostal z `unknown`
+na `Sign`, napíšeš **type guard**, `function isSign(x: unknown): x is Sign`,
+a kompilátor uvěří čemukoli, co vrátí. Sám nic nekontroluje.
+
+Guard ve starteru vrací `x instanceof Shop`. To se zkompiluje, je to naprosto
+dobrý boolean a je to špatně: přepážka je `Sign` tvarem a instancí ničeho.
+Guard lhal, kompilátor mu uvěřil a přepážky z adresáře zmizí. Kontroluj
+místo toho tvar — `typeof x === "object"`, `x !== null`, `"render" in x` a
+`typeof x.render === "function"` — což je přesně to, co interface slíbil, a
+nic víc.
+
+`show(sign)` rozhoduje za běhu: `sign.render()` najde ten `render`, který
+objekt má, na svém prototypu nebo na sobě.
+'''
+hints = [
+  "Celá oprava je tělo isSign. Přepážka je objektový literál; nic, čeho je instancí, nemá jméno.",
+  "\"render\" in x zúží x na něco s vlastností render typu unknown; typeof x.render === \"function\" ho zúží zbytek cesty. Obojí jsou skutečné kontroly za běhu, a to je rozdíl oproti starteru.",
+  "Type guard je jen tak upřímný jako jeho tělo. `return true` se taky zkompiluje. Kompilátor věří `x is Sign` tak, jako věří `as` a `!` — a všechny tři se vymažou spolu s typy.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.advanced.29.frozen"
+title = "Nemění se"
+story = "Noční ceník odchází v 19:00 na každou obrazovku označený jako readonly a ve 22:00 do něj tři z nich napsaly a jedna přidala sloupec, který tam není."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<NAME> <CENTS>`.
+
+Postav z každého řádku `Price` s poli `readonly`. Pak pro každou cenu zkus
+přepsat její `cents` a vypiš `FROZEN <NAME>`, když pokus vyhodí výjimku.
+Dále `Tally` s jedním polem, `count`: nastav ho, pak zkus nastavit
+přepsané `cuont` a vypiš `SEALED YES`, když vyhodí výjimku *tohle*. Nakonec
+`IN_SET <k>`, kolik je různých cen podle jména a centů, a `TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SEALED YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+`readonly` je smlouva s kompilátorem a jako každá smlouva tady se
+**vymaže**. `price.cents = 0` se nezkompiluje — takže starter píše přes
+rozšířený pohled, `(price as { cents: number }).cents = 0`, což se
+zkompiluje, protože vlastnost readonly je přiřaditelná do měnitelné, a za
+běhu nic nestojí v cestě. Do ceníku se napíše a `TOTAL` je `0`. Běhová
+polovina smlouvy je `Object.freeze(this)` na konci konstruktoru: přiřazení
+do vlastnosti zmrazeného objektu ve striktním režimu vyhodí `TypeError` a
+každý soubor, který `tsc` pod `strict` vydá, začíná `"use strict"`.
+
+`Object.seal(this)` je ten druhý pevný tvar: existující pole zůstanou
+zapisovatelná a přidání nového — překlepu — vyhodí výjimku, místo aby
+potichu vzniklo pole, které nikdo nečte. Kompilátor by `tally.cuont` taky
+chytil, kdybys ho nechal; starter ho nenechá, a `JSON.parse` taky ne.
+
+A `Set` objektů počítá **objekty**, ne hodnoty: ty dvě ceny `LAM 1200` jsou
+dva členy, protože jsou to dvě alokace. Dej množině klíč jako řetězec
+složený z polí — `` `${name}:${cents}` `` — a je to jedna.
+'''
+hints = [
+  "Object.freeze(this) jako poslední řádek konstruktoru Price. Parametrové vlastnosti se přiřadí dřív, než tělo proběhne, takže už jsou tam a dají se zmrazit.",
+  "Object.seal(this) v konstruktoru Tally. Pole třídy se inicializují před tělem konstruktoru, takže count v tu chvíli existuje a zůstane zapisovatelné.",
+  "TOTAL je součet původních centů, což platí jen proto, že zápisy selhaly. Ve starteru je v tu chvíli každá cena 0 a TOTAL je 0 — do polí readonly se napsalo a nikdo neřekl ani slovo.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.advanced.30.error-classes"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy rezervačního systému reklam vyhazují každá něco svého a rezervační obrazovka jedno z toho chytí a ostatní ji shodí."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků, každý má být délka
+rezervace v hodinách.
+
+Definuj hierarchii chyb: `PriceError extends Error` jako základ, a
+`NotANumber` a `Negative`, které ho rozšiřují. `Negative` nese hodiny a
+jeho zpráva je `negative hours: <h>`; zpráva `NotANumber` je
+`not a number`. `price(text)` převede text přes `BigInt(text)` — což
+vyhodí `SyntaxError` na čemkoli, co není celé číslo — a vyhodí
+`NotANumber` **se `SyntaxError` jako jeho `cause`**, odmítne zápornou délku
+a jinak vrátí `500 + 100 * hours`.
+
+Vypiš každou cenu nebo zprávu chyby, pak `ERRORS <k>`. Zužuj na **základní
+třídu**, jednou.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative hours: -2
+        ERRORS 2
+```
+
+Starter zužuje přes `err instanceof Negative` a všechno ostatní znovu
+vyhodí, takže řádek `xx` shodí program nechyceným `NotANumber`.
+`err instanceof PriceError` je true pro každého člena hierarchie a
+`err.message` je zpráva — která žije ve třídě, předaná do `super(...)`, ne
+v handleru.
+
+`new NotANumber({ cause })` — `ErrorOptions` je v knihovně `es2022` —
+zaznamená `SyntaxError` pod ní. Nic tady ji nevypisuje; nechycená by to
+udělala, jako blok `[cause]:` pod stack tracem. Ten řetěz je důvod ji
+předávat.
+
+`class X extends Error` a `instanceof X` fungují, protože cíl je `es2022`.
+Při kompilaci dolů do ES5 podtřída `Error` ztratí svůj prototyp a
+`instanceof` potichu vrací `false` — důvod, proč jsou starší codebase plné
+`Object.setPrototypeOf(this, new.target.prototype)`.
+'''
+hints = [
+  "err instanceof PriceError — základní třída pokryje obě podtřídy, a o to u základní třídy jde.",
+  "Po kontrole instanceof je err PriceError a err.message projde typovou kontrolou. Předtím je err unknown a neprojde nic.",
+  "catch v TypeScriptu nemá typový filtr, takže pořadí tvých kontrol instanceof je pořadí klauzulí except v Pythonu: podtřída testovaná po své základní třídě je mrtvý kód a nic tě nevaruje.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "typescript.advanced.31.iterator"
+title = "Next, dokud to nepřestane"
+story = "Automat na lístky u fronty v Lee Garden vydává čísla od začátku v pevných krocích a nedrží si jejich seznam, a obrazovka fronty vždycky ukazuje o jeden lístek méně, než automat vydal."
+brief = '''
+Na standardním vstupu jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš třídu `Tickets`, která implementuje **iterátorový protokol ručně**:
+`[Symbol.iterator]()` vrací `this` a `next()` vrací
+`{ done: false, value }` pro každou z `count` hodnot a pak
+`{ done: true, value: undefined }`. Vypiš každou hodnotu na vlastní řádek,
+pak `SUM <total>` spočítaný průchodem druhým `Tickets`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Tohle za tebe píše generátor. `for...of` na věci jednou zavolá
+`[Symbol.iterator]()`, pak na výsledku `next()`, dokud výsledek neřekne
+`done: true` — a na výsledek, který říká `done: true`, se už nedívá,
+**i s hodnotou**. Rozložení, `Array.from` a destrukturování dělají totéž.
+
+`next` ve starteru rozhoduje o `done` až poté, co lístek spotřeboval, takže
+poslední skutečný lístek odejde označený `done: true` a `for...of` ho
+zahodí. Typová kontrola projde: `{ done: boolean, value: number }` pasuje
+na `IteratorResult<number>` tak i tak. Smlouva říká, jak výsledek vypadá,
+ne kdy smíš říct, že jsi skončil.
+
+`[Symbol.iterator]()`, který vrací `this`, je znak **iterátoru**: dá se
+projít jednou a pak je vyčerpaný. **Kontejner** vrací pokaždé čerstvý
+iterátor a dá se procházet opakovaně; `Bag` na téhle cestě jím byl. Řekni,
+který píšeš; rozdíl se ukáže, až někdo projde smyčkou podruhé.
+'''
+hints = [
+  "Nejdřív zkontroluj `left === 0` a vrať { done: true, value: undefined }. Teprve pak vezmi lístek a vrať { done: false, value }.",
+  "Hodnotu výsledku s done for...of ignoruje. Poslední lístek starteru je ve výsledku, který říká done, a proto obrazovce i součtu chybí poslední lístek.",
+  "Hodnotu, kterou se chystáš vrátit, si ulož dřív, než se posuneš, jinak jsi o krok vedle na druhou stranu.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "typescript.advanced.32.containers"
+title = "Správný kontejner"
+story = "Kancelář signage drží noční log přehrání v jednom dlouhém poli a na každou otázku o něm odpovídá tak, že ho čte odshora."
+brief = '''
+Tři řádky standardního vstupu: řádek slov, řádek celých čísel už
+**seřazených vzestupně** a jedno celé číslo `x`.
+
+Vypiš čtyři řádky:
+
+1. `TOP <word> <count>` — nejčastější slovo, při shodě podle slova vzestupně
+2. `BISECT <l> <r>` — první index, jehož hodnota není menší než `x`, a
+   první index, jehož hodnota je větší než `x`, v seřazených celých číslech
+3. `SMALLEST3` a za ním tři nejmenší celá čísla, vyndaná z `MinHeap` ze
+   starteru — nebo méně, když jich je méně
+4. `GROUPS` a za ním `<letter>:<k>` pro každé první písmeno slov, písmena
+   vzestupně — `Map<string, string[]>` s klíčem podle prvního písmene
+
+```
+input:  tram bus tram bus ferry
+        1 3 3 5 8
+        3
+output: TOP bus 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS b:2 f:1 t:2
+```
+
+Standardní knihovna má na téhle polici `Map` a `Set` a nic jiného — žádný
+counter, žádnou haldu, žádný bisect. Halda je napsaná za tebe. Zbytek je
+tvůj.
+
+Starter si nechá první slovo, které uvidí s nejvyšším počtem, což je tady
+`tram`, a zadání říká `bus`. Rozhodni shodu klíčem, který říká, co myslíš.
+
+Obě bisekce jsou každá jedno binární hledání: drž `lo` a `hi`, podívej se
+doprostřed, posuň jeden konec — `Math.floor((lo + hi) / 2)` nebo
+`(lo + hi) >>> 1`. Jejich rozdíl je, kolik kopií `x` tam je, a ani jedna
+neselže, když `x` chybí, což `indexOf` dělá s `-1`, které vypadá jako
+index. Halda je správný kontejner, když chceš těch pár nejmenších, znovu a
+znovu: seřadit je všechny, abys ze začátku přečetl tři hodnoty, je přesně
+to, čemu se má vyhnout.
+
+Skupiny: `groups.get(letter)` je `string[] | undefined`. Při minutí seznam
+vytvoř, nastav ho, pak do něj vlož.
+'''
+hints = [
+  "Seřaď položky [word, count] podle počtu sestupně, pak podle slova vzestupně, a vezmi první. Seřadit celou mapu kvůli jedné položce je při téhle velikosti v pořádku; jeden průchod, který porovnává stejným pravidlem, dá stejnou odpověď.",
+  "Jeden bisect s příznakem: posouvej lo za mid, dokud sorted[mid] < x — a pro pravou bisekci taky dokud sorted[mid] === x. indexOf vrací -1, když x chybí, a jeden ze skrytých případů je přesně tohle.",
+  "Map drží pořadí vložení jako objekt, takže písmena před výpisem seřaď. [...groups.keys()].sort() je pořadí, které zadání chce.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "typescript.advanced.33.cancellation"
+title = "Přestaň čekat"
+story = "Velín pingne každou obrazovku kvůli stavu, než překreslí mapu ostrova, a obrazovka v Tin Hau, které nejde síťová karta, nikdy neodpoví, takže se mapa nikdy nepřekreslí."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<SCREEN> <DOWN>`, kde
+`DOWN` je `0` pro obrazovku, která odpoví hned, a `1` pro takovou, které
+nejde síťová karta a neodpoví vůbec nikdy.
+
+Pro každou obrazovku spusť její `ping(screen, down, token)` pod `withTimeout` s termínem **200 ms** a vypiš
+`<SCREEN> OK` nebo `<SCREEN> TIMEOUT`, v pořadí vstupu. Pak spusť úlohu
+`watch(token)`, která donekonečna smyčkuje na 10ms spánku, zruš její token,
+**počkej na ni** a nech ji vypsat `CANCELLED` ze svého `catch` a `CLEANUP`
+ze svého `finally`. Nakonec vypiš `TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+Promise se zrušit nedá. Žádné `.cancel()` není a `Promise.race` proti
+časovači jen rozhodne, koho *posloucháš* — poražený běží dál a cokoli, co
+má ještě rozpracované, časovač nebo odběr, se drží i po tvém posledním
+řádku. Takže zrušení je něco, co **předáš dovnitř**: token, který práce
+kontroluje, nebo k jehož odběru se přihlásí. Starter jeden má, `Token`, s
+`cancel()` a `onCancel(handler)`; `sleep` se přihlásí k odběru a při
+zrušení vymaže svůj časovač a odmítne s `Cancelled`, a `silence` — mrtvá
+obrazovka — je promise, který nikdy nevyřeší nic kromě zrušení.
+(`AbortController` je platformní verze téže věci. Tady deklarovaný není.)
+
+`withTimeout(work, ms)` vytvoří token, nechá `work(token)` závodit s
+časovačem, který odmítne s `Timeout` **a** zruší token, a vymaže svůj
+vlastní časovač ve `finally`, když vyhraje práce. Starter ho nikdy nevolá:
+čeká na `ping` přímo a `WONG` nikdy neodpoví. Viděl jsi, co s tím Node
+udělá: nezbylo nic, co by kohokoli probudilo, takže proces skončí, se
+stavem `0`, po `LAM OK`.
+
+Taky zruší `watch`, aniž by na ni počkal, takže `TIMEOUTS` se vypíše dřív,
+než přišel watcher na řadu — a znovu vyhozené `Cancelled` watcheru
+nedopadne na nikoho, což Node nahlásí jako unhandled rejection a skončí se
+stavem `1`. `Cancelled` uvnitř `watch` po ošetření znovu vyhoď: spolknout
+ho je způsob, jak se z úlohy stane nezrušitelná. Chyť ho tam, kde jsi na
+úlohu čekal.
+'''
+hints = [
+  "withTimeout: promise termínu, jehož setTimeout odmítne s Timeout a zruší token, `return await Promise.race([work(token), deadline])` v try a clearTimeout ve finally.",
+  "`await watcher` je to, co nechá úlohu proběhnout její catch a finally dřív, než se vypíše TIMEOUTS; znovu na tebe vyhodí Cancelled, takže chyť i to — a jen to.",
+  "Vymaž časovač termínu ve finally. Bez toho každá obrazovka, která odpověděla, pořád nechá za sebou 200ms časovač a proces před skončením čeká na poslední z nich: správný výstup, při každém běhu pomalejší. Zrušení tokenu je stejná zdvořilost opačným směrem.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "typescript.advanced.34.event-loop"
+title = "Smyčka událostí"
+story = "Velín signage, jedno vlákno pro každou obrazovku na ostrově. Jeden callback nikdy neustoupí a každá tabule od Tin Hau po Hysan zamrzne na stejném snímku."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla `k` a `n`.
+
+Rozděl `1..n` na `k` souvislých kusů — kus `i` je
+`floor(n*i/k) + 1` až `floor(n*(i+1)/k)` včetně — a sečti druhé mocniny
+každého kusu obyčejnou smyčkou, jako `bigint`. Než začne jakákoli práce,
+`main` naplánuje jedno překreslení tabule přes `setImmediate`, které vypíše
+`BOARD <finished>`: kolik kusů bylo hotových, když tabule dostala vlákno.
+Tabule ho musí dostat **po prvním kusu a před druhým**. Vypiš
+`CHUNK <i> <sum>` pro každý kus v pořadí indexů, pak `TOTAL <sum>`, pak
+`CHUNKS <k>`.
+
+```
+input:  3 10
+output: BOARD 1
+        CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        CHUNKS 3
+```
+
+Node pouští tvůj JavaScript na **jednom vlákně** a každá obrazovka v budově
+na něj čeká. Callback, který běží, se nedá přerušit — ne časovačem, ne I/O,
+ne tabulí — dokud se nevrátí nebo neudělá `await`. Starter zabalí každý kus
+do `async` funkce a všechny je předá `Promise.all`, a vypadá to souběžně.
+Je to jeden dlouhý callback: `async` funkce bez `await` uvnitř proběhne od
+začátku do konce v okamžiku, kdy je zavolána. Všech `k` kusů je sečteno
+dřív, než `main` vůbec pustí, tabule se překreslí poslední a ukáže
+`BOARD 3`, a na `4 2000000` ukazuje každá obrazovka na ostrově po celou
+dobu součtu tentýž snímek. Nic, co tady napíšeš, nepustí součty paralelně;
+odpovědí Node na to je worker thread, který tenhle `node.d.ts` nedeklaruje.
+Async je na **čekání**. Práci CPU na jednom vlákně lze udělat jen
+**zdvořilou**.
+
+Tak buď zdvořilý: jeden kus, pak vrať vlákno, pak další. A vrať ho do
+správné fronty. `await null` nebo `await Promise.resolve()` ustoupí do
+fronty **microtasků**, kterou Node vyprázdní, než spustí jediný immediate
+nebo časovač — tabule by pořád viděla `BOARD 3`.
+`await new Promise((r) => setImmediate(r))` jde na konec řady za tabuli,
+která byla zařazena první.
+
+A ta malá chyba, která má s načasováním všechno společné. Starter sčítá
+přes `total += await work(...)`. JavaScript vyhodnotí levou stranu `+=`
+**před** `await`: každá úloha přečte `total` jako `0`, zaparkuje a vrátí se
+zapsat `0 + moje`. Vyhraje ta poslední a `TOTAL` je poslední kus. To je
+ztracená aktualizace z účtovacího čítače bez jediného řádku kódu mezi
+čtením a zápisem, na kterém bys ji viděl — čtení a zápis sdíleného stavu s
+`await` mezi nimi je souběh na jednom vlákně. Čti součet až po await, nebo
+drž zámek.
+'''
+hints = [
+  "Spusť starter a přečti poslední řádek: BOARD 3, vypsané až po všem. Tabule byla naplánovaná první a stejně šla poslední, protože nic nikdy nevrátilo vlákno.",
+  "Jeden kus za kolo: obyčejná smyčka for přes kusy s `await new Promise((r) => setImmediate(r))` po každém. Immediate tabule byl zařazen první, takže proběhne po kusu 0.",
+  "`total += await x` přečte total dřív, než čeká. `const part = await x; total += part;` ho přečte potom — nebo, bez jakéhokoli await v těle smyčky, není o co závodit.",
+  "n*(n+1)*(2n+1)/6 je uzavřený vzorec pro součet. Jednou proti němu zkontroluj TOTAL a víš, že hranice kusů jsou správně.",
+]

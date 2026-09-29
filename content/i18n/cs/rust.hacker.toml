@@ -1,0 +1,1418 @@
+# RUST LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/rust/hacker.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.hacker.01.two-sum"
+title = "Dvě jízdenky"
+story = "Room 7-32. První otázka je ta, kterou dostane každý, a hodiny se spustí už cestou dovnitř."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` celých čísel.
+
+Vypiš indexy `i j` (**od 1**) dvou různých položek, které dají dohromady
+`target`, jako `i j` s `i < j`. Pokud vyhovuje víc dvojic, dej tu, jejíž
+druhý index je nejmenší; pokud je i tak shoda, nejmenší první index. Pokud
+nevyhovuje žádná dvojice, vypiš `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+Skryté případy jsou tu malé: kontrolují rozhodnutí při shodě a případ bez
+odpovědi, ne tvou rychlost. Otázka je pořád ta lineární — jeden průchod,
+jedna hashovací mapa — protože skutečné `n` je 200000 a vnořená smyčka je
+přesně to, co má tahle otázka vytřídit. Napiš odpověď, na kterou se otázka
+ptá, ne tu, která náhodou projde těmito čtyřmi případy.
+'''
+hints = [
+  "Jeden průchod. U každé hodnoty se zeptej, jestli už bylo viděno target minus ona.",
+  "entry(x).or_insert(j) si u opakované hodnoty nechá první index, a to je rozhodnutí při shodě, které zadání žádá.",
+  "Vypiš a vrať se v okamžiku, kdy ji najdeš — první zásah při průchodu už má nejmenší druhý index.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.hacker.02.window"
+title = "Bez opakování"
+story = "Druhá otázka je na tabuli dřív, než stihneš odložit fixu."
+brief = '''
+Jeden řádek textu, bez mezer.
+
+Vypiš délku nejdelšího úseku znaků, ve kterém se nic neopakuje, pak
+samotný úsek. Pokud je víc úseků stejně dlouhých, vypiš ten nejvíc vlevo.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+Okno se pohybuje jen doprava. Pokud zjistíš, že po opakování procházíš
+znovu od začátku, napsal jsi tu kvadratickou.
+
+Případy jsou tu malé a hodiny je neměří — a neměřily by ani větší případ.
+Generovaný řetězec kvadratickou odpověď nechytí: na 200000 náhodných
+písmenech je nejdelší úsek bez opakování devatenáct znaků dlouhý, takže
+„začni znovu na každé pozici a prodlužuj až k opakování“ udělá asi devatenáct
+kroků na začátek a dorazí za šest milisekund, stejně jako okno. Kvadratickou
+verzi potrestá text s dlouhými úseky bez opakování, a to je nepřátelský
+vstup, ne náhodný. Napiš okno proto, že skutečný vstup je nepřátelský, ne
+proto, že na něm trvaly tyhle čtyři případy.
+'''
+hints = [
+  "Drž index, kde byl každý znak naposledy viděn, a index, kde začíná okno.",
+  "Opakování se počítá jen tehdy, když jeho poslední pozice leží uvnitř aktuálního okna — to je test `previous >= start`.",
+  "Zaznamenej nejlepší délku *i* to, kde začala, jinak úsek na konci nevypíšeš.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.hacker.03.intervals"
+title = "Rozpis směn"
+story = "Podají ti rozpis směn v Lucky Mac a ptají se, které hodiny jsou skutečně pokryté."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je `<start> <end>` se `start <= end`.
+
+Slouč každou dvojici, která se překrývá nebo dotýká, a vypiš výsledek
+vzestupně, jeden `<start> <end>` na řádek, pak `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Dotyk se počítá jako překryv: `1 4` a `4 5` se sloučí do `1 5`.
+'''
+hints = [
+  "Nejdřív seřaď podle začátku. Pak stačí jeden průchod zleva doprava a nikdy se nedíváš zpátky víc než o jeden interval.",
+  "Když je nový začátek <= konci posledního sloučeného intervalu, prodluž ho; jinak vlož nový.",
+  "Prodlužuj na max(last.end, end) — krátký interval pohlcený dlouhým ho nesmí zkrátit.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.hacker.04.grid"
+title = "Ven z budovy"
+story = "Půdorys na tabuli, požární dveře v protějším rohu a tazatel, který sleduje hodiny, a ne fixu."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je podlaží: `.` je volno, `#` je zeď.
+
+Začni vlevo nahoře `(0,0)` a dostaň se vpravo dolů `(r-1, c-1)`, pohybem
+nahoru, dolů, doleva nebo doprava jen přes volná políčka.
+
+Vypiš počet **kroků** na nejkratší cestě, nebo `-1`, když žádná není. Pak
+vypiš `REACHED <k>`: kolik volných políček je ze startu dosažitelných,
+včetně samotného startu.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Do šířky, ne do hloubky. Průchod do hloubky najde *nějakou* cestu; otázka
+chce tu nejkratší.
+'''
+hints = [
+  "VecDeque použitá jako fronta je tady celý rozdíl mezi BFS a DFS.",
+  "Políčko označ, když ho vkládáš, ne když ho vybíráš, jinak se do fronty dostane několikrát.",
+  "Mřížka vzdáleností zároveň slouží jako množina navštívených: -1 znamená ještě neviděno, takže druhou strukturu nepotřebuješ.",
+  "Jedno pole čtyř posunů je lepší než čtyři kopie těla. Souseda spočítej v i64 a meze zkontroluj dřív, než přetypuješ zpátky: řádek i sloupec jsou usize a `r - 1` při `r` rovném 0 v debug buildu zpanikaří a v release se přetočí na zhruba 1.8e19.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.hacker.05.binary-search"
+title = "Jak velká dodávka"
+story = "Depo chce nejmenší dodávku, která odveze denní zásilky ve dnech, které mají. Neřeknou ti, která dodávka to je; řeknou ti, jestli ta, kterou jmenuješ, je moc malá."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné
+hmotnosti nejsou — postavíš je sám, **přesně** tímto generátorem, v
+aritmetice `u64`, která se přetáčí:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+weights[i] = next() % 1000 + 1        for i in 0..n
+```
+
+Depo má vždycky **tři** dny. Najdi nejmenší kapacitu dodávky, která odveze
+všech `n` balíků nejvýš za tři dny, při nakládání v pořadí, v jakém je
+generátor vyrobil, bez přeuspořádání a bez dělení balíku.
+
+Vypiš kapacitu, pak `MAX <heaviest package>`.
+
+```
+input:  8 1
+output: 1702
+        MAX 903
+```
+
+Pro `8 1` jsou hmotnosti `775 154 197 871 35 796 131 903`. Dodávka `1701`
+potřebuje čtyři dny; `1702` to zvládne za tři.
+
+Neprohledáváš seznam. Prohledáváš **odpověď**: kapacity od `max(weight)` do
+`sum(weights)`, na kterých je „vejde se to do tří dní“ nepravda, nepravda,
+nepravda a pak navždy pravda. Na to pusť binární hledání.
+
+**Tenhle quest vynucuje svou složitost.** Jeden skrytý případ je
+`n = 200000`, kde odpověď je `33355734` a nejtěžší balík je `1000` — takže
+hledaná kapacita leží třicet tři milionů kroků nad místem, kde hledání
+začíná. Stoupat po jedné kapacitě je správně, je to starter a **nedoběhlo to
+ani za dvě minuty** proti limitu běhu pět sekund. Půlení rozsahu je místo
+toho dvacet sedm zkoušek po `O(n)` a doběhne za **10 milisekund**. Obojí
+změřeno na tomhle stroji, se dvěma programy v tomhle questu.
+
+Oba konce rozsahu jsou součty, ne jednotlivé hodnoty: `sum(weights)` je u
+velkého případu těsně nad `10^8`. To se do `i32` pořád vejde, ale jen proto,
+že generátor omezuje balík na `1000`. Drž to v `i64` a otázka přestane být
+zajímavá, a přesně to od ní chceš.
+'''
+hints = [
+  "Dolní mez je nejtěžší jednotlivý balík — nic menšího ho nikdy neunese.",
+  "Horní mez je celkový součet: jeden den, všechno naráz.",
+  "low + (high - low) / 2, a při úspěchu posuň `high` dolů na `mid`, abys udržel nejmenší kapacitu, která fungovala.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.hacker.06.stack"
+title = "Další větší"
+story = "Sloupec jízdného na tabuli a jedna otázka: pro každé z nich, které další za ním je větší."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Pro každou položku vypiš první položku **napravo od ní**, která je ostře
+větší, nebo `-1`, když žádná není. Dej je na jeden řádek, oddělené mezerou.
+Pak vypiš `NONE <k>`, kolik z nich bylo `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Drž zásobník pozic, jejichž odpověď je ještě neznámá, a ten zůstává odspodu
+nahoru klesající. Každá pozice se jednou vloží a jednou vyjme, takže celé je
+to jeden průchod, ať to vypadá jakkoli.
+
+Případy jsou tu malé: kontrolují plató a úplně sestupnou řadu, ne tvou
+rychlost. Velký náhodný případ by nepomohl taky. Vzdálenost od hodnoty k
+další větší je v průměru asi `ln n`, takže procházení doprava z každé pozice
+udělá na 200000 náhodných hodnotách 2.1 milionu vnitřních kroků a doběhne za
+šest milisekund — k nerozeznání od zásobníku. Vstup, na kterém je ta odpověď
+kvadratická, je sestupný seznam, a generátor by musel být postavený tak, aby
+ho vyrobil, ne aby na něj náhodou narazil. Zásobník je pořád ta odpověď,
+jedno vložení a jedno vyjmutí na pozici, ať jsou data jakákoli; jen to tady
+neříkají hodiny.
+'''
+hints = [
+  "Zásobník drží indexy, které ještě čekají na odpověď, ne hodnoty.",
+  "Když nová hodnota přebije hodnotu na vrcholu zásobníku, odpověď toho indexu je nová hodnota — a vybírej dál, může jich přebít několik.",
+  "Ostře větší, takže stejné hodnoty se navzájem nevyřeší; naskládají se a vyřeší se později spolu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.hacker.07.coins"
+title = "Přesně na drobné"
+story = "Pokladna na Percival Street má tři přihrádky na mince a zákazníka, který si bankovku nevezme."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` hodnot mincí. Každá mince je k
+dispozici v neomezeném množství.
+
+Vypiš nejmenší počet mincí, který dá přesně `target`, nebo `-1`, když se to
+složit nedá. Pak vypiš `REACH <k>`: kolik z částek `0..=target` se dá složit
+vůbec, včetně `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+Skryté případy jsou malé, takže chytají spíš špatnost než pomalost — a jeden
+z nich chytá obvyklou špatnou odpověď. Hladový algoritmus, který bere
+největší minci, která se vejde, a opakuje, skládá `6` z `3 4` tak, že
+chňapne `4` a pak selže, a na přesně tohle případ je. Druhá špatná odpověď,
+obyčejná rekurze bez tabulky, tu chycená není a pořád to není ta, kterou
+psát: `target` je ve skutečnosti 100000 a tatáž částka se přepočítává
+tisíckrát.
+'''
+hints = [
+  "best[0] = 0 a best[a] je o jedna víc než nejlevnější best[a - coin] přes každou minci, která se vejde.",
+  "Než k buňce přičteš jedna, ohlídej, že nečteš nedosažitelnou, jinak přeteče.",
+  "REACH je prostě to, kolik buněk hotové tabulky není pořád označených jako nedosažitelné.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.hacker.08.top-k"
+title = "Pět nejčastějších"
+story = "Rozehřívací kolo. Chtějí pět slov, která se loni v tiketech objevovala nejčastěji, a stejně to měří."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` slov oddělených mezerami.
+
+Vypiš `k` nejčastějších slov, nejčastější první, při shodě podle slova
+vzestupně, jedno na řádek. Pokud je různých slov méně než `k`, vypiš
+všechna. Pak vypiš `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Počítej do hashovací mapy, pak řaď. Rozhodnutí při shodě není ozdoba.
+`HashMap` vydává své položky v pořadí, které je v každém procesu náhodné,
+takže komparátor, který se dívá jen na počet, nechá slova se stejným počtem v
+pořadí, jaké mapa zrovna vyrobila — tentýž program vypíše při dalším běhu
+jinou odpověď a žádná *stabilita* řazení ho nezachrání, protože vstup řazení
+už byl libovolný. Opraví to až **úplné** porovnání — počet sestupně, pak
+slovo vzestupně — a to je odpověď, na kterou tazatel čeká.
+
+Skryté případy jsou tu malé: kontrolují rozhodnutí při shodě a `k` větší než
+počet různých slov, a o rychlosti vůbec nic. Vstup jsou slova, a to je jediný
+tvar, který generátor přesvědčivě vyrobit nedokáže — takže laťka, kterou tahle
+otázka klade, je ta laťka správnosti výše, a drží ji poctivě, ne hodinami.
+'''
+hints = [
+  "Jeden průchod na počítání, jedno řazení na pořadí. Nesnaž se při počítání udržovat pořadí aktuální.",
+  "b.1.cmp(&a.1) je počet sestupně; .then(a.0.cmp(b.0)) je rozhodnutí při shodě podle slova vzestupně.",
+  "take(k) je bezpečné, i když jich je méně než k — zastaví se na konci, místo aby zpanikařilo.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.hacker.09.linked-list"
+title = "Řetěz"
+story = "Chtějí to bez Vec. Uzly, které ukazují na uzly, protože to je tvar, o kterém otázka doopravdy je."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel, v pořadí.
+
+Postav z nich jednosměrně spojový seznam — `Option<Box<Node>>`, v odpovědi
+žádný `Vec` — a pak vypiš tři řádky:
+
+1. seznam obráceně, oddělený mezerami
+2. hodnotu v prostředním uzlu (pro sudé `n` ten druhý z těch dvou)
+3. `LEN <n>` spočítané procházením seznamu, ne důvěrou ve vstup
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+Prostředek je běžec: jeden ukazatel po jednom kroku, druhý po dvou, a když
+rychlému dojde cesta, pomalý je tam. Jeden průchod.
+'''
+hints = [
+  "Stavět odzadu dopředu je ten snadný směr: každý nový uzel vezme starou hlavu jako svůj next.",
+  "node.next.take() za sebou nechá None a podá ti zbytek, a to je to, co ti dovolí přesunout uzel mezi seznamy bez klonování.",
+  "Pro prostředek posuň slow jen na krocích, kde fast zvládl dva.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.hacker.10.tree-walk"
+title = "Třikrát kolem stromu"
+story = "Strom na tabuli a otázka, nad kterou by nikdo neměl přemýšlet dvakrát: vyjmenuj ta tři pořadí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` hodnot v **pořadí po úrovních**, kde
+`-1` znamená „tady žádný uzel“ — takže strom je uložený tak, jak se ukládá
+halda: potomci indexu `i` jsou `2i+1` a `2i+2`.
+
+Vypiš čtyři řádky: průchody **preorder**, **inorder** a **postorder**, každý
+oddělený mezerami, a pak `DEPTH <d>` — počet uzlů na nejdelší cestě od
+kořene k listu.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder je uzel, levý, pravý. Inorder je levý, uzel, pravý. Postorder je
+levý, pravý, uzel. Rekurze jsou pokaždé tytéž tři řádky a posouvá se jen
+pozice `push`.
+'''
+hints = [
+  "Jedna rekurzivní funkce s push na třech možných místech je lepší než tři skoro stejné funkce.",
+  "Bázový případ jsou obě podmínky najednou: za koncem pole, nebo na -1.",
+  "Hloubka je 1 + hlubší z obou potomků a 0 pro chybějící uzel.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.hacker.11.bst"
+title = "Je to opravdu BST"
+story = "Doplňující otázka. Každý zkontroluje ty dva potomky a každý se napoprvé mýlí."
+brief = '''
+Stejné kódování po úrovních jako v minulém questu: `-1` je chybějící uzel,
+potomci `i` jsou `2i+1` a `2i+2`.
+
+První řádek je `n q`. Druhý řádek je `n` hodnot stromu. Třetí řádek je `q`
+hodnot dotazů.
+
+Vypiš `VALID` nebo `INVALID` — je to binární vyhledávací strom, kde každá
+hodnota v levém podstromu je ostře menší než uzel a každá v pravém ostře
+větší? Pak jeden řádek na dotaz: `<value> FOUND <depth>`, když je ve stromu,
+`<value> ABSENT`, když není, kde kořen má hloubku 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Kontrola `left < node < right` v každém uzlu **nestačí** — hodnota hluboko v
+levém podstromu může být pořád větší než předek. Nes místo toho dolů
+otevřený interval.
+'''
+hints = [
+  "Předávej dolů otevřený interval (low, high). Kořen dostane celý rozsah; levý potomek dostane (low, node), pravý potomek (node, high).",
+  "Chybějící uzel je triviálně platný — to je bázový případ a vrací true, ne false.",
+  "Vyhledání je binární hledání: menší jde doleva, jinak doprava, a hloubka je, kolik skoků to trvalo.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.hacker.12.heap"
+title = "K seřazených front"
+story = "Každá pobočka Lucky Mac posílá své lístky už seřazené. Slouč je do jedné řady, aniž bys to celé řadil znovu."
+brief = '''
+První řádek je `k`. Pak `k` řádků, každý počet a za ním tolik celých čísel,
+už seřazených vzestupně.
+
+Vypiš je všechny sloučené do jednoho vzestupného řádku, oddělené mezerami,
+pak `POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+`BinaryHeap` je **max**-halda. Aby posloužila jako min-halda, vkládej
+`std::cmp::Reverse(x)` a na cestě ven `Reverse` rozbal — to je celý trik
+specifický pro Rust, a právě ten otázka kontroluje.
+
+Halda drží jednu položku na seznam, ne jednu na prvek, takže zůstává
+velikosti `k`, ať jsou seznamy jakkoli dlouhé.
+
+Případy jsou tu malé a hodiny je neměří. Halda je pořád ta odpověď —
+procházení všech `k` hlav pro každý prvek je `O(N·k)` a skutečné `k` jde do
+tisíců — ale nic v těchto čtyřech případech není dost velké, aby ty dvě
+odlišilo, a vstup s `k` seznamy není tvar, který generátor této cesty vyrábí.
+'''
+hints = [
+  "Položka haldy musí nést, odkud hodnota přišla, jinak po jejím vyjmutí nemůžeš doplnit.",
+  "Reverse((value, which, at)) řadí nejdřív podle hodnoty, a to je přesně to, co chceš.",
+  "Další prvek seznamu vlož jen tehdy, když vyjmeš jeden z jeho prvků — to drží haldu na k.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.hacker.13.backtracking"
+title = "Každá kombinace"
+story = "Vyjmenuj každý způsob, jak by se dal obchod uspořádat. Všechny, v pevném pořadí, a žádný nevypiš dvakrát."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` různých celých čísel **už ve
+vzestupném pořadí**.
+
+Vypiš každou podmnožinu, jednu na řádek, hodnoty oddělené mezerami, prázdnou
+podmnožinu jako `-`. Seřaď je tak, jak je vyrobí ta zřejmá rekurze: na každé
+pozici nejdřív větev, která prvek **bere**, pak větev, která ho vynechá.
+Pak vypiš `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Vložit, zanořit se, **vyjmout**. Vyjmutí je ta část, kterou lidé vynechají,
+a příznakem je, že každý řádek po prvním je moc dlouhý.
+'''
+hints = [
+  "Dvě rekurzivní volání na prvek: jedno s ním vloženým, jedno bez. Ber první a pořadí z ukázky vyjde samo.",
+  "chosen.pop() jde mezi ta dvě volání. To je to `undo` v try-recurse-undo.",
+  "Bázový případ je at == nums.len() a prázdný výběr je tam prázdná podmnožina, která se pořád počítá.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.hacker.14.word-search"
+title = "Je to slovo v mřížce"
+story = "Tabulka písmen a jméno. Chtějí vědět, jestli je to jméno v ní napsané, a chtějí počet slepých uliček."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je mřížka malých písmen. Poslední
+řádek je slovo.
+
+Slovo je v mřížce, když ho dokážeš vyhláskovat pohybem nahoru, dolů, doleva
+nebo doprava mezi **sousedními** políčky, bez použití téhož políčka dvakrát
+v jednom pokusu.
+
+Vypiš `FOUND` nebo `ABSENT`, pak `STARTS <k>`: kolik políček drží první
+písmeno slova.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Políčko označ jako použité cestou dovnitř a **odznač ho cestou ven**.
+Políčko, které zůstane označené po neúspěšné větvi, nechá pozdější větve
+selhat z důvodu, který v mřížce není.
+'''
+hints = [
+  "Přepiš políčko znakem, který slovo obsahovat nemůže, zanoř se, pak vrať původní.",
+  "Počáteční písmena spočítej v samostatném průchodu před hledáním, jinak počet zmatou značky '#'.",
+  "Bázový případ úspěchu je `at + 1 == word.len()` — kontrolovaný po shodě tohoto políčka, ne před ní.",
+  "Čtyři směry řetěz přes `||` místo čtyř ifů a příznaku `found`: `||` se už zastaví na první větvi, která uspěje, a stejně tak `any` přes počáteční políčka. Pokračovat po zásahu je práce, o kterou tě nikdo nežádal.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.hacker.15.topo-sort"
+title = "V jakém pořadí se to sestaví"
+story = "Jedenáct crates a graf závislostí. Jmenuj pořadí sestavení, nebo jmenuj cyklus, který znamená, že žádné není."
+brief = '''
+První řádek je `n m`: `n` úloh číslovaných `0..n-1` a `m` hran. Dalších `m`
+řádků je `<a> <b>`, což znamená, že `a` se musí sestavit před `b`.
+
+Vypiš pořadí sestavení na jeden řádek, oddělené mezerami. Když je víc úloh
+připravených najednou, vezmi tu s **nejnižším číslem**, aby byla odpověď
+jednoznačná. Pokud žádné pořadí neexistuje, vypiš místo toho `CYCLE`. Pak
+vypiš `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahnův algoritmus: spočítej, na kolik věcí každá úloha čeká, začni těmi, co
+nečekají na nic, a když úlohu vezmeš, sniž počet jejím závislým. Pokud
+skončíš a úlohy zbydou, ty úlohy jsou ten cyklus.
+'''
+hints = [
+  "waiting[b] je vstupní stupeň b — kolik hran na něj ukazuje.",
+  "Obyčejná fronta dá *nějaké* pořadí; min-halda dá *to* pořadí, které zadání žádá.",
+  "Cyklus nikdy nedetekuješ přímo. Všimneš si, že vyšlo méně než n úloh, a ty, co zbyly, jsou v něm.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.hacker.16.union-find"
+title = "Kdo je spojený s kým"
+story = "Tramvajová síť, MTR a linky minibusů na jednom listu. Kolik oddělených sítí tam doopravdy je."
+brief = '''
+První řádek je `n m`: `n` zastávek číslovaných `0..n-1`, `m` neorientovaných
+spojení. Dalších `m` řádků je `<a> <b>`.
+
+Vypiš tři řádky: kolik je oddělených sítí, velikost té největší a
+`REDUNDANT <k>` — kolik spojení spojilo dvě zastávky, které už spojené byly.
+
+```
+input:  6 4
+        0 1
+        1 2
+        3 4
+        0 2
+output: 3
+        3
+        REDUNDANT 1
+```
+
+Union-find: každá zastávka ukazuje na rodiče, `find` dojde ke kořeni,
+`union` nasměruje jeden kořen na druhý. Na cestě ven z `find` cestu
+zkomprimuj a celé je to v praxi konstantní čas na dotaz.
+
+Případy jsou tu malé: kontrolují počet nadbytečných spojení a opakované
+spojení, ne tvou rychlost. „V praxi konstantní“ je tvrzení o milionu dotazů
+a tady jsou čtyři spojení — komprese cesty je pořád to, co napíšeš, a tyhle
+případy nejsou to, co to dokazuje.
+'''
+hints = [
+  "Začni s každou zastávkou jako vlastním rodičem a n skupinami; každé úspěšné union sníží počet o jedna.",
+  "Spojení, jehož oba konce už mají stejný kořen, je to nadbytečné — započítej ho a jdi dál.",
+  "Smysl má jen položka velikosti u kořene, takže největší čti z kořenů, ne z každého indexu.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.hacker.17.lis"
+title = "Nejdelší rozběh"
+story = "Rok denních tržeb. Chtějí nejdelší úsek zlepšujících se dnů, a nemusí jít po sobě."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš délku nejdelší **ostře rostoucí podposloupnosti** — hodnoty si drží
+pořadí, ale nemusí sousedit. Pak vypiš `TAILS <k>`, kde `k` je tatáž délka,
+odečtená z počtu hromádek patience sortingu.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+Tabulka `O(n²)` je odpověď, kterou bys měl umět napsat zpaměti. Ta
+`O(n log n)` drží pro každou délku nejmenší hodnotu, na které může
+podposloupnost té délky končit — seznam, který je vždycky seřazený, takže
+pozice nové hodnoty je binární hledání. Tady projde obojí; případy jsou malé
+a říkají to. Napiš stejně tu druhou, protože doplňující otázka je vždycky
+„a rychleji?“.
+'''
+hints = [
+  "tails není podposloupnost. Jeho délka je odpověď; jeho obsah jsou jen nejlepší koncové hodnoty.",
+  "Ostře rostoucí znamená, že nahradíš první tail, který je >= value, takže binární hledání hledá tails[mid] < value.",
+  "Doběhnout za konec tails znamená, že tahle hodnota prodlužuje dosud nejdelší rozběh — vlož ji.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.hacker.18.edit-distance"
+title = "Jak daleko od sebe"
+story = "Dva zápisy stejné ulice na dvou různých cedulích. Kolik je mezi nimi úprav po jednom znaku."
+brief = '''
+Dva řádky, na každém jedno slovo, malými písmeny. Kterýkoli řádek může být
+**prázdný** a pak je odpovědí délka toho druhého.
+
+Vypiš **editační vzdálenost**: nejmenší počet vložení, smazání nebo záměn po
+jednom znaku, které promění první ve druhé. Pak vypiš `LCS <k>`, délku
+jejich nejdelší společné podposloupnosti.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Dvě tabulky nad týmiž dvěma řetězci a obě jsou tatáž třířádková rekurence
+s jiným rozhodováním. Plň řádek po řádku; odpověď je v protějším rohu.
+Řádek `0` a sloupec `0` nejsou u editační tabulky nulové — jsou to náklady
+na smazání nebo vložení všeho.
+'''
+hints = [
+  "edit[i][0] = i a edit[0][j] = j: proměnit prefix v nic stojí jedno smazání na znak.",
+  "Shodné znaky nestojí nic a jdou diagonálně; neshoda stojí jedna a vezme nejlevnějšího ze tří sousedů.",
+  "LCS je tentýž průchod s max místo min a bez diagonálního kroku při neshodě.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.hacker.19.knapsack"
+title = "Co se vejde do tašky"
+story = "Jeden kurýr, jedna taška a tabule objednávek, každá s váhou a spropitným. Hladový algoritmus vybere ty špatné."
+brief = '''
+První řádek je `n cap`. Dalších `n` řádků je `<weight> <value>`. Každou
+položku lze vzít nejvýš **jednou**.
+
+Vypiš nejlepší celkovou hodnotu, která se vejde do `cap`, pak `GREEDY <v>`:
+co bys dostal, kdybys opakovaně bral položku s nejlepší hodnotou na váhu,
+která se ještě vejde.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+To, že se ta dvě čísla liší, je celá pointa questu, a ukázka to předvádí:
+nejlepší hodnota na váhu je položka `6 10` s `1.67` a její vzetí nechá čtyři
+jednotky místa, do kterých se nic nevejde. Vynechat ji a vzít obě položky
+`5 7` má cenu `14`. Skryté případy jsou malé, takže kontrolují, že máš obě
+čísla správně, ne že je tabulka rychlá.
+'''
+hints = [
+  "Procházení kapacit směrem dolů je to, co z toho dělá 0/1 místo neomezeného. Nahoru by se táž položka dala použít znovu.",
+  "Poměry porovnávej bez dělení: b.value * a.weight proti a.value * b.weight, takže v odpovědi není žádná plovoucí čárka.",
+  "Hladový průchod je přímá smyčka přes seřazené položky — žádný návrat, a přesně proto je špatně.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.hacker.20.bits"
+title = "Ten, který je sám"
+story = "Každá zásilka je naskenovaná dvakrát kromě jedné. Nenechají tě použít hashovací mapu a nenechají tě řadit."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` nezáporných celých čísel, ve kterých
+se každá hodnota objeví přesně dvakrát kromě jedné.
+
+Vypiš čtyři řádky:
+
+1. hodnotu, která se objeví jednou, nalezenou přes **xor** s konstantním
+   místem navíc
+2. kolik bitů `1` je v ní nastaveno
+3. `POW2 YES`, když je mocninou dvojky, jinak `POW2 NO` (`0` jí není)
+4. hodnotu s vynulovaným nejnižším nastaveným bitem, nebo `0`, když žádný
+   nemá
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` a `x ^ 0 == x` a xor je jedno, v jakém pořadí se děje. To je
+celý první řádek. `x & (x - 1)` vynuluje nejnižší nastavený bit, což ti dá
+třetí a čtvrtý řádek zadarmo.
+
+Případy jsou tu malé a zvětšit je by nic nedokázalo. Otázka žádá
+**konstantní místo navíc** a hodiny místo měřit neumí: při jakémkoli `n`,
+které by tahle cesta použila, doběhne hashovací mapa i řazení hluboko pod
+limitem běhu, a přitom jsou to přesně ty dvě odpovědi, které otázka
+vyloučila. Tyhle testy kontrolují, že čtyři řádky jsou správně. Jak ses k
+nim dostal, kontroluje člověk naproti přes stůl.
+'''
+hints = [
+  "Páry se samy vyruší, ať přijdou v jakémkoli pořadí, takže stačí jedno složení přes seznam.",
+  "Počítání bitů tak, že se pokaždé vynuluje ten nejnižší, proběhne jednou na nastavený bit, ne jednou na šířku v bitech.",
+  "Mocnina dvojky má nastavený přesně jeden bit, takže vynulování nejnižšího nechá nulu — a samotnou nulu je třeba vyloučit ručně.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.hacker.21.matrix"
+title = "Otoč půdorys"
+story = "Plán je vzhůru nohama a na stole není místo na jeho druhou kopii."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je mřížka `n × n` celých čísel.
+
+Vypiš mřížku otočenou o **90° po směru hodinových ručiček**, `n` řádků
+hodnot oddělených mezerami. Pak vypiš její hodnoty ve **spirálovém pořadí**
+— vnější prstenec po směru hodinových ručiček zleva nahoře, dovnitř — na
+jeden řádek.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+Otočení je to, které se dělá na místě: transponovat, pak obrátit každý
+řádek. Říct to nahlas je půlka otázky.
+'''
+hints = [
+  "Transponuj prohazováním jen nad diagonálou — c začíná na r + 1 — jinak všechno zase prohodíš zpátky.",
+  "Spirála chce původní mřížku, takže si před otočením na místě nech kopii.",
+  "Dvě stráže `if` uvnitř spirálové smyčky jsou to, co zabrání, aby se jediný prostřední řádek nebo sloupec prošel dvakrát.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.hacker.22.trie"
+title = "Krabička na prefixy"
+story = "Automatické doplňování pro tabuli zastávek — to poctivé, které doplní jen to, co na seznamu opravdu je."
+brief = '''
+První řádek je `n q`. Dalších `n` řádků jsou slova malými písmeny k vložení.
+Dalších `q` řádků jsou dotazy, každý `WORD <s>` nebo `PREFIX <s>`.
+
+Postav trie — strom uzlů, z nichž každý drží až 26 potomků — a odpověz:
+
+* `WORD <s>` → `YES`, když bylo `s` vloženo, jinak `NO`
+* `PREFIX <s>` → kolik z `n` vložených slov začíná na `s`
+
+Není slíbeno, že těch `n` slov je různých, a `PREFIX` počítá **vložení**, ne
+různá slova: vlož `tram` dvakrát a `PREFIX tram` je `2`. `NODES` počítá
+uzly, takže druhé vložení žádný nepřidá.
+
+Pak vypiš `NODES <k>`, počet uzlů v trie včetně kořene.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Drž na každém uzlu počet, kolik vložených slov jím prochází, a `PREFIX` je
+průchod bez počítání na konci.
+'''
+hints = [
+  "Ulož uzly do jednoho Vec a nech potomky držet indexy. Box na každý uzel tu bojuje s borrow checkerem bez jakéhokoli užitku.",
+  "`through` se zvýší na uzlu, na který *vstoupíš*, takže kořen nikdy nepočítá sám sebe.",
+  "Dotaz, který spadne z trie, dá None a None odpoví NO a 0 bez zvláštního případu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.hacker.23.prefix-sums"
+title = "Kolika způsoby trefit cíl"
+story = "Den tržeb a číslo, které chce auditor vidět. Kolik úseků po sobě jdoucích hodin dá dohromady přesně tohle."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu není
+žádný seznam a ani cíl — obojí postavíš sám, **přesně** tímto generátorem, v
+aritmetice `u64`, která se přetáčí:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+k = (next() % 9) - 4                  # the target, drawn first
+values[i] = (next() % 9) - 4          for i in 0..n
+```
+
+Vypiš, kolik souvislých úseků má součet přesně `k`, pak `RANGE <s>`, součet
+celého seznamu, odečtený z posledního prefixového součtu, ne dalším
+sčítáním.
+
+```
+input:  8 1
+output: 4
+        RANGE 0
+```
+
+Pro `8 1` je cíl `1` a hodnoty jsou `-1 -1 -1 -4 4 1 3 -1`.
+
+Záporné hodnoty zabijí posuvné okno — okno, které je moc velké, se
+zmenšením opravit nedá. Přežijí prefixové součty: úsek `i..j` má součet `k`
+přesně tehdy, když `prefix[j] - prefix[i] == k`, takže spočítej, kolik
+dřívějších prefixů se rovná `prefix[j] - k`. Mapu osaď s `0 → 1` pro úseky,
+které začínají na začátku.
+
+**Tenhle quest vynucuje svou složitost.** Jeden skrytý případ je
+`n = 500000`. Sčítat každý úsek od jeho vlastního začátku je `1.25 × 10^11`
+sčítání — to je starter, je správně a trvá **51 sekund** proti limitu běhu
+pět sekund. Odpověď s prefixy a mapou je jeden průchod, `O(n)`, a doběhne za
+**14 milisekund**. Obojí změřeno na tomhle stroji, se dvěma programy v tomhle
+questu.
+
+`n` je 500000, a ne 200000, které si dvojitá smyčka obvykle zaslouží, a ten
+důvod stojí za to znát. Naivní vnitřní smyčka je tu jedno sčítání a jedno
+porovnání přes souvislý řez, který kompilátor ochotně vektorizuje: při 200000
+dorazila pořád za **méně než devět sekund** — přes limit, ale ne dvojnásobně,
+a rychlejší stroj by ji pustil dál. Laťka, kterou přeskočíš koupí lepšího
+notebooku, není laťka.
+
+Počet je velký — `53075531` u velkého případu — a do `i32` se pořád vejde,
+stejně jako průběžný prefix, protože hodnoty jsou v `-4..4` a 500000 z nich
+dá dohromady pár tisíc. Nic tu není potichu špatně kvůli špatné šířce. Je to
+jen pomalé.
+'''
+hints = [
+  "Dřívější prefix vyhledej *dřív*, než zaznamenáš ten aktuální, jinak se úsek nulové délky při k rovném 0 započítá sám.",
+  "seen.insert(0, 1) hned na začátku je to, co vůbec umožní najít úsek, který začíná na indexu 0.",
+  "Poslední prefix je celkový součet, takže druhý řádek nic navíc nestojí.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.hacker.24.inversions"
+title = "Ten, který chytí hodiny"
+story = "První otázka odpoledního kola. Naivní odpověď je správná, a je to špatná odpověď."
+brief = '''
+Na standardním vstupu jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné
+pole není — postavíš ho sám, **přesně** tímto generátorem, v aritmetice
+`u64`, která se přetáčí:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (wrapping)
+    next value = (x >> 33) % 1000000007
+```
+
+Spočítej **inverze**: dvojice `i < j`, kde `a[i] > a[j]`. Vypiš počet, pak
+`MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**Tenhle quest vynucuje svou složitost a je to jediný druh, který to umí.**
+Jeden skrytý případ je `n = 200000`. Dvojitá smyčka `O(n²)` — což je to, čím
+starter je — je `2 × 10^10` porovnání a nedoběhne v limitu běhu pět sekund.
+Počítání inverzí během merge sortu je `O(n log n)` a doběhne asi za dvacet
+milisekund. Změřeno, na tomhle stroji, s těmito dvěma programy.
+
+Dvě další věci za tebe rozhodne velký případ. Odpověď pro `n = 200000` je
+`9990744366`, což se do `i32` nevejde — střádač špatné šířky je potichu
+špatně, ne pomalý. A generátor se musí přetočit, ne zpanikařit, což v release
+režimu udělá tak jako tak a v debug režimu by neudělal: napiš
+`wrapping_mul` a `wrapping_add` a mysli to vážně.
+'''
+hints = [
+  "Maximum vezmi před řazením, nebo řaď kopii. Merge sort ti pole pod rukama přeuspořádá.",
+  "Když slučování vyhraje hodnota zprava, každý zbývající prvek levé poloviny je větší než ona — to je `mid - left` inverzí naráz, a to je celý trik.",
+  "Fenwickův strom nad zkomprimovanými hodnotami je ta druhá odpověď O(n log n) a stojí za to ji v místnosti zmínit; merge sort je pod hodinami méně kódu.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.hacker.25.test-cases"
+title = "Následuje T testovacích případů"
+story = "Tvar, který používá každý test, a chyba, kterou každý kandidát aspoň jednou napíše: druhý případ si pamatuje ten první."
+brief = '''
+První řádek je `T`, počet nezávislých testovacích případů. Každý případ je
+řádek s `n`, pak řádek s `n` celými čísly — a když je `n` rovno `0`, je ten
+druhý řádek prázdný.
+
+Pro každý případ vypiš **druhou největší různou** hodnotu, nebo `NONE`, když
+jsou různé hodnoty méně než dvě. Po všech vypiš `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+Tohle je standardní obal soutěžních testů a kandidáty shazuje z jediného
+důvodu: stav, který měl být pro každý případ zvlášť, byl deklarován před
+smyčkou. Každý akumulátor, každá množina, každé `best` patří **dovnitř** `for`.
+
+Čti po tokenech oddělených bílými znaky místo po řádcích a prázdný řádek
+pro `n = 0` přestane být zvláštním případem úplně — což je druhá věc, kterou
+tenhle tvar učí.
+'''
+hints = [
+  "Přesuň množinu dovnitř smyčky. To je celá oprava a je to celý quest.",
+  "BTreeSet je seřazená a bez duplikátů najednou, takže .iter().rev().nth(1) je druhá největší různá hodnota.",
+  "nth(1) na iterátoru s méně než dvěma položkami dá None, a to je přesně případ NONE — žádná kontrola délky není potřeba.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.hacker.26.statistics"
+title = "Šest desetinných míst"
+story = "Chtějí čísla zaokrouhlená tak, jak říká specifikace, ne tak, jak je tvůj jazyk náhodou vypisuje."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš tři řádky, každý na **šest desetinných míst**: průměr, **populační**
+směrodatnou odchylku (děl `n`, ne `n - 1`) a medián — který je pro sudé `n`
+průměrem dvou prostředních hodnot.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+Tenhle quest se hodnotí s `match = "float:1e-6"`, takže porovnání je
+číselné: `3.8` i `3.800000` projdou a hodnota, která je vedle o `1e-7`,
+projde taky. To je záměr — nejde o tvůj formátovač, jde o to, že `sum / n` v
+celočíselné aritmetice dá `3` a že medián sudé délky je hranice, kterou lidé
+pod tlakem hodin kazí.
+
+Populační, ne výběrová. Přečti si zadání dvakrát; na skutečném testu je
+rozdíl mezi `/ n` a `/ (n - 1)` celé odevzdání.
+'''
+hints = [
+  "Na f64 převeď před dělením, ne po něm. `sum / n as i64` už zlomek zahodilo.",
+  "Populační rozptyl je průměr čtverců odchylek — součet vyděl n.",
+  "Pro sudý počet je medián průměrem values[n/2 - 1] a values[n/2] a v tom odečítání žije chyba o jedničku.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.hacker.27.commands"
+title = "Problém je ve vstupu"
+story = "Log pokladny vyjede ze stroje zalomený na osmdesát sloupců a počet nahoře je počet příkazů, ne slov."
+brief = '''
+První řádek je `k`, počet **příkazů**, které následují. Příkazy jsou tokeny
+oddělené bílými znaky, nacpané do zbývajících řádků, jak se zrovna zalomily
+— jakýkoli počet na řádek, jakékoli mezery, možná prázdný řádek na konci.
+
+| příkaz | tokeny | účinek |
+| --- | --- | --- |
+| `ADD <cents>` | dva | vloží položku |
+| `VOID` | jeden | odstraní poslední položku, nebo nic, když žádná není |
+| `TOTAL` | jeden | vypíše aktuální součet |
+| `CLEAR` | jeden | odstraní všechno |
+
+Po `k` příkazech vypiš `COMMANDS <k>` a `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` počítá příkazy a `ADD` je jeden příkaz ze dvou tokenů — takže smyčka,
+která proběhne `k`krát a za každé kolo přečte jeden token, se zastaví na
+špatném místě. Čti `k` příkazů a argument vytáhni jen tehdy, když ho příkaz
+má.
+
+`VOID` na prázdné pokladně i `TOTAL` dřív, než se cokoli přidalo, musí
+fungovat. V zadání není řádek, který by říkal, že se to stát nemůže, a na
+skutečném testu je to mlčení specifikací.
+'''
+hints = [
+  "split_whitespace() sloučí každou řadu mezer, tabulátorů a konců řádků, takže zalomení v souboru přestane hrát roli ve chvíli, kdy přestaneš číst po řádcích.",
+  "Argument ADD vytáhni uvnitř větve ADD, z téhož iterátoru. Čítač smyčky počítá příkazy, ne tokeny.",
+  "Vec::pop na prázdném Vec vrátí None a nic nezmění, a to je přesně to, co má udělat VOID na prázdné pokladně — žádná stráž není potřeba.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.hacker.29.dijkstra"
+title = "Ne každá ulice je stejně dlouhá"
+story = "Každá mapa, kterou jsi dosud prošel, počítala skoky. Tramvaji je jedno, kolik je zastávek; zajímá ji, jak dlouho trvají."
+brief = '''
+Na standardním vstupu je `n m seed`: `n` zastávek, `m` neorientovaných
+ohodnocených hran. Graf si postav sám, **přesně** tímto generátorem, v
+přetáčivém `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Vypiš součet nejkratších vzdáleností ze zastávky `0` ke každé dosažitelné
+zastávce (včetně samotné `0`, která je `0`), pak `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 100000`,
+`m = 200000`. Dijkstra je správný algoritmus tak jako tak; hodiny rozhodují
+o prioritní frontě. Procházení každého nenavštíveného uzlu kvůli minimu je
+`O(V²)` a trvá **asi šestnáct sekund** proti limitu běhu pět sekund. Binární
+halda z toho udělá `O((V + E) log V)` a doběhne za **asi padesát
+milisekund**. Obě čísla změřena na tomhle stroji, se dvěma programy, které
+se s tímhle questem dodávají: starter je ta procházející verze.
+
+Stojí za to to vidět jasně, protože je to nejčastější způsob, jak neprojít
+časovaným testem: **starter není špatně.** Vypíše přesně správnou odpověď.
+Odmítnut je jen za to, že dorazí třikrát později, než má.
+
+`std::collections::BinaryHeap` je max-halda, takže vkládej `Reverse((distance,
+node))`. Nemá decrease-key a nepotřebuješ ho: vylepšenou vzdálenost vlož jako
+novou položku a každou vyjmutou položku, jejíž vzdálenost je už horší než ta
+zaznamenaná, přeskoč. To přeskočení „zastaralé položky“ je řádek, na který
+lidé zapomínají, a bez něj halda roste bez omezení.
+'''
+hints = [
+  "Reverse((distance, node)) udělá z max-haldy min-haldu a dá vzdálenost na první místo, takže podle ní se položky řadí.",
+  "`if d > dist[u] { continue; }` je přeskočení zastaralé položky. Bez něj je algoritmus pořád správný a halda se plní zastaralými položkami.",
+  "Polovina generátoru s kostrou zaručuje, že každý uzel je dosažitelný, takže filtr na i64::MAX nikdy nic neodstraní — stejně si ho nech, protože verze téhle otázky s nedosažitelným uzlem je ta doplňující.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.hacker.30.range-queries"
+title = "Součty, které se pořád mění"
+story = "Čtyři miliony pokladních operací z jednoho dne v celém řetězci, polovina z nich opravy, a někdo chce průběžné součty."
+brief = '''
+Na standardním vstupu je `n q seed`. Postav pole `n` hodnot a pak spusť `q`
+operací, vše z téhož generátoru, v přetáčivém `u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..=r]) to a running total
+```
+
+Vypiš průběžný součet odpovědí na všechny dotazy, pak `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**Složitost se tu vynucuje, a dalo to práci.** Naivní odpověď — projít
+rozsah pro každý dotaz — je `O(n)` na dotaz a na tomhle stroji ji kompilátor
+*taky* vektorizuje do něčeho překvapivě rychlého. Malé případy ji nechytí.
+Takže velký skrytý případ je `n = 500000, q = 4000000`, kde naivní odpověď
+sáhne na řádově `10^11` prvků a v limitu běhu pět sekund nedoběhne, zatímco
+Fenwickův strom zvládne celé za asi desetinu sekundy. Obojí změřeno, se
+dvěma programy v tomhle questu.
+
+Ponaučení je to, na které tazatel chytá: *bodová aktualizace, součet
+rozsahu* je přesně ten tvar, pro který Fenwickův strom existuje. Tři krátké
+funkce — add, prefix a range jako rozdíl dvou prefixů — a
+`i & i.wrapping_neg()` je způsob, jak krokovat po nejnižším nastaveném bitu.
+'''
+hints = [
+  "Strom postav zavoláním add jednou na každou počáteční hodnotu. Stavba zdola nahoru v O(n) je pěkná optimalizace a není to to, co hodiny testují.",
+  "i & i.wrapping_neg() izoluje nejnižší nastavený bit. Přičtení jde stromem nahoru; odečtení dolů.",
+  "range(l, r) je prefix(r + 1) - prefix(l) a trefit tu dvojici chyb o jedničku je většina ladění.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.hacker.31.palindrome"
+title = "Stejně pozpátku"
+story = "Otázka z první dvacítky, v nějaké podobě položená na většině testů, a ta, kterou většina lidí jednou napsala a nikdy nepochopila."
+brief = '''
+Na standardním vstupu je `n alphabet seed`. Řetězec si postav sám:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Vypiš délku nejdelšího palindromického podřetězce, pak `AT <index>` —
+začátek (od 0) **nejlevějšího** z té délky.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Rozšiřuj kolem každého středu. Středů je `2n - 1`, ne `n`: každý znak je
+středem pro palindromy liché délky a každá mezera mezi dvěma znaky je
+středem pro ty sudé. Zapomenout na mezery je důvod, proč řešení, které
+vypadá správně, vrátí na `abba` `1`.
+
+**Co testy vynucují a co ne**, na rovinu. Skrytý případ, který dělá tu
+práci, je `n = 20000` nad **jednopísmennou** abecedou. Je to nejhorší případ
+pro rozšiřování kolem středu — každý střed doběhne na konec řetězce — takže
+správná odpověď tam udělá svých plných `O(n²)` a pořád doběhne za **0.08 s**.
+Je to taky to, co odmítne projít-každý-podřetězec-a-každý-otestovat: to
+**běželo ještě po čtyřiceti sekundách** proti limitu pět sekund.
+
+Druhý velký případ, `n = 20000` nad dvoupísmennou abecedou, je případ
+**správnosti**, ne rychlosti. Na náhodném binárním řetězci test palindromu
+selže po znaku nebo dvou, takže i kubická odpověď ho zvládne za **0.64 s**.
+Kontroluje, že tvůj generátor a tvoje rozhodování o nejlevějším indexu
+souhlasí s našimi ve velkém. Nekontroluje, že jsi byl rychlý. Všechna tři
+čísla změřena na tomhle stroji.
+
+Jedna poctivá výhrada, protože přesně na tohle by tazatel zatlačil: to, co
+jednopísmenný případ odmítne, je projít-*každý*-podřetězec. Přidej jediný
+řádek, který přeskočí každý podřetězec, který není delší než dosud nalezený
+nejlepší, a tatáž kubická smyčka projde oběma velkými případy — na tomhle
+vstupu ji to prořezání srazí na `O(n²)`. Takže testy odmítnou naivní kubickou
+odpověď, ne každý program, který je v nejhorším případě kubický.
+
+Takže: testy odmítnou kubické a přijmou kvadratické. **Nežádají**
+Manacherův algoritmus, který je odpovědí `O(n)`. Věz, že existuje a co dělá,
+protože „a dokážeš to líp než kvadraticky?“ je doplňující otázka, kterou má
+tahle otázka obvykle připravit.
+'''
+hints = [
+  "Dvě volání na střed: (c, c) pro liché délky a (c, c + 1) pro sudé. Starteru chybí to druhé.",
+  "Když se smyčka zastaví, i a j se oba posunuly o jedno za palindrom — takže začíná na i + 1 a jeho délka je j - i - 1.",
+  "Aktualizuj jen při ostře delším palindromu a nejlevější z každé délky je ten, který si necháš, a to je to, na co se ptá AT.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.hacker.32.modular"
+title = "Modulo miliarda sedm"
+story = "Ta fráze se objeví na konci zadání a polovina místnosti neví, co po nich chce."
+brief = '''
+Na standardním vstupu je `n q seed`. Vygeneruj `q` dotazů, v přetáčivém
+`u64`:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+Pro každý dotaz spočítej kombinační číslo `C(a, b)` **modulo
+1000000007**. Vypiš součet všech `q` odpovědí, sám modulo `1000000007`, pak
+`LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` má při těchto velikostech stovky tisíc číslic, takže se nikdy
+nespočítá a pak nezredukuje — každé násobení se redukuje průběžně. Problém je
+dělení: `a! / (b! (a-b)!)` nemá v modulární aritmetice smysl. Nahradí ho
+**modulární inverze**, a protože `1000000007` je prvočíslo, dá ti ji malá
+Fermatova věta: `inverse(v) = v^(p-2) mod p`, spočítaná rychlým umocňováním
+za asi třicet umocnění na druhou.
+
+Takže: jednou předpočítej `factorial[0..=n]` a na každý dotaz odpověz jako
+`f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 200000`,
+`q = 200000`. Počítání každého koeficientu zvlášť — vynásobit `b` členů,
+vydělit `b` členy, na každý jedna modulární inverze — nedoběhne v limitu běhu
+pět sekund; to je starter. Jedna sdílená tabulka faktoriálů doběhne asi za
+padesát milisekund. Obojí změřeno na tomhle stroji.
+
+Každý mezivýsledek je součin dvou hodnot pod `2^30`, takže se vejde do `i64`
+a nic nepřeteče. V jazyce s 32bitovým `int` by se nevešel, a to je druhá
+polovina toho, proč se tahle otázka klade.
+'''
+hints = [
+  "Redukuj po každém násobení, nikdy až na konci. i64 udrží součin dvou hodnot pod P; faktoriál neudrží.",
+  "inverse(v) je power(v, P - 2) a funguje jen proto, že P je prvočíslo — to je tu celý obsah malé Fermatovy věty.",
+  "Předpočítat i inverzní faktoriály, směrem dolů od inverse(factorial[n]), odstraní z každého dotazu obě volání power(). Pro projití to není potřeba, a stojí za to to říct nahlas.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.hacker.33.grid-paths"
+title = "Přes blok, nikdy zpátky"
+story = "Doručovací mřížka se třemi ulicemi zavřenými kvůli bambusovému lešení. Kolika cestami se dá projít a která je nejlevnější."
+brief = '''
+Na standardním vstupu je `r c pct seed`. Mřížku si postav sám, po řádcích,
+s **dvěma** losovanými hodnotami na každé políčko:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Pohybuj se jen **doprava** nebo **dolů**, přes volná políčka. Vypiš:
+
+1. `PATHS <k>` — kolik různých cest vede z `(0,0)` do `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — nejmenší celkovou cenu cesty, včetně obou koncových bodů,
+   nebo `-1`, když žádná cesta není
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+Jeden průchod po řádcích udělá obojí: cesty do políčka jsou součtem cest do
+něj shora a zleva a jeho nejlepší cena je jeho vlastní cena plus levnější z
+těch dvou. Protože se pohybuješ jen doprava nebo dolů, obě políčka, která
+potřebuješ, jsou vždycky už hotová — a proto to nepotřebuje rekurzi ani
+množinu navštívených.
+
+Počet `PATHS` se bere modulo `1000000007` z obvyklého důvodu: na skrytém
+případu `1000 × 1000` má skutečné číslo přes šest set číslic. Redukuj při
+sčítání.
+
+**Co velký případ vynucuje:** odmítne každou odpověď, která cesty vyjmenovává.
+Je jich víc, než je v místnosti atomů. Nerozliší tabulku zdola nahoru od
+memoizované rekurze — obě jsou lineární v počtu políček a obě projdou s
+rezervou.
+'''
+hints = [
+  "Losuj obě hodnoty pro každé políčko, včetně dvou rohů — generátor je nepřeskakuje, jen je odmítá zablokovat.",
+  "Volné políčko bez volného souseda shora ani zleva je dosažitelné nula cestami a nemá nejlepší cenu; nech i64::MAX znamenat `unreachable` a sčítání ohlídej.",
+  "Cíl může být volný a přesto nedosažitelný, a přesně tehdy je PATHS 0 a MIN -1. Jeden ze skrytých případů je tohle.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.hacker.34.stable-sort"
+title = "Shody si drží místo"
+story = "Dva kurýři skončili se stejným skóre a žebříček je při každém překreslení dá v jiném pořadí."
+brief = '''
+Na standardním vstupu je `n buckets seed`. Postav `n` kurýrů, kde kurýr `i`
+má index `i` a skóre:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Seřaď kurýry podle skóre **sestupně**. Kurýři se stejným skóre si musí
+nechat pořadí, v jakém přišli. Vypiš jejich indexy, oddělené mezerami, pak
+`TIES <k>` — kolik sousedních dvojic ve tvém seřazeném pořadí má stejné
+skóre.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` je malé, takže skoro všechno je shoda a odpověď je skoro celá
+rozhodnutá tím, co se s nimi stane.
+
+**Tohle je quest o tom, vědět, které řazení držíš v ruce.**
+`sort_by_key` je **stabilní** — stejné prvky si drží vzájemné pořadí.
+`sort_unstable_by_key` není, a na skutečném vstupu ho viditelně neudrží: je
+to pattern-defeating quicksort, bývá rychlejší a o shodách neslibuje vůbec
+nic. Starter ho používá a skryté případy jsou dost velké, aby je
+prokazatelně zamíchal. (Při `n = 8` se to náhodou nestane — a proto by malý
+test nic nedokázal a proto je malý případ tady ten *viditelný*, ne ten,
+který tě posuzuje.)
+
+Správné odpovědi jsou dvě a měl bys umět dát obě. Použij stabilní řazení.
+**Nebo** nech to nestabilní a udělej porovnání **úplné** — řaď podle
+`(Reverse(score), index)`, aby se žádné dva prvky nikdy neporovnaly jako
+stejné a stabilita přestala být otázkou. To druhé je to, po čem sahat ve
+výchozím stavu; nestabilní řazení nemá co dokazovat, když je pořadí úplně
+určené.
+'''
+hints = [
+  "Jedno slovo: sort_unstable_by_key se změní na sort_by_key. To je ta stabilní odpověď.",
+  "Druhá odpověď nechá nestabilní řazení a řadí podle (Reverse(score), index) — úplné pořadí, takže nezbydou žádné shody, u kterých by šlo být nestabilní.",
+  "TIES počítá sousední stejná skóre v hotovém pořadí a ten počet je stejný, ať jsi napsal kteroukoli z těch dvou — prozradí tě pořadí indexů.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "rust.hacker.28.lru"
+title = "Tabule"
+story = "Room 7-32, poslední otázka, a tazatel vypne monitor. Žádné zvýraznění, žádné doplňování, jen hodiny."
+brief = '''
+První řádek je `cap q`. Dalších `q` řádků je `PUT <key> <value>` nebo
+`GET <key>`.
+
+Implementuj cache s pevnou kapacitou, která při zaplnění vyhodí **nejdéle
+nepoužitou** položku. `GET` i `PUT` se počítají jako použití klíče.
+
+Pro každý `GET` vypiš hodnotu, nebo `-1`, když tam není. Na konci vypiš
+přeživší klíče, nejčerstvěji použité první, oddělené mezerami — nebo `-`,
+když je cache prázdná — a pak `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Projdi si ukázku: `GET 1` udělá `1` znovu čerstvým, takže když `PUT 3`
+potřebuje místo, jde pryč `2`. `GET 2` mine. `GET 3` zasáhne a udělá `3`
+nejčerstvějším, a proto se přeživší vypíšou jako `3 1`.
+
+Učebnicová odpověď je hashovací mapa do obousměrně spojového seznamu. V Rustu,
+bez `unsafe` nebo `Rc<RefCell<_>>`, je poctivá verze `HashMap<i64, (i64, u64)>`
+s monotónně rostoucím razítkem, a vyhazování hledá to nejstarší. To je O(cap)
+na vyhození místo O(1), a říct to v místnosti nahlas má větší cenu než
+předstírat opak.
+'''
+hints = [
+  "Jedny hodiny, které tiknou při každé operaci, a každý dotčený klíč si zapíše jejich stav. Čerstvost je pak jen číslo, podle kterého se řadí.",
+  "Přepsání klíče, který už tam je, není vyhození — zkontroluj contains_key dřív, než rozhodneš, že je cache plná.",
+  "Poslední řádek je seřazený podle razítka sestupně, takže klíč dotčený naposledy jde první.",
+]

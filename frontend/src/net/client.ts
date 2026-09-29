@@ -180,6 +180,7 @@ export class Client {
     this.token = null;
     this.user = null;
     this.formats = null;
+    this.lands = null;
     this.hadSession = false;
   }
 
@@ -415,7 +416,7 @@ export class Client {
     // seconds would otherwise be reported to the player as a run that never
     // came back.
     const ms = Client.SLOW.has(type) ? SUBMIT_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
-    return new Promise<Responses[K]>((resolve, reject) => {
+    const reply = new Promise<Responses[K]>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         if (type === "quest.submit") this.submitInFlight = false;
@@ -423,6 +424,12 @@ export class Client {
       }, ms);
       this.pending.set(id, { type, resolve: resolve as (v: unknown) => void, reject, timer });
       this.transport!.send(encode(id, type, payload));
+    });
+    if (type !== "world.lands") return reply;
+    return reply.then((res) => {
+      const rows = (res as Responses["world.lands"]).lands;
+      if (Array.isArray(rows)) this.lands = rows.map((r) => String(r.land));
+      return res;
     });
   }
 
@@ -478,6 +485,13 @@ export class Client {
    * let the error speak", which is what every client did before.
    */
   formats: string[] | null = null;
+
+  /**
+   * The land ids the last `world.lands` reported (§4.6), kept from whichever
+   * screen asked, so the map's switcher walks this server's lands without a
+   * second request. Null until one has come back.
+   */
+  lands: string[] | null = null;
 
   /** Whether FORMAT is worth drawing for this land. */
   canFormat(lang: string): boolean {

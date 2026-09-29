@@ -1,0 +1,1267 @@
+# TYPESCRIPT LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "typescript.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.advanced.01.conversions"
+title = "一个名字，一种形态"
+story = "19:00，三十楼的控制室。数据源把时代广场时段的价钱当文本发来，计费屏要的是数字，大屏幕要的是元。"
+brief = '''
+读取一行：一个以分为单位的金额，全是数字。
+
+输出三行：
+
+1. 去掉首尾空白后的文本有多少个字符
+2. 这个金额作为数字
+3. 这个金额换算成元，精确到两位小数
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+金额非负。在 Python 里你会把一个名字重新绑定三次。TypeScript 不让你这么做：一个名字保留它
+诞生时的类型，所以
+
+```ts
+let cents = input.trim();   // string, for the rest of its life
+cents = Number(cents);      // TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+在任何一行运行之前就失败了。这是契约在尽它的职责。给每种形态一个自己的 `const` —— 文本、
+数字、元 —— 这样读代码的人永远不必往上翻，去弄清一个名字此刻装的是什么。
+
+算元的时候不要经过浮点数。`(1234 / 100).toFixed(2)` 今天碰巧能用，而 `0.1 + 0.2`
+每天都是 `0.30000000000000004`。`Math.trunc(cents / 100)` 和 `cents % 100` 精确地给出
+两个部分，`String(cents % 100).padStart(2, "0")` 给第二部分补零。
+'''
+hints = [
+  "趁你手里还是字符串的时候取 text.length，就是第一行。",
+  "const cents: number = Number(text) 是一个新名字、一个新类型。拿 `text` 来装它是 TS2322，这是编译器在告诉你旧的契约仍然有效。",
+  "padStart(2, \"0\") 在左边补到宽度二：5 分是 0.05，不是 0.5。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.advanced.02.control-flow"
+title = "哪个时段"
+story = "时代广场的大屏幕按轮换播放：每第三个时段放广告，每第五个放新闻。排程器每次都只打印时段编号，于是屏幕上出现一个四十英尺高的数字。"
+brief = '''
+读取一个整数 `n`。对从 `1` 到 `n` 的每个 `i`，输出一行：
+
+* 如果 `i` 能同时被 3 和 5 整除，输出 `ADNEWS`
+* 如果 `i` 能被 3 整除，输出 `AD`
+* 如果 `i` 能被 5 整除，输出 `NEWS`
+* 否则输出 `i` 本身
+
+然后继续读取整数，每行一个，直到读到 `0` 为止，再输出 `SKIPPED <k>`，即途中读到的
+非零行数。
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        AD
+        4
+        NEWS
+        SKIPPED 2
+```
+
+两个循环，两种类型。第一个在开始之前就知道要跑多少次：`for (let i = 1; i <= n; i++)`。
+第二个不知道：`for (;;)` 或者 `while (true)` 加一个 `break`，因为次数由你读到的东西决定。
+`i < n` 会少跑一次，这是每个人在这里都会写一次的差一错误。
+
+标准输入是一整块送来的。`input.split("\n")` 给你各行，而一个沿着它们往下走的下标，就是
+你在任何其他语言里都会有的那个“读下一行”。
+'''
+hints = [
+  "先检查两者都满足的情况，不然它永远不会触发。能被 3 和 5 整除就是能被 15 整除。",
+  "i < n 停在 n - 1。起始代码就有这个 bug；样例输出早一行就结束了。",
+  "用 === 而不是 ==。`\"0\" == 0` 是 true，`\"\" == 0` 也是 true，一个空行就是这样结束了一个不该结束的循环。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.advanced.03.arrays"
+title = "牌子的中间"
+story = "怡和街电车站的牌子显示今晚的头班车和末班车，调度员想知道中间所有车一共有多少座位。"
+brief = '''
+标准输入第一行是计数 `n`，第二行是 `n` 个整数，用空格分隔。`n` 至少为 `1`，所以总有
+第一个值和最后一个值可以输出。
+
+输出三行：第一个值、最后一个值，以及严格位于它们之间的所有值的和。少于三个值时这个和是 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums.slice(1, -1)` 就是中间部分：一个**新数组**，复制出来的，负数的结束位置从后往前数。
+`nums[nums.length - 1]` 是最后一个元素，`nums.at(-1)` 也是 —— 但看看它们的类型。下标说
+`number`，因为编译器信任你；`at` 说 `number | undefined`，因为数组可能是空的，而编译器看不出
+你的不是。两者在运行时是同一个值。只有一个对此是诚实的。
+
+`reduce((sum, v) => sum + v, 0)` 把中间部分加起来。那个 `0` 不是装饰：在空数组上
+**不带初始值**调用 `reduce` 会抛出 `TypeError: Reduce of empty array with no initial value`，
+而只有一个元素的输入会让中间部分为空。
+'''
+hints = [
+  "nums[nums.length - 1] 是最后一个元素。nums.at(-1) 也是，而且它的类型承认它可能不存在。",
+  "nums.slice(1, -1) 是除了第一个和最后一个以外的全部；只有一两个值时它是 []。",
+  "reduce 需要 0 作为第二个参数，否则空的中间部分会抛异常，而不是加出一个零。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.advanced.04.strings"
+title = "三种长度"
+story = "希慎广场的 LED 墙按 `.length` 给跑马灯分配预算。一个电车 emoji 算两个，銅鑼灣 算三个，而底下的控制器数出九个。"
+brief = '''
+读取一行。输出三行：
+
+1. 它编码成 UTF-8 后的长度，以**字节**计
+2. 它的长度，以**字符**（Unicode 码点）计
+3. 字符顺序反转后的这一行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+一个 JavaScript 字符串有三种长度，而 `.length` 不是题目要的两种里的任何一种。它数的是
+**UTF-16 码元**：`"銅鑼灣".length` 是 `3`，看起来对，而 `"🚋".length` 是 `2`，就不对了。
+字符是 `for (const ch of s)` 和 `[...s]` 走过的东西 —— 字符串迭代器按码点前进 —— 所以
+`[...s].length` 是第二行。
+
+字节是第三个数。这里没有 `TextEncoder` 也没有 `Buffer`：`node.d.ts` 两个都没声明，`tsc`
+会用 `TS2304: Cannot
+find name` 拦住你。改为从码点去数 —— `ch.codePointAt(0)` 小于 `0x80` 是一个字节，小于
+`0x800` 是两个，小于 `0x10000` 是三个，再往上是四个。
+
+`s.split("").reverse().join("")` 是每个人都会伸手去拿的反转写法，而它会把代理对劈成两半。
+反转 `[...s]`。
+'''
+hints = [
+  "[...line] 是一个码点数组；它的长度就是字符数。line.length 是 UTF-16 码元数，起始代码把它打印了两次。",
+  "for (const ch of line) 也按码点前进，所以 ch.codePointAt(0) 是整个字符的编号，绝不会是一对里的一半。",
+  "split(\"\") 按码元切分，会把 emoji 弄坏；反转展开后的数组能让每个字符保持完整。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.advanced.05.maps"
+title = "墙上在说什么"
+story = "希慎广场的墙给今晚数据源送上来的词排名，而上面每个计数都显示 NaN。"
+brief = '''
+读取整个标准输入，按空白切分。
+
+每个不同的词输出一次，格式为 `<word> <count>`，按计数降序排列，计数相同时按词升序。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+起始代码把计数放进一个 `Record<string, number>`，类型说每个键都装着一个 `number`。在运行时，
+一个没人写过的键装的是 `undefined`，而 `undefined + 1` 是 `NaN` —— 没有异常，没有警告，
+只有墙上一个错误的数字。用 `Map<string, number>`：`counts.get(word)` 的类型是
+`number | undefined`，这才是实情，而 `?? 0` 就是对它的回答。
+
+用比较函数给条目排序：计数降序是 `b[1] - a[1]`，当它是 `0` 时再落到词上比较。用 `<` 和 `>`
+比较词，不要用 `localeCompare` —— `localeCompare` 会去问机器的区域设置，而一块牌子在每台
+机器上都必须读起来一样。
+'''
+hints = [
+  "起始代码打印 NaN，是因为 += 之前 counts[word] 是 undefined。Record 类型承诺了一个从来不存在的数字。",
+  "counts.set(word, (counts.get(word) ?? 0) + 1) —— get 承认没找到，?? 补上那个零。",
+  "b[1] - a[1] || wordOrder：比较函数返回 0 时，就把平局交给 || 的右边。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.advanced.06.sets"
+title = "两块屏幕都在播的"
+story = "怡和街两边有两块屏幕面对面，广告主想知道她付钱让哪些片段在同一个路口播了两遍。"
+brief = '''
+两行标准输入，每行是一块屏幕的片段，用空格分隔。一块屏幕可能把同一个片段列两次；那只算一次。
+
+输出三行：
+
+1. `BOTH`，后面跟着两个列表上都有的每个片段，排好序，用空格分隔 —— 如果一个都没有，就是
+   `BOTH -`
+2. `ONLY_A <k>`：有多少片段在第一个列表上而不在第二个上
+3. `ALL <k>`：两个列表合起来有多少个不同的片段
+
+```
+input:  milktea sneakers phone sneakers
+        phone watch
+output: BOTH phone
+        ONLY_A 2
+        ALL 4
+```
+
+`Set` 没有重复。在这个地图编译所用的 `es2023` 库里，它也没有 `intersection`、`difference`
+或 `union` —— 这些是 ES2025 才来的，`tsc` 会用 `TS2339: Property 'intersection'
+does not exist` 告诉你。决定什么存在的是你编译所用的库，不是你运行时的 Node 版本。所以自己
+写出来：`[...a].filter((x) => b.has(x))` 是交集，把条件换成 `!b.has(x)` 是差集，
+`new Set([...a, ...b])` 是并集。
+
+不带比较函数的 `.sort()` 按 UTF-16 码元给字符串排序，对这些来说恰好正确，对数字来说恰好错误。
+排名牌还在两道题之后。
+'''
+hints = [
+  "new Set(tokens) 在进门时就丢掉重复的运动鞋。Set 的个数是 .size，不是 .length。",
+  "[...a].filter((x) => b.has(x)) 是交集；把测试取反就是差集；把两者都展开进一个 Set 就是并集。",
+  "both.length > 0 ? both.join(\" \") : \"-\" 用一个表达式就处理了空的情况。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.advanced.07.functions"
+title = "按小时计"
+story = "价目卡上每个屏幕时段都按小时计，除非另有说明，而卡片打印机在每个没说明的时段下面都写了 `/undefined`。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行 `<NAME> <CENTS>` 或 `<NAME> <CENTS> <UNIT>`。
+
+写一个 `tag(name, cents, unit = "hour")`，返回带两位小数的 `<NAME> $<dollars>/<unit>`，
+每行打印一个标签。
+
+```
+input:  3
+        TSQ 1200
+        HYSAN 250 minute
+        LEEGARDEN 800
+output: TSQ $12.00/hour
+        HYSAN $2.50/minute
+        LEEGARDEN $8.00/hour
+```
+
+起始代码能编译、能运行，并打印 `TSQ $12.00/undefined`。看看为什么。
+`const [name, cents, unit] = line.split(" ")` 把三个都定为 `string` 类型，因为 `split` 返回
+`string[]`，而编译器不知道它有多长。在只有两个词的行上，`unit` 在运行时是 `undefined`，模板
+字面量就忠实地把这个词打印出来。这个类型是数组从未做过的承诺。
+
+**默认参数**就是修复办法，而它奏效的原因值得知道：当实参是 `undefined` 时默认值就会生效 ——
+缺省，或者显式传入 `undefined`，这正是这里 `tag(name, cents, unit)` 所做的。`null` 不会触发它。
+函数签名就是契约，说明调用者可以省略什么，以及省略时会得到什么。
+'''
+hints = [
+  "在参数列表里写 unit: string = \"hour\"。这就是整个修复。",
+  "默认值在遇到 undefined 时生效，包括故意传入的 undefined。在函数体里写 `unit ?? \"hour\"` 是同一个想法，只是写在了使用处。",
+  "模板字面量里的 `$${...}` 是一个字面的美元符号，后面跟一个插值。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.advanced.08.exceptions"
+title = "那行不是数字"
+story = "怡和街电车站的到站牌从数据源读一列分钟数，而中间有一行写着 `xx`。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行。每一行本该是一个整数。
+
+对每一行，要么输出翻倍后的值，要么在它不是整数时输出 `BAD <line>`。最后输出 `SUM <total>`，
+其中总数是你输出过的那些值的和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`Number("xx")` 不会失败。它返回 `NaN`，而 `Number("1.5")` 是 `1.5`，`Number("")` 是 `0`。
+这就是为什么起始代码的 `double` 要用一个模式检查文本，并**抛出** `NotANumber` —— 也是为什么
+起始代码在第二行就带着这个异常死掉，因为没有任何东西捕获它。
+
+把那个可能抛异常的调用包在 `try`/`catch` 里。在 `strict` 下，捕获到的值类型是 **`unknown`**：
+JavaScript 的 `throw` 可以抛出任何东西，字符串、数字或者 `undefined`，编译器不会假装不是这样。
+没有 `catch (NotANumber e)` 这种写法。你自己去收窄它 —— `if (err instanceof NotANumber)` ——
+不是你的就再 `throw err` 一次，这样你自己代码里的笔误仍然会大声失败，而不是被当作一行坏数据报告。
+'''
+hints = [
+  "起始代码带着 NotANumber: not a whole number: xx 死掉。你要捕获的就是这个类。",
+  "让 try 块保持小：只把可能失败的调用放进去，打印和累加放在后面。",
+  "catch (err: unknown)，然后 `if (err instanceof NotANumber)`。其他任何东西都用 `throw err` 重新抛出；一个什么都吞掉的 catch，就是程序学会默默失败的方式。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.advanced.09.array-methods"
+title = "沿着数据源走一遍"
+story = "Alex 说用三个 for 循环和三个计数器就能做。等第三个跑完，送往希慎广场墙的数据源早就往前走了。"
+brief = '''
+标准输入是一行用空格分隔的整数。
+
+输出三行：
+
+1. 偶数值的和（没有的话是 `0`）
+2. 每个大于 `10` 的值，翻倍，按原顺序，用单个空格连接 —— 没有的话是 `-`
+3. 有多少个不同的值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+TypeScript 没有推导式。它有数组方法，那是同一个想法从左往右写：`filter` 保留，`map` 变换，
+`reduce` 折叠，`new Set(...)` 去重。每一个都返回一个新值，没有一个需要下标。
+
+`reduce` 接收一个初始值，而在这里它不是可选的：样例里有偶数，但有一个隐藏用例没有，而
+`[].reduce((a, b) => a + b)` 会抛出 `TypeError: Reduce of empty array with
+no initial value`。`reduce((sum, v) => sum + v, 0)` 把空的东西加成 `0`。
+
+负数：在 JavaScript 里 `-4 % 2` 是 `-0`。`-0 === 0` 是 `true`，所以偶数测试没问题 —— 但要
+通过模板字面量打印数字，在那里 `` `${-0}` `` 是 `"0"`，永远不要让一个光秃秃的 `-0` 到达
+`console.log`。
+'''
+hints = [
+  "nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0) —— 先保留，再折叠，用 0 作为起始的和。",
+  "先 filter，后 map：按原值过滤，再把留下的翻倍。",
+  "new Set(nums).size 就是不同值的个数。Set 按值比较数字，所以两个 12 算一个。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.advanced.10.from-entries"
+title = "同样的一遍，按键"
+story = "利园的购物 app 收到今晚的价钱，是一串按各店输入顺序排列的键值对。促销横幅要的是一块牌子，而且要两次。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行 `<ITEM> <PRICE>`。`PRICE` 是以分为单位的整数。每个商品
+最多出现一次，`n` 至少为 `1` —— 总有一个最便宜的商品可以报出来。
+
+输出三行：
+
+1. 每个价格**严格大于 100** 的商品，格式为 `ITEM=PRICE`，按商品排序，用单个空格连接 ——
+   没有的话是 `-`
+2. 每个商品，价格**减半并向下取整**，格式相同，按商品排序
+3. `CHEAPEST <item>` —— 价格最低的，平局按商品升序
+
+```
+input:  3
+        SCARF 120
+        MUG 80
+        BAG 250
+output: BAG=250 SCARF=120
+        BAG=125 MUG=40 SCARF=60
+        CHEAPEST MUG
+```
+
+`Object.fromEntries(pairs)` 用一个表达式从 `[key, value]` 键值对构建一个带键的对象，
+`Object.entries(obj)` 再把它拆开 —— 所以 `Object.fromEntries(Object.entries(prices).filter(...))`
+是一块过滤过的牌子，而把它换成 `.map(([k, v]) => [k, Math.floor(v / 2)])` 就是一块变换过的。
+两者都不需要一个空对象加一个往里填的循环。
+
+打印之前先给条目排序，即使它们看起来已经排好了。对象按插入顺序保存字符串键，**除了**看起来像
+数组下标的键 —— `"7"` 在 `"10"` 之前，`"10"` 在 `"SCARF"` 之前，不管它们以什么顺序到达。
+一块以商品编号为键的牌子会自己重新排序。把你要的顺序说出来。
+'''
+hints = [
+  "Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100)) —— 拆开，保留，再装回去。",
+  "Object.entries(obj).sort(byKey) 按键的顺序给出 [key, value] 对，正是 ITEM=PRICE 想要的。",
+  "找最便宜的，就按价格排序，价格相同时落到名字上：a[1] - b[1] || byKey(a, b)。第一个条目胜出。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.advanced.11.sorting"
+title = "排名牌"
+story = "三十楼的广告办公室给今晚时代广场大屏幕的出价排名，两个出价相同的广告主按他们打电话进来的顺序出现。"
+brief = '''
+两行标准输入：第一行是广告主名字，第二行是他们以分为单位的出价，顺序相同。至少有一个广告主。
+
+按最便宜的在前给广告主排名，格式为 `<rank>. <NAME> <cents>`，名次从 `1` 开始，平局按名字升序。
+然后输出 `CHEAPEST <NAME>`。
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`names.map((name, i) => ({ name, cents: bids[i] }))` 把两个列表配成对；带比较函数的 `sort`
+给这些对排序；`map` 交给你的下标就是名次。比较函数返回负数、零或正数，而起始代码里的那个只会
+返回价格差 —— 所以平局按输入顺序出来，因为 `sort` 是稳定的，而稳定不等于正确。
+
+永远不要对数字调用不带比较函数的 `.sort()`。它会先把它们转成字符串，于是
+`[900, 1200].sort()` 是 `[1200, 900]`，因为 `"1"` 排在 `"9"` 前面。
+'''
+hints = [
+  "平局时 a.cents - b.cents 是 0，而 0 || nameOrder 会落到名字上。",
+  "用 < 和 > 比较名字。localeCompare 在这里也行，但它还会去问机器的区域设置，而排名牌不该依赖这个问题。",
+  "sort 原地修改数组并返回它。toSorted 是复制的版本，它在 es2023 里。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.advanced.12.classes"
+title = "操作员的笔记本"
+story = "控制室里每个操作员都有一本笔记本，记着今晚排进队列的片段，而夜班那本里有一条铅笔测试，夜班没有人写过。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行 `<CLIP> <CENTS>`。
+
+建一个收集片段的 `Notebook` 类，然后按到达顺序把每个片段打印回来，格式为 `<CLIP> <CENTS>`，
+再输出 `TOTAL <sum>`，最后通过 `` console.log(`${book}`) `` 打印笔记本本身 —— 它的 `toString()`
+必须产生 `Notebook(items=<n>, total=<sum>)`。
+
+```
+input:  2
+        TRAILER 600
+        PROMO 2800
+output: TRAILER 600
+        PROMO 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` 可能是 `0`，那时两行就是 `TOTAL 0` 和 `Notebook(items=0, total=0)`。
+
+起始代码把 `items` 声明为 **`static`**：类上的一个数组，被将来存在的每一个 `Notebook` 共享。
+不带 `static` 声明的字段 —— `items: Entry[] = []` —— 在每次 `new` 时初始化一次，属于实例。
+起始代码的 `main` 建了一本草稿笔记本，往里写了一条铅笔测试，结果铅笔测试出现在了真的那本里。
+
+模板字面量会调用对象的 `toString()`。如果没有，你得到的是默认的 `[object Object]`，这也正是
+起始代码打印的东西。`console.log(book)` 不一样 —— 它打印的是 Node 对各字段的检视结果 ——
+所以题目说的是模板。
+'''
+hints = [
+  "运行起始代码，看输出的第一行：PENCIL 0，来自一本没人往里写过它的笔记本。这就是那个共享的 static 数组。",
+  "去掉 `static` 写 items: Entry[] = []，并在起始代码写 Notebook.items 的每个地方改用 `this.items`。",
+  "toString(): string { return `Notebook(items=..., total=...)` } —— main 里的模板字面量会替你调用它。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.advanced.13.unions"
+title = "谁在乘车"
+story = "利园小巴站的车费屏向每张卡收全价，包括那些不是成人的，还有那张根本不是卡的。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行 `<TYPE> <STOPS>`。
+
+基本车费是 `500 + 100 * STOPS` 分。对每一行输出下列之一：
+
+* `ADULT` —— 基本车费
+* `STUDENT` —— 基本车费的一半，向下取整
+* `SENIOR` —— 总是 `200`
+* 其他任何东西 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+把这一行建模成一个**可辨识联合**：每种情况一个对象类型，都共享一个字面量 `kind` 字段，另有一个
+保留原始文本的 `UNKNOWN` 情况。`parse` 是唯一去看从线上来的字符串的地方；在它之后，类型说明了
+一个 `Order` 可以是哪四种东西，而对 `order.kind` 的 `switch` 会在每个 `case` 里收窄 `order`。
+
+起始代码的 `switch` 只有一个分支和一个 `default`，其他所有东西都打印 `UNKNOWN` —— 包括它本该
+认识的两种。给每种 kind 一个分支，并让 `default` 证明已经没有剩下的了：
+
+```ts
+default: {
+  const unreachable: never = order;
+  return unreachable;
+}
+```
+
+如果将来联合里加了第五种而 switch 里没加，这一行就不再能编译。联合本身在运行时被擦除 ——
+`node` 从来看不到它 —— 所以检查必须在这里、在 `tsc` 里发生，否则就根本不会发生。
+'''
+hints = [
+  "每种 kind 一个 case。在 `case \"STUDENT\":` 里编译器知道 order 有 `stops`；在 `case \"UNKNOWN\":` 里它知道 order 有 `raw` 而没有 `stops`。",
+  "Math.floor(x / 2) 是向下取整的一半。单用 `/` 在基本车费为奇数时会得到 450.5，牌子会把它打印出来。",
+  "default 里的 const unreachable: never = order 就是穷尽性检查 —— 和 Rust 里没有 `_` 分支的 match 做的是同一件事。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.advanced.14.generators"
+title = "你自己的 FOR 循环"
+story = "时代广场大屏幕上的倒计时以固定步长从一个数跳到下一个，而它背后的控制器在任何地方都不保存这些数的列表。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+写一个**生成器函数** `ticker(start, step, count)`，从 `start` 开始、以 `step` 递进，产出
+`count` 个值。每个值单独打印一行，然后输出通过遍历第二个 ticker 算出的 `SUM <total>`。
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        [object Generator]
+```
+
+最后一行是 `Object.prototype.toString.call(ticker(...))`，由起始代码原样的 `main` 打印。
+现在它说的是 `[object Array]`。
+
+`function*` 在你调用它时并不运行。它返回一个生成器对象，而函数体一次运行一步，每当有东西要下一个
+值时 —— `for...of`、展开、`Array.from`。这就是为什么它能描述一百万个值，却从来不需要存在一个
+一百万个值的数组。
+
+起始代码构建了数组并返回它，而且能通过类型检查，因为返回类型写的是 `Iterable<number>`，数组
+就是一个。契约满足了；问题却没有回答。数组是一次给出所有值；生成器是被问到时给一个值。把 `push`
+改成 `yield`，并删掉那个数组。
+'''
+hints = [
+  "输出的最后一行是对象的标签，测试要的是 [object Generator]。这正是 function* 返回的东西。",
+  "先 yield 值，再递进。函数在 yield 处暂停，下一次请求时从它之后继续。",
+  "生成器只能遍历一次。这就是为什么 main 为求和新建了一个 ticker，而不是重用第一个循环已经耗尽的那个。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.advanced.15.higher-order"
+title = "包起来"
+story = "计费屏想知道今晚费率函数运行了多少次，而费率函数不想知道自己被人盯着。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 个以小时计的时长。
+
+`price(hours)` 是 `500 + 100 * hours`。用 `counted` 把它包起来，让每次调用都被计数，而
+`price` 并不知道。每个时长输出一个价格，然后是 `CALLS <n>`，然后是 `NAME <price.name>` ——
+它必须仍然是 `price`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+TypeScript 的 `@decorators` 是存在的，但只能用在类和类的成员上；一个独立的函数戴不了。而装饰器
+*是*什么并不需要语法：一个接收函数并返回函数的函数。所以
+`const price = counted(function price(hours: number) { ... })` 就是整个机制，而 `counted` 上的
+泛型 —— `<A extends unknown[], R>` —— 让它能包住任何签名，并交回同一个签名。
+
+`counted` 返回的函数是一个叫 `wrapper` 的闭包，除非你另作说明，它的 `name` 就是 `"wrapper"`：
+起始代码输出的最后一行。Python 有 `functools.wraps`；在这里你用
+`Object.defineProperty(wrapper, "name", { value: fn.name })` 自己复制名字 —— `name` 是只读的，
+所以在严格模式下直接赋值会抛异常。
+
+计数放在 wrapper 上：函数声明之后紧接着写 `wrapper.calls = 0`。`tsc` 看到这个赋值，会把
+`calls: number` 加进函数的类型，所以 `price.calls` 在 `main` 里能通过类型检查。
+'''
+hints = [
+  "在 return 之前写 Object.defineProperty(wrapper, \"name\", { value: fn.name })。一行。",
+  "wrapper.name = fn.name 能编译，然后抛出 TypeError: Cannot assign to read only property 'name'。defineProperty 就是绕过它的办法。",
+  "带 A extends unknown[] 的 (...args: A) => R，就是 wrapper 在不知道签名的情况下转发任何签名的方式，也是 price 包装后仍保留 (hours: number) => number 类型的方式。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.advanced.16.structural"
+title = "只要形状对"
+story = "一个来自利园的纸袋。收银屏前没人问它是什么；他们问里面有几样东西、运动鞋在不在，还要一样一样过一遍。"
+brief = '''
+标准输入是一行用空格分隔的货品，然后是一行，只有一个要找的词。
+
+把货品放进一个 `Bag`，交给起始代码的 `report`，它会输出：
+
+1. `LEN <k>` —— 来自 `bag.size`
+2. 货品，每行一个 —— 来自 `for (const item of bag)`
+3. `HAS <WORD> YES` 或 `HAS <WORD> NO` —— 来自 `bag.has(word)`
+4. `LONGEST <item>` —— 最长的那个，平局取第一个
+
+```
+input:  cap sneakers tee
+        sneakers
+output: LEN 3
+        cap
+        sneakers
+        tee
+        HAS sneakers YES
+        LONGEST sneakers
+```
+
+`report` 接收一个 `Container<string>`，而 `Bag` 哪里都没写 `implements Container`。它不需要。
+TypeScript 的类型是**结构化**的：一个值符合某个接口，靠的是拥有那些成员，而不是报出它的名字。
+这就是鸭子类型，只不过由 `tsc` 在程序运行之前检查，而不是由解释器在跑到那里时检查。
+`Set<string>` 也符合 `Container<string>`，同样没有人写下这一点。
+
+起始代码的 `Bag` 一个成员都没有，所以编译不过：
+
+```
+error TS2345: Argument of type 'Bag' is not assignable to parameter of type 'Container<string>'.
+```
+
+给它一个 `size` getter、一个 `has` 方法，以及一个 `[Symbol.iterator]()` —— 这是 `for...of`
+通过那个 symbol 去查找的方法，就像 Python 的 `for` 去查找 `__iter__` 一样。
+'''
+hints = [
+  "get size(): number { return this.goods.length; } —— 用 getter，因为接口说 `size` 是属性，不是方法。",
+  "[Symbol.iterator]() 可以交回数组自己的迭代器：this.goods[Symbol.iterator]()。一个 `*[Symbol.iterator]() { yield* this.goods; }` 生成器也行。",
+  "report 在等长时保留第一个，因为它只在严格更长时才替换 —— 用的是 > 而不是 >=。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.advanced.17.undefined"
+title = "23:59 的牌子"
+story = "23:59，控制室。费率牌向数据源要一块今晚没开的屏幕，数据源回了一个“什么都没有”，而牌子读出了这个“什么都没有”的价钱。"
+brief = '''
+标准输入是计数 `n`，然后是 `n` 行 `<SCREEN> <CENTS>` —— 今晚开着的屏幕 —— 然后是计数 `q`
+和 `q` 个要查的屏幕名。
+
+对每个查询输出 `<SCREEN> <cents>`，如果那块屏幕没开则输出 `<SCREEN> NONE`。然后输出
+`MISSING <k>` 和 `CHEAPEST <SCREEN>` —— 费率最低的屏幕，平局按名字 —— 如果什么都没开，就是
+`CHEAPEST NONE`。
+
+```
+input:  2
+        TSQ 1200
+        HYSAN 900
+        3
+        HYSAN
+        YEEWO
+        TSQ
+output: HYSAN 900
+        YEEWO NONE
+        TSQ 1200
+        MISSING 1
+        CHEAPEST HYSAN
+```
+
+起始代码编译时没有一个警告，然后在 `YEEWO` 上崩溃：
+
+```
+TypeError: Cannot read properties of undefined (reading 'cents')
+```
+
+这一行就是这张地图的头目。它从来不指向 bug。它指向的是一个 `undefined` 终于被*使用*的地方，
+而在起始代码里，这个 `undefined` 是在两个编译器被告知不必担心的地方产生的。
+
+`lookup` 从一个 `Record<string, Screen>` 返回 `board[name]`，下标类型说的是 `Screen` ——
+不是 `Screen | undefined` —— 因为 TypeScript 假定你读的下标就是存在的下标。注解说 `Screen`，
+`tsc` 相信了它，而在运行时这个键不在。
+而 `cheapest` 在主路径上没有 `return` —— 它算出最好的屏幕，然后从末尾掉出去 —— 所以它隐式
+返回 `undefined`，这是它的类型允许的；调用者随后用 `!`，也就是非空断言，穿过它去取值 —— 一个
+对编译器的、没人检查的承诺。
+
+让两个函数都**有意地**说 `Screen | undefined` —— `Map<string, Screen>` 有 `get`，它的类型
+已经承认会查不到 —— 然后在 `undefined` 落地的地方用 `=== undefined` 处理它。不要用 `!screen`：
+它对对象有效，而等到哪天这块牌子变成 `Map<string, number>`，那块 `0` 分的免费屏幕就不再存在了。
+'''
+hints = [
+  "从上往下读栈追踪：TypeError 发生在 console.log 上，但 undefined 是早一行从 lookup 里出来的，再之前是从 Record 下标里出来的。",
+  "一旦 lookup 返回 Screen | undefined，在你检查之前 `screen.cents` 就不再能编译。这个错误就是编译器在做 Record 下标跳过的那份工作。",
+  "cheapest 有两条路径，只有一条有返回。另一条从末尾掉出去，`Screen | undefined` 返回类型悄悄允许了这一点，而调用者的 `!` 发誓它没有。返回 `best`，并去掉调用处的 `!`。",
+  "`!` 和 `as` 都是编译器无法检查的承诺。它们和其他所有类型一起在运行时被擦除，剩下的就是实际到达的那个值。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.advanced.18.promise-all"
+title = "十二块屏幕，一个线程"
+story = "22:00，广告屏控制室。十二块屏幕同时被问要帧数，报告却在任何一块回答之前就打印出来了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 async 任务：它等待事件循环转一圈，算出这个值的平方，存进 `results[i]` —— 它自己的格子，所以没有两个任务写同一个地方。等**所有**任务都完成，然后**按下标顺序**输出结果，每行一个，最后输出 `TASKS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        TASKS 3
+```
+
+调用一个 `async` 函数会立刻启动它。它同步地一直跑到第一个 `await`，在那里交回一个 `Promise`，调用者接着往下走。只有一个线程：这些任务并不是在别处同时跑着，它们是**停着的**，等事件循环回来找它们 —— 而事件循环只有在当前正在跑的代码让出线程之后才能回来。
+
+起始代码启动了每个任务就马上打印，于是在任何一个任务回来填格子之前就把格子打印了出来：`undefined`，`n` 次。`await Promise.all(tasks)` 就是汇合点。它让出线程，直到每个任务都已落定；只要其中任何一个抛出异常，它就立刻 reject —— 这也是要留住这些 promise、而不是把它们随手丢掉的另一个原因。
+'''
+hints = [
+  "在打印循环之前 await Promise.all(tasks)。起始代码已经建好了 tasks 数组；只是没有任何东西在等它。",
+  "先启动每个任务，再等全部任务。这里 `for (const t of tasks) await t;` 也是对的，因为在第一个 await 之前所有任务都已经启动了。",
+  "results 被 square 的闭包捕获；它和 main 打印的是同一个数组，所以汇合之后那些写入是看得见的。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.advanced.19.mutex"
+title = "一个计数器，八块屏幕"
+story = "岛上每块屏幕都把播放次数报进三十楼那唯一的计费计数器。到了午夜，计数器说只有一次播放，而每块屏幕都发誓自己报过了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 async 任务，全部同时启动。每个任务读取共享计数器，去计费服务器走一个**来回**（起始代码里的 `roundTrip()`，事件循环转一圈），然后把计数器写回去：总数加上它的值，命中次数加一。等全部完成，然后输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+JavaScript 只有一个线程，人们会告诉你这意味着它没有竞态。它没有**数据**竞态：没有两行代码会在同一瞬间运行。其他各种竞态它都有。起始代码的任务全都读了计数器，全都停在那个来回上，然后全都回来写 `我读到的 + 我的` —— 而它们每一个读到的都是 `0`。最后写的那个赢：`TOTAL 4`、`HITS 1`，确定无疑，每次都一样。读和写之间的一个 `await` 就是一扇门，什么都能从中走过去。
+
+保留那个来回；它就是这份工作本身。在读、来回和写的外面加一把锁。起始代码有一个签名正确、里面却没有锁的 `Mutex` 类 —— `run` 只是直接调用临界区。只用 Promise 把它做成真的：保存一个 `tail` promise；每个调用者都接在 tail 后面，用自己的一个 promise 替换它，等待旧的那个，运行，然后在 `finally` 里 resolve 自己的，这样异常就不会让锁一直被占着。
+'''
+hints = [
+  "运行起始代码：TOTAL 是最后一个值，HITS 是 1。每个任务都在任何任务写入之前读了计数器；它们就是在那个来回上彼此错过的。",
+  "锁就是一个 promise 队列。`const ahead = this.tail; this.tail = <a new promise you can resolve>; await ahead;` —— 然后运行，再 resolve 你自己的。",
+  "在 `finally` 里 resolve，并在 try 里 `return await critical()`，这样释放发生在临界区结束之后，而不是在它的 promise 刚被创建的时候。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.advanced.20.channel"
+title = "谁来关掉这条数据流"
+story = "控制室把每个到站时间都顺着数据流推给怡和街的牌子，最后一个之后，牌子一直等着一个永远不会来的下一个，然后黑屏了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+一个生产者任务把每个值乘以十，顺着一个 `Channel` 发出去，事件循环每转一圈发一个，然后**关闭**它。主任务一直接收，直到 channel 说它已关闭，边接收边打印每个值并累加总数，然后输出 `SUM <total>` 和 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+起始代码的 `Channel` 是完整的：`send`、`receive`，还有 `close`，它用 `undefined` 唤醒每一个正在等待的接收者。生产者从来不调用 `close`，所以最后一个值之后，接收者在 await 一个永远没人会 resolve 的 promise。
+
+在 Go 里这是 `fatal error: all goroutines are asleep - deadlock!`。在 Python 里它会一直挂着，直到运行器把它杀掉。Node 两样都不做。当事件循环里再没有任何东西能唤醒什么 —— 没有定时器，没有 I/O，没有 immediate —— 进程就直接**退出**，状态码 `0`，就在你的 `for (;;)` 中间。`SUM` 那行和 `CLOSED` 那行永远不会运行，而从外面看，它就像成功了。这比崩溃还糟，而起始代码做的正是这个。
+
+由生产者关闭 channel。永远不是消费者 —— 知道数据流已经结束的那一方，才是结束它的那一方。
+'''
+hints = [
+  "一行，放在 control 的末尾：feed.close()。",
+  "接收者已经在检查 `=== undefined`。它在等一个生产者从来没发的东西。`if (!value) break` 也会停下 —— 在第一个 0 上，而有一个隐藏用例正好会发 0。",
+  "如果 undefined 可能是 channel 上的一个真实值，receive 就会改为返回 { done: true } | { done: false, value: T } —— 和迭代器的 next() 返回的形状一样，理由也一样。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.advanced.21.worker-pool"
+title = "八台编码器"
+story = "希慎广场的屏幕墙有四十段片子要渲染，机架上有八台编码器。没人想要四十台编码器；他们要的是这八台永远不闲着。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+运行一个有 `w` 个 worker 的池。每个 worker 循环：取下一个还没被认领的下标，`await render(index, value)` —— 它在事件循环转过几圈之后（圈数取决于下标）返回 `[index, value * value]` —— 然后把这一对 push 进 `results`，直到没有下标剩下。等每个 worker 都完成，按下标给结果排序，每行输出一个 `<index> <value>`，最后输出 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+这些对是按任务**完成**的顺序到达的，而那不是它们开始的顺序；在结果里带上下标，才让输出每次都一样，而按它排序就是答案的最后一行。
+
+`const i = next++` 不需要锁，上一道题之后，值得知道为什么：在读取 `next` 和把它加一之间没有 `await`，所以没有别的 worker 能插进来。锁从来只在跨越 `await` 时才需要。
+
+起始代码用 `workers.forEach(async (w) => {
+await w; })` 来等待 worker。它能编译，但它什么都没等：`forEach` 调用这个 async 回调，拿回一个 promise，然后把它扔掉。每个回调都在 await；`main` 一个也没 await，于是打印出一个空结果。
+'''
+hints = [
+  "用 await Promise.all(pool) 代替那个 forEach。forEach 从不等待它的回调返回的任何东西，不管是不是 async。",
+  "结果按完成顺序到达；每一对里的下标是它从哪里来的唯一记录，而排序把它放回原位。",
+  "`for (const running of pool) await running;` 也行。不行的是任何接收回调的数组方法 —— map、forEach、filter —— 被当成会替你 await 回调来用。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.advanced.22.async-await"
+title = "ASYNC 到底在哪里运行"
+story = "阿美写了四年 `await`，却从来没见过驱动它的那个东西。控制室只有一个循环，岛上每块屏幕都在它上面轮流。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+`async function double(value)` 让出一次 —— `await null` —— 然后返回这个值的两倍。用 `Promise.all` 运行全部 `n` 个，按输入顺序输出每个结果，然后输出 `SUM <total>` 和 `TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+起始代码的 `run` 把这些值映射过 `double`，得到一个 **promise** 数组 —— 然后告诉编译器它是一个数字数组：
+
+```ts
+const results = nums.map((v) => double(v)) as unknown as number[];
+```
+
+`tsc` 接受了，因为 `as unknown as` 就是你叫它别再检查的方式。这个类型断言和其他所有类型一起被擦除，到了运行时这个数组仍然是 promise：输出是三次 `[object Promise]`，以及一个由它们和零粘在一起的字符串 `SUM`。类型断言不是转换。它改变的是编译器相信什么，而不是值本身的任何东西。
+
+`Promise.all` 接收这些 promise，resolve 成它们的结果，**顺序就是你传入的顺序**，不管它们按什么顺序完成。
+
+这一切到底在哪里运行？在那一个线程上，轮流运行。`await null` 把函数剩下的部分放进 **microtask** 队列，Node 会把它完全清空，才去碰定时器、immediate 或任何 I/O —— 也就是 macrotask。在一千个 await 之前安排的 `setTimeout(..., 0)`，仍然在它们全部之后才运行。这里没有任何东西是并行的；事情是轮流运行的，停在它们声明自己可以停下的地方。
+'''
+hints = [
+  "删掉那个类型断言，看看 tsc 怎么说：Type 'Promise<number>[]' is not assignable to type 'number[]'。那条错误就是类型断言藏起来的真相。",
+  "return Promise.all(nums.map((v) => double(v))) —— await 在调用处，也就是 await run(nums) 的地方。",
+  "Promise.all 保持参数顺序。如果你想按完成顺序拿到结果，你就得自己带上下标，就像 worker 池那样。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.advanced.23.work-queue"
+title = "谁来说它做完了"
+story = "三个操作员在清屏幕更新的队列，值班主管等着队列说它空了。它永远不会这么说，因为没人告诉它哪个更新做完了。23:10，整个控制台黑了。"
+brief = '''
+标准输入是两个整数 `w` 和 `n`，然后是 `n` 个值。
+
+把 `[index, value]` 对放进起始代码的 `WorkQueue`。启动 `w` 个消费者任务，它们循环：取一对，等一圈，把 `value * 10` 写进 `results[index]`，然后调用 `taskDone()`。主任务 await `queue.join()`，然后关闭队列，让消费者的 `get()` 返回 `undefined` 从而停下，再 await 它们，然后按下标顺序输出结果和 `CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+当每一个曾经被 `put` 的项都有了一个对应的 `taskDone()`，`join()` 就会 resolve。起始代码的消费者从不调用它。于是 `main` 在等 `join`，消费者在 `get` 上等永远不会来的项，而事件循环上再没有任何能唤醒谁的东西。
+
+这就是**死锁** —— 每个人都在等，没有人在动 —— 而它不需要线程，也不需要锁：两个 promise 各自等着对方先动就够了。两个任务以相反的顺序获取两个 async mutex，是同一件事，只是更讲究排场。Node 对它的回应就是上一张地图里那个：循环跑空，进程退出，状态码 `0`，什么都没打印。
+
+修复又是一行，在消费者那一边。
+'''
+hints = [
+  "每处理完一个项之后调用 queue.taskDone()。join 只拿 put 的次数和 taskDone 的次数对数，别的一概不管。",
+  "运行起始代码，它什么都不打印，以 0 退出。不是崩溃，也不是挂起：事件循环里再也没有可能发生的事了。",
+  "close() 用 undefined 唤醒每一个停在 get() 里的消费者，这结束了它们的循环；这就是 main 能在 join 之后 await 它们的原因。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.advanced.24.finally"
+title = "锁照样锁回去"
+story = "控制室每次更新都会解锁一个广告商的时段，更新完再锁上。22:40 收到一个坏更新的那个时段从那以后一直开着，因为上锁的代码在失败的那一行后面。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>`，其中 `CENTS` 本应是整数。
+
+写一个生成器 `opened(name)`，它打印 `OPEN <NAME>`，yield 一次，然后打印 `SHUT <NAME>` —— **无论循环体有没有抛出异常**。循环体是一个 `for (const _ of opened(name))` 循环，它解析 cents 并加到总数上。cents 解析不了的那一行，要在时段关上之后报告为 `BAD <NAME>`。最后输出 `TOTAL <sum>` 和 `REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+对生成器做 `for...of` 就是一种资源守卫，原因在这里：当循环体提前退出 —— `break`、`return` 或异常 —— `for...of` 会调用生成器的 `return()`，它让生成器**在 `yield` 处**恢复，就好像那个 `yield` 是一条 `return` 语句。`yield` 之后的代码不会运行。包在 `yield` 外面的 `finally` 里的代码会运行。起始代码没有 `finally`，于是 `WONG` 的时段永远关不上。
+
+TypeScript 5.2 有 `using` 和 `Symbol.dispose` 专门干这个，但这里没有：`es2023` 库里没有 `Symbol.dispose`，所以 `using` 编译不过。`try`/`finally` 就是 `using` 的构成材料。
+
+不要在生成器里面捕获错误。调用者要打印 `BAD`，而一个把错误吞掉的生成器会若无其事地打印 `TOTAL`。
+'''
+hints = [
+  "try { yield; } finally { console.log(`SHUT ${name}`); } —— finally 是每条路径上都会运行的那部分。",
+  "异常在 return() 运行完 finally 之后穿出 for...of，所以 main 的 catch 仍然看得到它 —— 这就是 BAD 在 SHUT 之后打印的原因。",
+  "生成器不是唯一的办法：一个在 `body()` 外面包着 try/finally 的 `withSlot(name, body)` 函数也能做同样的事。生成器的写法能让你看到 for...of 在退出时做了什么。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.advanced.25.pipeline"
+title = "数据流的各个阶段"
+story = "通往怡和街各块牌子的数据流要经过三十楼的两个阶段：一个把读数平方，下一个维护累计数，牌子应该每来一个就看到一个，而不是在 23:59 看到整晚的全部。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+用**生成器**搭一条两阶段的流水线：
+
+1. `squares(values)` yield 每个值的平方
+2. `running(stream)` 接收任意 `Iterable<number>`，维护一个累计总数，
+   并 yield `[value, total]` 对
+
+`main` 把每一对按 `<square> <total>` 输出，然后输出 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+两个阶段都不构建数组。每个 `yield` 把一项交给下一阶段并暂停；`main` 拉取，`running` 从 `squares` 拉取，`squares` 从输入拉取。任何东西都不会在被需要之前算出来，整条流水线同时只有一项在途。
+
+起始代码的第二阶段只是名义上的生成器。它走完整个数据流，然后在最后只 yield **一次**，带着最后一个值和最终总数 —— 这完全通过类型检查，因为 `Generator<[number, number]>` 只说了每一项长什么样，对有多少项只字未提。牌子在午夜收到一行。
+'''
+hints = [
+  "把 yield 移到循环里面：每个值 yield 一次 [value, total]。",
+  "起始代码的输出是一行，外加 PIPE 1。一个在循环之后才 yield 的阶段，只是多了几步的数组。",
+  "running(squares(nums)) 能组合，是因为生成器是一个 Iterable；running 从来不知道、也不关心它的输入是另一个生成器。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.advanced.26.toolbox"
+title = "不在架子上的工具箱"
+story = "控制室的手册说要用迭代器辅助方法来数相同帧的连续段。三十楼的编译器从来没听说过它们，夜班操作员只好用手数。"
+brief = '''
+标准输入是一行整数。
+
+输出三行，每一行都由你自己写的一个生成器构建：
+
+1. `SUMS` 后面跟累计和 —— `accumulate(values)`
+2. `RUNS` 后面跟每一段**相邻**相等值，写成 `<v>x<k>` ——
+   `runs(values)`
+3. `PAIRS <k>`：有多少个由**不同**值组成的无序对 ——
+   在排好序的不同值上用 `pairs(items)`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Python 的架子上有 `itertools`。JavaScript 有迭代器辅助方法 —— `Iterator.prototype.map`、`.filter`、`.take` —— Node 从 22 版起就有，但它们**不在**这个架子上：`es2023` 库没有声明它们，所以不管底下的 `node` 多新，`tsc` 都说 `TS2339: Property 'map' does not exist`。你能用的是库里声明的东西，以及你 import 进来的东西。这个文件用 ES `import` 从 `"fs"` 导入 `readFileSync` —— 这让文件成为一个**模块**，而 `tsc` 把它编译成 `require`，因为目标是 CommonJS。其余的一切，你自己写。
+
+`runs` 只把**相邻**的相等项归为一组。它不是计数，而样例特意选成让两者结果不同：`1` 出现了四次，分在两段里。起始代码第二行用一个 `Map` 来计数，恰好在这个输入上出错。
+'''
+hints = [
+  "accumulate 维护一个总数，每个值之后 yield 它；它 yield 的最后一个就是总和。",
+  "runs 记着正在进行的那一段。下一个值不同时，yield 已完成的那一段，然后开始新的一段 —— 循环结束后，yield 最后一段，没有别的地方会替你做。",
+  "pairs 是两层嵌套循环，j 从 i + 1 开始。数量是 n*(n-1)/2，手算核对一下，你就知道 n 取对了。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.advanced.27.memo"
+title = "记住你算出来的东西"
+story = "时代广场大屏的排程器在午夜之前要从同样两个数算出同一个轮播一万一千次，每次都从头算起。"
+brief = '''
+标准输入是 `n k bits`：两个整数和一串二进制数字。
+
+输出四行：
+
+1. `FIB <fib(n)>` —— 来自一个**递归**的 `fib`，包在你自己写的记忆化
+   `memo(...)` 里
+2. `PRODUCT <k!>` —— 在 `1..k` 上用乘法做 `reduce`，带一个初始值，
+   这样 `k = 0` 得到 `1`
+3. `BIN <value>` —— 由 `fromBinary` 把 `bits` 按二进制读出，它是一个
+   单参数函数，基数在内部固定
+4. `MISSES <m>` —— 记忆化实际运行函数体的次数
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最大是 `400`。起始代码的包装器只数调用次数，什么都不记，所以 `fib(10)` 是 177 次调用，`fib(35)` 是三千万次，而 `fib(90)` 跑不完。有了缓存，每个 `fib(i)` 只运行一次，`MISSES` 是 `n + 1`。
+
+这些数装不进 `number`。`fib(90)` 是 `2880067194370816120`，超过了 `Number.MAX_SAFE_INTEGER`，而 `number` 会一声不吭地把它打印错。用 **`bigint`**：`0n`、`1n`、`BigInt(i)`。模板字符串把 bigint 打印成它的数字；单独 `console.log(5n)` 打印的是 `5n`。
+
+不带基数的 `parseInt(bits)` 把 `1010` 读成一千零一十。起始代码就是这么干的。在一个闭包里把基数固定下来 —— `(text: string) => parseInt(text, 2)` —— 这就是 Python 的 `functools.partial`：一个部分参数已经定好了的函数。`bind` 做的是同样的事，但只能固定**前面的**参数，而基数是第二个。
+'''
+hints = [
+  "memo 在它的闭包里保存一个从参数到结果的 Map；命中就从 Map 返回，未命中就运行函数体、存下结果并计数。",
+  "fib 在递归里必须调用记忆化之后的 fib，否则只有最外层的调用被缓存。先声明 fib 及其类型，箭头函数才能引用它。",
+  "reduce((a, b) => a * b, 1n) —— 第二个参数是起始值，正是它让空区间得到 1n。它也必须是 bigint：1 * 1n 是 TS2365，而不是悄悄转换。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.advanced.28.type-guard"
+title = "它只需要能画出来"
+story = "利园的导览屏列出商店和服务柜台，它们从两个不同系统顺着同一条数据流过来，而屏幕只想知道每一个都能把自己画出来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每行是以下之一
+
+* `SHOP <NAME> <LEVEL>` —— 渲染为 `<NAME> / L<LEVEL>`
+* `COUNTER <NUMBER>` —— 渲染为 `COUNTER <NUMBER>`
+
+起始代码的 `parse` 把每一行变成数据流会发来的东西：商店是一个 `Shop` 实例，柜台是一个带 `render` 方法的**普通对象**。它把它们作为 `unknown[]` 交出来，因为这是任何从线上传来的东西的诚实类型。通过 `show` 输出每一个是 `Sign` 的项，然后输出 `SIGNS <k>` 和 `SHOPS <k>` —— 后者用 `instanceof Shop` 来数。
+
+```
+input:  3
+        SHOP LAM 4
+        COUNTER 2
+        SHOP WONG 1
+output: LAM / L4
+        COUNTER 2
+        WONG / L1
+        SIGNS 3
+        SHOPS 2
+```
+
+`Sign` 是一个接口，而接口会被**擦除**。运行时没有 `Sign` 可问 —— `x instanceof Sign` 编译不过，因为右边没有任何东西可以让它指代。要从 `unknown` 走到 `Sign`，你得写一个**类型守卫**，`function isSign(x: unknown): x is Sign`，而编译器相信它返回的任何东西。它自己什么都不检查。
+
+起始代码的守卫返回 `x instanceof Shop`。它能编译，是个完全正常的布尔值，但它是错的：柜台按形状是一个 `Sign`，却不是任何东西的实例。守卫撒了谎，编译器信了它的话，柜台就从导览里消失了。改为检查形状 —— `typeof x === "object"`、`x !== null`、`"render" in x`，以及 `typeof x.render === "function"` —— 这恰好就是接口承诺的东西，不多也不少。
+
+`show(sign)` 在运行时分派：`sign.render()` 找到这个对象拥有的那个 `render`，不管是在原型上还是在它自己身上。
+'''
+hints = [
+  "整个修复就是 isSign 的函数体。柜台是一个对象字面量；它不是任何有名字的东西的实例。",
+  "\"render\" in x 把 x 收窄成某个带有类型为 unknown 的 render 属性的东西；typeof x.render === \"function\" 把它收窄到底。两者都是真正的运行时检查，这就是和起始代码的区别。",
+  "类型守卫只和它的函数体一样诚实。`return true` 也能编译。编译器信任 `x is Sign` 的方式，和它信任 `as` 和 `!` 一样 —— 而这三者都随类型一起被擦除。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.advanced.29.frozen"
+title = "它不会变"
+story = "当晚的价目卡在 19:00 发到每块屏幕，标着 readonly；到了 22:00，有三块屏幕在上面写了东西，还有一块加了一列根本不存在的字段。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<NAME> <CENTS>`。
+
+把每一行建成一个字段为 `readonly` 的 `Price`。然后对每个价格尝试覆盖它的 `cents`，尝试抛出异常时输出 `FROZEN <NAME>`。接着，一个只有一个字段 `count` 的 `Tally`：设置它，然后尝试设置拼错的 `cuont`，当*这个*抛出异常时输出 `SEALED YES`。最后输出 `IN_SET <k>`，即按名字和 cents 算有多少个不同的价格，以及 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SEALED YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+`readonly` 是和编译器的约定，和这里的每一个约定一样，它会被**擦除**。`price.cents = 0` 编译不过 —— 所以起始代码通过一个放宽了的视图去写，`(price as { cents: number }).cents = 0`，它能编译，因为 readonly 属性可以赋给可变属性，而到了运行时没有任何东西拦着。价目卡被写了，`TOTAL` 是 `0`。约定在运行时的那一半是构造函数末尾的 `Object.freeze(this)`：在严格模式下，给冻结对象的属性赋值会抛出 `TypeError`，而 `tsc` 在 `strict` 下输出的每个文件都以 `"use strict"` 开头。
+
+`Object.seal(this)` 是另一种固定形状：已有字段仍然可写，而添加新字段 —— 一个拼写错误 —— 会抛出异常，而不是悄悄造出一个没人读的字段。如果你让编译器管，它也会抓到 `tally.cuont`；起始代码不让它管，`JSON.parse` 也不让。
+
+还有，对象的 `Set` 数的是**对象**，而不是值：两个 `LAM 1200` 价格是两个成员，因为它们是两次分配。用由字段组成的字符串 —— `` `${name}:${cents}` `` —— 作为集合的键，它们就是一个。
+'''
+hints = [
+  "Object.freeze(this) 作为 Price 构造函数的最后一行。参数属性在函数体运行之前就已赋值，所以它们已经在那里，可以冻结了。",
+  "在 Tally 的构造函数里 Object.seal(this)。类字段在构造函数体之前初始化，所以那时 count 已经存在，并保持可写。",
+  "TOTAL 是原始 cents 的和，这只有在那些写入都失败时才成立。在起始代码里，到那时每个价格都是 0，TOTAL 是 0 —— readonly 字段被写了，而没有任何东西吭一声。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.advanced.30.error-classes"
+title = "你自己的错误"
+story = "广告预订系统的四层各抛各的东西，预订屏幕接住了其中一种，却被其他几种搞垮了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行，每行本应是以小时计的预订时长。
+
+定义一个错误层级：`PriceError extends Error` 作为基类，`NotANumber` 和 `Negative` 继承它。`Negative` 带着小时数，它的消息是 `negative hours: <h>`；`NotANumber` 的消息是 `not a number`。`price(text)` 用 `BigInt(text)` 转换文本 —— 它在任何不是整数的东西上抛出 `SyntaxError` —— 然后抛出 `NotANumber`，**把那个 `SyntaxError` 作为它的 `cause`**；它拒绝负的时长，否则返回 `500 + 100 * hours`。
+
+输出每个价格或错误的消息，然后输出 `ERRORS <k>`。收窄到**基类**，只收窄一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative hours: -2
+        ERRORS 2
+```
+
+起始代码用 `err instanceof Negative` 收窄，把其他一切重新抛出，于是 `xx` 那一行用一个未捕获的 `NotANumber` 把程序搞垮了。`err instanceof PriceError` 对层级里的每个成员都为真，而 `err.message` 就是那条消息 —— 它存在于类里，传给 `super(...)`，而不是在处理代码里。
+
+`new NotANumber({ cause })` —— `ErrorOptions` 在 `es2022` 库里 —— 记录下底下的那个 `SyntaxError`。这里没有东西打印它；一个未捕获的错误会打印，作为栈追踪下面的一个 `[cause]:` 块。这条链就是要传它的原因。
+
+`class X extends Error` 和 `instanceof X` 能工作，是因为目标是 `es2022`。编译到 ES5 时，`Error` 的子类会丢掉它的原型，`instanceof` 悄悄地返回 `false` —— 这就是为什么老代码库里到处是 `Object.setPrototypeOf(this, new.target.prototype)`。
+'''
+hints = [
+  "err instanceof PriceError —— 基类覆盖了两个子类，这正是要有一个基类的意义。",
+  "在 instanceof 检查之后，err 是一个 PriceError，err.message 能通过类型检查。在它之前，err 是 unknown，什么都通不过。",
+  "TypeScript 的 catch 没有类型过滤，所以你的 instanceof 检查的顺序就是 Python 的 except 子句的顺序：排在基类之后检查的子类是死代码，而没有任何东西会警告你。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "typescript.advanced.31.iterator"
+title = "下一个，直到停下"
+story = "利园排队处的取号机从一个起点按固定步长发号，不保留号码列表，而排队屏幕上显示的永远比机器发出的少一张。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+写一个类 `Tickets`，**手工实现迭代器协议**：`[Symbol.iterator]()` 返回 `this`，`next()` 对 `count` 个值中的每一个返回 `{ done: false, value }`，然后返回 `{ done: true, value: undefined }`。每个值单独一行输出，然后输出 `SUM <total>`，它通过遍历第二个 `Tickets` 算出。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+这就是生成器替你写的东西。`for...of` 对那个东西调用一次 `[Symbol.iterator]()`，然后对结果调用 `next()`，直到某个结果说 `done: true` —— 而一个说 `done: true` 的结果不会再被看一眼，**连同它的值**。展开、`Array.from` 和解构也一样。
+
+起始代码的 `next` 在用掉号码之后才决定 `done`，所以最后一张真实的号码是标着 `done: true` 发出去的，而 `for...of` 把它丢了。它能通过类型检查：`{ done: boolean, value: number }` 无论如何都符合 `IteratorResult<number>`。约定说的是结果长什么样，而不是你什么时候可以说你结束了。
+
+`[Symbol.iterator]()` 返回 `this` 是**迭代器**的标志：它只能被遍历一次，然后就耗尽了。**容器**每次都返回一个新的迭代器，可以被反复遍历；这条路上的 `Bag` 就是一个。说清楚你写的是哪一种；差别会在别人第二次循环时显现出来。
+'''
+hints = [
+  "先检查 `left === 0`，返回 { done: true, value: undefined }。然后才取号码，返回 { done: false, value }。",
+  "for...of 会忽略 done 结果的值。起始代码的最后一张号码在说 done 的那个结果里，这就是屏幕和总和都少了最后一张的原因。",
+  "在前进之前先保存你要返回的值，否则你会朝另一个方向差一步。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "typescript.advanced.32.containers"
+title = "对的容器"
+story = "广告屏办公室把当晚的播放日志存在一个长长的数组里，关于它的每个问题都从头读起来回答。"
+brief = '''
+三行标准输入：一行单词，一行已经**升序排好**的整数，以及一个整数 `x`。
+
+输出四行：
+
+1. `TOP <word> <count>` —— 出现最多的单词，平局按单词升序
+2. `BISECT <l> <r>` —— 在排好序的整数里，第一个值不小于 `x` 的下标，
+   以及第一个值大于 `x` 的下标
+3. `SMALLEST3` 后面跟三个最小的整数，从起始代码的 `MinHeap` 里弹出 ——
+   不足三个就少一些
+4. `GROUPS` 后面跟单词的每个首字母对应的 `<letter>:<k>`，字母升序 ——
+   一个以首字母为键的 `Map<string, string[]>`
+
+```
+input:  tram bus tram bus ferry
+        1 3 3 5 8
+        3
+output: TOP bus 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS b:2 f:1 t:2
+```
+
+标准库在这个架子上只有 `Map` 和 `Set` —— 没有计数器，没有堆，没有 bisect。堆已经替你写好了。其余的归你。
+
+起始代码保留它见到的第一个最高计数的单词，在这里是 `tram`，而题目说的是 `bus`。用一个说出你本意的键来打破平局。
+
+两次二分各是一个二分查找：维护 `lo` 和 `hi`，看中间，移动一端 —— `Math.floor((lo + hi) / 2)` 或 `(lo + hi) >>> 1`。它们的差就是 `x` 有多少个副本，而且 `x` 不存在时它们都不会失败，`indexOf` 却会返回一个看起来像下标的 `-1`。当你要一遍又一遍地取最小的几个时，堆就是对的容器：把它们全部排序只为从前面读三个值，正是它存在所要避免的事。
+
+分组：`groups.get(letter)` 是 `string[] | undefined`。未命中时创建列表，set 进去，然后 push。
+'''
+hints = [
+  "把 [word, count] 条目按 count 降序、再按 word 升序排序，取第一个。在这个规模下为了一个条目给整个 map 排序没问题；用同一规则比较的单次遍历也是同一个答案。",
+  "一个带标志的 bisect：当 sorted[mid] < x 时把 lo 移过 mid —— 对右侧二分，当 sorted[mid] === x 时也这样。x 不存在时 indexOf 返回 -1，而有一个隐藏用例恰好就是这样。",
+  "Map 和对象一样保持插入顺序，所以打印前要给字母排序。[...groups.keys()].sort() 就是题目要求的顺序。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "typescript.advanced.33.cancellation"
+title = "别再等了"
+story = "控制室在重画全岛地图之前要 ping 每块屏幕的状态，而天后那块网卡坏了的屏幕永远不回答，于是地图永远不重画。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行 `<SCREEN> <DOWN>`，其中 `DOWN` 为 `0` 表示屏幕会立刻回答，为 `1` 表示它的网卡坏了，根本不会回答。
+
+对每块屏幕，在 `withTimeout` 下以 **200 ms** 的期限运行它的 `ping(screen, down, token)`，并按输入顺序输出 `<SCREEN> OK` 或 `<SCREEN> TIMEOUT`。然后启动一个 `watch(token)` 任务，它以 10 ms 的 sleep 无限循环；取消它的 token，**await 它**，让它在 `catch` 里打印 `CANCELLED`，在 `finally` 里打印 `CLEANUP`。最后输出 `TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+Promise 不能被取消。没有 `.cancel()`，而用 `Promise.race` 和一个定时器赛跑只决定你*听谁的* —— 输家继续跑，它还挂着的任何东西，一个定时器或一个订阅，在你的最后一行之后仍然抓着不放。所以取消是你**传进去**的东西：一个工作会去检查或订阅的 token。起始代码有一个，`Token`，带 `cancel()` 和 `onCancel(handler)`；`sleep` 会订阅它，取消时清掉自己的定时器并以 `Cancelled` reject，而 `silence` —— 那块死掉的屏幕 —— 是一个除了取消之外什么都不会让它落定的 promise。（`AbortController` 是平台版本的同一样东西。这里没有声明它。）
+
+`withTimeout(work, ms)` 创建一个 token，让 `work(token)` 和一个以 `Timeout` reject **并且**取消 token 的定时器赛跑，工作赢了时在 `finally` 里清掉自己的定时器。起始代码从不调用它：它直接 await `ping`，而 `WONG` 永远不回答。你已经见过 Node 对此怎么做：再没有任何能唤醒谁的东西，于是进程在 `LAM OK` 之后退出，状态码 `0`。
+
+它还取消了 `watch` 却不 await 它，所以 `TIMEOUTS` 在 watcher 轮到之前就打印了 —— 而 watcher 重新抛出的 `Cancelled` 没有落到任何人手里，Node 把它报告为未处理的 rejection，以状态码 `1` 退出。在 `watch` 里处理完 `Cancelled` 之后要重新抛出它：吞掉它，任务就变得无法取消了。在你 await 这个任务的地方捕获它。
+'''
+hints = [
+  "withTimeout：一个 deadline promise，它的 setTimeout 以 Timeout reject 并取消 token；在 try 里 `return await Promise.race([work(token), deadline])`，在 finally 里 clearTimeout。",
+  "`await watcher` 让任务在 TIMEOUTS 打印之前运行它的 catch 和 finally；它会把 Cancelled 重新抛给你，所以也要捕获它 —— 并且只捕获它。",
+  "在 finally 里清掉 deadline 的定时器。不清的话，每块已经回答了的屏幕仍然会留下一个 200 ms 的定时器，进程要等最后一个到期才退出：输出正确，每次都更慢。取消 token 是反方向上的同一份礼貌。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "typescript.advanced.34.event-loop"
+title = "事件循环"
+story = "广告屏控制室，全岛每块屏幕共用一个线程。一个回调从不让出，从天后到希慎的每块牌子都定格在同一帧上。"
+brief = '''
+标准输入是两个整数 `k` 和 `n`。
+
+把 `1..n` 分成 `k` 个连续的块 —— 第 `i` 块是从 `floor(n*i/k) + 1` 到 `floor(n*(i+1)/k)`（含两端）—— 用一个普通循环把每块的平方和算成 `bigint`。在任何工作开始之前，`main` 用 `setImmediate` 安排一次牌子重画，它打印 `BOARD <finished>`：牌子拿到线程时已经完成了多少块。牌子必须**在第一块之后、第二块之前**拿到线程。按下标顺序为每块输出 `CHUNK <i> <sum>`，然后输出 `TOTAL <sum>`，然后输出 `CHUNKS <k>`。
+
+```
+input:  3 10
+output: BOARD 1
+        CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        CHUNKS 3
+```
+
+Node 在**一个线程**上运行你的 JavaScript，楼里的每块屏幕都在等它。一个正在运行的回调不能被打断 —— 定时器不行，I/O 不行，牌子也不行 —— 直到它返回或 `await`。起始代码把每一块包进一个 `async` 函数，全部交给 `Promise.all`，看起来是并发的。其实它是一个长长的回调：一个里面没有 `await` 的 `async` 函数，一被调用就从头跑到尾。在 `main` 放手之前，全部 `k` 块都已求和，牌子最后才重画，显示 `BOARD 3`，而在 `4 2000000` 上，全岛每块屏幕在整个求和期间都显示同一帧。你在这里写的任何东西都没法让求和并行运行；Node 对此的答案是 worker 线程，而这个 `node.d.ts` 没有声明它。Async 是用来**等待**的。一个线程上的 CPU 工作只能做得**有礼貌**。
+
+那就有礼貌些：做一块，然后把线程还回去，然后下一块。而且要还给对的队列。`await null` 或 `await Promise.resolve()` 让给的是 **microtask** 队列，Node 会在运行任何 immediate 或定时器之前把它清空 —— 牌子仍然会看到 `BOARD 3`。`await new Promise((r) => setImmediate(r))` 排到队尾，在先入队的牌子后面。
+
+还有那个小 bug，它和时机息息相关。起始代码用 `total += await work(...)` 来累加。JavaScript 在 `await` **之前**就求出 `+=` 的左边：每个任务都把 `total` 读成 `0`，停下，回来写 `0 + 我的`。最后一个赢，`TOTAL` 就是最后一块。这就是计费计数器上的丢失更新，只是读和写之间没有一行代码让你看见 —— 对共享状态的一次读和一次写，中间隔着一个 `await`，就是一个线程上的竞态。在 await 之后再读总数，或者拿着锁。
+'''
+hints = [
+  "运行起始代码，读最后一行：BOARD 3，在一切之后打印。牌子最先被安排，却仍然最后运行，因为从来没有东西把线程还回去。",
+  "每一轮一块：对各块写一个普通 for 循环，每块之后 `await new Promise((r) => setImmediate(r))`。牌子的 immediate 先入队，所以它在第 0 块之后运行。",
+  "`total += await x` 在 await 之前读 total。`const part = await x; total += part;` 在之后读 —— 或者，循环体里根本没有 await，就没有什么可竞争的。",
+  "n*(n+1)*(2n+1)/6 是总数的闭式。用它核对一次 TOTAL，你就知道块的边界是对的。",
+]
