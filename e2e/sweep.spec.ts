@@ -902,7 +902,7 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
       const c = document.querySelector("#game") as HTMLCanvasElement;
       const g = c.getContext("2d")!;
       const r = c.getBoundingClientRect();
-      const px = Math.round(((x + w * 0.12 - r.left) / r.width) * c.width);
+      const px = Math.round(((x + w * 0.06 - r.left) / r.width) * c.width);
       const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
       const d = g.getImageData(px, py, 1, 1).data;
       return `${d[0]},${d[1]},${d[2]}`;
