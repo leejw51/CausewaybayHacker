@@ -459,6 +459,12 @@ export class QuestScene implements Scene {
   private quizWrongAt = -1;
   private consoleOpen = false;
   private logScroll = 0;
+  /** How many lines of the log are above the window, as last drawn. */
+  private logOverflow = 0;
+  /** Where the log's well was last drawn, for a finger on it. */
+  private logRect: Rect = [0, 0, 0, 0];
+  /** A finger down on the log: where, and how far back it was then. */
+  private logDrag: { y: number; scroll: number } | null = null;
   private queued = 0;
   private briefScroll = 0;
   private briefOverflow = 0;
@@ -2045,6 +2051,30 @@ export class QuestScene implements Scene {
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (this.focus && this.coder?.pointer(x, y, phase)) return;
+    // A finger on the log: drag to scroll it, on either page. The wheel and
+    // PGUP/PGDN were the only ways back through it, and an iPad has neither.
+    const logDrag = this.logDrag;
+    if (logDrag) {
+      if (phase === "move") {
+        const lineH = ensureFonts(this.app.layout.uiScale()).codeSm.height;
+        const moved = Math.round((y - logDrag.y) / lineH);
+        this.logScroll = Math.max(0, Math.min(this.logOverflow, logDrag.scroll + moved));
+        return;
+      }
+      if (phase === "up") {
+        this.logDrag = null;
+        return;
+      }
+    }
+    if (
+      phase === "down" &&
+      this.consoleOpen &&
+      this.logOverflow > 0 &&
+      inRect(x, y, this.logRect)
+    ) {
+      this.logDrag = { y, scroll: this.logScroll };
+      return;
+    }
     // A finger on the brief: drag to scroll it. The wheel was the only way
     // in, and a tablet has no wheel — on an iPad a brief longer than its
     // panel showed its first screen and nothing after it. A quiz's choices
@@ -2583,6 +2613,7 @@ export class QuestScene implements Scene {
       // One line of the answer, on a press. It used to be TAB and TAB is the
       // editor's key — a person writing code reaches for it to indent.
       { id: "complete", label: t("quest.completeLine"), dim: !this.canComplete() },
+      { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
     const rows = rowsIn(
@@ -2638,7 +2669,15 @@ export class QuestScene implements Scene {
     this.statusAt = [pad + Math.round(8 * s) + f.size * 6, statusY + f.height / 2];
 
     const top = strip + Math.round(6 * s);
-    const body: Rect = [pad, top, layout.vw - pad * 2, layout.vh - top - pad];
+    let body: Rect = [pad, top, layout.vw - pad * 2, layout.vh - top - pad];
+    // The log, under the code. RUN is on this page, and a RUN whose answer
+    // is only on the other page was a button that seemed to do nothing.
+    if (this.consoleOpen) {
+      const ch = Math.round(body[3] * (layout.isPortrait() ? 0.36 : 0.32));
+      const gap = Math.round(6 * s);
+      body = [body[0], body[1], body[2], body[3] - ch - gap];
+      this.drawConsole(g, [body[0], body[1] + body[3] + gap, body[2], ch]);
+    } else this.logRect = [0, 0, 0, 0];
     // The agent's panel takes its share when it is open (docs/agent.md §7).
     const carve = this.coder?.split(body, layout.isPortrait(), s) ?? { editor: body, panel: null };
     const [ex, ey, ew, eh] = carve.editor;
@@ -3292,6 +3331,7 @@ export class QuestScene implements Scene {
    */
   private drawConsole(g: Ctx, rect: Rect): void {
     let [x, y, w, h] = rect;
+    this.logRect = [0, 0, 0, 0];
     const s = this.app.layout.uiScale();
     const fonts = ensureFonts(s);
     if (this.runResult) {
@@ -3316,6 +3356,9 @@ export class QuestScene implements Scene {
         text: t("quest.lostOutput", { gaps: [...this.log.gaps].join(", ") }),
       });
     }
+    this.logRect = [x, y, w, h];
+    this.logOverflow = Math.max(0, flat.length - rows);
+    this.logScroll = Math.min(this.logScroll, this.logOverflow);
     const start = Math.max(0, flat.length - rows - this.logScroll);
     clipped(g, x + pad, y + pad, w - pad * 2, h - pad * 2, () => {
       let ly = y + pad;
@@ -3336,6 +3379,14 @@ export class QuestScene implements Scene {
         printf(g, fonts.codeSm, t("quest.silentCompiler"), x + pad, y + pad, w - pad * 2, "left");
       }
     });
+    if (this.logOverflow > 0) {
+      // The playground's scrollbar: a panel that can scroll and does not say
+      // so is a panel nobody drags.
+      const thumbH = Math.max(12, (h * h) / (h + this.logOverflow * lineH));
+      const frac = 1 - this.logScroll / this.logOverflow;
+      fill(g, Theme.ink, x + w - 4, y, 4, h, 0.5);
+      fill(g, Theme.coin, x + w - 4, y + (h - thumbH) * frac, 4, thumbH);
+    }
     if (this.stage !== "idle") {
       fill(
         g,
