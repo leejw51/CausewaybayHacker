@@ -322,6 +322,11 @@ export class PlaygroundScene implements Scene {
    */
   private outputScroll = 0;
   private outputOverflow = 0;
+  /**
+   * A run just finished: open its answer at the first line, not the last.
+   * Taken by the next draw, the first that knows how far back the top is.
+   */
+  private outputToTop = false;
   private outputRect: Rect = [0, 0, 0, 0];
   /** A finger down on the output: where, and how far back it was then. */
   private outputDrag: { y: number; scroll: number } | null = null;
@@ -1192,6 +1197,9 @@ export class PlaygroundScene implements Scene {
         ...(this.stdinEl.value ? { stdin: this.stdinEl.value } : {}),
       });
       this.result = res.run;
+      // The log streamed in pinned to its tail; the answer is read from the
+      // top, and scrolling back up after every RUN was the chore.
+      this.outputToTop = true;
       if (res.run.outcome === "ok") this.app.chip.coin();
       // No screen shake here, on purpose *and* because it could not land:
       // `App.shake` refuses while the overlay has children, and this screen
@@ -2489,6 +2497,10 @@ export class PlaygroundScene implements Scene {
     // fix for "cannot scroll" — the panel used to always show only the tail,
     // with nothing to move that window and no wheel handler to move it.
     this.outputOverflow = Math.max(0, out.length - room);
+    if (this.outputToTop && r) {
+      this.outputToTop = false;
+      this.outputScroll = this.outputOverflow;
+    }
     const scroll = Math.min(this.outputScroll, this.outputOverflow);
     const end = out.length - scroll;
     const shown = out.slice(Math.max(0, end - room), end);
