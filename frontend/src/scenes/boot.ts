@@ -10,7 +10,7 @@
  */
 import type { App, Scene } from "../app";
 import { Assets } from "../engine/assets";
-import { ensureFonts, printf, remeasure } from "../engine/text";
+import { ensureFonts, facesReady, printf, remeasure } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { neonPrint, type Ctx } from "../engine/ui";
 import { LandsScene } from "./lands";
@@ -40,6 +40,9 @@ export class BootScene implements Scene {
         // reason as the other two: a panel measured against the fallback and
         // then re-measured when the real font lands is a panel that jumps.
         localeReady(),
+        // And whatever the player chose for the interface and the code, if
+        // it is not one of the two above.
+        facesReady(),
       ]);
       remeasure();
     } catch {

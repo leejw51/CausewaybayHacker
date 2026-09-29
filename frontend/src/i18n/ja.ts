@@ -32,6 +32,8 @@ export const ja: Partial<Catalogue> = {
   "app.fullscreenOn": "全画面: オン",
   "app.fullscreenOff": "全画面: オフ",
   "app.language": "言語: {name}",
+  "app.uiFace": "フォント: {name}",
+  "app.fontChip": "フォント {name}",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.logout": "ログアウト",
   "chrome.difficulty": "難易度",

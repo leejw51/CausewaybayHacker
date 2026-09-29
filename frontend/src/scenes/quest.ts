@@ -17,6 +17,7 @@ import {
   CODE_FACES,
   ensureFonts,
   getCodeFace,
+  loadCodeFace,
   getTextScale,
   printf,
   setCodeFace,
@@ -1928,9 +1929,14 @@ export class QuestScene implements Scene {
   }
 
   /** The code face, cycled. Shared with the playground through one key. */
-  private cycleFace(): void {
-    const at = CODE_FACES.indexOf(getCodeFace());
-    const next = CODE_FACES[(at + 1) % CODE_FACES.length];
+  private async cycleFace(): Promise<void> {
+    const from = getCodeFace();
+    const next = CODE_FACES[(CODE_FACES.indexOf(from) + 1) % CODE_FACES.length];
+    // Fetched before it is named, so the pane is never measured without it.
+    // A second press while the first is still downloading is dropped rather
+    // than skipping a face.
+    await loadCodeFace(next);
+    if (getCodeFace() !== from) return;
     setCodeFace(next);
     writePref(CODE_FACE_KEY, next);
     this.app.remeasure();
@@ -2154,7 +2160,7 @@ export class QuestScene implements Scene {
         this.sizeFont(1);
         break;
       case "face":
-        this.cycleFace();
+        void this.cycleFace();
         break;
     }
   }

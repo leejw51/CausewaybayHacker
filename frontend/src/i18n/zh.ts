@@ -33,6 +33,8 @@ export const zh: Partial<Catalogue> = {
   "app.fullscreenOn": "全屏：开",
   "app.fullscreenOff": "全屏：关",
   "app.language": "语言：{name}",
+  "app.uiFace": "字体：{name}",
+  "app.fontChip": "字体 {name}",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.logout": "退出登录",
   "chrome.difficulty": "难度",

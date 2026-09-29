@@ -476,12 +476,21 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   // of them — `fn`, on today's first RUST × BASIC street — the run up to it
   // is rightly nothing. So: the buffer is a prefix of the answer, and what
   // follows it is the hole that is live.
-  expect(full.startsWith(drill), `BLANKS buffer ${JSON.stringify(drill)} is the answer's start`).toBe(true);
+  expect(
+    full.startsWith(drill),
+    `BLANKS buffer ${JSON.stringify(drill)} is the answer's start`,
+  ).toBe(true);
   const live = await page.evaluate(() =>
-    (document.querySelector(".cwb-blank-now")?.textContent ?? "").replace(/\u200b/g, ""),
+    (document.querySelector(".cwb-blank-now")?.textContent ?? "").replace(
+      /\u200b/g,
+      "",
+    ),
   );
   expect(live.length, "a hole is live").toBeGreaterThan(0);
-  expect(full.slice(drill.length).startsWith(live), `the fill stops at the hole ${JSON.stringify(live)}`).toBe(true);
+  expect(
+    full.slice(drill.length).startsWith(live),
+    `the fill stops at the hole ${JSON.stringify(live)}`,
+  ).toBe(true);
   // And something is left to do.
   expect(await ghosts()).toBeGreaterThan(0);
   // The holes are drawn as the words they are, breathing, rather than as
@@ -885,9 +894,12 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     await pref(page, "quest.face"),
     "the choice is remembered",
   ).toBeTruthy();
-  // Round the cycle and back to where it started.
-  await clickButton(page, "face");
-  await page.waitForTimeout(700);
+  // Round the cycle and back to where it started: seven faces, two pressed.
+  // The four downloadable ones are fetched on the press, so each gets time.
+  for (let k = 0; k < 5; k++) {
+    await clickButton(page, "face");
+    await page.waitForTimeout(1200);
+  }
   expect(await faceOf(), "the cycle comes back round").toBe(face0);
 
   // Which compiler is live, on the button itself. The row hand-paints the
@@ -911,7 +923,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
         const c = document.querySelector("#game") as HTMLCanvasElement;
         const g = c.getContext("2d")!;
         const r = c.getBoundingClientRect();
-        const px = Math.round(((x + (w / vw) * 10 - r.left) / r.width) * c.width);
+        const px = Math.round(
+          ((x + (w / vw) * 10 - r.left) / r.width) * c.width,
+        );
         const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
         const d = g.getImageData(px, py, 1, 1).data;
         return `${d[0]},${d[1]},${d[2]}`;

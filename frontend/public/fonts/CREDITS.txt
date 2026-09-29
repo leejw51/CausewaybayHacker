@@ -1,0 +1,18 @@
+Fonts shipped with Causewaybay Hacker, and where they come from.
+
+PressStart2P-Regular.ttf   Press Start 2P, CodeMan38            SIL OFL 1.1   PressStart2P-OFL.txt
+VT323-Regular.ttf          VT323, Peter Hull                    SIL OFL 1.1   VT323-OFL.txt
+Iosevka-Code.woff2         Iosevka (subset), Belleve Invis      SIL OFL 1.1   Iosevka-OFL.txt
+JetBrainsMono-Code.woff2   JetBrains Mono (subset), JetBrains   SIL OFL 1.1   JetBrainsMono-OFL.txt
+
+IBM-VGA-8x16.woff          "Web437 IBM VGA 8x16" from The Ultimate Oldschool PC
+                           Font Pack v2.2 by VileR, https://int10h.org/oldschool-pc-fonts/
+                           CC BY-SA 4.0                         OldschoolPC-CC-BY-SA-4.0.txt
+                           Renamed from Web437_IBM_VGA_8x16.woff; otherwise unmodified.
+neodgm.woff2               Neo둥근모 (NeoDunggeunmo) v1.601,
+neodgm_code.woff2          Neo둥근모 Code, Eunbin Jeong (Dalgona),
+                           https://github.com/neodgm/neodgm     SIL OFL 1.1   neodgm-OFL.txt
+Galmuri11.woff2            Galmuri11 and GalmuriMono11 v2.40.4, Lee Minseo (quiple),
+GalmuriMono11.woff2        https://github.com/quiple/galmuri    SIL OFL 1.1   Galmuri-OFL.txt
+ComicMono.ttf              Comic Mono, dtinth (from Comic Shanns by Shannon Miwa),
+                           https://github.com/dtinth/comic-mono-font  MIT  ComicMono-MIT.txt

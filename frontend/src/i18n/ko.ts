@@ -32,6 +32,8 @@ export const ko: Partial<Catalogue> = {
   "app.fullscreenOn": "전체 화면: 켬",
   "app.fullscreenOff": "전체 화면: 끔",
   "app.language": "언어: {name}",
+  "app.uiFace": "글꼴: {name}",
+  "app.fontChip": "글꼴 {name}",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.logout": "로그아웃",
   "chrome.difficulty": "난이도",
