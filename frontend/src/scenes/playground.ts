@@ -18,7 +18,16 @@
  * cost work either.
  */
 import type { App, Scene } from "../app";
-import { elide, ensureFonts, inkBox, inkCentreY, printf, width, wrap } from "../engine/text";
+import {
+  elide,
+  ensureFonts,
+  inkBox,
+  inkCentreY,
+  printf,
+  width,
+  wrap,
+  type Font,
+} from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { burstPlan } from "../engine/burst";
 import { remoteSaveAction } from "../net/remote";
@@ -1638,32 +1647,59 @@ export class PlaygroundScene implements Scene {
     const fonts = ensureFonts(s);
     const body = stacked ? fonts.stationSm : fonts.small;
     const inner = titledPanel(g, rect, t("pg.scratchpads"), Theme.coin);
-    let y = inner[1];
     const pad = Math.round(8 * s);
+    const minH = this.app.layout.minTouchH();
+    const findH = Math.max(minH, body.height + Math.round(14 * s));
 
-    // What the buttons at the foot of this panel will take, measured before
-    // anything above them is drawn — in portrait this panel is a quarter of
-    // the window and the blurb ran straight under them.
     const listItems = [
       { id: "new", label: t("pg.new") },
       { id: "rename", label: t("pg.rename") },
       ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
     ];
-    const [, listBtnH] = btnBox(
-      fonts.button,
-      listItems.map((b) => b.label),
-      0,
-      btnPad(fonts.button),
-      this.app.layout.minTouchH(),
-    );
+    const labels = listItems.map((b) => b.label);
     const listGap = Math.round(6 * s);
-    const listRows = rowsIn(
-      fonts.button,
-      listItems.map((b) => b.label),
-      inner[2],
-      this.app.layout.minTouchH(),
-    );
-    const listH = listRows * listBtnH + (listRows - 1) * listGap;
+    // What the NEW / RENAME / DELETE rows take in a column `w` wide.
+    const buttonsH = (w: number): number => {
+      const [, bh] = btnBox(fonts.button, labels, 0, btnPad(fonts.button), minH);
+      const n = rowsIn(fonts.button, labels, w, minH);
+      return n * bh + (n - 1) * listGap;
+    };
+    // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
+    // three of them wrap in a narrow column instead of the third being
+    // painted over the second's last letter.
+    const placeButtons = (x: number, y: number, w: number, h: number): void =>
+      this.buttons.row(fonts.button, [x, y, w, h], listItems, minH);
+    const placeSearch = (x: number, y: number, w: number): void => {
+      well(g, x, y, w, findH, [0.06, 0.05, 0.14, 0.98]);
+      this.searchOverlay?.place([x + 4, y + 3, w - 8, findH - 6], body.size);
+    };
+
+    if (stacked) {
+      // Stacked, the panel is a quarter of the window and one column of it
+      // was rule, search, rows and buttons in turn — the rows got what was
+      // left, a row and a half. Two panes instead: the pads down the left
+      // at full height, everything that acts on them down the right.
+      const gap = pad;
+      const listW = Math.round((inner[2] - gap) * 0.56);
+      const cx = inner[0] + listW + gap;
+      const cw = inner[2] - listW - gap;
+      this.drawRows(g, body, s, inner[0], inner[1], listW, inner[3]);
+
+      let y = inner[1];
+      placeSearch(cx, y, cw);
+      y += findH + pad;
+      const bh = buttonsH(cw);
+      placeButtons(cx, y, cw, bh);
+      y += bh + pad;
+      const bottom = inner[1] + inner[3];
+      this.drawNote(g, body, cx, y, cw, bottom - y);
+      if (this.saveNote) this.drawSaveNote(g, body, s, cx, bottom, cw);
+      return;
+    }
+
+    // What the buttons at the foot of this panel will take, measured before
+    // anything above them is drawn.
+    const listH = buttonsH(inner[2]);
     const listTop = inner[1] + inner[3] - listH;
 
     // The rule, stated once, where it cannot be missed. It is the opposite of
@@ -1674,44 +1710,64 @@ export class PlaygroundScene implements Scene {
     // itself under five, on the grounds that four pads are read in one
     // glance — and then it was gone exactly when somebody looked for it, and
     // nobody could tell whether the list had a search at all.
-    const findH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
-    const noteRoom = listTop - pad - findH - pad;
-    // Clipped to its room rather than trusted to stop: a Hangul line inks
-    // below the nominal line height it is measured by, so "does the next line
-    // fit?" let half a row of glyphs through and the buttons were drawn
-    // across the middle of them.
-    const noteTop = y;
-    const noteH = Math.max(0, noteRoom - pad - noteTop);
+    const noteTop = inner[1];
+    const noteH = Math.max(0, listTop - pad - findH - pad - pad - noteTop);
+    let y = this.drawNote(g, body, inner[0], noteTop, inner[2], noteH) + pad;
+
+    placeSearch(inner[0], y, inner[2]);
+    y += findH + pad;
+
+    const room = Math.max(0, listTop - pad - y);
+    this.drawRows(g, body, s, inner[0], y, inner[2], room);
+    if (this.saveNote) this.drawSaveNote(g, body, s, inner[0], y + room, inner[2]);
+
+    placeButtons(inner[0], listTop, inner[2], listH);
+  }
+
+  /**
+   * The rule, clipped to its room rather than trusted to stop: a Hangul line
+   * inks below the nominal line height it is measured by, so "does the next
+   * line fit?" let half a row of glyphs through and the buttons were drawn
+   * across the middle of them. Returns where the last line drawn ends.
+   */
+  private drawNote(g: Ctx, body: Font, x: number, top: number, w: number, h: number): number {
+    let y = top;
+    if (h <= 0) return y;
     g.fillStyle = css(Theme.cream, 0.7);
-    const note = t("pg.notScored");
-    clipped(g, inner[0], noteTop, inner[2], noteH, () => {
+    clipped(g, x, top, w, h, () => {
       // Laid out on the **taller** of the nominal line box and what these
       // lines actually ink. The body face is Latin-only, so a Hangul line is
       // served by a fallback whose ink is half again the height it was
       // measured by: stepping by the nominal box let a line in that did not
       // fit, and the clip then sliced its glyphs through the middle.
-      const lines = wrap(body, note, inner[2]);
+      const lines = wrap(body, t("pg.notScored"), w);
       const step = lines.reduce((n, l) => {
         const ink = inkBox(body, l);
         return Math.max(n, ink.asc + ink.desc);
       }, body.height);
-      let ny = noteTop;
       for (const line of lines) {
-        if (ny + step > noteTop + noteH) break;
-        printf(g, body, line, inner[0], ny, inner[2], "left");
-        ny += step;
+        if (y + step > top + h) break;
+        printf(g, body, line, x, y, w, "left");
+        y += step;
       }
-      y = ny;
     });
-    y += pad;
+    return y;
+  }
 
-    well(g, inner[0], y, inner[2], findH, [0.06, 0.05, 0.14, 0.98]);
-    this.searchOverlay?.place([inner[0] + 4, y + 3, inner[2] - 8, findH - 6], body.size);
-    y += findH + pad;
-
+  /** The saved pads, one row each, clipped to the room they are given. */
+  private drawRows(
+    g: Ctx,
+    body: Font,
+    s: number,
+    x: number,
+    y: number,
+    w: number,
+    room: number,
+  ): void {
+    const fonts = ensureFonts(s);
+    const pad = Math.round(8 * s);
     const rowH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
-    const room = listTop - pad - y;
-    clipped(g, inner[0], y, inner[2], Math.max(0, room), () => {
+    clipped(g, x, y, w, Math.max(0, room), () => {
       let ry = y;
       const shown = this.visibleSnippets();
       for (const snip of shown) {
@@ -1719,28 +1775,20 @@ export class PlaygroundScene implements Scene {
         const id = `snip:${snip.id}`;
         const open = snip.id === this.held.id;
         const hover = this.rows.hovered === id;
-        fill(g, open ? Theme.navy : Theme.ink, inner[0], ry, inner[2], rowH - 2, open ? 0.95 : 0.5);
-        fill(
-          g,
-          landColour(snip.lang),
-          inner[0],
-          ry,
-          Math.round(4 * s),
-          rowH - 2,
-          open || hover ? 1 : 0.5,
-        );
+        fill(g, open ? Theme.navy : Theme.ink, x, ry, w, rowH - 2, open ? 0.95 : 0.5);
+        fill(g, landColour(snip.lang), x, ry, Math.round(4 * s), rowH - 2, open || hover ? 1 : 0.5);
         // The language tag owns the right of the row, so the name is measured
         // against what is left of it. A server-assigned name is a date and it
         // is long enough to run straight under the tag otherwise.
         const tagW = Math.round(46 * s);
         g.fillStyle = css(open ? Theme.coin : Theme.cream, hover ? 1 : 0.85);
         // One line, elided: a name that wraps is a row drawn over the next one.
-        const nameW = inner[2] - Math.round(20 * s) - tagW;
+        const nameW = w - Math.round(20 * s) - tagW;
         printf(
           g,
           body,
           elide(body, snip.name, nameW),
-          inner[0] + Math.round(10 * s),
+          x + Math.round(10 * s),
           ry + Math.round((rowH - body.height) / 2),
           nameW,
           "left",
@@ -1750,12 +1798,12 @@ export class PlaygroundScene implements Scene {
           g,
           fonts.stationSm,
           landName(snip.lang),
-          inner[0],
+          x,
           ry + Math.round((rowH - fonts.stationSm.height) / 2),
-          inner[2] - Math.round(8 * s),
+          w - Math.round(8 * s),
           "right",
         );
-        this.rows.add({ id, rect: [inner[0], ry, inner[2], rowH - 2], label: snip.name });
+        this.rows.add({ id, rect: [x, ry, w, rowH - 2], label: snip.name });
         ry += rowH;
       }
       if (shown.length === 0) {
@@ -1764,46 +1812,31 @@ export class PlaygroundScene implements Scene {
           g,
           body,
           this.snippets.length === 0 ? t("pg.nothingSaved") : t("pg.noMatch"),
-          inner[0],
+          x,
           y + pad,
-          inner[2],
+          w,
           "center",
         );
       }
-      if (this.saveNote) {
-        // One line, on its own band: the note used to wrap upward over the
-        // rows, and a saved poster's file name made four lines of it.
-        const ny = y + room - body.height - Math.round(4 * s);
-        fill(
-          g,
-          Theme.ink,
-          inner[0],
-          ny - Math.round(2 * s),
-          inner[2],
-          body.height + Math.round(6 * s),
-          0.9,
-        );
-        g.fillStyle = css(Theme.coin, 0.85);
-        printf(
-          g,
-          body,
-          elide(body, this.saveNote, inner[2] - Math.round(8 * s)),
-          inner[0] + Math.round(4 * s),
-          ny,
-          inner[2],
-          "left",
-        );
-      }
     });
+  }
 
-    // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
-    // three of them wrap in a narrow list panel instead of the third being
-    // painted over the second's last letter.
-    this.buttons.row(
-      fonts.button,
-      [inner[0], listTop, inner[2], listH],
-      listItems,
-      this.app.layout.minTouchH(),
+  /**
+   * One line, on its own band, sitting on `bottom`: the note used to wrap
+   * upward over the rows, and a saved poster's file name made four lines of it.
+   */
+  private drawSaveNote(g: Ctx, body: Font, s: number, x: number, bottom: number, w: number): void {
+    const ny = bottom - body.height - Math.round(4 * s);
+    fill(g, Theme.ink, x, ny - Math.round(2 * s), w, body.height + Math.round(6 * s), 0.9);
+    g.fillStyle = css(Theme.coin, 0.85);
+    printf(
+      g,
+      body,
+      elide(body, this.saveNote, w - Math.round(8 * s)),
+      x + Math.round(4 * s),
+      ny,
+      w,
+      "left",
     );
   }
 
