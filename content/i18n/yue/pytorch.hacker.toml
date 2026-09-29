@@ -1,0 +1,880 @@
+# PYTORCH LAND — HACKER, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/hacker.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong practitioners actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "pytorch.hacker"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.hacker.01.pairwise"
+title = "每一對，冇 loop"
+story = "7-32 號房，第五次。第一條題目係個個都會攞到嗰條，一入門口個鐘就開始計。"
+brief = '''
+第一行係 `n d`。跟住係 `n` 行，每行 `d` 個浮點數。
+
+印出 `n × n` 嘅歐幾里得距離矩陣，每個四捨五入到三個小數位，一行一橫，數值之間用一個空格分隔。
+
+佢哋想聽嘅答案入面冇 Python loop。將 `(n, 1, d)` 同 `(1, n, d)` broadcast，一次過就得到每一個差。
+
+```
+input:  3 2
+        0 0
+        3 4
+        0 4
+output: 0.0 5.0 4.0
+        5.0 0.0 3.0
+        4.0 3.0 0.0
+```
+'''
+hints = [
+  "(x.unsqueeze(1) - x.unsqueeze(0)) 嘅形狀係 (n, n, d) —— 每一對嘅每一個差。",
+  "torch.cdist(x, x) 係 library 嘅答案；面試通常想你將個 broadcast 寫出嚟。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.hacker.02.topk-accuracy"
+title = "喺頭五名入面"
+story = "篇 paper 話係 top-5，但段 code 計嘅係 top-1。一直冇人留意，直至 reviewer 問攞個數字。"
+brief = '''
+第一行係 `n c k`。跟住係 `n` 行，每行 `c` 個 logits。最後一行係 `n` 個整數 label。
+
+印出 top-1 準確率同 top-`k` 準確率，每個四捨五入到四個小數位，用一個空格分隔。如果一個樣本嘅 label 喺佢嗰行最大嘅 `k` 個 logits 入面，就算 top-`k` 啱。
+
+`topk` 回傳數值同 index；呢條題目講嘅係 index。
+
+```
+input:  3 4 2
+        1 2 3 0
+        5 1 0 2
+        0 1 4 3
+        2 0 3
+output: 0.6667 1.0
+```
+'''
+hints = [
+  "logits.topk(k, dim=1).indices 係 (n, k)，已經由最好排起，所以第 0 欄就係 top-1 預測。",
+  "(idx == want.unsqueeze(1)).any(dim=1) —— 靠個 unsqueeze，label 先可以 broadcast 過 k 欄。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.hacker.03.cosine"
+title = "睇角度，唔睇長度"
+story = "個 retrieval 用 dot product 排名，最長嗰個向量每條 query 都贏，唔理佢講乜。"
+brief = '''
+第一行係 `n m d`。跟住係 `n` 行 query，每行 `d` 個浮點數，然後 `m` 行文件，每行 `d` 個浮點數。
+
+印出 `n × m` 嘅餘弦相似度矩陣，四捨五入到四個小數位，一行一橫。
+
+餘弦相似度係**正規化**之後嘅向量嘅 dot product。先正規化再乘，個答案就一直係一個矩陣乘法；之後先除嘅話要一個 norm 嘅外積，好多人就係喺度亂咗。
+
+```
+input:  2 2 2
+        1 0
+        0 2
+        1 0
+        1 1
+output: 1.0 0.7071
+        0.0 0.7071
+```
+'''
+hints = [
+  "q / q.norm(dim=1, keepdim=True) —— 靠 keepdim，個除法先會沿住每行 broadcast。",
+  "然後一個矩陣乘法：qn @ kn.t()。零向量會除以零，F.normalize 入面個 eps 就係為咗呢樣。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.hacker.04.stable-softmax"
+title = "寫 softmax"
+story = "寫 softmax。佢哋第一樣就問呢樣，而佢哋等緊聽嘅，係冇人第一次會寫嘅嗰個減數。"
+brief = '''
+第一行係 `n c`。跟住係 `n` 行，每行 `c` 個 logits。
+
+每行印出佢嘅 softmax，四捨五入到四個小數位 —— **唔准**用 `torch.softmax`。
+
+一個大 logit 嘅 `exp` 會 overflow 變 `inf`，成行就變 `nan`。先減走每行嘅最大值，數學上乜都冇變，數值上就乜都唔同，因為最大嘅指數變咗 `exp(0)`。
+
+```
+input:  2 3
+        1 2 3
+        1000 1000 1000
+output: 0.09 0.2447 0.6652
+        0.3333 0.3333 0.3333
+```
+'''
+hints = [
+  "x - x.max(dim=1, keepdim=True).values，然後 exp，然後除以該行嘅總和。",
+  "max(dim=...) 回傳數值同 index；.values 係你要嗰半，而 keepdim 令個 broadcast 老老實實。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.hacker.05.cross-entropy"
+title = "寫 cross entropy"
+story = "而家寫個損失，喺佢哋交畀你嗰個 batch 上面同 library 對得上五個小數位。"
+brief = '''
+第一行係 `n c`。跟住係 `n` 行，每行 `c` 個 logits，然後一行 `n` 個 label。
+
+印出你嘅 cross-entropy，四捨五入到五個小數位，然後如果同 `nn.CrossEntropyLoss` 相差喺 `1e-5` 之內就印 `True`。
+
+一個 batch 嘅 cross-entropy 係每行 `-log_softmax(logits)[row, label]` 嘅平均。咁樣寫就穩定、就係一個 `gather`，亦都係佢哋想要嘅答案。寫成 `-log(softmax(x))` 嘅話，就係喺隱藏測試回傳 `inf` 嗰個答案。
+
+```
+input:  2 3
+        1 2 3
+        3 1 0
+        2 0
+output: 0.28873 True
+```
+'''
+hints = [
+  "先 log_softmax，然後 gather 真正嗰個類別，然後取負再攞平均。",
+  "預設嘅 reduction 係成個 batch 嘅平均，唔係總和 —— 要對得上 library，呢個係另一半。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.hacker.06.one-hot"
+title = "唔用個 helper"
+story = "面試官話，唔准用 `F.one_hot`。有兩個寫法，佢哋等緊嘅係 scatter 嗰個。"
+brief = '''
+第一行係 `n c`。第二行係 `n` 個 label。
+
+以整數印出 `n × c` 嘅 one-hot 矩陣，一行一橫。
+
+`zeros(n, c).scatter_(1, labels.unsqueeze(1), 1.0)` 喺每行 label 嗰欄寫一個一。比較嘅寫法 —— `labels.unsqueeze(1) == arange(c)` —— 係另一個收貨嘅答案，而且講出口嗰陣更易解釋。
+
+```
+input:  3 4
+        2 0 3
+output: 0 0 1 0
+        1 0 0 0
+        0 0 0 1
+```
+'''
+hints = [
+  "torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0) —— dim 1，index 嘅形狀同來源一樣。",
+  "y.unsqueeze(1) == torch.arange(c) 以 boolean 畀返同一個矩陣，喺面試讀起嚟好啲。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.hacker.07.normal-equations"
+title = "冇梯度下降"
+story = "唔訓練都 fit 到條線。最小二乘法有 closed form，佢哋想知你識唔識。"
+brief = '''
+第一行係 `n d`。跟住係 `n` 行，每行 `d` 個 feature，然後一行 `n` 個 target。
+
+喺一行印出 `d + 1` 個最小二乘係數 —— `d` 個權重，然後係截距 —— 每個四捨五入到四個小數位。
+
+截距嚟自加多一欄一，而答案係 `(XᵀX)⁻¹Xᵀy`。用 `torch.linalg.lstsq`，佢唔使砌個逆矩陣都計到；只要有 bias 嗰欄，面試官兩樣都收。
+
+```
+input:  3 1
+        0
+        1
+        2
+        1 3 5
+output: 2.0 1.0
+```
+'''
+hints = [
+  "用 torch.cat([x, torch.ones(n, 1)], dim=1) 加嗰欄一 —— 嗰欄就係截距。",
+  "torch.linalg.lstsq(xb, y.unsqueeze(1)).solution —— 右手邊佢要一個矩陣。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.hacker.08.kmeans-step"
+title = "一次迭代"
+story = "分配，然後平均，然後講有乜變咗。佢哋要嘅係個 loop 入面嗰段，唔係 library。"
+brief = '''
+第一行係 `n k d`。跟住係 `n` 個點，每個 `d` 個浮點數，然後 `k` 行 centroid，每行 `d` 個浮點數。
+
+第一行印出每個點嘅分配，然後印 `k` 個更新咗嘅 centroid，一行一個，四捨五入到四個小數位。冇點嘅 centroid 保留佢舊嘅位置。
+
+一次迭代係：用 broadcast 計距離，用 `argmin` 做分配，再逐個 cluster 計一個有 mask 嘅平均。
+
+```
+input:  4 2 1
+        0
+        1
+        10
+        11
+        0
+        10
+output: 0 0 1 1
+        0.5
+        10.5
+```
+'''
+hints = [
+  "(x.unsqueeze(1) - c.unsqueeze(0)) 係 (n, k, d)；平方，加埋最後一條軸，喺 k 上面 argmin。",
+  "空嘅 cluster 冇平均 —— 要守住佢，唔係個 centroid 會變 nan，永遠返唔到嚟。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.hacker.09.iou"
+title = "佢哋重疊幾多"
+story = "偵測框，同決定一個預測算唔算數嘅嗰個指標。喺零度 clamp 嗰行，就係人哋會唔記得嗰行。"
+brief = '''
+第一行係 `n m`。跟住係 `n` 個框同 `m` 個框，每個寫做 `x1 y1 x2 y2`。
+
+印出 `n × m` 嘅 IoU 矩陣，四捨五入到四個小數位，一行一橫。
+
+交集係兩個區間喺每條軸上面嘅重疊，**喺零度 clamp** —— 兩個唔掂到嘅框會畀出負嘅闊度，冇個 clamp 嘅話，兩個負數相乘出嚟係正數，個指標就靜靜雞報一個根本唔存在嘅重疊。
+
+```
+input:  2 1
+        0 0 2 2
+        1 1 3 3
+        0 0 2 2
+output: 1.0
+        0.1429
+```
+'''
+hints = [
+  "左上係兩個角嘅逐元素最大值，右下係最小值；然後 (rb - lt).clamp(min=0)。",
+  "聯集係 areaA + areaB - intersection —— 要減佢，唔係每個重疊都會被低估。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.hacker.10.nms"
+title = "每樣嘢留一個"
+story = "一度機櫃門上面有九個框，個 detector 深信有九度機櫃門。"
+brief = '''
+第一行係 `n thr`。跟住係 `n` 行 `x1 y1 x2 y2 score`。
+
+印出 non-maximum suppression 留低嘅 index，按留低嘅次序，用空格分隔。如果一個都冇留低，就印一行空行。
+
+NMS 係貪心嘅：攞分數最高嘅框，留低佢，掉走其餘同佢 IoU **大過** `thr` 嘅每個框，重複。啱啱好等於門檻嘅框會留低。
+
+```
+input:  3 0.5
+        0 0 2 2 0.9
+        0 0 2 2 0.8
+        5 5 7 7 0.7
+output: 0 2
+```
+'''
+hints = [
+  "按分數由高到低排，pop 最好嗰個，用對佢嘅 IoU 篩走其餘，重複。",
+  "壓走嘅比較係嚴格大過門檻，所以啱啱好等於 thr 嘅框會留低。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.hacker.11.dropout"
+title = "寫 dropout"
+story = "佢哋話寫 dropout，然後問：inference 嗰陣佢做乜？第二條問題先係真正嗰條。"
+brief = '''
+第一行係 `n p seed`，`p` 係 drop 嘅機率。
+
+印出生存落嚟嘅比例同輸出嘅平均，每個四捨五入到**一**個小數位，然後如果期望值保得住就印 `True` —— 即係生存落嚟嘅元素有冇乘以 `1/(1-p)`。
+
+得一個小數位，因為實際抽到乜係 generator 嘅事，唔係題目嘅事：檢查緊嘅係，掉走咗 `p` 咁多比例之後，個輸出平均仍然係 1。
+
+呢個係**倒轉式** dropout，每個 framework 都係咁實作：縮放喺訓練嗰陣做，所以 inference 就只係恆等，冇嘢要記、冇嘢要熄。
+
+```
+input:  1000 0.5 0
+output: 0.5 1.0 True
+```
+'''
+hints = [
+  "訓練嗰條路除以 (1 - p)；dropout 同單純清零嘅分別就係咁多。",
+  "冇個縮放嘅話，activation 會縮細 (1 - p) 倍，下游每一層喺 inference 都會見到錯嘅尺度。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.hacker.12.gelu"
+title = "Transformer 入面嗰個"
+story = "個 block 入面嘅 MLP 唔用 ReLU 又唔用 sigmoid，考生要寫出佢真正用嗰個。"
+brief = '''
+第一行係 `n`。第二行係 `n` 個浮點數。
+
+印出你嘅精確 GELU，四捨五入到四個小數位，然後如果同 `nn.GELU()` 相差喺 `1e-5` 之內就印 `True`。
+
+精確 GELU 係 `x · Φ(x)`，`Φ` 係標準常態分佈嘅 CDF：`0.5 · (1 + erf(x/√2))`。`tanh` 嗰個形式係近似，同預設**唔會**對得上 `1e-5`，呢個就係題目個陷阱。
+
+```
+input:  3
+        -1 0 1
+output: -0.1587 0.0 0.8413 True
+```
+'''
+hints = [
+  "x * 0.5 * (1 + torch.erf(x / 2 ** 0.5)) —— torch.erf 係誤差函數。",
+  "nn.GELU(approximate=\"tanh\") 係另一個；預設係精確嗰個，你要對得上嘅就係佢。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.hacker.13.rmsnorm"
+title = "連平均都冇"
+story = "新啲嘅模型掉咗置中嗰步，用少啲算術得到同一個結果。寫佢哋留低嗰個。"
+brief = '''
+第一行係 `n d`。跟住係 `n` 行，每行 `d` 個浮點數。
+
+印出每行正規化之後嘅結果，四捨五入到四個小數位，一行一個。
+
+RMSNorm 除以該行嘅均方根，**唔會**減平均：`x / sqrt(mean(x²) + eps)`。用 `eps = 1e-6`。同 LayerNorm 嘅分別就係咁多，亦都係佢平啲嘅原因。
+
+```
+input:  2 4
+        1 1 1 1
+        0 0 0 2
+output: 1.0 1.0 1.0 1.0
+        0.0 0.0 0.0 2.0
+```
+'''
+hints = [
+  "x.pow(2).mean(dim=-1, keepdim=True) 然後 sqrt —— 要 keepdim，咁佢先會 broadcast 返落成行。",
+  "冇減平均，亦冇 bias；一行全部係一，出嚟都係一行全部係一。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.hacker.14.sinusoidal"
+title = "冇參數嘅位置"
+story = "原本篇 paper 嘅位置編碼：冇表、冇訓練，而且可以伸延到超過任何人畀佢睇過最長嘅序列。"
+brief = '''
+第一行係 `t d`，`d` 係雙數。
+
+印出 `t × d` 嘅 sinusoidal 位置編碼，四捨五入到四個小數位，一行一橫。
+
+雙數欄係 `sin(pos / 10000^(2i/d))`，單數欄係同一個參數嘅 `cos`，`i` 係第幾對。所以位置 0 係 `sin(0), cos(0), sin(0), cos(0), …` —— 零同一交替嘅一行，值得第一樣檢查。
+
+```
+input:  2 4
+output: 0.0 1.0 0.0 1.0
+        0.8415 0.5403 0.01 0.9999
+```
+'''
+hints = [
+  "頻率係 1 / 10000 ** (i / d)，i 喺 arange(0, d, 2) 入面 —— 每對一個，唔係每欄一個。",
+  "pe[:, 0::2] 同 pe[:, 1::2] 係雙數欄同單數欄；兩邊都用同一個 (t, d/2) 嘅參數。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.hacker.15.label-smoothing"
+title = "永遠唔會十足肯定"
+story = "個模型係啱嘅，但自信得離譜，張 calibration 圖係一個懸崖。"
+brief = '''
+第一行係 `n c eps`。跟住係 `n` 行，每行 `c` 個 logits，然後一行 `n` 個 label。
+
+印出你 smooth 咗嘅損失，四捨五入到五個小數位，然後如果同 `nn.CrossEntropyLoss(label_smoothing=eps)` 相差喺 `1e-5` 之內就印 `True`。
+
+Label smoothing 將 one-hot target 換成：真正嗰個類別 `1 - eps`，再將 `eps / c` 平均分落**全部** `c` 個類別 —— 包括真正嗰個，你個數字同 library 對唔對得上，就係睇呢個細節。
+
+```
+input:  2 3 0.1
+        1 2 3
+        3 1 0
+        2 0
+output: 0.42206 True
+```
+'''
+hints = [
+  "(1 - eps) * nll + eps * (-logp.mean(dim=1)) —— 第二項係平均分佈嗰部分，覆蓋每一個類別。",
+  "eps / c 平均分落全部 c 個類別，啱啱好就係成行 -log_softmax 嘅平均。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.hacker.16.focal"
+title = "易嘅唔再計數"
+story = "一萬塊背景 patch 同四十塊真嘢，而個損失全部由模型本來已經答啱嘅背景組成。"
+brief = '''
+第一行係 `n gamma`。第二行係一個二元問題嘅 `n` 個 logits。第三行係 `n` 個 label，每個係 0 或 1。
+
+印出 focal loss 嘅平均，四捨五入到五個小數位，同埋普通 binary cross-entropy 嘅平均，四捨五入到五個小數位。
+
+Focal loss 係 `-(1 - p_t)^γ · log(p_t)`，`p_t` 係模型畀**真正** label 嘅機率。一個有信心又啱嘅預測，`p_t` 接近 1，所以 `(1 - p_t)^γ` 接近零，佢就唔再有貢獻。
+
+```
+input:  2 2.0
+        4 -4
+        1 0
+output: 0.00001 0.01815
+```
+'''
+hints = [
+  "torch.where(y > 0.5, p, 1 - p) 就係 p_t —— 邊個 label 係真嘅，就係嗰個嘅機率。",
+  "gamma = 0 嘅話 focal loss 會變返普通 BCE，呢個係第一樣要行嘅檢查。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.hacker.17.grad-accumulation"
+title = "塞唔落嘅 batch"
+story = "篇 paper 嘅 batch size 係 512，張卡得 128。答案係四次 backward、一次 step，同埋個個都唔記得嗰個除法。"
+brief = '''
+喺 `k` 個 micro-batch 上面累積梯度，然後 step 一次，等同一個大 batch —— **前提係**每個 micro-batch 嘅損失要先除以 `k`。冇個除法嘅話，梯度大咗 `k` 倍，實際嘅 learning rate 就靜靜雞乘咗上去。
+
+第一行係 `n k`。跟住係 `n` 個浮點數，每個係一個樣本。
+
+印出累積嘅梯度同成個 batch 嘅梯度，每個四捨五入到六個小數位，然後如果兩者相差喺 `1e-6` 之內就印 `True`。
+
+```
+input:  4 2
+        1 2 3 4
+output: 2.5 2.5 True
+```
+'''
+hints = [
+  "每個 micro-batch 嘅損失喺佢 backward 之前除以 k。",
+  "呢個成立係因為啲 micro-batch 一樣大；如果最後一個 batch 短啲，就要按樣本數加權。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.hacker.18.adam"
+title = "寫 Adam"
+story = "憑記憶寫 Adam，三步之後要同 library 對得上。題目問嘅係 bias correction。"
+brief = '''
+第一行係 `steps lr`。第二行係 `steps` 個梯度，每步一個，用喺一個由 `0` 開始嘅純量參數上面。
+
+印出行完之後你嘅參數，四捨五入到六個小數位，然後印 torch 嘅，然後如果兩者相差喺 `1e-6` 之內就印 `True`。
+
+Adam，`β₁ = 0.9`、`β₂ = 0.999`、`eps = 1e-8`：
+
+```
+m = b1*m + (1-b1)*g
+v = b2*v + (1-b2)*g*g
+mh = m / (1 - b1**t)
+vh = v / (1 - b2**t)
+w = w - lr * mh / (sqrt(vh) + eps)
+```
+
+`t` 由 **1** 開始數。冇 bias correction 嘅話，頭幾步會細得太多，因為 `m` 同 `v` 由零開始。
+
+```
+input:  3 0.1
+        1 1 1
+output: -0.3 -0.3 True
+```
+'''
+hints = [
+  "t 由 1 開始，所以用 enumerate(gs, start=1) —— t 係 0 嘅話，第一次 correction 就除以零。",
+  "梯度不變嘅話，修正咗嘅 mh/sqrt(vh) 差唔多啱啱好係 1，所以每步大約行 lr 咁遠。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.hacker.19.padding-mask"
+title = "唔係四四方方嘅 batch"
+story = "四句唔同長度嘅句子擺喺一個張量入面，而個模型連 padding 都一齊平均埋。"
+brief = '''
+第一行係 `n t`。第二行係 `n` 個長度。跟住係 `n` 行，每行 `t` 個浮點數。
+
+以整數印出個 mask，一行一橫，然後喺一行印出每行只計**真實**位置嘅平均，四捨五入到四個小數位。
+
+`torch.arange(t) < lengths.unsqueeze(1)` 一行就係個 mask，冇 loop。有 mask 嘅平均係有 mask 嘅總和除以長度 —— 除以 `t` 就係呢條題目講嘅 bug。
+
+```
+input:  2 4
+        2 4
+        1 2 9 9
+        1 2 3 4
+output: 1 1 0 0
+        1 1 1 1
+        1.5 2.5
+```
+'''
+hints = [
+  "torch.arange(t) < lens.unsqueeze(1) —— 個 arange 會 broadcast 過成個 batch。",
+  "除以 mask.sum(dim=1)，唔好除以 t，唔係每行短嘅都會俾拉向零。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.hacker.20.masked-attention"
+title = "穿咗窿嘅注意力"
+story = "啲 padding 位都被 attend 緊。修正係一個 masked_fill，擺喺啱啱好一個位，而題目問嘅就係邊個位。"
+brief = '''
+第一行係 `t d len`，`len` 係 `t` 個位置入面有幾多個係真嘅。跟住係 `t` 行，每行 `d` 個浮點數，同時用做 `q`、`k` 同 `v`。
+
+印出第一個 query 嘅注意力權重，四捨五入到四個小數位，然後如果每行加埋仍然係一就印 `True`。
+
+Key 嘅 mask 係加喺 **scores** 上面，喺 softmax 之前，將 padding 嘅 key 設做 `-inf`。之後每個 query 就會將全部注意力只分落真實嘅位置。
+
+```
+input:  3 2 2
+        1 0
+        0 1
+        9 9
+output: 0.6698 0.3302 0.0 True
+```
+'''
+hints = [
+  "個 mask 擺喺 key 嗰條軸：~keep.unsqueeze(0) mask 嘅係欄，即係每個 query 睇 padding key 嘅嗰個角度。",
+  "改為 mask query 嗰條軸嘅話，會得到成行都係 -inf，而嗰樣嘢嘅 softmax 係 nan。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.hacker.21.unfold"
+title = "一次過每個窗口"
+story = "喺一條長訊號上面行 sliding window，用 Python loop 做嘅話，比唔用 loop 嗰行慢四百倍。"
+brief = '''
+第一行係 `n k s`。第二行係 `n` 個浮點數。
+
+以 tuple 印出開窗 view 嘅形狀，然後喺一行印出每個窗口嘅平均，四捨五入到四個小數位。
+
+`x.unfold(0, k, s)` 以 **view** 畀出每個長度 `k`、stride `s` 嘅窗口 —— 冇複製、冇 loop，而窗口嗰條軸會擺喺最後。
+
+```
+input:  6 3 1
+        1 2 3 4 5 6
+output: (4, 3)
+        2.0 3.0 4.0 5.0
+```
+'''
+hints = [
+  "x.unfold(0, k, s) —— 維度、大小、步長，就係咁嘅次序。",
+  "窗口數目係 (n - k) // s + 1，而結果係一個 view，所以寫落佢即係寫落 x。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.hacker.22.conv-by-hand"
+title = "卷積就係矩陣乘法"
+story = "佢哋問卷積實際上點實作，答案係一去到硬件，佢根本就唔係卷積。"
+brief = '''
+第一行係 `n k`。第二行係 `n` 個浮點數 —— 個訊號。第三行係 `k` 個浮點數 —— 個 kernel。
+
+印出你嘅一維 valid cross-correlation，四捨五入到四個小數位，然後如果同 `nn.functional.conv1d` 相差喺 `1e-5` 之內就印 `True`。
+
+將訊號 unfold 成窗口，再乘以 kernel：`windows @ kernel`。呢個就係 im2col，亦都係點解卷積可以用矩陣乘法嘅速度行。留意 torch 嘅 `conv1d` 係 cross-correlation —— 佢**唔會**反轉個 kernel，呢個係題目另一半。
+
+```
+input:  5 3
+        1 2 3 4 5
+        1 0 -1
+output: -2.0 -2.0 -2.0 True
+```
+'''
+hints = [
+  "x.unfold(0, k, 1) 係 (n - k + 1, k)；同 kernel 做一個矩陣乘法就搞掂。",
+  "如果你反轉個 kernel，得到嘅係真正嘅卷積，就會同 conv1d 對唔上。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.hacker.23.maxpool"
+title = "寫 max pooling"
+story = "將張圖縮一半，每個格仔留低最強嗰樣嘢。面試官話，唔准用 pooling 層。"
+brief = '''
+第一行係 `h w`，兩個都係雙數。跟住係 `h` 行，每行 `w` 個浮點數。
+
+印出 2×2 max-pool 之後嘅結果，四捨五入到四個小數位，一行一橫，然後如果同 `nn.functional.max_pool2d` 相差喺 `1e-5` 之內就印 `True`。
+
+Reshape 做 `(h/2, 2, w/2, 2)`，會將兩條窗口軸擺喺一對 `amax` 呼叫搆得到嘅位。常見嘅錯答案係 reshape 做 `(h/2, w/2, 2, 2)`，會將錯嘅元素交錯埋一齊，而且照樣行得到。
+
+```
+input:  4 4
+        1 2 3 4
+        5 6 7 8
+        9 10 11 12
+        13 14 15 16
+output: 6.0 8.0
+        14.0 16.0
+        True
+```
+'''
+hints = [
+  "x.reshape(h // 2, 2, w // 2, 2) 然後 .amax(dim=(1, 3)) —— 兩條大小係 2 嘅軸就係個窗口。",
+  "amax 收一個維度 tuple；max 唔收，所以呢度要用嘅係佢。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.hacker.24.segment-sum"
+title = "每組加埋"
+story = "逐句 pool 啲 token 向量，而各種長度嘅句子全部擺喺一個扁平嘅張量入面。逐組行嘅 loop 係成條 pipeline 最慢嘅部分。"
+brief = '''
+第一行係 `n g`。第二行係 `n` 個 `[0, g)` 入面嘅組 id。第三行係 `n` 個浮點數。
+
+喺一行印出每組入面嘅總和，四捨五入到四個小數位。冇成員嘅組係 `0.0`。
+
+`index_add_`（或者 `scatter_add_`）一個呼叫就做到，冇 loop、冇排序 —— `EmbeddingBag` pool 一個 batch 唔同長度嘅序列，正正就係咁做。
+
+```
+input:  5 3
+        0 2 0 1 2
+        1 2 3 4 5
+output: 4.0 4.0 7.0
+```
+'''
+hints = [
+  "torch.zeros(g).index_add_(0, grp, val) —— 重複嘅 index 會累加，重點就係咁。",
+  "普通 index 賦值 out[grp] = val 每個 index 淨係留低最後一次寫入，唔會加埋。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.hacker.25.running-stats"
+title = "一次過計平均同方差"
+story = "個 dataset 塞唔落 memory，正規化常數要喺行一次嘅過程入面計出嚟。"
+brief = '''
+第一行係 `n bs`。第二行係 `n` 個浮點數，要逐 `bs` 個一舊咁食。
+
+印出 running 平均同 running **母體**方差，四捨五入到五個小數位，然後如果兩者都同成個張量一次過計嘅結果相差喺 `1e-4` 之內就印 `True`。
+
+記住一個數目、一個總和同一個平方和就夠：`var = E[x²] - E[x]²`。每個 framework 嘅 `BatchNorm` buffer 都係用呢條公式，而平均好大嗰陣佢亦都係會失精度嗰條 —— 值得講出口。
+
+```
+input:  6 2
+        1 2 3 4 5 6
+output: 3.5 2.91667 True
+```
+'''
+hints = [
+  "累積數目、總和同平方和；然後 mean = sum/count，var = sq/count - mean²。",
+  "unbiased=False 係母體方差 —— 除以 n，正正係呢條公式畀嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.hacker.26.mixup"
+title = "兩個樣本，一個 target"
+story = "用兩張圖嘅平均同佢哋 label 嘅平均去訓練。理論上唔應該 work，但佢係 work 嘅。"
+brief = '''
+第一行係 `n c lam`。跟住係 `n` 行，每行 `c` 個 logits，然後 `n` 個 label，然後 `n` 個排列 index。
+
+印出 mixup 損失，四捨五入到五個小數位，然後如果佢同 soft-target 嗰條路 —— 砌 `lam * onehot(y) + (1 - lam) * onehot(y[perm])`，再計 `-(target * log_softmax(x)).sum(1).mean()` —— 相差喺 `1e-5` 之內就印 `True`。嗰個參考已經寫好；你寫嘅係一行版本。
+
+混合**損失**而唔係混合 one-hot target，係標準嘅實作，而對 cross-entropy 嚟講兩者完全一樣，因為佢對 target 係線性嘅。向自己證明呢點，就係題目。
+
+```
+input:  2 3 0.7
+        1 2 3
+        3 1 0
+        2 0
+        1 0
+output: 1.03873 True
+```
+'''
+hints = [
+  "lam * ce(x, y) + (1 - lam) * ce(x, y[perm]) —— y[perm] 係洗亂咗之後拍檔嘅 label。",
+  "真正嘅實作入面啲輸入都會混合，用同一個由 Beta 分佈抽出嚟嘅 lam。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.hacker.27.sgd-from-scratch"
+title = "寫 SGD，全部"
+story = "Momentum 同 weight decay 一齊用，而題目問嘅係邊個先做。"
+brief = '''
+第一行係 `steps lr mu wd`。第二行係 `steps` 個梯度，用喺一個由 `1.0` 開始嘅純量參數上面。
+
+印出行完之後你嘅參數，四捨五入到六個小數位，然後印 torch 嘅，然後如果兩者相差喺 `1e-6` 之內就印 `True`。
+
+Torch 嘅次序係：weight decay **先**併入梯度，然後 momentum 累積嗰個 decay 咗嘅梯度，然後先行一步。
+
+```
+g = g + wd * w
+b = mu * b + g
+w = w - lr * b
+```
+
+喺 momentum 之後先 decay，或者直接 decay 權重而唔係 decay 梯度，會行出一條唔同嘅軌跡 —— AdamW 講嘅就係呢個分別。
+
+```
+input:  3 0.1 0.9 0.1
+        1 1 1
+output: 0.388169 0.388169 True
+```
+'''
+hints = [
+  "先 d = g + wd * w，然後 buffer，然後 step。",
+  "Torch 將 momentum buffer 初始化做第一個 decay 咗嘅梯度，而唔係 mu * 0 + g —— 喺呢度係同一樣嘢，但值得知道佢係一個特例。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.hacker.28.perplexity"
+title = "Paper 上面嗰個數字"
+story = "語言模型嘅招牌指標，考生要答：一個平均亂估嘅模型，呢個數會係幾多。"
+brief = '''
+第一行係 `t v`。跟住係 `t` 行，每行 `v` 個 logits，然後一行 `t` 個 target token。
+
+印出平均 cross-entropy 同 perplexity，每個四捨五入到四個小數位。
+
+Perplexity 係 `exp(mean cross-entropy)`。一個將機率平均分落 `v` 個 token 嘅模型，perplexity 啱啱好係 `v` —— 呢個就係 sanity check，亦都係點解個數字喺同樣大小嘅詞彙表之間比得，喺唔同大小之間就冇意義。
+
+```
+input:  2 4
+        0 0 0 0
+        0 0 0 0
+        1 3
+output: 1.3863 4.0
+```
+'''
+hints = [
+  "對平均 cross-entropy 做 torch.exp —— 改為對加總嘅損失取指數，得出嚟嘅數字會隨住文字長度增長。",
+  "喺 v 個 token 上面平均嘅 logits 畀出 ln(v)，佢嘅 exp 就係 v。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.hacker.29.top-k-filter"
+title = "淨係要似樣嗰啲"
+story = "個 sampler 間中伸手入條尾度，跟住個 completion 就去咗一個冇人解釋到嘅地方。"
+brief = '''
+第一行係 `v k`。第二行係 `v` 個 logits。
+
+喺一行印出篩選之後嘅機率，四捨五入到四個小數位：top `k` 以外嘅全部係零，生存落嚟嗰啲重新正規化，加埋係一。
+
+標準實作將排除咗嘅 logits 設做 `-inf` 再 softmax，免費幫你重新正規化。用 `topk(...).values[-1]` 攞第 `k` 大嘅做門檻，會保留打和嘅，reviewer 會問嘅就係呢個行為。
+
+```
+input:  5 2
+        1 2 3 4 5
+output: 0.0 0.0 0.0 0.2689 0.7311
+```
+'''
+hints = [
+  "thr = x.topk(k).values[-1] 係第 k 大；mask 走所有嚴格細過佢嘅。",
+  "喺 softmax 之前 mask，生存嗰啲先會重新正規化；之後先清零，佢哋加埋會少過一。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.hacker.30.beam-search"
+title = "一次兩個候選"
+story = "Greedy 攞最好嘅 token，就失咗最好嘅句子。留兩個，第二個字就見到分別。"
+brief = '''
+第一行係 `steps v beam`。跟住係 `steps` 行，每行 `v` 個 log-probability，每個 beam 都用同一行 —— 一個唔理自己歷史嘅玩具模型。
+
+印出 beam search 搵到最好嘅序列，用空格分隔嘅 token id，然後印佢嘅總 log-probability，四捨五入到四個小數位。
+
+每一步，將每個仲生存嘅 beam 用每個 token 延伸，按**加總**嘅 log-probability 評分，留低最好嘅 `beam` 個。淨係按最後一步評分，就係 greedy 扮 beam。
+
+```
+input:  2 3 2
+        -0.1 -0.2 -3.0
+        -2.0 -0.05 -1.0
+output: 0 1
+        -0.15
+```
+'''
+hints = [
+  "將每個生存嘅 beam 用每個 token 擴展，按累計總和排序，留低最好嘅 `beam` 個。",
+  "如果想佢唔再偏愛短嘅序列，可以將分數除以序列長度做長度正規化 —— 就算冇問，都講出口。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "pytorch.hacker.31.kv-cache"
+title = "唔好重計過去"
+story = "生成第一千個 token 會重讀頭九百九十九個。唔使嘅；佢哋冇變過。"
+brief = '''
+第一行係 `t d`。跟住係 `t` 行，每行 `d` 個浮點數，用做 `q`、`k` 同 `v`。
+
+如果 cache 嗰步同成個重新計相差喺 `1e-5` 之內就印 `True`，然後印最後一行輸出，四捨五入到四個小數位。
+
+因為個 mask 係 causal 嘅，前面位置嘅 key 同 value 永遠唔會變。所以生成第 `t` 步只需要一個新 query 對住**成個** cache —— `(1, t)` 個 scores 而唔係 `(t, t)` —— 就係咁將生成由每個 token 平方變成線性。
+
+兩個方法都計一次最後嗰行：一次行完整嘅 causal 注意力，一次由 cache 計。
+
+```
+input:  3 2
+        1 0
+        0 1
+        1 1
+output: True 0.7517 0.7517
+```
+'''
+hints = [
+  "最後一個 query 係 x[-1:]，保留住行嗰條軸；cache 係到目前為止每一個 key 同 value。",
+  "Cache 嗰步唔使 mask —— 最後一個位置可以 attend 佢之前嘅所有嘢，即係成個 cache。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "pytorch.hacker.32.head-split"
+title = "一個矩陣拆出四個 head"
+story = "啲 head 唔係四個矩陣。佢哋係一個矩陣加一個 reshape，而 reshape 錯咗就會靜靜雞將啲 head 撈埋一齊。"
+brief = '''
+第一行係 `b t d h`，`h` 整除 `d`。
+
+將一個 `(b, t, d)` 拆成 head，再合返埋，印出拆開嘅形狀、合返嘅形狀，然後如果一來一回完全一樣就印 `True`。
+
+拆係 `view(b, t, h, d//h).transpose(1, 2)`；合係 `transpose(1, 2)` 然後 `reshape`。靠個 transpose，head 嗰條軸先變成 batch 軸，亦都係因為佢，合返嗰陣要用 `reshape` 而唔係 `view` —— transpose 之後 memory 已經唔再連續。
+
+```
+input:  2 5 8 4
+output: (2, 4, 5, 2) (2, 5, 8) True
+```
+'''
+hints = [
+  "x.view(b, t, h, d // h).transpose(1, 2) —— 拆開 feature 軸，然後對調時間同 head。",
+  "合返係 heads.transpose(1, 2).reshape(b, t, d)；喺度用 view 會 raise，因為 transpose 整爛咗連續性。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "pytorch.hacker.33.reorder-beams"
+title = "Cache 跟住 beam 走"
+story = "第三個 beam 剪走咗，第一個 beam 分咗做兩個，而 key-value cache 仲係照兩樣嘢發生之前咁排。"
+brief = '''
+第一行係 `n t`。跟住係 `n` 行 cache，每行 `t` 個浮點數。最後一行係 `n` 個 parent index，講每個新 beam 係由邊個舊 beam 嚟。
+
+印出重新排好嘅 cache，一行一橫，四捨五入到四個小數位。
+
+`cache.index_select(0, parents)` 就係成個操作，而且佢處理得到重複嘅 parent —— 一個 beam 分叉做兩個 —— 正正係用就地賦值嘅 `for` loop 會搞錯嗰樣。
+
+```
+input:  3 2
+        1 1
+        2 2
+        3 3
+        2 0 0
+output: 3.0 3.0
+        1.0 1.0
+        1.0 1.0
+```
+'''
+hints = [
+  "cache.index_select(0, parents) —— 或者等價嘅 cache[parents]，讀起嚟好啲。",
+  "index_select 會複製，所以分叉嘅 parent 會畀出兩行獨立嘅，而唔係同一行嘅兩個 view。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "pytorch.hacker.34.teaching-cluster"
+title = "教學叢集"
+story = "7-32 號房，最後一條題目，就係樓下兩層嗰樣嘢。砌佢一個 block，然後證明佢睇唔到未來。"
+brief = '''
+第一行係 `t d h seed`。
+
+寫一個 **pre-norm causal transformer block** 嘅 forward pass：LayerNorm、多頭 causal self-attention、residual、LayerNorm、GELU MLP、residual。每個權重都畀咗你；淨係欠 `forward`。
+
+印四樣嘢：輸出嘅形狀；如果注意力核心同 `F.scaled_dot_product_attention(..., is_causal=True)` 相差喺 `1e-5` 之內就印 `True`；如果個 block 係 causal 嘅就印 `True` —— 改**最後**一個 token 一定唔可以郁到之前任何一行輸出；如果輸出係有限數就印 `True`。
+
+Causality 係性質，唔係段 code。一個過到形狀檢查但過唔到呢個嘅 block，就係嗰個訓練到完美損失、但生成出嚟係雜訊嘅 bug。
+
+```
+input:  6 16 4 0
+output: (6, 16) True True True
+```
+'''
+hints = [
+  "attend：除以 sqrt(d // h) —— head 嘅維度 —— 然後用下三角 mask 做 masked_fill，然後 softmax，然後 @ v。",
+  "block 係兩個 residual：x = x + proj(attend(x))，然後 x = x + mlp(ln2(x))。Pre-norm 即係 LayerNorm 喺每條分支入面，永遠唔會喺 residual 本身上面。",
+  "如果 causality 檢查唔過，就係冇 mask 或者 mask 擺咗喺 softmax 之後；如果參考檢查唔過，就係 scale 用咗 d 而唔係 d // h。",
+]

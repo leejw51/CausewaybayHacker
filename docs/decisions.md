@@ -7619,3 +7619,26 @@ through, the lantern carnival, and an indigo overworld with the dragon
 coiled where the boss sits. Both portrait plates were re-rolled once for a
 flat patch under a node, which `checknodes.py` found and the prompt had not
 prevented.
+
+## 2026-09-28 — Every quest in every language
+
+The six lands after Rust, Go and Python — C++, PyTorch, TypeScript, Zig, Lua
+and REMIX — had no translations at all, and the first three had holes of
+their own (`python.hacker` in every locale, `rust.basic` since its rewrite,
+`rust.hacker` and `go.hacker` in Cantonese and Czech, one quest of
+`python.advanced`). All of it is written now: 170 files, 1094 quests in each
+of ko, yue, zh, ja and cs. Neither client needed a change — both already send
+`locale` on `world.map`, `quest.get` and `hint.get` and draw `text_locale`
+— so this was content only.
+
+Each pack was written with the code fences as placeholders and the English
+fences pasted back by script, so the fenced-block rule held by construction
+rather than by care; titles of the same interview question are the same
+across lands in each locale. Two things the work found: `cpp.basic.08`'s
+English brief never closed its last fence, so its worked example had never
+been checked against a visible case (it is closed now, in all six files, and
+it matches); and CI's `--i18n` gate did not name the TypeScript packs. The
+gate names every land now and runs with `--require-complete`: coverage is no
+longer a number to report but a rule, and a new quest lands with its five
+translations or the content job goes red.
+

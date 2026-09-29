@@ -1,0 +1,565 @@
+# TYPESCRIPT LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/typescript/verybasic.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, the quiz's four choices, sample input and
+# output and the exact strings a program must print are the English pack's and
+# are never translated.
+
+pack   = "typescript.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.verybasic.01.print"
+title = "První obrazovka"
+story = "19:00 nad Times Square. Velká obrazovka se rozsvítí načerno a první řádek noci se musí napsat ručně."
+brief = '''
+Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna metoda na globálním objektu `console` zapíše řádek na standardní výstup.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+output: hello, causewaybay
+```
+'''
+hints = [
+  "console.log(\"hello, causewaybay\"); — závorky a čárka uvnitř řetězce.",
+  "Žádné print() tu není; na jméno, které nikdy neviděl, odpoví tsc chybou TS2304 dřív, než se cokoli spustí.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.verybasic.02.int-types"
+title = "Rozdělený playlist"
+story = "LED stěna Hysan Place rozděluje klipy noci mezi své panely; plánovač má říct, kolik dostane každý panel a kolik jich zbude, a neříká nic."
+brief = '''
+`a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené mezerou. TypeScript má jediný typ `number` a žádný operátor celočíselného dělení: `/` dá vždy zlomek, `Math.trunc` ho zahodí a `%` je zbytek.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+hints = [
+  "console.log(Math.trunc(a / b), a % b); — console.log dá mezi své argumenty mezeru.",
+  "a / b je 3.5, ne 3: každé číslo je double. A // tu není operátor; začíná komentář.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.verybasic.03.floats"
+title = "Čekací doba"
+story = "Tramvajová tabule na Yee Wo Street ukazuje čekání na dvě desetinná místa a dnes večer ukazuje 3.5 s mezerou tam, kam patří poslední číslice."
+brief = '''
+`x` a `y` jsou čísla. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. Číslo má metodu, která ho naformátuje s pevným počtem desetinných míst a vrátí řetězec.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "console.log((x / y).toFixed(2)); — závorky zajistí, že se nejdřív dělí.",
+  "Math.round(x / y * 100) / 100 je pořád číslo a číslo se vypíše jako 3.5, ne 3.50.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.verybasic.04.strings"
+title = "Banner"
+story = "Banner aplikace Lee Garden přijde od marketingu malými písmeny a brand manuál ho chce velkými; banner se vyvěsí přesně tak, jak je napsaný."
+brief = '''
+`s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Metoda řetězce vrátí kopii, ve které je každé písmeno velké.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+hints = [
+  "console.log(s.toUpperCase()); — camelCase a volá se se závorkami.",
+  "s.upper() je Python; typ string takovou metodu nemá a tsc to řekne.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.verybasic.05.bool-if"
+title = "Východ, nebo západ"
+story = "Příjezdové tabule na Yee Wo Street míří na sudých zastávkách na východ a na lichých na západ; montér na žebříku má číslo zastávky a potřebuje stranu."
+brief = '''
+`n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je `if`, který porovná zbytek s nulou operátorem striktní rovnosti, dlouhým tři znaky.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if (n % 2 === 0) { — tři rovnítka porovnávají, jedno přiřazuje.",
+  "n % 2 je číslo a tsc odmítne porovnat číslo s řetězcem \"0\": ty typy se nepřekrývají.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.verybasic.06.loops"
+title = "Součet"
+story = "Velín ve třicátém patře sčítá své obrazovky jedna plus dvě plus tři dolů po racku a součet na konzoli ukazuje nulu."
+brief = '''
+`n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst do `total`. Hlavička `for` má začátek, podmínku kontrolovanou před každým průchodem a krok.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for (let i = 1; i <= n; i++) { — menší nebo rovno, takže se projde i samotné n.",
+  "for...in prochází klíče objektu; číslo žádné nemá a tsc to nenechá zkusit.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.verybasic.07.functions"
+title = "Sazba za slot"
+story = "Obrazovka na Times Square účtuje prvních deset reklamních slotů noci po pěti a každý další po třech; účtovací funkce slibuje číslo a tsc ji nesestaví."
+brief = '''
+`fare(rides)` musí vrátit platbu: prvních deset jízd po 5, každou jízdu po desáté po 3. Signatura říká `: number`, takže tělo, které nic nevrátí, se nezkompiluje. Funkce vrací hodnotu jedním klíčovým slovem.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+output: 15
+```
+'''
+hints = [
+  "return Math.min(rides, 10) * 5 + Math.max(rides - 10, 0) * 3;",
+  "Funkce s typem `: number`, která vypisuje místo vracení, se nezkompiluje: tsc řekne, že musí vrátit hodnotu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.verybasic.08.structs"
+title = "Jedna karta, dvě pole"
+story = "Každá produktová karta v aplikaci Lee Garden má jméno a cenu; konstruktor cenu nikdy nenastaví a build se zastaví na řádku, který ji sliboval."
+brief = '''
+Konstruktor `Stall` dostane `name` a `price`. Třída deklaruje `price: number` a pod `strict` musí být každé deklarované pole přiřazeno v konstruktoru. Musí uložit `price` na objekt stejně, jako se ukládá `name`, aby ho `s.price` přečetlo zpátky.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+hints = [
+  "this.price = price; — this je objekt; holé jméno je parametr.",
+  "this.price = name; se nezkompiluje: name je řetězec a pole je číslo.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.verybasic.09.struct-method"
+title = "Řádek košíku"
+story = "Cena krát množství je jeden řádek každého košíku v aplikaci Lee Garden a metoda, která to má říct, slibuje číslo a nevrací žádné."
+brief = '''
+`Stall.total()` musí vrátit cenu krát množství. Parametry konstruktoru s `public` deklarují pole a rovnou je uloží; uvnitř metody se k polím objektu dostaneš přes `this`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+hints = [
+  "return this.price * this.qty; — obě pole přes this.",
+  "Holé price uvnitř metody není pole; je to price přečtené ze vstupu mimo třídu, řetězec, a řetězec tsc násobit nebude.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.verybasic.10.enums"
+title = "Barva linky"
+story = "Panel MTR nad východem Causeway Bay na stěně Hysan jmenuje tři linky; feed posílá slovo a panel potřebuje člen enumu, který mu odpovídá."
+brief = '''
+`word` je jedno z `island`, `tsuenwan`, `kwuntong`. Program z něj musí udělat odpovídající člen `Line`. Enum se dá indexovat jménem člena, ale jen klíčem, o kterém tsc ví, že je jedním z jeho jmen: `keyof typeof Line` je ta množina jmen a `as` řekne tsc, že řetězec jedním z nich je. Aserce se za běhu vymaže — nic nekontroluje, takže řetězec by měl sedět.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "const line = Line[word.toUpperCase() as keyof typeof Line]; — jména jsou velkými písmeny.",
+  "Line[word as keyof typeof Line] se zkompiluje, protože `as` je slib, který tsc bere na důvěru; za běhu je Line[\"tsuenwan\"] undefined.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.verybasic.11.vector"
+title = "Playlist"
+story = "Každý klip, který velín dostane, jde na playlist noci v pořadí, v jakém přišel, a playlist zůstává prázdný."
+brief = '''
+`xs` je `number[]`, které začíná prázdné. Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, aby zůstalo pořadí vstupu. Pole na to má jednu metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs.push(x); — jedna hodnota, na konec.",
+  "unshift(x) ji dá dopředu a otočí pořadí.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.verybasic.12.vector-edit"
+title = "Stažený klip"
+story = "První klip na playlistu Hysan Place byl stažen dřív, než šel do vysílání; musí pryč a všechno za ním se posune o jedno dopředu."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí odstranit prvek na indexu 0, aby se zbytek posunul dolů. Jedna metoda pole odstraňuje podle počátečního indexu a počtu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+hints = [
+  "xs.splice(0, 1); — od indexu 0, jeden prvek.",
+  "delete xs[0] nechá díru tam, kde prvek byl; délka se nezmění.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.verybasic.13.list"
+title = "Začátek tickeru"
+story = "Horké zprávy jdou na začátek tickeru pod obrazovkou na Times Square a nejnovější položka pořád přistává vzadu."
+brief = '''
+`chain` je `number[]`; TypeScript nemá deque a pole zvládne oba konce. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, takže poslední přečtené skončí první. Pole má pro ten konec metodu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "chain.unshift(x); — dvojče push pro přední konec.",
+  "push(x) jde dozadu.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.verybasic.14.maps"
+title = "Počet ťuknutí"
+story = "Aplikace Lee Garden počítá ťuknutí na produkt, jeden řádek na produkt; první ťuknutí na cokoli nenajde řádek, ke kterému by přičetlo."
+brief = '''
+`counts` je `Map<string, number>`. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. `get` má typ `number | undefined`, protože klíč může chybět, a `??` dodá hodnotu, která se použije, když chybí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "counts.set(w, (counts.get(w) ?? 0) + 1); — výchozí hodnota v závorkách, pak přičíst.",
+  "counts.get(w)! + 1 se zkompiluje — ! řekne tsc, že hodnota tam je — a za běhu je undefined + 1 NaN.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.verybasic.15.hashtable"
+title = "Vyhledání"
+story = "Tabulka velína mapuje jméno zastávky na číslo tabule a dotaz na zastávku, která v ní není, má říct -1, ne vymazat tabuli na Yee Wo Street."
+brief = '''
+`table` mapuje jména na čísla tabulí a číslo tabule může být 0. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. `get` vrací pro chybějící klíč `undefined`; jeden operátor nahradí přesně `null` a `undefined` a nic jiného.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+hints = [
+  "console.log(table.get(w) ?? -1); — ?? zasáhne jen pro undefined nebo null.",
+  "|| zasáhne pro každou nepravdivou hodnotu a 0 je nepravdivá: tabule s číslem 0 by ukázala -1.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.verybasic.16.sets"
+title = "Různí inzerenti"
+story = "Šest slotů v rotaci na Times Square, tři různí inzerenti; faktura chce vědět, kolik různých, a říká šest."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. `Set` si nechá od každé jednu a počítá se vlastností, ne přes `length`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+hints = [
+  "console.log(new Set(xs).size); — new množinu postaví, size ji spočítá.",
+  "Set bez new se nedá zavolat; tsc se zeptá, jestli jsi nechtěl přidat new.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.verybasic.17.stack"
+title = "Zásobník překryvů"
+story = "Překryvy se na stěně Hysan Place skládají na sebe a sundávají se shora; renderer pořád loupe ten spodní."
+brief = '''
+`stack` je pole používané jako zásobník. Program musí sundat HORNÍ (poslední) prvek do `top`. Jedna metoda pole odebere a vrátí poslední položku; má typ `number | undefined`, protože zásobník mohl být prázdný.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+hints = [
+  "const top = stack.pop(); — bez argumentu; je to vždycky ten poslední.",
+  "stack[stack.length - 1] vrchol přečte, ale nechá ho na hromádce.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.verybasic.18.queue"
+title = "Fronta na pop-up"
+story = "Fronta na pop-up v Lee Garden se obsluhuje v pořadí, v jakém se lidé zařadili, a aplikace pořád vyvolává nejnovější lístek."
+brief = '''
+`q` je pole, které drží lístky v pořadí. Program musí sundat PRVNÍ z nich do `first`. Pole odebírá zepředu jednou metodou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+hints = [
+  "const first = q.shift(); — shift bere zepředu, pop zezadu.",
+  "q[0] přečte první lístek, aniž by ho odebral.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.verybasic.19.heap"
+title = "Nejnaléhavější první"
+story = "Poruchy chodí do velína v libovolném pořadí a stěna má pokaždé ukázat jako další tu nejnaléhavější; seznam, na kterém se drží, netuší, která to je."
+brief = '''
+Standardní knihovna TypeScriptu nemá haldu, takže starter nese malou `MinHeap`: `push` přidá hodnotu a probublá ji nahoru, `pop` vezme nejmenší. Každé `x` musí jít dovnitř vlastní metodou haldy, aby `pop` později vracel nejmenší jako první. Zápis přímo do `items` probublání přeskočí a rozbije pořadí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heap.push(x); — metoda haldy, která probublá x nahoru tam, kam patří.",
+  "heap.items.push(x) dá x na konec pole a probublání přeskočí.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.verybasic.20.sorting"
+title = "Žebříček jízdného"
+story = "Jízdné na tabuli na Yee Wo Street je v pořadí, v jakém se přidávaly trasy, a tabule ho řadí jako text: 10 před 9."
+brief = '''
+`xs` drží celá čísla z řádku. Program musí `xs` seřadit na místě, vzestupně, než se vypíše. Metoda pole `sort` bere komparátor: záporný výsledek nechá první argument první. Bez něj `sort` porovnává čísla jako řetězce.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "xs.sort((a, b) => a - b); — a minus b je vzestupně.",
+  "xs.sort() bez komparátoru dá 10 před 9, protože \"1\" je před \"9\".",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.verybasic.21.sort-by-key"
+title = "Žebříček hráčů"
+story = "Žebříček ťukací hry na obrazovce Times Square má být skóre od nejvyššího, při shodě podle jména, a ukazuje pořadí, v jakém se lidé přidali."
+brief = '''
+`rows` je `[string, number][]`: pole typovaných n-tic, jméno a pak skóre. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. Komparátor je arrow funkce; `||` propadne k druhému porovnání jen tehdy, když první dá 0, a `byName` porovná dva řetězce.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+hints = [
+  "rows.sort((a, b) => b[1] - a[1] || byName(a[0], b[0])); — b před a pro sestupné skóre.",
+  "Prvek 1 n-tice je číslo a prvek 0 řetězec; tsc ví, který je který, a byName(a[1], b[1]) se nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.verybasic.22.reverse"
+title = "Odzadu dopředu"
+story = "Stěna Hysan Place posouvá text zprava doleva a operátor chce mít řetězec uložený pozpátku, než se vyvěsí."
+brief = '''
+`s` je jeden řádek textu. Program ho musí vypsat obráceně. Řetězec žádné vlastní obrácení nemá: rozlož ho do pole znaků, obrať pole a spoj ho zpátky do řetězce.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "console.log([...s].reverse().join(\"\")); — rozložit, obrátit, spojit s ničím mezi.",
+  "Bez join vypíše console.log samotné pole, i se závorkami a uvozovkami.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.verybasic.23.closures"
+title = "Servisní poplatek"
+story = "Ke každé ceně v aplikaci Lee Garden se přičte stejný servisní poplatek a funkce, která si ho má pamatovat, ho zapomene."
+brief = '''
+`makeAdder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Její návratový typ `(x: number) => number` říká, že musí vrátit funkci — samotnou vnitřní funkci, aby se `add(x)` dalo zavolat později a `k` zůstalo zapamatované.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return add; — holé jméno, bez závorek.",
+  "return add(); ji zavolá, bez argumentu, a vrátí číslo tam, kde signatura slibovala funkci.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.verybasic.24.lambdas"
+title = "Sudá patra"
+story = "Obrazovky na sudých patrech parkovacího domu platí nájem podle čtverce patra, suterény včetně, a lichá patra neplatí nic; účetní kniha chce jeden součet."
+brief = '''
+`xs` drží celá čísla z řádku. `total` musí být součet druhých mocnin SUDÝCH hodnot, postavený z `filter`, `map` a `reduce` a tří arrow funkcí. `reduce` potřebuje počáteční hodnotu, jinak prázdné pole nemá od čeho začít.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "const total = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);",
+  "reduce bez 0 hodí na prázdném poli TypeError: každá hodnota byla lichá a nebylo co sčítat.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.verybasic.25.threads"
+title = "Všechny panely najednou"
+story = "Každý panel stěny Hysan Place renderuje svůj vlastní snímek a stěna se rozsvítí dřív, než kterýkoli z nich skončí."
+brief = '''
+Žádná vlákna tu nejsou: jedna smyčka událostí a `square` jí vrací řízení, zatímco spí. Každé volání už bylo spuštěno a jeho promise je v `tasks`. Než se vypíšou výsledky, musí `main` POČKAT, až se všechny vyřídí. `Promise` má funkci, která z pole promisů udělá jeden, a `await` na něj čeká.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "await Promise.all(tasks); — jeden promise pro všechny a na něj await.",
+  "Promise.all(tasks) bez await promise postaví a rovnou ho mine; tasks.join() je metoda pole a nic nespojí.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.verybasic.26.mutex"
+title = "Jeden čítač, čtyři feedy"
+story = "Čtyři prodejní feedy přičítají do jednoho čítače na konzoli velína; zámek existuje a nikdo na něj před čtením nečeká."
+brief = '''
+Jedno vlákno, a přesto souběh: každý worker přečte `counter`, udělá `await` a zapíše ho zpátky, a ostatní workery běží v té mezeře. `lock` je malý asynchronní zámek. Před čtením musí každý worker zámek VZÍT a počkat, dokud ho nemá; uvolnění je už napsané za zápisem. `acquire` vrací promise, který se vyřídí, když je zámek tvůj.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1000
+output: 4000
+```
+'''
+hints = [
+  "await lock.acquire(); — pak čtení a zápis, pak uvolnění, které už tam je.",
+  "lock.acquire() bez await o zámek požádá a čítač přečte stejně, dřív než ho má.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.verybasic.27.binary-tree"
+title = "Any"
+story = "23:59 ve velínu ve třicátém patře: feed přijde s typem `any`, každá kontrola projde a obrazovka na Times Square ukáže `undefined` dvanáctimetrovými písmeny. Jedna anotace by to chytila."
+brief = '''
+Id obrazovek jdou do binárního vyhledávacího stromu a každý potomek má anotaci `TreeNode | null` — ne `any` — takže tsc udělá z prázdného případu případ. `insert(n, v)` vrací kořen stromu, ve kterém je `v`; případ `null` a pravá strana jsou napsané. Pro menší `v` se levý potomek musí nahradit výsledkem vložení do něj, aby se z potomka `null` stal uzel.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v); — rekurze vrací nový kořen podstromu; ulož ho.",
+  "Volání insert bez uložení výsledku nechá null tam, kde byl, a tsc to nevidí: typy spolu všechny souhlasí.",
+]

@@ -1,0 +1,876 @@
+# PYTORCH LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/pytorch/hacker.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim.
+
+pack   = "pytorch.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.hacker.01.pairwise"
+title = "Každá dvojice, žádná smyčka"
+story = "Room 7-32, popáté. První otázka je ta, kterou dostane každý, a hodiny se rozběhnou už cestou dovnitř."
+brief = '''
+První řádek je `n d`. Pak `n` řádků po `d` floatech.
+
+Vypiš matici `n × n` eukleidovských vzdáleností, každou zaokrouhlenou na tři místa, jeden řádek matice na řádek výstupu, hodnoty oddělené jednou mezerou.
+
+Odpověď, kterou hledají, v sobě nemá žádnou pythonovou smyčku. Broadcasting `(n, 1, d)` proti `(1, n, d)` dá všechny rozdíly najednou.
+
+```
+input:  3 2
+        0 0
+        3 4
+        0 4
+output: 0.0 5.0 4.0
+        5.0 0.0 3.0
+        4.0 3.0 0.0
+```
+'''
+hints = [
+  "(x.unsqueeze(1) - x.unsqueeze(0)) má tvar (n, n, d) — každý rozdíl každé dvojice.",
+  "torch.cdist(x, x) je odpověď z knihovny; pohovor obvykle chce broadcasting rozepsaný.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.hacker.02.topk-accuracy"
+title = "V první pětce"
+story = "Článek tvrdí top-5 a kód počítá top-1. Nikdo si toho nevšiml, dokud si recenzent neřekl o to číslo."
+brief = '''
+První řádek je `n c k`. Pak `n` řádků po `c` logitech. Poslední řádek je `n` celočíselných labelů.
+
+Vypiš přesnost top-1 a přesnost top-`k`, každou zaokrouhlenou na čtyři místa, oddělené mezerou. Vzorek se do top-`k` počítá, pokud je jeho label mezi `k` největšími logity jeho řádku.
+
+`topk` vrací hodnoty a indexy; o indexech je tahle otázka.
+
+```
+input:  3 4 2
+        1 2 3 0
+        5 1 0 2
+        0 1 4 3
+        2 0 3
+output: 0.6667 1.0
+```
+'''
+hints = [
+  "logits.topk(k, dim=1).indices je (n, k), už seřazené od nejlepšího, takže sloupec 0 je predikce top-1.",
+  "(idx == want.unsqueeze(1)).any(dim=1) — unsqueeze je to, co nechá label broadcastovat přes k sloupců.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.hacker.03.cosine"
+title = "Úhel, ne délka"
+story = "Vyhledávání řadí podle skalárního součinu a nejdelší vektor vyhraje každý dotaz bez ohledu na to, co říká."
+brief = '''
+První řádek je `n m d`. Pak `n` řádků dotazů po `d` floatech, pak `m` řádků dokumentů po `d` floatech.
+
+Vypiš matici kosinové podobnosti `n × m`, zaokrouhlenou na čtyři místa, jeden řádek matice na řádek výstupu.
+
+Kosinová podobnost je skalární součin **normalizovaných** vektorů. Nejdřív normalizovat a pak násobit je odpověď, která zůstane jedním maticovým násobením; dělit až potom chce vnější součin norem a tam lidé ztrácejí nit.
+
+```
+input:  2 2 2
+        1 0
+        0 2
+        1 0
+        1 1
+output: 1.0 0.7071
+        0.0 0.7071
+```
+'''
+hints = [
+  "q / q.norm(dim=1, keepdim=True) — keepdim je to, co nechá dělení broadcastovat dolů přes řádky.",
+  "Pak jedno maticové násobení: qn @ kn.t(). Nulový vektor by dělil nulou, a na to je eps ve F.normalize.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.hacker.04.stable-softmax"
+title = "Napiš softmax"
+story = "Napiš softmax. Je to první, na co se ptají, a odpověď, na kterou čekají, je to odečtení, které nikdo nenapíše na první pokus."
+brief = '''
+První řádek je `n c`. Pak `n` řádků po `c` logitech.
+
+Pro každý řádek vypiš softmax zaokrouhlený na čtyři místa — spočítaný **bez** `torch.softmax`.
+
+`exp` velkého logitu přeteče do `inf` a z řádku se stane `nan`. Odečíst nejdřív maximum každého řádku matematicky nezmění nic a numericky všechno, protože největší exponent se stane `exp(0)`.
+
+```
+input:  2 3
+        1 2 3
+        1000 1000 1000
+output: 0.09 0.2447 0.6652
+        0.3333 0.3333 0.3333
+```
+'''
+hints = [
+  "x - x.max(dim=1, keepdim=True).values, pak exp, pak vydělit součtem řádku.",
+  "max(dim=...) vrací hodnoty a indexy; .values je ta polovina, kterou chceš, a keepdim drží broadcasting poctivý.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.hacker.05.cross-entropy"
+title = "Napiš cross-entropy"
+story = "Teď napiš ztrátu a zařiď, aby se s knihovnou shodovala na pět desetinných míst na dávce, kterou ti podají."
+brief = '''
+První řádek je `n c`. Pak `n` řádků po `c` logitech, pak řádek s `n` labely.
+
+Vypiš svou cross-entropy zaokrouhlenou na pět míst, pak `True`, pokud se s `nn.CrossEntropyLoss` shoduje na `1e-5`.
+
+Cross-entropy dávky je průměr přes řádky z `-log_softmax(logits)[row, label]`. Napsaná takhle je stabilní, je to jeden `gather` a je to odpověď, kterou chtějí. Napsaná jako `-log(softmax(x))` je to odpověď, která na skrytém případu vrátí `inf`.
+
+```
+input:  2 3
+        1 2 3
+        3 1 0
+        2 0
+output: 0.28873 True
+```
+'''
+hints = [
+  "Nejdřív log_softmax, pak gather správné třídy, pak změnit znaménko a vzít průměr.",
+  "Výchozí redukce je průměr přes dávku, ne součet — to je druhá polovina shody s knihovnou.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.hacker.06.one-hot"
+title = "Bez pomocníka"
+story = "Žádný `F.one_hot`, říká tazatel. Dva způsoby, a ten, na který čeká, je scatter."
+brief = '''
+První řádek je `n c`. Druhý řádek je `n` labelů.
+
+Vypiš one-hot matici `n × c` jako celá čísla, jeden řádek matice na řádek výstupu.
+
+`zeros(n, c).scatter_(1, labels.unsqueeze(1), 1.0)` zapíše jedničku do sloupce labelu v každém řádku. Tvar s porovnáním — `labels.unsqueeze(1) == arange(c)` — je druhá uznávaná odpověď a nahlas se obhajuje snáz.
+
+```
+input:  3 4
+        2 0 3
+output: 0 0 1 0
+        1 0 0 0
+        0 0 0 1
+```
+'''
+hints = [
+  "torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0) — dim 1, index ve tvaru zdroje.",
+  "y.unsqueeze(1) == torch.arange(c) dá stejnou matici jako booleany a na pohovoru se čte líp.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.hacker.07.normal-equations"
+title = "Žádný gradientní sestup"
+story = "Proložit přímku bez tréninku. Metoda nejmenších čtverců má uzavřený tvar a chtějí vědět, jestli ho znáš."
+brief = '''
+První řádek je `n d`. Pak `n` řádků po `d` příznacích, pak řádek s `n` cíli.
+
+Vypiš `d + 1` koeficientů nejmenších čtverců — `d` vah a pak absolutní člen — každý zaokrouhlený na čtyři místa, na jednom řádku.
+
+Absolutní člen vznikne připojením sloupce jedniček a řešení je `(XᵀX)⁻¹Xᵀy`. Použij `torch.linalg.lstsq`, který to udělá bez sestavení inverze; tazatel vezme obojí, pokud tam sloupec pro bias je.
+
+```
+input:  3 1
+        0
+        1
+        2
+        1 3 5
+output: 2.0 1.0
+```
+'''
+hints = [
+  "Připoj sloupec jedniček přes torch.cat([x, torch.ones(n, 1)], dim=1) — ten sloupec je absolutní člen.",
+  "torch.linalg.lstsq(xb, y.unsqueeze(1)).solution — na pravé straně chce matici.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.hacker.08.kmeans-step"
+title = "Jedna iterace"
+story = "Přiřadit, pak zprůměrovat, pak říct, co se změnilo. Chtějí tělo smyčky, ne knihovnu."
+brief = '''
+První řádek je `n k d`. Pak `n` bodů po `d` floatech, pak `k` řádků centroidů po `d` floatech.
+
+Na první řádek vypiš přiřazení každého bodu, pak `k` aktualizovaných centroidů, jeden na řádek, zaokrouhlených na čtyři místa. Centroid bez bodů si nechá svou starou polohu.
+
+Jedna iterace je: vzdálenosti přes broadcasting, `argmin` pro přiřazení a maskovaný průměr pro každý shluk.
+
+```
+input:  4 2 1
+        0
+        1
+        10
+        11
+        0
+        10
+output: 0 0 1 1
+        0.5
+        10.5
+```
+'''
+hints = [
+  "(x.unsqueeze(1) - c.unsqueeze(0)) je (n, k, d); umocnit, sečíst poslední osu, argmin přes k.",
+  "Prázdný shluk nemá průměr — ošetři ho, jinak se centroid stane nan a už se nevzpamatuje.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.hacker.09.iou"
+title = "Jak moc se překrývají"
+story = "Detekční boxy a metrika, která rozhoduje, jestli se predikce počítá. Ořez na nule je řádek, na který lidé zapomínají."
+brief = '''
+První řádek je `n m`. Pak `n` boxů a `m` boxů, každý jako `x1 y1 x2 y2`.
+
+Vypiš matici IoU `n × m`, zaokrouhlenou na čtyři místa, jeden řádek matice na řádek výstupu.
+
+Průnik je překryv dvou intervalů na každé ose, **oříznutý na nule** — dva boxy, které se nedotýkají, dají zápornou šířku, a bez ořezu vyjde součin dvou záporných čísel kladný a metrika potichu hlásí překryv, který tam není.
+
+```
+input:  2 1
+        0 0 2 2
+        1 1 3 3
+        0 0 2 2
+output: 1.0
+        0.1429
+```
+'''
+hints = [
+  "Levý horní roh je maximum obou rohů po prvcích, pravý dolní minimum; pak (rb - lt).clamp(min=0).",
+  "Sjednocení je areaA + areaB - intersection — odečti ho, jinak je každý překryv podhodnocený.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.hacker.10.nms"
+title = "Jeden na každou věc"
+story = "Devět boxů na jedněch dveřích racku a detektor je přesvědčený, že dveří je devět."
+brief = '''
+První řádek je `n thr`. Pak `n` řádků `x1 y1 x2 y2 score`.
+
+Vypiš indexy, které si non-maximum suppression ponechá, v pořadí, v jakém si je ponechá, oddělené mezerami. Pokud si nenechá žádný, vypiš prázdný řádek.
+
+NMS je hladové: vezmi box s nejvyšším skóre, nech si ho, zahoď každý zbývající box, jehož IoU s ním je **větší než** `thr`, a opakuj. Box přesně na prahu přežije.
+
+```
+input:  3 0.5
+        0 0 2 2 0.9
+        0 0 2 2 0.8
+        5 5 7 7 0.7
+output: 0 2
+```
+'''
+hints = [
+  "Seřaď podle skóre sestupně, vyndej nejlepší, zbytek vyfiltruj podle IoU vůči němu, opakuj.",
+  "Pro potlačení je porovnání ostře větší než práh, takže box přesně na thr zůstane.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.hacker.11.dropout"
+title = "Napiš dropout"
+story = "Napiš dropout, řeknou, a pak: co dělá při inferenci? Ta druhá otázka je ta skutečná."
+brief = '''
+První řádek je `n p seed`, kde `p` je pravděpodobnost zahození.
+
+Vypiš podíl, který přežil, a průměr výstupu, každý zaokrouhlený na **jedno** místo, a `True`, pokud se zachovala očekávaná hodnota — tedy pokud byly přeživší prvky přeškálované o `1/(1-p)`.
+
+Jedno místo, protože přesný los je věc generátoru, a ne otázky: kontroluje se, že výstup má v průměru pořád 1 poté, co se podíl `p` z něj zahodil.
+
+Tohle je **invertovaný** dropout, a ten implementuje každý framework: škálování se děje při tréninku, takže inference je jen identita, bez čehokoli k zapamatování a bez čehokoli k vypínání.
+
+```
+input:  1000 0.5 0
+output: 0.5 1.0 True
+```
+'''
+hints = [
+  "Na trénovací cestě vyděl (1 - p); v tom je celý rozdíl mezi dropoutem a prostým nulováním.",
+  "Bez škálování se aktivace zmenší faktorem (1 - p) a každá další vrstva při inferenci vidí špatné měřítko.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.hacker.12.gelu"
+title = "Ta z transformeru"
+story = "MLP v bloku nepoužívá ani ReLU, ani sigmoidu, a kandidát má napsat tu, kterou používá."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` floatů.
+
+Vypiš svou přesnou GELU zaokrouhlenou na čtyři místa, pak `True`, pokud se s `nn.GELU()` shoduje na `1e-5`.
+
+Přesná GELU je `x · Φ(x)`, kde `Φ` je distribuční funkce standardního normálního rozdělení: `0.5 · (1 + erf(x/√2))`. Tvar s `tanh` je aproximace a s výchozí verzí se na `1e-5` **neshoduje**, a v tom je past té otázky.
+
+```
+input:  3
+        -1 0 1
+output: -0.1587 0.0 0.8413 True
+```
+'''
+hints = [
+  "x * 0.5 * (1 + torch.erf(x / 2 ** 0.5)) — torch.erf je chybová funkce.",
+  "nn.GELU(approximate=\"tanh\") je ta druhá; výchozí je přesná a s tou se musíš shodovat.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.hacker.13.rmsnorm"
+title = "Vůbec žádný průměr"
+story = "Novější modely zahodily krok centrování a dostaly stejný výsledek za méně aritmetiky. Napiš tu, kterou si nechaly."
+brief = '''
+První řádek je `n d`. Pak `n` řádků po `d` floatech.
+
+Vypiš každý normalizovaný řádek zaokrouhlený na čtyři místa, jeden na řádek.
+
+RMSNorm dělí kvadratickým průměrem řádku a průměr **neodečítá**: `x / sqrt(mean(x²) + eps)`. Použij `eps = 1e-6`. To je celý rozdíl od LayerNorm a proto je levnější.
+
+```
+input:  2 4
+        1 1 1 1
+        0 0 0 2
+output: 1.0 1.0 1.0 1.0
+        0.0 0.0 0.0 2.0
+```
+'''
+hints = [
+  "x.pow(2).mean(dim=-1, keepdim=True) a pak sqrt — keepdim, aby se to broadcastovalo zpátky přes řádek.",
+  "Žádné odečtení průměru ani bias tu není; řádek samých jedniček vyjde jako řádek samých jedniček.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.hacker.14.sinusoidal"
+title = "Pozice bez parametrů"
+story = "Poziční kódování z původního článku: žádná tabulka, žádný trénink, a funguje i za nejdelší sekvencí, jakou mu kdo ukázal."
+brief = '''
+První řádek je `t d`, kde `d` je sudé.
+
+Vypiš sinusové poziční kódování `t × d`, zaokrouhlené na čtyři místa, jeden řádek matice na řádek výstupu.
+
+Sudé sloupce jsou `sin(pos / 10000^(2i/d))` a liché sloupce jsou `cos` téhož argumentu, kde `i` je index dvojice. Pozice 0 je tedy `sin(0), cos(0), sin(0), cos(0), …` — střídavý řádek nul a jedniček, a to je kontrola, kterou stojí za to udělat jako první.
+
+```
+input:  2 4
+output: 0.0 1.0 0.0 1.0
+        0.8415 0.5403 0.01 0.9999
+```
+'''
+hints = [
+  "Frekvence jsou 1 / 10000 ** (i / d) pro i v arange(0, d, 2) — jedna na dvojici, ne jedna na sloupec.",
+  "pe[:, 0::2] a pe[:, 1::2] jsou sudé a liché sloupce; oba berou stejný argument tvaru (t, d/2).",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.hacker.15.label-smoothing"
+title = "Nikdy úplně jistý"
+story = "Model má pravdu a je nesmírně přesebevědomý, a graf kalibrace je útes."
+brief = '''
+První řádek je `n c eps`. Pak `n` řádků po `c` logitech, pak řádek s `n` labely.
+
+Vypiš svou vyhlazenou ztrátu zaokrouhlenou na pět míst, pak `True`, pokud se s `nn.CrossEntropyLoss(label_smoothing=eps)` shoduje na `1e-5`.
+
+Label smoothing nahradí one-hot cíl hodnotou `1 - eps` na správné třídě a `eps / c` rozprostřeným přes **všech** `c` tříd — včetně té správné, a to je detail, který rozhodne, jestli se tvoje číslo s knihovnou shoduje.
+
+```
+input:  2 3 0.1
+        1 2 3
+        3 1 0
+        2 0
+output: 0.42206 True
+```
+'''
+hints = [
+  "(1 - eps) * nll + eps * (-logp.mean(dim=1)) — druhý člen je ta rovnoměrná část, přes každou třídu.",
+  "eps / c rozprostřené přes všech c tříd je přesně průměr -log_softmax přes řádek.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.hacker.16.focal"
+title = "Ty snadné přestanou počítat"
+story = "Deset tisíc výřezů pozadí a čtyřicet skutečných, a ztráta je celá z pozadí, které už model trefuje."
+brief = '''
+První řádek je `n gamma`. Druhý řádek je `n` logitů pro binární problém. Třetí řádek je `n` labelů, každý 0 nebo 1.
+
+Vypiš průměrnou focal loss zaokrouhlenou na pět míst a průměrnou obyčejnou binární cross-entropy zaokrouhlenou na pět míst.
+
+Focal loss je `-(1 - p_t)^γ · log(p_t)`, kde `p_t` je pravděpodobnost, kterou model dal **správnému** labelu. Sebejistá, správná predikce má `p_t` blízko 1, takže `(1 - p_t)^γ` je blízko nuly a přestane přispívat.
+
+```
+input:  2 2.0
+        4 -4
+        1 0
+output: 0.00001 0.01815
+```
+'''
+hints = [
+  "torch.where(y > 0.5, p, 1 - p) je p_t — pravděpodobnost toho labelu, který je správný.",
+  "gamma = 0 vrátí focal loss zpátky na obyčejnou BCE, a to je kontrola, kterou pustit jako první.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.hacker.17.grad-accumulation"
+title = "Dávka, která se nevejde"
+story = "Batch size v článku je 512 a karta pojme 128. Odpověď jsou čtyři zpětné průchody a jeden krok, a dělení, na které každý zapomene."
+brief = '''
+Akumulovat gradienty přes `k` mikrodávek a jednou udělat krok je totéž co jedna velká dávka — **pokud** se ztráta každé mikrodávky nejdřív vydělí `k`. Bez dělení je gradient `k`krát větší a efektivní rychlost učení se potichu násobí.
+
+První řádek je `n k`. Pak `n` floatů, jeden na vzorek.
+
+Vypiš akumulovaný gradient a gradient celé dávky, každý zaokrouhlený na šest míst, a `True`, pokud se shodují na `1e-6`.
+
+```
+input:  4 2
+        1 2 3 4
+output: 2.5 2.5 True
+```
+'''
+hints = [
+  "Vyděl ztrátu každé mikrodávky k před jejím zpětným průchodem.",
+  "Platí to, protože mikrodávky jsou stejně velké; s kratší poslední dávkou se musí vážit počtem vzorků.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.hacker.18.adam"
+title = "Napiš Adam"
+story = "Napiš Adam zpaměti a zařiď, aby se po třech krocích shodoval s knihovnou. Otázka je korekce vychýlení."
+brief = '''
+První řádek je `steps lr`. Druhý řádek je `steps` gradientů, jeden na krok, aplikovaných na skalární parametr začínající na `0`.
+
+Vypiš svůj parametr po krocích zaokrouhlený na šest míst, pak ten z torche, pak `True`, pokud se shodují na `1e-6`.
+
+Adam, s `β₁ = 0.9`, `β₂ = 0.999`, `eps = 1e-8`:
+
+```
+m = b1*m + (1-b1)*g
+v = b2*v + (1-b2)*g*g
+mh = m / (1 - b1**t)
+vh = v / (1 - b2**t)
+w = w - lr * mh / (sqrt(vh) + eps)
+```
+
+`t` se počítá od **1**. Bez korekce vychýlení jsou první kroky příliš malé, protože `m` a `v` začínají na nule.
+
+```
+input:  3 0.1
+        1 1 1
+output: -0.3 -0.3 True
+```
+'''
+hints = [
+  "t začíná na 1, takže enumerate(gs, start=1) — t rovné 0 dělí nulou hned při první korekci.",
+  "S konstantním gradientem je korigované mh/sqrt(vh) skoro přesně 1, takže každý krok posune zhruba o lr.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.hacker.19.padding-mask"
+title = "Dávka, která není čtvercová"
+story = "Věty čtyř různých délek v jednom tenzoru a model průměruje i přes padding."
+brief = '''
+První řádek je `n t`. Druhý řádek je `n` délek. Pak `n` řádků po `t` floatech.
+
+Vypiš masku jako celá čísla, jeden řádek matice na řádek výstupu, pak průměr každého řádku jen přes **skutečné** pozice, zaokrouhlený na čtyři místa, na jednom řádku.
+
+`torch.arange(t) < lengths.unsqueeze(1)` je maska na jeden řádek, bez smyčky. Maskovaný průměr je maskovaný součet vydělený délkou — dělit `t` je ta chyba, o které tahle otázka je.
+
+```
+input:  2 4
+        2 4
+        1 2 9 9
+        1 2 3 4
+output: 1 1 0 0
+        1 1 1 1
+        1.5 2.5
+```
+'''
+hints = [
+  "torch.arange(t) < lens.unsqueeze(1) — arange se broadcastuje přes dávku.",
+  "Vyděl mask.sum(dim=1), ne t, jinak se každý krátký řádek stáhne k nule.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.hacker.20.masked-attention"
+title = "Attention s dírami"
+story = "Na vyplněná místa se dává attention. Oprava je jeden masked_fill na přesně jednom místě, a to místo je ta otázka."
+brief = '''
+První řádek je `t d len`, kde `len` je, kolik z `t` pozic je skutečných. Pak `t` řádků po `d` floatech, použitých jako `q`, `k` i `v`.
+
+Vypiš váhy attention pro první query, zaokrouhlené na čtyři místa, a `True`, pokud každý řádek pořád dává dohromady jedničku.
+
+Maska klíčů se aplikuje na **skóre**, před softmaxem, jako `-inf` na vyplněných klíčích. Každá query pak rozdělí celou svou attention jen mezi skutečné pozice.
+
+```
+input:  3 2 2
+        1 0
+        0 1
+        9 9
+output: 0.6698 0.3302 0.0 True
+```
+'''
+hints = [
+  "Maska jde na osu klíčů: ~keep.unsqueeze(0) maskuje sloupce, tedy pohled každé query na vyplněné klíče.",
+  "Maskování osy queries místo toho dá celé řádky -inf a softmax z toho je nan.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.hacker.21.unfold"
+title = "Každé okno najednou"
+story = "Posuvné okno přes dlouhý signál a pythonová smyčka, která to dělá, je čtyřistakrát pomalejší než řádek, který smyčku nemá."
+brief = '''
+První řádek je `n k s`. Druhý řádek je `n` floatů.
+
+Vypiš tvar pohledu s okny jako n-tici, pak průměr každého okna na jednom řádku, zaokrouhlený na čtyři místa.
+
+`x.unfold(0, k, s)` dá každé okno délky `k` s krokem `s` jako **view** — žádná kopie, žádná smyčka, a osa okna skončí poslední.
+
+```
+input:  6 3 1
+        1 2 3 4 5 6
+output: (4, 3)
+        2.0 3.0 4.0 5.0
+```
+'''
+hints = [
+  "x.unfold(0, k, s) — dimenze, velikost, krok, v tomhle pořadí.",
+  "Počet oken je (n - k) // s + 1 a výsledek je view, takže zápis do něj zapisuje do x.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.hacker.22.conv-by-hand"
+title = "Konvoluce je maticové násobení"
+story = "Ptají se, jak je konvoluce doopravdy implementovaná, a odpověď je, že jakmile dorazí na hardware, vůbec to konvoluce není."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` floatů — signál. Třetí řádek je `k` floatů — jádro.
+
+Vypiš svou 1-D valid vzájemnou korelaci zaokrouhlenou na čtyři místa, pak `True`, pokud se s `nn.functional.conv1d` shoduje na `1e-5`.
+
+Rozlož signál na okna a vynásob jádrem: `windows @ kernel`. To je im2col, a proto konvoluce běží rychlostí maticového násobení. Všimni si, že `conv1d` v torchi je vzájemná korelace — jádro **neotáčí**, a to je druhá polovina otázky.
+
+```
+input:  5 3
+        1 2 3 4 5
+        1 0 -1
+output: -2.0 -2.0 -2.0 True
+```
+'''
+hints = [
+  "x.unfold(0, k, 1) je (n - k + 1, k); jedno maticové násobení s jádrem to dokončí.",
+  "Když jádro otočíš, dostaneš skutečnou konvoluci, a ta se s conv1d shodovat nebude.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.hacker.23.maxpool"
+title = "Napiš max pooling"
+story = "Zmenši obrázek na polovinu a z každého čtverce si nech to nejsilnější. Žádná pooling vrstva, říká tazatel."
+brief = '''
+První řádek je `h w`, obě sudé. Pak `h` řádků po `w` floatech.
+
+Vypiš výsledek max poolingu 2×2 zaokrouhlený na čtyři místa, jeden řádek matice na řádek výstupu, pak `True`, pokud se s `nn.functional.max_pool2d` shoduje na `1e-5`.
+
+Reshape na `(h/2, 2, w/2, 2)` dá obě osy okna tam, kam dosáhne dvojice volání `amax`. Běžná špatná odpověď dělá reshape na `(h/2, w/2, 2, 2)`, což prokládá špatné prvky a stejně to proběhne.
+
+```
+input:  4 4
+        1 2 3 4
+        5 6 7 8
+        9 10 11 12
+        13 14 15 16
+output: 6.0 8.0
+        14.0 16.0
+        True
+```
+'''
+hints = [
+  "x.reshape(h // 2, 2, w // 2, 2) a pak .amax(dim=(1, 3)) — ty dvě osy velikosti 2 jsou okno.",
+  "amax bere n-tici dimenzí; max ne, a proto je tady ta, po které sáhnout.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.hacker.24.segment-sum"
+title = "Součet po skupinách"
+story = "Sluč vektory tokenů po větách, s větami všech délek v jednom plochém tenzoru. Smyčka přes skupiny je nejpomalejší část celé pipeline."
+brief = '''
+První řádek je `n g`. Druhý řádek je `n` id skupin v `[0, g)`. Třetí řádek je `n` floatů.
+
+Vypiš součet uvnitř každé skupiny, zaokrouhlený na čtyři místa, na jednom řádku. Skupina bez členů je `0.0`.
+
+`index_add_` (nebo `scatter_add_`) to udělá jedním voláním, bez smyčky a bez řazení — a přesně tak `EmbeddingBag` slučuje dávku sekvencí proměnné délky.
+
+```
+input:  5 3
+        0 2 0 1 2
+        1 2 3 4 5
+output: 4.0 4.0 7.0
+```
+'''
+hints = [
+  "torch.zeros(g).index_add_(0, grp, val) — opakované indexy se sčítají, a v tom je celá pointa.",
+  "Obyčejné přiřazení přes index, out[grp] = val, si pro každý index nechá jen poslední zápis, místo aby sčítalo.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.hacker.25.running-stats"
+title = "Průměr a rozptyl na jeden průchod"
+story = "Dataset se nevejde do paměti a normalizační konstanty musí vzejít z jednoho průchodu přes něj."
+brief = '''
+První řádek je `n bs`. Druhý řádek je `n` floatů, které se mají zpracovat po kusech velikosti `bs`.
+
+Vypiš průběžný průměr a průběžný **populační** rozptyl, zaokrouhlené na pět míst, pak `True`, pokud se oba shodují s jedním průchodem přes celý tenzor na `1e-4`.
+
+Stačí držet počet, součet a součet čtverců: `var = E[x²] - E[x]²`. Je to vzorec, který používá buffer `BatchNorm` v každém frameworku, a je to taky ten, který ztrácí přesnost, když je průměr velký — to stojí za to říct nahlas.
+
+```
+input:  6 2
+        1 2 3 4 5 6
+output: 3.5 2.91667 True
+```
+'''
+hints = [
+  "Sčítej počet, součet a součet čtverců; pak mean = sum/count a var = sq/count - mean².",
+  "unbiased=False je populační rozptyl — dělení n, a to je to, co tenhle vzorec dá.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.hacker.26.mixup"
+title = "Dva vzorky, jeden cíl"
+story = "Trénuj na průměru dvou obrázků a průměru jejich labelů. Nemělo by to fungovat, a funguje to."
+brief = '''
+První řádek je `n c lam`. Pak `n` řádků po `c` logitech, pak `n` labelů, pak `n` indexů permutace.
+
+Vypiš mixup ztrátu zaokrouhlenou na pět míst a `True`, pokud se na `1e-5` rovná cestě přes měkký cíl — sestavit `lam * onehot(y) + (1 - lam) * onehot(y[perm])` a vzít `-(target * log_softmax(x)).sum(1).mean()`. Ta referenční verze už je napsaná; tvoje je ta jednořádková.
+
+Míchat **ztrátu** místo one-hot cíle je standardní implementace a pro cross-entropy jsou obě totožné, protože je v cíli lineární. Dokázat si to je ta otázka.
+
+```
+input:  2 3 0.7
+        1 2 3
+        3 1 0
+        2 0
+        1 0
+output: 1.03873 True
+```
+'''
+hints = [
+  "lam * ce(x, y) + (1 - lam) * ce(x, y[perm]) — y[perm] je label zamíchaného partnera.",
+  "Ve skutečné implementaci se míchají i vstupy, se stejným lam vylosovaným z Beta rozdělení.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.hacker.27.sgd-from-scratch"
+title = "Napiš SGD, celé"
+story = "Momentum a weight decay dohromady a otázka je, co se aplikuje první."
+brief = '''
+První řádek je `steps lr mu wd`. Druhý řádek je `steps` gradientů pro skalární parametr začínající na `1.0`.
+
+Vypiš svůj parametr po krocích zaokrouhlený na šest míst, pak ten z torche, pak `True`, pokud se shodují na `1e-6`.
+
+Pořadí v torchi je: weight decay se **nejdřív** složí do gradientu, pak momentum nasčítá gradient s decayem a pak se udělá krok.
+
+```
+g = g + wd * w
+b = mu * b + g
+w = w - lr * b
+```
+
+Decay až po momentu, nebo decay přímo na váze místo na gradientu, dá jinou trajektorii — a o tom rozdílu je AdamW.
+
+```
+input:  3 0.1 0.9 0.1
+        1 1 1
+output: 0.388169 0.388169 True
+```
+'''
+hints = [
+  "Nejdřív d = g + wd * w, pak buffer, pak krok.",
+  "Torch inicializuje buffer momenta na první gradient s decayem, ne na mu * 0 + g — tady je to totéž a stojí za to vědět, že je to speciální případ.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.hacker.28.perplexity"
+title = "Číslo v článku"
+story = "Hlavní metrika jazykového modelu a kandidát dostane otázku, kolik by vyšla pro model, který hádá rovnoměrně."
+brief = '''
+První řádek je `t v`. Pak `t` řádků po `v` logitech, pak řádek s `t` cílovými tokeny.
+
+Vypiš průměrnou cross-entropy a perplexitu, každou zaokrouhlenou na čtyři místa.
+
+Perplexita je `exp(mean cross-entropy)`. Model, který svou pravděpodobnost rozprostře rovnoměrně přes `v` tokenů, má perplexitu přesně `v` — to je kontrola zdravého rozumu, a díky tomu je to číslo srovnatelné mezi slovníky stejné velikosti a bezvýznamné mezi různými.
+
+```
+input:  2 4
+        0 0 0 0
+        0 0 0 0
+        1 3
+output: 1.3863 4.0
+```
+'''
+hints = [
+  "torch.exp průměrné cross-entropy — umocnění sečtené ztráty místo toho dá číslo, které roste s délkou textu.",
+  "Rovnoměrné logity přes v tokenů dají ln(v) a exp z toho je v.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.hacker.29.top-k-filter"
+title = "Jen ty věrohodné"
+story = "Sampler občas sáhne do chvostu a dokončení jde někam, kde to nikdo neumí vysvětlit."
+brief = '''
+První řádek je `v k`. Druhý řádek je `v` logitů.
+
+Vypiš vyfiltrované pravděpodobnosti zaokrouhlené na čtyři místa na jednom řádku: všechno mimo top `k` je nula a přeživší se přenormalizují, aby dávali dohromady jedničku.
+
+Standardní implementace nastaví vyřazené logity na `-inf` a udělá softmax, který přenormalizuje zadarmo. Vzít `k`-tý největší jako práh přes `topk(...).values[-1]` nechá shody, a to je chování, na které se recenzent zeptá.
+
+```
+input:  5 2
+        1 2 3 4 5
+output: 0.0 0.0 0.0 0.2689 0.7311
+```
+'''
+hints = [
+  "thr = x.topk(k).values[-1] je k-tý největší; zamaskuj všechno ostře pod ním.",
+  "Maskování před softmaxem je to, co přeživší přenormalizuje; vynulování potom je nechá dávat dohromady méně než jedna.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.hacker.30.beam-search"
+title = "Dva kandidáti naráz"
+story = "Hladový algoritmus vezme nejlepší token a ztratí nejlepší větu. Nech si dva a rozdíl se ukáže na druhém slově."
+brief = '''
+První řádek je `steps v beam`. Pak `steps` řádků po `v` log-pravděpodobnostech, použitých pro každý paprsek stejně — hračkový model, který ignoruje svou vlastní historii.
+
+Vypiš nejlepší sekvenci nalezenou beam searchem jako id tokenů oddělená mezerami, pak její celkovou log-pravděpodobnost zaokrouhlenou na čtyři místa.
+
+V každém kroku rozšiř každý živý paprsek o každý token, hodnoť podle **sečtené** log-pravděpodobnosti a nech si nejlepších `beam`. Hodnotit jen podle posledního kroku je hladový algoritmus převlečený za paprsek.
+
+```
+input:  2 3 2
+        -0.1 -0.2 -3.0
+        -2.0 -0.05 -1.0
+output: 0 1
+        -0.15
+```
+'''
+hints = [
+  "Rozšiř každý živý paprsek o každý token, seřaď podle průběžného součtu, nech si nejlepších `beam`.",
+  "Normalizuj skóre délkou — vyděl ho délkou sekvence — pokud chceš, aby přestalo upřednostňovat krátké sekvence; řekni to nahlas, i když se na to neptají.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "pytorch.hacker.31.kv-cache"
+title = "Nepřepočítávej minulost"
+story = "Generování tisícího tokenu znovu čte prvních devět set devadesát devět. Nemusí; nezměnily se."
+brief = '''
+První řádek je `t d`. Pak `t` řádků po `d` floatech, použitých jako `q`, `k` a `v`.
+
+Vypiš `True`, pokud se krok s cache shoduje s úplným přepočtem na `1e-5`, pak poslední řádek výstupu zaokrouhlený na čtyři místa.
+
+Protože maska je kauzální, klíče a hodnoty dřívějších pozic se nikdy nemění. Generování kroku `t` proto potřebuje jednu novou query proti **celé** cache — skóre `(1, t)` místo `(t, t)` — a to je to, co udělá z generování místo kvadratického na token lineární.
+
+Spočítej poslední řádek oběma způsoby: jednou spuštěním celé kauzální attention, jednou z cache.
+
+```
+input:  3 2
+        1 0
+        0 1
+        1 1
+output: True 0.7517 0.7517
+```
+'''
+hints = [
+  "Poslední query je x[-1:], s osou řádků zachovanou; cache je každý klíč a hodnota dosud.",
+  "Na kroku s cache není potřeba žádná maska — poslední pozice smí dávat attention všemu před sebou, a to je celá cache.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "pytorch.hacker.32.head-split"
+title = "Čtyři hlavy z jedné matice"
+story = "Hlavy nejsou čtyři matice. Jsou jedna matice a reshape, a špatný reshape hlavy potichu smíchá dohromady."
+brief = '''
+První řádek je `b t d h`, kde `h` dělí `d`.
+
+Rozděl `(b, t, d)` na hlavy, slož ho zpátky a vypiš tvar po rozdělení, tvar po složení a `True`, pokud je cesta tam a zpátky přesná.
+
+Rozdělení je `view(b, t, h, d//h).transpose(1, 2)`; složení je `transpose(1, 2)` a pak `reshape`. Transpozice je to, co z osy hlav udělá osu dávky, a je to také důvod, proč složení potřebuje `reshape` a ne `view` — po transpozici už paměť není souvislá.
+
+```
+input:  2 5 8 4
+output: (2, 4, 5, 2) (2, 5, 8) True
+```
+'''
+hints = [
+  "x.view(b, t, h, d // h).transpose(1, 2) — rozdělit osu příznaků, pak prohodit čas a hlavu.",
+  "Složení je heads.transpose(1, 2).reshape(b, t, d); view tam vyhodí chybu, protože transpozice rozbila souvislost paměti.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "pytorch.hacker.33.reorder-beams"
+title = "Cache jde za paprskem"
+story = "Paprsek tři byl odříznut a paprsek jedna se rozvětvil na dva, a key-value cache je pořád rozložená tak, jak byla, než se cokoli z toho stalo."
+brief = '''
+První řádek je `n t`. Pak `n` řádků cache po `t` floatech. Poslední řádek je `n` indexů rodičů, které říkají, ze kterého starého paprsku každý nový paprsek vzešel.
+
+Vypiš přeskládanou cache, jeden řádek na řádek výstupu, zaokrouhlenou na čtyři místa.
+
+`cache.index_select(0, parents)` je celá operace a zvládne i opakovaného rodiče — jeden paprsek rozvětvený na dva — a to je přesně to, co smyčka `for` s přiřazováním na místě pokazí.
+
+```
+input:  3 2
+        1 1
+        2 2
+        3 3
+        2 0 0
+output: 3.0 3.0
+        1.0 1.0
+        1.0 1.0
+```
+'''
+hints = [
+  "cache.index_select(0, parents) — nebo ekvivalentní cache[parents], které se čte líp.",
+  "index_select kopíruje, takže rozvětvený rodič dá dva nezávislé řádky, a ne dva pohledy na jeden.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "pytorch.hacker.34.teaching-cluster"
+title = "Výukový cluster"
+story = "Room 7-32, poslední otázka, a je to ta věc o dvě patra níž. Postav jeden její blok a dokaž, že nevidí do budoucnosti."
+brief = '''
+První řádek je `t d h seed`.
+
+Napiš dopředný průchod jednoho **pre-norm kauzálního transformer bloku**: LayerNorm, vícehlavá kauzální self-attention, reziduální spojení, LayerNorm, MLP s GELU, reziduální spojení. Každá váha je daná; chybí jen `forward`.
+
+Vypiš čtyři věci: výstupní tvar, `True`, pokud se jádro attention shoduje s `F.scaled_dot_product_attention(..., is_causal=True)` na `1e-5`, `True`, pokud je blok kauzální — změna **posledního** tokenu musí nechat všechny dřívější řádky výstupu nedotčené — a `True`, pokud je výstup konečný.
+
+Kauzalita je vlastnost, ne kód. Blok, který projde kontrolou tvaru a touhle neprojde, je ta chyba, která se natrénuje na dokonalou ztrátu a generuje šum.
+
+```
+input:  6 16 4 0
+output: (6, 16) True True True
+```
+'''
+hints = [
+  "attend: škáluj sqrt(d // h) — rozměrem hlavy — pak masked_fill s dolní trojúhelníkovou maskou, pak softmax, pak @ v.",
+  "block jsou dvě reziduální spojení: x = x + proj(attend(x)) a pak x = x + mlp(ln2(x)). Pre-norm znamená, že LayerNorm je uvnitř každé větve, nikdy na samotném reziduálním spojení.",
+  "Pokud selže kontrola kauzality, maska chybí nebo je aplikovaná po softmaxu; pokud selže referenční kontrola, škáluje se d místo d // h.",
+]

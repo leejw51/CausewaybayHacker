@@ -1,0 +1,522 @@
+# PYTORCH LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/pytorch/verybasic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim.
+
+pack   = "pytorch.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.verybasic.01.first-tensor"
+title = "První tenzor"
+story = "23:00 ve strojovně pod Chow Yei Ching Building. Konzole je otevřená, torch je naimportovaný a zatím nevzniklo nic."
+brief = '''
+Tenzor je ta jediná hodnota, ze které je tahle země postavená. `torch.tensor` ho postaví z pythonového seznamu a zachová pořadí, v jakém ho dostal.
+
+Vyber řádek, který postaví tenzor `1 2 3`, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+output: [1, 2, 3]
+```
+'''
+hints = [
+  "torch.tensor bere jeden argument — seznam — ne tři čísla.",
+  "Pořadí v seznamu je pořadí v tenzoru; nic se za tebe netřídí.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.verybasic.02.shape"
+title = "Jaký to má tvar"
+story = "Ulička s racky má dvě řady po dvanácti a inventární skript trvá na tom, že je to dvacet čtyři něčeho. Nikdo neumí říct čeho."
+brief = '''
+Každý tenzor zná svůj tvar. `x.shape` je `torch.Size`, což je pod povrchem n-tice — `tuple(...)` ho vypíše jako n-tici, bez `torch.Size` kolem.
+
+Tenzor už je postavený. Vyber řádek, který vypíše jeho tvar jako obyčejnou n-tici.
+
+```
+output: (2, 3)
+```
+'''
+hints = [
+  "tuple(x.shape) — tvar už je posloupnost; tuple() mění jen to, jak se vypíše.",
+  "print(x.shape) vypíše torch.Size([2, 3]), což není stejný text.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.verybasic.03.dtype"
+title = "Celé číslo, které nemělo být"
+story = "Log spotřeby dělí watty počtem vzorků a v každém řádku dostane nulu. Watty jsou celá čísla a výsledek taky, a v tom je ten problém."
+brief = '''
+Tenzor má jeden dtype pro celý svůj obsah a `torch.tensor` ho odvodí z toho, co mu podáš: seznam pythonových `int` dá `torch.int64`, seznam s `.` v sobě dá `torch.float32`.
+
+Vyber řádek, který postaví float tenzor, aby vypsaný dtype byl ten float.
+
+```
+output: torch.float32
+```
+'''
+hints = [
+  "torch.tensor([1.0, 2.0]) — float z toho dělá desetinná tečka.",
+  "Seznam obyčejných intů se odvodí jako torch.int64 a celočíselné dělení je místo, odkud se vzaly ty nuly.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.verybasic.04.zeros"
+title = "Prázdný rack"
+story = "Nový akumulátor pro otáčky ventilátorů: tři řádky po čtyřech, samé nuly, dokud nedorazí první měření."
+brief = '''
+`torch.zeros` bere rozměry jako samostatné argumenty — jeden na každou dimenzi — a vyplní tenzor nulami.
+
+Vyber řádek, který udělá tři řádky po čtyřech, a napiš ho.
+
+```
+output: (3, 4) 0.0
+```
+'''
+hints = [
+  "torch.zeros(3, 4) — nejdřív řádky, pak sloupce.",
+  "torch.zeros(4, 3) jsou čtyři řádky po třech, což je jiný tenzor.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.verybasic.05.arange"
+title = "Číslování uzlů"
+story = "Šest strojů a tiskárna štítků je chce očíslovat od nuly, tak jako už jsou očíslované porty na switchi."
+brief = '''
+`torch.arange(n)` je `range(n)` jako tenzor: od `0` až po `n`, ale bez něj.
+
+Vyber řádek, který počítá od nuly do pěti, a napiš ho.
+
+```
+output: [0, 1, 2, 3, 4, 5]
+```
+'''
+hints = [
+  "torch.arange(6) skončí před 6, takže poslední číslo je 5.",
+  "torch.arange(5) skončí na 4, což je o jedno méně.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.verybasic.06.reshape"
+title = "Pořád těch dvanáct"
+story = "Dvanáct hodnot ze senzorů přijde v jednom dlouhém řádku. Report je chce jako tři racky po čtyřech a jinak odmítá cokoli nakreslit."
+brief = '''
+`reshape` dá stejným číslům jiný tvar. Počet prvků musí sedět: dvanáct čísel může být `(3, 4)` nebo `(4, 3)` nebo `(2, 6)`, nikdy `(5, 5)`.
+
+Vyber řádek, který rozloží těch dvanáct do tří řádků po čtyřech.
+
+```
+output: [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]
+```
+'''
+hints = [
+  "x.reshape(3, 4) — nejdřív počet řádků, a 3 * 4 se musí rovnat 12.",
+  "reshape nekopíruje ani nepřeskládává; čísla vyjdou v tom pořadí, v jakém vešla.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.verybasic.07.index"
+title = "Jedno měření"
+story = "Sonda ve studené uličce hlásí mřížku teplot a alarm zajímá jen ta v prostředním řádku, druhém sloupci."
+brief = '''
+2-D tenzor se indexuje nejdřív řádkem, pak sloupcem, obojí od nuly: `x[r, c]`. Výsledek je pořád tenzor — 0-rozměrný — a `.item()` z něj vytáhne pythonové číslo.
+
+Vyber řádek, který přečte řádek 1, sloupec 2.
+
+```
+output: 6
+```
+'''
+hints = [
+  "x[1, 2] — nejdřív index řádku, pak index sloupce, obojí se počítá od nuly.",
+  "x[2, 1] je jiná buňka; čárka není symetrická.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.verybasic.08.slice"
+title = "Druhý sloupec"
+story = "Každý rack hlásí čtyři čísla a jen to druhé je teplota na vstupu. Graf chce ten sloupec a kreslí všechny čtyři."
+brief = '''
+`:` znamená *každý index na téhle ose*. `x[:, 1]` je tedy sloupec 1 každého řádku — jedno číslo na řádek, a osa řádků zmizí.
+
+Vyber řádek, který vezme sloupec 1 z každého řádku.
+
+```
+output: [1, 5, 9]
+```
+'''
+hints = [
+  "x[:, 1] — dvojtečka je osa řádků, 1 je sloupec.",
+  "x[1, :] je řádek 1, což jsou čtyři čísla, ne tři.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.verybasic.09.elementwise"
+title = "Dvě sondy se shodnou"
+story = "Dvě sondy na tom samém racku a report chce dvojici sečíst pozici po pozici. Smyčka, která to dělá, trvá déle než interval měření."
+brief = '''
+Aritmetika na dvou tenzorech stejného tvaru je po prvcích a žádná smyčka tam není: `a + b` sčítá pozici po pozici a dá tenzor stejného tvaru.
+
+Vyber řádek, který sečte obě sondy.
+
+```
+output: [11, 22, 33]
+```
+'''
+hints = [
+  "a + b — operátor už pracuje po prvcích; nic kolem něj psát nemusíš.",
+  "torch.cat spojí dva tenzory za sebe, což dá šest čísel, ne tři.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.verybasic.10.broadcast"
+title = "Jeden posun, každý řádek"
+story = "Každá sonda ukazuje o deset stupňů méně. Kalibrační skript píše smyčku přes řádky a z řádků se brzy stane milion."
+brief = '''
+Broadcasting je pravidlo, které nechá potkat se i tvary, které si nejsou rovny. Tenzor tvaru `(3,)` přičtený k tenzoru tvaru `(2, 3)` se roztáhne přes řádky — stejná tři čísla se přičtou ke každému řádku a žádná kopie nevznikne.
+
+Vyber řádek, který přičte ten jeden řádek posunů k oběma řádkům mřížky.
+
+```
+output: [[11, 22, 33], [14, 25, 36]]
+```
+'''
+hints = [
+  "grid + off — poslední osa je na obou stranách 3, takže tvary jsou kompatibilní a off se roztáhne dolů přes řádky.",
+  "off.unsqueeze(1) by z něj udělal sloupec, který se broadcastuje špatným směrem.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.verybasic.11.matmul"
+title = "Vnitřní rozměr"
+story = "Dávka dvou měření přes směšovací tabulku tři krát dva. `*` hodí chybu o tvarech a ta chyba má pravdu."
+brief = '''
+`@` je maticové násobení a `*` je po prvcích. `(2, 3) @ (3, 2)` funguje, protože vnitřní rozměry sedí — ta 3 a ta 3 — a výsledek je `(2, 2)`.
+
+Vyber řádek, který vynásobí dávku tabulkou.
+
+```
+output: [[22, 28], [49, 64]]
+```
+'''
+hints = [
+  "a @ b — zavináč, ne hvězdička.",
+  "b @ a taky proběhne a dá (3, 3), což je úplně jiný součin.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.verybasic.12.sum-axis"
+title = "Po rackách, ne celkem"
+story = "Report spotřeby sečte každé číslo v mřížce a vypíše jedno číslo za celý suterén. Správa budovy chce jedno číslo na rack."
+brief = '''
+`x.sum()` sbalí všechno do jednoho čísla. `dim=` říká, *kterou osu sbalit*: `dim=1` sčítá podél sloupců a nechá jedno číslo na řádek.
+
+Vyber řádek, který dá jeden součet na řádek.
+
+```
+output: [6, 15]
+```
+'''
+hints = [
+  "x.sum(dim=1) — dim jmenuje osu, která zmizí, a sloupce jsou osa 1.",
+  "dim=0 místo toho sbalí řádky a dá jedno číslo na sloupec.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.verybasic.13.mean"
+title = "Průměr na vstupu"
+story = "Čtyři teploty na vstupu a průměr, který pokaždé vyjde jako celé číslo, čemuž křivka chlazení nevěří."
+brief = '''
+`mean` je definovaný jen pro tenzory s plovoucí čárkou — celočíselný tenzor vyhodí chybu, místo aby potichu zaokrouhlil. `x.float()` vrátí float kopii a její průměr je float.
+
+Vyber řádek, který spočítá průměr čtyř měření.
+
+```
+output: 2.5
+```
+'''
+hints = [
+  "x.float().mean() — nejdřív převést, pak průměrovat.",
+  "x.mean() na tenzoru int64 vyhodí chybu; torch tady dtype za tebe nevybere.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.verybasic.14.argmax"
+title = "Která vyhrála"
+story = "Klasifikátor vypíše skóre třídy, kterou vybral, a s takovým číslem nikdo nic neudělá. Otázka vždycky byla, která třída."
+brief = '''
+`max` dá největší hodnotu. `argmax` dá, *kde* ta největší hodnota je — index — a to je to, co odpověď klasifikátoru ve skutečnosti je.
+
+Vyber řádek, který dá index největšího skóre.
+
+```
+output: 2
+```
+'''
+hints = [
+  "scores.argmax() — arg znamená index čeho, ne hodnotu na něm.",
+  "scores.max() dá 0.9, což je skóre a ne třída.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.verybasic.15.mask"
+title = "Přes čáru"
+story = "Šest teplot na vstupu a tepelná pojistka na 30. Alarm počítá pythonovou smyčkou a ta smyčka se sotva vejde do intervalu měření."
+brief = '''
+Porovnání tenzoru s číslem dá tenzor `True`/`False`, jednu hodnotu na prvek. Součet takového booleovského tenzoru spočítá `True`, protože `True` je 1.
+
+Vyber řádek, který spočítá měření ostře nad 30.
+
+```
+output: 2
+```
+'''
+hints = [
+  "(t > 30).sum() — na závorkách záleží, protože .sum() váže silněji než >.",
+  "t >= 30 započítá i měření, které je přesně na pojistce, a to nad ní není.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.verybasic.16.cat"
+title = "Dvě dávky, jedna dávka"
+story = "Dva soubory se záznamem, každý se dvěma řádky, a loader chce jeden tenzor o čtyřech řádcích, jinak neudělá vůbec nic."
+brief = '''
+`torch.cat` spojuje tenzory podél osy, která už existuje. Spojení dvou `(2, 2)` podél `dim=0` naskládá řádky pod sebe a dá `(4, 2)`.
+
+Vyber řádek, který udělá jednu dávku o čtyřech řádcích.
+
+```
+output: (4, 2)
+```
+'''
+hints = [
+  "torch.cat([a, b], dim=0) — tenzory jdou do seznamu a dim=0 je osa řádků.",
+  "torch.stack místo toho udělá novou osu, takže tvar by byl (2, 2, 2).",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.verybasic.17.unsqueeze"
+title = "Dávka o jednom"
+story = "Jedno měření předané modelu, který nikdy neviděl nic jiného než dávky. Odmítá ho: chce dva rozměry a dostal jeden."
+brief = '''
+Model trénovaný na dávkách čeká vpředu osu dávky. `unsqueeze(0)` vloží na pozici 0 novou osu velikosti 1 a z `(3,)` udělá `(1, 3)` — jeden vzorek, tři příznaky — aniž by změnil jediné číslo.
+
+Vyber řádek, který z jednoho měření udělá dávku o jednom.
+
+```
+output: (1, 3)
+```
+'''
+hints = [
+  "one.unsqueeze(0) — 0 je místo, kam jde nová osa, a osa dávky jde dopředu.",
+  "unsqueeze(1) dá (3, 1), což jsou tři dávky po jednom příznaku — obráceně.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.verybasic.18.transpose"
+title = "Tabulka obráceně"
+story = "Směšovací tabulka dorazila s prohozenými řádky a sloupci a matmul hlásí, že vnitřní rozměry nesedí."
+brief = '''
+`x.t()` prohodí obě osy 2-D tenzoru: z `(2, 3)` se stane `(3, 2)`, řádek `i` sloupec `j` se stane řádkem `j` sloupcem `i`.
+
+Vyber řádek, který tabulku transponuje.
+
+```
+output: [[1, 4], [2, 5], [3, 6]]
+```
+'''
+hints = [
+  "x.t() — ta krátká, a je to volání metody, takže závorky jsou potřeba.",
+  "x.reshape(3, 2) taky dá (3, 2), ale čísla skončí ve špatných buňkách.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.verybasic.19.requires-grad"
+title = "Ten, který se učí"
+story = "První parametr v suterénu. Drží číslo a nic zatím netuší, kterým směrem s ním pohnout."
+brief = '''
+Tenzor zaznamenává, co se s ním děje, jen když o to požádáš. `requires_grad=True` označí tenzor jako něco, co se má naučit, a od té chvíle se každá operace na něm pamatuje, aby se dal zpátky dohledat gradient.
+
+Vyber řádek, který udělá učitelný tenzor s hodnotou 2.0.
+
+```
+output: True 2.0
+```
+'''
+hints = [
+  "torch.tensor(2.0, requires_grad=True) — příznak je pojmenovaný argument konstruktoru.",
+  "requires_grad funguje jen na float tenzoru; int tenzor gradient nést nemůže.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.verybasic.20.backward"
+title = "Kudy je dolů"
+story = "`w` je 3.0, ztráta je `w * w` a `w.grad` je None. Nic zatím grafu neřeklo, ať běží pozpátku."
+brief = '''
+Dopředný průchod staví graf; `backward()` ho projde obráceně a nechá gradient v `.grad`. Pro `y = w * w` je derivace `2w`, takže při `w = 3.0` je gradient `6.0`.
+
+Vyber řádek, který spustí zpětný průchod.
+
+```
+output: 6.0
+```
+'''
+hints = [
+  "y.backward() — volá se na ztrátě, na konci grafu, ne na parametru.",
+  "w.backward() žádá parametr, aby derivoval sám sebe, a to backward neznamená.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.verybasic.21.no-grad"
+title = "Ne, když se díváme"
+story = "Evaluační průchod staví graf, který nikdy nepoužije, a graf paměti v suterénu stoupá pokaždé, když se ohodnotí validační sada."
+brief = '''
+Inference graf nepotřebuje. Torch má context manager, který pro blok, který obaluje, zaznamenávání vypne, takže výsledky vyjdou s `requires_grad` false a nic se neschovává pro zpětný průchod, který se nikdy nestane.
+
+`with` už je napsané. Vyber řádek, který postaví context manager, do kterého vstupuje.
+
+```
+output: False
+```
+'''
+hints = [
+  "Je to ten, jehož jméno říká, co dělá: žádné gradienty, po dobu bloku.",
+  "Musí se zavolat — holý atribut není context manager a `with` ho odmítne.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.verybasic.22.linear"
+title = "První vrstva"
+story = "Čtyři příznaky dovnitř, dvě třídy ven, a vrstva, která má sedět mezi nimi, ještě není postavená."
+brief = '''
+`nn.Linear(in_features, out_features)` je jedno maticové násobení a jedno přičtení biasu, s vahami vytvořenými za tebe. Pořadí argumentů je nejdřív *in*, pak *out* — dovnitř jde `(batch, 4)` a ven vyjde `(batch, 2)`.
+
+Vyber řádek, který postaví vrstvu.
+
+```
+output: (3, 2)
+```
+'''
+hints = [
+  "nn.Linear(4, 2) — nejdřív vstupní příznaky, pak výstupní.",
+  "nn.Linear(2, 4) postaví vrstvu obráceně a vstup do ní už nepasuje.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.verybasic.23.parameters"
+title = "Jak je to velké"
+story = "Žádost o grant chce počet parametrů a jediné číslo, které kdokoli má, je počet vrstev."
+brief = '''
+`model.parameters()` vydá každý učitelný tenzor, který modul vlastní, a `p.numel()` je, kolik čísel je v jednom z nich. `Linear(4, 2)` vlastní váhu `(2, 4)` a bias `(2,)`: 8 + 2 = 10.
+
+Vyber řádek, který je sečte.
+
+```
+output: 10
+```
+'''
+hints = [
+  "sum(p.numel() for p in model.parameters()) — numel je počet čísel, ne tenzorů.",
+  "len(list(model.parameters())) počítá tenzory, a těch jsou 2: jedna váha a jeden bias.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.verybasic.24.relu"
+title = "Ohyb"
+story = "Dvě lineární vrstvy na sobě a nic mezi nimi, a celý stoh se zhroutí do jedné přímky, ať se jich přidá kolik chce."
+brief = '''
+Lineární vrstvy na sobě jsou pořád lineární; to, co síti dovolí se ohnout, je aktivace mezi nimi. ReLU je ta nejjednodušší: kladné nechá a všechno záporné nastaví na nulu.
+
+Vyber řádek, který ji použije.
+
+```
+output: [0.0, 0.0, 1.5]
+```
+'''
+hints = [
+  "torch.relu(x) — max(0, x) aplikované na každý prvek.",
+  "torch.abs by z -2.0 udělal 2.0, což je úplně jiná funkce.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.verybasic.25.softmax"
+title = "Ze skóre pravděpodobnosti"
+story = "Konzole vypíše tři surová skóre a operátora na noční směně se ptají, jak si je model jistý. V surovém skóre žádná odpověď není."
+brief = '''
+Softmax udělá z řádku skóre řádek pravděpodobností: všechno kladné a řádek dává dohromady 1. `dim=` říká, která osa se musí sečíst na jedničku — pro řádek skóre tříd je to ta poslední.
+
+Vyber řádek, který udělá softmax podél řádku.
+
+```
+output: 1.0 2
+```
+'''
+hints = [
+  "torch.softmax(scores, dim=0) — dim je povinný a tenhle tenzor má jen osu 0.",
+  "Softmax je monotónní: největší skóre zůstane největší pravděpodobností.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.verybasic.26.mse"
+title = "Jak moc vedle, jedním číslem"
+story = "Predikce je 3.0 a pravda je 1.0 a trénovací smyčka nemá co minimalizovat, protože nikdo neřekl, co znamená vedle."
+brief = '''
+Ztráta je jedno číslo, které říká, jak moc je predikce vedle. Střední kvadratická chyba je druhá mocnina rozdílu, zprůměrovaná: pro `3.0` proti `1.0` je to `(3 - 1)² = 4.0`.
+
+Vyber řádek, který postaví ztrátovou funkci.
+
+```
+output: 4.0
+```
+'''
+hints = [
+  "nn.MSELoss() — je to třída, takže se nejdřív postaví a pak zavolá.",
+  "nn.L1Loss() je absolutní rozdíl, který by dal 2.0 místo 4.0.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.verybasic.27.first-step"
+title = "První krok"
+story = "Všechno je na místě — parametr, ztráta, gradient — a číslo se ani nehne. Optimalizátor je postavený a nikdo ho nepožádal, aby něco udělal."
+brief = '''
+Tohle je celá smyčka, jednou: dopředný průchod, ztráta, `backward()` a pak ta věc, která parametrem opravdu pohne. Optimalizátor použije gradienty, které leží v `.grad`, a dělá to vlastní metoda optimalizátoru — bez toho volání se gradient spočítá a zahodí a parametr je přesně tam, kde začal.
+
+`w` začíná na `5.0`, cíl je `0.0`, ztráta je `w * w`, takže gradient je `10.0`. S obyčejným SGD a `lr=0.1` je krok `w - 0.1 * 10.0`.
+
+Vyber řádek, který udělá krok.
+
+```
+output: 4.0 moved
+```
+'''
+hints = [
+  "opt.step() — zero_grad maže, backward plní, step aplikuje. Všechny tři, v tomhle pořadí.",
+  "loss.backward() jen spočítá gradient; parametru se nikdy nedotkne.",
+]

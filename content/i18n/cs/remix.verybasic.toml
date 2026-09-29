@@ -1,0 +1,1379 @@
+# REMIX LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/remix/verybasic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "remix.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.verybasic.01.numbers-go"
+title = "Celé číslo a float — GO"
+story = "Stůl jedna. Na objednávkovém lístku dvě čísla a účet se musí rozdělit: kolik na každého, kolik zbude a přesný podíl na cent. Gogo si to objedná v Go."
+brief = '''
+Celé číslo a float jsou různé typy a dělení dvou celých čísel dá celé číslo: podíl zaokrouhlený k nule, zbytek zůstane pro `%`. Pro přesný podíl nejdřív převedeš a pak dělíš. Program načte `a` a `b`, vypíše jejich součet, pak na jednom řádku podíl a zbytek a nakonec `a / b` jako float na dvě desetinná místa.
+
+V Go je `/` mezi dvěma hodnotami `int64` celočíselné dělení a `%` zbytek. `float64(a)` je převod — přetypování ve tvaru funkce — a teprve když jsou obě strany `float64`, dělí `/` přesně. `%.2f` v `Printf` vypíše dvě desetinná místa.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "q := a / b a pak r := a % b — obojí zůstává int64; f := float64(a) / float64(b) převede před dělením.",
+  "float64(a) / b se nezkompiluje: Go nikdy nemíchá int64 a float64 v jednom výrazu.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.verybasic.02.numbers-rust"
+title = "Celé číslo a float — RUST"
+story = "Stůl jedna. Na objednávkovém lístku dvě čísla a účet se musí rozdělit: kolik na každého, kolik zbude a přesný podíl na cent. Ferris si to objedná v Rustu."
+brief = '''
+Celé číslo a float jsou různé typy a dělení dvou celých čísel dá celé číslo: podíl zaokrouhlený k nule, zbytek zůstane pro `%`. Pro přesný podíl nejdřív převedeš a pak dělíš. Program načte `a` a `b`, vypíše jejich součet, pak na jednom řádku podíl a zbytek a nakonec `a / b` jako float na dvě desetinná místa.
+
+V Rustu je `/` mezi dvěma hodnotami `i64` celočíselné dělení a `%` zbytek. `a as f64` je převod a váže těsněji než `/`, takže `a as f64 / b as f64` dělí dva floaty. `{:.2}` v `println!` vypíše dvě desetinná místa.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "let q = a / b; a pak let r = a % b; — obojí i64; let f = a as f64 / b as f64; převede před dělením.",
+  "a as f64 / b se nezkompiluje: f64 nejde dělit hodnotou i64.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.verybasic.03.numbers-python"
+title = "Celé číslo a float — PYTHON"
+story = "Stůl jedna. Na objednávkovém lístku dvě čísla a účet se musí rozdělit: kolik na každého, kolik zbude a přesný podíl na cent. Krajta si to objedná v Pythonu."
+brief = '''
+Celé číslo a float jsou různé typy a dělení dvou celých čísel dá celé číslo: podíl zaokrouhlený k nule, zbytek zůstane pro `%`. Pro přesný podíl nejdřív převedeš a pak dělíš. Program načte `a` a `b`, vypíše jejich součet, pak na jednom řádku podíl a zbytek a nakonec `a / b` jako float na dvě desetinná místa.
+
+V Pythonu dá `/` vždy float, i pro dva inty, takže přesný podíl žádný převod nepotřebuje. Celočíselný podíl je *jiný* operátor, `//`, a `%` je zbytek. `f"{f:.2f}"` vypíše dvě desetinná místa.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  7 2
+output: 9
+        3 1
+        3.50
+```
+'''
+hints = [
+  "q = a // b a pak r = a % b pro celá čísla; f = a / b už float je.",
+  "float(a) / b funguje taky a tak to napíše ruka zvyklá na Go nebo Rust; v Pythonu to není potřeba.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.verybasic.04.strings-go"
+title = "Řetězec — GO"
+story = "Objednávkový lístek je jeden řádek jmen oddělených čárkami a kuchyně je chce vykřičet, oddělit a spočítat po písmenech. Gogo si to objedná v Go."
+brief = '''
+Řetězec se rozdělí na kousky podle oddělovače, kousky se spojí zpět jiným a celý řetězec se převede na velká písmena jedním voláním. Past je délka: jméno s diakritikou má víc bajtů než znaků a jen jedno z toho by spočítal člověk. Program načte jeden řádek jmen oddělených čárkami, vypíše, kolik jich je, jména velkými písmeny spojená pomocí ` | ` a počet znaků řádku.
+
+V Go dělá práci balíček `strings`: `strings.Split` dá `[]string`, `strings.Join` z něj udělá zpět řetězec, `strings.ToUpper` vrátí nový řetězec. `len(s)` jsou bajty; počet znaků je `utf8.RuneCountInString(s)`, protože řetězec v Go jsou bajty a runa je to, na co se dekódují.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "strings.Split(line, \",\") a pak strings.ToUpper(strings.Join(names, \" | \")); počet je utf8.RuneCountInString(line).",
+  "len(line) jsou bajty: Zoë má čtyři bajty a tři znaky, a skrytý test to ví.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.verybasic.05.strings-rust"
+title = "Řetězec — RUST"
+story = "Objednávkový lístek je jeden řádek jmen oddělených čárkami a kuchyně je chce vykřičet, oddělit a spočítat po písmenech. Ferris si to objedná v Rustu."
+brief = '''
+Řetězec se rozdělí na kousky podle oddělovače, kousky se spojí zpět jiným a celý řetězec se převede na velká písmena jedním voláním. Past je délka: jméno s diakritikou má víc bajtů než znaků a jen jedno z toho by spočítal člověk. Program načte jeden řádek jmen oddělených čárkami, vypíše, kolik jich je, jména velkými písmeny spojená pomocí ` | ` a počet znaků řádku.
+
+V Rustu je `split(',')` iterátor, takže se `collect`em sebere do `Vec<&str>`; `join(" | ")` na vektoru udělá `String` a `to_uppercase()` další. `len()` jsou bajty; počet znaků je `chars().count()`, protože `&str` jsou bajty UTF-8 a `chars()` je dekóduje.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "let names: Vec<&str> = line.split(',').collect(); a pak names.join(\" | \").to_uppercase(); počet je line.chars().count().",
+  "line.len() jsou bajty: Zoë má čtyři bajty a tři znaky, a skrytý test to ví.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.verybasic.06.strings-python"
+title = "Řetězec — PYTHON"
+story = "Objednávkový lístek je jeden řádek jmen oddělených čárkami a kuchyně je chce vykřičet, oddělit a spočítat po písmenech. Krajta si to objedná v Pythonu."
+brief = '''
+Řetězec se rozdělí na kousky podle oddělovače, kousky se spojí zpět jiným a celý řetězec se převede na velká písmena jedním voláním. Past je délka: jméno s diakritikou má víc bajtů než znaků a jen jedno z toho by spočítal člověk. Program načte jeden řádek jmen oddělených čárkami, vypíše, kolik jich je, jména velkými písmeny spojená pomocí ` | ` a počet znaků řádku.
+
+V Pythonu jsou metody na řetězci: `line.split(",")` dá seznam, `" | ".join(names)` se volá na *oddělovači* a `.upper()` vrátí nový řetězec. `len(s)` počítá znaky, ne bajty, protože `str` v Pythonu je už dekódovaný — počet bajtů by byl `len(s.encode())`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  Mei,Bo,Alex
+output: 3
+        MEI | BO | ALEX
+        11
+```
+'''
+hints = [
+  "names = line.split(\",\") a pak \" | \".join(names).upper(); počet je len(line).",
+  "len(line.encode()) jsou bajty: Zoë má čtyři bajty a tři znaky, a skrytý test to ví.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.verybasic.07.loops-go"
+title = "Smyčka — GO"
+story = "Štamgast počítá, kolikrát kuchyně objednávku vydělí dvěma nebo ztrojnásobí, než klesne na jedničku, a jak velká cestou byla. Gogo si to objedná v Go."
+brief = '''
+Smyčka běží, dokud platí podmínka, větvení vybere jednu ze dvou větví a počítadlo jde s každým kolem o jedna nahoru. Program načte `n` a prochází ho: sudé, vyděl dvěma; liché, ztrojnásob a přičti jedna; na 1 skonči. Vypíše počet kroků a největší hodnotu, kterou viděl.
+
+Go má jedno klíčové slovo pro smyčku. `for cond { }` je jeho smyčka while a `steps++` je příkaz inkrementu — příkaz, ne výraz, takže nemůže stát uvnitř většího výrazu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "for n != 1 { — while v Go — a pak steps++ jako první řádek uvnitř.",
+  "V Go není while; for s jednou podmínkou je ono.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.verybasic.08.loops-rust"
+title = "Smyčka — RUST"
+story = "Štamgast počítá, kolikrát kuchyně objednávku vydělí dvěma nebo ztrojnásobí, než klesne na jedničku, a jak velká cestou byla. Ferris si to objedná v Rustu."
+brief = '''
+Smyčka běží, dokud platí podmínka, větvení vybere jednu ze dvou větví a počítadlo jde s každým kolem o jedna nahoru. Program načte `n` a prochází ho: sudé, vyděl dvěma; liché, ztrojnásob a přičti jedna; na 1 skonči. Vypíše počet kroků a největší hodnotu, kterou viděl.
+
+Rust to píše `while cond { }` a inkrement je `steps += 1;` — `++` neexistuje. `if` uvnitř je taky výraz, a proto by fungovalo i `n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 };`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "while n != 1 { a pak steps += 1; jako první řádek uvnitř.",
+  "steps++ není Rust; += 1 ano.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.verybasic.09.loops-python"
+title = "Smyčka — PYTHON"
+story = "Štamgast počítá, kolikrát kuchyně objednávku vydělí dvěma nebo ztrojnásobí, než klesne na jedničku, a jak velká cestou byla. Krajta si to objedná v Pythonu."
+brief = '''
+Smyčka běží, dokud platí podmínka, větvení vybere jednu ze dvou větví a počítadlo jde s každým kolem o jedna nahoru. Program načte `n` a prochází ho: sudé, vyděl dvěma; liché, ztrojnásob a přičti jedna; na 1 skonči. Vypíše počet kroků a největší hodnotu, kterou viděl.
+
+Python to píše `while cond:` s dvojtečkou a odsazeným tělem a inkrement je `steps += 1` — žádné `++`. `if` / `else` uvnitř mají dvojtečky taky; složené závorky nejsou nikde.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  6
+output: 8
+        16
+```
+'''
+hints = [
+  "while n != 1: a pod ním odsazené steps += 1.",
+  "Řádek while končí dvojtečkou; složené závorky jsou syntaktická chyba.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.verybasic.10.closures-go"
+title = "Uzávěr — GO"
+story = "Každá objednávka dostane číslo lístku. Počítadlo, které je rozdává, žije uvnitř funkce, která ho vyrobila, a nikdo jiný na něj nesáhne. Gogo si to objedná v Go."
+brief = '''
+Uzávěr je funkce, která zachytí proměnnou z rozsahu, kde vznikla, a drží ji naživu i poté, co se ten rozsah vrátil. `counter()` jeden vyrobí: každé volání uzávěru, který vrátí, vydá další číslo. Program načte slova, očísluje je od 1 a pak vypíše číslo, které by uzávěr vydal jako další.
+
+V Go funkční literál `func() int { ... }` zachytí `n` odkazem, takže `n++` uvnitř změní `n` venku, a `counter` vrací literál jako hodnotu typu `func() int`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "return func() int { n++; return n } na čtyřech řádcích — literál zachytí n.",
+  "Návratový typ counter je func() int, takže literál musí říct int taky.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.verybasic.11.closures-rust"
+title = "Uzávěr — RUST"
+story = "Každá objednávka dostane číslo lístku. Počítadlo, které je rozdává, žije uvnitř funkce, která ho vyrobila, a nikdo jiný na něj nesáhne. Ferris si to objedná v Rustu."
+brief = '''
+Uzávěr je funkce, která zachytí proměnnou z rozsahu, kde vznikla, a drží ji naživu i poté, co se ten rozsah vrátil. `counter()` jeden vyrobí: každé volání uzávěru, který vrátí, vydá další číslo. Program načte slova, očísluje je od 1 a pak vypíše číslo, které by uzávěr vydal jako další.
+
+V Rustu je uzávěr `|| { ... }` a `move` způsobí, že si `n` vezme s sebou — bez `move` by si půjčoval lokální proměnnou, která za chvíli zmizí z rozsahu. Mění svou zachycenou hodnotu, takže návratový typ je `impl FnMut() -> i64` a volající ho váže jako `mut`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "move || { n += 1; n } na čtyřech řádcích — move vezme n do uzávěru.",
+  "Bez move si uzávěr n půjčuje a jeho vrácení je E0373: n nežije dost dlouho.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.verybasic.12.closures-python"
+title = "Uzávěr — PYTHON"
+story = "Každá objednávka dostane číslo lístku. Počítadlo, které je rozdává, žije uvnitř funkce, která ho vyrobila, a nikdo jiný na něj nesáhne. Krajta si to objedná v Pythonu."
+brief = '''
+Uzávěr je funkce, která zachytí proměnnou z rozsahu, kde vznikla, a drží ji naživu i poté, co se ten rozsah vrátil. `counter()` jeden vyrobí: každé volání uzávěru, který vrátí, vydá další číslo. Program načte slova, očísluje je od 1 a pak vypíše číslo, které by uzávěr vydal jako další.
+
+V Pythonu je uzávěr vnořená `def`. Číst `n` z vnějšího rozsahu smíš volně, ale přiřazení do něj vytvoří novou lokální proměnnou — ledaže vnitřní funkce nejdřív jedním klíčovým slovem prohlásí, že `n` patří do obklopujícího rozsahu. Který řádek je to prohlášení?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tea coffee milk
+output: 1 tea
+        2 coffee
+        3 milk
+        4
+```
+'''
+hints = [
+  "def next_id(): a pod ní nonlocal n, n += 1, return n — pak counter vrátí next_id.",
+  "Bez nonlocal je n += 1 UnboundLocalError: přiřazení vytvořilo nové lokální n dřív, než se přečetlo.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.verybasic.13.structs-go"
+title = "Struktura — GO"
+story = "Každý řádek účtu je jméno, cena a množství a to, co umí sečíst řádek, je řádek sám. Gogo si to objedná v Go."
+brief = '''
+Struktura seskupí pojmenovaná pole do jedné hodnoty a metoda je funkce připojená k tomu typu, která má hodnotu v ruce jako `self` / příjemce. Program načte řádky `name price qty` a pro každý vypíše jméno a součet řádku, pak celkový součet.
+
+V Go je metoda funkce s příjemcem před jménem: `func (it Item) Total() int64`. Příjemce je kopie struktury; `(it *Item)` by byl ukazatel. Exportovaná pole a metody začínají velkým písmenem.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "func (it Item) Total() int64 { return it.Price * it.Qty } — příjemce jde do vlastních závorek před jméno.",
+  "func Total(it Item) je obyčejná funkce; it.Total() by ji nenašlo.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.verybasic.14.structs-rust"
+title = "Struktura — RUST"
+story = "Každý řádek účtu je jméno, cena a množství a to, co umí sečíst řádek, je řádek sám. Ferris si to objedná v Rustu."
+brief = '''
+Struktura seskupí pojmenovaná pole do jedné hodnoty a metoda je funkce připojená k tomu typu, která má hodnotu v ruce jako `self` / příjemce. Program načte řádky `name price qty` a pro každý vypíše jméno a součet řádku, pak celkový součet.
+
+V Rustu metody žijí v bloku `impl Item { }` a `&self` říká, že si metoda strukturu půjčuje, místo aby si ji vzala. Tělo je `self.price * self.qty`; poslední výraz je návratová hodnota, takže tu není `return` ani středník.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "impl Item { fn total(&self) -> i64 { self.price * self.qty } } — &self si půjčuje a tělo je jeden výraz.",
+  "fn total(self) bere Item hodnotou a volání přes &items je E0507: z výpůjčky nejde přesunout.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.verybasic.15.structs-python"
+title = "Struktura — PYTHON"
+story = "Každý řádek účtu je jméno, cena a množství a to, co umí sečíst řádek, je řádek sám. Krajta si to objedná v Pythonu."
+brief = '''
+Struktura seskupí pojmenovaná pole do jedné hodnoty a metoda je funkce připojená k tomu typu, která má hodnotu v ruce jako `self` / příjemce. Program načte řádky `name price qty` a pro každý vypíše jméno a součet řádku, pak celkový součet.
+
+V Pythonu třída drží pole nastavená v `__init__` a metody pod ním; každá metoda bere jako první `self`, výslovně, a `self.price * self.qty` přes něj čte pole.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tea 12 3
+        bun 8 2
+output: tea 36
+        bun 16
+        52
+```
+'''
+hints = [
+  "def total(self): a pod ní return self.price * self.qty — self se píše, nikdy se nedomýšlí.",
+  "def total(): bez self je TypeError při volání: it.total() předá položku jako první argument.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.verybasic.16.enums-go"
+title = "Enum — GO"
+story = "Světlo nad výdejním okénkem je červené, zelené nebo žluté a čekání v sekundách záleží na tom, které — uzavřená množina případů a větvení přes každý z nich. Gogo si to objedná v Go."
+brief = '''
+Enum je typ s pevnou množinou pojmenovaných hodnot a match přes něj pojmenuje každý případ a vybere pro něj výsledek. Program načte názvy světel, každý převede na enum a vypíše název se sekundami čekání: red 30, green 25, yellow 5.
+
+Go nemá klíčové slovo enum: udělá ho pojmenovaný celočíselný typ a blok `const` s `iota` — `Red`, `Green`, `Yellow` jsou 0, 1, 2. Větvení je `switch` s jedním `case` na hodnotu; nic nepropadá dál a `default` chytí zbytek.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "case Red: return 30, pak case Green: return 25 — jeden case na konstantu, break netřeba.",
+  "case \"red\" porovnává Light s řetězcem, a to se nezkompiluje; switch jde přes enum, ne přes slovo.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.verybasic.17.enums-rust"
+title = "Enum — RUST"
+story = "Světlo nad výdejním okénkem je červené, zelené nebo žluté a čekání v sekundách záleží na tom, které — uzavřená množina případů a větvení přes každý z nich. Ferris si to objedná v Rustu."
+brief = '''
+Enum je typ s pevnou množinou pojmenovaných hodnot a match přes něj pojmenuje každý případ a vybere pro něj výsledek. Program načte názvy světel, každý převede na enum a vypíše název se sekundami čekání: red 30, green 25, yellow 5.
+
+Rust má `enum Light { Red, Green, Yellow }` a `match` přes něj musí pojmenovat každou variantu: jedno rameno na každou, varianta zapsaná se svým typem vlevo od `=>` a výsledek vpravo, za ním čárka. Který řádek je rameno, které dá červené jeho třicet sekund?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "Light::Red => 30, Light::Green => 25, Light::Yellow => 5 — tři ramena, za každým čárka.",
+  "Vynech variantu a rustc řekne E0004: non-exhaustive patterns. Kontroluje to za tebe.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.verybasic.18.enums-python"
+title = "Enum — PYTHON"
+story = "Světlo nad výdejním okénkem je červené, zelené nebo žluté a čekání v sekundách záleží na tom, které — uzavřená množina případů a větvení přes každý z nich. Krajta si to objedná v Pythonu."
+brief = '''
+Enum je typ s pevnou množinou pojmenovaných hodnot a match přes něj pojmenuje každý případ a vybere pro něj výsledek. Program načte názvy světel, každý převede na enum a vypíše název se sekundami čekání: red 30, green 25, yellow 5.
+
+`enum.Enum` v Pythonu dá `Light.RED`, `Light.GREEN` a `Light.YELLOW` a `match l:` vybere jednu s jedním `case` na hodnotu. Na jménu s tečkou záleží: holé jméno za `case` je záchytný vzor, který sedí na cokoli, a Python ho odmítne, protože případy za ním by nikdy neproběhly. Který řádek je případ pro červenou?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  red green yellow green
+output: red 30
+        green 25
+        yellow 5
+        green 25
+```
+'''
+hints = [
+  "case Light.RED: return 30, pak case Light.GREEN: return 25 — s tečkou, takže jsou to hodnotové vzory.",
+  "case Red: naváže jméno Red na cokoli a Python ho odmítne: případy za ním jsou nedosažitelné.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.verybasic.19.errors-go"
+title = "Chyba — GO"
+story = "Některá čísla na lístku nejsou čísla. Pokladna sečte ta, která jsou, vyvolá ta, která nejsou, a nespadne. Gogo si to objedná v Go."
+brief = '''
+Parsování může selhat a každý jazyk to selhání vrací jinak: jako druhou návratovou hodnotu, jako `Result`, nebo jako výjimku. Program načte tokeny, sečte ty, které se dají přečíst jako celá čísla, pro každý, který ne, vypíše `bad: <token>`, a pak součet.
+
+V Go vrací `strconv.ParseInt` hodnotu *a* `error` a kontrola hned za voláním je idiom celého jazyka: porovnej chybu s `nil` a na špatné straně toho porovnání to řekni a přeskoč. Nic se nevyhazuje. Který řádek je ta kontrola?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "v, err := strconv.ParseInt(t, 10, 64) a pak if err != nil { fmt.Println(\"bad:\", t); continue }.",
+  "10 je základ a 64 počet bitů; v je int64.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.verybasic.20.errors-rust"
+title = "Chyba — RUST"
+story = "Některá čísla na lístku nejsou čísla. Pokladna sečte ta, která jsou, vyvolá ta, která nejsou, a nespadne. Ferris si to objedná v Rustu."
+brief = '''
+Parsování může selhat a každý jazyk to selhání vrací jinak: jako druhou návratovou hodnotu, jako `Result`, nebo jako výjimku. Program načte tokeny, sečte ty, které se dají přečíst jako celá čísla, pro každý, který ne, vypíše `bad: <token>`, a pak součet.
+
+V Rustu `t.parse::<i64>()` vrátí `Result` a `let Ok(v) = ... else { ... };` hodnotu vytáhne, nebo spustí `else` — který musí odejít (`continue`, `return`, `break`). `match` s rameny `Ok` a `Err` je delší zápis téže věci.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "let Ok(v) = t.parse::<i64>() else { println!(\"bad: {}\", t); continue; }; — všimni si středníku za blokem else.",
+  "else u let-else musí odbočit: continue, break nebo return. Propadnout dál je E0308.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.verybasic.21.errors-python"
+title = "Chyba — PYTHON"
+story = "Některá čísla na lístku nejsou čísla. Pokladna sečte ta, která jsou, vyvolá ta, která nejsou, a nespadne. Krajta si to objedná v Pythonu."
+brief = '''
+Parsování může selhat a každý jazyk to selhání vrací jinak: jako druhou návratovou hodnotu, jako `Result`, nebo jako výjimku. Program načte tokeny, sečte ty, které se dají přečíst jako celá čísla, pro každý, který ne, vypíše `bad: <token>`, a pak součet.
+
+V Pythonu `int(t)` na špatném tokenu vyhodí `ValueError` a blok `try:` s klauzulí, která jmenuje přesně tu třídu, ji chytí — sčítání jde do `try`, zpráva pod klauzuli a smyčka prostě jede další kolo. Který řádek je ta klauzule?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  12 x 30 4y 8
+output: bad: x
+        bad: 4y
+        50
+```
+'''
+hints = [
+  "try: total += int(t) a pak except ValueError: print(\"bad:\", t) — čtyři řádky, dvě dvojtečky.",
+  "except TypeError: ji nechytí; int(\"x\") vyhodí ValueError a špatná třída ji pustí dál.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.verybasic.22.list-go"
+title = "Seznam — GO"
+story = "Fronta u pultu: jeden se přidá dozadu, první je obsloužen a vedoucí chce vidět, kdo je druhý a třetí. Gogo si to objedná v Go."
+brief = '''
+Rostoucí posloupnost: přidat na konec, sebrat zepředu, indexovat poslední a vyříznout podrozsah. Program načte čísla do seznamu, přidá 100, odebere první, pak vypíše poslední prvek, prvky na pozicích 1 a 2 a délku.
+
+V Go je seznam řez. `append` vrátí zvětšený řez a musí se přiřadit zpět; `nums[1:]` zahodí první prvek přeřezáním; `nums[len(nums)-1]` je poslední — záporné indexy nejsou — a `nums[1:3]` je podřez, který sdílí pole.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums = append(nums, 100); nums = nums[1:]; last := nums[len(nums)-1]; mid := nums[1:3].",
+  "append(nums, 100) samotné se nezkompiluje: výsledek se nepoužije a zvětšený je právě ten řez, který vrací.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.verybasic.23.list-rust"
+title = "Seznam — RUST"
+story = "Fronta u pultu: jeden se přidá dozadu, první je obsloužen a vedoucí chce vidět, kdo je druhý a třetí. Ferris si to objedná v Rustu."
+brief = '''
+Rostoucí posloupnost: přidat na konec, sebrat zepředu, indexovat poslední a vyříznout podrozsah. Program načte čísla do seznamu, přidá 100, odebere první, pak vypíše poslední prvek, prvky na pozicích 1 a 2 a délku.
+
+V Rustu je seznam `Vec`. `push` ho zvětší na místě, `remove(0)` sebere první, `nums[nums.len() - 1]` je poslední (nebo `*nums.last().unwrap()`) a `&nums[1..3]` je řez z něj vypůjčený — `&[i64]`, ne kopie.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums.push(100); nums.remove(0); let last = nums[nums.len() - 1]; let mid = &nums[1..3];",
+  "append v Rustu bere jiný Vec a přesune do sebe jeho prvky; jedna hodnota je push.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.verybasic.24.list-python"
+title = "Seznam — PYTHON"
+story = "Fronta u pultu: jeden se přidá dozadu, první je obsloužen a vedoucí chce vidět, kdo je druhý a třetí. Krajta si to objedná v Pythonu."
+brief = '''
+Rostoucí posloupnost: přidat na konec, sebrat zepředu, indexovat poslední a vyříznout podrozsah. Program načte čísla do seznamu, přidá 100, odebere první, pak vypíše poslední prvek, prvky na pozicích 1 a 2 a délku.
+
+V Pythonu je seznam `list`. `append` ho zvětší, `pop(0)` sebere první, `nums[-1]` je poslední — záporné indexy počítají od konce — a `nums[1:3]` je nový seznam s pozicemi 1 a 2.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  5 6 7 8
+output: 100
+        7 8
+        4
+```
+'''
+hints = [
+  "nums.append(100); nums.pop(0); last = nums[-1]; mid = nums[1:3].",
+  "nums += 100 je TypeError: += na seznamu chce další iterovatelný objekt a 100 žádný není.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.verybasic.25.map-go"
+title = "Mapa — GO"
+story = "Čárková tabule u pokladny: každá objednávka zvýší počet svého jídla a tabule ho hlásí, jak přibývá. Gogo si to objedná v Go."
+brief = '''
+Mapa vede od klíče k hodnotě a celý trik je v tom, co se stane s klíčem, který tam ještě není. Program načte slova; pro každé zvýší jeho počet a vypíše slovo s dosavadním počtem, pak vypíše, kolik bylo různých slov.
+
+V Go se chybějící klíč čte jako nulová hodnota, takže zvýšení žádnou kontrolu nepotřebuje: přečíst, přičíst jedna, uložit — v nejkratším zápisu „o jedna víc“, jaký Go má. `counts[w]` ho přečte zpět a `len(counts)` je počet klíčů. Který řádek zvýší počet?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "counts[w]++ a pak fmt.Println(w, counts[w]) — chybějící klíč je 0, takže inkrement prostě funguje.",
+  "map[string]int{} je prázdná mapa připravená k zápisu; nil mapa (var counts map[string]int) při prvním zápisu zpanikaří.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.verybasic.26.map-rust"
+title = "Mapa — RUST"
+story = "Čárková tabule u pokladny: každá objednávka zvýší počet svého jídla a tabule ho hlásí, jak přibývá. Ferris si to objedná v Rustu."
+brief = '''
+Mapa vede od klíče k hodnotě a celý trik je v tom, co se stane s klíčem, který tam ještě není. Program načte slova; pro každé zvýší jeho počet a vypíše slovo s dosavadním počtem, pak vypíše, kolik bylo různých slov.
+
+V Rustu je chybějící klíč otázka a odpovědí je entry API: `counts.entry(key).or_insert(0)` dá `&mut` na hodnotu, a když musí, nejdřív vloží 0, a `*... += 1` přes něj zapíše. Klíč je `String`, takže `w.to_string()`; `counts[w]` ho přečte zpět.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "*counts.entry(w.to_string()).or_insert(0) += 1; a pak println!(\"{} {}\", w, counts[w]);",
+  "counts[w] += 1 je E0594: HashMap se dá indexovat pro čtení, nikdy pro zápis.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.verybasic.27.map-python"
+title = "Mapa — PYTHON"
+story = "Čárková tabule u pokladny: každá objednávka zvýší počet svého jídla a tabule ho hlásí, jak přibývá. Krajta si to objedná v Pythonu."
+brief = '''
+Mapa vede od klíče k hodnotě a celý trik je v tom, co se stane s klíčem, který tam ještě není. Program načte slova; pro každé zvýší jeho počet a vypíše slovo s dosavadním počtem, pak vypíše, kolik bylo různých slov.
+
+V Pythonu je chybějící klíč při čtení `KeyError`, takže zvýšení se ptá `counts.get(w, 0)`, které místo toho vrátí výchozí hodnotu, a uloží o jedna víc. (`collections.Counter` a `defaultdict(int)` tenhle řádek schovávají; tohle je to, co schovávají.)
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tea bun tea milk tea
+output: tea 1
+        bun 1
+        tea 2
+        milk 1
+        tea 3
+        3
+```
+'''
+hints = [
+  "counts[w] = counts.get(w, 0) + 1 a pak print(w, counts[w]).",
+  "counts[w] += 1 je KeyError, když se w objeví poprvé: += čte dřív, než zapíše.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.verybasic.28.comprehension-go"
+title = "Comprehension — GO"
+story = "Z čísel na lístku patří kuchyni jen sudá a kuchyně chce každé na druhou, jedním dechem. Gogo si to objedná v Go."
+brief = '''
+Postav nový seznam ze starého tak, že některé prvky necháš a každý přeměníš: filtr a map v jednom výrazu. Python tomu říká comprehension a má na to syntaxi; Rust má řetěz iterátorů, který říká totéž; Go to říká smyčkou. Program načte čísla, udělá seznam druhých mocnin těch sudých, vypíše ho a vypíše jeho součet.
+
+Go comprehension nemá. Smyčka *je* ta comprehension: `for _, x := range nums`, `if` jako filtr a `append` jako map — čtyři řádky tam, kde má Python jeden, a každý z nich obyčejný.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "for _, x := range nums { if x%2 == 0 { squares = append(squares, x*x) } } — filtr je if, map je append.",
+  "squares := []int64{} začíná prázdný a ne nil; append ho zvětšuje.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.verybasic.29.comprehension-rust"
+title = "Comprehension — RUST"
+story = "Z čísel na lístku patří kuchyni jen sudá a kuchyně chce každé na druhou, jedním dechem. Ferris si to objedná v Rustu."
+brief = '''
+Postav nový seznam ze starého tak, že některé prvky necháš a každý přeměníš: filtr a map v jednom výrazu. Python tomu říká comprehension a má na to syntaxi; Rust má řetěz iterátorů, který říká totéž; Go to říká smyčkou. Program načte čísla, udělá seznam druhých mocnin těch sudých, vypíše ho a vypíše jeho součet.
+
+Comprehension v Rustu je řetěz iterátorů: `.iter()` prochází, `.filter(|x| ...)` nechává, `.map(|x| ...)` přeměňuje a `.collect()` staví `Vec` — líně, nic neběží až do `collect`. Uzávěry vidí `&i64`, odtud `*x`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 0).map(|x| x * x).collect();",
+  "Uzávěr filtru dostane referenci na referenci — &&i64 — a proto je to *x % 2, a ne x % 2.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.verybasic.30.comprehension-python"
+title = "Comprehension — PYTHON"
+story = "Z čísel na lístku patří kuchyni jen sudá a kuchyně chce každé na druhou, jedním dechem. Krajta si to objedná v Pythonu."
+brief = '''
+Postav nový seznam ze starého tak, že některé prvky necháš a každý přeměníš: filtr a map v jednom výrazu. Python tomu říká comprehension a má na to syntaxi; Rust má řetěz iterátorů, který říká totéž; Go to říká smyčkou. Program načte čísla, udělá seznam druhých mocnin těch sudých, vypíše ho a vypíše jeho součet.
+
+List comprehension v Pythonu je jeden výraz: `[x * x for x in nums if x % 2 == 0]` — nejdřív map, pak smyčka, pak filtr, všechno uvnitř hranatých závorek. Čte se jako věta „x na druhou, pro každé x v nums, pokud je x sudé“.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4 5 6
+output: 4 16 36
+        56
+```
+'''
+hints = [
+  "squares = [x * x for x in nums if x % 2 == 0] — výraz, for, if, v tomhle pořadí.",
+  "if na konci filtruje; if před for by byl podmíněný výraz a potřeboval by else.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "remix.verybasic.31.sorting-go"
+title = "Řazení — GO"
+story = "Žebříček nad pokladnou: nejvyšší skóre první a při shodě to jméno, které je v abecedě dřív. Gogo si to objedná v Go."
+brief = '''
+Řazení podle víc než jednoho klíče: primární klíč sestupně, shodu rozhodne sekundární klíč vzestupně. Program načte řádky `name score` a vypíše je seřazené podle skóre, nejvyšší první, pak podle jména.
+
+V Go bere `slices.SortFunc` porovnání, které vrací int: záporný, nulu nebo kladný. `cmp.Compare(b.Score, a.Score)` s prohozenými argumenty řadí sestupně a `cmp.Or` propadne k porovnání jmen, když je první nula.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "slices.SortFunc(people, func(a, b Person) int { return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(a.Name, b.Name)) }).",
+  "Porovnání vrací int, ne bool: v tom je rozdíl od staršího sort.Slice.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "remix.verybasic.32.sorting-rust"
+title = "Řazení — RUST"
+story = "Žebříček nad pokladnou: nejvyšší skóre první a při shodě to jméno, které je v abecedě dřív. Ferris si to objedná v Rustu."
+brief = '''
+Řazení podle víc než jednoho klíče: primární klíč sestupně, shodu rozhodne sekundární klíč vzestupně. Program načte řádky `name score` a vypíše je seřazené podle skóre, nejvyšší první, pak podle jména.
+
+V Rustu bere `sort_by` uzávěr, který vrací `Ordering`. `b.score.cmp(&a.score)` s prohozenými stranami je sestupně a `.then_with(|| a.name.cmp(&b.name))` je rozhodnutí shody, které běží, jen když je první `Equal`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "people.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.name.cmp(&b.name)));",
+  "cmp bere referenci: b.score.cmp(&a.score), s &.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "remix.verybasic.33.sorting-python"
+title = "Řazení — PYTHON"
+story = "Žebříček nad pokladnou: nejvyšší skóre první a při shodě to jméno, které je v abecedě dřív. Krajta si to objedná v Pythonu."
+brief = '''
+Řazení podle víc než jednoho klíče: primární klíč sestupně, shodu rozhodne sekundární klíč vzestupně. Program načte řádky `name score` a vypíše je seřazené podle skóre, nejvyšší první, pak podle jména.
+
+V Pythonu bere `sort` funkci `key` a klíč typu n-tice řadí podle svých částí popořadě: `(-p.score, p.name)` — negace dělá skóre sestupné a jméno rozhoduje shodu vzestupně. Žádný komparátor; klíč řekne všechno.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  mei 90
+        bo 85
+        alex 90
+output: alex 90
+        mei 90
+        bo 85
+```
+'''
+hints = [
+  "people.sort(key=lambda p: (-p.score, p.name)) — klíč n-tice, sestupně díky negaci.",
+  "reverse=True by otočilo i jméno; jen negace skóre nechá jména vzestupně.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "remix.verybasic.34.tree-go"
+title = "Strom — GO"
+story = "Čísla objednávek jdou do stromu, jak přicházejí, menší doleva, větší doprava, a když ho čteš popořadě, čteš je seřazená. Gogo si to objedná v Go."
+brief = '''
+Binární vyhledávací strom: každý uzel má hodnotu, levého potomka s menšími hodnotami a pravého s většími. Vkládání sestupuje dolů a nový uzel dá tam, kde nic nenajde; průchod in-order vypisuje seřazeně. Program načte čísla, každé vloží, vypíše průchod in-order a vypíše výšku.
+
+V Go je potomek `*Node` a prázdný potomek je `nil`. Základní případ `insert` je kontrola na nil: postav nový uzel s `v` uvnitř a vrať jeho adresu — ukazatel, ne hodnotu. Který řádek vrací nový uzel?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if n == nil { return &Node{Val: v} } — & vezme adresu nové struktury.",
+  "return Node{Val: v} je hodnota tam, kde se chce *Node, a nezkompiluje se.",
+]
+
+# ---------------------------------------------------------------- 35
+[[quest]]
+id    = "remix.verybasic.35.tree-rust"
+title = "Strom — RUST"
+story = "Čísla objednávek jdou do stromu, jak přicházejí, menší doleva, větší doprava, a když ho čteš popořadě, čteš je seřazená. Ferris si to objedná v Rustu."
+brief = '''
+Binární vyhledávací strom: každý uzel má hodnotu, levého potomka s menšími hodnotami a pravého s většími. Vkládání sestupuje dolů a nový uzel dá tam, kde nic nenajde; průchod in-order vypisuje seřazeně. Program načte čísla, každé vloží, vypíše průchod in-order a vypíše výšku.
+
+V Rustu je potomek `Option<Box<Node>>`: `None` pro prázdný, krabice na haldě pro uzel. `insert` vezme option a vrátí ji: rameno `None` postaví `Some(Box::new(Node { val: v, left: None, right: None }))` a rameno `Some(mut node)` sestoupí rekurzí na jednu stranu a uzel vrátí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "None => Some(Box::new(Node { val: v, left: None, right: None })), — Box ho dá na haldu, Some ho zabalí.",
+  "Samotné Box::new je Box<Node> tam, kde se chce Option<Box<Node>>: E0308.",
+]
+
+# ---------------------------------------------------------------- 36
+[[quest]]
+id    = "remix.verybasic.36.tree-python"
+title = "Strom — PYTHON"
+story = "Čísla objednávek jdou do stromu, jak přicházejí, menší doleva, větší doprava, a když ho čteš popořadě, čteš je seřazená. Krajta si to objedná v Pythonu."
+brief = '''
+Binární vyhledávací strom: každý uzel má hodnotu, levého potomka s menšími hodnotami a pravého s většími. Vkládání sestupuje dolů a nový uzel dá tam, kde nic nenajde; průchod in-order vypisuje seřazeně. Program načte čísla, každé vloží, vypíše průchod in-order a vypíše výšku.
+
+V Pythonu je potomek buď `Node`, nebo `None`. Základní případ `insert` je `if n is None:` — postav jeden uzel, který drží `v`, a vrať ho; každý jiný krok sestoupí rekurzí na jednu stranu a vrátí `n`. Který řádek staví uzel?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if n is None: return Node(v) — konstruktor bere hodnotu a potomci začínají jako None.",
+  "Node(v, None, None) je TypeError: __init__ bere za self jeden argument.",
+]
+
+# ---------------------------------------------------------------- 37
+[[quest]]
+id    = "remix.verybasic.37.interface-go"
+title = "Rozhraní — GO"
+story = "Kulaté stoly a hranaté stoly a půdorys se každého ptá jen na jeho plochu. Gogo si to objedná v Go."
+brief = '''
+Jedno jméno pro chování, které poskytuje několik typů, takže volající může držet kterýkoli z nich a ptát se na totéž. Go tomu říká rozhraní a typy ho splňují tím, že mají ty metody; Rust tomu říká trait a typy ho implementují tím, že to řeknou; Python tomu říká duck typing, a když to chce ověřit, `Protocol`. Program načte řádky `circle r` a `rect w h`, sečte jejich plochy a vypíše součet na dvě desetinná místa a počet tvarů.
+
+V Go rozhraní pojmenuje množinu metod a nic dalšího není potřeba: `Circle` a `Rect` ho splňují jen tím, že mají metodu `Area() float64`, a `[]Shape` drží kterýkoli z nich. Který řádek otevírá deklaraci `Shape`?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "type Shape interface { Area() float64 } — množina metod a nic víc.",
+  "Nikde žádné klíčové slovo implements: Circle splňuje Shape ve chvíli, kdy má tu metodu.",
+]
+
+# ---------------------------------------------------------------- 38
+[[quest]]
+id    = "remix.verybasic.38.interface-rust"
+title = "Rozhraní — RUST"
+story = "Kulaté stoly a hranaté stoly a půdorys se každého ptá jen na jeho plochu. Ferris si to objedná v Rustu."
+brief = '''
+Jedno jméno pro chování, které poskytuje několik typů, takže volající může držet kterýkoli z nich a ptát se na totéž. Go tomu říká rozhraní a typy ho splňují tím, že mají ty metody; Rust tomu říká trait a typy ho implementují tím, že to řeknou; Python tomu říká duck typing, a když to chce ověřit, `Protocol`. Program načte řádky `circle r` a `rect w h`, sečte jejich plochy a vypíše součet na dvě desetinná místa a počet tvarů.
+
+V Rustu se chování deklaruje jednou, s `fn area(&self) -> f64;` jako jedinou povinnou metodou, a každý typ výslovně řekne `impl Shape for Circle { ... }`. `Box<dyn Shape>` drží kterýkoli z nich. Který řádek otevírá deklaraci?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "trait Shape { fn area(&self) -> f64; } — signatura se středníkem, bez těla.",
+  "impl Shape for Circle je ta výslovná polovina: Rust nikdy nehádá, že typ sedí.",
+]
+
+# ---------------------------------------------------------------- 39
+[[quest]]
+id    = "remix.verybasic.39.interface-python"
+title = "Rozhraní — PYTHON"
+story = "Kulaté stoly a hranaté stoly a půdorys se každého ptá jen na jeho plochu. Krajta si to objedná v Pythonu."
+brief = '''
+Jedno jméno pro chování, které poskytuje několik typů, takže volající může držet kterýkoli z nich a ptát se na totéž. Go tomu říká rozhraní a typy ho splňují tím, že mají ty metody; Rust tomu říká trait a typy ho implementují tím, že to řeknou; Python tomu říká duck typing, a když to chce ověřit, `Protocol`. Program načte řádky `circle r` a `rect w h`, sečte jejich plochy a vypíše součet na dvě desetinná místa a počet tvarů.
+
+V Pythonu se nic deklarovat nemusí: poslouží jakýkoli objekt s metodou `area()`, a to je duck typing. Pro *ověření* pojmenuje metodu `typing.Protocol` a `@runtime_checkable` dovolí, aby se `isinstance(s, Shape)` zeptalo za běhu — což program dělá před přičtením každé plochy.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  circle 1
+        rect 2 3
+        circle 0.5
+output: 9.93
+        3
+```
+'''
+hints = [
+  "@runtime_checkable nad class Shape(Protocol): a pod ní def area(self) -> float: ...",
+  "class Shape: bez Protocol je obyčejná třída, ze které nikdo nedědí, a isinstance řekne ne každému tvaru.",
+]
+
+# ---------------------------------------------------------------- 40
+[[quest]]
+id    = "remix.verybasic.40.generics-go"
+title = "Generika — GO"
+story = "Jedno `largest` pro čísla na účtu a totéž `largest` pro jména na seznamu rezervací. Napsané jednou. Gogo si to objedná v Go."
+brief = '''
+Funkce nad typovým parametrem: napsaná jednou, použitá s celými čísly i s řetězci, pod podmínkou, že typ jde porovnávat. Program načte řádek čísel a řádek slov a vypíše největší z každého přes jednu funkci `largest`.
+
+V Go jde typový parametr do hranatých závorek se svým omezením: `func largest[T cmp.Ordered](xs []T) T`. `cmp.Ordered` je omezení, které dovoluje `<` a `>`; `any` by to nedovolilo. Volání `largest(nums)` odvodí `T` z argumentu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "func largest[T cmp.Ordered](xs []T) T { — závorky drží typový parametr a jeho omezení.",
+  "S [T any] se x > best v těle nezkompiluje: any o > nic neslibuje.",
+]
+
+# ---------------------------------------------------------------- 41
+[[quest]]
+id    = "remix.verybasic.41.generics-rust"
+title = "Generika — RUST"
+story = "Jedno `largest` pro čísla na účtu a totéž `largest` pro jména na seznamu rezervací. Napsané jednou. Ferris si to objedná v Rustu."
+brief = '''
+Funkce nad typovým parametrem: napsaná jednou, použitá s celými čísly i s řetězci, pod podmínkou, že typ jde porovnávat. Program načte řádek čísel a řádek slov a vypíše největší z každého přes jednu funkci `largest`.
+
+V Rustu jde typový parametr do lomených závorek se svou mezí: `fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T`. `PartialOrd` dovoluje `>`, `Copy` dovoluje, aby `best = x` zkopírovalo hodnotu z řezu, a obojí jsou traity — mez je trait. `largest(&nums)` odvodí `T`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T { — dvě meze spojené +.",
+  "Bez PartialOrd je > E0369; bez Copy je best = x E0507. Každá mez koupí jeden řádek těla.",
+]
+
+# ---------------------------------------------------------------- 42
+[[quest]]
+id    = "remix.verybasic.42.generics-python"
+title = "Generika — PYTHON"
+story = "Jedno `largest` pro čísla na účtu a totéž `largest` pro jména na seznamu rezervací. Napsané jednou. Krajta si to objedná v Pythonu."
+brief = '''
+Funkce nad typovým parametrem: napsaná jednou, použitá s celými čísly i s řetězci, pod podmínkou, že typ jde porovnávat. Program načte řádek čísel a řádek slov a vypíše největší z každého přes jednu funkci `largest`.
+
+V Pythonu je typový parametr součástí řádku `def`: jméno v hranatých závorkách hned za jménem funkce ho deklaruje a anotace parametru a návratové hodnoty ho pak používají. Za běhu je to duck typing; signatura je to, co čte kontrolor typů. Který řádek je signatura?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  3 9 4
+        bun tea milk
+output: 9
+        tea
+```
+'''
+hints = [
+  "def largest[T](xs: list[T]) -> T: — [T] za jménem ho deklaruje (Python 3.12+).",
+  "Řádek končí dvojtečkou, jako každý def; bez ní je tělo syntaktická chyba.",
+]
+
+# ---------------------------------------------------------------- 43
+[[quest]]
+id    = "remix.verybasic.43.ownership-go"
+title = "Vlastnictví — GO"
+story = "Seznam objednávek jde k pokladně sečíst a vrátí se; pak jde natrvalo do kuchyně. Kdo ho má potom, to je celá otázka. Gogo si to objedná v Go."
+brief = '''
+Hodnota předaná funkci je buď půjčená — volající si ji nechá — nebo darovaná. Rust z toho rozdílu dělá pravidlo, které kontroluje kompilátor: `&orders` půjčuje, `orders` přesouvá a přesunuté jméno je pryč. Go a Python takové pravidlo nemají a tatáž dvě volání vypadají stejně; zadání pro každý z nich říká, co doopravdy mění majitele. Program sečte objednávky přes půjčující `total` a pak je předá `take`, který je spočítá a nechá si je.
+
+V Go se řez předává hodnotou, ale ta hodnota je malá hlavička — ukazatel, délka, kapacita — takže `total(orders)` i `take(orders)` vidí stejné pole a `orders` jde po obou dál použít. `take` vynuluje, co dostane, a volající by to viděl taky. Žádný přesun tu není.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "sum := total(orders) a pak n := take(orders) — tentýž řez, dvakrát, nikde žádné &.",
+  "&orders je *[]int64 a total bere []int64: chyba typu. Řezy už sdílejí.",
+]
+
+# ---------------------------------------------------------------- 44
+[[quest]]
+id    = "remix.verybasic.44.ownership-rust"
+title = "Vlastnictví — RUST"
+story = "Seznam objednávek jde k pokladně sečíst a vrátí se; pak jde natrvalo do kuchyně. Kdo ho má potom, to je celá otázka. Ferris si to objedná v Rustu."
+brief = '''
+Hodnota předaná funkci je buď půjčená — volající si ji nechá — nebo darovaná. Rust z toho rozdílu dělá pravidlo, které kontroluje kompilátor: `&orders` půjčuje, `orders` přesouvá a přesunuté jméno je pryč. Go a Python takové pravidlo nemají a tatáž dvě volání vypadají stejně; zadání pro každý z nich říká, co doopravdy mění majitele. Program sečte objednávky přes půjčující `total` a pak je předá `take`, který je spočítá a nechá si je.
+
+V Rustu `total(&orders)` půjčuje: `&Vec<i64>` se převede na `&[i64]`, které funkce chce, a `orders` patří volajícímu i potom. `take(orders)` přesune `Vec` do `take`, který ho při návratu zahodí, a použít `orders` po tom řádku je E0382. Pořadí těch dvou volání je ten program.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "let sum = total(&orders); a pak let n = take(orders); — nejdřív půjčit, pak darovat.",
+  "total(orders) bez & přesune Vec do total a take na dalším řádku je E0382: use of moved value.",
+]
+
+# ---------------------------------------------------------------- 45
+[[quest]]
+id    = "remix.verybasic.45.ownership-python"
+title = "Vlastnictví — PYTHON"
+story = "Seznam objednávek jde k pokladně sečíst a vrátí se; pak jde natrvalo do kuchyně. Kdo ho má potom, to je celá otázka. Krajta si to objedná v Pythonu."
+brief = '''
+Hodnota předaná funkci je buď půjčená — volající si ji nechá — nebo darovaná. Rust z toho rozdílu dělá pravidlo, které kontroluje kompilátor: `&orders` půjčuje, `orders` přesouvá a přesunuté jméno je pryč. Go a Python takové pravidlo nemají a tatáž dvě volání vypadají stejně; zadání pro každý z nich říká, co doopravdy mění majitele. Program sečte objednávky přes půjčující `total` a pak je předá `take`, který je spočítá a nechá si je.
+
+V Pythonu je každé jméno reference a volání předá referenci: `total(orders)` i `take(orders)` dostanou ten úplně stejný objekt seznamu. `take` ho vyprázdní a pak je `orders` v `main` prázdné taky — ne přesunuté, ne zkopírované, sdílené. Kopie by byla `orders[:]` nebo `list(orders)`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  12 30 8
+output: 50
+        3
+```
+'''
+hints = [
+  "sum_ = total(orders) a pak n = take(orders) — pokaždé tentýž objekt.",
+  "V Pythonu žádné & není; jméno už je reference a & je tady syntaktická chyba.",
+]
+
+# ---------------------------------------------------------------- 46
+[[quest]]
+id    = "remix.verybasic.46.lifetimes-go"
+title = "Životnost — GO"
+story = "Na každém lístku dvě jména jídel a výdejní okénko vyvolá to delší. Jméno, které vyvolá, je jedno z těch dvou, která dostalo — nikdy kopie. Gogo si to objedná v Go."
+brief = '''
+Funkce, která vrací jeden ze svých dvou řetězcových argumentů, vrací referenci do dat volajícího. Rust se ptá, jak dlouho je ta reference platná, a odpověď se píše do signatury jako životnost `'a`; Go a Python mají garbage collector a nikdy se neptají, takže tatáž funkce žádnou takovou značku nemá. Program načte řádky po dvou slovech a z každé dvojice vypíše delší, při shodě první.
+
+V Go `func longest(a, b string) string` vrací jeden ze svých argumentů a nikdo nemusí říkat, na jak dlouho: řetězec je neměnný a collector ho drží, dokud se k němu cokoli dostane. Dva parametry jednoho typu sdílejí jméno typu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "func longest(a, b string) string { if len(a) >= len(b) { return a }; return b }.",
+  "func longest(a, b string) bez návratového typu nemůže vrátit a; typ výsledku je součástí signatury.",
+]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "remix.verybasic.47.lifetimes-rust"
+title = "Životnost — RUST"
+story = "Na každém lístku dvě jména jídel a výdejní okénko vyvolá to delší. Jméno, které vyvolá, je jedno z těch dvou, která dostalo — nikdy kopie. Ferris si to objedná v Rustu."
+brief = '''
+Funkce, která vrací jeden ze svých dvou řetězcových argumentů, vrací referenci do dat volajícího. Rust se ptá, jak dlouho je ta reference platná, a odpověď se píše do signatury jako životnost `'a`; Go a Python mají garbage collector a nikdy se neptají, takže tatáž funkce žádnou takovou značku nemá. Program načte řádky po dvou slovech a z každé dvojice vypíše delší, při shodě první.
+
+V Rustu `fn longest<'a>(a: &'a str, b: &'a str) -> &'a str` říká, že vrácená reference žije tak dlouho jako kratší ze dvou vstupů — `'a` na všech třech je svazuje dohromady. Vynech ji a rustc řekne E0106: nepozná, jestli si výsledek půjčuje z `a`, nebo z `b`, takže hádat nebude.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str { — deklaruj 'a za jménem, pak ji použij na všech třech referencích.",
+  "fn longest(a: &str, b: &str) -> &str je E0106, missing lifetime specifier: dva vstupy a výsledek by mohl přijít z kteréhokoli.",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "remix.verybasic.48.lifetimes-python"
+title = "Životnost — PYTHON"
+story = "Na každém lístku dvě jména jídel a výdejní okénko vyvolá to delší. Jméno, které vyvolá, je jedno z těch dvou, která dostalo — nikdy kopie. Krajta si to objedná v Pythonu."
+brief = '''
+Funkce, která vrací jeden ze svých dvou řetězcových argumentů, vrací referenci do dat volajícího. Rust se ptá, jak dlouho je ta reference platná, a odpověď se píše do signatury jako životnost `'a`; Go a Python mají garbage collector a nikdy se neptají, takže tatáž funkce žádnou takovou značku nemá. Program načte řádky po dvou slovech a z každé dvojice vypíše delší, při shodě první.
+
+V Pythonu funkce vrací jeden ze svých argumentů a objekt žije, dokud na něj odkazuje nějaké jméno — žádná životnost, žádné `&`. Signatura anotuje oba parametry i výsledek jako `str` a končí dvojtečkou jako každá `def`. Který řádek to je?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  tea coffee
+        milk bun
+output: coffee
+        milk
+```
+'''
+hints = [
+  "def longest(a: str, b: str) -> str: a pod ní return a if len(a) >= len(b) else b.",
+  "a: &str je v Pythonu syntaktická chyba; není tu žádné & ani životnost, protože tu práci dělá collector.",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "remix.verybasic.49.threads-go"
+title = "Vlákno — GO"
+story = "Účet je dlouhý, tak se roztrhne na tři proužky a tři štamgasti sčítají každý jeden proužek naráz; součet jsou tři mezisoučty dohromady. Gogo si to objedná v Go."
+brief = '''
+Spusť několik vláken, dej každému kus práce, počkej na všechna a slož, co našla. Program načte čísla, rozřeže je na tři kusy, každý kus sečte ve vlastním vlákně, vypíše tři součty v pořadí kusů a pak celkový součet.
+
+V Go `go func(...) { ... }(args)` spustí gorutinu a `sync.WaitGroup` je počítá: `wg.Add(1)` před každým spuštěním, `defer wg.Done()` jako první věc uvnitř, `wg.Wait()` za smyčkou. Kus a jeho index se předávají jako argumenty, aby každá gorutina měla svoje.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "go func(i int, chunk []int64) { defer wg.Done(); ... }(i, chunk) — go vpředu z toho dělá gorutinu; bez něj literál prostě proběhne a bez Done se Wait nikdy nevrátí.",
+  "go func() { bez parametrů nesedí na (i, chunk) na konci: too many arguments.",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "remix.verybasic.50.threads-rust"
+title = "Vlákno — RUST"
+story = "Účet je dlouhý, tak se roztrhne na tři proužky a tři štamgasti sčítají každý jeden proužek naráz; součet jsou tři mezisoučty dohromady. Ferris si to objedná v Rustu."
+brief = '''
+Spusť několik vláken, dej každému kus práce, počkej na všechna a slož, co našla. Program načte čísla, rozřeže je na tři kusy, každý kus sečte ve vlastním vlákně, vypíše tři součty v pořadí kusů a pak celkový součet.
+
+V Rustu `thread::spawn(move || ...)` spustí vlákno a vrátí `JoinHandle`; `move` dá uzávěru vlastní kopii kusu (`Vec`, takže ho vlákno vlastní) a `h.join().unwrap()` počká a předá zpět, co uzávěr vrátil — tady součet, takže žádný sdílený stav.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "let chunk = chunk.to_vec(); a pak handles.push(thread::spawn(move || chunk.iter().sum::<i64>()));",
+  "Bez move si uzávěr chunk půjčuje a vlákno může přežít smyčku v main: E0373.",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "remix.verybasic.51.threads-python"
+title = "Vlákno — PYTHON"
+story = "Účet je dlouhý, tak se roztrhne na tři proužky a tři štamgasti sčítají každý jeden proužek naráz; součet jsou tři mezisoučty dohromady. Krajta si to objedná v Pythonu."
+brief = '''
+Spusť několik vláken, dej každému kus práce, počkej na všechna a slož, co našla. Program načte čísla, rozřeže je na tři kusy, každý kus sečte ve vlastním vlákně, vypíše tři součty v pořadí kusů a pak celkový součet.
+
+V Pythonu `threading.Thread(target=work, args=(i, c))` vyrobí vlákno — `args` je n-tice, odtud čárka v `(i,)` pro jeden argument — `t.start()` ho spustí a `t.join()` počká. GIL znamená, že ti tři sčítají po řadě, ale tvar je stejný.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4 5 6 7
+output: 6 15 7
+        28
+```
+'''
+hints = [
+  "threads = [threading.Thread(target=work, args=(i, c)) for i, c in enumerate(chunks)] a pak každé spusť.",
+  "args=(i) je jen i v závorkách, ne n-tice; Thread chce n-tici a (i,) je způsob, jak se píše jeden prvek.",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "remix.verybasic.52.mutex-go"
+title = "Mutex — GO"
+story = "Jedna čárkovnice na zdi a každý štamgast do ní přičítá tisíckrát za sebou; křída musí přecházet z ruky do ruky čistě, jinak je číslo špatně. Gogo si to objedná v Go."
+brief = '''
+Několik vláken přičítajících do jednoho čísla je datový závod, pokud se číslo kolem každého přičtení nezamkne. Mutex je ten zámek: vezmi ho, změň hodnotu, pusť ho. Program načte čísla, spustí jedno vlákno na číslo, každé přičte své číslo do sdíleného počítadla tisíckrát pod zámkem, a na konci vypíše počítadlo.
+
+V Go je `sync.Mutex` hodnota se dvěma metodami, jednou na vzetí zámku a jednou na jeho puštění, a počítadlo je obyčejná proměnná. Disciplína je na tobě: vzít, přičíst, pustit. Jména metod v Go začínají velkým písmenem, když jsou exportovaná, a tyhle jsou. Který řádek bere zámek?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "mu.Lock() pak counter += x pak mu.Unlock() — tři řádky, přičtení uprostřed.",
+  "Go rozlišuje velikost písmen a metoda je Lock; mu.lock() není definované.",
+]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "remix.verybasic.53.mutex-rust"
+title = "Mutex — RUST"
+story = "Jedna čárkovnice na zdi a každý štamgast do ní přičítá tisíckrát za sebou; křída musí přecházet z ruky do ruky čistě, jinak je číslo špatně. Ferris si to objedná v Rustu."
+brief = '''
+Několik vláken přičítajících do jednoho čísla je datový závod, pokud se číslo kolem každého přičtení nezamkne. Mutex je ten zámek: vezmi ho, změň hodnotu, pusť ho. Program načte čísla, spustí jedno vlákno na číslo, každé přičte své číslo do sdíleného počítadla tisíckrát pod zámkem, a na konci vypíše počítadlo.
+
+V Rustu počítadlo *je* zámek: `Arc<Mutex<i64>>`, sdílené přes `Arc::clone` a otevřené přes `.lock().unwrap()`, které vrátí strážce, jenž se dereferencuje na číslo a odemkne, když je na konci příkazu zahozen. `*guard += x` přes něj zapíše; k číslu se bez zámku nedá dostat.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "let counter = Arc::clone(&counter); před spawn, pak *counter.lock().unwrap() += x; uvnitř smyčky.",
+  "counter.lock().unwrap() += x bez * je E0368: strážce není číslo, jen se na něj dereferencuje.",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "remix.verybasic.54.mutex-python"
+title = "Mutex — PYTHON"
+story = "Jedna čárkovnice na zdi a každý štamgast do ní přičítá tisíckrát za sebou; křída musí přecházet z ruky do ruky čistě, jinak je číslo špatně. Krajta si to objedná v Pythonu."
+brief = '''
+Několik vláken přičítajících do jednoho čísla je datový závod, pokud se číslo kolem každého přičtení nezamkne. Mutex je ten zámek: vezmi ho, změň hodnotu, pusť ho. Program načte čísla, spustí jedno vlákno na číslo, každé přičte své číslo do sdíleného počítadla tisíckrát pod zámkem, a na konci vypíše počítadlo.
+
+V Pythonu je mutex `threading.Lock()` a kontextový manažer ho vezme a pustí kolem odsazeného bloku — za klíčovým slovem samotný objekt, ne jeho volání, a na konci dvojtečka. Který řádek ten blok otevírá?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3
+output: 6000
+```
+'''
+hints = [
+  "with lock: a pod ním odsazené counter += x.",
+  "lock() volá objekt Lock, který volat nejde: TypeError. with lock: stačí.",
+]
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id    = "remix.verybasic.55.channel-go"
+title = "Producent, mnoho konzumentů — GO"
+story = "YUENYEUNG. Jedno okénko mezi kuchyní a výdejem, tři roznašeči berou, co jím projde, a okénko se musí zavřít, když kuchyně skončí, jinak roznašeči čekají navždy. Gogo si to objedná v Go."
+brief = '''
+Jeden producent dává práci do kanálu, několik konzumentů si z něj bere, každý si vede vlastní součet, a když producent kanál zavře, konzumenti skončí a součty se sečtou. Zavření je celá obtíž: konzumenti se nemůžou dozvědět, že práce skončila, pokud to producent neřekne. Program načte čísla, pošle každé jedním kanálem třem konzumentům a vypíše celkový součet a kolik položek se zpracovalo.
+
+V Go `ch <- x` posílá a `for x := range ch` přijímá, dokud se kanál nezavře — a zavření je vestavěná funkce, ne metoda, kterou jednou zavolá producent, když všechno odeslal. Který řádek kanál zavírá?
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for _, x := range nums { ch <- x } a pak close(ch) — close je to, co nechá tři smyčky range skončit.",
+  "Kanál nemá metodu close; close je vestavěná funkce, jako len.",
+]
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id    = "remix.verybasic.56.channel-rust"
+title = "Producent, mnoho konzumentů — RUST"
+story = "YUENYEUNG. Jedno okénko mezi kuchyní a výdejem, tři roznašeči berou, co jím projde, a okénko se musí zavřít, když kuchyně skončí, jinak roznašeči čekají navždy. Ferris si to objedná v Rustu."
+brief = '''
+Jeden producent dává práci do kanálu, několik konzumentů si z něj bere, každý si vede vlastní součet, a když producent kanál zavře, konzumenti skončí a součty se sečtou. Zavření je celá obtíž: konzumenti se nemůžou dozvědět, že práce skončila, pokud to producent neřekne. Program načte čísla, pošle každé jedním kanálem třem konzumentům a vypíše celkový součet a kolik položek se zpracovalo.
+
+V Rustu dá `mpsc::channel()` jeden `Sender` a jeden `Receiver`; tři konzumenti sdílejí příjemce přes `Arc<Mutex<Receiver>>` a každý ho zamkne, aby mohl `recv()`. `tx.send(x)` posílá a `drop(tx)` je zavření: jakmile jsou všichni odesílatelé pryč, `recv` vrátí `Err` a konzumenti vyskočí ze smyčky a vrátí své součty.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for x in nums { tx.send(x).unwrap(); } a pak drop(tx); — zahození posledního Senderu je zavření.",
+  "Sender nemá metodu close; kanál se zavře, když jsou všechny Sendery zahozené.",
+]
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id    = "remix.verybasic.57.channel-python"
+title = "Producent, mnoho konzumentů — PYTHON"
+story = "YUENYEUNG. Jedno okénko mezi kuchyní a výdejem, tři roznašeči berou, co jím projde, a okénko se musí zavřít, když kuchyně skončí, jinak roznašeči čekají navždy. Krajta si to objedná v Pythonu."
+brief = '''
+Jeden producent dává práci do kanálu, několik konzumentů si z něj bere, každý si vede vlastní součet, a když producent kanál zavře, konzumenti skončí a součty se sečtou. Zavření je celá obtíž: konzumenti se nemůžou dozvědět, že práce skončila, pokud to producent neřekne. Program načte čísla, pošle každé jedním kanálem třem konzumentům a vypíše celkový součet a kolik položek se zpracovalo.
+
+V Pythonu je kanál `queue.Queue`: `q.put(x)` posílá a `q.get()` blokuje, dokud tam něco není. `Queue` nemá žádné zavření, takže producent pošle strážce — `None`, jednou na každého konzumenta — a každý konzument skončí, když ho dostane. To je zavření, napsané ručně.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+
+```
+input:  1 2 3 4 5 6 7 8 9 10
+output: 55
+        10
+```
+'''
+hints = [
+  "for x in nums: q.put(x) a pak for _ in threads: q.put(None) — jeden strážce na konzumenta.",
+  "queue.Queue nemá close; q.close() je AttributeError. Zavření je to None.",
+]

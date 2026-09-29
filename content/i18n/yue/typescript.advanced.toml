@@ -1,0 +1,1302 @@
+# TYPESCRIPT LAND — ADVANCED, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/advanced.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "typescript.advanced"
+locale = "yue"
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.advanced.01.conversions"
+title = "一個名，一個樣"
+story = "19:00，三十樓嘅控制室。個 feed 將時代廣場個時段價錢當文字咁傳過嚟，收費螢幕要佢係數字，大螢幕就要佢係蚊。"
+brief = '''
+讀一行：一個以仙為單位嘅金額，全部係數字。
+
+印三行：
+
+1. 剪走頭尾空白之後嘅文字有幾多個字元
+2. 個金額作為一個數字
+3. 個金額以蚊為單位，啱啱好兩個小數位
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+個金額唔會係負數。喺 Python 你會將同一個名重新綁定三次。
+TypeScript 唔畀你咁做：一個名出世嗰陣係乜型別，就一世都係乜型別，所以
+
+```ts
+let cents = input.trim();   // string, for the rest of its life
+cents = Number(cents);      // TS2322: Type 'number' is not assignable to type 'string'.
+```
+
+一行都未行就已經失敗。呢個就係份合約做緊佢嘅工作。每個樣都畀佢一個自己嘅
+`const` —— 文字、數字、蚊 —— 咁睇碼嘅人就唔使捲返上去睇個名而家裝緊乜。
+
+計蚊嗰行唔好經浮點數。`(1234 / 100).toFixed(2)` 今日啱啱好得，但係
+`0.1 + 0.2` 日日都係 `0.30000000000000004`。`Math.trunc(cents / 100)` 同
+`cents % 100` 啱啱好係兩截，而 `String(cents % 100).padStart(2, "0")`
+就幫第二截補零。
+'''
+hints = [
+  "仲揸住個字串嗰陣，text.length 就係第一行。",
+  "const cents: number = Number(text) 係一個新嘅名，配一個新嘅型別。用返 `text` 去裝佢就係 TS2322，即係編譯器話你知舊嗰份合約仲生效。",
+  "padStart(2, \"0\") 喺左邊補到闊度二：5 仙係 0.05，唔係 0.5。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.advanced.02.control-flow"
+title = "邊個時段"
+story = "時代廣場個螢幕輪住播：每第三個時段播廣告，每第五個播新聞。個排程器次次都印時段編號，於是個螢幕就顯示一個四十呎高嘅數字。"
+brief = '''
+讀一個整數 `n`。對每個由 `1` 到 `n` 嘅 `i`，印一行：
+
+* `i` 同時被 3 同 5 整除就印 `ADNEWS`
+* `i` 被 3 整除就印 `AD`
+* `i` 被 5 整除就印 `NEWS`
+* 否則印 `i` 本身
+
+之後繼續逐行讀整數，一行一個，直到讀到 `0`，然後印
+`SKIPPED <k>`，即係沿路讀咗幾多行唔係零嘅。
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        AD
+        4
+        NEWS
+        SKIPPED 2
+```
+
+兩個循環，兩種。第一個未開始就知要行幾多次：`for (let i = 1; i <= n; i++)`。
+第二個唔知：`for (;;)` 或者 `while (true)` 加一個 `break`，因為次數係由你讀到乜決定。
+`i < n` 會早一次停，呢個 off-by-one 人人喺度都寫過一次。
+
+標準輸入係一嚿過到嘅。`input.split("\n")` 畀你啲行，而一個沿住佢哋行落去嘅
+index，就係其他語言入面嘅「讀下一行」。
+'''
+hints = [
+  "先 check 兩樣都中嘅情況，唔係佢永遠都唔會觸發。被 3 同 5 整除即係被 15 整除。",
+  "i < n 去到 n - 1 就停。個 starter 就係有呢隻蟲；個範例輸出早咗一行完。",
+  "用 === 唔好用 ==。`\"0\" == 0` 係 true，`\"\" == 0` 都係 true，一行空白就係咁樣結束咗一個唔應該結束嘅循環。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.advanced.03.arrays"
+title = "塊板嘅中間"
+story = "怡和街電車站塊板顯示今晚第一班同最後一班電車，調度員想知中間所有車加埋有幾多個座位。"
+brief = '''
+標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格分開。`n` 至少係 `1`，
+所以一定有第一個值同最後一個值可以印。
+
+印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有值嘅總和。少過三個值嘅話，
+嗰個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`nums.slice(1, -1)` 就係中間：一個**新嘅 array**，係複製出嚟嘅，負數嘅
+結尾由後面數起。`nums[nums.length - 1]` 係最後一個元素，`nums.at(-1)`
+都係 —— 但睇下佢哋嘅型別。用 index 嗰個話係 `number`，因為編譯器信你；
+`at` 話係 `number | undefined`，因為一個 array 可以係空嘅，而編譯器睇唔到
+你嗰個唔係。兩個喺執行嗰陣係同一個值。得一個係老實嘅。
+
+`reduce((sum, v) => sum + v, 0)` 將中間加埋。個 `0` 唔係裝飾：喺一個空
+array 度 `reduce` 而**冇初始值**，會 throw
+`TypeError: Reduce of empty array with no initial value`，而得一個元素嘅
+輸入就會令中間係空。
+'''
+hints = [
+  "nums[nums.length - 1] 係最後一個元素。nums.at(-1) 都係，而佢嘅型別認咗佢可能唔喺度。",
+  "nums.slice(1, -1) 係除咗第一個同最後一個之外嘅所有嘢；得一個或者兩個值嘅時候佢係 []。",
+  "reduce 要個 0 做第二個參數，唔係嘅話一個空嘅中間會 throw，而唔係加埋等於冇嘢。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.advanced.04.strings"
+title = "三個長度"
+story = "希慎廣場幅 LED 牆用 `.length` 計跑馬燈嘅預算。一個電車 emoji 佢計兩個，銅鑼灣佢計三個，而下面個控制器就數到九。"
+brief = '''
+讀一行。印三行：
+
+1. 佢用 UTF-8 編碼有幾多個 **byte**
+2. 佢有幾多個 **字元**（Unicode code point）
+3. 呢一行嘅字元倒轉排
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+一個 JavaScript 字串有三個長度，而 `.length` 唔係要求嘅兩個之中任何一個。
+佢數嘅係 **UTF-16 code unit**：`"銅鑼灣".length` 係 `3`，睇落啱，
+`"🚋".length` 係 `2`，就唔啱。字元係 `for (const ch of s)` 同 `[...s]`
+行過嘅嘢 —— 字串嘅 iterator 係一個 code point 一個 code point 咁行 ——
+所以 `[...s].length` 就係第二行。
+
+byte 係第三個數字。呢度冇 `TextEncoder`，亦都冇 `Buffer`：
+`node.d.ts` 兩個都冇宣告，`tsc` 會用 `TS2304: Cannot
+find name` 截停你。改為由 code point 數返出嚟 —— `ch.codePointAt(0)`
+細過 `0x80` 係一個 byte，細過 `0x800` 兩個，細過 `0x10000` 三個，
+再大就係四個。
+
+`s.split("").reverse().join("")` 係人人都會伸手去攞嘅倒轉寫法，而佢會將一對
+surrogate pair 切開兩半。倒轉 `[...s]` 啦。
+'''
+hints = [
+  "[...line] 係一個 code point 嘅 array；佢嘅長度就係字元數。line.length 係 UTF-16 unit，而個 starter 將佢印咗兩次。",
+  "for (const ch of line) 都係一個 code point 一個咁行，所以 ch.codePointAt(0) 係成個字元嘅編號，永遠唔會係半對。",
+  "split(\"\") 係按 code unit 切，會整爛個 emoji；倒轉展開咗嘅 array 就可以保住每個字元完整。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.advanced.05.maps"
+title = "幅牆講緊乜"
+story = "希慎廣場幅牆將今晚個 feed 送上嚟嘅字排名，而上面每一個數都寫住 NaN。"
+brief = '''
+讀晒成個標準輸入，按空白字元切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，次數一樣就按字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+個 starter 數入一個 `Record<string, number>`，個型別話每個 key 都裝住一個
+`number`。執行嗰陣，一個冇人寫過嘅 key 裝住嘅係 `undefined`，而
+`undefined + 1` 係 `NaN` —— 冇 exception，冇警告，淨係幅牆上面一個錯嘅數字。
+用 `Map<string, number>`：`counts.get(word)` 嘅型別係
+`number | undefined`，呢個先係真相，而 `?? 0` 就係對佢嘅回答。
+
+用一個 comparator 排啲 entry：次數由多到少係 `b[1] - a[1]`，而佢係 `0`
+嘅時候就落去比個字。比字用 `<` 同 `>`，唔好用 `localeCompare` ——
+`localeCompare` 會問部機嘅 locale，而一塊板喺邊部機都要讀出一樣嘅嘢。
+'''
+hints = [
+  "個 starter 印 NaN，因為 += 之前 counts[word] 係 undefined。個 Record 型別應承咗一個從來冇出現過嘅數字。",
+  "counts.set(word, (counts.get(word) ?? 0) + 1) —— get 認咗搵唔到，?? 補返個零。",
+  "b[1] - a[1] || wordOrder：一個 comparator 回傳 0，就將打和交畀 || 右邊處理。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.advanced.06.sets"
+title = "兩個螢幕都播嘅"
+story = "兩個螢幕隔住怡和街面對面，個廣告客想知佢喺同一個路口畀錢播咗兩次嘅係邊啲片。"
+brief = '''
+兩行標準輸入，每行係一個螢幕嘅片，用空格分開。一個螢幕可能同一條片列兩次；
+嗰樣只計一次。
+
+印三行：
+
+1. `BOTH` 跟住兩張清單都有嘅每條片，排好序，用空格分開 —— 或者
+   冇嘅話就印 `BOTH -`
+2. `ONLY_A <k>`：有幾多條片喺第一張清單度而唔喺第二張
+3. `ALL <k>`：兩張清單加埋有幾多條唔同嘅片
+
+```
+input:  milktea sneakers phone sneakers
+        phone watch
+output: BOTH phone
+        ONLY_A 2
+        ALL 4
+```
+
+`Set` 冇重複。喺呢個 land 編譯所用嘅 `es2023` library 入面，佢亦都冇
+`intersection`、`difference` 或者 `union` —— 嗰啲係 ES2025 先有，
+`tsc` 會用 `TS2339: Property 'intersection' does not exist` 話你知。
+決定有乜存在嘅係你編譯所對嘅 library，唔係你行緊嘅 Node 版本。所以自己寫：
+`[...a].filter((x) => b.has(x))` 係交集，換做 `!b.has(x)` 就係差集，
+`new Set([...a, ...b])` 係並集。
+
+冇 comparator 嘅 `.sort()` 係按 UTF-16 code unit 排字串，對呢啲嚟講啱啱好，
+對數字嚟講就錯晒。排名榜喺兩個 quest 之後。
+'''
+hints = [
+  "new Set(tokens) 入去嗰陣已經掉咗重複嘅 sneakers。Set 嘅數量係 .size，唔係 .length。",
+  "[...a].filter((x) => b.has(x)) 係交集；將個測試反轉就係差集；兩個都展開入一個 Set 就係並集。",
+  "both.length > 0 ? both.join(\" \") : \"-\" 一個表達式就處理埋空嘅情況。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.advanced.07.functions"
+title = "每個鐘"
+story = "價目表上面每個螢幕時段，除非另外寫明，否則都係以鐘計，而印價目表嗰部機喺每個冇寫明嘅下面都印咗 `/undefined`。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<NAME> <CENTS>` 或者
+`<NAME> <CENTS> <UNIT>`。
+
+寫 `tag(name, cents, unit = "hour")`，回傳 `<NAME> $<dollars>/<unit>`，
+兩個小數位，每行印一個 tag。
+
+```
+input:  3
+        TSQ 1200
+        HYSAN 250 minute
+        LEEGARDEN 800
+output: TSQ $12.00/hour
+        HYSAN $2.50/minute
+        LEEGARDEN $8.00/hour
+```
+
+個 starter 編譯到、行到，然後印出 `TSQ $12.00/undefined`。睇下點解。
+`const [name, cents, unit] = line.split(" ")` 將三個都當做 `string`，
+因為 `split` 回傳 `string[]`，而編譯器唔知佢有幾長。喺一行得兩個 token 嘅時候，
+`unit` 執行嗰陣係 `undefined`，而 template literal 就忠實咁將呢個字印出嚟。
+個型別係一個 array 從來冇應承過嘅承諾。
+
+**預設參數**就係修法，而佢得嘅原因值得知道：當個參數係 `undefined` ——
+冇傳，或者明確咁傳 `undefined`，即係呢度 `tag(name, cents, unit)` 做緊嘅嘢
+—— 預設值就會生效。`null` 就唔會觸發佢。個簽名就係份合約，講明叫佢嘅人
+可以漏咗乜，同埋漏咗嘅時候會得到乜。
+'''
+hints = [
+  "參數列入面寫 unit: string = \"hour\"。成個修法就係咁。",
+  "預設值喺 undefined 嘅時候生效，包括特登傳入嚟嘅 undefined。喺 body 入面寫 `unit ?? \"hour\"` 係同一個諗法，喺叫嘅地方寫出嚟。",
+  "template literal 入面嘅 `$${...}` 係一個真嘅錢銀符號，跟住一個插值。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.advanced.08.exceptions"
+title = "唔係數字嘅嗰行"
+story = "怡和街電車站個到站板由個 feed 讀一欄分鐘數，而中間有一行寫住 `xx`。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行。每行應該係一個整數。
+
+每行印個值乘二，或者如果佢唔係整數就印 `BAD <line>`。最後印
+`SUM <total>`，total 係你印過嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`Number("xx")` 唔會失敗。佢回傳 `NaN`，而 `Number("1.5")` 係
+`1.5`，`Number("")` 係 `0`。所以個 starter 嘅 `double` 先會用一個 pattern
+check 段文字，然後 **throw** `NotANumber` —— 亦都所以個 starter 去到第二行
+就死咗喺呢個 exception 度，因為冇嘢接住佢。
+
+將嗰一個會 throw 嘅呼叫包喺 `try`/`catch` 入面。喺 `strict` 之下，接住嘅值
+嘅型別係 **`unknown`**：JavaScript 嘅 `throw` 乜都可以 throw，一個字串、
+一個數字、甚至 `undefined`，而編譯器唔會扮唔知。冇 `catch (NotANumber e)`
+呢回事。你自己收窄佢 —— `if (err instanceof NotANumber)` —— 唔係你嘅就
+`throw err` 返出去，咁你自己碼入面打錯字都仍然會大大聲咁失敗，而唔會被
+當做一行壞嘅輸入報告。
+'''
+hints = [
+  "個 starter 死喺 NotANumber: not a whole number: xx。你要接嘅就係呢個 class。",
+  "try block 要細：淨係會失敗嗰個呼叫放入去，印嘢同加總放喺後面。",
+  "catch (err: unknown)，然後 `if (err instanceof NotANumber)`。其他嘢就用 `throw err` 再 throw 出去；一個乜都吞晒嘅 catch，就係程式學識靜靜雞失敗嘅方法。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.advanced.09.array-methods"
+title = "沿住個 feed 行一次"
+story = "Alex 話用三個 for 循環加三個計數器就搞得掂。第三個行完嗰陣，送去希慎廣場幅牆嘅 feed 早就過咗。"
+brief = '''
+標準輸入係一行整數，用空格分開。
+
+印三行：
+
+1. 雙數值嘅總和（冇嘅話就係 `0`）
+2. 每個大過 `10` 嘅值乘二，按次序，用單一空格連埋 ——
+   冇嘅話就印 `-`
+3. 有幾多個唔同嘅值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+TypeScript 冇 comprehension。佢有 array method，係同一個諗法由左到右咁寫：
+`filter` 留低，`map` 轉換，`reduce` 摺埋，`new Set(...)` 去重。每個都回傳
+一個新嘅值，冇一個要用 index。
+
+`reduce` 收一個初始值，而喺呢度佢唔係可有可無：個範例有雙數，但其中一個
+隱藏測試冇，而 `[].reduce((a, b) => a + b)` 會 throw `TypeError: Reduce of empty array with
+no initial value`。`reduce((sum, v) => sum + v, 0)` 加埋冇嘢就係 `0`。
+
+負數：喺 JavaScript `-4 % 2` 係 `-0`。`-0 === 0` 係 `true`，所以
+雙數測試冇問題 —— 但數字要經 template literal 印，嗰度
+`` `${-0}` `` 係 `"0"`，永遠唔好畀一個光禿禿嘅 `-0` 去到 `console.log`。
+'''
+hints = [
+  "nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0) —— 先留低，再摺埋，個 0 做起始總和。",
+  "先 filter 後 map：用原本嘅值 filter，然後將留低嘅乘二。",
+  "new Set(nums).size 就係唔同嘅值嘅數量。Set 係按值比較數字，所以兩個 12 算一個。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.advanced.10.from-entries"
+title = "同一次，按 key"
+story = "利園個購物 app 收到今晚嘅價錢，係一串 pair，次序係啲舖頭打入去嗰個。減價 banner 要將佢哋變做一塊板，而且要兩次。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<ITEM> <PRICE>`。`PRICE` 係以仙為單位嘅整數。
+每樣貨最多出現一次，而 `n` 至少係 `1` —— 一定有一樣最平嘅貨可以講。
+
+印三行：
+
+1. 每樣價錢**嚴格大過 100** 嘅貨，格式係 `ITEM=PRICE`，按貨名排，
+   用單一空格連埋 —— 冇嘅話就印 `-`
+2. 每樣貨，價錢**減半再向下取整**，同一個格式，按貨名排
+3. `CHEAPEST <item>` —— 最低價嗰樣，打和就按貨名由細到大
+
+```
+input:  3
+        SCARF 120
+        MUG 80
+        BAG 250
+output: BAG=250 SCARF=120
+        BAG=125 MUG=40 SCARF=60
+        CHEAPEST MUG
+```
+
+`Object.fromEntries(pairs)` 一個表達式就由 `[key, value]` pair 砌出一個有 key
+嘅物件，而 `Object.entries(obj)` 再將佢拆返開 —— 所以
+`Object.fromEntries(Object.entries(prices).filter(...))` 係一塊過濾咗嘅板，
+同樣咁加 `.map(([k, v]) => [k, Math.floor(v / 2)])` 就係一塊轉換咗嘅板。
+兩個都唔使一個空物件同一個循環去填佢。
+
+印之前先排好啲 entry，就算佢哋睇落已經排好。一個物件會按加入次序保留字串 key，
+**除咗**睇落似 array index 嘅 key —— `"7"` 喺 `"10"` 前面，`"10"` 喺 `"SCARF"`
+前面，唔理佢哋係咩次序到。一塊用產品編號做 key 嘅板會自己重新排過。
+你想要咩次序就講出嚟。
+'''
+hints = [
+  "Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100)) —— 拆開、留低、砌返埋。",
+  "Object.entries(obj).sort(byKey) 畀你按 key 排好嘅 [key, value] pair，正正就係 ITEM=PRICE 要嘅。",
+  "搵最平嗰樣，就按價錢排，價錢打和就落去比名：a[1] - b[1] || byKey(a, b)。第一個 entry 贏。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.advanced.11.sorting"
+title = "排名榜"
+story = "三十樓嘅廣告部將今晚時代廣場螢幕嘅出價排名，兩個出價一樣嘅廣告客，出嚟嘅次序係佢哋打電話入嚟嘅次序。"
+brief = '''
+兩行標準輸入：第一行係廣告客名，第二行係佢哋以仙為單位嘅出價，次序一樣。
+最少有一個廣告客。
+
+將廣告客由最平排到最貴，印 `<rank>. <NAME> <cents>`，
+rank 由 `1` 開始，打和就按名由細到大。然後印
+`CHEAPEST <NAME>`。
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+`names.map((name, i) => ({ name, cents: bids[i] }))` 將兩張清單配對；
+`sort` 加一個 comparator 將啲 pair 排好；`map` 交畀你嘅 index 就係 rank。
+comparator 回傳負數、零或者正數，而個 starter 嗰個除咗價錢差之外乜都唔回傳
+—— 所以打和就照輸入次序出嚟，因為 `sort` 係穩定嘅，而穩定唔等於啱。
+
+永遠唔好對數字叫冇 comparator 嘅 `.sort()`。佢會先將佢哋轉做字串，
+`[900, 1200].sort()` 係 `[1200, 900]`，因為 `"1"` 排喺 `"9"` 前面。
+'''
+hints = [
+  "打和嘅時候 a.cents - b.cents 係 0，而 0 || nameOrder 就會落去比名。",
+  "用 < 同 > 比名。localeCompare 喺呢度都得，但佢亦都會問部機嘅 locale，而排名榜唔應該靠呢個問題。",
+  "sort 就地改個 array 再回傳佢。toSorted 係複製嘅版本，es2023 有。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.advanced.12.classes"
+title = "操作員本簿仔"
+story = "控制室每個操作員都有本簿仔記住今晚排咗啲乜片，而夜更嗰本入面有一個鉛筆測試，夜更冇人寫過。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<CLIP> <CENTS>`。
+
+整一個 `Notebook` class 收集啲片，然後按到達次序將每條印返出嚟，格式係
+`<CLIP> <CENTS>`，跟住印 `TOTAL <sum>`，最後用 `` console.log(`${book}`) ``
+印本簿仔本身 —— 佢嘅 `toString()` 一定要出
+`Notebook(items=<n>, total=<sum>)`。
+
+```
+input:  2
+        TRAILER 600
+        PROMO 2800
+output: TRAILER 600
+        PROMO 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` 可以係 `0`，嗰陣兩行就係 `TOTAL 0` 同
+`Notebook(items=0, total=0)`。
+
+個 starter 將 `items` 宣告做 **`static`**：class 上面得一個 array，
+由以後所有 `Notebook` 共用。一個冇 `static` 宣告嘅 field ——
+`items: Entry[] = []` —— 每次 `new` 都初始化一次，屬於嗰個 instance。
+個 starter 嘅 `main` 整咗本草稿簿仔，喺入面寫咗個鉛筆測試，而個鉛筆測試
+走咗入真嗰本度。
+
+template literal 會對一個物件叫 `toString()`。冇嘅話你會得到預設嗰個，
+`[object Object]`，亦都係個 starter 印出嚟嘅嘢。
+`console.log(book)` 唔同 —— 佢印 Node 對啲 field 嘅檢視 ——
+所以個 brief 先會講明要用 template。
+'''
+hints = [
+  "行一次個 starter，睇輸出第一行：PENCIL 0，嚟自一本冇人寫過佢嘅簿仔。嗰個就係共用嘅 static array。",
+  "items: Entry[] = []，唔好 `static`，而個 starter 寫 Notebook.items 嘅地方全部改做 `this.items`。",
+  "toString(): string { return `Notebook(items=..., total=...)` } —— main 入面個 template literal 會幫你叫佢。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.advanced.13.unions"
+title = "邊個搭緊車"
+story = "利園小巴站個車費螢幕每張卡都收全費，包括唔係成人嗰啲，同埋唔係卡嗰一張。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<TYPE> <STOPS>`。
+
+基本車費係 `500 + 100 * STOPS` 仙。每行印以下其中一樣：
+
+* `ADULT` —— 基本車費
+* `STUDENT` —— 基本車費一半，向下取整
+* `SENIOR` —— 永遠係 `200`
+* 其他任何嘢 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+將每行建模做一個 **discriminated union**：每種情況一個物件型別，全部共用
+一個 literal `kind` field，再加一個保留原始文字嘅 `UNKNOWN` 情況。
+`parse` 係唯一一個睇由線上面嚟嗰個字串嘅地方；過咗佢之後，個型別就講明
+一個 `Order` 可以係邊四樣嘢，而對 `order.kind` 做嘅 `switch` 會喺每個
+`case` 入面收窄 `order`。
+
+個 starter 嘅 `switch` 得一個 arm，加一個 `default` 對其他所有嘢都印
+`UNKNOWN` —— 包括佢應該識嘅兩種。每一種都畀佢一個 arm，再令個 `default`
+證明冇嘢剩低：
+
+```ts
+default: {
+  const unreachable: never = order;
+  return unreachable;
+}
+```
+
+如果將來 union 加咗第五種而 switch 冇加，嗰行就會編譯唔到。個 union 本身
+喺執行嗰陣會被抹走 —— `node` 從來見唔到佢 —— 所以個 check 一係喺呢度、
+喺 `tsc` 入面做，一係就冇得做。
+'''
+hints = [
+  "每一種一個 case。喺 `case \"STUDENT\":` 入面，編譯器知道 order 有 `stops`；喺 `case \"UNKNOWN\":` 入面，佢知道 order 有 `raw` 而冇 `stops`。",
+  "Math.floor(x / 2) 就係向下取整嘅一半。淨係用 `/` 嘅話，基本車費係單數就會得出 450.5，而塊板會照印。",
+  "default 入面嘅 const unreachable: never = order 就係窮舉檢查 —— 同一個冇 `_` arm 嘅 Rust match 做緊同一份工。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.advanced.14.generators"
+title = "你自己嘅 for 循環"
+story = "時代廣場螢幕上面個倒數以固定嘅跳距由一個數跳去下一個，而後面個控制器冇喺任何地方保留一張數字清單。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+寫一個 **generator function** `ticker(start, step, count)`，yield 出
+`count` 個值，由 `start` 開始，每次加 `step`。每個值印一行，然後印行第二個
+ticker 計出嚟嘅 `SUM <total>`。
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        [object Generator]
+```
+
+最後一行係 `Object.prototype.toString.call(ticker(...))`，由個
+starter 嘅 `main` 照原樣印出嚟。而家佢寫住 `[object Array]`。
+
+`function*` 喺你叫佢嗰陣唔會行。佢回傳一個 generator 物件，而個 body 係
+一步一步咁行，每次有嘢問佢要下一個值嗰陣行一步 —— `for...of`、展開、
+`Array.from`。所以佢可以描述一百萬個值，而一個有一百萬個值嘅 array 從來都唔使存在。
+
+個 starter 砌好個 array 再回傳佢，而佢過到型別檢查，因為回傳型別寫住
+`Iterable<number>`，而 array 就係一個。份合約滿足咗；條問題就冇。array 係
+一次過所有值；generator 係你問先畀一個值。將個 `push` 變做 `yield`，再刪咗
+個 array。
+'''
+hints = [
+  "輸出最後一行係個物件嘅 tag，而個測試要 [object Generator]。function* 回傳嘅就係呢樣。",
+  "yield 個值，然後推前。個 function 喺 yield 度停低，下一次有人要嘢嗰陣由佢後面繼續。",
+  "一個 generator 只可以行一次。所以 main 計總和嗰陣會整過個新 ticker，而唔係用返第一個循環已經榨乾咗嗰個。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.advanced.15.higher-order"
+title = "包住咗"
+story = "收費螢幕想知今晚個計價 function 行咗幾多次，而個計價 function 唔想知自己俾人監視緊。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 個以鐘計嘅時長。
+
+`price(hours)` 係 `500 + 100 * hours`。用 `counted` 包住佢，令每次呼叫都
+被數到，而 `price` 唔知道。每個時長印一個價錢，然後印 `CALLS <n>`，
+再印 `NAME <price.name>` —— 佢一定仍然要寫住 `price`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+TypeScript 有 `@decorators`，但只可以用喺 class 同佢嘅成員度；一個獨立嘅
+function 戴唔到。decorator *係*乜，唔使任何語法：一個收一個 function、
+回傳一個 function 嘅 function。所以
+`const price = counted(function price(hours: number) { ... })` 就係成個機制，
+而 `counted` 上面嘅 generic —— `<A extends unknown[], R>` —— 就係令佢可以
+包住任何簽名、再交返同一個簽名出嚟嘅嘢。
+
+`counted` 回傳嘅 function 係一個叫 `wrapper` 嘅 closure，除非你另外講，
+否則佢個 `name` 係 `"wrapper"`：即係個 starter 輸出嘅最後一行。
+Python 有 `functools.wraps`；呢度你自己用
+`Object.defineProperty(wrapper, "name", { value: fn.name })` 抄個名過去 ——
+`name` 係唯讀嘅，所以喺 strict mode 直接賦值會 throw。
+
+個計數放喺 wrapper 度：function 宣告之後即刻寫 `wrapper.calls = 0`。
+`tsc` 見到呢個賦值，會喺個 function 嘅型別度加 `calls: number`，所以
+`main` 入面嘅 `price.calls` 過到型別檢查。
+'''
+hints = [
+  "return 之前寫 Object.defineProperty(wrapper, \"name\", { value: fn.name })。一行。",
+  "wrapper.name = fn.name 編譯到，然後 throw TypeError: Cannot assign to read only property 'name'。defineProperty 就係繞過佢嘅方法。",
+  "(...args: A) => R 配 A extends unknown[]，就係 wrapper 唔使知道都可以轉交任何簽名嘅方法，亦都係 price 包完之後仲保住 (hours: number) => number 型別嘅原因。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.advanced.16.structural"
+title = "有嗰個樣就得"
+story = "一個利園嘅紙袋。收銀螢幕冇人問過入面係乜；佢哋問嘅係入面有幾多樣嘢、有冇 sneakers，同埋逐樣過一次。"
+brief = '''
+標準輸入係一行貨品，用空格分開，然後一行得一個要搵嘅字。
+
+將啲貨品放入一個 `Bag`，交畀個 starter 嘅 `report`，佢會印：
+
+1. `LEN <k>` —— 由 `bag.size` 嚟
+2. 啲貨品，每行一樣 —— 由 `for (const item of bag)` 嚟
+3. `HAS <WORD> YES` 或者 `HAS <WORD> NO` —— 由 `bag.has(word)` 嚟
+4. `LONGEST <item>` —— 最長嗰樣，打和就要第一樣
+
+```
+input:  cap sneakers tee
+        sneakers
+output: LEN 3
+        cap
+        sneakers
+        tee
+        HAS sneakers YES
+        LONGEST sneakers
+```
+
+`report` 收一個 `Container<string>`，而 `Bag` 冇任何地方寫
+`implements Container`。佢唔使寫。TypeScript 嘅型別係 **structural**：
+一個值啱唔啱一個 interface，睇佢有冇嗰啲成員，唔係睇佢有冇講出個名。
+呢個就係 duck typing，不過係喺程式行之前由 `tsc` 檢查，而唔係等直譯器
+行到嗰度先檢查。`Set<string>` 都啱 `Container<string>`，同樣冇人寫低過。
+
+個 starter 嘅 `Bag` 一個成員都冇，所以編譯唔到：
+
+```
+error TS2345: Argument of type 'Bag' is not assignable to parameter of type 'Container<string>'.
+```
+
+畀佢一個 `size` getter、一個 `has` method，同一個 `[Symbol.iterator]()` ——
+即係 `for...of` 用嗰個 symbol 去搵嘅 method，同 Python 嘅 `for`
+搵 `__iter__` 一樣。
+'''
+hints = [
+  "get size(): number { return this.goods.length; } —— 用 getter，因為個 interface 話 `size` 係一個 property，唔係 method。",
+  "[Symbol.iterator]() 可以交返個 array 自己嘅 iterator：this.goods[Symbol.iterator]()。寫一個 `*[Symbol.iterator]() { yield* this.goods; }` generator 都得。",
+  "report 會保留長度一樣嘅第一樣，因為佢淨係遇到嚴格更長嘅先會換 —— 用 > 唔係 >=。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.advanced.17.undefined"
+title = "23:59 嘅價錢板"
+story = "23:59，控制室。價錢板向個 feed 問一個今晚冇開嘅螢幕，個 feed 答佢「冇嘢」，塊板就讀咗嗰個「冇嘢」嘅價錢。"
+brief = '''
+標準輸入係一個數量 `n`，然後 `n` 行 `<SCREEN> <CENTS>` —— 今晚開咗嘅螢幕
+—— 然後一個數量 `q`，再有 `q` 個要查嘅螢幕名。
+
+每個查詢印 `<SCREEN> <cents>`，如果嗰個螢幕冇開就印 `<SCREEN> NONE`。
+然後印 `MISSING <k>` 同 `CHEAPEST <SCREEN>` —— 價錢最低嗰個螢幕，
+打和就睇名 —— 如果一個都冇開就印 `CHEAPEST NONE`。
+
+```
+input:  2
+        TSQ 1200
+        HYSAN 900
+        3
+        HYSAN
+        YEEWO
+        TSQ
+output: HYSAN 900
+        YEEWO NONE
+        TSQ 1200
+        MISSING 1
+        CHEAPEST HYSAN
+```
+
+個 starter 編譯嗰陣一個警告都冇，去到 `YEEWO` 就仆街：
+
+```
+TypeError: Cannot read properties of undefined (reading 'cents')
+```
+
+呢一行就係呢張地圖嘅大佬。佢永遠唔會指住隻蟲。佢指住嘅係一個 `undefined`
+最後畀人*用*嘅位置，而喺個 starter 入面，佢係喺兩個編譯器被叫唔使擔心嘅地方
+整出嚟嘅。
+
+`lookup` 由一個 `Record<string, Screen>` 回傳 `board[name]`，而個 index
+型別話係 `Screen` —— 唔係 `Screen | undefined` —— 因為 TypeScript
+假設你讀嘅 index 係一個存在嘅 index。個註解話係 `Screen`，`tsc` 信咗，
+而執行嗰陣個 key 唔喺度。
+而 `cheapest` 喺主要路徑上冇 `return` —— 佢計出最好嗰個螢幕，然後行到
+落尾 —— 所以佢暗中回傳 `undefined`，而佢嘅型別容許咗；叫佢嘅人跟住就用
+`!`，即係 non-null assertion，穿過佢去攞嘢 —— 一個對編譯器嘅承諾，冇人會 check。
+
+**特登**令兩個 function 都講明 `Screen | undefined` —— `Map<string, Screen>`
+有 `get`，佢嘅型別本身已經認咗搵唔到 —— 然後喺個 `undefined` 落地嘅地方
+用 `=== undefined` 處理佢。唔好用 `!screen`：對一個物件嚟講得，但到咗
+呢塊板變成 `Map<string, number>` 嗰日，嗰個 `0` 仙嘅免費螢幕就會唔見咗。
+'''
+hints = [
+  "由上面開始讀個 stack trace：TypeError 係喺 console.log 嗰行，但個 undefined 係前一行由 lookup 出嚟嘅，再之前係由個 Record index 出嚟嘅。",
+  "lookup 一回傳 Screen | undefined，`screen.cents` 就會編譯唔到，直到你 check 咗為止。嗰個錯誤就係編譯器做緊個 Record index 跳咗嘅工作。",
+  "cheapest 有兩條路徑，得一條有 return。另一條行到落尾，`Screen | undefined` 回傳型別靜靜雞容許咗，而叫佢嘅人個 `!` 就發誓冇咁嘅事。回傳 `best`，再刪咗呼叫嗰度個 `!`。",
+  "`!` 同 `as` 都係對編譯器嘅承諾，佢 check 唔到。執行嗰陣佢哋同其他所有型別一齊被抹走，剩低嘅就係真正到咗嘅嗰個值。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.advanced.18.promise-all"
+title = "十二塊螢幕，一條 thread"
+story = "22:00，招牌控制室。十二塊螢幕同時被問佢哋嘅幀數，而份報告喺任何一塊答之前就印咗出嚟。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+每個值開一個 async task，等 event loop 行一轉，計出個值嘅平方，儲落 `results[i]`——佢自己嘅格，所以冇兩個 task 會寫同一個位。等**齊晒**佢哋，然後**按 index 次序**印出啲結果，一行一個，再印 `TASKS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        TASKS 3
+```
+
+呼叫一個 `async` 函數會即刻開始行佢。佢會同步咁行到第一個 `await`，喺嗰度交返一個 `Promise` 出嚟，呼叫者就繼續行落去。得一條 thread：啲 task 唔係喺第二度同時行緊，佢哋係**泊咗喺度**，等 event loop 返嚟搵佢哋——而 event loop 要等而家行緊嘅 code 放開條 thread 先返得嚟。
+
+starter 開晒啲 task 之後即刻印，所以喺任何一個 task 返嚟填格之前就已經印咗啲格：`undefined`，印 `n` 次。`await Promise.all(tasks)` 就係個 join。佢會放開條 thread，直到每個 task 都 settle 咗；只要其中一個 throw，佢就即刻 reject——呢個係要揸住啲 promise、唔好隨手掉落地嘅另一個原因。
+'''
+hints = [
+  "喺印嘢嗰個 loop 之前 await Promise.all(tasks)。starter 已經砌好個 tasks array；只係冇嘢等佢。",
+  "開晒每個 task，然後等齊佢哋。呢度 `for (const t of tasks) await t;` 都啱，因為所有 task 喺第一個 await 之前已經開始咗。",
+  "results 被 square 嘅 closure 捉住；佢同 main 印嗰個係同一個 array，所以 join 之後睇得到啲寫入。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.advanced.19.mutex"
+title = "一個計數器，八塊螢幕"
+story = "島上每塊螢幕都將播放次數報去三十樓嗰一個收費計數器，到咗半夜，計數器話得一次播放，而每塊螢幕都發誓自己報咗。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+每個值開一個 async task，一次過全部開。每個 task 讀個共用計數器，去收費伺服器行一個**來回**（starter 嘅 `roundTrip()`，event loop 行一轉），然後將計數器寫返入去：總數加上佢個值，hits 加一。等齊晒佢哋，然後印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+JavaScript 得一條 thread，啲人會話你知咁即係冇 race。佢冇嘅係 **data** race：永遠冇兩行 code 喺同一刻行。其他種類嘅 race 佢全部都有。starter 啲 task 全部讀咗計數器，全部泊喺個來回度，全部返嚟寫 `我讀到嘅 + 我嘅`——而佢哋每個讀到嘅都係 `0`。最後寫嗰個贏：`TOTAL 4`、`HITS 1`，確定咁、次次都係。讀同寫之間嘅一個 `await` 就係一道門，乜嘢都可以行入嚟。
+
+個來回要留住；佢就係份工。將讀、來回同寫用一把鎖包住。starter 有個 `Mutex` class，簽名啱晒，但入面冇鎖——`run` 淨係呼叫個 critical section。將佢變成真嘅，淨係用 Promise 砌：留住一個 `tail` promise；每個呼叫者駁落 tail 後面，用一個自己嘅 promise 換走佢，等舊嗰個，行，然後喺 `finally` 入面 resolve 自己嗰個，咁一個 exception 都唔會令把鎖一直俾人揸住。
+'''
+hints = [
+  "行吓個 starter：TOTAL 係最後嗰個值，HITS 係 1。每個 task 都喺任何 task 寫之前讀咗計數器；佢哋就係喺個來回度擦身而過。",
+  "把鎖係一條 promise 隊。`const ahead = this.tail; this.tail = <a new promise you can resolve>; await ahead;`——然後行，然後 resolve 你嗰個。",
+  "喺 `finally` 入面 resolve，喺 try 入面 `return await critical()`，咁釋放先會喺 critical section 行完之後先發生，而唔係喺佢個 promise 啱啱整出嚟嗰陣。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.advanced.20.channel"
+title = "邊個閂條 feed"
+story = "控制室將每個到站時間沿住條 feed 推去怡和街塊牌，最後一個之後，塊牌坐喺度等一個永遠唔會嚟嘅下一個，然後就黑咗。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+一個 producer task 將每個值乘十送落一條 `Channel`，event loop 每轉一個，然後**閂咗**佢。main task 一路收，直到條 channel 話佢閂咗為止，印每個值、計住總數，然後印 `SUM <total>` 同 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+starter 嘅 `Channel` 係完整嘅：`send`、`receive`，同埋 `close`——佢會用 `undefined` 叫醒每個等緊嘅 receiver。個 producer 從來冇呼叫 `close`，所以最後一個值之後，receiver 就 await 緊一個永遠冇人會 resolve 嘅 promise。
+
+喺 Go 嗰度，呢個係 `fatal error: all goroutines are asleep - deadlock!`。喺 Python，就係 hang 住直到 runner 殺咗佢。Node 兩樣都唔係。當 event loop 冇嘢剩低可以叫醒任何嘢——冇 timer、冇 I/O、冇 immediate——個 process 就咁**退出**，status `0`，喺你個 `for (;;)` 中間。`SUM` 嗰行同 `CLOSED` 嗰行永遠唔會行，由外面睇好似成功咗咁。呢個仲衰過 crash，而 starter 就係咁。
+
+由 producer 閂條 channel。永遠唔係 consumer——知道條流完咗嗰邊，就係結束佢嗰邊。
+'''
+hints = [
+  "一行，放喺 control 嘅最尾：feed.close()。",
+  "receiver 已經有檢查 `=== undefined`。佢係等緊一樣 producer 從來冇送嘅嘢。`if (!value) break` 都會停——但係喺第一個 0 就停，而其中一個隱藏測試就係送 0。",
+  "如果 undefined 可以係 channel 上面一個真嘅值，receive 就會改為回傳 { done: true } | { done: false, value: T }——同 iterator 嘅 next() 回傳嘅形狀一樣，原因都一樣。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.advanced.21.worker-pool"
+title = "八部編碼器"
+story = "希慎廣場幅牆有四十段片要 render，機架上面有八部編碼器。冇人想要四十部編碼器；佢哋要嘅係嗰八部永遠唔停手。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+行一個有 `w` 個 worker 嘅 pool。每個 worker 一路 loop：攞下一個未有人認領嘅 index，`await render(index, value)`——佢會喺 event loop 行幾轉之後回傳 `[index, value * value]`，轉幾多轉視乎個 index——然後將呢對嘢 push 落 `results`，直到冇 index 剩為止。等齊每個 worker，按 index 排好啲結果，一行一個印 `<index> <value>`，然後印 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+啲對係按工作**做完**嘅次序到嘅，唔係開始嘅次序；喺結果入面帶住個 index，先令到每次行嘅輸出都一樣，而按佢排序就係答案嘅最後一行。
+
+`const i = next++` 唔使鎖，而經過上一關之後值得知道點解：讀 `next` 同加一之間冇 `await`，所以冇其他 worker 可以插入嚟。把鎖從來都只係喺跨越 `await` 嗰陣先需要。
+
+starter 用 `workers.forEach(async (w) => {
+await w; })` 等啲 worker。佢編譯到，而佢乜都冇等：`forEach` 呼叫個 async callback，攞返一個 promise，然後掉咗佢。每個 callback 都有 await；`main` 就一個都冇 await，印出一個空嘅結果。
+'''
+hints = [
+  "用 await Promise.all(pool) 取代個 forEach。forEach 永遠唔會等佢個 callback 回傳嘅任何嘢，async 唔 async 都一樣。",
+  "啲結果按做完嘅次序到；每對入面個 index 係佢從邊度嚟嘅唯一記錄，排序就將佢放返原位。",
+  "`for (const running of pool) await running;` 都得。唔得嘅係任何收 callback 嘅 array 方法——map、forEach、filter——當佢會幫你 await 個 callback 咁用。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.advanced.22.async-await"
+title = "ASYNC 其實喺邊度行"
+story = "Mei 寫咗四年 `await`，但從來未見過推動佢嘅嗰樣嘢。控制室得一個 loop，島上每塊螢幕輪流用佢。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+`async function double(value)` 讓出一次——`await null`——然後回傳個值乘二。用 `Promise.all` 行晒 `n` 個，按輸入次序印每個結果，然後印 `SUM <total>` 同 `TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+starter 個 `run` 將啲值經 `double` map 一次，得到一個 **promise** array——然後話畀 compiler 知佢係一個數字 array：
+
+```ts
+const results = nums.map((v) => double(v)) as unknown as number[];
+```
+
+`tsc` 接受，因為 `as unknown as` 就係叫佢唔好再檢查嘅寫法。呢個 cast 同其他所有型別一齊被抹走，執行時個 array 仍然係 promise：輸出係三次 `[object Promise]`，同一個由佢哋黐埋一個零而成嘅字串 `SUM`。cast 唔係轉換。佢改變 compiler 相信乜，但完全冇改變個值。
+
+`Promise.all` 收啲 promise，resolve 出佢哋嘅結果，**按你傳入嘅次序**，唔理佢哋係咩次序做完。
+
+咁全部喺邊度行？喺嗰一條 thread 上面，輪住行。`await null` 將函數剩低嘅部分放上 **microtask** 隊，Node 會將呢條隊完全清空，先會掂 timer、immediate 或者任何 I/O——即係 macrotask。一個喺一千個 await 之前排好嘅 `setTimeout(..., 0)`，仍然係喺佢哋全部之後先行。呢度冇嘢係並行嘅；嘢係輪住行，喺佢哋講明可以停嘅地方停。
+'''
+hints = [
+  "刪咗個 cast，睇吓 tsc 講乜：Type 'Promise<number>[]' is not assignable to type 'number[]'. 呢個 error 就係個 cast 收埋咗嘅真相。",
+  "return Promise.all(nums.map((v) => double(v)))——個 await 喺呼叫者嗰邊，run(nums) 被 await 嗰度。",
+  "Promise.all 保持參數次序。如果你想按做完嘅次序攞結果，就要自己帶住個 index，同 worker pool 一模一樣。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.advanced.23.work-queue"
+title = "邊個話做完"
+story = "三個操作員清緊螢幕更新嘅隊，值班主管等條隊話佢空咗。佢永遠唔會咁講，因為冇人話佢知一個更新做完咗，到 23:10 成個 console 黑晒。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+將 `[index, value]` 對放上 starter 嘅 `WorkQueue`。開 `w` 個 consumer task，一路 loop：攞一對、等一轉、將 `value * 10` 寫入 `results[index]`，然後呼叫 `taskDone()`。main task await `queue.join()`，然後閂咗條隊，等 consumer 嘅 `get()` 回傳 `undefined`、佢哋停低，await 佢哋，然後按 index 次序印結果同 `CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`join()` 喺每一個曾經 `put` 過嘅項目都有一個對應嘅 `taskDone()` 之後就會 resolve。starter 啲 consumer 從來冇呼叫佢。所以 `main` 等緊 `join`，consumer 喺 `get` 度等永遠唔會嚟嘅項目，event loop 上面冇剩任何可以叫醒任何人嘅嘢。
+
+呢個就係 **deadlock**——個個都等緊，冇人郁——而佢唔使 thread，亦都唔使鎖：兩個 promise 互相等對方郁就夠。兩個 task 用相反次序攞兩把 async mutex，係同一樣嘢，只係多啲儀式。Node 對佢嘅回應同上一關一樣：loop 行到乾，個 process 退出，status `0`，乜都冇印過。
+
+修正又係一行，喺 consumer 嗰邊。
+'''
+hints = [
+  "每處理完一個項目就 queue.taskDone()。join 淨係將 put 同 taskDone 對數，其他乜都唔理。",
+  "行 starter，佢乜都唔印，exit 0。唔係 crash，唔係 hang：event loop 冇晒可能會發生嘅嘢。",
+  "close() 會用 undefined 叫醒每個泊喺 get() 度嘅 consumer，結束佢哋嘅 loop；所以 main 喺 join 之後先可以 await 佢哋。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.advanced.24.finally"
+title = "把鎖始終都會鎖返"
+story = "控制室每次更新都會解鎖一個廣告商嘅時段，更新完再鎖返。22:40 收到壞更新嗰個由嗰陣開始一直冇鎖，因為上鎖嘅 code 喺出錯嗰行後面。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行 `<NAME> <CENTS>`，`CENTS` 理論上係一個整數。
+
+寫一個 generator `opened(name)`，印 `OPEN <NAME>`，yield 一次，然後印 `SHUT <NAME>`——**唔理個 body 有冇 raise**。body 係一個 `for (const _ of opened(name))` loop，解析 cents 然後加落總數。cents 解析唔到嘅一行，要喺個時段閂咗之後報做 `BAD <NAME>`。最後印 `TOTAL <sum>` 同 `REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+對 generator 用 `for...of` 係一個資源守衛，原因係咁：當 loop body 提早離開——`break`、`return`，或者 exception——`for...of` 會呼叫 generator 嘅 `return()`，佢會喺**個 `yield` 度**恢復 generator，當個 `yield` 係一句 `return` 咁。`yield` 後面嘅 code 唔會行。包住個 `yield` 嘅 `finally` 入面嘅 code 就會行。starter 冇 `finally`，`WONG` 個時段永遠閂唔到。
+
+TypeScript 5.2 有 `using` 同 `Symbol.dispose` 正正係做呢樣嘢，但呢度冇：`es2023` 函式庫冇 `Symbol.dispose`，所以 `using` 編譯唔到。`using` 本身就係用 `try`/`finally` 砌出嚟。
+
+唔好喺 generator 入面 catch 個 error。呼叫者要印 `BAD`，而一個吞咗個 error 嘅 generator 會當乜事都冇咁印 `TOTAL`。
+'''
+hints = [
+  "try { yield; } finally { console.log(`SHUT ${name}`); }——finally 就係每條路都會行嘅部分。",
+  "return() 行完個 finally 之後，個 exception 會經 for...of 傳出去，所以 main 個 catch 仍然睇到佢——所以 BAD 喺 SHUT 之後先印。",
+  "generator 唔係唯一方法：一個 `withSlot(name, body)` 函數，用 try/finally 包住 `body()`，做到同一件事。generator 嘅寫法係展示 for...of 離開時做咗乜嘅嗰個。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.advanced.25.pipeline"
+title = "Feed 嘅工序"
+story = "去怡和街啲牌嘅 feed 會經過三十樓兩道工序：一道將讀數平方，下一道計住累計數，塊牌應該每個一到就見到，而唔係 23:59 先一次過見到成晚。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 個整數。
+
+用 **generator** 砌一條兩級嘅 pipeline：
+
+1. `squares(values)` yield 每個值嘅平方
+2. `running(stream)` 收任何 `Iterable<number>`，計住累計總數，yield `[value, total]` 對
+
+`main` 將每對印做 `<square> <total>`，然後印 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+兩級都唔會砌 array。每個 `yield` 將一個項目交畀下一級然後暫停；`main` 拉，`running` 由 `squares` 拉，`squares` 由輸入拉。冇嘢會喺需要之前計，成條 pipeline 同一時間得一個項目喺半路。
+
+starter 嘅第二級只係名義上係 generator。佢行晒成條流，然後喺最尾先 yield **一次**，帶住最後一個值同最終總數——型別檢查完全冇問題，因為 `Generator<[number, number]>` 講嘅係每個項目係咩樣，完全冇講有幾多個。塊牌喺半夜先收到一行。
+'''
+hints = [
+  "將個 yield 搬入 loop 入面：每個值 yield [value, total] 一次。",
+  "starter 嘅輸出係一行同 PIPE 1。一個喺 loop 之後先 yield 嘅工序，就係一個多咗幾步嘅 array。",
+  "running(squares(nums)) 砌得埋，因為 generator 係一個 Iterable；running 從來唔知、亦唔理佢嘅輸入係另一個 generator。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.advanced.26.toolbox"
+title = "唔喺架上面嘅工具箱"
+story = "控制室本手冊話用 iterator helper 數相同畫面嘅連續段。三十樓部 compiler 從來未聽過佢哋，夜更操作員只好用手數。"
+brief = '''
+標準輸入係一行整數。
+
+印三行，每行都由你自己寫嘅 generator 砌出嚟：
+
+1. `SUMS` 跟住累計和——`accumulate(values)`
+2. `RUNS` 跟住每段**相鄰**相等值嘅連續段，寫做 `<v>x<k>`——`runs(values)`
+3. `PAIRS <k>`：有幾多對無序嘅**唔同**值——`pairs(items)`，行喺排好序嘅唔同值上面
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Python 架上有 `itertools`。JavaScript 有 iterator helper——`Iterator.prototype.map`、`.filter`、`.take`——Node 由 22 版開始有，但佢哋**唔喺**呢個架上面：`es2023` 函式庫冇宣告佢哋，所以無論底下個 `node` 幾新，`tsc` 都會話 `TS2339: Property 'map' does not exist`。你用得嘅就係函式庫宣告咗嘅嘢，同你 import 嘅嘢。呢個檔案用 ES `import` 由 `"fs"` import `readFileSync`——咁就令個檔案變做一個 **module**，而因為目標係 CommonJS，`tsc` 會將佢編譯做一個 `require`。其他所有嘢，你自己寫。
+
+`runs` 只係將**相鄰**嘅相等項目歸做一組。佢唔係計數，而個例子係特登揀嚟令兩者唔同：`1` 出現四次，分兩段。starter 第二行係用一個 `Map` 計數，正正喺呢個輸入度錯。
+'''
+hints = [
+  "accumulate 計住一個總數，每個值之後 yield 佢；佢最後 yield 嗰個就係總和。",
+  "runs 記住進行緊嗰段。下一個值唔同嗰陣，yield 做完嗰段，開一段新嘅——loop 之後，yield 最後嗰段，因為冇其他嘢會做。",
+  "pairs 係兩個巢狀 loop，j 由 i + 1 開始。數目係 n*(n-1)/2，用手核對一次，就知你個 n 啱唔啱。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.advanced.27.memo"
+title = "記住你計過嘅嘢"
+story = "時代廣場塊螢幕嘅排程器，半夜之前用同樣兩個數計同一個輪播一萬一千次，次次由頭計過。"
+brief = '''
+標準輸入係 `n k bits`：兩個整數同一串二進制數字。
+
+印四行：
+
+1. `FIB <fib(n)>`——由一個**遞迴**嘅 `fib` 計，包喺你自己寫嘅 memoise `memo(...)` 入面
+2. `PRODUCT <k!>`——喺 `1..k` 上面用乘法 `reduce`，要有初始值，咁 `k = 0` 就得 `1`
+3. `BIN <value>`——`bits` 由 `fromBinary` 當二進制讀，一個單參數函數，radix 喺入面固定咗
+4. `MISSES <m>`——個 memo 實際行咗個 body 幾多次
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最多係 `400`。starter 個包裝會數呼叫次數但乜都唔記，所以 `fib(10)` 係 177 次呼叫，`fib(35)` 係三千萬次，`fib(90)` 行唔完。有咗 cache，每個 `fib(i)` 只行一次，`MISSES` 就係 `n + 1`。
+
+啲數塞唔落一個 `number`。`fib(90)` 係 `2880067194370816120`，超過 `Number.MAX_SAFE_INTEGER`，一個 `number` 會一聲唔出咁印錯佢。用 **`bigint`**：`0n`、`1n`、`BigInt(i)`。template literal 會將 bigint 印做佢嘅數字；單獨 `console.log(5n)` 會印 `5n`。
+
+冇 radix 嘅 `parseInt(bits)` 會將 `1010` 讀做一千零一十。starter 就係咁做。喺一個 closure 入面固定個 radix——`(text: string) => parseInt(text, 2)`——呢個就係 Python 嘅 `functools.partial`：一個已經決定咗部分參數嘅函數。`bind` 都做到同樣嘢，但只限**前面**嘅參數，而 radix 係第二個。
+'''
+hints = [
+  "memo 喺佢個 closure 入面留住一個由參數對應到結果嘅 Map；命中就由 Map 回傳，唔中就行個 body、儲低結果，再計一次數。",
+  "fib 喺遞迴入面一定要呼叫 memoise 咗嘅 fib，否則只有最外層嗰個呼叫會被 cache。預先連型別宣告 fib，先令個箭嘴函數可以指返佢。",
+  "reduce((a, b) => a * b, 1n)——第二個參數係起始值，令空範圍得出 1n 嘅就係佢。佢都一定要係 bigint：1 * 1n 係 TS2365，唔會靜靜雞轉換。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.advanced.28.type-guard"
+title = "佢只要識得畫出嚟"
+story = "利園嘅指南螢幕列出商舖同服務櫃檯，佢哋由兩個唔同系統經同一條 feed 送嚟，而塊螢幕只想知每樣都識得畫自己出嚟。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行係以下其中一種
+
+* `SHOP <NAME> <LEVEL>`——畫做 `<NAME> / L<LEVEL>`
+* `COUNTER <NUMBER>`——畫做 `COUNTER <NUMBER>`
+
+starter 個 `parse` 將每行變做 feed 會送嘅嘢：商舖係一個 `Shop` instance，櫃檯係一個帶住 `render` 方法嘅**普通物件**。佢將佢哋當 `unknown[]` 交出嚟，因為任何由條線送落嚟嘅嘢，老實講型別就係咁。將每個係 `Sign` 嘅項目經 `show` 印出嚟，然後印 `SIGNS <k>` 同 `SHOPS <k>`——第二個用 `instanceof Shop` 數。
+
+```
+input:  3
+        SHOP LAM 4
+        COUNTER 2
+        SHOP WONG 1
+output: LAM / L4
+        COUNTER 2
+        WONG / L1
+        SIGNS 3
+        SHOPS 2
+```
+
+`Sign` 係一個 interface，而 interface 會被**抹走**。執行時冇 `Sign` 可以問——`x instanceof Sign` 編譯唔到，因為右手邊冇嘢可以代表佢。要由 `unknown` 去到 `Sign`，你要寫一個 **type guard**，`function isSign(x: unknown): x is Sign`，而 compiler 會相信佢回傳嘅任何嘢。佢自己乜都唔檢查。
+
+starter 個 guard 回傳 `x instanceof Shop`。佢編譯到，係一個完全正常嘅 boolean，但佢錯：櫃檯按形狀係一個 `Sign`，但唔係任何嘢嘅 instance。個 guard 講大話，compiler 信咗佢，啲櫃檯就由指南度消失咗。改為檢查形狀——`typeof x === "object"`、`x !== null`、`"render" in x`，同埋 `typeof x.render === "function"`——正正係個 interface 應承嘅嘢，唔多唔少。
+
+`show(sign)` 喺執行時派發：`sign.render()` 會搵到個物件有嘅嗰個 `render`，無論喺佢個 prototype 定佢自己身上。
+'''
+hints = [
+  "成個修正就係 isSign 個 body。櫃檯係一個 object literal；佢係邊樣嘢嘅 instance，嗰樣嘢冇名。",
+  "\"render\" in x 將 x 收窄做一樣有 render 屬性、型別係 unknown 嘅嘢；typeof x.render === \"function\" 將佢收窄埋餘下嗰段。兩樣都係真嘅執行時檢查，同 starter 嘅分別就喺呢度。",
+  "一個 type guard 只係同佢個 body 一樣咁老實。`return true` 都編譯到。compiler 信 `x is Sign`，就好似佢信 `as` 同 `!` 一樣——三樣都同型別一齊被抹走。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.advanced.29.frozen"
+title = "佢唔會變"
+story = "今晚嘅價目表 19:00 標住 readonly 發去每塊螢幕，到 22:00 已經有三塊喺上面寫過嘢，仲有一塊加咗一欄唔存在嘅嘢。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行 `<NAME> <CENTS>`。
+
+將每行砌做一個有 `readonly` 欄位嘅 `Price`。然後，對每個價錢，試吓覆寫佢嘅 `cents`，嘗試 throw 嘅話就印 `FROZEN <NAME>`。之後，一個得一個欄位 `count` 嘅 `Tally`：set 佢，然後試吓 set 一個串錯咗嘅 `cuont`，*嗰個* throw 嘅話就印 `SEALED YES`。最後印 `IN_SET <k>`——按名同 cents 計有幾多個唔同嘅價錢——同 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SEALED YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+`readonly` 係同 compiler 立嘅一份合約，而同呢度每份合約一樣，佢會被**抹走**。`price.cents = 0` 編譯唔到——所以 starter 經一個放闊咗嘅視圖寫入，`(price as { cents: number }).cents = 0`，佢編譯到，因為一個 readonly 屬性可以賦值畀一個可變嘅屬性，而執行時冇嘢攔住。價目表被人寫過，`TOTAL` 係 `0`。合約嘅執行時嗰一半係 constructor 最尾嘅 `Object.freeze(this)`：喺 strict mode 下，賦值畀一個 frozen 物件嘅屬性會 throw `TypeError`，而 `tsc` 喺 `strict` 之下輸出嘅每個檔案都以 `"use strict"` 開頭。
+
+`Object.seal(this)` 係另一種固定形狀：現有欄位仍然寫得，而加一個新嘅——一個錯字——會 throw，而唔係靜靜雞整咗一個冇人讀嘅欄位。如果你畀 compiler 做，佢都會捉到 `tally.cuont`；starter 唔畀佢做，`JSON.parse` 都唔會畀。
+
+仲有，一個裝物件嘅 `Set` 數嘅係**物件**，唔係值：兩個 `LAM 1200` 價錢係兩個成員，因為佢哋係兩次分配。用欄位砌成嘅字串做 set 嘅 key——`` `${name}:${cents}` ``——佢哋就係一個。
+'''
+hints = [
+  "Object.freeze(this) 放喺 Price constructor 最後一行。parameter property 喺 body 行之前已經賦咗值，所以佢哋已經喺度等你 freeze。",
+  "Object.seal(this) 放喺一個 Tally constructor 入面。class 欄位喺 constructor body 之前初始化，所以嗰陣 count 已經存在，而且仍然寫得。",
+  "TOTAL 係原本啲 cents 嘅總和，而呢點只係因為啲寫入失敗咗先成立。喺 starter 入面，嗰陣每個價錢都已經係 0，TOTAL 係 0——readonly 欄位被人寫過，而冇嘢出過聲。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.advanced.30.error-classes"
+title = "你自己嘅 error"
+story = "廣告預約系統有四層，每層都 throw 自己嘅嘢，預約螢幕 catch 到其中一樣，就俾其他幾樣搞冧咗。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行，每行應該係一個以小時計嘅預約長度。
+
+定義一個 error 階層：`PriceError extends Error` 做基底，`NotANumber` 同 `Negative` extend 佢。`Negative` 帶住個鐘數，佢嘅 message 係 `negative hours: <h>`；`NotANumber` 嘅 message 係 `not a number`。`price(text)` 用 `BigInt(text)` 轉換段文字——任何唔係整數嘅嘢佢都會 throw `SyntaxError`——然後 throw `NotANumber`，**以個 `SyntaxError` 做佢嘅 `cause`**；拒絕負數長度，否則回傳 `500 + 100 * hours`。
+
+印每個價錢或者個 error 嘅 message，然後印 `ERRORS <k>`。收窄到**基底 class**，一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative hours: -2
+        ERRORS 2
+```
+
+starter 用 `err instanceof Negative` 收窄，其他全部重新 throw，所以 `xx` 嗰行會用一個冇人 catch 嘅 `NotANumber` 搞冧成個程式。`err instanceof PriceError` 對階層入面每個成員都係 true，而 `err.message` 就係個 message——佢住喺個 class 入面，傳咗畀 `super(...)`，唔係喺 handler 入面。
+
+`new NotANumber({ cause })`——`ErrorOptions` 喺 `es2022` 函式庫入面——記低底下嗰個 `SyntaxError`。呢度冇嘢印佢；一個冇人 catch 嘅就會印，喺 stack trace 下面一個 `[cause]:` 區塊。嗰條鏈就係傳佢嘅原因。
+
+`class X extends Error` 同 `instanceof X` 用得，係因為目標係 `es2022`。編譯落 ES5 嘅話，`Error` 嘅 subclass 會冇咗佢個 prototype，`instanceof` 會靜靜雞回傳 `false`——所以舊啲嘅 codebase 周圍都係 `Object.setPrototypeOf(this, new.target.prototype)`。
+'''
+hints = [
+  "err instanceof PriceError——基底 class 包埋兩個 subclass，而有基底 class 嘅意義就喺度。",
+  "instanceof 檢查之後，err 係一個 PriceError，err.message 過得到型別檢查。之前，err 係 unknown，乜都過唔到。",
+  "TypeScript 嘅 catch 冇型別過濾，所以你啲 instanceof 檢查嘅次序就係 Python except 子句嘅次序：一個喺基底 class 之後先測試嘅 subclass 係死 code，而冇嘢會警告你。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "typescript.advanced.31.iterator"
+title = "NEXT，直到佢停"
+story = "利園排隊嗰部攞飛機由一個起點用固定步距派號碼，唔會留住張清單，而排隊螢幕永遠少部機派出嘅一張飛。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+寫一個 class `Tickets`，**親手實作 iterator 協定**：`[Symbol.iterator]()` 回傳 `this`，`next()` 對 `count` 個值每個回傳 `{ done: false, value }`，之後回傳 `{ done: true, value: undefined }`。每個值印一行，然後印 `SUM <total>`，用行第二個 `Tickets` 計出嚟。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+呢個就係 generator 幫你寫嘅嘢。`for...of` 對嗰樣嘢呼叫一次 `[Symbol.iterator]()`，然後對個結果一路呼叫 `next()`，直到有個結果話 `done: true`——而一個話 `done: true` 嘅結果唔會再被睇，**連個 value 在內**。spread、`Array.from` 同解構都係咁。
+
+starter 個 `next` 喺用咗張飛之後先決定 `done`，所以最後一張真嘅飛出去嗰陣標住 `done: true`，`for...of` 就掉咗佢。佢過得到型別檢查：`{ done: boolean, value: number }` 點都夾得落 `IteratorResult<number>`。合約講嘅係一個結果係咩樣，唔係你幾時先可以話自己完咗。
+
+`[Symbol.iterator]()` 回傳 `this` 係一個 **iterator** 嘅標記：佢可以行一次，之後就用完。一個 **container** 每次回傳一個新嘅 iterator，可以重複行；呢條路上嘅 `Bag` 就係一個。講清楚你寫緊邊一種；分別會喺有人第二次 loop 嗰陣現形。
+'''
+hints = [
+  "先檢查 `left === 0`，回傳 { done: true, value: undefined }。之後先攞張飛，回傳 { done: false, value }。",
+  "for...of 會忽略一個 done 結果嘅 value。starter 最後一張飛喺話 done 嗰個結果入面，所以螢幕同總和都少咗最後一張。",
+  "推進之前先儲低你準備回傳嘅值，否則你會向另一邊差一步。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "typescript.advanced.32.containers"
+title = "啱用嘅 container"
+story = "招牌辦公室將成晚嘅播放記錄放喺一個長長嘅 array 入面，每條關於佢嘅問題都由頭讀一次嚟答。"
+brief = '''
+三行標準輸入：一行字，一行已經**由細到大排好**嘅整數，同一個整數 `x`。
+
+印四行：
+
+1. `TOP <word> <count>`——最常出現嘅字，同數就按字由細到大
+2. `BISECT <l> <r>`——喺排好嘅整數入面，第一個值唔細過 `x` 嘅 index，同第一個值大過 `x` 嘅 index
+3. `SMALLEST3` 跟住最細嘅三個整數，由 starter 嘅 `MinHeap` pop 出嚟——少過三個就有幾多印幾多
+4. `GROUPS` 跟住每個字嘅頭一個字母嘅 `<letter>:<k>`，字母由細到大——一個以頭字母做 key 嘅 `Map<string, string[]>`
+
+```
+input:  tram bus tram bus ferry
+        1 3 3 5 8
+        3
+output: TOP bus 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS b:2 f:1 t:2
+```
+
+標準函式庫喺呢個架上得 `Map` 同 `Set`，冇其他——冇 counter、冇 heap、冇 bisect。heap 已經幫你寫好。其餘嘅係你嘅。
+
+starter 留低佢見到嘅第一個最高次數嘅字，呢度係 `tram`，而題目話係 `bus`。用一個講清楚你意思嘅 key 打和。
+
+兩個 bisect 各自係一次二分搜尋：留住 `lo` 同 `hi`，睇中間，移一頭——`Math.floor((lo + hi) / 2)` 或者 `(lo + hi) >>> 1`。佢哋嘅差就係 `x` 有幾多個，而 `x` 唔存在嗰陣兩個都唔會失敗；`indexOf` 就會，用一個睇落似 index 嘅 `-1`。當你想一次又一次攞最細嗰幾個，heap 就係啱用嘅 container：將全部排好序再由前面讀三個值，正正係佢存在就係為咗避免嘅事。
+
+分組：`groups.get(letter)` 係 `string[] | undefined`。唔中嗰陣整個 list，set 佢，然後 push。
+'''
+hints = [
+  "將 [word, count] 項目按次數由大到細、再按字由細到大排序，攞第一個。喺呢個大小，為咗一個項目排晒成個 map 冇問題；用同一條規則比較嘅單次掃描，答案一樣。",
+  "一個 bisect 加一個 flag：sorted[mid] < x 嗰陣將 lo 移過 mid——而右邊嗰個 bisect，sorted[mid] === x 嗰陣都移。x 唔存在嗰陣 indexOf 回傳 -1，而其中一個隱藏測試正正係咁。",
+  "Map 同物件一樣保持插入次序，所以印之前要將啲字母排序。[...groups.keys()].sort() 就係題目要嘅次序。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "typescript.advanced.33.cancellation"
+title = "唔好再等"
+story = "控制室重畫全島地圖之前會 ping 每塊螢幕攞狀態，而天后嗰塊網卡壞咗嘅螢幕永遠唔答，所以地圖永遠重畫唔到。"
+brief = '''
+標準輸入係個數量 `n`，然後 `n` 行 `<SCREEN> <DOWN>`，`DOWN` 係 `0` 代表即刻會答嘅螢幕，`1` 代表網卡壞咗、完全唔會答嘅螢幕。
+
+對每塊螢幕，喺 `withTimeout` 之下行佢嘅 `ping(screen, down, token)`，期限係 **200 ms**，按輸入次序印 `<SCREEN> OK` 或者 `<SCREEN> TIMEOUT`。然後開一個 `watch(token)` task，佢用 10 ms 嘅 sleep 永遠 loop 落去，cancel 佢個 token，**await 佢**，等佢喺 `catch` 入面印 `CANCELLED`，喺 `finally` 入面印 `CLEANUP`。最後印 `TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+Promise 係 cancel 唔到嘅。冇 `.cancel()`，而同一個 timer `Promise.race` 只係決定你*聽邊個*——輸咗嗰個照行，佢仲有嘅任何待辦嘢，一個 timer 或者一個訂閱，喺你最後一行之後仍然揸住唔放。所以 cancel 係你**傳入去**嘅嘢：一個畀份工檢查或者訂閱嘅 token。starter 有一個，`Token`，有 `cancel()` 同 `onCancel(handler)`；`sleep` 會訂閱，cancel 嗰陣佢清走自己個 timer，用 `Cancelled` reject；而 `silence`——死咗嗰塊螢幕——係一個除咗 cancel 之外乜都 settle 唔到嘅 promise。（`AbortController` 係平台版本嘅同一樣嘢。呢度冇宣告佢。）
+
+`withTimeout(work, ms)` 整一個 token，將 `work(token)` 同一個 timer race——個 timer 會用 `Timeout` reject **同埋** cancel 個 token——而份工贏嗰陣，喺 `finally` 入面清走自己個 timer。starter 從來冇呼叫佢：佢直接 await `ping`，而 `WONG` 永遠唔答。你已經見過 Node 點處理：冇剩任何可以叫醒任何人嘅嘢，所以個 process 喺 `LAM OK` 之後退出，status `0`。
+
+佢仲 cancel 咗 `watch` 但冇 await 佢，所以 `TIMEOUTS` 喺 watcher 輪到之前已經印咗——而 watcher 重新 throw 嘅 `Cancelled` 冇人接，Node 會報做 unhandled rejection，用 status `1` 退出。喺 `watch` 入面處理完 `Cancelled` 之後要重新 throw 佢：吞咗佢，就係一個 task 變成 cancel 唔到嘅原因。喺你 await 個 task 嘅地方 catch 佢。
+'''
+hints = [
+  "withTimeout：一個期限 promise，佢嘅 setTimeout 用 Timeout reject 同埋 cancel 個 token，喺 try 入面 `return await Promise.race([work(token), deadline])`，喺 finally 入面 clearTimeout。",
+  "`await watcher` 先令個 task 喺 TIMEOUTS 印之前行到佢嘅 catch 同 finally；佢會將 Cancelled 重新 throw 畀你，所以都要 catch 埋佢——而且只 catch 佢。",
+  "喺 finally 入面清走期限嘅 timer。冇咗佢，每塊答咗嘅螢幕都仍然留低一個 200 ms 嘅 timer，個 process 要等最後一個先退出：輸出啱，但次次行都慢啲。cancel 個 token 係反方向嘅同一種禮貌。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "typescript.advanced.34.event-loop"
+title = "EVENT LOOP"
+story = "招牌控制室，全島每塊螢幕共用一條 thread。有一個 callback 從來唔讓，由天后到希慎每塊牌都凍喺同一格畫面。"
+brief = '''
+標準輸入係兩個整數 `k` 同 `n`。
+
+將 `1..n` 分做 `k` 段連續嘅 chunk——第 `i` 段係 `floor(n*i/k) + 1` 到 `floor(n*(i+1)/k)`，包埋兩頭——用一個普通 loop 計每段嘅平方和，用 `bigint`。任何工作開始之前，`main` 用 `setImmediate` 排一次塊牌重畫，佢會印 `BOARD <finished>`：塊牌攞到條 thread 嗰陣做完咗幾多段。塊牌一定要喺**第一段之後、第二段之前**攞到。按 index 次序每段印 `CHUNK <i> <sum>`，然後印 `TOTAL <sum>`，再印 `CHUNKS <k>`。
+
+```
+input:  3 10
+output: BOARD 1
+        CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        CHUNKS 3
+```
+
+Node 喺**一條 thread** 上面行你嘅 JavaScript，而成座大廈每塊螢幕都等緊佢。一個行緊嘅 callback 係打斷唔到嘅——timer 唔得，I/O 唔得，塊牌都唔得——直到佢 return 或者 `await`。starter 將每段包喺一個 `async` 函數入面，全部交畀 `Promise.all`，睇落好似並行。其實係一個長長嘅 callback：一個入面冇 `await` 嘅 `async` 函數，一呼叫就由頭行到尾。`main` 未放手之前 `k` 段已經全部計完，塊牌最後先重畫，顯示 `BOARD 3`，而喺 `4 2000000` 嗰陣，全島每塊螢幕喺成個加總期間都顯示同一格畫面。你喺度寫乜都冇辦法令啲加總並行；Node 嘅答案係 worker thread，而呢個 `node.d.ts` 冇宣告佢。async 係用嚟**等**嘅。喺嗰一條 thread 上面嘅 CPU 工作，只可以整得**有禮貌**啲。
+
+咁就有禮貌啲：一段，然後交返條 thread，然後下一段。仲要交返去啱嘅隊。`await null` 或者 `await Promise.resolve()` 讓畀 **microtask** 隊，Node 會將佢清到空，先至行任何一個 immediate 或者 timer——塊牌仍然會見到 `BOARD 3`。`await new Promise((r) => setImmediate(r))` 會排去隊尾，喺塊牌後面，因為塊牌排先。
+
+仲有個細 bug，同時序大有關係。starter 用 `total += await work(...)` 加埋。JavaScript 喺 `await` **之前**計 `+=` 左手邊：每個 task 都將 `total` 讀做 `0`，泊低，返嚟寫 `0 + 我嘅`。最後嗰個贏，`TOTAL` 就係最後一段。呢個就係收費計數器嗰個遺失更新，只係讀同寫之間冇一行 code 畀你睇到——對共用狀態嘅一次讀同一次寫，中間隔住一個 `await`，就係一條 thread 上面嘅 race。喺 await 之後先讀個總數，或者揸住把鎖。
+'''
+hints = [
+  "行 starter，睇最後一行：BOARD 3，喺所有嘢之後先印。塊牌排咗第一，但仍然行最後，因為從來冇嘢交返條 thread。",
+  "每轉一段：一個普通 for loop 行啲 chunk，每段之後 `await new Promise((r) => setImmediate(r))`。塊牌嘅 immediate 排先，所以佢喺 chunk 0 之後行。",
+  "`total += await x` 喺 await 之前讀 total。`const part = await x; total += part;` 喺之後讀——或者 loop body 入面完全冇 await，就冇嘢可以 race。",
+  "n*(n+1)*(2n+1)/6 係總數嘅封閉公式。用佢核對一次 TOTAL，你就知啲 chunk 邊界啱。",
+]

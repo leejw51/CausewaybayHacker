@@ -1,0 +1,847 @@
+# C++ LAND — BASIC, in Korean. A translation pack (SPEC §12.1): the prose of
+# `content/cpp/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "cpp.basic"
+locale = "ko"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.basic.01.first-light"
+title = "첫 불빛"
+story = "12:00, 글로스터 로드 해안. 눈데이 건은 무언가가 올바른 주소에 썼기 때문에 발사되는데, 그 옆의 명판은 비어 있다."
+brief = '''
+정확히 다음을 출력하세요:
+
+```
+hello, causewaybay
+```
+
+소문자, 쉼표 하나, 공백 하나, 한 줄. 그 외에는 아무것도 없어야 합니다.
+
+`std::cout`은 `<iostream>`에 있고, `'\n'`이 줄바꿈입니다. `std::endl`도
+동작하고 버퍼를 비우기까지 하는데, 여기서는 필요 없고 나중에는 원하지 않게
+될 것입니다.
+'''
+hints = [
+  "std::cout << \"...\"가 프로그램의 전부입니다. include는 이미 있습니다.",
+  "문자열은 정확해야 합니다: 소문자, 쉼표 하나, 그 뒤 공백 하나.",
+  "main은 int를 돌려줍니다. return 없이 main의 끝에 닿는 것은 괜찮고 0을 뜻합니다.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.basic.02.bindings"
+title = "놋쇠 명판"
+story = "대포 옆 명판에는 숫자 하나가 있고, 날짜 수와 연도가 있던 자리 두 칸은 비어 있다."
+brief = '''
+C++의 변수는 타입을 먼저 써서 선언합니다: `long long n = 0;`은 `n`이라는
+64비트 정수를 만듭니다. `std::cin >> n`은 표준 입력에서 다음 숫자를 읽어
+그 안에 넣고, `std::cout << n << '\n'`은 줄바꿈과 함께 그것을 출력합니다.
+이름에 대한 산술은 그냥 산술입니다: `n * 2`, `n * n`.
+
+```
+std::cout << n * n << '\n';
+```
+
+프로그램은 `n`을 읽고 그것과 그 두 배를 출력합니다. `// FILL`에 그 줄을
+입력하세요: 세 번째 출력, `n * n`입니다.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "std::cout << n * n << '\\\\n'; — 바로 위 줄과 같은 모양입니다.",
+  "long long은 3000000000의 제곱을 담습니다. int는 담지 못하고, 그래서 명판에 long long이라고 적혀 있습니다.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.basic.03.types"
+title = "조석표"
+story = "항만장의 조석표는 대피항의 수심을 삼판 수로 나누는데, 답은 언제나 정수로 나온다. 정수가 아닐 때조차."
+brief = '''
+정수 둘을 나누면 정수가 나옵니다: `7 / 2`는 `3`이고, `7 % 2`는 나머지인
+`1`입니다. `3.5`를 얻으려면 한쪽이 먼저 부동소수점 수여야 하고,
+`static_cast<double>(a)`가 그것을 명시적으로 말하는 방법입니다. 소수 자릿수를
+고정해 출력하려면 `<iomanip>`에 `std::fixed`와 `std::setprecision(2)`가
+있습니다.
+
+```
+std::cout << a / b << '\n';
+std::cout << a % b << '\n';
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
+```
+
+정수 나눗셈과 나머지는 출력됩니다. `// FILL`에 세 번째 줄을 쓰세요: 나눗셈을
+소수 둘째 자리까지의 `double`로.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
+  "캐스트는 피연산자 하나에만 필요합니다: double을 long long으로 나누면 double입니다.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.basic.04.int-types"
+title = "레지스터의 너비"
+story = "대포의 발사 레지스터는 32비트 너비이고 항만 시계의 것은 64비트다. 한쪽에서 다른 쪽으로 옮긴 카운트는 누군가 그렇다고 말해 줄 때만 값을 지킨다."
+brief = '''
+`<cstdint>`는 정수를 너비로 이름 붙입니다: `int32_t`와 `int64_t`는 부호가
+있고, `uint32_t`와 `uint64_t`는 부호가 없습니다. 값은 `static_cast<...>`로
+너비 사이를 옮기며, 이것은 변환이 일어나고 있다는 것을 소리 내어 말합니다.
+`<limits>`의 `std::numeric_limits<T>::max()`는 한 너비가 담을 수 있는 가장
+큰 값입니다.
+
+```
+uint64_t b = static_cast<uint64_t>(a);
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';
+```
+
+`a`는 `int32_t`로 읽힙니다. 첫 번째 `// FILL`에 캐스트 줄을, 두 번째에 두
+번째 출력 줄을 입력하세요.
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "uint64_t b = static_cast<uint64_t>(a); — 캐스트는 가는 쪽의 너비를 이름으로 말합니다.",
+  "std::numeric_limits<uint64_t>::max()는 18446744073709551615입니다. 그 위의 int32_t 줄은 다른 타입으로 한 같은 호출입니다.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.basic.05.big-int"
+title = "서른두 바이트"
+story = "요트 클럽의 계류 키는 32바이트 숫자이고, 윈치는 그것을 큰 쪽 끝부터 한 바이트씩 읽는다. 바이트를 넣기 전까지 버퍼는 전부 0이다."
+brief = '''
+32바이트 정수 — 해시, 키, 주소 — 에는 내장 타입이 없으므로
+`std::array<uint8_t, 32>`에 삽니다: 32바이트, 빅엔디언, 가장 중요한 바이트가
+먼저. `uint64_t` 하나는 그중 마지막 여덟 바이트를 채웁니다. `8 * i`비트만큼
+오른쪽으로 시프트하면 바이트 `i`(작은 쪽 끝부터 셈)가 맨 아래로 내려오고,
+캐스트는 그 바이트만 남깁니다.
+
+```
+buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
+```
+
+`i`에 대한 루프와 16진수 출력은 적혀 있습니다. `// FILL`에 루프 본문으로 그
+줄을 입력하세요.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = static_cast<uint8_t>(v >> (8 * i)); — 마지막 인덱스가 가장 낮은 바이트를 받습니다.",
+  "v >> (8 * i)는 바이트 i를 맨 아래로 밀어 내리고, static_cast<uint8_t>는 나머지를 버립니다.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.basic.06.floats"
+title = "조위계"
+story = "대피항의 조위계는 double로 기록하고 표시판은 단정밀도라서, 둘은 소수 열째 자리에서 어긋난다."
+brief = '''
+`double`은 64비트 부동소수이고 `float`는 32비트입니다. `std::stod`는 텍스트를
+`double`로 파싱합니다. 그것을 `float`로 좁히는 것은 `static_cast<float>`이고,
+정밀도를 잃는 곳이 바로 이 캐스트입니다 — `0.1`에는 정확한 이진 형태가 없고,
+float는 double보다 적은 자릿수를 간직합니다.
+
+```
+double x = std::stod(s);
+float y = static_cast<float>(x);
+```
+
+`s`는 읽어 들인 줄이고, 두 출력 모두 소수 열 자리를 씁니다. `// FILL`에 그 두
+줄을 입력하세요.
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "double x = std::stod(s); — 문자열에서 double로, <string>에 있습니다.",
+  "float y = static_cast<float>(x); — 좁히기를 드러내 씁니다. y는 참인 자릿수가 더 적게 출력됩니다.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.basic.04.strings"
+title = "삼판의 이름"
+story = "삼판의 이름은 뱃머리에 대문자로, 선미에 거꾸로 칠해져 있는데, 항만장의 일지에는 어느 쪽으로도 적혀 있지 않다."
+brief = '''
+`std::string`은 자기 길이를 알고(`size()`), `<algorithm>`으로 걸을 수 있으며,
+아무 반복자 한 쌍으로도 만들 수 있습니다. `std::transform`은 모든 문자에
+함수를 적용하고 결과를 다시 써 넣습니다. `<cctype>`의 `::toupper`가 그
+함수입니다. `rbegin()`과 `rend()`는 문자열을 거꾸로 걸으므로, 그것들로 만든
+문자열은 뒤집힌 것입니다.
+
+```
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());
+```
+
+`upper`는 그 줄의 사본이고 `rev`는 자리표시자입니다. 자리표시자 `rev`를
+대신해 `// FILL`에 그 두 줄을 입력하세요.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper); — 원본, 원본 끝, 목적지, 함수.",
+  "std::string rev(line.rbegin(), line.rend()); — 역방향 반복자 두 개로 만든 문자열은 뒤집힌 것입니다.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.basic.08.string-slices"
+title = "짧은 이름"
+story = "항만장의 게시판에는 삼판 이름 네 글자와 그 뒤 표시 하나만큼의 자리가 있는데, 서기는 이름 전체를 옮겨 적는다."
+brief = '''
+`s.substr(pos, n)`은 문자열의 조각입니다: `pos`에서 시작하는 `n`개의 문자이며,
+**사본**입니다 — `s`와 메모리를 공유하지 않는 새 `std::string`입니다.
+문자열에 덧붙이는 것은 `+=`이나 `append(...)`이고, 문자열을 제자리에서
+늘립니다.
+
+```
+std::string t = s.substr(0, 4);
+t += "...";
+```
+
+`s`는 읽어 들인 줄입니다(최소 네 글자). 자리표시자 `t`를 대신해 `// FILL`에
+그 두 줄을 입력하세요.
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "std::string t = s.substr(0, 4); — 0에서 시작해 4개를 가져옵니다. 결과는 독립된 문자열입니다.",
+  "t += \"...\"; — 제자리에서 덧붙입니다. t.append(\"...\")도 같습니다.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.basic.09.int-slices"
+title = "가운데서 둘"
+story = "선가 일지는 둘째와 셋째 측정값만 따로 옮겨 적고 그 뒤에 아침 전체를 덧붙이길 원하는데, 사본은 아침 전체가 두 번이다."
+brief = '''
+`std::vector`에는 슬라이스 문법이 없습니다. 슬라이스는 반복자 두 개 —
+`begin() + 1`부터 `begin() + 3` 직전까지 — 로 만든 새 벡터이고, **사본**
+입니다(`<span>`의 `std::span`이 복사하지 않는 뷰입니다). 
+`insert(where, first, last)`는 `where`가 `end()`일 때 범위 전체를 덧붙입니다.
+
+```
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());
+```
+
+`v`에는 그 줄의 정수들이 들어 있습니다(최소 셋). 자리표시자 `part`를 대신해
+`// FILL`에 그 두 줄을 입력하세요.
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "std::vector<long long> part(v.begin() + 1, v.begin() + 3); — 범위 생성자. 끝은 가져오는 마지막 원소의 하나 뒤입니다.",
+  "part.insert(part.end(), v.begin(), v.end()); — 끝에 범위를 넣는 것이 덧붙이기입니다.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.basic.10.byte-slices"
+title = "앞 세 바이트"
+story = "대포의 전선은 이름을 바이트로 나르고, 수신기는 앞의 세 바이트를 남기고 마지막 두 바이트를 끝에 붙이는데, 출력되는 버퍼는 이름 전체다."
+brief = '''
+바이트는 `uint8_t`이고, 바이트 배열은 `std::vector<uint8_t>`입니다. 정수
+벡터와 같은 두 관용구가 통합니다: 슬라이스는 반복자 두 개로 만든 새
+벡터(사본)이고, `insert(end(), first, last)`는 범위를 덧붙입니다.
+`bytes.end() - 2`는 끝에서 둘 앞의 반복자입니다.
+
+```
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());
+```
+
+`bytes`에는 그 줄의 문자들이 들어 있습니다(최소 셋). 자리표시자 `head`를
+대신해 `// FILL`에 그 두 줄을 입력하세요. 16진수 줄과 텍스트 줄은 대신
+출력됩니다.
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3); — 세 바이트, 새 벡터.",
+  "head.insert(head.end(), bytes.end() - 2, bytes.end()); — 마지막 둘을 덧붙입니다.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.basic.05.loops"
+title = "예포를 세며"
+story = "대포는 그달의 하루마다 한 번씩 쏘고, 명판은 누적 합계를 원한다. 그리고 몇 번째 발이 3의 배수 날에 떨어졌는지도."
+brief = '''
+C++에서 횟수를 세는 루프는 세 부분으로 된 `for`입니다: 카운터가 어디서
+시작하는지, 얼마나 오래 계속하는지, 어떻게 움직이는지. `for (long long i = 1;
+i <= n; ++i)`는 `1`부터 `n`까지를 포함해 방문합니다. 본문은 방문마다 한 번
+실행되고, `%`는 나머지이므로 `i % 3 == 0`은 "3의 배수"라는 뜻입니다.
+
+```
+for (long long i = 1; i <= n; ++i) {
+```
+
+본문은 적혀 있습니다: `i`를 `sum`에 더하고 3의 배수를 셉니다. 자리표시자
+줄을 대신해 `// FILL`에 그 `for` 줄을 입력하세요.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (long long i = 1; i <= n; ++i) { — 1에서 시작해, i <= n인 동안 계속하고, 하나씩 나아갑니다.",
+  "< n이 아니라 <= n: 예포는 n 자체도 셉니다.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.basic.06.functions"
+title = "선가 요금"
+story = "요트 클럽 윈치는 그날 처음 열 번의 인양은 한 번에 5, 그 뒤로는 3을 받는데, 요금판에는 그냥 요금이라고만 적혀 있다."
+brief = '''
+함수는 일 한 덩어리에 이름을 붙입니다: 반환 타입, 이름, 매개변수, 그리고
+`return`으로 끝나는 본문. `long long fare(long long rides)`는 숫자 하나를
+받아 하나를 돌려줍니다. 함수는 `if` 안에서 일찍 `return`할 수 있고, 그 줄
+뒤에 오는 것은 모두 다른 경우입니다.
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+요금: 처음 10번은 각 5, 그 뒤로는 한 번에 3입니다. `main`은 `n`을 읽고
+`fare(n)`을 출력합니다. `return 0;`을 대신해 `// FILL`에 `fare`의 본문으로
+그 두 줄을 입력하세요.
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; — 그다음 줄에 return 50 + (rides - 10) * 3;",
+  "5씩 열 번이면 50이고, 열 번째를 넘는 한 번마다 그 위에 3이 더해집니다.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.basic.07.structs"
+title = "가판대 하나, 필드 셋"
+story = "태풍 대피항의 생선 가판대는 이름, 가격, 수량을 서로 다른 판 세 개에 적고, 아무도 그것들을 하나로 모으지 않았다."
+brief = '''
+`struct`는 이름 붙은 필드들을 한 값으로 묶고, 그 필드들로 일하는 멤버 함수를
+가질 수 있습니다. 중괄호는 필드가 선언된 순서대로 필드 하나씩 만듭니다:
+`Stall s{"fish", 12, 3};`. 멤버 함수 안에서 필드는 그냥 이름입니다.
+
+```
+return price * qty;
+Stall s{name, price, qty};
+```
+
+`Stall`에는 이름, 가격, 수량이 있고, `main`은 `name: total`을 출력합니다. 두
+`// FILL` 표시에 그 두 줄을 입력하세요: 첫 줄은 `total()`의 본문이고, 둘째
+줄은 `main`에서 `s`를 만듭니다.
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "total() 안에는 return price * qty;, main에는 Stall s{name, price, qty};.",
+  "중괄호 초기화는 선언 순서대로 필드를 채웁니다: name, 그다음 price, 그다음 qty.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.basic.08.enums"
+title = "노선의 색"
+story = "대피항 버스 정류장 위 환승 표지판은 MTR 노선 셋을 가리키는데, 각 노선 옆의 색 띠가 페인트로 지워져 있다."
+brief = '''
+`enum class`는 이름 붙은 값들의 닫힌 집합입니다: `Line::Island`,
+`Line::TsuenWan`, `Line::KwunTong`, 그리고 그 밖에는 없습니다. 그것에 대한
+`switch`는 담긴 값에 맞는 갈래를 고르고, 각 `case`는 타입을 앞에 붙여
+열거자를 부릅니다. 경우가 빠지면 컴파일러가 경고하는데, 그것이 닫힌 집합의
+요점입니다.
+
+```
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";
+```
+
+`parse`가 단어를 `Line`으로 바꾸고, `Island` 경우는 적혀 있습니다. `Island`
+줄 아래의 `// FILL`에 그 두 `case` 줄을 입력하세요.
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  "case Line::TsuenWan: return \"red\";와 case Line::KwunTong: return \"green\"; — Island 줄과 같은 모양입니다.",
+  "enum class 열거자는 언제나 타입을 앞에 붙여 씁니다: Line::TsuenWan이지, TsuenWan만 쓰는 일은 없습니다.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.basic.09.vector"
+title = "어획, 순서대로"
+story = "삼판마다 물 건너로 어획을 숫자 하나씩 외치는데, 항만장은 마지막 배가 들어올 때까지 그것들을 둘 곳이 없다."
+brief = '''
+`std::vector<long long>`은 늘어나는 배열이고, 여기에 하는 일은 넷입니다:
+추가, 삭제, 수정, 정렬. `push_back(x)`는 끝에 덧붙입니다.
+`erase(v.begin() + i)`는 인덱스 `i`의 원소를 지우고 틈을 메웁니다.
+`v[i] = x`는 이미 있는 것을 덮어씁니다. `<algorithm>`의 `std::sort`는 전체를
+오름차순으로 놓습니다. 인덱스 `0`이 맨 앞입니다.
+
+```
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());
+```
+
+`xs`에는 그 줄의 정수들이 들어 있습니다. 네 `// FILL` 표시에 그 네 줄을
+입력하세요: 끝에 `99`를 추가하고, 첫 원소를 지우고, 새 첫 원소를 `700`으로
+정하고, 그다음 정렬합니다. 벡터가 출력되고, 그다음 크기가 출력됩니다.
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); — 추가, 삭제, 수정, 정렬.",
+  "erase와 sort는 반복자(xs.begin(), xs.end())를 받습니다. []는 인덱스를 받습니다.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.basic.16.list"
+title = "앞이냐 뒤냐"
+story = "짝수 번호 삼판은 대피항 뒤쪽에, 홀수 번호는 앞쪽에 매어지는데, 계류 목록은 그냥 뒤에만 계속 덧붙인다."
+brief = '''
+`<list>`의 `std::list`는 이중 연결 리스트입니다: 어느 쪽 끝이든 추가나 삭제가
+상수 시간이고, 벡터는 앞쪽에서 그것을 할 수 없습니다. `push_front(x)`는 앞에
+추가하고, `pop_back()`은 마지막 원소를 지우며, `front()`는 참조입니다 — 거기에
+대입하면 첫 원소가 바뀝니다. 그리고 리스트는 자기 `sort()` 멤버로 스스로
+정렬하는데, `std::sort`는 임의 접근이 필요하고 연결 리스트에는 그것이 없기
+때문입니다.
+
+```
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();
+```
+
+`l`에는 이미 그 줄의 정수들이 순서대로 들어 있습니다. `// FILL` 표시에 그 네
+줄을 입력하세요: 앞에 `0`을 추가하고, 마지막 원소를 지우고, 앞을 `99`로
+덮어쓰고, 그다음 정렬합니다. 리스트가 출력됩니다.
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "l.push_front(0); l.pop_back(); l.front() = 99; l.sort(); — 한 줄에 하나씩, 그 순서대로.",
+  "std::sort는 std::list를 정렬할 수 없습니다(임의 접근이 없음). 리스트 자신의 l.sort()는 할 수 있습니다.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.basic.10.maps"
+title = "집계판"
+story = "대피항의 집계판은 선단이 내린 생선을 생선 하나에 한 단어씩 모두 적고, 구매자는 종류마다 수와 함께 한 줄을 원한다."
+brief = '''
+`std::map<std::string, int>`는 키 순서로 유지되는 사전입니다. `m[k] = v`는
+키를 추가합니다(있으면 덮어씁니다). `erase(k)`는 키를 지우고 없을 때는
+아무것도 하지 않습니다. `at(k)`는 이미 있어야 하는 키의 항목입니다 — 수정하려면
+거기에 대입하고, 키를 지어내는 대신 예외를 던집니다. 맵을 걸으면 키를 정렬된
+순서로 방문합니다 — `std::map`은 언제나 키 순서이므로 여기에는 정렬 줄이
+없습니다.
+
+```
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;
+```
+
+`counts`는 이미 그 줄의 모든 단어를 집계했고, 모든 줄에는 `fish`가 있습니다.
+`// FILL` 표시에 그 세 줄을 입력하세요: `crab`을 `1`로 추가하고, `rice`를
+지우고, 그다음 `fish`를 `9`로 정합니다. 정렬된 출력은 적혀 있습니다.
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; — 추가, 삭제, 수정.",
+  "[]는 없는 키를 만들고, at()은 그러기를 거부합니다. 키가 이미 있어야 할 때 at()을 쓰세요.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.basic.18.hashtable"
+title = "순서 없는 집계"
+story = "배식대는 요리마다 해시 테이블에 세고 나서 버킷이 우연히 놓인 순서대로 다시 읽는데, 두 번의 출력이 한 번도 일치하지 않는다."
+brief = '''
+`std::unordered_map`이 해시 테이블입니다: `std::map`과 같은 `[]`, `erase`,
+`at`을 갖고, 평균적으로 더 빠르며, 걸으면 **특별한 순서가 없습니다** — 그래서
+출력 전에 키를 정렬합니다. `count(k)`나 `find(k)`는 키를 만들지 않고 키가
+있는지 묻습니다.
+
+```
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;
+std::sort(keys.begin(), keys.end());
+```
+
+`counts`는 이미 그 줄의 모든 단어를 집계했고, 모든 줄에는 `mai`가 있습니다.
+`keys`는 버킷이 준 순서대로 복사해 낸 키들의 벡터입니다. `// FILL` 표시에 그
+네 줄을 입력하세요: `gun`을 `12`로 추가하고, `siu`를 지우고, `mai`를 `0`으로
+정하고, 그다음 출력이 매번 같도록 키를 정렬합니다.
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "counts[\"gun\"] = 12; counts.erase(\"siu\"); counts.at(\"mai\") = 0; 그다음 std::sort(keys.begin(), keys.end()); — 추가, 삭제, 수정, 정렬.",
+  "테이블에는 제 순서가 없습니다: 키는 대신 복사되어 나와 있고, 그것을 정렬하는 것이 출력 전의 네 번째 줄입니다.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.basic.11.sets"
+title = "계류 번호"
+story = "계류 목록에는 삼판 번호가 그 배가 들어온 횟수만큼 적혀 있고, 항만장은 실제로 배가 몇 척인지 알고 싶어 한다."
+brief = '''
+`std::set<long long>`은 각 값을 한 번씩, 오름차순으로 유지합니다.
+`insert(x)`는 값을 추가하고(중복은 무시됨) `erase(x)`는 값을 지웁니다(없는
+값은 무시됨). 집합에는 수정이 없습니다: 값이 곧 자기 키이므로, `1`을 `-1`로
+바꾸는 것은 erase 다음에 insert입니다. 그리고 정렬 줄도 없습니다: `std::set`은
+언제나 오름차순입니다.
+
+```
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);
+```
+
+`seen`에는 이미 그 줄의 서로 다른 값들이 들어 있습니다. `// FILL` 표시에 그
+세 줄을 입력하세요: `100`을 추가하고, `3`을 지우고, 그다음 `1`을 `-1`로
+바꿉니다. 크기와 정렬된 순회는 적혀 있습니다.
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); — 마지막 두 호출은 한 줄을 같이 씁니다.",
+  "3이 없는 집합에 erase(3)을 해도 아무 일도 없고, -1이 이미 있을 때 insert(-1)을 해도 아무 일도 없습니다: 둘 다 안전합니다.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.basic.12.stack-queue"
+title = "나중 것이 먼저, 먼저 것도 먼저"
+story = "삼판들은 도착한 순서대로 대피항 방파제에 줄지어 묶인다: 마지막에 들어온 배가 가장 먼저 떠날 수 있고, 가장 먼저 들어온 배가 구매자에게 가장 먼저 응대받는다."
+brief = '''
+`std::stack`은 나중에 들어간 것이 먼저 나옵니다: `push(x)`는 위에 추가하고,
+`pop()`은 맨 위를 지우며(아무것도 돌려주지 않음), `top()`은 그것에 대한
+참조입니다 — 맨 위를 제자리에서 수정하려면 거기에 대입합니다. `std::queue`는
+반대쪽 끝에서 같은 모양입니다: 뒤로 `push`, 앞에서 `front()`와 `pop()`.
+
+```
+st.push(0);
+st.pop();
+st.top() = 99;
+```
+
+모든 숫자는 이미 `st`와 `q` 양쪽에 넣어져 있습니다. `// FILL` 표시에 그 세
+줄을 입력하세요: 위에 `0`을 추가하고, 다시 그것을 꺼내고, 그다음 맨 위를
+`99`로 덮어씁니다. 그다음 스택이 비워지며 출력되고, 큐의 처음 둘이 꺼내집니다.
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "st.push(0); st.pop(); st.top() = 99; — 스택에 추가, 삭제, 수정. 큐는 건드리지 않습니다.",
+  "top()은 참조이므로, st.top() = 99는 pop()이 다음에 지울 원소를 바꿉니다.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.basic.13.sorting"
+title = "수심 순서"
+story = "대피항 방파제를 따라 잰 수심은 배가 잰 순서대로 적혀 있고, 해도는 그것을 얕은 것에서 깊은 것으로, 그다음 깊은 것에서 얕은 것으로 원한다."
+brief = '''
+`<algorithm>`의 `std::sort`는 범위를 제자리에서 정렬합니다. 벡터의 양 끝을
+주면 오름차순으로 정렬하고, 세 번째 인자로 비교자를 주면 그것으로 정렬하는데,
+`std::greater<>{}`는 "큰 것 먼저"입니다.
+
+```
+std::sort(v.begin(), v.end());
+std::sort(v.begin(), v.end(), std::greater<>{});
+```
+
+숫자들은 `v`에 읽혀 두 번 출력됩니다. 첫 번째 `// FILL`에 첫 줄을, 두 번째에
+둘째 줄을 입력하세요.
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std::sort(v.begin(), v.end()); 그다음 std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort는 컨테이너가 아니라 범위를 받습니다: begin()과 end().",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.basic.22.reverse"
+title = "앞뒤를 뒤집어"
+story = "마지막으로 들어온 삼판이 먼저 나가야 하는데 선가 게시판은 대기열을 적힌 그대로 읽고, 선미의 윈치 이름도 거꾸로 되어 있다."
+brief = '''
+`<algorithm>`의 `std::reverse(first, last)`는 어떤 컨테이너든 범위를 제자리에서
+뒤집습니다. 문자열은 이 길에서 이미 써 본 다른 방법으로 뒤집습니다:
+`rbegin()`부터 `rend()`까지로 새 문자열을 만드는 것입니다.
+
+```
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());
+```
+
+`v`에는 첫 줄의 정수들이, `s`에는 둘째 줄이 들어 있습니다. 자리표시자 `r`을
+대신해 `// FILL`에 그 두 줄을 입력하세요.
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std::reverse(v.begin(), v.end()); — 제자리에서. 아무것도 돌려주지 않습니다.",
+  "std::string r(s.rbegin(), s.rend()); — 역방향 반복자가 뒤집힌 사본을 만듭니다.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.basic.14.sort-by-key"
+title = "순위표"
+story = "요트 클럽의 경주 게시판은 모든 배를 점수와 함께 등록한 순서대로 적어 두는데, 커모도어는 1위를 맨 위에 원한다."
+brief = '''
+`std::sort`는 비교자를 받습니다: 첫 원소가 둘째보다 앞에 속하는지 말해 주는,
+원소 두 개의 함수입니다. 그 자리에서 쓴 람다가 흔한 비교자이고, "점수
+내림차순, 그다음 이름 오름차순"은 식 하나입니다: 점수가 다르면 높은 쪽이
+먼저, 같으면 작은 이름이 먼저 갑니다.
+
+```
+std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) {
+    return a.score != b.score ? a.score > b.score : a.name < b.name;
+});
+```
+
+행들은 읽혀서 출력됩니다. `// FILL`에 그 `std::sort`를 입력하세요.
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });",
+  "비교자는 \"a가 b보다 앞에 가는가\"에 답합니다: 높은 점수가 먼저, 동점이면 작은 이름이 먼저.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.basic.15.closures"
+title = "조수 보정값"
+story = "해도의 모든 수심은 저조 때 잰 것이고, 항만장은 오늘의 조수로 전부 보정하길 원한다. 그 조수는 그가 조위계에서 한 번 읽어 두었다."
+brief = '''
+람다는 그 자리에서 쓴 함수입니다: `[capture](params) { body }`. 캡처 목록은
+람다가 둘러싼 스코프에서 볼 수 있는 것입니다 — `[k]`는 `k`를 복사해 넣고,
+람다는 살아 있는 동안 그 사본을 간직합니다. `auto`로 이름을 붙이고, 호출은
+`add(x)`입니다.
+
+```
+auto add = [k](long long v) { return v + k; };
+```
+
+`k`와 숫자들이 읽히고, 루프가 각각에 `add`를 적용합니다. 자리표시자 `add`를
+대신해 `// FILL`에 그 줄을 입력하세요.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "auto add = [k](long long v) { return v + k; };",
+  "[k]는 k를 람다 안에 복사합니다. []는 아무것도 캡처하지 않아 k를 전혀 볼 수 없습니다.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.basic.16.lambdas"
+title = "짝수 선석, 제곱해서"
+story = "방파제를 따라 늘어선 짝수 번호 선석은 번호의 제곱만큼 내고 홀수는 아무것도 내지 않으며, 장부에는 합계를 적을 줄 하나가 있다."
+brief = '''
+`<numeric>`과 `<algorithm>`의 알고리즘들은 마지막 인자로 람다를 받습니다.
+`std::accumulate`는 범위를 값 하나로 접습니다: 초깃값에서 시작해, 지금까지의
+합계와 각 원소로 람다를 호출하고, 람다가 돌려준 것을 간직합니다. `0LL`에서
+시작하면 합계가 `long long`이 됩니다.
+
+```
+long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+```
+
+숫자들은 `xs`에 있고 `total`이 출력됩니다. 자리표시자 `total`을 대신해
+`// FILL`에 그 줄을 입력하세요: 람다는 `v`가 짝수이면 `v`의 제곱을 더하고,
+아니면 `acc`를 그대로 돌려줍니다.
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
+  "람다는 누적 합계와 원소 하나를 받고, 새 합계를 돌려줍니다.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.basic.17.threads"
+title = "배마다 윈치 하나"
+story = "선가의 삼판마다 자기 윈치가 있고, 모두 한꺼번에 끌어 올리며, 집계는 마지막 윈치가 멈춘 뒤에야 읽힌다."
+brief = '''
+`std::thread`는 만들어지는 순간 자기 스레드에서 함수를 실행합니다. `join()`은
+그것이 끝나기를 기다립니다. 스레드의 벡터는 `emplace_back`과 람다로
+만듭니다. `[&, i]` 캡처는 `i`만 빼고 모든 것을 참조로 빌리며, `i`는
+복사됩니다 — 루프는 나아가도 사본은 그대로입니다. 각 스레드는 자기 칸에만
+쓰므로 아무것도 공유되지 않고, 모든 `join()`이 돌아올 때까지 아무것도 출력되지
+않습니다.
+
+```
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+for (auto& t : threads) t.join();
+```
+
+`results`에는 숫자마다 칸이 하나씩 있고 출력은 적혀 있습니다. 자리표시자를
+대신해 루프 안의 `// FILL`에 첫 줄을, 그 뒤의 `// FILL`에 둘째 줄을
+입력하세요.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "루프 안에 threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });, 그 뒤에 for (auto& t : threads) t.join();.",
+  "main이 끝날 때까지 join되지 않은 스레드는 프로그램을 종료시킵니다. 출력하기 전에 모두 join하세요.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.basic.18.binary-tree"
+title = "SEGFAULT"
+story = "12:00, 눈데이 건. 발포표는 시각들의 트리이고, 대포는 애초에 없던 왼쪽 가지를 따라갔다 — nullptr를 역참조했다, 코즈웨이베이에서 절대 틀려서는 안 되는 단 하나의 주소에서."
+brief = '''
+이진 탐색 트리는 값 하나와 자식 포인터 둘을 가진 노드들입니다: 작은 값은
+`left` 아래에, 큰 값은 `right` 아래에 삽니다. 삽입은 재귀입니다: 빈
+서브트리(`nullptr`)는 새 노드가 되고, 아니면 값이 한쪽으로 내려가며 — 그쪽이
+무엇이 되든 그것을 다시 저장합니다. 그쪽이 방금 전까지 `nullptr`였을 수 있기
+때문입니다. 그 저장이 요령의 전부이고, 그 앞의 `nullptr` 검사가 보스의
+전부입니다.
+
+```
+if (!n) return new Node{v};
+if (v < n->val) n->left = insert(n->left, v);
+else n->right = insert(n->right, v);
+return n;
+```
+
+`Node`, `nullptr` 경우, `inorder`, `height`, `main`은 적혀 있습니다. 두
+`// FILL` 표시에 두 하강 줄을 입력하세요: 왼쪽 것은 `if` 안에, 오른쪽 것은
+`else` 안에.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "왼쪽에는 n->left = insert(n->left, v);, 오른쪽에는 n->right = insert(n->right, v);.",
+  "결과를 다시 저장하세요: 자식은 nullptr였을 수 있고, 새 노드는 insert가 돌려주는 것입니다.",
+]

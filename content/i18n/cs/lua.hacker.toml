@@ -1,0 +1,1172 @@
+# LUA LAND — HACKER, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/lua/hacker.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "lua.hacker"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.hacker.01.two-sum"
+title = "Dva lampiony"
+story = "Room 7-32, poosmé, měsíc nad hřebenem a dole v Tai Hang začínají bubny. První otázka je ta, kterou dostane každý, a hodiny se spustí už cestou dovnitř."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` celých čísel.
+
+Vypiš indexy **od 1** `i j` dvou různých položek, které dají dohromady `target`, jako `i j` s `i < j`. Pokud funguje víc dvojic, dej tu, jejíž druhý index je nejmenší; pokud je i pak shoda, tu s nejmenším prvním indexem. Pokud nefunguje žádná dvojice, vypiš `-1`.
+
+```
+input:  4 9
+        2 7 11 15
+output: 1 2
+```
+
+Skryté případy tady jsou malé: kontrolují rozhodnutí shody a případ bez odpovědi, ne tvoji rychlost. Otázka je pořád ta lineární — jeden průchod, jedna tabulka — protože skutečné `n` je 200000 a vnořená smyčka je přesně to, co má tahle otázka vyřadit. Napiš odpověď, na kterou se otázka ptá, ne tu, která náhodou projde těmito čtyřmi případy.
+
+Tabulka v Lua je ta hashovací mapa. `seen[target - x]` je `nil`, když klíč nikdy nikdo nezapsal, a `nil` je ten minutý zásah — testuj ho přes `~= nil` a klíč zapisuj jen tehdy, když ho vidíš poprvé, aby opakovaná hodnota držela svůj první index. Seznam je od 1, což je pro jednou přesně ten index, který zadání chce.
+'''
+hints = [
+  "Jeden průchod. U každé hodnoty se zeptej, jestli už byl viděn target minus ona.",
+  "Zapisuj klíč jen poprvé — `if seen[x] == nil then seen[x] = j end` drží první index opakování, což je rozhodnutí shody, které zadání chce.",
+  "Vypiš a udělej `return` v okamžiku, kdy to najdeš — `return` na nejvyšší úrovni chunku ukončí program a první zásah při procházení je už ten nejmenší druhý index.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.hacker.02.window"
+title = "Bez opakování"
+story = "Druhá otázka je na tabuli dřív, než odložíš fix. Za oknem jde řada vonných tyčinek, jedna na článek, žádné dvě stejné."
+brief = '''
+Jeden řádek textu, bez mezer.
+
+Vypiš délku nejdelšího úseku znaků, ve kterém se nic neopakuje, pak samotný úsek. Pokud je víc úseků stejně dlouhých, vypiš ten nejlevější.
+
+```
+input:  abcabcbb
+output: 3
+        abc
+```
+
+Okno se vždycky posouvá jen doprava. Pokud po opakování zase procházíš od začátku, napsal jsi tu kvadratickou verzi.
+
+Čtyři případy tady mají nanejvýš tucet znaků a hodiny na nich rychlost neměří — kvadratická verze jimi projde taky. Velký skrytý případ tu není, protože žádný poctivý se postavit nedá: na textu s malou abecedou je nejdelší úsek omezený abecedou, takže opakované procházení stojí konstantní násobek, ne kvadrát, a vstup, který by ho potrestal, už není text. Napiš jednoprůchodovou odpověď, protože to je ta odpověď, ne protože ji tyhle čtyři případy vynutí.
+
+Řetězec v Lua není tabulka: `text[i]` je `nil`, ne znak. Znak na pozici `i` je `text:sub(i, i)` (nebo `text:byte(i)` jako číslo) a úsek je `text:sub(start, start + length - 1)` — oba konce **včetně** a od 1, a právě tady žije chyba o jedničku.
+'''
+hints = [
+  "Drž index, kde byl každý znak naposledy viděn, v tabulce klíčované znakem, a index, kde okno začíná.",
+  "Opakování se počítá, jen když je jeho poslední pozice uvnitř aktuálního okna — to je test `previous ~= nil and previous >= start`.",
+  "Zaznamenej nejlepší délku *i* to, kde začala, jinak úsek na konci nevypíšeš. `text:sub(start, start + length - 1)` je ten úsek; `sub` zahrnuje oba konce.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.hacker.03.intervals"
+title = "Rozpis bubeníků"
+story = "Podají ti rozpis bubeníků na tři noci draka a ptají se, ve kterých hodinách je u bubnu doopravdy někdo."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je `<start> <end>` se `start <= end`.
+
+Spoj každou dvojici, která se překrývá nebo dotýká, a vypiš výsledek vzestupně, jeden `<start> <end>` na řádek, pak `COUNT <k>`.
+
+```
+input:  4
+        1 3
+        2 6
+        8 10
+        15 18
+output: 1 6
+        8 10
+        15 18
+        COUNT 3
+```
+
+Dotyk se počítá jako překryv: `1 4` a `4 5` se spojí do `1 5`.
+
+Čtyři případy tady mají každý tři nebo čtyři intervaly a hodiny na nich rychlost neměří. Seřadit a zamést je `O(n log n)`; verze, která pro každý interval znovu prochází spojený seznam, je `O(n²)` a projde těmito čtyřmi stejně snadno. Laťka je skutečná na skutečném rozpisu. Tyhle případy ji nekontrolují.
+
+`table.sort` bere komparátor a tady ho potřebuje: intervaly jsou tabulky a dvě tabulky nemají vlastní pořadí — `{1, 3} < {2, 6}` je chyba, ne odhad. Komparátor je `function(p, q) return p[1] < q[1] end` a spojený seznam je tabulka tabulek, takže `merged[#merged][2] = e` prodlouží ten poslední na místě.
+'''
+hints = [
+  "Nejdřív seřaď podle začátku, s komparátorem. Pak stačí jeden průchod zleva doprava a nikdy se nedíváš zpátky víc než o jeden interval.",
+  "Prodluž poslední spojený interval, když je nový začátek <= jeho konec; jinak přidej nový. `merged[#merged]` je ten poslední a je to tabulka, takže zápis `top[2] = e` ho změní na místě.",
+  "Prodlužuj na větší z obou konců — krátký interval spolknutý dlouhým ho nesmí zkrátit.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.hacker.04.grid"
+title = "Ven z budovy"
+story = "Půdorys Chow Yei Ching Building na tabuli, požární dveře v protějším rohu a tazatel, který sleduje hodiny místo fixu, zatímco z Tai Hang stoupají bubny."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je podlaží: `.` je volné, `#` je zeď.
+
+Začni vlevo nahoře `(0,0)` a dojdi vpravo dolů `(r-1, c-1)`, pohybem nahoru, dolů, doleva nebo doprava jen volnými buňkami.
+
+Vypiš počet **kroků** na nejkratší trase, nebo `-1`, pokud žádná není. Pak vypiš `REACHED <k>`: kolik volných buněk je ze startu dosažitelných, včetně samotného startu.
+
+```
+input:  3 3
+        ...
+        .#.
+        ...
+output: 4
+        REACHED 8
+```
+
+Do šířky, ne do hloubky. Průchod do hloubky najde *nějakou* trasu; otázka chce tu nejkratší. A ve standardní knihovně žádná fronta není: tabulka jí je, **pokud** ji čteš s posouvajícím se indexem začátku. `table.remove(queue, 1)` posune každý zbývající prvek o jedno dolů, což je `O(n)`, a z celého hledání udělá kvadratické.
+
+Tabulka může mít jakýkoli klíč, takže `open[0]` je skutečný řádek a `open[-1]` je prostě `nil` — žádná chyba a ani přetočení na poslední řádek. Chyba přijde o krok později, když `open[-1][c]` po tom `nil` jde: `attempt to index a nil value`. Chybějící klíč není chyba, dokud se po něm nejde; hranice kontroluj před čtením, ne po něm.
+'''
+hints = [
+  "Index začátku, který se posouvá jen dopředu, je tady celý rozdíl mezi frontou a zásobníkem; `queue[#queue + 1] = cell` přidává, `queue[head]` s `head = head + 1` bere zepředu v O(1).",
+  "Označ buňku, když ji vkládáš, ne když ji vybíráš, jinak se do fronty dostane několikrát.",
+  "Mřížka vzdáleností slouží zároveň jako množina navštívených: -1 znamená ještě neviděno, takže druhou strukturu nepotřebuješ.",
+  "`open[nr]` je mimo horní nebo dolní okraj podlaží nil a indexovat do něj je běhová chyba. Zkontroluj `nr >= 0 and nr < rows`, než přečteš `open[nr][nc]` — nebo čti `open[nr] and open[nr][nc]`, což je tatáž kontrola řečená v Lua.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.hacker.05.binary-search"
+title = "Jak velký náklaďák"
+story = "Sláma na draka přijíždí z Nových území po nákladech, v pořadí. Výbor chce nejmenší náklaďák, který seznam odveze za dny, které mají, a řeknou ti jen, jestli ten, který jmenuješ, je moc malý."
+brief = '''
+První řádek je `n d`. Druhý řádek je `n` hmotností balíků v pořadí, v jakém se musí naložit — pořadí se měnit nedá.
+
+Najdi nejmenší kapacitu náklaďáku, která odveze všech `n` balíků nejvýš za `d` dní, při nakládání v pořadí a bez dělení balíku.
+
+Vypiš kapacitu, pak `MAX <heaviest package>`.
+
+```
+input:  10 5
+        1 2 3 4 5 6 7 8 9 10
+output: 15
+        MAX 10
+```
+
+Neprohledáváš seznam. Prohledáváš **odpověď**: kapacity od `max(weights)` do `sum(weights)`, na kterých je „vejde se to do `d` dní“ nepravda, nepravda, nepravda a pak navždy pravda. Na to použij binární vyhledávání. V Lua žádný `bisect` není a stejně by nepomohl — není tu žádný seznam k půlení, jen predikát — takže tohle se píše ručně.
+
+Čtyři případy tady mají nanejvýš deset hmotností a hodiny na nich rychlost neměří: procházení kapacit po jedné nahoru od `max(weights)` projde každým, protože každá odpověď je pod dvacet. Neprošlo by skutečným nákladním listem, kde je mezera mezi `max` a `sum` miliardy široká — a to je vstup, o kterém otázka doopravdy je. Tyhle případy kontrolují, že máš hledání správně, ne že jsi nějaké napsal.
+
+`(low + high) / 2` je v Lua skutečné dělení — `(3 + 4) / 2` je `3.5` a kapacita `3.5` je kapacita, které se nic ve vstupu nemůže rovnat. Dej na to `math.floor`. `//` tu není.
+'''
+hints = [
+  "Dolní mez je nejtěžší jednotlivý balík — nic menšího ho nikdy neunese.",
+  "Horní mez je součet: jeden den, všechno naráz.",
+  "math.floor((low + high) / 2) — jinak ti `/` dá 7.5 — a při úspěchu posuň `high` dolů na `mid`, aby sis nechal nejmenší kapacitu, která fungovala.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.hacker.06.stack"
+title = "Další větší"
+story = "Sloupec výšek lampionů na tabuli a jedna otázka: pro každý z nich, který je první další za ním, jenž je vyšší."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Pro každou položku vypiš první položku **napravo od ní**, která je ostře větší, nebo `-1`, pokud žádná není. Dej je na jeden řádek, oddělené mezerami. Pak vypiš `NONE <k>`, kolik z nich bylo `-1`.
+
+```
+input:  4
+        2 1 2 4
+output: 4 2 4 -1
+        NONE 1
+```
+
+Drž zásobník pozic, jejichž odpověď ještě není známá, a ten zůstává odspodu nahoru klesající. Každá pozice se jednou vloží a jednou vyjme, takže celé je to jeden průchod, ať to vypadá jakkoli. Tabulka v Lua je ten zásobník: `pending[#pending + 1] = i` vkládá, `pending[#pending]` je vrchol a `pending[#pending] = nil` vyjímá — všechno `O(1)`, protože `#` na posloupnosti bez děr je délka, ne počítání.
+
+Pět případů tady má nanejvýš šest čísel a hodiny na nich rychlost neměří. Neměřily by ani na větším, a to stojí za to vědět: naivní odpověď — pro každou položku jdi doprava, dokud se neobjeví něco většího — je kvadratická jen na vstupu, který je už skoro sestupný. Na náhodném vstupu se zastaví v průměru asi po `ln(n)` krocích, takže žádný časový limit ji od zásobníku neoddělí. Zásobník je pořád ta odpověď, protože je `O(n)` na každém vstupu včetně sestupného — ale u tohohle questu je to tvrzení, které musíš přijmout na základě argumentu, ne hodin.
+
+`table.concat(answer, " ")` spojuje čísla stejně jako řetězce a je to způsob, jak vypsat řádek hodnot — `print(a, b)` mezi ně dá **tabulátor**.
+'''
+hints = [
+  "Zásobník drží indexy, které pořád čekají na svou odpověď, ne hodnoty.",
+  "Když nová hodnota porazí hodnotu na vrcholu zásobníku, odpověď toho indexu je ta nová hodnota — a vyjímej dál, může jich porazit několik. `pending[#pending] = nil` je vyjmutí.",
+  "Ostře větší, takže stejné hodnoty se navzájem nevyřeší; naskládají se a vyřeší se později spolu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.hacker.07.coins"
+title = "Přesně na drobné"
+story = "Stánek s vonnými tyčinkami na začátku Wun Sha Street má tři přihrádky na mince a zákazníka, který si nevezme bankovku."
+brief = '''
+První řádek je `n target`. Druhý řádek je `n` hodnot mincí. Každá mince je k dispozici v neomezeném množství.
+
+Vypiš nejmenší počet mincí, který dá přesně `target`, nebo `-1`, pokud to nejde. Pak vypiš `REACH <k>`: kolik z částek `0..target` se dá vůbec složit, včetně `0`.
+
+```
+input:  3 11
+        1 2 5
+output: 3
+        REACH 12
+```
+
+Skryté případy jsou malé, takže chytají spíš chybnost než pomalost — a jeden z nich chytá tu obvyklou špatnou odpověď. Hladový postup, který bere největší minci, která se vejde, a opakuje to, skládá `6` ze `3 4` tak, že chňapne `4` a pak selže, a přesně na to je tu případ. Ta druhá špatná odpověď, obyčejná rekurze bez tabulky, tady chycená není, a přesto to není ta, kterou psát: `target` je ve skutečnosti 100000 a tatáž částka se přepočítává tisíckrát.
+
+Tabulka jde od `0` do `target` a tabulka v Lua klidně začne na `0` — `best[0] = 0` je skutečná položka. Částka, která se složit nedá, prostě **chybí**: `best[amount]` je `nil` a `nil` je tady to poctivé „nedosažitelné“. Testuj ho přes `~= nil`, než k němu přičteš jedničku, protože `nil + 1` je `attempt to perform arithmetic on a nil value`. A nikdy nepoužívej `#best` k počítání čehokoli v tabulce s dírami: `#` je hranice, ne počet.
+'''
+hints = [
+  "best[0] = 0 a best[a] je o jedna víc než nejlevnější best[a - coin] přes všechny mince, které se vejdou.",
+  "nil je v Lua to poctivé `unreachable` — částka, kterou nikdo nesložil, nemá vůbec žádnou položku. Než přičteš jedničku, zkontroluj `~= nil`, jinak je chybou samotné sčítání.",
+  "REACH je, kolik z 0..target má položku — projdi rozsah a počítej; `#best` je na tabulce s dírami hranice a může to být cokoli.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.hacker.08.top-k"
+title = "Pět nejčastějších"
+story = "Zahřívací kolo. Chtějí pět slov, která se nejčastěji objevila v loňských lampionových hádankách, a stejně to měří."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` slov oddělených mezerami.
+
+Vypiš `k` nejčastějších slov, nejčastější první, shody rozhodne slovo vzestupně, jedno na řádek. Pokud je různých slov méně než `k`, vypiš všechna. Pak vypiš `DISTINCT <d>`.
+
+```
+input:  6 2
+        tram tram bus bus bus mtr
+output: bus
+        tram
+        DISTINCT 3
+```
+
+Počítej v tabulce klíčované slovem, pak seřaď. Rozhodnutí shody není ozdoba a v Lua je to celý quest: **`pairs` prochází tabulku v žádném pořadí** — ne v pořadí vložení, ne abecedně a ani ne ve stejném pořadí od jednoho běhu k dalšímu. Takže slova vyjdou z tabulky počtů do posloupnosti a posloupnost se seřadí porovnáním, které je **úplné**: počet sestupně, pak slovo vzestupně, což `table.sort` potřebuje, aby dal jednu odpověď, a na co tazatel poslouchá.
+
+Čtyři případy tady jsou hrstka slov a hodiny na nich rychlost neměří: počítání průchodem celého seznamu jednou pro každé různé slovo je `O(n²)` a projde všemi čtyřmi. Na roku hádanek by neprošlo. Tyhle případy kontrolují rozhodnutí shody, což je ta část, kterou lidé doopravdy pokazí.
+'''
+hints = [
+  "Jedna tabulka pro počty a druhá, ve tvaru posloupnosti, do které se slovo přidá, když je viděno poprvé — tu druhou tabulku řadíš, protože tabulku, kterou procházíš přes pairs, seřadit nejde.",
+  "Komparátor vrátí counts[a] > counts[b], když se liší, a a < b, když ne. Řetězce se v Lua porovnávají přes <, bajt po bajtu, což je to vzestupně, které zadání chce.",
+  "math.min(k, #words) je mez smyčky — smyčka do k na kratším seznamu vypíše nil.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.hacker.09.linked-list"
+title = "Řetěz"
+story = "Chtějí to bez posloupnosti. Tabulky, které ukazují na tabulky, tak jako se články draka drží toho před sebou, protože to je tvar, o kterém otázka doopravdy je."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel, v pořadí.
+
+Sestav z nich jednosměrně spojový seznam — uzel je tabulka s `value` a `next` — a pak odpovídej z uzlů. Obrácení, prostředek i délka vycházejí z procházení řetězu, ne z posloupnosti, do které jsi načetl vstup; posbírat výstup do posloupnosti a na konci ho spojit přes `table.concat` je v pořádku. Vypiš tři řádky:
+
+1. seznam obráceně, oddělený mezerami
+2. hodnotu v prostředním uzlu (pro sudé `n` ten druhý z těch dvou)
+3. `LEN <n>` spočítané procházením seznamu, ne důvěrou ve vstup
+
+```
+input:  5
+        1 2 3 4 5
+output: 5 4 3 2 1
+        3
+        LEN 5
+```
+
+Prostředek je běžec: jeden ukazatel po jednom kroku, jeden po dvou, a když rychlému dojde cesta, pomalý je tam. Jeden průchod.
+
+Uzel je `{ value = v, next = head }` a konec řetězu je `next`, které je `nil` — což není pole nastavené na nic, je to pole, které tam vůbec není. `while cursor ~= nil do` je ten průchod. Obrať ho smyčkou: rekurzivní obrácení jsou tři hezké řádky a zásobník LuaJIT jich pár tisíc unese, ale verze téhle otázky se sto tisíci uzly je ta, na kterou se ptají, a ta je `stack overflow`.
+'''
+hints = [
+  "Stavět odzadu dopředu je ten snadný směr: každý nový uzel si vezme starou hlavu jako svůj next a první postavený uzel má next = nil.",
+  "Ulož si cursor.next, než ho přepíšeš. Jakmile cursor.next ukazuje zpátky, zbytek starého seznamu je nedosažitelný.",
+  "Pro prostředek posuň slow jen v krocích, kdy fast zvládl dva.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.hacker.10.tree-walk"
+title = "Třikrát kolem stromu"
+story = "Strom čísel lampionů na tabuli a otázka, nad kterou by nikdo neměl přemýšlet dvakrát: vyjmenuj ta tři pořadí."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` hodnot v **pořadí po úrovních**, kde `-1` znamená „tady žádný uzel není“ — takže strom je uložený tak, jak se ukládá halda: děti indexu `i` jsou `2i+1` a `2i+2`.
+
+Vypiš čtyři řádky: průchody **preorder**, **inorder** a **postorder**, každý oddělený mezerami, a pak `DEPTH <d>` — počet uzlů na nejdelší cestě od kořene k listu.
+
+```
+input:  5
+        1 2 3 -1 4
+output: 1 2 4 3
+        2 4 1 3
+        4 2 3 1
+        DEPTH 3
+```
+
+Preorder je uzel, levý, pravý. Inorder je levý, uzel, pravý. Postorder je levý, pravý, uzel. Rekurze jsou pokaždé tytéž tři řádky a posouvá se jen místo přidání. Rekurze je tu tak hluboká jako strom, což je pro pole ve tvaru haldy `log n`, takže zásobník starost není — řekni to nahlas, protože se na to zeptají.
+
+Vzorec chce kořen na indexu `0` a tabulka v Lua klíč `0` mít může: ulož hodnoty jako `tree[0] .. tree[n-1]` a `2i+1` funguje beze změny. Za koncem tabulky je `tree[i]` `nil`, a tak zní i test na něj. `local function walk(...)` může volat sama sebe; obyčejné `local walk = function` nemůže, protože jméno uvnitř vlastního těla ještě není v dosahu.
+'''
+hints = [
+  "Jedna rekurzivní funkce s přidáním na třech možných místech je lepší než tři skoro stejné funkce.",
+  "Základní případ jsou obě podmínky naráz: za koncem pole, nebo na -1.",
+  "Hloubka je 1 + hlubší z obou dětí a 0 pro chybějící uzel.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.hacker.11.bst"
+title = "Je to opravdu BST"
+story = "Navazující otázka, tentýž strom čísel lampionů. Každý zkontroluje ty dvě děti a každý se napoprvé mýlí."
+brief = '''
+Stejné kódování po úrovních jako v minulém questu: `-1` je chybějící uzel, děti `i` jsou `2i+1` a `2i+2`.
+
+První řádek je `n q`. Druhý řádek je `n` hodnot stromu. Třetí řádek je `q` hodnot dotazů.
+
+Vypiš `VALID` nebo `INVALID` — je tohle binární vyhledávací strom, kde je každá hodnota v levém podstromu ostře menší než uzel a každá hodnota v pravém ostře větší? Pak jeden řádek na dotaz: `<value> FOUND <depth>`, pokud je ve stromu, `<value> ABSENT`, pokud ne, kde kořen má hloubku 1.
+
+```
+input:  7 2
+        4 2 6 1 3 5 7
+        3 8
+output: VALID
+        3 FOUND 3
+        8 ABSENT
+```
+
+Kontrolovat `left < node < right` u každého uzlu **nestačí** — hodnota hluboko v levém podstromu může být pořád větší než nějaký předek. Místo toho nes dolů otevřený interval. Lua nemá žádné nejmenší celé číslo, od kterého začít; meze začínají jako `nil`, což znamená „zatím žádná mez“, a `nil` potřebuje vlastní kontrolu, protože `value <= nil` je `attempt to compare number with nil`, běhová chyba, ne nepravda.
+
+Na dotaz se odpovídá **sestupem**: porovnej s uzlem, jdi doleva, když jsi menší, a jinak doprava, a ohlas `ABSENT`, když ze stromu spadneš. Na tom záleží, protože strom nemá slíbeno, že je BST, a v takovém, který jím není, může hodnota sedět v poli někde, kam se sestup nikdy nepodívá. Pak je `ABSENT` — ptají se tě, co udělá vyhledání, ne co by našel průchod polem.
+'''
+hints = [
+  "Předávej dolů otevřený interval (low, high). Kořen dostane (nil, nil); levé dítě dostane (low, node), pravé dítě (node, high).",
+  "Chybějící uzel je triviálně platný — to je základní případ a vrací true, ne false.",
+  "Vyhledání je to binární vyhledávání: menší jde doleva, jinak doprava, a hloubka je, kolik skoků to dalo. Pád ze stromu vrátí nil a nil se vypíše jako ABSENT.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.hacker.12.heap"
+title = "K seřazených front"
+story = "Každá ulička, kterou drak prochází, posílá svá čísla lampionů už seřazená. Spoj je do jednoho seznamu, aniž bys to celé znovu řadil."
+brief = '''
+První řádek je `k`. Pak `k` řádků, každý je počet a za ním tolik celých čísel, už seřazených vzestupně.
+
+Vypiš je všechna spojená do jednoho vzestupného řádku, oddělená mezerami, pak `POPS <total count>`.
+
+```
+input:  3
+        3 1 4 5
+        2 1 3
+        2 2 6
+output: 1 1 2 3 4 5 6
+        POPS 7
+```
+
+V Lua žádný `heapq` není. Binární min-halda je tabulka a dvě funkce — `push` probublá nový poslední prvek nahoru, `pop` přesune poslední prvek na vrchol a nechá ho klesnout — a starter jednu nese, dvě funkce po patnácti řádcích, takže otázkou je tady smyčka, ne halda. Přečti si ji jednou; dál na téhle cestě ji napíšeš sám.
+
+Položka je `{ value, which list, how far into it }` a halda řadí položky nejdřív podle `value` a při shodě podle indexu seznamu — což je v pořádku, protože to musí být jen *nějaké* pořadí, a musí být **úplné**, protože porovnání haldy píšeš ty a porovnání, které oběma směry říká „rovná se“, není chyba, kterou by Lua ohlásila.
+
+Halda drží jednu položku na seznam, ne jednu na prvek, takže zůstane velká `k`, ať jsou seznamy jakkoli dlouhé.
+
+Čtyři případy tady jsou hrstka čísel ve dvou nebo třech seznamech a hodiny na nich rychlost neměří: nasypat všechno do jedné tabulky a seřadit ji přes `table.sort` projde všemi čtyřmi, a stejně tak znovu procházet všech `k` začátků v každém kroku. Halda je to, co to drží na `O(N log k)`, když je `k` velké, a to je slib o vstupu, který tyhle případy neobsahují.
+'''
+hints = [
+  "Položka haldy musí nést, odkud hodnota přišla, jinak po jejím vybrání nemůžeš doplnit.",
+  "{ value, which, at } s `less`, které porovnává nejdřív value, je přesně to, co chceš; osej ji prvním prvkem každého neprázdného seznamu — seznam s počtem 0 nemá žádný začátek, kterým by šel osít.",
+  "Další prvek seznamu vlož jen tehdy, když vybereš jeden z jeho prvků — to drží haldu na k.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.hacker.13.backtracking"
+title = "Každá kombinace"
+story = "Vyjmenuj každý způsob, jak by se lampiony daly pověsit na stánek. Všechny, v pevném pořadí, a nevypisuj žádný dvakrát."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` různých celých čísel **už ve vzestupném pořadí**.
+
+Vypiš každou podmnožinu, jednu na řádek, hodnoty oddělené mezerami, prázdnou podmnožinu jako `-`. Seřaď je tak, jak je vyrobí ta zřejmá rekurze: na každé pozici nejdřív větev, která prvek **vezme**, pak větev, která ho přeskočí. Pak vypiš `SUBSETS <2^n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 2 3
+        1 2
+        1 3
+        1
+        2 3
+        2
+        3
+        -
+        SUBSETS 8
+```
+
+Přidej, zanoř se, **odeber**. Odebrání je ta část, kterou lidé vynechávají, a příznakem je, že každý řádek po prvním je moc dlouhý. V Lua je přidání `chosen[#chosen + 1] = v` a odebrání `chosen[#chosen] = nil` — přiřazení `nil` do poslední pozice je způsob, jak se posloupnost zkrátí, a `#chosen` ji následuje dolů. Žádné `itertools`, které by ti dalo podmnožiny v nějakém jiném pořadí, tu není; pořadí je vlastní pořadí rekurze, a právě to se kontroluje.
+'''
+hints = [
+  "Dvě rekurzivní volání na prvek: jedno s ním přidaným, jedno bez něj. Nejdřív vezmi a pořadí z ukázky vyjde samo.",
+  "chosen[#chosen] = nil patří mezi ta dvě volání. To je to `undo` v try-recurse-undo.",
+  "Základní případ je at > #nums a prázdný výběr tam je prázdná podmnožina, která se pořád počítá — a vypíše se jako `-`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.hacker.14.word-search"
+title = "Je to slovo v mřížce"
+story = "Deska písmen a jméno z lampionové hádanky. Chtějí vědět, jestli je to jméno v ní napsané, a chtějí počet slepých uliček."
+brief = '''
+První řádek je `r c`. Dalších `r` řádků je mřížka malých písmen. Poslední řádek je slovo.
+
+Slovo je v mřížce, pokud ho dokážeš vyhláskovat pohybem nahoru, dolů, doleva nebo doprava mezi **sousedními** buňkami, aniž bys v jednom pokusu použil stejnou buňku dvakrát.
+
+Vypiš `FOUND` nebo `ABSENT`, pak `STARTS <k>`: kolik buněk drží první písmeno slova.
+
+```
+input:  3 4
+        abce
+        sfcs
+        adee
+        abcced
+output: FOUND
+        STARTS 2
+```
+
+Označ buňku jako použitou cestou dovnitř a **odznač ji cestou ven**. Buňka, která zůstane označená po neúspěšné větvi, nechá pozdější větve selhat z důvodu, který v mřížce není. Řetězec v Lua se označit na místě nedá — je neměnný a `s:sub` vždycky jen vyrobí nový — takže z každého řádku se nejdřív stane tabulka jednoznakových řetězců a označení je zápis do té tabulky.
+
+`or` se v Lua zkracuje přesně tak jako jinde, takže zřetězení čtyř směrů přes `or` se zastaví u prvního, který vyhláskuje zbytek slova.
+'''
+hints = [
+  "Přepiš buňku znakem, který slovo obsahovat nemůže, zanoř se, pak vrať originál zpátky.",
+  "Počáteční písmena spočítej v samostatném průchodu před hledáním, jinak značky '#' počet zmatou.",
+  "Základní případ úspěchu je `at == #letters` — kontrolovaný po shodě této buňky, ne před ní.",
+  "Zřetěz čtyři směry přes `or` místo čtyř ifů a příznaku `found`: `or` se už zastaví u první větve, která uspěje. Pokračovat po zásahu je práce, o kterou tě žádali, abys ji nedělal.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.hacker.15.topo-sort"
+title = "V jakém pořadí se to sestaví"
+story = "Jedenáct prací, aby se drak dostal z kůlny — sláma, kostra, tyčinky, hlava nakonec — a list toho, co na co čeká. Jmenuj pořadí, nebo jmenuj cyklus, který znamená, že žádné není."
+brief = '''
+První řádek je `n m`: `n` úloh očíslovaných `0..n-1` a `m` hran. Dalších `m` řádků je `<a> <b>`, což znamená, že `a` se musí sestavit před `b`.
+
+Vypiš pořadí sestavení na jeden řádek, oddělené mezerami. Když je připraveno několik úloh naráz, vezmi tu s **nejnižším číslem**, aby byla odpověď jednoznačná. Pokud žádné pořadí neexistuje, vypiš místo toho `CYCLE`. Pak vypiš `DONE <how many you ordered>`.
+
+```
+input:  4 4
+        0 1
+        0 2
+        1 3
+        2 3
+output: 0 1 2 3
+        DONE 4
+```
+
+Kahnův algoritmus: spočítej, na kolik věcí každá úloha čeká, začni těmi, které nečekají na nic, a když úlohu vezmeš, sniž počty jejím závislým. Pokud skončíš a úlohy zbudou, ty úlohy jsou ten cyklus. Množina připravených je min-halda čísel — ta z uzlu 12 s porovnáním zúženým na `<` — takže „nejnižší číslo“ stojí `log n` místo procházení. Úlohy jsou číslované od `0` a `after[0]` a `waiting[0]` jsou v tabulce Lua obyčejné položky; jen `ipairs` a `#` předstírají, že tabulka začíná od `1`, takže úlohy procházej číselným `for`.
+'''
+hints = [
+  "waiting[b] je vstupní stupeň b — kolik hran na něj ukazuje.",
+  "Obyčejná fronta dá *nějaké* pořadí; min-halda dá *to* pořadí, které zadání chce.",
+  "Cyklus nikdy nezjistíš přímo. Všimneš si, že vyšlo méně než n úloh, a ty zbylé v něm jsou.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.hacker.16.union-find"
+title = "Kdo je spojený s kým"
+story = "Tramvaj, MTR a trasy minibusů na jednom listu a každá ulička, kterou drak dnes v noci zavře. Kolik oddělených sítí tam doopravdy je."
+brief = '''
+Standardní vstup je `n m seed`: `n` zastávek očíslovaných `0..n-1`, `m` neorientovaných spojů. Ve vstupu žádné spoje nejsou — postavíš je sám, **přesně** tímhle generátorem, v 64bitové aritmetice, která přetéká dokola:
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the m links, in order:
+    a = next() % n
+    b = next() % n
+    link a — b
+```
+
+Vypiš tři řádky: kolik je oddělených sítí, velikost největší a `REDUNDANT <k>` — kolik spojů spojilo dvě zastávky, které už spojené byly. Spoj ze zastávky do sebe samé je jeden z nich.
+
+```
+input:  8 5 1
+output: 4
+        5
+        REDUNDANT 1
+```
+
+Pro `8 5 1` je pět spojů `6—1`, `4—6`, `2—3`, `2—6`, `1—2`. Poslední spojuje dvě zastávky, které už jsou ve stejné síti, takže je to ten nadbytečný, a zbude `{1,2,3,4,6}` plus zastávky `0`, `5` a `7` samy o sobě.
+
+Číslo v Lua je double a double drží 53 bitů: vynásob v něm dvě z těch konstant a dolní bity jsou pryč dřív, než dojde na `+`. LuaJIT má typ, ve kterém je zadání napsané. `0ULL + seed` je neznaménkové 64bitové celé číslo, `*` a `+` na něm přetékají dokola na `2^64` — žádná maska, ten typ *je* maska — `bit.rshift(x, 33)` ho vezme a `tonumber(...)` vrátí 31bitový výsledek zpátky na obyčejné číslo, se kterým je `%` spokojené. Každý velký případ na téhle cestě používá tentýž čtyřřádkový generátor.
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 200000` s `m = 200000` spoji. Ta zřejmá odpověď, která není union-find — projdi síť od `a` a podívej se, jestli v ní už `b` je, jednou na spoj — je správná a je `O(n)` na spoj, tedy celkem `O(n·m)`: na tomhle stroji nedoběhla ani po **25 sekundách**, proti desetisekundovému limitu. To je starter. Union-find s kompresí cesty a sjednocením podle velikosti udělá týchž 200000 spojů za **0.01 sekundy**, změřeno tady s řešením, které je součástí tohohle questu.
+
+Stojí za to to vidět jasně, protože je to nejčastější způsob, jak neprojít časovaným testem: **starter není špatně.** Na ukázce i na obou malých skrytých případech vypíše přesně správnou odpověď. Je odmítnutý jen proto, že přijde mnohem pozdě.
+
+Union-find: každá zastávka ukazuje na rodiče, `find` dojde ke kořeni, `union` nasměruje jeden kořen na druhý. Komprimuj cestu při návratu z `find` a celé je to v praxi konstantní čas na dotaz.
+
+Napiš `find` jako smyčku. Rekurzivní je učebnicová verze a na řetězu dlouhém dvacet tisíc je to `stack overflow` — což je přesně ten tvar, kterému má sjednocení podle velikosti zabránit, a přesně ten tvar, který má nepřátelský vstup, než ho první `find` vůbec zkomprimuje.
+'''
+hints = [
+  "Losuj oba konce průběžně — jeden krok generátoru na každý, v tomhle pořadí — místo abys nejdřív stavěl seznam spojů. Nic tady spoje nepotřebuje dvakrát.",
+  "Začni s každou zastávkou jako vlastním rodičem a n skupinami; každé úspěšné sjednocení počet sníží o jednu. Potom má smysl jen položka velikosti u kořene, takže největší čti z kořenů, ne z každého indexu.",
+  "Spoj, jehož oba konce už mají stejný kořen, je ten nadbytečný — spočítej ho a jdi dál. Spoj na sebe, a == b, z toho testu vypadne sám.",
+  "parent[v], v = root, parent[v] komprimuje na jednom řádku: Lua vyhodnotí celou pravou stranu, než cokoli přiřadí, takže staré parent[v] se přečte dřív, než se přepíše.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.hacker.17.lis"
+title = "Nejdelší rozběh"
+story = "Rok nočních tržeb u stánku s lampiony. Chtějí nejdelší úsek zlepšujících se nocí a nemusí jít po sobě."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš délku nejdelší **ostře rostoucí podposloupnosti** — hodnoty si drží pořadí, ale nemusí sousedit. Pak vypiš `TAILS <k>`, kde `k` je tatáž délka, odečtená z počtu hromádek patience sortu.
+
+```
+input:  8
+        10 9 2 5 3 7 101 18
+output: 4
+        TAILS 4
+```
+
+Tabulka `O(n²)` je odpověď, kterou bys měl umět napsat z hlavy. Ta `O(n log n)` drží pro každou délku nejmenší hodnotu, na které může podposloupnost té délky končit — tabulku, která je vždy seřazená, takže pozice nové hodnoty je binární vyhledávání. V Lua žádný `bisect` není; hledání je šest řádků, napsaných ručně, a najde **první** konec, který je `>= value` — ten levý, ne pravý, protože ostře rostoucí znamená, že stejná hodnota nahrazuje, ne prodlužuje. Tady projde obojí; případy jsou malé a říkají to. Stejně napiš tu druhou, protože navazující otázka je vždycky „a rychleji?“.
+
+Zápis `tails[#tails + 1] = value` přidává na konec; zápis `tails[at] = value` pro `at` uvnitř posloupnosti nahrazuje. Binární vyhledávání ti dá `at`, a když dopadne o jedno za konec, totéž přiřazení udělá přidání.
+'''
+hints = [
+  "tails není podposloupnost. Její délka je odpověď; její obsah jsou jen nejlepší koncové hodnoty.",
+  "Ostře rostoucí znamená, že nahradíš první konec, který je >= value, a to najde hledání s `tails[mid] < value`. Hledání prvního konce > value by ti dalo neklesající.",
+  "Vyběhnout za konec tails — low == #tails + 1 — znamená, že tahle hodnota prodlužuje dosud nejdelší rozběh, a `tails[low] = value` je pak přidání na konec.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.hacker.18.edit-distance"
+title = "Jak daleko od sebe"
+story = "Dva zápisy téže uličky na dvou různých uličních cedulích. Kolik úprav po jednom znaku je mezi nimi."
+brief = '''
+Dva řádky, na každém jedno slovo, malými písmeny. Kterýkoli řádek může být **prázdný** a pak je odpovědí délka toho druhého.
+
+Vypiš **editační vzdálenost**: nejmenší počet vložení, smazání nebo záměn jednoho znaku, které z prvního udělají druhé. Pak vypiš `LCS <k>`, délku jejich nejdelší společné podposloupnosti.
+
+```
+input:  horse
+        ros
+output: 3
+        LCS 2
+```
+
+Dvě tabulky nad týmiž dvěma řetězci a obě jsou tatáž třířádková rekurence s jiným rozhodnutím. Plň řádek po řádku; odpověď je v protějším rohu. Řádek `0` a sloupec `0` nejsou u editační tabulky nula — jsou to náklady na smazání nebo vložení všeho.
+
+Prázdný první řádek znamená, že `gmatch("%S+")` by ti dal druhé slovo jako první. U tohohle čti po řádcích, ne po tokenech — `gmatch("(.-)\n")` prochází řádky a pro prázdný vrátí prázdný řetězec.
+
+Tabulka `(len(a)+1) × (len(b)+1)` je tabulka tabulek a každý řádek musí být **vlastní** tabulka: postav každý ve smyčce přes `{}`. Jedna tabulka řádku přiřazená pod každý index je jeden řádek, přepisovaný ze všech směrů, a odpověď v protějším rohu je nesmysl, který vypadá věrohodně.
+'''
+hints = [
+  "edit[i][0] = i a edit[0][j] = j: udělat z prefixu nic stojí jedno smazání na znak.",
+  "Shodné znaky nestojí nic a jdou diagonálně; neshoda stojí jedna a bere nejlevnějšího ze tří sousedů. a:byte(i) == b:byte(j) porovná znaky, aniž by vyrobilo dva nové řetězce.",
+  "LCS je tentýž průchod s max místo min a bez diagonálního kroku při neshodě. A každý řádek stav s vlastním {} uvnitř smyčky — jedna sdílená tabulka řádku je chyba, která vypíše věrohodné špatné číslo.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.hacker.19.knapsack"
+title = "Co se vejde do tašky"
+story = "Jeden běžec, jedna taška vonných tyčinek a tabule stánků, každý s hmotností a cenou. Hladový postup vybere ty špatné."
+brief = '''
+První řádek je `n cap`. Dalších `n` řádků je `<weight> <value>`. Každou položku lze vzít nejvýš **jednou**.
+
+Vypiš nejlepší celkovou hodnotu, která se vejde do `cap`, pak `GREEDY <v>`: co bys dostal, kdybys opakovaně bral položku s nejlepší hodnotou na hmotnost, která se ještě vejde. Při stejné hodnotě na hmotnost jde lehčí položka první.
+
+```
+input:  3 10
+        6 10
+        5 7
+        5 7
+output: 14
+        GREEDY 10
+```
+
+To, že se ta dvě čísla liší, je celá pointa questu a ukázka to ukazuje: nejlepší hodnota na hmotnost je položka `6 10` s `1.67` a když ji vezmeš, zbudou čtyři jednotky místa, do kterých se nic nevejde. Vynechat ji a vzít obě položky `5 7` má hodnotu `14`. Skryté případy jsou malé, takže kontrolují, že máš obě čísla správně, ne že je tabulka rychlá.
+
+Porovnávej poměry přesně. Lua má jeden číselný typ a je to double, takže `value / weight` je float a dva poměry, které se na papíře rovnají, můžou ve dvojkové soustavě vyjít trochu od sebe. `Fraction` tu není; je tu násobení do kříže: `p.value * q.weight > q.value * p.weight` je totéž porovnání bez dělení a součiny jsou celá čísla, která double drží přesně.
+'''
+hints = [
+  "for room = cap, weight, -1 prochází kapacity směrem dolů, a právě to z toho dělá 0/1 místo neomezeného. Směrem nahoru se tatáž položka dá použít znovu.",
+  "p.value * q.weight > q.value * p.weight je porovnání poměrů bez dělení; dej ho do komparátoru a řazení je přesné.",
+  "Hladový průchod je rovná smyčka přes seřazené položky — žádné vracení, a právě proto je špatně.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.hacker.20.bits"
+title = "Ten, který je sám"
+story = "Každý lístek na tyčinky je naskenovaný dvakrát, až na jeden. Nedovolí ti použít tabulku a nedovolí ti řadit."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` nezáporných celých čísel, ve kterých se každá hodnota objeví přesně dvakrát, až na jednu.
+
+Vypiš čtyři řádky:
+
+1. hodnotu, která se objeví jednou, nalezenou přes **xor** a s konstantní pamětí navíc
+2. kolik bitů `1` je v ní nastavených
+3. `POW2 YES`, pokud je to mocnina dvou, jinak `POW2 NO` (`0` není)
+4. hodnotu s vynulovaným nejnižším nastaveným bitem, nebo `0`, pokud žádný nemá
+
+```
+input:  5
+        4 1 2 1 2
+output: 4
+        1
+        POW2 YES
+        0
+```
+
+`x ^ x == 0` a `x ^ 0 == x` a xoru nezáleží na pořadí, v jakém se děje. To je celý první řádek. `x & (x - 1)` vynuluje nejnižší nastavený bit, což ti dá třetí a čtvrtý řádek zadarmo.
+
+Lua 5.1 nemá bitové operátory — `^` je tu **umocňování** a `4 ^ 4` je `256`. Bity žijí v knihovně `bit`: `bit.bxor(a, b)`, `bit.band(a, b)`, `bit.bor`, `bit.lshift`, `bit.rshift`. Pracují s 32bitovými celými čísly a vracejí číslo se znaménkem, takže hodnota od `2^31` výš by se vrátila záporná; hodnoty tady jsou malé. Napiš smyčku na počítání bitů, protože právě na tu smyčku se ptají.
+
+Čtyři případy tady mají nanejvýš pět čísel a hodiny na nich rychlost neměří: tabulka počtů projde každým, a stejně tak řazení. Ani větší případ by to nezměnil, protože laťka, kterou tahle otázka klade, je **paměť** — jeden akumulátor a nic jiného — a žádný časový limit nerozliší odpověď s konstantní pamětí od tabulky. Tohle je na tvém svědomí a na tazateli, který se zeptá.
+'''
+hints = [
+  "Dvojice se samy vyruší, ať přijdou v jakémkoli pořadí, takže stačí jedno složení seznamu přes bit.bxor.",
+  "Počítání bitů vynulováním nejnižšího pokaždé — walk = bit.band(walk, walk - 1) — proběhne jednou na nastavený bit, ne jednou na šířku.",
+  "Mocnina dvou má nastavený přesně jeden bit, takže vynulování nejnižšího nechá nulu — a samotnou nulu je třeba vyloučit ručně.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.hacker.21.matrix"
+title = "Otoč půdorys"
+story = "Plán lampionového jarmarku je vzhůru nohama a na stole není místo na jeho druhou kopii."
+brief = '''
+První řádek je `n`. Dalších `n` řádků je mřížka `n × n` celých čísel.
+
+Vypiš mřížku otočenou o **90° po směru hodinových ručiček**, `n` řádků hodnot oddělených mezerami. Pak vypiš její hodnoty ve **spirálovém pořadí** — vnější prstenec po směru hodinových ručiček od levého horního rohu, směrem dovnitř — na jeden řádek.
+
+```
+input:  3
+        1 2 3
+        4 5 6
+        7 8 9
+output: 7 4 1
+        8 5 2
+        9 6 3
+        1 2 3 6 9 8 7 4 5
+```
+
+Otočení je to, které se má udělat na místě: transponuj, pak obrať každý řádek. Říct to nahlas je polovina otázky. Vícenásobné přiřazení v Lua je to prohození — `grid[r][c], grid[c][r] = grid[c][r], grid[r][c]` — bez pomocné proměnné, protože pravá strana se vyhodnotí celá, než se cokoli uloží. Žádný jednořádek `zip(*grid)` tu není a nic, co by ti řádek obrátilo; obojí jsou smyčky a měl bys umět říct, proč každá funguje.
+
+Spirála chce **původní** mřížku a tabulka je reference: `copy = grid` jsou dvě jména pro jednu tabulku a `{unpack(grid)}` zkopíruje vnější tabulku a sdílí každý řádek. Kopíruj řádky jeden po druhém.
+'''
+hints = [
+  "Transponuj prohazováním jen nad diagonálou — c začíná na r + 1 — jinak všechno prohodíš zpátky. Vícenásobné přiřazení prohazuje bez pomocné proměnné.",
+  "Spirála chce původní mřížku, takže ji před otočením na místě zkopíruj řádek po řádku: tabulka je reference a `copy = grid` nic nezkopíruje.",
+  "Ty dvě stráže `if` uvnitř spirálové smyčky jsou to, co brání tomu, aby se jediný prostřední řádek nebo sloupec prošel dvakrát.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.hacker.22.trie"
+title = "Krabička na prefixy"
+story = "Automatické doplňování pro tabuli zastávek v tramvaji — to poctivé, které doplní jen to, co na seznamu doopravdy je."
+brief = '''
+První řádek je `n q`. Dalších `n` řádků jsou slova malými písmeny k vložení. Dalších `q` řádků jsou dotazy, každý `WORD <s>` nebo `PREFIX <s>`.
+
+Sestav trii — strom uzlů, z nichž každý drží mapu z písmene na dítě — a odpovídej:
+
+* `WORD <s>` → `YES`, pokud bylo `s` vloženo, jinak `NO`
+* `PREFIX <s>` → kolik z `n` vložených slov začíná na `s`
+
+Není slíbeno, že `n` slov je různých, a `PREFIX` počítá **vložení**, ne různá slova: vlož `tram` dvakrát a `PREFIX tram` je `2`. `NODES` počítá uzly, takže druhé vložení žádný nepřidá.
+
+Pak vypiš `NODES <k>`, počet uzlů v trii včetně kořene.
+
+```
+input:  3 3
+        tram
+        tramway
+        train
+        WORD tram
+        PREFIX tra
+        WORD tra
+output: YES
+        3
+        NO
+        NODES 10
+```
+
+Drž na každém uzlu počet, kolik vložených slov jím prochází, a `PREFIX` je průchod bez počítání na konci. Uzel je tabulka — `{ children = {}, through = 0, terminal = false }` — a `children` je tabulka klíčovaná jednoznakovým řetězcem, protože pole o 26 pozicích je odpověď v C a tabulka je ta v Lua. Dítě, které tam není, je `nil`, a `nil` je signál jak ho při vkládání vytvořit, tak se při vyhledávání zastavit. Písmena slova přicházejí z `word:gmatch(".")`, jedno po druhém.
+'''
+hints = [
+  "children[letter] je pro chybějící dítě nil a nil je signál jak ho při vkládání vytvořit, tak se při vyhledávání zastavit.",
+  "`through` se zvyšuje na uzlu, *na který* šlápneš, takže kořen nikdy nepočítá sám sebe.",
+  "Dotaz, který z trie spadne, nechá `at` jako nil a nil odpoví NO a 0 — ale jen pokud otestuješ `at ~= nil`, než z něj přečteš pole; `nil.terminal` je běhová chyba.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.hacker.23.prefix-sums"
+title = "Kolika způsoby trefit cíl"
+story = "Noc tržeb, hodinu po hodině, a číslo, které chce vidět auditor výboru. Kolik úseků po sobě jdoucích hodin dá dohromady přesně tohle."
+brief = '''
+První řádek je `n k`. Druhý řádek je `n` celých čísel, která můžou být záporná.
+
+Vypiš, kolik souvislých úseků má součet přesně `k`, pak `RANGE <s>`, součet celého seznamu, odečtený z posledního prefixového součtu, ne novým sčítáním.
+
+```
+input:  5 3
+        1 2 3 -3 3
+output: 5
+        RANGE 6
+```
+
+Záporné hodnoty zabijí posuvné okno — okno, které je moc velké, se zmenšením opravit nedá. Co přežije, jsou prefixové součty: úsek `i..j` má součet `k` přesně tehdy, když `prefix[j] - prefix[i] == k`, takže spočítej, kolik dřívějších prefixů se rovná `prefix[j] - k`. Osej tabulku `[0] = 1` pro úseky, které začínají na začátku.
+
+Počet, který nikdo nezapsal, je `nil`, a `nil + 1` je chyba, ne `1`. `(seen[key] or 0) + 1` je v Lua „nula, když chybí“ — to `or` je ten `defaultdict`.
+
+Čtyři případy tady mají nanejvýš pět čísel a hodiny na nich rychlost neměří: dvojitá smyčka `O(n²)` přes každý začátek a každý konec projde všemi čtyřmi. Laťka je skutečná — na noci tržeb je ta dvojitá smyčka otázkou minut — a tyhle případy ji nekontrolují. Kontrolují tu část, kterou je snadné pokazit: osetí `[0] = 1` a vyhledání před zaznamenáním.
+'''
+hints = [
+  "Dřívější prefix vyhledej *předtím*, než zaznamenáš ten aktuální, jinak se úsek nulové délky započítá sám, když je k 0.",
+  "seen = { [0] = 1 } hned na začátku je to, co vůbec dovolí najít úsek, který začíná na indexu 1.",
+  "Poslední prefix je celkový součet, takže druhý řádek nestojí nic navíc. (seen[key] or 0) je způsob, jak se chybějící počet čte jako nula.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.hacker.24.inversions"
+title = "Ten, který chytí hodiny"
+story = "První otázka večerního kola. Naivní odpověď je správná, a je to ta špatná odpověď."
+brief = '''
+Standardní vstup jsou dvě celá čísla, `n` a `seed`. Ve vstupu žádné pole není — postavíš ho sám, **přesně** tímhle generátorem, v 64bitové aritmetice, která přetéká dokola:
+
+```
+x = seed
+repeat n times:
+    x = x * 6364136223846793005 + 1442695040888963407    (mod 2^64)
+    next value = (x >> 33) % 1000000007
+```
+
+Spočítej **inverze**: dvojice `i < j`, kde `a[i] > a[j]`. Vypiš počet, pak `MAX <largest value>`.
+
+```
+input:  8 1
+output: 19
+        MAX 908834774
+```
+
+Pro `8 1` je pole
+`908834774 93944146 392341189 822192870 708211027 74839788 189567123 140486902`.
+
+**Tenhle quest vynucuje svou složitost a je to jediný druh, který to umí.** Jeden skrytý případ je `n = 200000`. Dvojitá smyčka `O(n²)` — což je starter — je `2 × 10^10` porovnání a na tomhle stroji nedoběhla ani po **25 sekundách** proti desetisekundovému limitu. Počítání inverzí během merge sortu je `O(n log n)` a doběhne za pár setin sekundy. Změřeno, na tomhle stroji, těmito dvěma programy.
+
+Dvě věci tenhle jazyk rozhoduje jinak. Generátor běží v 64bitovém celém čísle LuaJIT — `0ULL + seed` a konstanty s `ULL` na konci — protože obyčejné číslo je double a součin by ztratil dolní bity; `tonumber(bit.rshift(x, 33))` vrátí každé losování zpátky na číslo. A odpověď, `9990744366`, je nad `2^32` a hluboko pod `2^53`, takže ji double drží přesně a `print` ukáže každou číslici; říct, *proč* je to bezpečné a kde by to přestalo být, je součást odpovědi.
+'''
+hints = [
+  "Maximum ber během generování, nebo z původní tabulky, než ji seřadíš — tenhle merge sort pracuje na místě.",
+  "Když ve slučování vyhraje hodnota zprava, každý zbývající prvek levé poloviny je větší než ona — to je `mid - i + 1` inverzí naráz a je to celý trik.",
+  "Rekurze je log2(200000), asi osmnáct rámců hluboko — nikde blízko stropu LuaJIT. Fenwickův strom nad zkomprimovanými hodnotami je ta druhá odpověď O(n log n) a stojí za to ji v místnosti zmínit.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.hacker.25.test-cases"
+title = "Následuje T testovacích případů"
+story = "Tvar, který používá každý test, a chyba, kterou každý kandidát napíše aspoň jednou: druhý případ si pamatuje ten první, tak jako si druhá noc draka pamatuje tyčinky té první."
+brief = '''
+První řádek je `T`, počet nezávislých testovacích případů. Každý případ je řádek s `n`, pak řádek s `n` celými čísly — a když je `n` rovno `0`, je ten druhý řádek prázdný.
+
+Pro každý případ vypiš **druhou největší různou** hodnotu, nebo `NONE`, pokud jsou různé hodnoty méně než dvě. Po všech vypiš `CASES <T>`.
+
+```
+input:  3
+        5
+        3 1 4 1 5
+        3
+        7 7 7
+        0
+
+output: 4
+        NONE
+        NONE
+        CASES 3
+```
+
+Tohle je standardní obal soutěžního testu a kandidáti na něm padají z jednoho důvodu: stav, který měl být pro každý případ zvlášť, byl deklarovaný před smyčkou. Každý akumulátor, každá množina, každé `best` patří **dovnitř** `for` — `local` deklarované uvnitř těla smyčky je v každém kole nová proměnná.
+
+Čti po tokenech oddělených bílými znaky, ne po řádcích, a prázdný řádek pro `n = 0` přestane být zvláštním případem úplně — což je druhá věc, kterou tenhle tvar učí. Množina je tabulka s hodnotami jako klíči; chceš-li je seřadit, zkopíruj klíče přes `pairs` do posloupnosti a dej na ni `table.sort`, protože `pairs` žádné pořadí nemá a druhá největší je otázka pořadí.
+'''
+hints = [
+  "Přesuň `local distinct = {}` dovnitř smyčky. To je celá oprava a je to celý quest.",
+  "Tabulka klíčovaná hodnotami odstraní duplikáty; pairs vrátí klíče ven v žádném zvláštním pořadí a table.sort jim nějaké dá, takže ranked[#ranked - 1] je druhá největší různá hodnota.",
+  "ranked[#ranked - 1] na posloupnosti o jednom prvku je ranked[0], což je nil a vypíše se jako `nil`, místo aby vyhodilo chybu — proto je kontrola délky první a proto chybějící klíč není chyba, dokud se po něm nejde.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.hacker.26.statistics"
+title = "Šest desetinných míst"
+story = "Tržby stánku s lampiony, pět nocí. Chtějí čísla zaokrouhlená tak, jak říká specifikace, ne tak, jak je tvůj jazyk zrovna vypíše — a tenhle jazyk vypíše 4 pro 4.0."
+brief = '''
+První řádek je `n`. Druhý řádek je `n` celých čísel.
+
+Vypiš tři řádky, každý na **šest desetinných míst**: průměr, **populační** směrodatnou odchylku (děl `n`, ne `n - 1`) a medián — který je pro sudé `n` průměrem dvou prostředních hodnot.
+
+```
+input:  5
+        2 4 4 4 5
+output: 3.800000
+        0.979796
+        4.000000
+```
+
+Tenhle quest se posuzuje s `match = "float:1e-6"`, takže porovnání je číselné: `3.8` i `3.800000` projdou a hodnota, která je vedle o `1e-7`, projde taky. To je záměr — pointa není tvůj formátovač, ale to, že průměr musí být průměr a že medián pro sudou délku je hranice, kterou lidé pod tlakem hodin pokazí.
+
+Lua má jeden číselný typ. `19 / 5` je `3.8` a `print` ho ukáže jako `3.8`; `20 / 5` je `4` a `print` ho ukáže jako `4`, ne `4.0` — takže šest míst přijde ze `string.format("%.6f", v)` a `%d` na `3.8` je chyba, ne zaokrouhlení. Populační, ne výběrová: žádný modul `statistics`, po kterém by šlo sáhnout, tu není, takže smyčka je tvoje — průměr čtverců odchylek, pak `math.sqrt`. Přečti si zadání dvakrát; ve skutečném testu je rozdíl mezi `n` a `n - 1` celé odevzdání.
+'''
+hints = [
+  "`/` je vždycky skutečné dělení: sum / n už je průměr a math.floor ve starteru je to, co zlomek zahodilo.",
+  "Populační odchylka je druhá odmocnina průměru čtverců rozdílů od průměru — děl n. Dělit n - 1 je ta výběrová a tady je špatně.",
+  "Pro sudý počet je medián průměrem values[n / 2] a values[n / 2 + 1] v tabulce od 1 a právě v té dvojici indexů žije chyba o jedničku. n / 2 je pro sudé n celé číslo, takže je to platný klíč.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.hacker.27.commands"
+title = "Problém je ve vstupu"
+story = "Záznam pokladny stánku s tyčinkami vyjede ze stroje zalomený na osmdesát sloupců a počet nahoře je počet příkazů, ne slov."
+brief = '''
+První řádek je `k`, počet **příkazů**, které následují. Příkazy jsou tokeny oddělené bílými znaky, natlačené přes zbývající řádky tak, jak se zrovna zalomily — libovolný počet na řádek, libovolné mezery, možná prázdný řádek na konci.
+
+| command | tokens | effect |
+| --- | --- | --- |
+| `ADD <cents>` | dva | přidá položku |
+| `VOID` | jeden | odebere poslední položku, nebo nic neudělá, pokud žádná není |
+| `TOTAL` | jeden | vypíše aktuální součet |
+| `CLEAR` | jeden | odebere všechno |
+
+Po `k` příkazech vypiš `COMMANDS <k>` a `ITEMS <how many are left>`.
+
+```
+input:  5
+        ADD 600 ADD 2800 TOTAL VOID TOTAL
+output: 3400
+        600
+        COMMANDS 5
+        ITEMS 1
+```
+
+`k` počítá příkazy a `ADD` je jeden příkaz ze dvou tokenů — takže smyčka, která proběhne `k`krát a v každém kole přečte jeden token, se zastaví na špatném místě. Přečti `k` příkazů a argument vytáhni jen tehdy, když ho příkaz má — a nástroj na „vytáhni další token, když o něj požádám“ je **iterátor**, který vrací `gmatch`: `local next_token = input:gmatch("%S+")` a každé `next_token()` je další token, nebo `nil`, jakmile je vstup vyčerpaný, takže konec vstupu je hodnota, a ne chyba.
+
+`VOID` na prázdné pokladně i `TOTAL` dřív, než se cokoli přidalo, musí fungovat. V zadání není řádek, který by říkal, že se to stát nemůže, a ve skutečném testu je to mlčení specifikací. `items[#items] = nil` na prázdné tabulce zapíše `items[0] = nil`, což nic neudělá — Lua je tu shovívavá tam, kde jiné jazyky vyhodí chybu — a vědět, že je, a říct to, je odpověď, když se na to zeptají.
+'''
+hints = [
+  "gmatch(\"%S+\") dělí na každém běhu mezer, tabulátorů a konců řádků, takže na zalomení v souboru přestane záležet v okamžiku, kdy přestaneš číst řádky.",
+  "Argument ADD vytáhni uvnitř větve ADD, ze stejného iterátoru. Počítadlo smyčky počítá příkazy, ne tokeny.",
+  "`if #items > 0 then items[#items] = nil end` je vyjmutí se strážcem — strážce je v Lua zadarmo a napsat ho stejně říká, že jsi ten případ viděl.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.hacker.29.dijkstra"
+title = "Ne každá ulice je stejně dlouhá"
+story = "Každá mapa, kterou jsi zatím prošel, počítala skoky. Tramvaji je jedno, kolik je zastávek; zajímá ji, jak dlouho trvají — a dnes v noci trvá každá ulička v Tai Hang déle."
+brief = '''
+Standardní vstup je `n m seed`: `n` zastávek, `m` neorientovaných ohodnocených hran. Graf si postav sám, **přesně** tímhle generátorem, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`, jako na uzlu 16):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 1..n:                  # a spanning tree first, so it is connected
+    p = next() % i
+    w = next() % 1000 + 1
+    edge (p, i, w)
+for the remaining m - (n-1) edges:
+    a = next() % n
+    b = next() % n
+    w = next() % 1000 + 1
+    edge (a, b, w)
+```
+
+Vypiš součet nejkratších vzdáleností ze zastávky `0` do každé dosažitelné zastávky (včetně samotné `0`, která je `0`), pak `MAX <the largest of them>`.
+
+```
+input:  6 8 1
+output: 4594
+        MAX 1582
+```
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 100000`, `m = 200000`. Dijkstra je správný algoritmus tak či tak; co rozhodnou hodiny, je prioritní fronta. Starter drží nenavštívené zastávky v množině — tabulce se zastávkou jako klíčem — a nejbližší najde procházením množiny přes `pairs`, což je `O(V)` na krok a celkem `O(V²)`: na tomhle stroji **32 sekund** proti desetisekundovému limitu. Binární halda z toho udělá `O((V + E) log V)` a doběhne asi za šestinu sekundy. Obojí změřeno na tomhle stroji, se dvěma programy, které jsou součástí tohohle questu.
+
+Stojí za to to vidět jasně, protože je to nejčastější způsob, jak neprojít časovaným testem: **starter není špatně.** Vypíše přesně správnou odpověď. Je odmítnutý jen proto, že přijde mnohem pozdě.
+
+Žádný `heapq` tu není: halda je ta, kterou jsi dostal na uzlu 12, drží položky `{ distance, stop }` a porovnává podle vzdálenosti, a tentokrát ji píšeš ty. Nemá decrease-key a ty ho nepotřebuješ: vlož zlepšenou vzdálenost jako novou položku a přeskoč každou vybranou položku, jejíž vzdálenost je už horší než ta, kterou máš zaznamenanou. To přeskočení „zastaralé položky“ je řádek, na který lidé zapomínají, a bez něj halda roste bez omezení. `math.huge` je to poctivé `unreached`: porovná se jako větší než každé číslo a v relaxaci nepotřebuje žádnou kontrolu `nil`.
+'''
+hints = [
+  "Položky { distance, stop } v min-haldě klíčované prvním polem: halda z uzlu 12 s `less` zúženým na porovnání [1].",
+  "Přeskočení položky, jejíž vzdálenost je větší než dist[u], je přeskočení zastaralé položky. Bez něj je algoritmus pořád správný a halda se plní zastaralými položkami.",
+  "math.huge je to poctivé `unreached`: porovná se jako větší než každé číslo a v relaxaci nepotřebuje žádnou kontrolu nil. Polovina generátoru s kostrou zaručuje, že každá zastávka je dosažitelná, takže závěrečný filtr nikdy nic neodstraní — stejně ho nech, protože verze téhle otázky s nedosažitelnou zastávkou je ta navazující.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.hacker.30.range-queries"
+title = "Součty, které se pořád mění"
+story = "Tři sta tisíc pokladních operací z jedné noci napříč všemi stánky v parku, polovina z nich opravy, a někdo chce průběžné součty."
+brief = '''
+Standardní vstup je `n q seed`. Postav pole `n` hodnot a pak proveď `q` operací, vše ze stejného generátoru, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+values[i] = next() % 1000            for i in 0..n
+
+for each of the q operations:
+    a = next(); b = next(); c = next()
+    if a % 2 == 0:   UPDATE  values[b % n] += (c % 1000) + 1
+    else:            QUERY   l = b % n, r = c % n, swap them if l > r,
+                             and add sum(values[l..r]) to a running total
+```
+
+Vypiš průběžný součet všech odpovědí na dotazy, pak `UPDATES <k>`.
+
+```
+input:  8 6 1
+output: 4112
+        UPDATES 3
+```
+
+**Složitost se tu vynucuje.** Velký skrytý případ je `n = 500000, q = 300000`. Starter je odpověď z uzlu 23: tabulka prefixových součtů, díky které je každý dotaz `O(1)` — a kterou každá aktualizace rozbije, takže ji starter staví znovu, `O(n)` na aktualizaci, sto padesát tisíckrát. Na tomhle stroji to trvalo **57 sekund** proti desetisekundovému limitu. (Sčítat rozsah obyčejnou smyčkou není co do druhu o nic lepší a v praxi jen o málo: je to `O(n)` na *dotaz* místo na aktualizaci a tady to trvalo asi 14 sekund.) Fenwickův strom udělá celou věc za pár setin sekundy. Všechno změřeno, s programy z tohohle questu.
+
+(Verze tohohle questu v Rustu a Go spouštějí čtyři miliony operací. Tahle země si nechává pythonovských tři sta tisíc, protože případy jsou ty referenční — a pointa je oddělit správnou strukturu od špatné, ne jedno běhové prostředí od jiného.)
+
+Lekce je ta, na kterou tazatel rybaří: *bodová aktualizace, součet rozsahu* je přesně ten tvar, pro který Fenwickův strom existuje. Tři krátké funkce — add, prefix a range jako rozdíl dvou prefixů — a `bit.band(i, -i)` je způsob, jak kráčet po nejnižším nastaveném bitu: knihovna `bit` bere `-i` jako 32bitové celé číslo ve dvojkovém doplňku, a díky tomu ten trik funguje.
+
+Průběžný součet přesáhne `10^13`. Číslo v Lua drží každé celé číslo do `2^53` přesně a `print` ukáže všech čtrnáct číslic; to je rezerva, kterou máš, a vědět to je součást odpovědi.
+'''
+hints = [
+  "Strom postav voláním add jednou na každou počáteční hodnotu. Stavba zdola nahoru v O(n) je pěkná optimalizace a hodiny ji netestují.",
+  "bit.band(i, -i) izoluje nejnižší nastavený bit — knihovna bit vidí -i jako dvojkový doplněk. Jeho přičítání jde stromem nahoru; odečítání dolů.",
+  "range(l, r) je prefix(r + 1) - prefix(l) a trefit tuhle dvojici chyb o jedničku je většina ladění. Navázat bit.band na lokální proměnnou je jediná mikrooptimalizace, kterou tenhle quest potřebuje, a LuaJIT ji skoro nepotřebuje.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.hacker.31.palindrome"
+title = "Stejně pozpátku"
+story = "Otázka z první dvacítky, v nějaké podobě položená ve většině testů, a ta, kterou většina lidí jednou napsala a nikdy nepochopila. Drak se čte stejně od ocasu, říká tazatel, a neusměje se."
+brief = '''
+Standardní vstup je `n alphabet seed`. Řetězec si postav sám, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+s[i] = 'a' + (next() % alphabet)      for i in 0..n
+```
+
+Vypiš délku nejdelšího palindromického podřetězce, pak `AT <index>` — začátek **nejlevějšího** podřetězce té délky, počítaný od 0.
+
+```
+input:  12 3 5
+output: 5
+        AT 1
+```
+
+Rozšiřuj kolem každého středu. Středů je `2n - 1`, ne `n`: každý znak je středem pro palindromy liché délky a každá mezera mezi dvěma znaky je středem pro ty sudé délky. Zapomenout na mezery je důvod, proč správně vypadající řešení vrátí na `abba` `1` — a přesně to starter dělá.
+
+Řetězec jako řetězec nikdy nepotřebuješ. Drž losování v tabulce malých čísel — `s[i] = next() % alphabet` — a porovnávej čísla; `..` na dvaceti tisících jednoznakových řetězců nejdřív vyrobí dvacet tisíc řetězců. Tabulka je od 1 a `AT` ze zadání je od 0, takže index, který vypíšeš, je o jedna menší než index, který jsi našel.
+
+**Co testy vynucují a co ne**, na rovinu. Skrytý případ, který dělá tu práci, je `n = 8000` nad **jednopísmennou** abecedou. Je to nejhorší případ pro rozšiřování kolem středu — každý střed doběhne až na konec řetězce — takže správná odpověď tam udělá svých celých `O(n²)`, třicet dva milionů porovnání, a LuaJIT je udělá za pár setin sekundy. Zároveň odmítne zkontroluj-každý-podřetězec-a-otestuj-každý, což je kubické — tady řádově `10^11` porovnání — a daleko za desetisekundovým limitem.
+
+Druhý velký případ, `n = 20000` nad dvoupísmennou abecedou, je případ **správnosti**, ne rychlosti: na náhodném binárním řetězci test palindromu selže po znaku nebo dvou. Kontroluje, že tvůj generátor a tvoje rozhodnutí shody podle nejlevějšího indexu souhlasí s našimi ve velkém.
+
+Takže: testy odmítnou kubické a přijmou kvadratické. **Nevyžadují** Manacherův algoritmus, který je odpovědí `O(n)`. Věz, že existuje a co dělá, protože „a umíš to líp než kvadraticky?“ je navazující otázka, kterou tahle otázka obvykle připravuje.
+'''
+hints = [
+  "Dvě rozšiřování na střed: (c, c) pro liché délky a (c, c + 1) pro sudé. Starteru chybí to druhé.",
+  "Když se smyčka zastaví, i a j se oba posunuly o jedno za palindrom — takže jeho délka je j - i - 1 a v tabulce od 1 je i už ten začátek od 0.",
+  "Aktualizuj jen při ostře delším palindromu a nejlevější z každé délky je ten, který si necháš, což je to, na co se AT ptá. s[0] je nil, ne přetočený znak, a nil == s[j] je prostě nepravda — kontrola `i >= 1` je pořád ta poctivá, kterou napsat.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "lua.hacker.32.modular"
+title = "Modulo miliarda a sedm"
+story = "Ta fráze se objeví na konci zadání a půlka místnosti neví, o co ji žádá. V téhle místnosti žádá ještě o jednu věc: číslo, které drží padesát tři bitů, vynásobené dvakrát."
+brief = '''
+Standardní vstup je `n q seed`. Vygeneruj `q` dotazů v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q queries:
+    a = next() % (n + 1)
+    b = next() % (a + 1)          # so 0 <= b <= a <= n
+```
+
+Pro každý dotaz spočítej kombinační číslo `C(a, b)` **modulo 1000000007**. Vypiš součet všech `q` odpovědí, sám modulo `1000000007`, pak `LAST <the final query's answer>`.
+
+```
+input:  10 5 3
+output: 209
+        LAST 1
+```
+
+`C(a, b)` má v těchto velikostech stovky tisíc číslic a nic v Lua ho neudrží. Každé násobení se redukuje průběžně. Problém je dělení: `a! / (b! (a-b)!)` v modulární aritmetice nemá smysl. Nahrazuje ho **modulární inverze** a protože `1000000007` je prvočíslo, dá ti ji malá Fermatova věta: `inverse(v) = v^(p-2) mod p`, opakovaným umocňováním na druhou — `^` je tu mocnina v plovoucí čárce a tohle neumí, takže smyčka je tvoje.
+
+Takže: jednou předpočítej `factorial[0..n]` a na každý dotaz odpověz jako `f[a] * inv(f[b]) * inv(f[a-b])`.
+
+**A samotné násobení je v tomhle jazyce ta past.** Dva zbytky jsou každý pod `2^30`; jejich součin je pod `2^60` a číslo v Lua je double, který drží `2^53`. `(a * b) % P` je za tou hranicí špatně — žádná chyba, žádné přetečení, jen pryč dolní bity a zbytek, který je trochu vedle. Poctivý `mulmod` rozdělí jeden činitel na horní a dolní 16bitovou polovinu, takže každý dílčí součin zůstane pod `2^46`, a mezi polovinami redukuje. Je to pět řádků a starter ho nese; každý součin na tomhle uzlu jde přes něj.
+
+**Složitost se tu vynucuje.** Jeden skrytý případ je `n = 200000`, `q = 200000`. Počítat každé kombinační číslo nezávisle — vynásobit `b` členů, vydělit `b` členy, jedna modulární inverze na každý — nedoběhlo ani po **25 sekundách** proti desetisekundovému limitu; to je starter. Jedna sdílená tabulka faktoriálů s inverzními faktoriály předpočítanými pozpátku z jednoho `powmod` odpoví na každý dotaz dvěma `mulmod` a doběhne za pár setin sekundy. Obojí změřeno na tomhle stroji.
+'''
+hints = [
+  "Redukuj po každém násobení a násob jen přes mulmod: obyčejné a * b dvou zbytků je za 2^53 a potichu špatně.",
+  "powmod(v, P - 2) je modulární inverze a funguje jen proto, že P je prvočíslo — to je tady celý obsah malé Fermatovy věty.",
+  "Předpočítej i inverzní faktoriály, pozpátku od powmod(factorial[n], P - 2): inv_factorial[i - 1] = inv_factorial[i] * i. Pak je dotaz dva mulmody a žádný powmod.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "lua.hacker.33.grid-paths"
+title = "Přes blok, nikdy zpátky"
+story = "Mřížka Tai Hang se třemi uličkami zavřenými kvůli drakovi. Kolika způsoby se dá projít a která cesta je nejlevnější."
+brief = '''
+Standardní vstup je `r c pct seed`. Mřížku si postav sám, po řádcích, s losováním **dvou** hodnot pro každou buňku, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for i in 0..r, for j in 0..c:
+    a = next(); b = next()
+    the cell is BLOCKED if  a % 100 < pct,
+        except (0,0) and (r-1,c-1), which are never blocked
+    the cell costs  (b % 9) + 1
+```
+
+Pohybuj se jen **doprava** nebo **dolů**, volnými buňkami. Vypiš:
+
+1. `PATHS <k>` — kolik různých tras vede z `(0,0)` do `(r-1,c-1)`, modulo
+   `1000000007`
+2. `MIN <cost>` — nejmenší celkovou cenu trasy, včetně obou koncových bodů,
+   nebo `-1`, pokud žádná trasa není
+
+```
+input:  3 4 30 2
+output: PATHS 9
+        MIN 27
+```
+
+Jeden průchod po řádcích udělá obojí: trasy do buňky jsou součtem tras do ní shora a zleva a její nejlepší cena je její vlastní cena plus levnější z těch dvou. Protože se pohybuješ jen doprava nebo dolů, ty dvě buňky, které potřebuješ, jsou vždycky už hotové — a proto to nepotřebuje žádnou rekurzi ani množinu navštívených. Memoizovaná rekurze by v buňkách byla taky lineární a na případu `1000 × 1000` by byla taky dva tisíce rámců hluboká — shodou okolností pod stropem LuaJIT, ale smyčka je tu odpovědí z obvyklého důvodu: tvar problému je tabulka plněná popořadě.
+
+Počet `PATHS` se bere modulo `1000000007` z obvyklého důvodu: na skrytém případu `1000 × 1000` má skutečné číslo přes šest set číslic a double by z něj dávno udělal `inf`. Redukuj při sčítání — dva sečtené zbytky zůstanou pod `2^31`, takže tohle je jediné místo na téhle cestě, kde obyčejné `+` a `%` stačí.
+
+Nedosažitelná buňka **nemá** žádnou nejlepší cenu: `nil`, a `nil` se testuje přes `~= nil`, než se k němu cokoli přičte nebo se s ním cokoli porovná. Tabulka tabulek `1000 × 1000` je milion položek a LuaJIT to nevadí.
+
+**Co velký případ vynucuje:** odmítne každou odpověď, která trasy vyjmenovává. Je jich víc, než je lampionů v parku.
+'''
+hints = [
+  "Losuj obě hodnoty pro každou buňku, včetně obou rohů — generátor je nepřeskakuje, jen je odmítá zablokovat.",
+  "Volná buňka bez volného souseda nahoře nebo vlevo je dosažitelná nula trasami a nemá žádnou nejlepší cenu; nil je to poctivé `unreachable` a `~= nil` je strážce, než porovnáš nebo přičteš.",
+  "Cíl může být volný a přesto nedosažitelný, a to je přesně případ, kdy je PATHS 0 a MIN -1. Jeden ze skrytých případů je právě tohle.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "lua.hacker.34.stable-sort"
+title = "Shody si drží místo"
+story = "Dva běžci dokončili dračí okruh se stejným skóre a žebříček je při každém překreslení dá v jiném pořadí."
+brief = '''
+Standardní vstup je `n buckets seed`. Postav `n` jezdců, kde jezdec `i` má index `i` a skóre, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+score[i] = next() % buckets           for i in 0..n
+```
+
+Seřaď jezdce podle skóre **sestupně**. Jezdci se stejným skóre si musí zachovat pořadí, v jakém přišli. Vypiš jejich indexy, oddělené mezerami, pak `TIES <k>` — kolik sousedních dvojic ve tvém seřazeném pořadí má stejné skóre.
+
+```
+input:  8 3 5
+output: 1 5 6 0 2 3 4 7
+        TIES 6
+```
+
+`buckets` je malé, takže skoro všechno je shoda a odpověď je skoro celá rozhodnutá tím, co se s nimi stane.
+
+**Tohle je quest o tom, vědět, které řazení držíš v ruce.** `table.sort` **není stabilní**. Je to quicksort, neslibuje nic o pořadí prvků, které se porovnají jako rovné, a ten neslib dodržuje: na ukázce, seřazené obyčejným `a.score > b.score`, vyjdou shody `5 1 6 0 4 3 2 7` — což dělá starter. Nic nevyhodí chybu. Odpověď je prostě jiná odpověď, na tomhle vstupu, a na skutečném vstupu jí bude vždycky.
+
+Správná odpověď je tu jedna a je to ta, po které sáhnout ve výchozím stavu v každém jazyce: udělej porovnání **úplné**. Řaď podle `(-score, index)` — skóre sestupně, pak index vzestupně — takže se žádní dva jezdci nikdy neporovnají jako rovní a stabilita přestane být otázkou. Úplné pořadí nemá co dokazovat. (Ta druhá odpověď, kterou pythonovský pohovor přijme, „řazení je stabilní, opři se o to“, v téhle místnosti k dispozici není, a vědět to je celá pointa.)
+
+Hodiny tu rychlost neměří a není tu nic, co by měřily: `table.sort` je `table.sort`, ať mu dáš jakýkoli komparátor. Tyhle čtyři případy rozhoduje výhradně to, co se stane se shodami.
+'''
+hints = [
+  "Přidej do komparátoru druhou polovinu: když jsou skóre stejná, vrať a.index < b.index. To je celá oprava.",
+  "Nikdy nepiš komparátor, který říká `<=` nebo vrací true oběma směry — `invalid order function for sorting` je table.sort, který ti říká, že to pořadí není pořadí.",
+  "TIES počítá sousední stejná skóre v hotovém pořadí a ten počet je stejný, ať jsi napsal jakýkoli komparátor — prozradí tě pořadí indexů.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "lua.hacker.28.lru"
+title = "Měsíc"
+story = "Room 7-32, poslední otázka, poosmé. Tazatel vypne monitor a jediné světlo na tabuli je měsíc za oknem: jeden typ tabulky pro každou strukturu, a hodiny."
+brief = '''
+První řádek je `cap q` a pak buď `q` řádků operací, každá `PUT <key> <value>` nebo `GET <key>` — nebo, když první řádek nese **třetí** číslo `seed`, už žádné další řádky a `q` operací pochází z generátoru níže.
+
+Implementuj cache s pevnou kapacitou, která při zaplnění vyhodí **nejdéle nepoužitou** položku. `GET` i `PUT` se počítají jako použití klíče. `PUT` klíče, který cache už drží, nahradí jeho hodnotu a udělá z něj ten nejčerstvější — nepřidá žádnou položku, takže nic nevyhodí, ať je cache jakkoli plná.
+
+Pro každý `GET` vypiš hodnotu, nebo `-1`, když tam není. Na konci vypiš přeživší klíče, nejčerstvěji použité první, oddělené mezerami — nebo `-`, když je cache prázdná — a pak `EVICTED <k>`.
+
+```
+input:  2 6
+        PUT 1 10
+        PUT 2 20
+        GET 1
+        PUT 3 30
+        GET 2
+        GET 3
+output: 10
+        -1
+        30
+        3 1
+        EVICTED 1
+```
+
+Projdi si ukázku: `GET 1` udělá z `1` zase čerstvý klíč, takže když `PUT 3` potřebuje místo, jde pryč `2`. `GET 2` mine. `GET 3` zasáhne a udělá z `3` ten nejčerstvější, a proto se přeživší vypíšou jako `3 1`.
+
+Generovaná podoba, v 64bitové aritmetice, která přetéká dokola (`0ULL + seed`):
+
+```
+x = seed
+next():  x = x * 6364136223846793005 + 1442695040888963407   (mod 2^64)
+         return x >> 33
+
+for each of the q operations:
+    a   = next()
+    key = next() % (2 * cap)
+    if a % 4 == 0:   GET key
+    else:            PUT key (next() % 100)        # the value is a third draw
+```
+
+**Starter je špatně a ukázka to ukazuje.** Drží cache ve dvou tabulkách — `cache[key]` pro hodnoty a `order`, posloupnost klíčů, nejstarší první — a vyhazuje `order[1]`. `PUT` nového klíče přidá na konec `order`. `GET` přečte `cache[key]` a nic jiného neudělá, protože čtení tabulky v ní nic nepohne: tabulka si pamatuje, co je pod klíčem, ne kdy ses naposledy podíval. Takže cache vyhodí klíč, který přišel **první**, ne ten použitý **nejdéle nazpět**, a na ukázce `GET 2` vypíše `20`.
+
+To je ten boss. Všechno v téhle zemi je tabulka a tabulka si nepamatuje, že ji někdo četl. Čerstvost je věc, kterou musíš *zapsat* — při každém zásahu a každém přepsání, nejen při vložení — a struktura, která z toho zápisu udělá `O(1)`, je ta učebnicová: hashovací tabulka do obousměrně spojového seznamu. Žádný `OrderedDict` se schovanými ukazateli tu není. Tady jsou ukazatele pole: uzel je `{ key = k, value = v, prev = p, next = n }`, `nodes[key]` ho najde, vyjmout ho a znovu napojit na horký konec jsou čtyři přiřazení a studený konec je `head.next`. Dvě zarážkové tabulky na koncích znamenají, že v kódu seznamu není nikde žádná kontrola `nil`. Každá operace je `O(1)` a můžeš to říct bez vytáček.
+
+`table.remove(order, 1)` ve starteru je navíc k tomu, že je špatně, i `O(cap)`, a jeho `order` je to, co ho prozradí: posloupnost umí říct, kdo přišel první, ale přesunout klíč na konec při každém dotyku je hledání a posun, a spojový seznam je to, jak vypadá „přesuň na konec v konstantním čase“, když si to postavíš sám.
+
+(V pythonovské verzi tohohle pohovoru byl bossem limit rekurze a skrytý případ se dvěma tisíci operacemi je tu pořád. Starter prochází operace rekurzivně — `return step(i + 1)` na konci `step` — a projde, protože to je **správné koncové volání**: Lua rámec znovu použije a koncové volání nestojí nic, ať je jich kolik chce. Někde kolem dvaceti tisíc nekoncových rámců žije `stack overflow`. Znej obě fakta; rekurze nikdy nebyla tvarem tohohle problému a posloupnost operací je smyčka `for`.)
+'''
+hints = [
+  "Projdi ukázku na starteru: GET 1 přečte cache[1] a order je pořád { 1, 2 }, takže PUT 3 vyhodí 1 a GET 2 najde 20. Dotyk musí klíč přesunout a GET je dotyk.",
+  "Uzel je { key, value, prev, next }; vyjmutí jsou dvě přiřazení a napojení na horký konec čtyři. S hlavou a ocasem jako zarážkami není na žádném konci nil a žádný zvláštní případ pro prázdný seznam.",
+  "Přepsání klíče, který už tam je, je dotyk, ne vložení — zkontroluj nodes[key], než rozhodneš, že je cache plná, jinak případ přepsání vyhodí něco, co by neměl.",
+  "Přeživší jsou seznam čtený od horkého konce: jdi od tail.prev zpátky k head. Žádné řazení, žádná razítka a nikdy pairs — pairs ti žádné pořadí nedá.",
+]

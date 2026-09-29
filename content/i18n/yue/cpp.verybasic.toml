@@ -1,0 +1,588 @@
+# C++ LAND — VERY BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/cpp/verybasic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, the quiz choices, sample input and output and the exact strings
+# a program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "cpp.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.verybasic.01.print"
+title = "午炮第一句"
+story = "12:00，午炮。開炮記錄本應以一行開頭，而嗰一行唔見咗。"
+brief = '''
+個程式要一隻字唔差咁印出 `hello, causewaybay` 加一個換行。喺 C++ 入面，
+呢樣嘢係送去標準輸出 stream 嘅一句 statement。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  (nothing)
+output: hello, causewaybay
+```
+'''
+hints = [
+  "`std::cout << \"hello, causewaybay\" << '\\n';` — 個 stream、個字串、個換行、個分號。",
+  "單引號整出嚟嘅係字元常數；字串要用雙引號。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.verybasic.02.int-types"
+title = "int 裝唔落嘅數"
+story = "午炮嘅記錄由 1860 年起以百分之一為單位數住開過幾多炮，而裝住佢嘅 register 得 32 位闊。"
+brief = '''
+讀入 `a`。個程式需要 `big`：一個 64 位整數，裝住 `a` 乘十億 — `a` 一過 2，
+呢個值 `int` 就裝唔落。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+output: 3000000000
+```
+'''
+hints = [
+  "`long long big = a * 1000000000LL;` — 個 `LL` 後綴令個常數都係 64 位。",
+  "`int` 係 32 位：五十億塞唔落，出嚟嘅結果係垃圾。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.verybasic.03.floats"
+title = "小數潮汐"
+story = "潮汐表將一個讀數除以另一個，港務長想要兩個小數位，佢就印咗個整數出嚟。"
+brief = '''
+讀入兩個正整數 `a` 同 `b`。個程式需要 `q`：以 `double` 計嘅商 — 一個整數除另一個
+整數，出嚟仍然係整數，除非其中一個先轉型。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "`double q = static_cast<double>(a) / b;` — 除之前先將一邊轉型。",
+  "兩個整數嘅 `a / b` 會先向下取整做整數，然後先變做 double。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.verybasic.04.strings"
+title = "個名有幾長"
+story = "舢舨個名髹喺船頭，港口記錄想要佢有幾多個字元。"
+brief = '''
+讀一行入 `s`。個程式要印出佢有幾多個字元 — `std::string` 知道自己嘅長度。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: 8
+```
+'''
+hints = [
+  "`std::cout << s.size() << '\\n';` — `size()` 係一個呼叫，所以要有括號。",
+  "`sizeof(s)` 係個 string 物件本身嘅大細，唔係入面段文字嘅。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.verybasic.05.bool-if"
+title = "雙數定單數"
+story = "船排個絞盤一次拉兩隻舢舨，點算表話畀你知最後嗰隻係咪要自己一個上。"
+brief = '''
+讀入 `n`。個程式需要 `even`：一個 `bool`，`n` 除二冇餘數嘅時候係 true。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "`bool even = n % 2 == 0;` — `%` 係餘數，`==` 係比較。",
+  "單一個 `=` 係賦值；比較要用兩個。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.verybasic.06.loops"
+title = "數禮炮"
+story = "午炮開 n 響，記錄要將啲號碼加埋，但佢用嗰個迴圈從來冇開始過。"
+brief = '''
+讀入 `n`。個程式要將 `1 + 2 + … + n` 加入 `sum`。迴圈主體已經寫好；令 `i` 由 1
+行到 `n` 嘅 `for` 頭就係個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  10
+output: 55
+```
+'''
+hints = [
+  "`for (long long i = 1; i <= n; ++i) {` — 三個子句，用分號分開。",
+  "`<` 早一步停；`<=` 包埋 `n` 本身。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.verybasic.07.functions"
+title = "佢嘅平方"
+story = "泵房個錶顯示一個讀數，顯示屏想要佢嘅平方，而本應做呢件事嘅函數回傳嘅嘢冇一樣有用。"
+brief = '''
+`square` 攞一個數，要回傳嗰個數乘佢自己。佢嘅主體係個窿；`main` 讀入 `x` 再印
+`square(x)`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7
+output: 49
+```
+'''
+hints = [
+  "`return x * x;` — 乘，然後回傳結果。",
+  "`^` 喺 C++ 入面係 bitwise XOR，唔係次方。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.verybasic.08.structs"
+title = "一個檔口，兩個欄位"
+story = "避風塘嘅檔口登記冊每個檔口記一個名同一個價錢，而新檔口嗰條記錄係空嘅。"
+brief = '''
+`Stall` 有 `name` 同 `price`。個程式已經讀咗兩樣，需要 `s`：一個由佢哋砌出嚟嘅
+`Stall` — aggregate 係用大括號初始化嘅，欄位照次序。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40
+output: fish 40
+```
+'''
+hints = [
+  "`Stall s{name, price};` — 大括號，欄位照 struct 宣告嘅次序。",
+  "淨係一個初始值只會填第一個欄位；個價錢就會係零。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.verybasic.09.struct-method"
+title = "檔口自己個總數"
+story = "每條檔口記錄都知道自己嘅價錢同數量，而佢個 `total()` 問乜都答零。"
+brief = '''
+`Stall::total` 要回傳 `price` 乘 `qty`。喺 member function 入面，啲欄位直接用名。
+主體就係個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40 3
+output: fish: 120
+```
+'''
+hints = [
+  "`return price * qty;` — 啲欄位，用名，相乘。",
+  "`this` 係一個指標，所以會係 `this->price`；直接寫個名簡單啲。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.verybasic.10.enums"
+title = "兩條線，兩種顏色"
+story = "避風塘巴士站上面個轉車指示牌寫住兩條港鐵線，而揀 enumerator 嗰條線被人剪咗。"
+brief = '''
+讀一個字，`island` 或者 `tsuenwan`。個程式需要 `line`：一個由呢個字揀出嚟嘅 `Line`
+enumerator；印顏色嘅 `switch` 已經寫好。`enum class` 嘅 enumerator 永遠都要連住
+佢個型別寫。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "`Line line = word == \"island\" ? Line::Island : Line::TsuenWan;` — 條件運算子，enumerator 帶住型別。",
+  "前面冇 `Line::` 嘅話，`Island` 唔係編譯器識得嘅名。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.verybasic.11.vector"
+title = "漁獲，一個一個嚟"
+story = "啲舢舨逐個數咁報漁獲，而點算用嘅 vector 一直係空嘅。"
+brief = '''
+讀一行整數。每個值 `x` 一讀入就要加落 vector `xs` 嘅尾；個迴圈同印出嚟嗰段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3 4
+```
+'''
+hints = [
+  "`xs.push_back(x);` — vector 係喺尾度增長嘅。",
+  "`push` 係 `std::stack` 嘅；vector 講嘅係 `push_back`。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.verybasic.12.vector-edit"
+title = "第一隻落"
+story = "絞盤條隊係一個舢舨號碼嘅 vector，第一隻已經上咗，但佢仲喺個名單上面。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要移走第一個元素 — `erase` 收一個指向要刪嘅元素嘅
+iterator — 然後印出其餘嘅。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 2 3 4
+```
+'''
+hints = [
+  "`v.erase(v.begin());` — `begin()` 係指向第一個元素嘅 iterator。",
+  "`pop_back` 移走最後一個；vector 冇 `pop_front`。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.verybasic.13.list"
+title = "排隊嘅最前面"
+story = "避風塘嘅泊位名單係一條 linked list，每隻新舢舨本應由前面入。"
+brief = '''
+讀一行整數。每個 `x` 都要推入 `std::list` `l` 嘅最前面，咁最後讀入嗰個就會最先印。
+個迴圈同印出嚟嗰段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "`l.push_front(x);` — list 兩頭都可以用常數時間增長。",
+  "`push_back` 保持輸入次序；由前面入先會倒轉。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.verybasic.14.maps"
+title = "點算板"
+story = "避風塘嘅點算板數住每一種漁獲，而個數一直冇郁過。"
+brief = '''
+讀一行字。對每個字 `w`，`counts` 入面嘅計數要加一 — `std::map` 第一次被索引到
+一個唔存在嘅 key 嗰陣，會用零整一個出嚟。個迴圈同排咗序嘅印出段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish crab fish
+output: crab 1
+        fish 2
+```
+'''
+hints = [
+  "`++counts[w];` — 索引會用零建立個 key，然後加一。",
+  "`at()` 遇到未有嘅 key 會拋例外；`[]` 會整一個出嚟。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.verybasic.15.hashtable"
+title = "查到，或者查唔到"
+story = "檔口價錢放喺一個 hash table 入面，查一個冇人聽過嘅檔口一定要答負一，唔係作一個零出嚟。"
+brief = '''
+`table` 將檔口名對應去價錢，由第一行砌出嚟。讀一個名 `q`。個程式需要 `price`：
+個 key 喺度嘅話係表入面嘅值，唔喺度就係 `-1` — 而 `[]` 會靜靜雞插一個零入去。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  fish 40 crab 120
+        fish
+output: 40
+```
+'''
+hints = [
+  "`long long price = table.count(q) ? table[q] : -1;` — 先問，再索引。",
+  "`table[q]` 遇到唔存在嘅 key 會用 0 插佢入去 — 個查詢會印 0，唔係 -1。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.verybasic.16.sets"
+title = "每個數得一次"
+story = "泊位號碼有重複咁送到，而登記冊應該每個號碼得一個，照次序。"
+brief = '''
+讀一行整數。每個 `x` 都要放入 `std::set` `seen`，佢每個值只留一份，按升序排。
+印大細同啲值嗰段已經寫好。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 3 2 1
+output: 3
+        1 2 3
+```
+'''
+hints = [
+  "`seen.insert(x);` — set 有 `insert`，而且佢會唔理已經有嘅值。",
+  "`push_back` 係序列容器嘅講法；set 冇「尾」。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.verybasic.17.stack"
+title = "後入先出"
+story = "碟喺避風塘廚房出餐位疊起，由頂攞走，而個 stack 一隻碟都唔收。"
+brief = '''
+讀一行整數。每個 `x` 都要推上 `std::stack` `st`；個程式之後會將全部 pop 晒出嚟，
+最後入嗰個最先印。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "`st.push(x);` — stack 係 push 嘅，`top()` 見到最後 push 嗰個。",
+  "`push_back` 係畀 vector 嘅；`std::stack` 講嘅係 `push`。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.verybasic.18.queue"
+title = "先入先出"
+story = "客人喺避風塘個麵檔排隊，先到先服務，但條 queue 一個人都唔收。"
+brief = '''
+讀一行整數。每個 `x` 都要推入 `std::queue` `q`；個程式之後會按嚟到嘅次序由前面
+逐個攞走。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4
+```
+'''
+hints = [
+  "`q.push(x);` — 由尾入，`front()` 讀，`pop()` 攞走。",
+  "`push_front` 係 `deque` 嘅講法；queue 只會由尾 push。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.verybasic.19.heap"
+title = "最細嗰隻下一個"
+story = "絞盤每次都拉最輕嗰隻舢舨，而本應交佢出嚟嘅 heap 係倒轉咗嘅。"
+brief = '''
+讀一行整數。個程式將佢哋全部推入 `pq` 再逐個 pop 出嚟，而佢哋一定要由最細開始出。
+`std::priority_queue` 係一個 max-heap，除非宣告嗰陣用 `std::greater` 做 comparator；
+`pq` 嘅宣告就係個窿。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "`std::priority_queue<long long, std::vector<long long>, std::greater<long long>> pq;` — 值型別、容器、comparator。",
+  "comparator 係第三個 template argument；第二個係容器。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.verybasic.20.sorting"
+title = "按深度排"
+story = "泊位係按船到達嘅次序記錄嘅，而海圖想按深度排，最淺嘅先。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要就地將佢哋升序排好 — 個演算法收一對圈住個範圍嘅
+iterator。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "`std::sort(v.begin(), v.end());` — 一個 range 就係兩個 iterator。",
+  "`std::greater` 係降序排；預設係升序。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.verybasic.21.sort-by-key"
+title = "最重嘅漁獲先"
+story = "漁獲記錄列出每隻舢舨嘅名同重量，而塊板想最大嗰批排最頂。"
+brief = '''
+`rows` 裝住 `Row{name, score}` 記錄。個程式要按 `score` 排序，最高嘅先 — 用
+`std::sort` 加一個講明 `a` 幾時排喺 `b` 前面嘅 comparator lambda。啲分數冇重複。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+        mei 40
+        alex 90
+        sam 65
+output: alex 90
+        sam 65
+        mei 40
+```
+'''
+hints = [
+  "`std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score > b.score; });` — 個 lambda 答嘅係「a 係咪排先？」。",
+  "`<` 會將最細嘅排先；`>` 將最大嘅排先。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.verybasic.22.reverse"
+title = "由尾到頭"
+story = "潮汐讀數係最新嘅先記錄，而海圖係由最舊嘅開始讀。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式要就地將佢哋倒轉 — 用 `<algorithm>` 嘅演算法行成個
+範圍。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "`std::reverse(v.begin(), v.end());` — 一個行 range 嘅演算法，唔係 method。",
+  "vector 冇 `reverse()` member；`std::list` 有，vector 用演算法。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.verybasic.23.closures"
+title = "潮汐修正值"
+story = "每個讀數都要加同一個修正值，而本應記住個修正值嘅 lambda 唔記得咗。"
+brief = '''
+讀入 `k`，然後一行整數。個程式需要 `add`：一個 capture 住 `k`、回傳參數加 `k` 嘅
+lambda；佢會套用喺每個值上面，結果印出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "`auto add = [k](long long x) { return x + k; };` — `[k]` 就係個 capture。",
+  "用空嘅 `[]` 嘅話，個 lambda 完全見唔到 `k`。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.verybasic.24.lambdas"
+title = "數雙數泊位"
+story = "沿住岸壁嘅泊位號碼係一個 list 送到嘅，辦公室想知有幾多個係雙數。"
+brief = '''
+`v` 裝住嗰行嘅整數。個程式需要 `evens`：入面有幾多個係雙數，用 `std::count_if`
+加一個講明數邊啲值嘅 lambda 數出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4 6
+output: 3
+```
+'''
+hints = [
+  "`long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });` — 個 range，然後個測試。",
+  "`std::count` 數一個值；`count_if` 數 predicate 話 yes 嘅。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.verybasic.25.threads"
+title = "一個絞盤，一條 thread"
+story = "船排喺第二條 thread 加總舢舨嘅重量，主 thread 就等，而嗰條 thread 從來冇開始過。"
+brief = '''
+`v` 裝住嗰行嘅整數，`sum_of` 將佢哋加埋。個程式需要 `t`：一條 `std::thread`，行一個
+將 `sum_of(v)` 存入 `result` 嘅 lambda；`main` join 佢然後印。個 lambda 一定要
+by reference capture，先掂到 `v` 同 `result`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+hints = [
+  "`std::thread t([&] { result = sum_of(v); });` — thread 係由一個 callable 砌出嚟嘅。",
+  "`[&]` 係 by reference capture，個 lambda 就係咁先寫得到 `result`。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.verybasic.26.mutex"
+title = "四隻手，一個計數器"
+story = "泵房入面四條 thread 加落同一個計數器，而本應令佢哋輪流嘅 lock 第一次之後就永遠揸住。"
+brief = '''
+四條 thread 各自將 `counter` 加一，加十萬次。每次行迴圈都一定要喺加嘅時候揸住
+mutex `mu` — 而且喺嗰次結束時放開佢。個佔位 lock 咗就永遠唔 unlock，所以第二次
+就永遠等落去；一個 lock guard 離開 scope 嗰陣就會放開。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  (nothing)
+output: 400000
+```
+'''
+hints = [
+  "`std::lock_guard<std::mutex> lock(mu);` — 即刻 lock，`lock` 喺 `}` 死嗰陣 unlock。",
+  "淨係 `mu.lock()` 永遠唔會被撤銷；下一次會 block 喺一個呢條 thread 自己已經揸住嘅 mutex 上面。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.verybasic.27.binary-tree"
+title = "SEGFAULT"
+story = "12:00，午炮。開炮時間表係一棵搜尋樹，而本應行落右邊嘅 insert 停咗喺個根度。"
+brief = '''
+`insert` 將 `v` 放入以 `n` 為根嘅搜尋樹：空嘅情況已經寫好，會整一個新節點。個窿
+係將 `v` 送落正確嗰邊嘅嗰一行 — 細過 `n->val` 就落左邊，否則落右邊 — 並且將遞歸
+回傳嘅嘢存返去。Inorder 遍歷之後會按升序印出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+```
+'''
+hints = [
+  "`if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v);` — 遞歸入其中一邊，再將結果存返去。",
+  "`n` 係一個指標：用 `->`，唔係 `.`；細嘅落左邊。",
+]

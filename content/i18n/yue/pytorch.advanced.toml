@@ -1,0 +1,696 @@
+# PYTORCH LAND — ADVANCED, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/advanced.toml`, quest by quest, and nothing
+# else. Code blocks, identifiers, sample input and output and the exact
+# strings a program must print are the English pack's and are copied
+# verbatim, never translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong practitioners actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "pytorch.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.advanced.01.view-contiguous"
+title = "唔肯 view 嘅 view"
+story = "個 batch 一入嚟就畀人 transpose 咗，嗰個用咗一年都冇事嘅 flatten 而家報錯，話 contiguity 有問題。"
+brief = '''
+`view` 要求張量嘅記憶體本身已經係新形狀需要嘅排法。Transpose 唔會搬任何記憶體 —— 佢淨係改 strides —— 所以喺 transpose 咗嘅張量上面 `view` 會 raise `RuntimeError`，而呢個係 PyTorch 面試一定會問嘅兩三個錯誤之一。
+
+`reshape` 有需要就會抄，點都得。`contiguous()` 就係明明白白咁抄一次，抄完 `view` 又合法返。
+
+印出 `view` 喺 transpose 咗嘅張量上面失敗，然後印出兩種照樣 flatten 到嘅方法。
+
+```
+output: RuntimeError True True
+```
+'''
+hints = [
+  "x.reshape(6) 有需要就抄；x.contiguous().view(6) 先抄，再 view。",
+  "Transpose 改嘅係 strides，唔係記憶體 —— 而呢樣正正係 view 忍唔到嘅。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.advanced.02.in-place"
+title = "條底線"
+story = "有人加咗個底線慳記憶體，而家 backward pass 報錯，話計梯度要用嘅一個變數畀人改咗。"
+brief = '''
+尾後一個底線即係 *in place*：`relu_`、`add_`、`mul_`。In-place 慳咗一次分配，但係同時毀咗 backward pass 本來要用嘅值，而 autograd 會捉到 —— 喺 `backward()` 嗰陣，離搞出事嗰行好遠。
+
+用 out of place 做同一條算術，等 backward pass 捱得過，然後印出梯度。
+
+`y = w * 2`，然後 `y = y + 1`，然後 `loss = y.sum()`：損失對 `w` 嘅梯度每個元素都係 `2`。
+
+```
+output: [2.0, 2.0, 2.0] caught
+```
+'''
+hints = [
+  "y = y + 1 係將個名重新綁去一個新張量；y += 1 就會 in place 改，搞爛個 graph。",
+  "加一個常數唔會改梯度 —— d(2w + 1)/dw 仍然係 2。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.advanced.03.detach-clone"
+title = "一個副本，一刀切斷"
+story = "寫 log 嗰段碼留低咗個損失張量而唔係佢個數，04:00 嘅時候四個鐘嘅 graph 仲喺記憶體入面。"
+brief = '''
+`clone()` 抄咗啲數據，而且**留喺 graph 入面** —— 梯度會流過佢。`detach()` 共用啲數據，而且**離開 graph** —— 乜都唔會流返轉頭。佢哋唔係二揀一；佢哋答緊唔同嘅問題。
+
+想影張快照就要 `x.detach().clone()`：新記憶體，冇 graph。
+
+三個都印出嚟：佢 requires grad 唔 requires，同埋佢同原本嗰個有冇共用 storage。
+
+```
+output: clone True False detach False True snapshot False False
+```
+'''
+hints = [
+  "x.clone()、x.detach()、x.detach().clone() —— 就係咁嘅次序。",
+  "detach 共用同一舊記憶體，所以寫入去就等於寫落原本嗰個度。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.advanced.04.dtype-promotion"
+title = "捨咗位嘅除數"
+story = "Normalisation 用總數除啲 count，結果每個機架都出零，除咗出一嗰個。"
+brief = '''
+兩個整數張量用 `/` 會得出浮點張量 —— torch 會 promote。`//` 保留整數兼向下取整，而 `int_tensor /= 2` 會 raise，唔會靜靜雞截斷，因為結果嘅 dtype 放唔返入原本嗰個度。
+
+印出真除法、floor 除法同埋明確轉 float 三者嘅 dtype 同數值。
+
+```
+output: torch.float32 [0.5, 1.0, 1.5] torch.int64 [0, 1, 1] torch.float32 [0.5, 1.0, 1.5]
+```
+'''
+hints = [
+  "n / 2、n // 2、n.float() / 2 —— 第一個已經 promote，第二個唔會。",
+  "float32 張量裝唔到一個好大嘅 int64 嘅準確值；promotion 係一個決定，唔係方便。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.advanced.05.gather"
+title = "佢畀正確答案嘅分數"
+story = "由一個 batch 嘅 logits 攞每個樣本對真實類別嘅信心，而做呢樣嘢嘅 loop 係成個評估入面最慢嗰行。"
+brief = '''
+`gather` 按 index 每行揀一個元素，唔使 loop。一個 `(batch, classes)` 嘅機率張量加一個 `(batch,)` 嘅標籤張量，`probs.gather(1, labels.unsqueeze(1)).squeeze(1)` 就係模型對每個樣本嘅正確類別畀嘅機率。
+
+個 `unsqueeze` 唔係裝飾：`gather` 嘅 index 一定要同來源有一樣咁多個維度。
+
+```
+output: [0.7, 0.2, 0.9]
+```
+'''
+hints = [
+  "probs.gather(1, want.unsqueeze(1)).squeeze(1) —— dim 1 係類別軸。",
+  "probs[want] index 嘅係行，唔係列，會畀返三行完全錯嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.advanced.06.masked-fill"
+title = "負無限"
+story = "Batch 入面 pad 咗嘅位畀人當係字咁 attend，個模型學識咗預測 padding。"
+brief = '''
+想喺 softmax 入面剔走一個位置，要喺 softmax **之前**將佢嘅分數設做 `-inf`，唔係之後將佢嘅機率設做零：`exp(-inf)` 係 0，剩返嘅機率加埋仍然係一。之後先設零，嗰行加埋就會少過一。
+
+`scores.masked_fill(mask, float("-inf"))` 喺布林 mask 係 `True` 嘅地方填值。
+
+Mask 走最後一個位置，印出四捨五入咗嘅機率同嗰行嘅總和。
+
+```
+output: [0.7311, 0.2689, 0.0] 1.0
+```
+'''
+hints = [
+  "scores.masked_fill(keep_out, float(\"-inf\")) —— mask 係 True 嘅地方就填。",
+  "畀 mask 走嗰個本來分數最大；喺 softmax 之後先 mask，佢就會繼續壓晒其他。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.advanced.07.keepdim"
+title = "唔見咗嘅軸"
+story = "每行減走嗰行嘅最大值，一個長方形張量減完變咗正方形，乜都冇 raise。"
+brief = '''
+Reduction 會拎走佢 reduce 嗰條軸。喺 `(2, 3)` 上面 `x.max(dim=1).values` 得出 `(2,)`，由 `(2, 3)` 減走佢就會沿住**錯**嘅軸 broadcast —— 佢將個 2 對住個 3 嘅位，而當啲數啱啱夾到嘅時候，就靜靜雞計出一堆廢嘢。
+
+`keepdim=True` 會將條軸留低做 size 1，呢個先係 broadcast 想要嘅。
+
+印出冇 keepdim 嘅形狀、有 keepdim 嘅形狀，同埋減完之後每行嘅最大值，佢哋係零。
+
+```
+output: (2,) (2, 1) [0.0, 0.0]
+```
+'''
+hints = [
+  "x.max(dim=1).values 同 x.max(dim=1, keepdim=True).values —— max 回傳一個 named tuple，唔係張量。",
+  "正正係呢個減法，就係數值穩定 softmax 嘅第一行。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.advanced.08.batched-matmul"
+title = "每個 head 乘一次"
+story = "四個注意力 head，段碼用 Python loop 逐個行。Profiler 話個 loop 就係成個模型。"
+brief = '''
+喺多過兩個維度嘅張量上面，`@` 係一個 **batched** 矩陣乘法：最後兩條軸係矩陣，前面全部係 batch，而 batch 軸會 broadcast。
+
+`(B, H, T, d) @ (B, H, d, T)` 得出 `(B, H, T, T)` —— 正正就係注意力分數張量，每條序列嘅每個 head 一次過計晒，唔使 loop。
+
+砌出嚟，印出形狀，同埋佢同用 loop 計嘅答案係咪一樣。
+
+```
+output: (2, 4, 5, 5) True
+```
+'''
+hints = [
+  "q @ k.transpose(-2, -1) —— 用負數軸，咁無論 batch 有幾多維，同一行都用得。",
+  "k.t() 淨係得 2-D 張量先用得，4-D 嘅會 raise。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.advanced.09.stop-gradient"
+title = "識倒學返轉頭嘅目標"
+story = "Target network 本應企定，等 online 嗰個追上嚟，而家兩個都郁緊。"
+brief = '''
+當損失係對住一樣由模型產生嘅嘢嚟計，梯度會流入**兩邊**，除非你截停佢。喺 target 上面 `detach()` 就係 stop-gradient，而唔記得佢就係嗰個模型對住自己訓練然後崩潰嘅 bug。
+
+將 `b` detach 咗，訓練 `a` 去貼近 `b`，然後印出兩個之中邊個有梯度。
+
+```
+output: True False
+```
+'''
+hints = [
+  "target = b.detach() —— 個 target 而家係一個數，唔係一樣要學嘅嘢。",
+  "冇咗 detach，b.grad 都會有嘢，個 target 會漂去個預測度。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.advanced.10.retain-graph"
+title = "想 backward 兩次"
+story = "一次 forward pass 有兩個損失，第二次 backward 報錯，話啲 buffer 已經釋放咗。"
+brief = '''
+`backward()` 一路行個 graph 一路釋放佢。所以喺同一次 forward pass 上面再 `backward()` 一次會 raise —— 啲 buffer 冇咗 —— 而 `retain_graph=True` 就係留住佢哋嘅方法。
+
+老實嘅修正通常係將啲損失加埋，然後 `backward()` 一次；`retain_graph` 係俾你真係需要兩次獨立 pass 嘅時候用，而且佢食記憶體。
+
+保留住 graph 行第二次 pass，印出累積咗嘅梯度：喺 `w = 2`，`d(w²)/dw + d(3w)/dw` 係 `4 + 3`。
+
+```
+output: caught 7.0
+```
+'''
+hints = [
+  "first.backward(retain_graph=True) —— 咁第二次 pass 仲有個 graph 可以行。",
+  "梯度會累積，所以印出嚟嘅數係兩個導數加埋。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.advanced.11.freeze"
+title = "企定唔郁嘅層"
+story = "淨係 fine-tune 最後一層，但成個 backbone 都郁緊，因為個優化器攞咗晒所有嘢。"
+brief = '''
+Freeze 係兩樣分開嘅嘢，兩樣都要做。`requires_grad = False` 令梯度唔會計；淨係將未 freeze 嘅參數交畀優化器，令佢唔會 step 啲已 freeze 嘅。做咗一樣唔做另一樣，就係常見嘅半 freeze bug。
+
+Freeze 第一層，淨係將仲學緊嘅嘢交畀優化器，印出兩邊各自見到幾多個張量，同埋 freeze 咗嘅權重有冇郁過。
+
+```
+output: 2 4 True False
+```
+'''
+hints = [
+  "喺個 loop 入面 p.requires_grad = False，然後按 requires_grad 篩 model.parameters()。",
+  "model.parameters() 仍然會畀出啲 freeze 咗嘅張量；淨係優化器個 list 短咗。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.advanced.12.clip-grad"
+title = "個尖峰"
+story = "03:40 一個壞 batch，一個超大嘅梯度，03:41 模型入面每個權重都係 NaN。"
+brief = '''
+Clipping 會將成個梯度向量按比例縮細，等佢嘅 norm 最多係 `max_norm`，方向唔變，步就縮短。佢要喺 `backward()` **之後**、`step()` **之前** —— 放喺第二度就乜都冇做到。
+
+`clip_grad_norm_` 回傳佢見到嘅 norm，即係 clip 之前嗰個。
+
+呢度個梯度嘅 norm 係 `sqrt(3² + 4²) = 5`；clip 到 `1.0` 就變成同一個方向嘅單位向量。
+
+```
+output: 5.0 1.0 [0.6, 0.8]
+```
+'''
+hints = [
+  "nn.utils.clip_grad_norm_([w], max_norm=1.0) —— 尾後有底線，因為佢 in place 改 .grad。",
+  "佢回傳 clip 之前嘅 norm，嗰個先係值得 log 低嘅數。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.advanced.13.custom-function"
+title = "自己嘅導數"
+story = "Straight-through estimator：forward pass 捨入，backward pass 扮冇捨過。"
+brief = '''
+`torch.autograd.Function` 畀你自己寫兩邊：`forward` 計個值，`backward` 講要傳乜嘢梯度返轉頭。捨入喺每一點嘅導數都係零，會殺死訓練；straight-through estimator 就改為將梯度原封不動咁傳過去。
+
+將 backward 寫成 identity，印出捨入咗嘅 forward 同去到輸入嘅梯度。
+
+```
+output: [0.0, 1.0, 1.0] [1.0, 1.0, 1.0]
+```
+'''
+hints = [
+  "return g —— 入嚟嘅梯度，直接送返出去，forward 每個輸入對應一個回傳值。",
+  "個 function 係用 .apply(x) 呼叫，永遠唔好直接 call forward。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.advanced.14.log-sum-exp"
+title = "零嘅 log"
+story = "每一千個 batch 就有一個，損失印出 `inf`。嗰個 batch 嘅 logits 好大，有嘢對一個已經 underflow 咗嘅機率攞咗 log。"
+brief = '''
+`log(softmax(x))` 會溢出：`exp(1000)` 係 `inf`，`log(0)` 係 `-inf`。`log_softmax` 計同一樣嘢，但係先減走嗰行嘅最大值，任何輸入都保持有限。
+
+所以 `nn.CrossEntropyLoss` 收嘅係 logits 而唔係機率 —— 穩定版本就喺佢入面。
+
+印出天真做法係咪有限、穩定做法係咪有限，同埋穩定做法嘅數值。
+
+```
+output: False True [-1000.0, 0.0]
+```
+'''
+hints = [
+  "torch.log_softmax(big, dim=0) —— 一個呼叫，佢永遠唔會對一個 underflow 咗嘅數攞 log。",
+  "入面嘅技巧係 exp 之前先減走每行最大值；keepdim 就係令嗰個減法 broadcast 得到嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.advanced.15.init"
+title = "權重由邊度開始"
+story = "隱藏層入面每個神經元永永遠遠都學同一樣嘢。佢哋全部由零開始，冇嘢分得開佢哋。"
+brief = '''
+初始化做常數嘅層係對稱嘅：每個單元攞到同一個梯度，成個 run 都同隔籬一模一樣。隨機初始化打破個對稱，而隨機嘅*幅度*決定訊號捱唔捱得過深度 —— Kaiming 同 Xavier 就係為咗呢樣。
+
+用 Kaiming normal 初始化權重、bias 設做零，然後印出行一步之後啲隱藏行係咪唔同。
+
+```
+output: True True
+```
+'''
+hints = [
+  "nn.init.kaiming_normal_(layer.weight, nonlinearity=\"relu\") 同 nn.init.zeros_(layer.bias)。",
+  "所有 init 函數都係底線收尾：佢哋寫入你交畀佢哋嘅張量。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.advanced.16.batchnorm"
+title = "移動平均"
+story = "個模型訓練嗰陣分數好靚，一上線就好差，用嘅係同一批數據。冇人 call 過 eval，batch 統計數字由得一個樣本嘅 batch 重新計。"
+brief = '''
+`BatchNorm` 訓練嗰陣用當前 batch 嘅統計數字做 normalise，eval 嗰陣就用訓練期間累積落嚟嘅移動平均。上線嗰陣仲留喺 `train()` 嘅模型，會用每個請求自己嚟 normalise 自己，所以得一個樣本嘅 batch 出嚟係零。
+
+行幾個訓練 batch，轉去 eval，印出 running mean 有冇郁過，同埋得一個樣本嘅 batch 而家捱唔捱得過。
+
+```
+output: True True False
+```
+'''
+hints = [
+  "bn.eval() —— 喺 train mode，一個樣本嘅 batch 方差係零，BatchNorm1d 會 raise。",
+  "running_mean 係一個 buffer，唔係參數：佢喺 state dict 入面，但冇梯度。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.advanced.17.layernorm"
+title = "逐個 token，唔係逐個 batch"
+story = "機架入面嗰個 transformer 每個 token 自己 normalise 自己，而呢度寫嗰個版本就用 batch 嚟 normalise，batch 一變就漂。"
+brief = '''
+LayerNorm 喺 **feature** 軸上面 normalise，一次一個 token，所以佢唔理 batch 入面仲有乜 —— 所以 transformer 用佢而唔用 BatchNorm。
+
+寫出嚟就係 `(x - mean) / sqrt(var + eps)`，mean 同方差喺最後一條軸上面用 `keepdim=True` 計，而方差嘅 unbiased 係 `False`。
+
+用手寫出 `nn.LayerNorm` 嘅結果，印出兩者吻唔吻合，同埋一行嘅平均值同標準差。
+
+平均值按構造係零，但喺 float32 入面佢會落喺零嘅左邊或者右邊差少少 —— 而 `round(-1e-8, 4)` 係 `-0.0`，同 `0.0` 唔係同一段文字。佢落喺邊邊係部機嘅事，唔關你事。Print 入面嘅 `+ 0.0` 就係搞掂佢嘅嘢：喺 IEEE 754 之下，`-0.0 + 0.0` 係 `0.0`。
+
+```
+output: True 0.0 1.0
+```
+'''
+hints = [
+  "dim=-1 加 keepdim=True，方差用 unbiased=False —— LayerNorm 除 n，唔係 n-1。",
+  "eps 預設係 1e-5，放喺開方入面，唔係出面。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.advanced.18.scheduler"
+title = "近尾，慢啲"
+story = "損失跌咗一個鐘，然後喺一個底度彈嚟彈去，永遠落唔去。帶佢去到嗰度嘅步幅，而家大到降落唔到。"
+brief = '''
+Learning-rate schedule 隨住訓練進行將步幅縮細。`StepLR(opt, step_size=2, gamma=0.1)` 每兩個 epoch 將 rate 乘 `0.1`，而 `sched.step()` 係**每個 epoch call 一次**，喺優化器 step 之後 —— 每個 batch call 一次，衰減就會快過預期幾百倍。
+
+行六個 epoch，印出每個 epoch 開始時嘅 rate。
+
+```
+output: [0.1, 0.1, 0.01, 0.01, 0.001, 0.001]
+```
+'''
+hints = [
+  "torch.optim.lr_scheduler.StepLR(opt, step_size=2, gamma=0.1)。",
+  "而家嘅 rate 喺 opt.param_groups[0][\"lr\"] 讀得到；scheduler 寫入嘅正正係嗰度。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.advanced.19.weight-decay"
+title = "拉返去零"
+story = "個模型將訓練集一字不漏咁背咗落嚟，有一個權重大過隔籬四百倍。"
+brief = '''
+Weight decay 喺每一步都加一股拉向零嘅力。喺普通 SGD 入面佢就正正係 L2 regularisation：梯度會加上 `wd * w`，所以就算完全冇其他梯度，一個權重每步都會縮細 `1 - lr * wd` 倍。
+
+呢度個損失係常數，所以唯一郁到個權重嘅就係個 decay：`2.0` 喺 `lr=0.1`、`wd=0.5` 之下變成 `2.0 * 0.95`。
+
+```
+output: 1.9
+```
+'''
+hints = [
+  "torch.optim.SGD([w], lr=0.1, weight_decay=0.5) —— decay 係優化器嘅參數，唔係損失入面嘅一項。",
+  "Bias 同 normalisation 參數通常唔做 decay，咁就要兩個 param group。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.advanced.20.momentum"
+title = "佢繼續衝"
+story = "沿住條又長又淺嘅山谷落去，普通嘅步要行一萬次。總要有嘢記住佢本來向緊邊個方向。"
+brief = '''
+Momentum 保留住一個持續嘅速度：`v ← μv + g`，然後 `w ← w - lr·v`。Torch 嘅 SGD 正正係咁做，而親手寫出嚟係搞清楚 `μ` 係乜嘢意思最平嘅方法。
+
+梯度恆定係 `1.0`、`μ = 0.9`、`lr = 0.1`，三步嘅速度係 `1`、`1.9`、`2.71`。
+
+親手寫個更新，同 torch 嘅並排印出嚟。
+
+```
+output: [-0.1, -0.29, -0.561] True
+```
+'''
+hints = [
+  "v = 0.9 * v + 1.0，然後 mine = mine - 0.1 * v —— 先速度，後步。",
+  "Torch 第一步用原始梯度做初始速度，v 由 0 開始正正就係咁。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.advanced.21.early-stop"
+title = "由呢度開始變差"
+story = "過去二百個 epoch，訓練損失跌，驗證損失升。冇人睇住第二個數。"
+brief = '''
+Early stopping 睇住驗證損失，留住見過最好嘅權重，連續 `patience` 個 epoch 冇進步就放棄。上線嘅權重係最好嗰份，唔係最後嗰份 —— 成件事嘅重點就係咁，亦都係大部分實作唔記得嘅部分。
+
+行一次記錄低嘅驗證損失，報告停低嘅 epoch 同最好嘅 epoch。
+
+```
+output: 2 5
+```
+'''
+hints = [
+  "每次有進步就將壞數 counter 歸零；超過 patience 就 break。",
+  "呢度 best_epoch 係 2 —— 0.7 從來冇畀人打低過 —— 而個 run 喺 epoch 5 停。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.advanced.22.checkpoint"
+title = "維修時段"
+story = "個 job 由 checkpoint 接返落去，損失即刻彈返上嚟。權重還原咗；優化器嘅 momentum 冇。"
+brief = '''
+一個淨係還原 `model.state_dict()` 嘅 checkpoint 會冇咗優化器嘅狀態 —— Adam 嘅兩個 moment 估計、SGD 嘅速度 —— 接返之後第一步其實等於冷啟動。
+
+兩樣都 save，兩樣都還原入新嘅物件，然後顯示下一步落喺同一個冇中斷過嘅 run 一樣嘅位置。
+
+```
+output: True True
+```
+'''
+hints = [
+  "resumed.load_state_dict(ckpt[\"model\"]) 同 resumed_opt.load_state_dict(ckpt[\"opt\"]) —— 兩邊都要。",
+  "優化器要先攞住啱嘅參數，先可以將狀態 load 入去。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.advanced.23.generator"
+title = "同一個 run 行兩次"
+story = "同一個 script 行兩次，同一個 seed，唔同嘅數。中間有第二樣嘢喺 global generator 度抽咗數。"
+brief = '''
+`torch.manual_seed` 設定一條 global 嘅流，任何喺佢度抽數嘅嘢都會推佢向前 —— 所以上游任何地方多咗一個 `randn`，之後每個數都會移位。一個本地嘅 `torch.Generator` 係自己一條流，傳佢落去嘅碼無論有乜其他嘢行緊都可以重現。
+
+砌一個 seed 咗嘅 generator，喺佢度抽兩次，中間重新 seed，顯示兩次抽出嚟一樣，而 global 嗰啲唔一樣。
+
+```
+output: True False
+```
+'''
+hints = [
+  "torch.Generator().manual_seed(1234) —— manual_seed 回傳個 generator，所以可以串落去。",
+  "DataLoader 都收 generator=，shuffle 就係咁樣變得可以重現。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.advanced.24.class-weights"
+title = "百分之九十九，冇用"
+story = "一百個機架得一個真係會壞。個模型次次都預測 `fine`，拎到百分之九十九。"
+brief = '''
+喺一個唔平衡嘅問題上，多數類別會支配個損失。`nn.CrossEntropyLoss(weight=...)` 會按比例調整每個類別嘅貢獻，令罕見類別每個樣本值多啲，個模型就唔可以再無視佢。
+
+權重張量每個類別一個數，按類別次序排，而且一定要係 float。
+
+將罕見類別嘅權重設做 9，顯示喺一個罕見類別嘅錯誤上面損失會升。
+
+```
+output: True 9.0
+```
+'''
+hints = [
+  "torch.tensor([1.0, 9.0]) —— 每個類別一個權重，float，按類別次序。",
+  "用預設 reduction 嘅話權重亦都會除埋總數，所以 reduction=\"sum\" 先至清楚睇到個倍數。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.advanced.25.mnist-shape"
+title = "二十八乘二十八"
+story = "啲數字以一疊灰色方格嘅樣到嚟，第一層喺做任何嘢之前，要準確知道自己收緊乜。"
+brief = '''
+MNIST 係 28×28 單 channel 灰階、十個類別，而 torch 要圖像係 `(batch, channels, height, width)` —— channels 喺 height **之前**，由其他 library 過嚟嘅人成日搞錯呢個慣例。
+
+Runner 入面冇網絡、冇 torchvision，所以呢度啲數字係生成出嚟嘅：每個類別喺自己嘅位置放一條光棒，上面再鋪一層雜訊。佢係 MNIST 形狀，唔係 MNIST 本身，而下面每個形狀、dtype 同層都係真嘢。
+
+砌個 batch，印出佢嘅形狀、佢嘅 dtype、標籤嘅 dtype 同類別數。
+
+```
+output: (64, 1, 28, 28) torch.float32 torch.int64 10
+```
+'''
+hints = [
+  "tuple(x.shape) —— channel 軸係第二條，唔係最後一條。",
+  "Cross-entropy 嘅標籤一定要係 int64；randint 已經畀你呢個。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.advanced.26.mnist-mlp"
+title = "壓扁咗嘅數字"
+story = "第一個數字分類器掉咗張圖，當佢係一行七百八十四個數嚟讀。佢竟然得，呢樣先至出奇。"
+brief = '''
+MNIST 上面嘅 MLP 將 `(batch, 1, 28, 28)` 壓扁做 `(batch, 784)`，當佢係一個普通嘅 feature 向量。`nn.Flatten()` 以一層嘅形式做壓扁，保留 batch 軸。
+
+砌 `784 → 64 → 10`，中間一個 ReLU，訓練佢，印出 held-out 準確度檢查。
+
+```
+output: (128, 784) True
+```
+'''
+hints = [
+  "nn.Sequential(nn.Flatten(), nn.Linear(784, 64), nn.ReLU(), nn.Linear(64, 10))。",
+  "784 係 1 * 28 * 28；Flatten 保留軸 0，之後嘅全部摺埋一齊。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.advanced.27.conv-shape"
+title = "卷積嘅算術"
+story = "卷積之後嗰個 linear 層要一個冇人推得出嘅數，估錯咗四次，traceback 先至爆咗出嚟。"
+brief = '''
+卷積輸出嘅邊長係 `floor((H + 2p - k) / s) + 1`。一個 3×3 kernel 加 `padding=1` 同 `stride=1` 唔會改尺寸 —— 所以周圍都見到呢個組合 —— 而一個冇 padding 嘅 5×5 會減走四。
+
+`Conv2d(in_channels, out_channels, kernel_size)` 無論空間尺寸點變，都會將 channel 數改做 `out_channels`。
+
+印出三個卷積每個之後嘅形狀。
+
+```
+output: (2, 8, 28, 28) (2, 16, 24, 24) (2, 8, 14, 14)
+```
+'''
+hints = [
+  "nn.Conv2d(1, 8, 3, padding=1)、nn.Conv2d(1, 16, 5)、nn.Conv2d(1, 8, 3, stride=2, padding=1)。",
+  "(28 + 2 - 3)/1 + 1 = 28，(28 - 5)/1 + 1 = 24，floor((28 + 2 - 3)/2) + 1 = 14。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.advanced.28.pool-flatten"
+title = "分類器前面嗰個數"
+story = "最後一個卷積同十個類別之間得一個數，搞錯佢係成間房最常見嘅 traceback。"
+brief = '''
+`MaxPool2d(2)` 將兩條空間軸都減半。經過 `Conv2d(1, 8, 3, padding=1)` 同一次 pool，一個 28×28 會變成 `(batch, 8, 14, 14)`，壓扁之後就係 `8 * 14 * 14 = 1568` 個 feature —— 就係分類 head 需要嗰個數。
+
+砌好成疊嘢，等 head 嘅輸入尺寸係推出嚟而唔係估出嚟，然後印出 feature 數同輸出形狀。
+
+```
+output: 1568 (2, 10)
+```
+'''
+hints = [
+  "feats = body(x).shape[1] —— 行一個假 batch 過去，讀返個數出嚟。",
+  "推出嚟好過自己計：改咗個 kernel，推出嚟嗰個版本照樣用得。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.advanced.29.mnist-cnn"
+title = "數字，認真做"
+story = "卷積令張圖保持係一張圖，held-out 數字嘅準確度升咗，一個多餘樣本都冇加。"
+brief = '''
+完整嘅 MNIST 形狀 run：卷積、ReLU、pool、壓扁、分類，用 mini-batch 訓練三個 epoch，再用另一個 seed 生成嘅數字評分。
+
+Loop 入面就係 BASIC 嗰個，外面包住 node 23 嘅 batching。
+
+```
+output: True True
+```
+'''
+hints = [
+  "兩個張量都用同一個 i:i + 64 切，然後嗰三個呼叫。",
+  "8 * 14 * 14 係一個 3x3 same 卷積加一個 2x2 pool 之後壓扁嘅尺寸。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.advanced.30.per-class"
+title = "佢邊個數字差"
+story = "整體百分之九十六，而每一個失敗都係同一個類別。一個數將佢收埋咗。"
+brief = '''
+整體準確度會收埋一個模型從來都答唔啱嘅類別。一個 confusion count —— 每個真實類別有幾多個預測啱 —— 係顯示到佢嘅最細嘅嘢。
+
+`(want == k)` 係類別 `k` 嘅 mask；嗰個 mask 入面嘅準確度就係每個類別嘅數。
+
+```
+output: [1.0, 0.5, 0.0] 0.6
+```
+'''
+hints = [
+  "mask = want == k，然後 (pred[mask] == k).float().mean() —— 布林 index 揀出啲行。",
+  "冇樣本嘅類別喺呢度會得出 nan，值得喺佢去到 dashboard 之前處理好。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "pytorch.advanced.31.embeddings"
+title = "一張識學嘢嘅表"
+story = "機架入面嗰樣嘢完全唔知一個字係乜。佢有一張表，每個 token 一行，而嗰啲行係學返嚟嘅。"
+brief = '''
+`nn.Embedding(V, D)` 係一個 `(V, D)` 矩陣加一個查表：畀佢 token id，佢就畀返嗰啲行。佢正正就係跳過咗 one-hot 嘅 one-hot 矩陣乘法，所以超出範圍嘅 id 會 raise index error，而唔係畀返零。
+
+Transformer 會喺 token embedding 上面加一個 **position** embedding，因為淨係注意力本身分唔到第一同最後。`torch.arange(t)` 就係 position id。
+
+兩個都砌，加埋，印出形狀同參數數量：`16*8 + 4*8 = 160`。
+
+```
+output: (2, 4, 8) 160 True
+```
+'''
+hints = [
+  "tok(idx) + pos(torch.arange(idx.shape[1])) —— position 嗰行會沿住 batch broadcast。",
+  "喺位置 0 嘅 token 1 同喺位置 3 嘅 token 1 係唔同嘅向量；position 表嘅重點就係咁。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "pytorch.advanced.32.attention"
+title = "Query、Key、Value"
+story = "一行算術，2017 年寫嘅，而地庫入面嗰個機架就係四百份佢。"
+brief = '''
+Scaled dot-product attention 係一條式：`softmax(QKᵀ / √d) V`。個 scale 喺度，係因為兩個 `d` 維向量嘅點積會隨住 `d` 變大，冇咗佢 softmax 會飽和，梯度會消失。
+
+注意力矩陣每一行加埋都係一 —— 佢係 value 上面嘅加權平均，冇其他。
+
+寫出嚟，印出形狀同每行總和。
+
+```
+output: (2, 5, 5) (2, 5, 4) 1.0
+```
+'''
+hints = [
+  "torch.softmax(q @ k.transpose(-2, -1) / d ** 0.5, dim=-1)，然後 att @ v。",
+  "softmax 用 dim=-1：每個 query 將佢嘅注意力分畀啲 key，所以最後一條軸加埋係一。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "pytorch.advanced.33.causal-mask"
+title = "佢睇得到答案"
+story = "個語言模型訓練嗰陣滿分，叫佢續寫任何嘢就出雜訊。佢預測下一個 token 嗰陣，同時睇緊嗰個 token。"
+brief = '''
+一個 causal 模型淨係可以 attend 自己或者之前嘅位置。冇咗 mask，訓練損失會跌到零 —— 答案就喺輸入入面 —— 而生成嗰陣將來真係唔喺度，佢就崩潰。
+
+`torch.tril(torch.ones(t, t))` 係下三角嘅允許矩陣；喺佢係零嘅地方，將分數 `masked_fill` 做 `-inf`，喺 softmax **之前**。
+
+將個 mask 以整數印出，同埋位置 0 嘅注意力行，佢淨係睇得到自己。
+
+```
+output: [[1, 0, 0], [1, 1, 0], [1, 1, 1]] [1.0, 0.0, 0.0]
+```
+'''
+hints = [
+  "torch.tril(torch.ones(t, t))，然後 scores.masked_fill(mask == 0, float(\"-inf\"))。",
+  "喺 softmax 之後先 mask，啲行加埋唔係一，而且仍然會將將來漏入梯度。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "pytorch.advanced.34.completion"
+title = "續寫"
+story = "地庫入面嗰個機架就係呢樣嘢，放大四億倍。呢度佢得一萬四千個參數，喺一部手提電腦上面，續寫一條冇人話過佢結尾嘅序列。"
+brief = '''
+每個部件而家都齊晒，呢個 node 將佢哋砌埋一齊，變成地庫入面嗰樣嘢真正嘅架構：token 同 position embedding、LayerNorm、multi-head causal self-attention、一個 residual、一個 GELU MLP、再一個 residual，同埋一個返去詞彙表嘅 linear head。
+
+Multi-head 嘅拆分係唯一未見過嘅一塊，而佢只不過係一個 reshape：`(B, t, D)` 變成 `(B, H, t, D/H)`，咁 node 8 嘅 batched 矩陣乘法就一次過做晒每個 head。
+
+喺一條八個 token 嘅序列上面訓練佢，直到佢背熟為止，然後 greedy 咁續寫 `[1, 2]` —— 攞**最後**一個位置嘅 argmax，加落去，再行過。
+
+```
+output: 14000 [1, 2, 3, 4, 5, 6, 7, 8] True
+```
+'''
+hints = [
+  "分數係 (q @ k.transpose(-2, -1)) / (D // H) ** 0.5 —— scale 用 head 嘅維度，唔係模型嘅維度。",
+  "然後 att.masked_fill(mask == 0, float(\"-inf\")).softmax(dim=-1)，就係咁嘅次序。",
+  "Greedy 生成淨係讀最後一個位置：model(torch.tensor([out]))[0, -1].argmax().item()。",
+]

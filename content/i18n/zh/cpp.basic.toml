@@ -1,0 +1,794 @@
+# C++ LAND — BASIC, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "cpp.basic"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.basic.01.first-light"
+title = "第一声"
+story = "12:00，告士打道海旁。午炮能响，是因为有东西写对了地址；可它旁边的铜牌是空白的。"
+brief = '''
+请精确输出：
+
+```
+hello, causewaybay
+```
+
+小写，一个逗号，一个空格，一行。其他什么都不要有。
+
+`std::cout` 在 `<iostream>` 里，`'\n'` 是换行。`std::endl` 也行，而且还会刷新输出，
+这里你用不着，以后你也不会想要。
+'''
+hints = [
+  "std::cout << \"...\" 就是整个程序。include 已经写好了。",
+  "字符串必须精确：小写，一个逗号，逗号后面一个空格。",
+  "main 返回 int；走到 main 的末尾而没有 return 是可以的，意思是 0。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.basic.02.bindings"
+title = "铜牌"
+story = "午炮旁边的铜牌上只剩一个数字，后面两格空着，原来写的是天数和年份。"
+brief = '''
+C++ 里声明变量时类型写在前面：`long long n = 0;` 造出一个叫 `n` 的 64 位整数。
+`std::cin >> n` 从标准输入读下一个数放进去，`std::cout << n << '\n'` 把它连同换行一起
+打印出来。对这个名字做算术就是普通的算术：`n * 2`、`n * n`。
+
+```
+std::cout << n * n << '\n';
+```
+
+程序读入 `n`，打印它和它的两倍。把这一行敲在 `// FILL` 处：第三个打印，`n * n`。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "std::cout << n * n << '\\\\n'; —— 和它上面那一行同一个形状。",
+  "long long 装得下 3000000000 的平方；int 装不下，所以铜牌上写的是 long long。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.basic.03.types"
+title = "潮汐表"
+story = "港务长的潮汐表用避风塘的水深除以舢舨的数目，得出来的总是整数，即使它本来不是。"
+brief = '''
+两个整数相除得到整数：`7 / 2` 是 `3`，`7 % 2` 是余数 `1`。想得到 `3.5`，必须先让其中
+一边变成浮点数，`static_cast<double>(a)` 就是把这件事明说出来的写法。要以固定的小数位
+打印，`<iomanip>` 里有 `std::fixed` 和 `std::setprecision(2)`。
+
+```
+std::cout << a / b << '\n';
+std::cout << a % b << '\n';
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';
+```
+
+整数除法和余数已经打印了。在 `// FILL` 处写第三行：以 `double` 做除法，保留两位小数。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
+  "只需要转换一个操作数：double 除以 long long 就是 double。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.basic.04.int-types"
+title = "寄存器宽度"
+story = "午炮的发射寄存器是 32 位宽，港口时钟的是 64 位；一个计数从这边抄到那边，只有有人明说时才保得住它的值。"
+brief = '''
+`<cstdint>` 按宽度给整数命名：`int32_t` 和 `int64_t` 是有符号的，`uint32_t` 和
+`uint64_t` 是无符号的。值在不同宽度之间移动用 `static_cast<...>`，它大声说出这里正在
+发生一次转换。`<limits>` 里的 `std::numeric_limits<T>::max()` 是某个宽度能装下的最大值。
+
+```
+uint64_t b = static_cast<uint64_t>(a);
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';
+```
+
+`a` 是以 `int32_t` 读入的。把转换那一行敲在第一个 `// FILL` 处，第二个打印行敲在
+第二个 `// FILL` 处。
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "uint64_t b = static_cast<uint64_t>(a); —— 转换写明它要去的宽度。",
+  "std::numeric_limits<uint64_t>::max() 是 18446744073709551615；它上面 int32_t 那一行是同一个调用，只是换了类型。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.basic.05.big-int"
+title = "三十二个字节"
+story = "游艇会的泊位钥匙是 32 字节的数，绞盘从大端开始一个字节一个字节地读；字节放进去之前，缓冲区全是零。"
+brief = '''
+一个 32 字节的整数 —— 哈希、密钥、地址 —— 没有内置类型，所以它住在
+`std::array<uint8_t, 32>` 里：32 个字节，大端序，最高位的字节在最前面。一个 `uint64_t`
+填满其中最后八个。右移 `8 * i` 位把第 `i` 个字节（从小端数起）移到最底下，而转换只
+留下那一个字节。
+
+```
+buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));
+```
+
+对 `i` 的循环和十六进制打印已经写好。把这一行作为循环体敲在 `// FILL` 处。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = static_cast<uint8_t>(v >> (8 * i)); —— 最后一个下标拿到最低的字节。",
+  "v >> (8 * i) 把第 i 个字节滑到最底下；static_cast<uint8_t> 把其余的扔掉。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.basic.06.floats"
+title = "潮位计"
+story = "避风塘的潮位计用 double 记录，显示牌是单精度的，两者在小数点后第十位对不上。"
+brief = '''
+`double` 是 64 位浮点数，`float` 是 32 位的。`std::stod` 把文本解析成 `double`；把它收窄
+成 `float` 用 `static_cast<float>`，而精度就是在这次转换里丢掉的 —— `0.1` 没有精确的
+二进制形式，float 保留的位数比 double 少。
+
+```
+double x = std::stod(s);
+float y = static_cast<float>(x);
+```
+
+`s` 是读入的那一行，两个打印都用十位小数。把这两行敲在 `// FILL` 处。
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "double x = std::stod(s); —— 字符串转 double，来自 <string>。",
+  "float y = static_cast<float>(x); —— 收窄被明确写出来；y 打印出来的真实位数更少。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.basic.04.strings"
+title = "舢舨的名字"
+story = "舢舨的名字在船头用大写漆着，在船尾倒过来漆着，而港务长的记录里两种都没有。"
+brief = '''
+`std::string` 知道自己的长度（`size()`），可以用 `<algorithm>` 遍历，也可以用任意一对
+迭代器构造。`std::transform` 对每个字符调用一个函数并把结果写回去；`<cctype>` 里的
+`::toupper` 就是这个函数。`rbegin()` 和 `rend()` 倒着走过字符串，所以用它们构造的
+字符串就是反转后的。
+
+```
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());
+```
+
+`upper` 是这一行的副本，`rev` 是占位。把这两行敲在 `// FILL` 处，替换掉占位的 `rev`。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper); —— 源头、源尾、目的地、函数。",
+  "std::string rev(line.rbegin(), line.rend()); —— 用两个反向迭代器构造的字符串就是反转后的。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.basic.08.string-slices"
+title = "短名"
+story = "港务长的牌子上只有放舢舨名字前四个字母和后面一个记号的位置，文员却把整个名字抄了上去。"
+brief = '''
+`s.substr(pos, n)` 是字符串的一个切片：从 `pos` 开始的 `n` 个字符，而且它是一个
+**副本** —— 一个新的 `std::string`，不和 `s` 共享内存。往字符串后面追加用 `+=` 或
+`append(...)`，它会就地让字符串变长。
+
+```
+std::string t = s.substr(0, 4);
+t += "...";
+```
+
+`s` 是读入的那一行（至少四个字符）。把这两行敲在 `// FILL` 处，替换掉占位的 `t`。
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "std::string t = s.substr(0, 4); —— 从 0 开始，取 4 个；结果是一个独立的字符串。",
+  "t += \"...\"; —— 就地追加；t.append(\"...\") 也一样。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.basic.09.int-slices"
+title = "从中间取两个"
+story = "船排的记录要把第二和第三个读数单独抄出来，再把整个早上的读数接在后面，结果抄出来的是整个早上两遍。"
+brief = '''
+`std::vector` 没有切片语法；切片就是用两个迭代器构造的新 vector —— 从 `begin() + 1`
+到 `begin() + 3`（不含）—— 而且它是一个**副本**（`<span>` 里的 `std::span` 才是不复制的
+视图）。当 `where` 是 `end()` 时，`insert(where, first, last)` 就把整个区间追加上去。
+
+```
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());
+```
+
+`v` 装着这一行的整数（至少三个）。把这两行敲在 `// FILL` 处，替换掉占位的 `part`。
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "std::vector<long long> part(v.begin() + 1, v.begin() + 3); —— 区间构造函数；结尾是所取的最后一个元素的下一个位置。",
+  "part.insert(part.end(), v.begin(), v.end()); —— 在末尾插入一个区间就是追加。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.basic.10.byte-slices"
+title = "前三个字节"
+story = "午炮的线路把一个名字当作字节传过来，接收端留下前三个，再把最后两个接在后面，结果打印出来的缓冲区是整个名字。"
+brief = '''
+字节是 `uint8_t`，字节数组是 `std::vector<uint8_t>`。和整数 vector 一样的两个惯用法
+在这里也适用：切片是用两个迭代器构造的新 vector（一个副本），`insert(end(), first, last)`
+追加一个区间。`bytes.end() - 2` 是离末尾两个位置的迭代器。
+
+```
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());
+```
+
+`bytes` 装着这一行的字符（至少三个）。把这两行敲在 `// FILL` 处，替换掉占位的 `head`。
+十六进制那一行和文本那一行已经替你打印了。
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3); —— 三个字节，一个新 vector。",
+  "head.insert(head.end(), bytes.end() - 2, bytes.end()); —— 最后两个，追加上去。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.basic.05.loops"
+title = "数礼炮"
+story = "这个月的每一天午炮都响一次，铜牌要的是累计总数，以及哪几响落在逢三的日子上。"
+brief = '''
+C++ 里的计数循环是一个有三部分的 `for`：计数器从哪里开始、持续到什么时候、怎么移动。
+`for (long long i = 1;
+i <= n; ++i)` 依次访问 `1` 到 `n`（含）。每访问一次循环体就运行一次，而 `%` 是余数，
+所以 `i % 3 == 0` 的意思是“3 的倍数”。
+
+```
+for (long long i = 1; i <= n; ++i) {
+```
+
+循环体已经写好：它把 `i` 加进 `sum`，并数出 3 的倍数。把这一行 `for` 敲在 `// FILL`
+处，替换掉占位的那一行。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for (long long i = 1; i <= n; ++i) { —— 从 1 开始，只要 i <= n 就继续，每次加一。",
+  "是 <= n，不是 < n：礼炮要把 n 本身也算进去。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.basic.06.functions"
+title = "船排收费"
+story = "游艇会的绞盘当天前十次每次收五块，之后每次三块，而收费牌上只写着 fare。"
+brief = '''
+函数给一件工作起个名字：返回类型、名字、参数，以及一个以 `return` 结束的函数体。
+`long long fare(long long
+rides)` 接收一个数，交回一个数。函数可以在 `if` 里提前 `return`，而那一行之后的
+一切就是另一种情况。
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+收费规则：前 10 次每次 5，之后每次 3。`main` 读入 `n` 并打印 `fare(n)`。把这两行
+作为 `fare` 的函数体敲在 `// FILL` 处，替换掉 `return 0;`。
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; —— 然后在下一行写 return 50 + (rides - 10) * 3;",
+  "十次每次 5 是 50，第十次以后的每一次在这上面再加 3。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.basic.07.structs"
+title = "一个档口，三个字段"
+story = "避风塘的鱼档把名字、价钱和数量写在三块不同的牌子上，没人把它们放到一块上。"
+brief = '''
+`struct` 把几个有名字的字段合成一个值，还可以带上操作这些字段的成员函数。花括号按
+字段声明的顺序逐个构造它：`Stall s{"fish", 12, 3};`。在成员函数里，字段就是普通的名字。
+
+```
+return price * qty;
+Stall s{name, price, qty};
+```
+
+`Stall` 有名字、价钱和数量，`main` 打印 `name: total`。把这两行敲在两个 `// FILL`
+处：第一行是 `total()` 的函数体，第二行在 `main` 里构造 `s`。
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "total() 里写 return price * qty;，main 里写 Stall s{name, price, qty};。",
+  "花括号初始化按声明顺序填字段：先 name，然后 price，然后 qty。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.basic.08.enums"
+title = "路线颜色"
+story = "避风塘巴士站上方的转乘牌写着三条港铁线，每条旁边的色带都被漆掉了。"
+brief = '''
+`enum class` 是一组封闭的具名值：`Line::Island`、`Line::TsuenWan`、`Line::KwunTong`，
+再没有别的。对它做 `switch` 会挑出它所持有的值对应的分支，每个 `case` 写出一个前面
+带着类型的枚举值。少了一个 case 时编译器会警告，这正是封闭集合的意义。
+
+```
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";
+```
+
+`parse` 把单词变成一个 `Line`，`Island` 的 case 已经写好。把这两行 `case` 敲在
+`// FILL` 处，放在 `Island` 那一行下面。
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  "case Line::TsuenWan: return \"red\"; 和 case Line::KwunTong: return \"green\"; —— 和 Island 那一行同一个形状。",
+  "enum class 的枚举值前面永远要带类型：Line::TsuenWan，绝不能只写 TsuenWan。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.basic.09.vector"
+title = "渔获，按顺序"
+story = "每条舢舨隔着水面一个数一个数地报出渔获，最后一条船进来之前，港务长没地方放它们。"
+brief = '''
+`std::vector<long long>` 是可以变长的数组，对它做的四件事是增、删、改、排序。
+`push_back(x)` 追加到末尾；`erase(v.begin() + i)` 删除下标 `i` 处的元素并合拢空位；
+`v[i] = x` 覆盖已有的值；`<algorithm>` 里的 `std::sort` 把整个东西排成升序。下标 `0`
+是最前面。
+
+```
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());
+```
+
+`xs` 装着这一行的整数。把这四行敲在四个 `// FILL` 处：在末尾加上 `99`，删除第一个
+元素，把新的第一个元素设成 `700`，然后排序。先打印 vector，再打印它的大小。
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); —— 增、删、改、排序。",
+  "erase 和 sort 接收迭代器（xs.begin()、xs.end()）；[] 接收下标。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.basic.16.list"
+title = "前面还是后面"
+story = "单号的舢舨泊在避风塘前面，双号的泊在后面，可泊位名单只会一直往后面加。"
+brief = '''
+`<list>` 里的 `std::list` 是双向链表：在任意一端增删都是常数时间，而 vector 在前端
+做不到。`push_front(x)` 加到前面，`pop_back()` 删除最后一个元素，`front()` 是一个引用
+—— 给它赋值，第一个元素就变了 —— 而链表用自己的 `sort()` 成员给自己排序，因为
+`std::sort` 需要随机访问，而链表没有。
+
+```
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();
+```
+
+`l` 已经按顺序装着这一行的整数。把这四行敲在 `// FILL` 处：在前面加上 `0`，删除最后
+一个元素，把最前面的覆盖成 `99`，然后排序。链表会被打印出来。
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "l.push_front(0); l.pop_back(); l.front() = 99; l.sort(); —— 每行一个，按这个顺序。",
+  "std::sort 排不了 std::list（没有随机访问）；链表自己的 l.sort() 可以。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.basic.10.maps"
+title = "点数板"
+story = "避风塘的点数板列出船队卸下的每一条鱼，一条鱼一个词，买家想要每种一行，带上数目。"
+brief = '''
+`std::map<std::string, int>` 是按键排序保存的字典。`m[k] = v` 添加一个键（或覆盖已有
+的）；`erase(k)` 删除一个键，键不存在时什么都不做；`at(k)` 是一个必须已经存在的键所
+对应的条目 —— 给它赋值就是修改，而且它会抛异常，不会凭空造出一个键。遍历 map 时键是
+有序的 —— `std::map` 永远按键排序，所以这里没有排序那一行。
+
+```
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;
+```
+
+`counts` 已经统计了这一行的每个词，而且每一行都有 `fish`。把这三行敲在 `// FILL`
+处：把 `crab` 加为 `1`，删除 `rice`，然后把 `fish` 设成 `9`。有序的打印已经写好。
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; —— 增、删、改。",
+  "[] 会创建缺失的键；at() 不肯。键必须已经存在时就用 at()。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.basic.18.hashtable"
+title = "无序的点数板"
+story = "出菜口把每道菜都记在哈希表上，然后按桶碰巧排出的顺序读回来，两次打印没有一次一样。"
+brief = '''
+`std::unordered_map` 是哈希表：和 `std::map` 一样的 `[]`、`erase` 和 `at`，平均更快，
+遍历时**没有特定顺序** —— 所以打印前要先把键排序。`count(k)` 或 `find(k)` 可以问一个
+键在不在，而不会创建它。
+
+```
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;
+std::sort(keys.begin(), keys.end());
+```
+
+`counts` 已经统计了这一行的每个词，而且每一行都有 `mai`；`keys` 是装着它的键的
+vector，按桶给出的任意顺序复制出来。把这四行敲在 `// FILL` 处：把 `gun` 加为 `12`，
+删除 `siu`，把 `mai` 设成 `0`，然后给键排序，这样每次打印都一样。
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "counts[\"gun\"] = 12; counts.erase(\"siu\"); counts.at(\"mai\") = 0; 然后 std::sort(keys.begin(), keys.end()); —— 增、删、改、排序。",
+  "这个表自己没有顺序：键已经替你复制出来了；给它们排序是第四行，在打印之前。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.basic.11.sets"
+title = "泊位号码"
+story = "泊位名单上，一条舢舨每进来一次它的号码就出现一次，港务长想知道实际上到底有几条船。"
+brief = '''
+`std::set<long long>` 每个值只保存一次，按升序排列。`insert(x)` 添加一个值（重复的会
+被忽略），`erase(x)` 删除一个值（不存在的会被忽略）。集合没有修改：值就是它自己的键，
+所以把 `1` 变成 `-1` 就是先 erase 再 insert。它也没有排序那一行：`std::set` 永远是升序。
+
+```
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);
+```
+
+`seen` 已经装着这一行里不重复的值。把这三行敲在 `// FILL` 处：加上 `100`，删除 `3`，
+然后把 `1` 变成 `-1`。大小和有序遍历已经写好。
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); —— 最后两个调用在同一行。",
+  "对没有 3 的集合 erase(3) 什么都不做，-1 已经在里面时 insert(-1) 也什么都不做：两者都安全。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.basic.12.stack-queue"
+title = "后进，先出"
+story = "舢舨按到达的顺序在避风塘墙边并排泊好：最后进来的是最先能离开的，最先进来的是买家最先招呼的。"
+brief = '''
+`std::stack` 是后进先出：`push(x)` 加在顶上，`pop()` 移除顶部（什么也不返回），`top()`
+是指向它的引用 —— 给它赋值就是就地修改顶部。`std::queue` 在另一端是同样的形状：在
+尾部 `push`，在前面 `front()` 和 `pop()`。
+
+```
+st.push(0);
+st.pop();
+st.top() = 99;
+```
+
+每个数都已经推入了 `st` 和 `q`。把这三行敲在 `// FILL` 处：在顶上加上 `0`，再把它弹出，
+然后把顶部覆盖成 `99`。之后栈会被清空并打印，队列取出前两个。
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "st.push(0); st.pop(); st.top() = 99; —— 对栈增、删、改；队列不动。",
+  "top() 是引用，所以 st.top() = 99 改的正是 pop() 下一次要移除的那个元素。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.basic.13.sorting"
+title = "按深度排序"
+story = "沿着避风塘墙边的测深读数是按船测量的顺序记下的，而海图要先由浅到深，再由深到浅。"
+brief = '''
+`<algorithm>` 里的 `std::sort` 就地给一个区间排序。给它 vector 的两端，它按升序排；
+第三个参数给一个比较器，它就按那个来排，而 `std::greater<>{}` 是“大的在前”。
+
+```
+std::sort(v.begin(), v.end());
+std::sort(v.begin(), v.end(), std::greater<>{});
+```
+
+数字被读进 `v` 并打印两次。把第一行敲在第一个 `// FILL` 处，第二行敲在第二个处。
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std::sort(v.begin(), v.end()); 然后 std::sort(v.begin(), v.end(), std::greater<>{});",
+  "std::sort 接收的是区间，不是容器：begin() 和 end()。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.basic.22.reverse"
+title = "倒过来"
+story = "最后进来的舢舨应该最先出去，可船排的牌子照写下的顺序读队列，船尾的绞盘名字也反了。"
+brief = '''
+`<algorithm>` 里的 `std::reverse(first, last)` 就地把一个区间倒过来，任何容器都行。
+字符串则用这条路已经用过的另一种方法倒过来：从 `rbegin()` 到 `rend()` 构造一个新的。
+
+```
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());
+```
+
+`v` 装着第一行的整数，`s` 是第二行。把这两行敲在 `// FILL` 处，替换掉占位的 `r`。
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std::reverse(v.begin(), v.end()); —— 就地进行；什么也不返回。",
+  "std::string r(s.rbegin(), s.rend()); —— 反向迭代器构造出反转后的副本。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.basic.14.sort-by-key"
+title = "排行榜"
+story = "游艇会的比赛榜按报名顺序列出每条船和它的积分，而会长要第一名在最上面。"
+brief = '''
+`std::sort` 接收一个比较器：一个接收两个元素的函数，说明第一个是否应排在第二个前面。
+就地写的 lambda 是常用的比较器，而“按分数降序，再按名字升序”就是一个表达式：分数不同
+时，高的在前；分数相同时，名字小的在前。
+
+```
+std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) {
+    return a.score != b.score ? a.score > b.score : a.name < b.name;
+});
+```
+
+各行已经读入并会被打印。把那个 `std::sort` 敲在 `// FILL` 处。
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });",
+  "比较器回答的是“a 是否排在 b 前面”：分数高的在前，平分时名字小的在前。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.basic.15.closures"
+title = "潮汐修正"
+story = "海图上的每个测深读数都是在低潮时测的，港务长要把它们全部按今天的潮位修正，而潮位他只在潮位计上读过一次。"
+brief = '''
+lambda 是就地写的函数：`[capture](params) { body }`。捕获列表是它能从外围作用域看到
+的东西 —— `[k]` 把 `k` 复制进来，lambda 在存活期间一直保留这份副本。用 `auto` 给它
+起名，调用它就是 `add(x)`。
+
+```
+auto add = [k](long long v) { return v + k; };
+```
+
+`k` 和那些数已经读入，循环对每个数应用 `add`。把这一行敲在 `// FILL` 处，替换掉占位
+的 `add`。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "auto add = [k](long long v) { return v + k; };",
+  "[k] 把 k 复制进 lambda；[] 什么都不捕获，根本看不到 k。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.basic.16.lambdas"
+title = "双号泊位，平方"
+story = "墙边的双号泊位按号码的平方付费，单号的不用付，账本上只有一行写总数。"
+brief = '''
+`<numeric>` 和 `<algorithm>` 里的算法把 lambda 作为最后一个参数。`std::accumulate`
+把一个区间折叠成一个值：它从一个初始值开始，用目前的总数和每个元素去调用 lambda，
+保留 lambda 返回的东西。从 `0LL` 开始，总数就是 `long long`。
+
+```
+long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });
+```
+
+数字在 `xs` 里，`total` 会被打印。把这一行敲在 `// FILL` 处，替换掉占位的 `total`：
+`v` 是偶数时 lambda 加上 `v` 的平方，否则原样交回 `acc`。
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
+  "lambda 拿到目前的总数和一个元素，返回新的总数。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.basic.17.threads"
+title = "一条船一台绞盘"
+story = "船排上的每条舢舨都有自己的绞盘，它们同时拉，点数要等最后一台停下后才读。"
+brief = '''
+`std::thread` 一被造出来就在自己的线程上运行一个函数；`join()` 等它结束。线程的 vector
+用 `emplace_back` 和一个 lambda 构造。捕获 `[&, i]` 按引用借用一切，只有 `i` 是复制的
+—— 循环会往前走，副本不会。每个线程只写自己的格子，所以没有共享任何东西，而且在每个
+`join()` 都返回之前什么都不打印。
+
+```
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+for (auto& t : threads) t.join();
+```
+
+`results` 每个数一个格子，打印已经写好。把第一行敲在循环里的 `// FILL` 处，替换掉
+占位；第二行敲在它后面的 `// FILL` 处。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "循环里写 threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });，循环后写 for (auto& t : threads) t.join();。",
+  "到 main 结束还没被 join 的线程会终止整个程序；打印之前把它们全部 join。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.basic.18.binary-tree"
+title = "SEGFAULT"
+story = "12:00，午炮。发射时间表是一棵时间树，而午炮沿着一条根本不存在的左分支走了下去 —— nullptr，被解引用，就在铜锣湾唯一一个绝不能错的地址上。"
+brief = '''
+二叉搜索树由节点组成，每个节点有一个值和两个子指针：小的值在 `left` 下面，大的在
+`right` 下面。插入是递归的：空子树（`nullptr`）变成一个新节点，否则值就沿一边往下走
+—— 而那一边变成的东西要存回去，因为那一边刚才可能还是 `nullptr`。这次存回就是全部
+的诀窍，而它之前对 `nullptr` 的检查就是整个 boss。
+
+```
+if (!n) return new Node{v};
+if (v < n->val) n->left = insert(n->left, v);
+else n->right = insert(n->right, v);
+return n;
+```
+
+`Node`、`nullptr` 的情况、`inorder`、`height` 和 `main` 都已经写好。把两行下降的代码
+敲在两个 `// FILL` 处：左边那行在 `if` 里，右边那行在 `else` 里。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "左边写 n->left = insert(n->left, v);，右边写 n->right = insert(n->right, v);。",
+  "把结果存回去：子节点可能是 nullptr，而新节点就是 insert 的返回值。",
+]

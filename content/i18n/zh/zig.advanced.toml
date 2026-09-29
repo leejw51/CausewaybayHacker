@@ -1,0 +1,1302 @@
+# ZIG LAND — ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/zig/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "zig.advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.advanced.01.lines"
+title = "收费亭日志"
+story = "1 号收费亭的当班日志把每辆车记成一行：收费员听到的名字，然后是它付的钱，有多少枚硬币就记多少个数。打印机比隧道还老，每页结尾仍然印着渡轮公司的那个词。"
+brief = '''
+第一行是数量 `n`。接下来的 `n` 行，每行是一个名字，后面跟着零个或多个整数，用空格分隔。
+
+每辆车输出一行，格式为 `<NAME> <how many numbers> <their sum>`，最后输出
+`BOATS <n>` —— 这是广场的打印机自从属于渡轮公司以来，每一页都用来收尾的那行合计。
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+这里的单位是行，而不是记号。对整个输入做一次 `std.mem.tokenizeAny`，它在空白处停下，
+不管换行，所以它没法告诉你一辆车在哪里结束、下一辆从哪里开始。先把输入切成行 ——
+`std.mem.splitScalar(u8, input, '\n')` 给你一个迭代器，它的 `next()` 是 `?[]const u8`，
+一次一行 —— 然后在这一行**之内**再做记号切分。
+
+这些切片每一个都指向 `input`。什么都没有复制：一行只是开向你已经拥有的那些字节的一扇窗，
+所以 `input` 必须活到你用完它们全部为止，这也是为什么 `defer gpa.free(input)` 是最后
+一个执行的。
+'''
+hints = [
+  "对 '\\n' 做 splitScalar，每次 next() 交给你一行；在这一行上用 tokenizeAny、以 \" \\r\\t\" 作分隔符，就能走完它的记号，而且不会越过行尾。",
+  "名字是第一个记号，所以在循环之前用一次 fields.next() 取走它；之后 while (fields.next()) |tok| 看到的就只剩数字。",
+  "只有名字的一行给出 0 0，不需要特殊处理：while 循环根本不会执行。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.advanced.02.pointers"
+title = "副本不是原件"
+story = "收费亭主管把每个硬币盘的数都记在一张表的副本上，而她身后墙上那张表从来不变。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+通过函数 `load` 把每个值压进同一个 `std.ArrayList(i64)`，然后输出三行：
+`LOADED <how many>`，来自只读函数 `total` 的 `TOTAL <sum>`，以及 `FIRST <value>`
+—— 没有任何值时输出 `FIRST NONE`。
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+起始代码能编译，输出 `LOADED 0`。`load` **按值**接收列表，而 Zig 的参数是不可变的，
+于是起始代码做了人们接下来会做的事：`var mine = sheet;` —— 复制一份列表的头部 —— 然后
+往副本里追加。副本变长了，副本在返回时死掉，墙上那张表纹丝不动。
+
+用 `*` 把你的意思说出来：类型为 `*std.ArrayList(i64)` 的参数是调用者那个列表的地址，
+通过它调用 `sheet.append(gpa, value)`，值就落进调用者的列表里。`total` 应该接收
+`[]const i64` —— 也就是列表的 `.items` —— 因为它只需要看，不需要碰，而类型里的 `const`
+就是编译器让你说到做到的方式。
+
+`FIRST` 是一个可选指针：`?*const i64` 要么是第一个元素的地址，要么是 `null`，而 `null`
+是 Zig 唯一不先问一声就不让你透过它读取的值 —— `if (first) |p|` 就是那一问。这片领地
+的全部，就在这一行里。
+'''
+hints = [
+  "修好 load 只要两处：签名里写 sheet: *std.ArrayList(i64)，调用处写 &sheet。通过指针调用方法不需要箭头；sheet.append(gpa, v) 还是同一行。",
+  "total 应该接收 []const i64，并用 sheet.items 调用 —— const 是一个承诺，编译器会检查它。",
+  "&sheet.items[0] 是第一个元素的地址，只有在它存在时才有意义；if (first) |p| 解开可选值，p.* 是它背后的值。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.advanced.03.slices"
+title = "队伍的中间"
+story = "六点前，4 号收费亭前堵了四十辆车。主管看得见最前面的保险杠和最后面的尾灯，中间什么都看不见。"
+brief = '''
+标准输入第一行是数量 `n`，第二行是 `n` 个用空格分隔的整数。`n` 至少为 `1`。
+
+输出三行：第一个值、最后一个值，以及严格位于两者之间的所有值之和。值少于三个时，这个和为 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+切片就是这个序列。`nums[0]` 和 `nums[nums.len - 1]` 是两端；`nums[1 .. nums.len - 1]`
+是中间，一个指向同一批字节的**新切片**，没有任何复制，对它做一次 `for` 就是求和。切片和
+下标一样会被检查：`nums[1..0]` —— 只有一个元素的队伍算出来的中间正是这个 —— 会得到
+`panic: start index 1 is larger than end index 0`，所以对 `nums.len` 的判断要写在切片之前，
+而不是之后。
+
+用 `i64` 求和。有一个隐藏用例的中间部分装不进 `i32`，而在 `-O Debug` 下，溢出的 `i32`
+不会回绕 —— 它会 panic。
+'''
+hints = [
+  "nums[1 .. nums.len - 1] 是两端之间的切片；对它做一次 for 就能求和。它和 nums 共享同一块内存。",
+  "只有一个或两个值时，这个范围是空的或者是倒着的，而倒着的切片在 Debug 下是 panic —— 写它之前先用 if 判断 nums.len。",
+  "中间的和是 i64：那个大用例要把两个三十亿的值相加，i32 的累加器会以 integer overflow panic。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.advanced.04.strings"
+title = "字节不是字符"
+story = "广场上方的指示牌把「銅鑼灣」截在第三个字节，只显示出一个字。"
+brief = '''
+读入一行。输出三行：
+
+1. 它以**字节**计的长度
+2. 它以**字符**计的长度 —— UTF-8 码点
+3. 把字符倒过来之后的这一行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+这一行可能包含 ASCII 以外的字符，这时前两个数就不相同了。Zig 的字符串是 `[]const u8`：
+一个字节切片，`.len` 是字节数。它一直都是。在这个层面上语言对编码一无所知；`u8` 就是一个字节。
+
+UTF-8 不用解码就很容易数：每个码点都以一个**不**属于 `10xxxxxx` 形式的字节开头，而每个
+后续字节都属于这种形式。所以字节 `c` 恰好在 `(c & 0xC0) != 0x80` 时开始一个字符。倒转
+的是字符，不是字节 —— `std.mem.reverse(u8, line)` 会把 `銅` 切成三块，再倒着打印出来。
+'''
+hints = [
+  "for (line, 0..) |c, i| 连同下标走遍每个字节；(c & 0xC0) != 0x80 挑出每个字符的第一个字节。",
+  "把每个字符的起始下标收集进一个 std.ArrayList(usize)；它的长度就是字符数，什么都不用解码。",
+  "倒着走这些起始下标，把每个字符的字节 —— line[from..to] —— 用 appendSlice 追加到一个 std.ArrayList(u8) 上，然后用 {s} 打印它的 .items。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.advanced.05.structs"
+title = "收费亭账本"
+story = "2 号收费亭按车轴收费，把各项都记在同一张账本表格上 —— 至少在那条建议用一行注释替换掉这个结构体的函数之前是这样。"
+brief = '''
+第一行是 `<NAME> <n>`。接下来 `n` 行是 `<ITEM> <CENTS>`。
+
+为这个名字建一个 `Ledger` 来收集各项，然后按到达顺序把每一项原样输出为 `<ITEM> <CENTS>`，
+再输出 `TOTAL <sum>`，再输出 `BOAT <name> <count>` —— 这张账本表格是渡轮公司的，它的
+名字栏至今还写着 `BOAT`。
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` 可能是 `0`，这时输出只有最后两行。
+
+Zig 没有 `class`；最接近的是一个在内部声明了函数的 `struct`，而它就是全部。没有在你背后
+运行的构造函数：`init` 是你自己写的一个普通函数，返回这个值。没有隐藏的 `this`：`self`
+是第一个参数，明明白白写出来 —— 函数要写账本时是 `*Ledger`，只读时是 `*const Ledger`
+—— 这就是方法上的 `const`，只是变得看得见了。也没有 `private:`；字段在文件里任何地方都
+能访问，让 `main` 不去碰 `items` 的，是结构体提供了 `total()` 和 `count()`，没有理由绕过它们。
+'''
+hints = [
+  "一个 std.ArrayList(Item) 就够了；结构体的作用是让账本拥有自己的各行。add 就是一次 append：self.items.append(gpa, .{ .name = name, .cents = cents })。",
+  "add 用 self: *Ledger，因为它要写；total 和 count 用 self: *const Ledger，因为它们只读。两种情况下 ledger.add(...) 都是同一个调用 —— Zig 替你取地址。",
+  "各项的名字是 input 的切片，所以填满账本不花任何代价，而 input 必须比它活得久 —— main 里 defer 的顺序已经保证了这一点。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.advanced.06.tagged-union"
+title = "谁在开车"
+story = "快易通车道对每张电子标签都收会员价，包括那些不是会员的，以及那张根本不是标签的。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行 `<TYPE> <HOURS>`。
+
+基本费率是 `500 + 100 * HOURS` 分。每一行输出以下之一：
+
+* `MEMBER` —— 基本费率
+* `CREW` —— 基本费率的一半，整数除法
+* `JUNIOR` —— 永远是 `200`
+* 其他任何东西 —— `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+把标签建模为一个有四种情况的 `union(enum)`，其中一种是 `other`。C++ 的 `enum class`
+不能携带数据，认不出的文本只能在它旁边另外传递；Zig 的带标签的联合把它放在情况**内部**：
+`other: []const u8`，而另外三种情况什么都不携带。`union(enum)` 的情况不会在你背后转换
+成整数，也不会把它的名字漏到外层作用域里，而这正是 `enum class` 存在的两个理由。
+
+用一个 `switch` 决定收费。对带标签的联合做 `switch` 必须覆盖每一种情况 —— 漏掉一个就
+编译不过，不需要任何警告开关 —— 而 `.other => |raw|` 就是把数据从所在情况里取出来的方式。
+'''
+hints = [
+  "other: []const u8 是第四种情况，用 .{ .other = raw } 构造；三个 void 情况分别构造为 .member、.crew、.junior。",
+  "std.mem.eql(u8, raw, \"MEMBER\") 比较两个切片；切片上的 == 比较的是指针，那从来不是你想要的。",
+  "@divTrunc(base, 2) 是明明白白写出来的整数除法；有符号整数上的普通 / 在结果可能不整除时编译不过。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.advanced.07.maps"
+title = "广场在喊什么"
+story = "06:30 的收费广场：每个收费亭都隔着车道喊着什么，主管要的是排名。"
+brief = '''
+读入全部标准输入，按空白切分。
+
+每个不同的词输出一次，格式为 `<word> <count>`，按次数降序排列，次数相同时按词升序。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std.StringHashMap(i64)` 没有任何顺序 —— 不按键，不按次数，也不按到达 —— 所以排名是
+单独的一步：把条目复制进一个由小结构体组成的 `std.ArrayList`，再用比较函数对它做
+`std.mem.sort`。`getOrPut(word)` 找到槽位或者插入它，并用 `found_existing` 告诉你是
+哪一种，这正是计数循环要的；新槽位的 `value_ptr` 在你写入之前是未初始化的。
+
+Zig 没有 lambda。比较函数是一个普通函数，按名字传入，第一个参数是它本来会捕获的上下文
+—— 这里是 `{}`，类型为 `void`，因为它什么都不捕获。键是 `input` 的切片，所以必须在释放
+`input` 之前 `deinit` 这个映射：按正确顺序写 `defer`，不用多想就做到了。
+'''
+hints = [
+  "getOrPut(word) 返回一个带 found_existing 和 value_ptr 的槽位；新的时候设 value_ptr.* = 0，然后加一。这就是整个计数循环。",
+  "counts.iterator() 走遍所有条目；每个条目有 key_ptr 和 value_ptr。每个条目往一个 std.ArrayList(Row) 里追加一个 Row。",
+  "比较函数是 fn byRank(_: void, a: Row, b: Row) bool —— 先按次数降序，再看 std.mem.order(u8, a.word, b.word) == .lt —— 用 std.mem.sort(Row, rows.items, {}, byRank) 应用它。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.advanced.08.hashtable"
+title = "毫无顺序"
+story = "广场的点名结果按哈希表高兴的顺序回来，而主管要的是各个收费亭实际应答的顺序。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行一个收费亭名字。`n` 至少为 `1`，名字是一段连续的
+非空格字符。同一个名字可能出现不止一次。
+
+每个不同的名字输出一次，格式为 `<name> <count>`，**按名字第一次出现的顺序**。然后输出
+`DISTINCT <k>`。
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+容器自己不会给你这个，而这就是整道题。
+
+`std.StringHashMap` 是一张哈希表：查找平均是 O(1)，但 `iterator()` 按**桶的顺序**交回
+条目 —— 不排序，不按插入顺序，而且表一变大就变了。没有什么保证顺序，所以一个靠遍历哈希
+映射来打印的程序，输出取决于哈希函数。起始代码正是这么做的，它甚至能通过只有一个不同
+名字的用例 —— 这就是破绽：一个分辨不出顺序的测试，不能证明顺序是对的。
+
+把两件事放在两个容器里：一个 `std.ArrayList([]const u8)` 记住每个名字第一次出现的顺序，
+一个 `std.StringHashMap(i64)` 负责计数。打印时遍历列表。
+'''
+hints = [
+  "哈希表是用来快速查找的。列表是用来记住顺序的。两个你都需要。",
+  "found_existing 对每个名字恰好有一次是 false —— 就在插入时 —— 那正是把名字追加到顺序列表的时机。",
+  "打印时遍历列表，用 count.get(name).? 向映射要每个名字的次数，永远不要遍历映射。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.advanced.09.set-and-sort"
+title = "谁停在哪里"
+story = "天桥下停车处的告示板把同一辆货车在同一个车位上列了两次，没人说得清哪几行是重复的。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行 `<BERTH> <NAME>`。
+
+每个不同的 `<BERTH> <NAME>` 组合输出一次，先按车位、再按名字排序，然后输出
+`DISTINCT <k>` 和 `DUPES <n - k>`。
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+Zig 没有有序的二元组集合；最接近的是两个各做一件事的工具。`std.StringHashMap(void)`
+是一个集合 —— 值不占空间的映射 —— 用**这一行本身** `2 KWAN` 作键，任何已经在里面的组合
+都会被拒绝第二份。一个由小结构体 `{ berth, name }` 组成的 `std.ArrayList` 收集集合放行
+的那些，再用带比较函数的 `std.mem.sort` 把它们排成先车位后名字的顺序。没有结构化绑定来
+拆开这一对；结构体的字段本来就有名字。
+'''
+hints = [
+  "std.StringHashMap(void) 就是集合；getOrPut(line).found_existing 在同一行的第二份上是 true，第一份上是 false。",
+  "只有集合放行的行才进列表，所以列表的长度就是 DISTINCT，n 减去它就是 DUPES。",
+  "比较函数先按车位排，相同时看 std.mem.order(u8, a.name, b.name) == .lt；用 std.mem.sort(Mooring, moorings.items, {}, byBerthThenName) 应用它。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.advanced.10.comptime-fn"
+title = "沿车道走一遍"
+story = "车轴日志是一列计数。Alex 说写四个 for 循环。Mei 说写四个有名字的 for 循环，而那些名字就是函数。"
+brief = '''
+标准输入是一行用空格分隔的整数。
+
+输出四行：
+
+1. 偶数值之和（没有偶数时为 `0`）
+2. 每个大于 `10` 的值乘以二，按原顺序，用单个空格连接 —— 没有这样的值时输出 `-`
+3. 有多少个不同的值
+4. `FIRST_BIG <i>` —— 第一个大于 `10` 的值的下标（从 0 开始），没有则为 `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+Zig 没有 `<algorithm>`，也没有 lambda，而最接近的东西比听上去更近：一个把**另一个函数作为
+`comptime` 参数**接收的函数。`fn sumIf(xs: []const i64, comptime keep: fn (i64) bool) i64`
+就是带谓词的 `accumulate`；你按名字传入 `isEven`，编译器生成一份把调用内联进去的 `sumIf`，
+运行时根本没有函数指针。写出 `sumIf`、`keepDoubled`、一个靠对副本做 `std.mem.sort` 再
+扫一遍相邻对得出的不同值计数，以及 `indexOfFirst`。要点不在于循环难写；而在于名字说明了
+这个循环是干什么的，谓词是一个你读得懂的值。
+'''
+hints = [
+  "comptime keep: fn (i64) bool 是参数类型；在函数体里 keep(x) 是一次普通调用，在调用处你传 isEven，不带括号。",
+  "keepDoubled 需要一个写入的地方：返回一个由调用者 deinit 的 std.ArrayList(i64)，并在内部对它的 deinit 做 errdefer，这样 append 失败时不会泄漏。",
+  "gpa.dupe(i64, xs) 就是用来排序的副本；排好序的切片里重复值是相邻的，所以一个值恰好在它和前一个不同时才是新的。",
+  "indexOfFirst 返回 ?usize；if (indexOfFirst(...)) |i| 打印命中的下标，else 分支打印 -1。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.advanced.11.generics"
+title = "只写一次"
+story = "广场的仪表板上 largest 写了四遍 —— 车轴、分钟、车道，还有车道名 —— 而第五遍要在头班电车之前交。"
+brief = '''
+标准输入是两行：第一行是整数，第二行是单词。
+
+写**一个**对两者都适用的 `largest`，以及一个带 `larger()` 和 `smaller()` 的类型 `Pair(T)`。
+
+输出最大的整数、最大的单词，然后是由前两个整数组成的 `Pair` 的 `PAIR <larger> <smaller>`。
+相等时算 `a` 是较大的那个。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+起始代码编译不过：`largest` 被钉死在 `i64` 上，所以把单词传给它就是
+*expected type '[]const i64', found '[][]const u8'*。Zig 里的泛型函数就是一个带有
+**`comptime T: type`** 参数的函数：`fn largest(comptime T: type, xs: []const T) T` 对每个
+被调用的类型生成一份，而 `T` 在调用处写出来 —— `largest([]const u8, words)` —— 而不是推导出来。
+
+单词没有 `>`；切片用 `std.mem.order` 比较。在泛型内部，`if (comptime T == []const u8)`
+在编译期选择比较方式 —— 不适用的那个分支根本不会被分析，这和模板特化是同一个想法，却
+没有那一套机制。
+
+`Pair(T)` 是用在类型上的同一个技巧：一个接收 `type` 并**返回一个结构体**的函数。没有单独
+的类模板语法；类型在编译期就是一个值，函数可以造出一个。
+'''
+hints = [
+  "第一个参数写 comptime T: type，里面所有的 i64 换成 T，调用就变成 largest(i64, nums.items) 和 largest([]const u8, words.items)。",
+  "x > best 对切片编译不过；if (comptime T == []const u8) std.mem.order(u8, x, best) == .gt else x > best 为每个实例挑出正确的比较。",
+  "fn Pair(comptime T: type) type { return struct { ... }; } —— 在里面，const Self = @This() 命名正在构造的这个结构体，Pair(i64){ .a = ..., .b = ... } 造出一个。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.advanced.12.function-values"
+title = "闸杆计数"
+story = "5 号收费亭的闸杆记录谁开进来、谁倒出去，主管要的是当班结束时的那个数，不管中间发生了什么。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行是 `IN` 或 `OUT`。
+
+维护一个永远不会低于零的累计数，每条命令之后输出它。然后输出 `INS <k>` —— 有多少条命令
+是 `IN`，用一个泛型的 `countIf` 加一个谓词函数来数 —— 以及 `CLOSED <final>`。
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+Zig 没有闭包 —— 没有 lambda，没有捕获 —— 最接近的东西就明明白白写在你看得见的地方。
+计数器是一个**自己保存总数的结构体**，而 `add` 是 `*Counter` 上的方法：C++ lambda 会用
+`[total = 0LL]` 捕获并标成 `mutable` 的那个状态，在这里是一个字段，而改变它的调用通过
+指针接收这个结构体。结构体之外，除了经由 `add`，什么都碰不到这个总数。
+
+谓词是一个**作为 `comptime` 参数传入的函数**：`countIf(commands, isIn)` 写出 `isIn` 的
+名字，编译器把它内联。没有东西要捕获，所以什么都没有被捕获，面试官会问的 `[&]` 对
+`[=]` 的那个问题在这里无处藏身。
+'''
+hints = [
+  "add 就三行：self.total += delta，在零处截住，返回 self.total。它接收 *Counter，因为它要写；count.add(...) 会替你传地址。",
+  "用 var count = Counter{} 声明的 Counter 因为字段默认值而从零开始；const 的那个就不能往上加了。",
+  "fn countIf(items: []const []const u8, comptime pred: fn ([]const u8) bool) usize 走遍切片，数出 pred 接受的那些；按名字传入 isIn。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.advanced.13.optional-union"
+title = "不是数字的那一行"
+story = "车轴计数器的读数器交上来一列数字，中间夹着某人的早餐单。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行。每一行本该是一个整数。
+
+对每一行，要么输出它的两倍，要么在解析不了时输出 `BAD <line>`。最后输出 `SUM <total>`，
+其中 total 是你输出的那些值的和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+答案由两个类型承载。`fn parse(text: []const u8) ?i64` 是*一个数字，或者什么都没有*：
+`std.fmt.parseInt` 返回一个错误联合，而 `catch return null` 把错误变成可选值的 `null`
+那一半。它要么接受整个字符串，要么全部拒绝，所以 `4x` 和 `xx` 一样被拒绝。
+
+`fn doubled(text: []const u8) Doubled` 返回一个 `union(enum) { value: i64, bad: []const u8 }` —— *要么是翻倍后的值，要么是失败的那一行*，恰好两种情况之一，绝不会
+两个都是，也绝不会两个都不是。对它做 `switch`，就能从当前那个情况里取出数据：
+`.value => |v|`、`.bad => |line|`。`main` 里一个 `try` 都没有；失败是一个值，它去值该去的
+地方。起始代码的 `main` 已经是那个 switch；`parse` 和 `doubled` 是空壳，在写好之前每一行
+都会输出 `BAD`。
+'''
+hints = [
+  "std.fmt.parseInt(i64, text, 10) catch return null 就是 parse 的全部：成功时值作为可选值的数据落下去，遇到任何错误函数就返回 null。",
+  "可选值用 if (parse(text)) |value| 解开；else 那条路就是 null，.bad 情况就在那里构造。",
+  "同一个函数既能返回 .{ .value = v } 也能返回 .{ .bad = text } 是合法的，因为返回类型是一个两者皆可容纳的联合；main 里的 switch 挑选分支，数据被捕获在 |v| 或 |text| 里。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.advanced.14.error-sets"
+title = "你自己的错误"
+story = "收费服务的四层各自返回不同的东西，而它们上面没有任何一层接住其中任何一个。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 行，每行本该是一个以 km 计的距离。
+
+`fare(text)` 用 `std.fmt.parseInt` 解析 —— 它在 `xx` 上以 `error.InvalidCharacter`
+**失败**，在 `fare` 内部被转换成它自己的 `error.NotANumber` —— 并用你自己的第二个错误
+`error.NegativeDistance` 拒绝负的距离。两者都来自同一个具名错误集 `FareError`。否则它
+返回 `500 + 100 * km`。
+
+每个输入行输出一行：收费，或者解析不了时输出 `not a number`，或者距离为负时输出
+`negative distance: <km>`。然后输出 `ERRORS <k>`，即失败的行数。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+起始代码能编译，然后死在 `xx` 上：`main` 里的 `try fare(text)` 把错误往上交，而 `main`
+上面没有任何人 —— 程序输出 `error: NotANumber` 和一段调用栈，以 `1` 退出。这就是 Zig 关于错误的全部故事：错误是返回类型
+`!i64` 里的一个值，每个调用处要么把它 `try` 上去，要么把它 `catch` 住。没有什么会越过
+一个没说自己可能失败的函数向外展开。
+
+Zig 的错误是一个**名字**，不是一个对象：它不带消息，也不带数据，所以
+`negative distance: <km>` 是由仍然握着文本的调用者构造的。`catch |e| switch (e) { ... }`
+就是两个分支的 catch，而 switch 必须点到错误集里的每一个错误 —— C++ 里那个会悄悄吞掉
+派生类的 `catch (const std::runtime_error&)` 在这里没有对应物，因为没有可供切割的继承层次。
+'''
+hints = [
+  "if (fare(text)) |cents| { ... } else |e| switch (e) { ... } 就是带两个 catch 分支的 try 块；成功时的数据是 cents，错误是 e。",
+  "消息要你自己构造：错误什么都不带，但 text 还在作用域里，可以作为消息要的 km 打印出来。",
+  "到达 main 顶端的错误会输出 error: <Name> 和一段调用栈，并以 1 退出。起始代码在第二行做的就是这个，而这是好结果 —— 程序说出了它停在哪里。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.advanced.15.iterators"
+title = "你自己的 while 循环"
+story = "广场的车轴表从当班开始到结束，一个读数一个读数地跳过去，哪一个都不存下来。"
+brief = '''
+标准输入是三个整数：`start`、`step`、`count`。
+
+给 `Stops` 一个迭代器，使得对它做的 `while` 循环产出 `count` 个值，从 `start` 开始，每次
+前进 `step`。每个值单独一行输出，然后输出 `SUM <total>`，由一个 `total` 函数在同一个
+`Stops` 的一个新迭代器上算出。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+起始代码编译不过：`main` 调用了 `stops.iter()`，而 `Stops` 没有这个函数。Zig 没有迭代器
+协议，也没有可以继承的 trait。迭代器就是一个**带有返回可选值的 `next` 方法的结构体**
+—— 这里是 `?i64` —— 而遍历它的循环是 `while (it.next()) |value| { ... }`，遇到第一个 `null` 就停。这就是全部约定，也是
+`std.mem.tokenizeAny` 以及你在这条路上用过的每个 `std` 迭代器都遵守的那一个。
+
+`total` 用同一个 `while` 走同一个约定；给它一个新的迭代器，因为已经到达 `null` 的迭代器
+会一直停在那里。
+'''
+hints = [
+  "迭代器是一个嵌套结构体：const Iter = struct { value, step, left, fn next(self: *Iter) ?i64 }。next 接收 *Iter，因为它要移动迭代器。",
+  "left 为 0 时 next 返回 null；否则它记下当前值，前进一步，倒数一次，然后返回记下的那个值。",
+  "循环变量必须是 var —— var walk = stops.iter() —— 否则 next 取不到它的地址；total 用第二次 stops.iter() 造出它自己的那个。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.advanced.16.defer"
+title = "它自己收拾干净"
+story = "当班结束时，广场的日志簿会自己合上，顺序正确，不管有没有人记得去合。"
+brief = '''
+标准输入是数量 `n`，然后是 `n` 个整数。
+
+在 `main` 的**顶部**声明两个 `Guard` 值，分别叫 `first` 和 `second`，并对每一个的 `drop`
+做 `defer`，`drop` 输出 `DROP <name>`。在一个嵌套块里，把这些值喂给一个 `Tally`，它被
+defer 的 `report` 输出 `TALLY <count> <sum>`。块之后输出 `DONE`。`main` 自己不输出任何
+别的东西。
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+除了 `DONE`，每一行都是由 `defer` 输出的。Zig 没有析构函数；最接近的是 `defer`，而且它
+对此更诚实：释放的那一行就写在获取的那一行旁边，它在**块**结束时运行 —— 在右花括号处，
+在 `return` 时，在错误经由 `try` 出去时 —— 按 `defer` 的**逆序**运行。`Tally` 的 `defer`
+在内层块里，所以 `TALLY` 在 `DONE` 之前；两个守卫的 `defer` 在 `main` 的块里，而 `second`
+是最后被 defer 的，所以它最先运行。这些都不是你安排的。是作用域安排的。
+
+有一件事要做对：`defer w.flush()` 是 `main` 里的第一个 `defer`，所以它**最后**运行 ——
+在守卫们把它们的行写进缓冲区之后。把它放到它们后面，`DROP` 那几行就会被写进一个没人
+刷新的缓冲区。`defer gpa.free(input)`、`defer list.deinit(gpa)`、下一张地图上的
+`defer m.unlock(io)`：这条路上的每一次释放都是同一个想法。
+'''
+hints = [
+  "在 first 声明之后紧接着写 defer first.drop(w);，second 也一样。你永远不自己调用 drop；main 的结尾会调用。",
+  "TALLY 在 DONE 之前输出，全靠内层的花括号：写在里面的 defer tally.report(w) 在它们的右花括号处运行。去掉花括号，它就在后面输出了。",
+  "defer 永远逆序运行，所以 second 在 first 之前 —— 也所以最先被 defer 的 flush 在它们两个之后运行。",
+  "tally.report 读取的是 defer 运行那一刻的 tally，而不是写下它那一刻的：defer 是一条被推迟的语句，它提到的参数在那时才求值。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.advanced.17.past-the-end"
+title = "最后一个收费亭再往后一个"
+story = "隧道口，06:00:00。6 号收费亭旁的信号板保存着海滨上所有会响的东西的鸣放表，而它的校验和循环多读了表尾之后的一项。"
+brief = '''
+第一行是 `n`。接下来 `n` 行是鸣放表，`<NAME> <SECONDS>`。然后是一行 `q`，以及 `q` 个
+要查的名字。
+
+对每个名字输出 `<NAME> FIRES AT <seconds>` 或 `<NAME> UNKNOWN`。然后输出
+`LOADED <n> CHECKSUM <sum of every SECONDS in the table>`。
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+起始代码编译干净，却会 panic 两次，原因各不相同，两个你都得找出来。
+
+第一个是 `lookup`。它返回一个 `?*Shell` —— 匹配项的地址，或者 `null` —— 而调用者看都
+不看就在上面写了 `.?`。`.?` 的意思是*我知道这不是 null*，而当它是 null 时，`-O Debug`
+会以 `panic: attempt to use null value` 停下程序。去检验这个可选值：`if (lookup(...)) |shell|` 是拿到它背后东西的唯一方式，而 `else` 分支就是 `UNKNOWN` 所在的地方。
+
+第二个是校验和循环。它走 `1..=n` 并读取 `table[i]`，而下标 `n` 已经越过末尾一位：
+`panic: index out of bounds: index 2, len 2`。修好这个循环。然后理解这次 panic 替你买到
+了什么：这道题的 C++ 版本不加检查地读取 `table[n]`，拿到那个地址上碰巧有的东西 —— 堆上
+的下一个对象，或者什么都没有 —— 然后输出一个错得没人能重现的校验和。Zig 在 Debug 下检查
+每个下标和每个 `.?`，而在 `-O ReleaseFast` 下两者都不检查：同样两行在那里就成了未定义
+行为，和 C++ 一模一样。这就是这片领地的交易：你在构建时检查是开着的，而等它关掉的时候，
+你的责任是让它一次都没被需要过。
+'''
+hints = [
+  "绑定查找结果并检验它：if (lookup(table, name)) |shell| { ... } else { UNKNOWN }。这个可选值既是答案也是提问。",
+  "合法下标从 0 到 len - 1。从 1 开始、一直走到 len 的循环两头都差一，只有上头那一端会 panic。对切片做 for 就没有下标可以写错。",
+  "两次 panic 都是 Debug 模式的检查。用 -O ReleaseFast 构建起始代码，两行都不会停：校验和读过了末尾，null 被一路跟到零地址。检查是你付钱买的东西，修复是你用来付的钱。",
+  "panic 在 stderr 上输出消息和调用栈，以 134 退出；评测读的是 stdout，所以 panic 之前输出的一切都还在，而且还是错的。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.advanced.18.threads"
+title = "两条车道，一个计数器"
+story = "07:00，天桥开放第二条车道，隧道口的车龙终于散了。广场上别的什么都没变。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 `std.Thread`，计算它的平方并写进 `out[i]` —— 它自己的槽位，所以没有两个线程
+会碰同一个元素。join 所有线程，然后每行输出一个结果，最后输出 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+`std.Thread.spawn(.{}, worker, .{ args })` 在一个新的操作系统线程上用这些参数启动 `worker`，
+返回句柄或者一个错误；参数会被复制进线程，所以传进去的切片是 `main` 内存上的一个视图，而传进去
+的下标是那个线程自己的。这里没有闭包会按引用捕获错的东西：线程能看到的一切都在那个元组里，
+你读得到。
+
+线程按调度器喜欢的任意顺序结束。按下标写入、在 join 之后再输出，才让每次运行的输出都一样。
+一个自己去输出的线程做不到这一点。
+'''
+hints = [
+  "std.Thread.spawn(.{}, square, .{ nums, out, i }) 立刻启动线程并返回它的句柄；把句柄存在一个 std.Thread 的切片里，这样才能 join 它们。",
+  "for (threads, 0..) |*t, i| 带着下标遍历句柄槽位；t.* = try std.Thread.spawn(...) 把每一个填上。",
+  "在读 out 之前 join 每一个线程。join() 会阻塞直到那个线程结束，之后它写的东西就可见了。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.advanced.19.join"
+title = "不签退，谁也不许走"
+story = "一个车道线程做完了它的班，工头没拿它的句柄就走出了收费亭，整个广场的电就断了。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行文本。
+
+每行启动一个线程，把它转成大写写进自己的槽位。join 所有线程，按顺序输出这些行，然后输出 `DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+初始代码编译不过，而这个错误就是这一课。`std.Thread.spawn` 返回 `!std.Thread` —— 句柄，或者
+一个错误 —— 而初始代码把它当作一条裸语句丢在了地上：*error union is ignored*。Zig 拒绝让一个
+可能是错误的值不经检查就过去，这是在帮你：句柄是 `join` 的**唯一**途径，而一个没人 join 的线程，
+在 `main` 返回时还在跑 —— 进程在它脚下结束了，那些行转了一半大写，或者根本没转，全看调度器。
+C++ 在一个仍然 joinable 的 `std::thread` 被销毁时中止；Zig 让你把句柄握在手里，然后问你打算拿它
+做什么。
+
+所以每一个句柄都要留着，每一个线程都要在读取它的工作之前 join（或者 `detach`，而那几乎从来不是
+你想要的）。形状和分配器一样：`alloc` 一个 `std.Thread` 的切片，填满它，join 它，`free` 它 ——
+join 循环站在 C++ 析构函数原来站的位置。
+'''
+hints = [
+  "编译器要你看一眼 spawn 的返回值。t.* = try std.Thread.spawn(...) 留住句柄并把任何错误往上交，这是对两半都诚实的处理。",
+  "把句柄存在一个大小为 n 的 std.Thread 切片里；在输出任何东西之前 for (threads) |t| t.join();。",
+  "先把它们全部 spawn，再把它们全部 join。在 spawn 循环里 join 在这里也能通过 —— 但线程就一个接一个地跑了，那不是线程的用途。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.advanced.20.mutex"
+title = "一个硬币盘，八个收费亭"
+story = "每个收费亭都把收到的钱加到广场墙上的同一个总数里，而到了整点，墙上的数和它们每一个都对不上。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个线程，把它加到**同一个共享总数**上。join 所有线程，然后输出 `TOTAL <sum>` 和
+`THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+初始代码能编译，输出 `TOTAL 0`。worker **按值**接收 `total` —— 一个被复制进线程参数元组的 `i64` ——
+加到它自己的副本上，然后扔掉。传一个指针 `*i64`，你就有了另一个 bug，一个在这么小的测试里不会
+露面的 bug：多个线程同时执行 `total.* += value` 是**数据竞争**。Zig 的 Debug 检查抓不到它；在这里
+竞争和在 C++ 里一样是未定义行为，而不只是一个错的数字。
+
+在总数旁边放一个 `std.Io.Mutex`，每个碰它的线程都先加锁，这就是答案：`m.lockUncancelable(io)`
+拿到锁，`defer m.unlock(io)` 在块结束时把它还回去，不管中间发生了什么。worker 接收一个
+`io: std.Io` 参数，因为互斥锁需要它 —— 在 0.16 里锁是 I/O 运行时的一部分，而不是线程库的，
+`std.Thread.Mutex` 已经不存在了。这个 `defer` 就是 C++ 的 `lock_guard`，写在解锁将要发生的地方。
+'''
+hints = [
+  "传 &total，而不是 total：worker 的参数变成 total: *i64，加法变成 total.* += value。线程应该改的是 main 的 total，而不是它自己的。",
+  "在 main 里 var total_mutex: std.Io.Mutex = .init;，元组里放 &total_mutex，在 worker 里加法之前 m.lockUncancelable(io); defer m.unlock(io);。",
+  "在所有 join 之后读 total 不加锁也安全：join() 是一个同步点，而且已经没有线程会再写了。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.advanced.21.counter"
+title = "自己上锁的计数器"
+story = "3 号收费亭的车轴计数器记着两个必须彼此一致的数字，而有两个人在同时读它们。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+完成 `Counter`：`add` 加锁，加到总数上并把命中次数加一；`snapshot` 加锁并把两者一起返回。每个值
+启动一个线程，join 它们，然后输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+互斥锁住在结构体**里面**，挨着它守护的字段，每一个碰这些字段的函数都要拿它。这就是形状：锁是
+对象的一部分，而不是寄希望于调用者记得的东西。
+
+初始代码编译不过，原因值得花一分钟。`snapshot` 接收 `self: Counter` —— 按值，只读的方法通常
+就是这么写的 —— 而给互斥锁加锁会*改变这个互斥锁*，所以 `self.mutex.lockUncancelable(io)` 要的是
+`*std.Io.Mutex`，而一个按值的 `self` 能给出的只有 `*const`。更糟的是，按值的 `self` 是计数器的一个
+**副本**：就算它编译过了，它锁的也是锁的副本，什么也锁不住。修法是 `self: *Counter`。这里没有
+`mutable` 关键字可用，因为本来就没有要绕过的 `const` 方法：一个必须拿锁的方法在签名里就这么说，
+而签名就是全部的承诺。
+'''
+hints = [
+  "一个字符就能修好编译错误：fn snapshot(self: *Counter, io: std.Io) Snapshot。counter.snapshot(io) 读起来还是一样；Zig 会替你取地址。",
+  "按值的 self 本来会是整个 Counter 的副本，连互斥锁一起。给副本加锁什么也保护不了，所以编译器的拒绝是正确的答案，而不是麻烦。",
+  "Counter.add 是一个第一个参数为 *Counter 的普通函数，所以 std.Thread.spawn(.{}, Counter.add, .{ &counter, io, value }) 就是线程调用方法的方式。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.advanced.22.lock-order"
+title = "两把锁，一个顺序"
+story = "雨棚下两个硬币盘，两把锁，两个收费亭，两闸杆杆在同一秒停住了。"
+brief = '''
+两个硬币盘 `A` 和 `B`，各是一个 `i64`，各有自己的 `std.Io.Mutex`。
+
+标准输入第一行是起始余量，第二行是数量 `n`，然后是 `n` 行 `<FROM> <TO> <AMOUNT>`，
+`FROM`/`TO` 属于 `{A, B}`。
+
+每笔转移在它自己的线程上执行，join 所有线程，然后输出 `A <level>`、`B <level>`、`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+初始代码有两处错，只有一处会在输出里显出来。它从来源扣了钱，却从不给目的地加上 —— 这是看得见
+的 bug。另一处是形状：*先锁来源*意味着两笔方向相反的转移可以各自握着一把锁、等着另一把，永远
+等下去。这就是死锁，它不会在测试里出现；它出现在某个星期二的 07:59。
+
+Zig 没有一次拿多个互斥锁的 `scoped_lock`；最接近的是它所实现的那条规则，由你手工遵守。按**一个
+全局顺序**拿两把锁 —— 先 `A` 的互斥锁再 `B` 的，在每一个线程里都是如此，不管硬币往哪边走 ——
+环就形成不了。两个 `lockUncancelable`，两个 `defer unlock`，而 defer 按相反顺序释放，这也正是
+`scoped_lock` 会用的顺序。
+'''
+hints = [
+  "在碰任何一个余量之前把两个盘都锁上：先 a 的互斥锁，再 b 的，在每个线程里都按这个顺序，每个后面跟着它的 defer unlock。",
+  "硬币的方向决定哪个余量减，而不是决定先拿哪把锁。",
+  "两个 defer 按相反顺序释放：b 的锁先还，然后是 a 的。这是 C++ scoped_lock 会用的顺序，规则也一样 —— 每个线程都认同这个顺序。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.advanced.23.queue"
+title = "递件口"
+story = "一个收费亭把硬币从递件口送进点钞室，一个文员把它们取出来，而这个文员从 06:40 起就一直守着一个空的递件口。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+一个生产者把每个值推进一个 `std.Io.Queue(i64)`；一个消费者一次取出一个，输出它的两倍。生产者推完
+所有值后，`main` **关闭**队列，而消费者在队列被取空且已关闭时停下。await 两者，然后输出
+`CONSUMED <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+C++ 用一个 `std::queue`、一个互斥锁、一个条件变量和一个 `done` 标志搭出这个东西；Zig 0.16 把整套
+做成了一个类型。`std.Io.Queue(T)` 是建在你自己拥有的缓冲区上的有界通道：`putOneUncancelable(io, v)`
+在满时阻塞，`getOneUncancelable(io)` 在空时阻塞，而在 `close(io)` 之后，对一个已取空的队列 `get`
+会返回 `error.Closed` —— 这就是消费者停下的信号，循环是 `while
+(q.getOneUncancelable(io)) |v| { ... } else |_| {}`。队列是先进先出的，所以不管调度器怎么做，顺序
+都是输入的顺序。
+
+`io.concurrent(func, .{ args })` 在运行时自己的池上启动 `func` —— 它保证拥有自己的并发单元，否则
+调用失败 —— 并交回一个 future；对它调用 `.await(io)` 就是 join。初始代码会挂住。生产者推完所有值
+就返回了，没人关闭队列，消费者为最后一个值醒来，取空队列，然后等着一个永远不会来的下一个。每一对
+生产者/消费者都需要一种方式来说*不会再有了* —— 这就是 `close`。
+'''
+hints = [
+  "在 feeding.await(io) 之后加一行：hatch.close(io)。然后 taking.await(io) 就会返回，程序结束。",
+  "close 不会扔掉队列里还剩的东西；消费者会一直拿到值直到队列空了，然后才看到 error.Closed。",
+  "消费者运行时它是唯一在输出的，而 main 只在 taking.await(io) 之后才输出 CONSUMED —— 正是这个先后顺序让 writer 不加锁也安全。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.advanced.24.atomic"
+title = "一个字，不用锁"
+story = "车轴计数不需要锁。点钞室里别的东西都需要，而分清它们就是这份工作。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个线程。每个线程把它的值加到一个共享的 `std.atomic.Value(i64)` 上，并把另一个共享的
+`std.atomic.Value(i64)` 加一 —— 哪里都没有互斥锁。join 所有线程，输出 `TOTAL <sum>` 和 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+初始代码编译不过：worker **按值**接收这两个原子量，而 `fetchAdd` 需要一个
+`*std.atomic.Value(i64)` —— 按值的参数能给的只有 `*const`。这是有意的。原子量是若干线程约定一次
+一条指令地更新的一个位置；它的副本会是另一个位置，共享也就没了。传地址。
+
+原子量不是更便宜的互斥锁；它是另一种工具，用于在一条指令里完成读-改-写的一个机器字。
+`fetchAdd(v, .monotonic)` 就是那条指令。一旦两个字段必须彼此一致，锁就回来了 —— 没有针对「这两样
+东西，一起」的原子操作，这就是为什么前几个任务的 `Counter` 有互斥锁，而这一个没有。
+
+这里用 `.monotonic` 就够了，因为没有任何东西依赖这些自增*何时*相对于其他写入变得可见，只要求一个
+都不丢。这句话就是面试官的追问。
+'''
+hints = [
+  "错误信息说它要 *atomic.Value(i64)，而手上只有一个 *const 的。把两个参数都改成指针，并在元组里传 &total 和 &hits。",
+  "fetchAdd 返回之前的值并原子地完成加法；_ = 丢掉返回值，没有锁也没有 defer。",
+  "total.raw += value 能编译，而它就是那个竞争；fetchAdd 是那条不竞争的指令。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.advanced.25.parallel-sum"
+title = "把广场分开"
+story = "一万二千个车轴读数，四个收费亭。主管要每个亭的份额和总数，而且总数每次运行都必须一样。"
+brief = '''
+第一行是 `k n`：`k` 个线程和 `n` 个值。第二行是这 `n` 个值。
+
+把这些值分成 `k` 个连续的块 —— 块 `i` 覆盖的下标从 `i * n / k` 起，直到 `(i + 1) * n / k` 但不包括
+它，用整数运算 —— 让线程 `i` 把它的块加起来写进 `partial[i]`。join 所有线程，然后按顺序为每个块
+输出 `CHUNK <i> <sum>`，再输出 `TOTAL <部分和之和>`。
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+这是真正会因为线程而变快的形状，也是这张地图上唯一的一个：每个线程读自己的子切片、写自己的槽位，
+所以没有锁，没有原子量，除了输入之外什么都不共享。把子切片本身交给线程 —— `nums[begin..end]`
+是一个视图，而读者就该拿到视图 —— 再加一个指向它那一个槽位的指针。块边界的公式让划分恰好精确 ——
+最后一块总是结束于 `n`，而当 `k > n` 时某个块可能是空的，有一个隐藏用例正是这样安排的；空切片
+的和是 `0`，不需要特殊处理。
+'''
+hints = [
+  "在 main 里算出 begin 和 end 并在那里切片：nums[begin..end] 是线程拿到的视图，&partial[i] 是它唯一可以写的槽位。",
+  "线程里用一个局部 sum，最后对 slot.* 写一次，这样每个线程对共享切片恰好只碰一次。",
+  "k > n 会让某些块为空 —— begin == end —— 而 nums[begin..end] 是一个空切片，它的 for 循环根本不会执行。没有特殊情况。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.advanced.26.futures"
+title = "答应我那个数"
+story = "主管派跑腿的去取每一个数字，自己不站在递件口干等；数字什么时候回来就什么时候回来。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+每个值启动一个 `io.concurrent` 任务，返回这个值的平方。把 future 收集在一个列表里，**按顺序**
+`await` 它们，逐个输出。然后把一个只有一个槽位的 `std.Io.Queue(i64)` 交给另一个线程，由它把 `n`
+放进去，再根据取出来的东西输出 `READY <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+future 是一个还没到的值。`io.concurrent(square, .{ v })` 在运行时的池上启动 `square`，给你一个
+代表它返回值的 `std.Io.Future(i64)`；`.await(io)` 阻塞到值出现为止，然后交给你，只交一次。按顺序
+await 这些 future，输出才有顺序 —— 任务本身什么时候结束就什么时候结束。
+
+Zig 没有 `std::promise`；最接近的是同一根管道的另一端，而 0.16 已经有这根管道了。一个建在**只有一个
+元素**的缓冲区上的 `std.Io.Queue(i64)` 就是一个承诺：一边把值放进去，另一边把它取出来，取的一方
+阻塞到它出现为止。这是一个线程不用互斥锁、不用标志、也不用包装返回值就能报告一个结果的方式 ——
+它和三个任务之前的递件口是同一个类型，只是缓冲区大小为一。
+
+`io.concurrent` 承诺任务在自己的并发单元上运行 —— 如果运行时给不出线程，它就以
+`error.ConcurrencyUnavailable` 失败 —— 而 `io.async` 给的承诺更弱：在一个没有第二个线程可给的
+运行时上，函数*可能*就在原地、在 `async` 返回之前被调用。你要的是 `concurrent` 时，就明说出来。
+'''
+hints = [
+  "try io.concurrent(square, .{v}) 返回一个 std.Io.Future(i64)；边走边把它追加到列表里，而且永远不要复制 future —— 通过指针 await 它，for (squares.items) |*f|。",
+  "每个 future 的 f.await(io) 只能调用一次，并阻塞到值出现为止；按顺序遍历列表，输出就是有序的。",
+  "报告线程拿到 &ready 和 n；main 里的 ready.getOneUncancelable(io) 会阻塞到 put 发生为止。在 main 返回之前 join 这个线程。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.advanced.27.optional-pointer"
+title = "编译器说得出的大小"
+story = "2 号收费亭票钉上那串收费收据：每张收据压着下一张，一直到这个班的第一张，而没有人会把同一张收据拿两次。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个以分为单位的金额。
+
+把它们按到达顺序放在一条链里，每个金额一个节点：
+
+```
+const Entry = struct {
+    cents: i64,
+    next: ?*Entry,
+};
+```
+
+输出三行：
+
+1. 按顺序排列、以空格分隔的金额，如果一个都没有就输出 `-`
+2. `SUM <total>`，由一个在链上**递归**的函数算出
+3. `LAST <cents>` —— 最后一个节点上的金额 —— 或者 `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+初始代码编译不过，而这个错误正是指针存在的理由。写 `next: Entry`，编译器就得把 `Entry` 在内存里
+排布出来：`cents` 的八个字节，加上一个 `Entry` 的大小 —— 而那正是它想要算出来的东西。
+*struct 'Entry' depends on itself.*
+
+`?*Entry` 是一个指针，而指针的大小编译器早就知道。Zig 没有 `unique_ptr`；最接近的是它所强制的那条
+规则，由你手工遵守：**分配器是拥有者。**`gpa.create(Entry)` 给你一个节点，`gpa.destroy(node)`
+把它还回去，恰好一次，而*谁*来销毁它，由约定来回答 —— 链拥有它的节点，所以 `main` 在返回之前
+沿着链把它释放掉。`?` 是编译器确实会检查的那部分：`null` 既是链的末尾也是空链，而任何东西都不能
+不解包就透过 `?*Entry` 去读，所以哪里都不需要单独的空情况。
+'''
+hints = [
+  "一行就能修好编译错误：next: ?*Entry —— 现在这个结构体是十六个字节，不管它指向什么。",
+  "从后往前建：node = try gpa.create(Entry); node.* = .{ .cents = v, .next = head }; head = node。旧的 head 变成新节点的尾巴。",
+  "用 while (walk) |node| : (walk = node.next) 遍历；可选值每一步解包一次，循环在 null 处结束。递归求和两行就够：null 是 0，否则是 cents 加上其余部分的和。",
+  "在声明 head 之后紧接着 defer freeChain(gpa, head)：defer 在运行时才读 head，也就是 main 结束、链已经完整的时候。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.advanced.28.refcount"
+title = "还有谁拿着它"
+story = "两个仪表通过同一本账读同一个硬币盘，而这本账必须留到最后一个仪表离开为止，多一秒都不行。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+把这些值放进一个由 `Ledger` 拥有的切片里，这个 `Ledger` **数着它的持有者**：`share()` 交出一个
+句柄并把计数加一，`release(gpa)` 把计数减一，并在计数归零时释放切片。拿两个句柄，再留一个不计数
+的观察者。输出四行：
+
+1. `REF <sum>` —— 通过第二个句柄读出的和
+2. `SHARED <k>` —— 两个句柄都活着时的计数
+3. `ALIVE yes` —— 两个句柄活着时的 `watch.alive()`
+4. `ALIVE no` —— 两个句柄都被释放之后
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+Zig 没有 `shared_ptr`；最接近的是 `shared_ptr` 底下的东西，写在你看得见的地方。上一个任务是一个
+拥有者。这一个是拥有者的计数，放在对象旁边，计数归零时对象被释放 —— 由碰巧最后离开的那个句柄
+释放。`share()` 加计数；`release()` 减计数。没有任何东西替你做这两件事：右大括号处不会运行析构
+函数，所以每一个 `share()` 都要配一个你亲手写的 `release()`，否则切片就泄漏了，而 `-O Debug` 的
+分配器会在 `main` 返回时在 stderr 上说出来。
+
+观察者就是 `Ledger` 本身，只看不计数。它能看到切片还在不在 —— `items` 是 `?[]i64`，最后一次
+释放之后的 `null` 就是这个类型为「没了」给出的**零值** —— 而它不能让切片继续活着。这就是打破
+循环的东西，也是这条路上最后一张地图要讲的。
+'''
+hints = [
+  "share() 两行：self.refs += 1; return self。调用两次得到 SHARED 2，而 mirror.items.? 拿到的是同一个切片。",
+  "release() 把计数减一，并且只有在它归零时才释放切片并把 items 设为 null —— alive() 读的就是那个 null。",
+  "把两个句柄都释放；只释放第一个什么也不会释放，第二个才会。把原因说出来：这才是这个任务真正在问的问题。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.advanced.29.take"
+title = "带走它"
+story = "主管把每张单据交给骑手之前都要先影印一份，而复印机是广场上最慢的东西。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 行文本。
+
+每行建一个 `Docket`，放在列表 `pile` 里，然后把每张单据交给第二个列表 `sent`，从 `sent` 输出每张
+单据转成大写的文本，然后输出 `SENT <n>`、`COPIES <c>`、`MOVES <m>`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` 拥有它的文本 —— 一个它自己分配的 `[]u8` —— 并记录发生在它身上的事：`copy(gpa)` 复制
+字节并把一个全局计数加一，`take()` 加另一个。初始代码报告 `COPIES 2`：
+`sent.append(gpa, try d.copy(gpa))` 把每张单据连同字节全部复制了一遍。
+
+Zig 没有移动语义，也没有移动构造函数；最接近的是一种纪律，而这个任务把它写出来。给结构体赋值
+复制的是它的头部 —— 对 `Docket` 来说，就是文本的指针和长度 —— 所以 `sent.append
+(gpa, d)` 会留下**两张**单据，都以为自己拥有同样的字节，而第二次 `free` 它们就是崩溃。`take()`
+是诚实的交接：它返回一张持有文本的单据，并给来源留下一个**空切片**，所以来源仍然可以被释放 ——
+释放的是空 —— 并且永远不会被当成还持有文本来读。这就是 C++ 所说的*有效但未指定*的被移动后状态，
+写成了一个由你选定的值。
+'''
+hints = [
+  "只改一个调用：sent.append(gpa, d.take())。take 需要 *Docket，这就是为什么循环已经用 |*d| 遍历 pile。",
+  "pile 的 deinit 循环仍然会跑遍每一张单据；take 之后每张都持有一个空切片，而 deinit 对空切片会跳过 free。没有任何东西被释放两次。",
+  "sent.append(gpa, d.*) 能编译，并输出 COPIES 0 MOVES 0 —— 然后在 main 结束时两个列表会释放同样的字节。这些计数器的存在，就是为了让诚实的交接和双重释放看起来不一样。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.advanced.30.generic-ring"
+title = "装什么货都行的环"
+story = "车轴仪表留着最近几个读数，主管留着最近几个车牌号，而 Alex 把同一个环形缓冲区写了两遍。"
+brief = '''
+第一行是容量 `cap`。第二行是一串整数；第三行是一串单词。
+
+写**一个** `Ring(comptime T: type) type`：一个固定容量的缓冲区，保留最近推入的 `cap` 个元素，
+覆盖最旧的，并且可以按到达顺序遍历。把整数推进一个 `Ring(i64)`，把单词推进一个
+`Ring([]const u8)`，每个环的内容输出一行，然后输出 `DROPPED <k>` —— 总共有多少个元素被挤出去。
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+初始代码编译不过：`Ring` 是为 `i64` 写的，单词无处可放。Zig 里的泛型类型是一个**返回结构体的
+函数**，和这条路前面的 `Pair(T)` 一模一样：`fn Ring(comptime T:
+type) type { return struct { ... }; }`，槽位用 `[]T`，`push` 用 `T`。整个东西在不知道 `T` 是什么
+的情况下写成 —— 只知道它能被复制 —— 而 `Ring(i64)` 和 `Ring([]const u8)` 是从同一个定义里压出来
+的两个不同类型。
+
+再给它一个迭代器。环不是按到达顺序存储的 —— 最旧的元素在写头即将覆盖的地方 —— 所以 `next()`
+得自己算，而这正是值得亲手写、而不是读别人写的部分。输出需要对 `T` 做一个 `comptime` 分支，
+因为单词是 `{s}`，数字是 `{d}`。
+'''
+hints = [
+  "在结构体外面包上 fn Ring(comptime T: type) type { return struct { ... }; }，槽位用 []T，push 用 T，并用 const Self = @This() 在内部称呼这个结构体。然后在两处使用的地方写 Ring(i64).init 和 Ring([]const u8).init。",
+  "最旧的元素在 (head + cap - count) % cap；按到达顺序的第 k 个元素是 (oldest + k) % cap。迭代器只需要带着 k 和一个指向环的指针。",
+  "fn printRing(w, comptime T: type, ring: *const Ring(T)) 遍历迭代器；if (comptime T == []const u8) 选 {s} 而不是 {d}，另一个分支对那个 T 根本不会被分析。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "zig.advanced.31.invalidation"
+title = "边走边删"
+story = "主管一边往下读路边停车处的名单，一边划掉货车，而每划掉一辆，就漏掉下一辆。"
+brief = '''
+第一行是 `n t`。第二行是 `n` 个整数。
+
+**原地**从列表里删掉每一个小于 `t` 的值，在一行里输出剩下的（如果什么都不剩就输出 `-`），然后
+输出 `REMOVED <k>`。
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+初始代码是人人都会写一次的那个 bug：它按下标遍历，调用 `orderedRemove(i)`，然后执行 `i += 1` ——
+而滑进槽位 `i` 的那个元素从来没被看过。两个相邻的小值，第二个就活了下来。这个 bug 至少是有定义的。
+它的切片孪生兄弟就不是了：`for
+(list.items) |v|` 只取**一次**切片，指针和长度，而循环里的 `orderedRemove` 在它脚下把列表缩短了。
+循环继续按旧的长度走，读到新末尾之后的槽位 —— 列表仍然拥有、却已不再代表任何东西的内存 ——
+而没有任何 Debug 检查会触发，因为那些字节在分配的范围之内。它通常看起来像是成功了，这更糟。
+
+`orderedRemove(i)` 把 `i` 之后的一切往下挪一位，并交回它删掉的东西。所以：命中时，删掉并且**不要**
+前进；没命中时，`i += 1`；绝不两者都做。自增写在分支里面的 `while` 循环就是这个形状，在链表和
+哈希表上也是同一个形状。
+'''
+hints = [
+  "去掉 while 上的 : (i += 1)。只在没有删除的那个分支里用 i += 1 前进；在另一个分支里，orderedRemove 已经把下一个元素挪进了槽位 i。",
+  "moorings.items.len 在每次循环判断时都会重新读取，这就是 while 正确的原因：对切片的 for 会在一开始就把长度冻结。",
+  "从末尾往回走是另一个正确答案 —— 在 i 处删除永远不会扰动它下面的槽位 —— 当他们问没有分支的版本时，就给这个。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "zig.advanced.32.overflow"
+title = "停下来的计数器"
+story = "广场的升数计数器是一个 i32，到了 2147483647 升，闸杆落下，收费亭屏幕上显示 panic: integer overflow。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数，每个都放得进一个 `i64`。它们的累计总和也放得进
+`i64`。
+
+输出两行：如果沿途每一个累计总和都放得进 `i32`，输出 `INT32 OK`，否则输出 `INT32 OVERFLOW <i>`，
+其中是那个本会把它推出范围的第一个值的 0 基下标；然后输出 `INT64 <total>`。
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+初始代码把总数存在一个 `i32` 里，在第二个值上 panic：`panic: integer overflow`。这正是 Zig 在履行
+这片领地的承诺 —— 在 `-O Debug` 下，溢出的整数会说出来并停下，而宽的那个用例还要早一行停下，在
+那个本会截断 `5000000000` 的 `@intCast` 处。把这个 panic 当成礼物，然后读完合同的其余部分：`+%`
+回绕，`+|` 饱和，而普通的 `+` 在 Debug 下 panic，在 **`-O ReleaseFast` 下是未定义行为**，那里检查
+是关掉的，优化器假定它永远不会发生 —— 所以在 `v` 为正时，`total + v < total` 在那里*永远为假*，
+这个测试会被删掉，和 gcc、clang 对 C++ 删掉它一模一样。
+
+所以你永远不要通过制造溢出来检测溢出。你要在窄类型的加法*之前*检测它，用一个更宽的类型，或者
+与极限值比较 —— `std.math.minInt(i32)` 和 `std.math.maxInt(i32)` —— 这样这个程序的期望输出就不
+依赖于任何构建模式下未定义的东西。
+'''
+hints = [
+  "把总数存在 i64 里，每次加法之后和 std.math.minInt(i32) 及 maxInt(i32) 比较。从头到尾不发生任何 i32 运算，所以什么都不会 panic，也没有什么是未定义的。",
+  "只记下第一个离开范围的下标 —— 一个只设置一次的 ?usize —— 因为后面的值可能把总数带回范围内，而问题问的是它第一次离开的地方。",
+  "如果你一定要把两个 i32 相加并想知道是否安全：@addWithOverflow(a, b) 返回回绕后的和以及一个进位位，在每种构建模式下都有定义。这才是检查；普通加法结果的符号，正是优化器会删掉的东西。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "zig.advanced.33.stop-flag"
+title = "叫停就停"
+story = "夜间车道一直开着，直到有人叫它停下，而在这个班之前，没有人能叫得停它。"
+brief = '''
+标准输入是一个数量 `n`，然后是 `n` 个整数。
+
+启动两个线程。第一个把这些值加起来并存下结果。第二个接收一个**停止标志**，一个
+`*std.atomic.Value(bool)`，一直循环直到读到 `true`；读到时，它运行一个 `onStop` 函数来设置第二个
+标志，然后记下它已经停了。在 `main` 里设置停止标志，join 两个线程，然后输出：
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std.Thread` 没有 `stop_token`，也没有 `jthread`；最接近的是构成它们的那些东西，由你手工传递。
+停止请求是一个 `bool`，请求方写、工作线程读，而因为有两个线程碰它，它是一个原子量：一边是
+`stop.store(true, .release)`，另一边在工作线程的循环里是 `stop.load(.acquire)`。一个检查自己标志的
+线程是你随时都能关掉的线程；不检查的，就是初始代码里的夜间车道，它的 `join` 永远不会返回。
+
+C++ 的 `stop_callback` 在请求停止的那一刻、在发出请求的线程上运行；这里是工作线程看到标志时自己
+运行 `onStop`，这是同一个承诺 —— *因为有人要求停止，所以某件事发生了* —— 从另一边来履行。`store`
+之后的 `join` 就是 `jthread` 的析构函数，写了出来：先请求，再等待。循环里的 `std.Thread.yield()`
+把核心让给任何想用它的人；光秃秃地空转也能通过，也会浪费一个核心。
+'''
+hints = [
+  "车道线程按指针接收三个标志；它的循环是 while (!stop.load(.acquire)) std.Thread.yield() catch {};，循环之后调用 onStop 并存下 stopped。",
+  "在设置标志之前 spawn 车道线程，之后 join 它。在线程启动之前就设好的标志没问题 —— 它在第一次检查时就停下 —— 但没有 store 的 join 永远不会返回。",
+  "store 上的 .release 和 load 上的 .acquire 是一对，它让 store 之前发生的事在 load 之后可见；.monotonic 在这里也能通过，而面试官会问为什么。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "zig.advanced.34.unreachable"
+title = "不可达"
+story = "07:59，坚拿道天桥。车道模型把一个分支标成不可达，早高峰的车流到达了它，所有车道同时关闭 —— 而一个车道线程还在读一个广场早已交还的缓冲区。"
+brief = '''
+第一行是 `w n`：`w` 条车道和 `n` 个读数。第二行是这些读数。
+
+`pump(gpa, w, ledger)` 在一个带引用计数的 `Ledger`（三个任务之前的那个）所持有的读数上启动 `w` 个
+线程；线程 `i` 把从 `i * n / w` 到 `(i + 1) * n / w` 的读数加起来写进 `partial[i]`，然后 `pump`
+返回这些部分和。`main` 为每一个输出 `PUMP <i> <sum>`，再输出 `TOTAL <sum>`，然后如果在一切完成时
+读数已经被释放，就输出 `FREED yes` —— 通过账本的 `alive()` 观察到。
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+初始代码失败了两次，而这两次失败正是这片领地的两半。
+
+第一次是车道模型。`pump` 算出每条车道的边界，然后说 `if (begin == end) unreachable;` ——
+*没有车流的车道不可能发生*。三条车道分两个读数，它就发生了。`unreachable` 不是注释，也不是断言：
+它是 Zig 里唯一一行意思是**假定**的代码。在 `-O Debug` 下到达它就是
+`panic: reached unreachable code`，广场停下，原因显示在屏幕上。在 `-O ReleaseFast` 下编译器*相信*
+你 —— 这个分支被删掉，所有只可能通向它的东西也一起被删掉 —— 而到达它的程序是未定义的，和一个
+透过悬空指针去读的 C++ 程序是未定义的完全一样。panic 是同一份合同的诚实版本。删掉这个断言，处理
+这种情况：空车道的和是 `0`。
+
+第二次是所有权。初始代码的 `pump` 在启动车道之前就**释放**了账本 —— *工作线程已经有了它们的切片，
+句柄用不着了* —— 而这次释放是最后一次，所以读数被释放了，而工作线程照样去读。在 Debug 下，分配器
+会把它收回的内存每个字节都涂成 `0xAA`，所以每个读数回来都是 `-6148914691236517206`，而第一条把
+其中两个相加的车道就用 `panic: integer overflow` 让广场停下 —— 这就是可见用例显示出来的失败，那里
+每条车道都有车流，`unreachable` 从未被到达：一个对输入中任何读数都不可能溢出的和，以及一条指向
+并非错误所在那一行的调用栈。在 ReleaseFast 下没有涂色也没有检查：
+车道读到的是下一次分配放在那里的任何东西，或者是一页已经被内核收走的内存。这就是悬空读取，而它是
+最昂贵的那种 bug，因为它不在出错的地方失败。
+
+修的是所有权，而不是症状。每条车道在启动之前**拿一份**账本的份额，做完时释放，所以读数恰好活到
+最后一个持有它们的线程为止 —— 不管车道按什么顺序结束。`pump` 在返回之前 join，并最后释放 `main`
+交给它的那个句柄。回到 `main`，`alive()` 是 `false`：读数被释放了，只释放了一次，由最后一次释放 ——
+`pump` 自己的那次，在 join 之后 —— 而且已经没有人还在读。计数是原子的，因为各车道的释放彼此竞争；
+账本本身不是线程安全的，也不需要是，因为没有人写读数。
+
+这就是整片领地，浓缩在一个程序里。每次你错了，检查都会拦住你，而让你正确的工具 —— 说出谁在拿着
+它的计数，会等待的 join，负责释放的 `defer` —— 就是你在基础路上遇到的那些。
+'''
+hints = [
+  "删掉 unreachable，让空车道照常运行：begin == end 是一个空切片，它的和是零。一个你证明不了的断言，就不该作出。",
+  "给每条车道一份份额：用 ledger.share() 来 spawn 它，并让它 defer ledger.release(gpa)。车道的份额就是让读数活着的东西；它在车道的函数返回时被释放，而不是在 pump 返回时。",
+  "pump 自己的释放挪到 pump 顶部的一个 defer 里，这样它在 join 之后运行 —— 在读数被读完之后 —— 而它释放的正是 main 交出去的那个句柄。",
+  "partial 按槽位交给各车道，这是对的：pump 拥有它，pump 在返回它之前 join，而且每条车道只写自己的槽位。如果 main 留了一份份额，FREED 就会是 no —— 读数活着是因为 main 还拿着它们，而能解释这一点，是这个 boss 接受的另一个答案。",
+]

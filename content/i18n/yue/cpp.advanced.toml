@@ -1,0 +1,1277 @@
+# C++ LAND — ADVANCED, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/cpp/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "cpp.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.advanced.01.getline"
+title = "舢舨記錄簿"
+story = "避風塘嘅港務長每隻舢舨記一行：個船名，跟住係佢卸咗嘅嘢，有幾多個數就幾多個數。"
+brief = '''
+第一行係個數量 `n`。之後嘅 `n` 行每行係一個船名，跟住零個或者多個整數，用空格分開。
+
+每隻船印一行，格式係 `<NAME> <how many numbers> <their sum>`，最後印
+`BOATS <n>`。
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+呢度嘅單位係行，唔係 token。`std::cin >> x` 去到空白字元就停，而且唔理換行，
+所以佢話唔到你知一隻船喺邊度完、下一隻喺邊度開始。`std::getline` 畀你成行；
+之後喺嗰行上面開一個 `std::istringstream`，你又可以用返 `>>`，不過只限喺嗰行
+入面。
+
+有一樣嘢人人都會中一次：`std::cin >> n` 之後，第一行尾嗰個換行仲喺個 stream
+度等緊，第一個 `getline` 會將佢當做一行空行讀咗。
+'''
+hints = [
+  "讀完 n 之後用一個 std::getline(std::cin, junk) 掉咗 >> 留低嘅換行。",
+  "std::istringstream fields(line); fields >> name; 然後 while (fields >> value) 行晒其餘嘅 — 冇嘢再 parse 嘅時候個迴圈就完。",
+  "船名係嗰行嘅第一個 token，一行得個名就會係 0 0，唔使特別處理。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.advanced.02.references"
+title = "copy 唔係本尊"
+story = "遊艇會船排嘅絞盤佬每次都將重量寫落張紙嘅副本度，而牆上面嗰張紙永遠冇變過。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+經一個函數 `load` 將每個值推入同一個 `std::vector<long long>`，然後印三行：
+`LOADED <how many>`、由一個淨係讀嘅函數 `total` 計出嚟嘅 `TOTAL <sum>`，同埋
+`FIRST <value>` — 乜都冇嘅時候就印 `FIRST NONE`。
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+個 starter 編譯到，印 `LOADED 0`。`load` 係 **by value** 攞個 vector，所以每次
+呼叫都有自己一個 copy，推落嗰個度，回傳嗰陣就掉咗佢。除非你講明，否則 C++ 都係
+copy。
+
+用 `&` 講明：型別係 `std::vector<long long>&` 嘅參數係呼叫者個 vector 嘅
+reference，唔係佢嘅 copy。`total` 應該攞 `const std::vector<long long>&` — 佢要睇，
+唔使郁，而 `const` 就係喺 signature 入面咁講嘅方法，等編譯器幫你睇住。
+
+`FIRST` 係一個指標：`long long* first` 一係係第一個元素嘅地址，一係係 `nullptr`，
+而 `nullptr` 就係你跟住佢去之前一定要 check 嘅嗰個值。成個 land 就係呢一句。
+'''
+hints = [
+  "一個字元就整好 load：std::vector<long long>& sheet。呼叫嗰度唔使改；reference 會照寫法綁住個參數。",
+  "total 應該攞 const std::vector<long long>& — 個 const 係一個承諾，編譯器會 check。",
+  "&sheet.front() 係第一個元素嘅地址，有元素先有意思；寫 *first 之前先 check nullptr。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.advanced.03.vector"
+title = "船排中間"
+story = "四十隻舢舨喺避風塘泊埋一排。港務長睇到最出同最入嗰隻，中間嘅一隻都睇唔到。"
+brief = '''
+標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格分開。`n` 至少係 `1`。
+
+印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有值嘅總和。少過三個值嘅話，
+嗰個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+`std::vector` 就係個序列。`front()` 同 `back()` 係兩頭；`begin() + 1` 到
+`end() - 1` 係中間，喺嗰個範圍上面行 `std::accumulate` 就係總和 — 只要你交畀佢嘅
+起始值係 `long long`。`std::accumulate(first, last, 0)` 會用 `int` 加，因為 `0`
+係 `int`，而有一個隱藏 case 嘅中間係裝唔落嘅。
+'''
+hints = [
+  "nums.begin() + 1 同 nums.end() - 1 係 iterator，而 <numeric> 同 <algorithm> 就係用一對 iterator 嚟指一個範圍。",
+  "得一個或者兩個值嘅時候，嗰個範圍係空或者倒轉嘅 — 砌佢之前用一個 if 對 nums.size() 守住。",
+  "個 0LL 好重要：accumulate 係由起始值推斷結果型別，而淨係 0 就係 int。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.advanced.04.strings"
+title = "byte 唔係字"
+story = "避風塘嘅告示板將「銅鑼灣」截喺三個 byte，得返一個字。"
+brief = '''
+讀一行。印三行：
+
+1. 佢有幾多個 **byte**
+2. 佢有幾多個 **字元** — UTF-8 code point
+3. 將啲字元倒轉咗嘅嗰行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+嗰行可能有 ASCII 以外嘅字元，噉頭兩個數就唔一樣。`std::string::size()` 係 byte
+數，一向都係。`std::string` 對編碼一無所知；佢係一串 `char`，而一個 `char` 就係
+一個 byte。
+
+UTF-8 唔使解碼都好易數：每個 code point 都係由一個**唔係** `10xxxxxx` 形式嘅 byte
+開頭，而每個延續 byte 都係。所以一個 byte `c` 喺 `(c & 0xC0) != 0x80` 嘅時候
+先係一個字元嘅開頭。倒轉嘅係字元，唔係 byte — 直接對個字串用 `std::reverse` 會將
+`銅` 斬開三舊，再倒轉咁印出嚟。
+'''
+hints = [
+  "用 unsigned char 行啲 byte；普通 char 可能係 signed，噉對 0x7F 以上嘅嘢做位測試就會出錯。",
+  "每個字元收做一個細細嘅 std::string，將佢哋個 vector 倒轉，再駁埋。",
+  "數 (c & 0xC0) != 0x80 嘅 byte，唔使解碼任何嘢就係字元數。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.advanced.05.classes"
+title = "船排帳簿"
+story = "遊艇會船排每次拉船上岸都收錢，啲記錄擺喺同一個地方 — 起碼喺個建議將個 class 換咗做一句註解之前係咁。"
+brief = '''
+第一行係 `<BOAT> <n>`。之後嘅 `n` 行係 `<ITEM> <CENTS>`。
+
+幫隻船砌一個收集啲項目嘅 `Ledger`，然後照到達次序將每個項目以 `<ITEM> <CENTS>`
+印返出嚟，跟住印 `TOTAL <sum>`，再印 `BOAT <name> <count>`。
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` 可以係 `0`，噉輸出就得最後兩行。
+
+`class` 就係一個成員預設 private 嘅 `struct`，除非你寫 `public:`。constructor
+喺個主體有機會行之前就行咗，所以成員係喺 **initialiser list** 度設定 —
+`Ledger(std::string boat) : boat_(std::move(boat)) {}` — 而唔係喺大括號入面賦值。
+`total()` 乜都唔改，所以佢宣告做 `const`，亦只係因為咁先可以喺一個
+`const Ledger&` 上面呼叫佢。
+'''
+hints = [
+  "一個 std::vector<std::pair<std::string, long long>> 已經夠。個 class 喺度係為咗等本帳簿擁有自己啲記錄。",
+  "initialiser list — : boat_(std::move(boat)) — 喺成員構造嗰陣就設定佢；喺大括號入面賦值會先整一個空字串，然後再覆寫。",
+  "用 const reference 回傳啲項目，等 main 唔使 copy 個 vector 都行得晒，同埋每個唔改帳簿嘅 method 都標 const。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.advanced.06.enum-class"
+title = "邊個揸緊舵"
+story = "遊艇會閘口對每張卡都收會員價，包括唔係會員嗰啲，同埋嗰張根本唔係卡嘅。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行 `<TYPE> <HOURS>`。
+
+基本收費係 `500 + 100 * HOURS` 仙。每行印以下其中一樣：
+
+* `MEMBER` — 基本收費
+* `CREW` — 基本收費嘅一半，整數除法
+* `JUNIOR` — 永遠係 `200`
+* 其他 — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+將張卡做成一個有四個值嘅 `enum class Card`，其中一個係 `Other`。`enum class`
+嘅值唔會偷偷轉做 `int`，亦唔會將啲名漏出去外面個 scope — 普通 `enum` 兩樣都會，
+而正正因為咁先應該寫前者。
+
+C++ 嘅 enum 唔可以帶 payload，所以認唔到嘅 tag 要喺隔籬跟住：一個細細嘅
+`struct Tag { Card card; std::string raw; }`。用一個 `switch` 決定收費。每個
+enumerator 都 cover 晒，編譯器就冇嘢好警告；漏咗一個，`-Wall` 會話你知係邊個。
+'''
+hints = [
+  "Card::Other 係第四個 enumerator；佢認唔到嘅字串就住喺隔籬嘅 Tag::raw。",
+  "switch (tag.card)，每個 enumerator 一個 case，喺每個 case 入面直接 return — 每個 arm 都 return 就唔使 break。",
+  "std::to_string 將個數變做 std::string；UNKNOWN 嗰行就係用 + 駁字串。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.advanced.07.maps"
+title = "避風塘嗌緊乜"
+story = "正午嘅避風塘：每隻舢舨都嗌緊啲乜，港務長想要個排名。"
+brief = '''
+讀晒成個標準輸入，按空白字元切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，次數一樣就按字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std::map<std::string, long long>` 按 key 排，`std::unordered_map` 乜都唔按，
+兩個都唔係按次數排 — 所以排名係另一步：將啲 entry 抄入一個裝 pair 嘅
+`std::vector`，再用一個 comparator 做 `std::sort`。對一個唔存在嘅 key 做
+`counts[word]++` 會先用 `0` 插入佢，正正係數數迴圈想要嘅。
+'''
+hints = [
+  "while (std::cin >> word) 會讀晒每個用空白字元分開嘅 token，直到輸入完；counts[word]++ 就係成個數數迴圈。",
+  "一個 vector 可以直接由個 map 嘅 begin() 同 end() 砌出嚟；每個元素係一個 std::pair<const std::string, long long>。",
+  "comparator 係一個 lambda，a 要排喺 b 前面就 return true：先按次數由多到少，打和就按字由細到大。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.advanced.08.hashtable"
+title = "完全冇次序"
+story = "避風塘點名嘅結果按字母排咗返嚟，而港務長想要嘅係啲船真正應嘅次序。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行一個船名。`n` 至少係 `1`，而一個名係一段
+冇空格嘅字元。同一個名可以出現多過一次。
+
+每個唔同嘅名印一次，格式係 `<name> <count>`，**按個名第一次出現嘅次序**。然後印
+`DISTINCT <k>`。
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+兩個 container 單獨都畀唔到你呢樣，而成個任務就係講呢樣。
+
+`std::map` 係一棵樹：行佢會將啲名**排好序**咁畀返你，唔係佢哋應嘅次序。
+`std::unordered_map` 係一個 hash table：平均查詢係 O(1) 而唔係 O(log n)，但行佢
+會**完全冇指定次序**咁畀返你 — 唔係排好序，唔係插入次序，兩次都唔一定一樣。標準
+冇承諾任何次序，所以一個行 `unordered_map` 嚟印嘢嘅程式，輸出係靠佢用嗰個 library
+決定。個 starter 正正係咁做，而且得一個唔同名嘅 case 佢仲會過 — 呢個就係破綻：
+一個分唔到次序嘅測試，唔係次序啱嘅證據。
+
+兩份工擺兩個 container：一個 `std::vector<std::string>` 記住每個名第一次見到嘅
+次序，一個 `std::unordered_map<std::string, long
+long>` 負責數。行個 vector 嚟印。
+'''
+hints = [
+  "hash table 係用嚟快啲查。vector 係用嚟記次序。兩樣都要。",
+  "`count[name]++ == 0` 每個名淨係 true 一次 — 就係插入嗰次 — 因為 operator[] 會預設構造個值做 0。",
+  "行個 vector，逐個名問個 map 攞次數嚟印，永遠唔好行個 map。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.advanced.09.set-and-pair"
+title = "邊個泊喺邊"
+story = "泊位板將同一隻舢舨喺同一個泊位列咗兩次，冇人講得出邊幾行係重複嘅。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行 `<BERTH> <NAME>`。
+
+每個唔同嘅 `<BERTH> <NAME>` 組合印一次，先按泊位再按名排，然後印 `DISTINCT <k>`
+同 `DUPES <n - k>`。
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+一個 `std::set<std::pair<int, std::string>>` 一次過做晒三份工：佢唔收已經有嘅嘢
+嘅第二份，佢自己保持排好序，而 `std::pair` 本身嘅比較方式正正係輸出想要嘅 — 先比
+第一個元素，再比第二個。用 range-`for` 行佢，用 **structured binding**
+`const auto& [berth, name]` 拆開每個 pair，唔好用 `.first` 同 `.second`。
+'''
+hints = [
+  "換個 container：std::set<std::pair<int, std::string>>。插入重複嘅嘢唔係錯誤，只係乜都唔做。",
+  "set 係按元素型別嘅 operator< 排，而 std::pair 先比 first 再比 second — 正正係輸出想要嘅先泊位後名嘅次序。",
+  "for (const auto& [berth, name] : moorings) 將每個 pair 拆做兩個名；n 減個 set 嘅大細就係重複數。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.advanced.10.algorithms"
+title = "船排上一次過"
+story = "絞盤記錄係一欄重量。Alex 話寫三個 for 迴圈。阿美話標準庫早就寫好咗。"
+brief = '''
+標準輸入係一行用空格分開嘅整數。
+
+印四行：
+
+1. 雙數值嘅總和（冇就係 `0`）
+2. 每個大過 `10` 嘅值乘二，照次序，用單個空格駁埋 — 冇就印 `-`
+3. 有幾多個唔同嘅值
+4. `FIRST_BIG <i>` — 第一個大過 `10` 嘅值嘅 index（由 0 開始），冇就係 `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+用 `<algorithm>` 同 `<numeric>`，唔好用 index 迴圈：第一行用 `std::accumulate`
+加一個 lambda，第二行用 `std::copy_if` 同 `std::transform`，第三行先
+`std::sort` 再 `std::unique`，第四行用 `std::find_if`。佢哋個個都收一對
+iterator，要做決定嘅就再收一個 lambda。重點唔係個迴圈難寫；而係個名講明咗個迴圈
+係做乜嘅。
+'''
+hints = [
+  "accumulate 嘅第四個參數係一個二元函數 (acc, x) -> acc；等佢淨係喺 x 係雙數嘅時候先加 x。",
+  "copy_if 要有地方寫 — std::back_inserter(big) 會一路寫一路令個 vector 變大。transform 可以寫返落同一個範圍。",
+  "std::unique 將重複嘅搬去尾，回傳一個指住佢哋開始位置嘅 iterator；由 begin() 去到嗰度嘅距離就係唔同值嘅數量。佢淨係睇到相鄰嘅重複，所以先 sort 一個 copy。",
+  "find_if 搵唔到就畀返 end()，搵到嘅話 iterator 減 begin() 就係 index。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.advanced.11.templates"
+title = "寫一次就夠"
+story = "泵房嘅錶板將 largest 寫咗四次 — 公升一次、分鐘一次、泵一次、泵嘅名一次 — 而第五次要喺轉潮之前交。"
+brief = '''
+標準輸入係兩行：第一行係整數，第二行係字。
+
+寫**一個**兩樣都用得嘅 `largest`，同一個有 `larger()` 同 `smaller()` 嘅 class
+template `Pair<T>`。
+
+印最大嘅整數、最大嘅字，然後用頭兩個整數整一個 `Pair`，印
+`PAIR <larger> <smaller>`。打和就當 `a` 係大嗰個。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+個 starter 編譯唔到：`largest` 釘死咗喺 `long long`，所以將啲字傳畀佢就係
+*no matching function*。一個 **function template**，
+`template <typename T> T largest(const std::vector<T>& xs)`，每種用嚟呼叫佢嘅
+型別都會印一份出嚟 — `T` 由參數推斷，而個主體對 `T` 嘅唯一要求就係 `>` 用得。
+
+`Pair<T>` 係 class 版嘅同一個諗法。佢啲 method 係 `const`，因為佢哋讀唔寫；佢哋
+回傳 `const T&` 而唔係 copy，因為呼叫者淨係想睇。兩個 signature 都講明自己承諾
+乜，而編譯器會睇住佢哋。
+'''
+hints = [
+  "喺 largest 前面加 template <typename T>，入面所有 long long 換做 T。啲呼叫唔使改；T 係推斷出嚟嘅。",
+  "std::string 本身已經有 operator>，所以同一個 template 主體唔使加任何嘢都編譯到啲字。",
+  "Pair<T> 係一個 class template；喺用嗰度先講明型別 — Pair<long long> — 而啲 method 係 const，因為佢哋淨係比較。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.advanced.12.lambdas"
+title = "門口點人數"
+story = "遊艇會嘅閘機數住邊個入、邊個出，經理想知收工嗰陣有幾多人，中間發生過乜都好。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行係 `IN` 或者 `OUT`。
+
+keep 住一個永遠唔會跌落零以下嘅累計數，每個指令之後印佢。然後印 `INS <k>` —
+有幾多個指令係 `IN`，用 `std::count_if` 加一個 lambda 數 — 同 `CLOSED <final>`。
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+個計數器係一個 closure：`make_counter` 回傳一個擁有自己總數嘅 lambda。lambda
+預設係 by copy capture，而一個 copy 喺主體入面係 `const` — 喺參數列後面加
+`mutable`，先可以令 capture 咗嘅總數喺每次呼叫之間改變。一個 **init-capture**，
+`[total = 0LL]`，就喺個方括號入面宣告 capture 嘅變數，而唔係喺外面個 scope，
+所以 lambda 以外冇嘢畀其他人郁。
+
+另一種 capture，`[&]`，全部 by reference 攞。呢個任務兩種都有寫；知道自己想要
+邊種，就係面試官聽緊嘅嘢。
+'''
+hints = [
+  "[total = 0LL](long long delta) mutable { ... } — init-capture 宣告 total，mutable 令主體可以賦值畀佢。",
+  "冇 mutable 嘅話，主體係個 closure 型別嘅 const member function，而 total += delta 係編譯錯誤，唔係靜靜雞乜都唔做。",
+  "std::count_if(begin, end, predicate) 回傳 predicate 接受咗幾多個元素；個 predicate 係一個收一個指令嘅 lambda。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.advanced.13.optional-variant"
+title = "唔係數字嗰行"
+story = "泵房抄錶嘅交咗一欄數字，中間夾住某人嘅午餐柯打。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行。每行應該係一個整數。
+
+每行印個值乘二，或者 parse 唔到就印 `BAD <line>`。最後印 `SUM <total>`，個總數
+係你印過嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+兩個型別裝住答案。`std::optional<long long> parse(const std::string&)`
+係*一個數，或者乜都冇*，由 `std::from_chars` 填：佢唔會拋例外，而係回傳一個錯誤
+碼，仲話你知佢喺邊度停，所以 `4x` 同 `xx` 一樣可以拒絕。
+
+`std::variant<long long, std::string> doubled(const std::string&)` 係*乘二咗嘅
+值，或者失敗嗰行* — 正正兩個型別其中一個，永遠唔會兩個都係，亦唔會兩個都唔係。
+`std::get_if<long long>(&result)` 入面係數字就畀你一個指住佢嘅指標，唔係就畀
+`nullptr`，正正係 `main` 需要嘅兩路分支。成個程式冇任何例外；失敗係一個值，值去
+邊佢就去邊。
+'''
+hints = [
+  "std::from_chars(first, last, value) 回傳一個有 ptr 同 ec 嘅 struct；成功係 ec == std::errc() 而且 ptr == last，唔係 4x 呢類行會 parse 咗一半。",
+  "optional 裝住值嘅時候係 truthy，所以 if (auto v = parse(text)) 就係成個分支，*v 就係個數。",
+  "同一個函數回傳 long long 或者 std::string 係合法嘅，因為回傳型別係一個兩樣都裝得嘅 variant；喺 main 度用 get_if 揀分支。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.advanced.14.exceptions"
+title = "你自己嘅錯誤"
+story = "泊位收費服務有四層，每層拋嘅嘢都唔同，而佢哋上面冇嘢接到任何一樣。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行應該係一個以公里計嘅距離。
+
+`fare(text)` 用 `std::stoll` parse — 遇到 `xx` 佢會**拋出**
+`std::invalid_argument` — 而負數距離就拋你自己嘅 `NegativeDistance` 嚟拒絕，
+佢係一個由 `std::runtime_error` 衍生嘅 class，`what()` 寫住
+`negative distance: <km>`。否則就回傳 `500 + 100 * km`。
+
+每行輸入印一行：收費；parse 唔到就印 `not a number`；距離係負數就印
+`NegativeDistance` 嘅 `what()`。然後印 `ERRORS <k>`，即係有幾多行失敗。
+
+parse 失敗印嘅係你自己嘅字，唔係個例外嘅，因為
+`std::invalid_argument::what()` 係 library 鍾意講乜就乜 — libstdc++ 係 `stoll`，
+libc++ 係 `stoll: no conversion` — 而預期輸出唔可以靠呢啲。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+個 starter 編譯到，但遇到 `xx` 就死：一個冇人接嘅例外去到 `main` 頂，runtime
+就呼叫 `std::terminate`，即係你見到嗰個 abort。一個有兩個 `catch` arm 嘅 `try`
+block 就整好 — 較具體嘅型別擺先，因為 arm 係照次序試，`std::runtime_error` 擺
+先嘅話會吞咗 `NegativeDistance`。永遠用 `const&` 接：by value 接會將衍生嘅例外
+slice 落佢個 base，失咗你拋出嚟嗰句訊息。
+'''
+hints = [
+  "用 try { ... } 包住個呼叫，再加 catch (const NegativeDistance& e)，跟住 catch (const std::invalid_argument&) — 就係呢個次序。",
+  "e.what() 係你喺 constructor 砌嗰句訊息；std::runtime_error 幫你存住佢。",
+  "冇人接嘅例外會呼叫 std::terminate，佢會 abort 個 process，除咗已經出咗去嘅嘢之外乜輸出都唔會 flush。個 starter 喺第二行就係咁。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.advanced.15.iterators"
+title = "你自己嘅 for 迴圈"
+story = "泵房個錶由一更嘅開頭到結尾逐個讀數跳過去，一個都冇存低。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+幫 `Stops` 整一個 iterator，等對佢做 range-`for` 會出 `count` 個值，由 `start`
+開始，每次行 `step`。每個值印一行，然後印 `SUM <total>`，由 `std::accumulate`
+喺同一對 `begin()`/`end()` 上面計出嚟。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+個 starter 編譯唔到：range-`for` 會被編譯器改寫做呼叫 `begin()` 同 `end()`，而
+`Stops` 兩樣都冇。冇 trait 要繼承，亦冇 interface 要宣告；個迴圈點名要三樣嘢 —
+`operator*`、前置 `operator++`、`operator!=` — 喺 `begin()` 回傳嘅嘢上面，有嘅話
+就用得。成份合約就係咁，而 `std::accumulate` 同其他每個 algorithm 用嘅都係同一份
+合約。
+'''
+hints = [
+  "個 iterator 係一個自己嘅細 struct：而家個值、步長，同埋仲剩幾多個。",
+  "end() 係乜都唔剩嘅嗰個 iterator；operator!= 淨係比倒數，所以 end() 入面個值係乜都冇所謂。",
+  "std::accumulate 行嘅都係 for 迴圈用嗰三個 operator — begin()/end() 一有，兩樣都唔使多寫一行就用得。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.advanced.16.raii"
+title = "佢自己執手尾"
+story = "泵房本記錄簿喺收更嗰陣自己合埋，次序啱晒，有冇人記得都一樣。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+喺 `main` **最頂**宣告兩個 `Guard` 值，叫 `first` 同 `second`，佢哋嘅
+destructor 會印 `DROP <name>`。喺一個巢狀 block 入面，將啲值餵入一個 `Tally`，
+佢嘅 destructor 會印 `TALLY <count> <sum>`。block 之後印 `DONE`。`main` 自己
+乜都唔印。
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+除咗 `DONE`，每一行都係 destructor 印嘅。`Tally` 喺佢個 block 收尾嘅大括號度死，
+所以 `TALLY` 喺 `DONE` 前面；兩個 guard 喺 `main` 回傳嗰陣死，次序同宣告**相反**，
+所以 `second` 行先過 `first`。冇一樣係你安排嘅，係 scope 安排嘅。
+
+呢個就係 RAII，個名比個諗法差：一個資源綁住一個物件嘅生命期，destructor 就係
+釋放。`std::lock_guard` 係咁 unlock，`std::unique_ptr` 係咁 free，
+`std::ofstream` 係咁 close，而提早 `return` 或者拋咗例外都一樣會逐個行晒。下一張
+地圖你三個都會見到。
+'''
+hints = [
+  "destructor 係 ~Guard() { ... } — 冇回傳型別、冇參數，你永遠唔使自己呼叫佢；scope 會。",
+  "入面嗰對大括號就係 TALLY 喺 DONE 之前印嘅全部原因。拎走佢，就會喺之後印。",
+  "銷毀永遠係構造嘅相反次序，所以 second 行先，亦所以第二個攞嘅鎖會第一個放。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.advanced.17.segfault"
+title = "地址錯咗"
+story = "12:00:00。午炮向一個冇人擁有嘅地址開炮，成個海旁靜晒。"
+brief = '''
+第一行係 `n`。之後嘅 `n` 行係開炮表，`<NAME> <SECONDS>`。然後一行 `q`，同
+`q` 個要查嘅名。
+
+每個名印 `<NAME> FIRES AT <seconds>` 或者 `<NAME> UNKNOWN`。然後印
+`LOADED <n> CHECKSUM <sum of every SECONDS in the table>`。
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+個 starter 編譯得乾乾淨淨，但會 crash 兩次，兩個唔同原因，你要兩個都搵出嚟。
+
+第一個係 checksum 迴圈。佢行 `1..n`，讀 `table.at(i)`，而 `at` 會 **check**：
+index `n` 係尾後一格，所以佢拋 `std::out_of_range`，冇嘢接，個 process 就
+abort。整好個迴圈。然後諗吓 `at` 幫你買咗乜：同一個迴圈用 `table[i]` 寫就唔會
+拋。佢會讀嗰個地址啱啱有嘅嘢 — heap 上面下一個物件，或者乜都冇 — 然後印一個錯咗
+某個冇人重現到嘅數嘅 checksum。vector 嘅 `[]` 唔 check。呢個 land 嘅交易就係咁：
+佢快，而睇住佢係你嘅責任。
+
+第二個係 `lookup`。佢回傳一個 `Shell*`，個名唔喺表入面嗰陣佢回傳 `nullptr` —
+而呼叫者睇都唔睇就喺佢上面寫 `->seconds`。經一個 null 指標讀嘢係 undefined
+behaviour；喺呢個程式行嘅每部機上面，佢亦都係一個 segmentation fault，呢個係
+undefined behaviour 最仁慈嘅樣，因為起碼佢會停。check 個指標。成個 boss 就係咁，
+亦係每個 C++ 面試真正問緊嘅問題：*嗰個地址而家有乜，邊個話你可以讀佢？*
+'''
+hints = [
+  "將查詢結果綁落一個名再 check：if (Shell* shell = lookup(...)) { ... } else { UNKNOWN }。個指標同時係答案同問題。",
+  "有效 index 由 0 到 size() - 1。由 1 開始行到 size() 嘅迴圈兩頭都差一，而淨係頂嗰頭會 crash。",
+  "at() 拋 std::out_of_range，[] 就完全唔 check；你見到嘅 crash 係好結果。你冇見到嗰個先係 boss。",
+  "segmentation fault 係 OS 拒絕 process 讀一個唔屬於佢嘅地址。地址 0 永遠係其中之一，所以 nullptr 一定 crash，而一個指住已經 free 咗嘅記憶體嘅舊指標就唔一定。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.advanced.01.threads"
+title = "兩個泵，一個集水井"
+story = "維園嘅泵房喺正午開咗第二個泵，個集水井終於排得乾。間房其他嘢一樣都冇變。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 `std::thread`，計佢嘅平方，寫入 `out[i]` — 佢自己嘅格，所以冇兩條
+thread 會掂同一個元素。join 晒佢哋，然後每個結果印一行，再印 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+啲 thread 係 scheduler 鍾意乜次序就乜次序咁完成。按 index 寫、join 完先印，先令
+每次行出嚟嘅輸出都一樣。自己印嘢嘅 thread 就唔會，而一條 by reference capture 咗
+迴圈變數嘅 thread，會讀緊一個早已行咗去下一個值嘅變數 — `i` 用 by value capture，
+`out` 用 by reference。
+'''
+hints = [
+  "threads.emplace_back(lambda) 就地構造條 thread，即刻開始行。",
+  "capture [i, &nums, &out]：index by value，等每條 thread 有自己一份；vector by reference，等寫入落到 main 嗰份度。",
+  "讀 out 之前 join 晒每條 thread。join() 會等到條 thread 完先返，之後啲寫入就睇得到。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.advanced.02.join"
+title = "冇簽退，冇人走得"
+story = "一條泵 thread 做完更，工頭冇幫佢簽退就行咗出間房，成棟樓就停晒電。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行文字。
+
+每行開一條 thread，將佢轉做大楷寫入佢自己嘅格。join 晒佢哋，照次序印啲行，然後
+印 `DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+個 starter 編譯到，開咗啲 thread，然後 abort。佢從來冇 join 過佢哋，而一條
+destructor 行嗰陣仍然係 **joinable** 嘅 `std::thread` 會呼叫 `std::terminate`。
+呢個唔係 library 嘅 bug。一條活得耐過開佢嗰個函數嘅 thread，會對住啲已經唔存在
+嘅 stack 變數行，而標準決定咗，一個睇得到嘅 abort 好過一次你睇唔到嘅、讀已釋放
+記憶體嘅動作。
+
+所以每條 `std::thread` 喺出 scope 之前都要 join（或者 detach，但幾乎永遠都唔係
+你想要嘅）。C++20 有 `std::jthread`，佢喺 destructor 入面 join — thread 版嘅
+RAII，同 `lock_guard` 對鎖嘅諗法一樣 — 預設就應該用佢。兩種寫法喺呢度都過到。
+'''
+hints = [
+  "最細嘅修正係一個迴圈：印任何嘢之前 for (std::thread& t : threads) t.join();。",
+  "較好嘅修正係換型別：std::vector<std::jthread>，等個 vector 出 scope 嗰陣由 destructor 去 join。",
+  "將個 jthread vector 擺喺佢自己個 block 入面，咁 join 就會喺收尾大括號度發生，喺印嘢迴圈讀啲行之前。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.advanced.03.mutex"
+title = "一個集水井，八個泵"
+story = "每個泵都將自己排咗幾多加落牆上面同一個總數，到咗個鐘尾，牆上面個數同佢哋個個都唔夾。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 thread，將佢加落**一個共用嘅總數**。join 晒佢哋，然後印
+`TOTAL <sum>` 同 `THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+個 starter 編譯到，印 `TOTAL 0`。個 lambda by value capture `total` —
+`[total, value]` 加 `mutable` — 所以每條 thread 都加落自己私人嗰份 copy 然後掉咗
+佢。改做 by reference capture，你就有另一個 bug，一個喺咁細嘅測試入面唔會現形嘅：
+幾條 thread 同時做 `total +=
+value` 係一個 **data race**，喺 C++ 係 undefined behaviour，唔只係個數錯咁簡單。
+
+喺總數隔籬擺一個 `std::mutex`，每條掂佢嘅 thread 用一個 `std::lock_guard`，
+就係答案。個 guard 喺 constructor 鎖、喺 destructor 解鎖，所以冇 unlock 會唔記得，
+更新到一半拋咗例外都一樣會放返。
+'''
+hints = [
+  "by reference capture total — [&total, &total_mutex, value] — 拎走個 mutable；條 thread 應該改 main 嘅 total，唔係佢自己嗰份。",
+  "std::lock_guard<std::mutex> lock(total_mutex); 一行搞掂，解鎖就係個 block 嘅尾。",
+  "join 晒之後讀 total 唔使鎖都安全：join() 係一個同步點，而且已經冇 thread 會再寫。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.advanced.04.counter"
+title = "自己上鎖嘅計數器"
+story = "維園東閘嘅閘機記住兩個一定要對得上嘅數，而有兩個人同時讀緊佢哋。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+整完個 `Counter`：`add` 攞鎖、加落總數、將 hit 數加一；`snapshot` 攞鎖、將兩樣
+一齊回傳。每個值開一條 thread，join 晒，然後印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 mutex 住喺 class **入面**，喺佢守住嘅欄位隔籬，而每個掂嗰啲欄位嘅 method 都會
+攞佢。就係呢個形狀：個鎖係物件嘅一部分，唔係靠呼叫者記得嘅嘢。
+
+個 starter 編譯唔到，原因值得諗一分鐘。`snapshot()` 係 `const` — 佢冇改任何
+呼叫者睇得到嘅欄位 — 但鎖一個 mutex *會改到個 mutex*，而喺 `const` method 入面
+每個成員都係 `const`。修正係 `mutable std::mutex`：`mutable` 標住一個就算經
+`const` 物件都准改嘅成員，正正係為咗呢類唔屬於個值嘅記帳嘢。呢度係 `mutable`
+唯一經常用得啱嘅地方，面試官問起佢，想聽嘅就係呢個例子。
+'''
+hints = [
+  "一個字就整好個編譯錯誤：mutable std::mutex mutex_;",
+  "拎走 snapshot() 嘅 const 都編譯到，但係錯嘅答案 — 個 method 真係冇改個值，signature 應該講明。",
+  "std::mutex 唔可以 copy 亦唔可以 move，所以裝住佢嘅 class 都唔得；用 reference 傳 Counter，個 lambda 已經係咁做。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.advanced.05.scoped-lock"
+title = "兩個鎖，一個次序"
+story = "噴水池下面兩道水閘，兩個鎖，兩條 thread，兩個泵喺同一秒停晒。"
+brief = '''
+兩個水缸，`A` 同 `B`，每個係一個 `long long`，各有自己嘅 `std::mutex`。
+
+標準輸入第一行係起始水位，第二行係一個數量 `n`，跟住 `n` 行
+`<FROM> <TO> <AMOUNT>`，`FROM`/`TO` 係 `{A, B}` 其中之一。
+
+每次轉移用自己一條 thread 行，join 晒佢哋，然後印 `A <level>`、`B <level>`、
+`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+個 starter 有兩樣嘢錯，但淨係一樣喺輸出睇得到。佢由來源扣咗，但從來冇加落目的地
+— 呢個係睇得到嘅 bug。另一個係形狀：*先鎖來源*，即係兩個方向相反嘅轉移可以各自
+揸住一個鎖，永遠等緊另一個。呢個就係死鎖，測試入面唔會出現；佢會喺某個星期二
+12:00 出現。
+
+用**一個全域次序**攞兩個鎖，個循環就形成唔到。C++17 免費畀你個次序：
+`std::scoped_lock lock(a_mutex, b_mutex)` 用一個避開死鎖嘅演算法攞任意數量嘅
+mutex，喺 destructor 入面全部放返。兩個永遠先 `A` 後 `B` 咁攞嘅 `lock_guard`，
+係人手寫嘅同一個答案。
+'''
+hints = [
+  "掂任何一個水位之前先鎖晒兩個缸。std::scoped_lock lock(a.mutex, b.mutex); 一行搞掂，而且次序安全。",
+  "水流嘅方向決定邊個水位要減，唔係決定邊個鎖先攞。",
+  "兩個 std::lock_guard 物件，永遠先 A 嘅 mutex 再 B 嘅，係同一個答案；規則就係每條 thread 都同意同一個次序。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.advanced.06.condition-variable"
+title = "個閘口"
+story = "一個泵注滿個缸，一個泵排走佢，而排水嗰個由 11:40 開始就一直 poll 緊一個空缸。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+一條 producer thread 將每個值推入一個用 mutex 守住嘅 `std::queue`；一條 consumer
+thread 逐個 pop 出嚟，乘二再印。producer 推晒之後就設定 `done` 兼叫醒 consumer，
+而 consumer 喺個 queue 係空**而且** `done` 已經設定咗嘅時候停。join 晒兩條，然後
+印 `CONSUMED <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+queue 係 FIFO，所以無論 scheduler 點做，次序都係輸入次序。
+`std::condition_variable` 係 consumer 瞓到有嘢做為止嘅方法，而唔係喺個鎖上面
+空轉：`cv.wait(lock, predicate)` 會放開個 mutex、瞓覺，每次被叫醒都重新 check 個
+predicate — 咁就幫你處理咗 spurious wakeup，亦係點解淨係應該寫 predicate 嗰種寫法。
+
+個 starter 會 hang。producer 推晒所有嘢就回傳，從來冇設定 `done` 亦冇 notify，所以
+consumer 為最後一個值醒咗，清晒個 queue，然後等一個永遠唔會嚟嘅訊號。每對
+producer/consumer 都要有方法講*冇嘢再嚟* — 呢個就係 `done`。
+'''
+hints = [
+  "producer 個迴圈之後：鎖、設 done = true、解鎖、cv.notify_all()。四行，個程式就會完。",
+  "done 係喺 wait 嘅 predicate 入面、喺 mutex 底下讀嘅，所以寫佢都要喺 mutex 底下 — 冇鎖咁寫嘅 flag 係 data race。",
+  "cv.wait 收 std::unique_lock，唔係 lock_guard，因為 wait 要解鎖再重新鎖；每次醒都會重新 check 個 predicate。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.advanced.07.atomic"
+title = "一個字，冇鎖"
+story = "閘機個數唔使鎖。泵房其他嘢就要，分得清邊樣係邊樣就係呢份工。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 thread。每條將自己個值加落一個共用嘅 `std::atomic<long long>`，
+再將一個共用嘅 `std::atomic<int>` 加一 — 任何地方都冇 mutex。join 晒佢哋，印
+`TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 starter 編譯唔到：個 lambda **by value** capture 咗兩個 atomic，而
+`std::atomic` 冇 copy constructor。呢個係刻意嘅。一個 atomic 係幾條 thread 同意
+一次一條指令咁更新嘅位置；佢嘅 copy 會係另一個位置，共用就冇咗。by reference
+capture 佢哋。
+
+atomic 唔係平啲嘅 mutex；佢係另一種工具，用嚟喺單一條指令入面讀、改、寫一個機器
+字。`fetch_add` 就係嗰條指令。兩個欄位一要對得上，個鎖就要返嚟 — 冇一個 atomic
+係「呢兩樣嘢，一齊」嘅，所以上一個任務嘅 `Counter` 有 mutex，而呢個冇。
+
+呢度用 `std::memory_order_relaxed` 就夠，因為冇嘢靠呢啲加法相對其他寫入*幾時*
+睇得到，只係要一個都唔好漏。呢句就係跟進問題。
+'''
+hints = [
+  "錯誤訊息話 std::atomic 嘅 copy constructor 係 deleted。capture [&total, &hits, value]，拎走個 mutable。",
+  "fetch_add 回傳之前個值，並且 atomic 咁做加法；冇鎖，亦冇 guard。",
+  "對 atomic 做 total += value 都係 atomic，冇問題；total = total + value 就唔係 — 嗰個係一個 load 同一個 store，中間有空隙。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.advanced.08.parallel-sum"
+title = "分開個集水井"
+story = "一萬二千個讀數，四個泵。間房想要每個泵嘅份額同總數，而總數每次行都要一樣。"
+brief = '''
+第一行係 `k n`：`k` 條 thread 同 `n` 個值。第二行係嗰 `n` 個值。
+
+將啲值分做 `k` 段連續嘅 chunk — 第 `i` 段由 index `i * n / k` 開始，去到
+`(i + 1) * n / k` 但唔包佢，用整數運算 — 等第 `i` 條 thread 將佢嗰段加入
+`partial[i]`。join 晒佢哋，然後照次序每段印 `CHUNK <i> <sum>`，再印
+`TOTAL <sum of partials>`。
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+呢個係用 thread 真係會快啲嘅形狀，亦係呢張地圖唯一一個：每條 thread 讀自己嘅範圍、
+寫自己嘅格，所以冇鎖、冇 atomic，除咗輸入之外乜都唔共用。chunk 邊界條公式令個分割
+啱啱好 — 最後一段永遠喺 `n` 完，而 `k > n` 嘅時候有啲 chunk 可以係空嘅，有一個
+隱藏 case 正正係咁安排。
+'''
+hints = [
+  "喺 main 計好兩個邊界，by value capture 佢哋；條 thread 唔應該要知個分割係點決定。",
+  "喺 thread 入面用一個本地總和，最後先寫一次 partial[i]，咁每條 thread 就啱啱掂共用個 vector 一次。",
+  "k > n 令某啲 chunk 係空 — begin == end — 個迴圈就咁唔行。唔使特別處理。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.advanced.09.async"
+title = "應承我個數"
+story = "絞盤佬叫個細路去攞每個數字，自己唔企喺度等；啲數字幾時返就幾時返。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值用 `std::launch::async` 開一個 `std::async` task，回傳個值嘅平方。將啲
+`std::future` 收入一個 vector，**照次序** `get()` 佢哋，逐個印。然後將一個
+`std::promise<int>` 交畀多一條 thread，由佢設定做 `n`，再由對應嘅 future 印
+`READY <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+future 係一個仲未到嘅值。`std::async` 畀你一個裝住函數回傳值嘅 future；`get()`
+會等到個值存在，然後交畀你，淨係一次。照次序叫啲 future 就係令輸出有次序嘅原因 —
+啲 task 本身幾時完就幾時完。
+
+`std::promise` 係同一條喉嘅另一頭，用喺冇回傳值可以包嘅時候：一邊呼叫
+`set_value`，另一邊 `get` 佢。一條 thread 就係咁唔使 mutex、queue 或者 flag 咁
+報告一個結果。
+
+講清楚 `std::launch::async`。冇咗佢，實作可以揀 `deferred`，即係喺 `get()` 入面、
+喺呼叫嗰條 thread 上面懶惰咁行個 task — 喺呢度一樣啱，但唔係任何睇到 `async` 嘅
+人會預期嘅。
+'''
+hints = [
+  "std::async(std::launch::async, lambda) 回傳一個 std::future，裝住個 lambda 回傳嘅嘢；推佢入個 vector。",
+  "每個 future 淨係可以 get() 一次，而且會等到個值到為止；照次序行個 vector，輸出就照次序。",
+  "個 promise move 或者用 reference 交入條 thread，喺嗰度呼叫 set_value(n)，main 入面嘅 ready.get() 就會等佢。main 回傳之前 join 條 thread。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.advanced.10.unique-ptr"
+title = "編譯器叫得出嘅大細"
+story = "避風塘嘅泊船鏈：每個環扣住下一個，一路落到個錨，而冇人會揸住同一個環兩次。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個以仙計嘅金額。
+
+將佢哋照到達次序裝落一條鏈，每個金額一個 node：
+
+```
+struct Entry {
+    long long cents;
+    std::unique_ptr<Entry> next;
+};
+```
+
+印三行：
+
+1. 照次序嘅金額，用空格分開，冇就印 `-`
+2. `SUM <total>`，由一個喺條鏈上面行嘅**遞迴**函數計
+3. `LAST <cents>` — 最後一個 node 嘅金額 — 或者 `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+個 starter 編譯唔到，而個錯誤正正係指標存在嘅原因。寫 `Entry next;`，編譯器就要
+喺記憶體度排好 `Entry`：`cents` 八個 byte，加一個 `Entry` 有幾大 — 而呢個正正係
+佢想計出嚟嘅嘢。*Field has incomplete type.*
+
+`std::unique_ptr<Entry>` 係一個指標，而指標嘅大細編譯器早就知道。佢**擁有**佢指住
+嘅嘢：啱啱一個擁有者，喺 destructor 入面 `delete`，唔可以 copy，可以 move。raw
+`Entry*` 係另一種指標 — 佢睇，但乜都唔擁有 — 而行條鏈嚟印，正正係 raw 指標嘅
+用途。`nullptr` 同時係條鏈嘅尾同空鏈，所以任何地方都冇另外嘅空 case。
+'''
+hints = [
+  "一行就整好個編譯錯誤：std::unique_ptr<Entry> next; — 而家個 struct 係十六個 byte，無論佢指住乜。",
+  "由尾砌到頭：head = std::make_unique<Entry>(Entry{value, std::move(head)})。個 std::move 係必要嘅；unique_ptr 唔可以 copy，只可以交出去。",
+  "由 head.get() 攞一個 const Entry* 嚟行，每步去 walk->next.get()。raw 指標係借；unique_ptr 仍然擁有，冇嘢會 free 兩次。",
+  "遞迴總和兩行搞掂：nullptr 係 0，否則就係 cents 加其餘嘅總和。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.advanced.11.shared-ptr"
+title = "仲有邊個揸住佢"
+story = "兩個錶經一條喉讀同一個缸，條喉要留到最後一個錶走咗為止，一秒都唔可以多。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+將啲值擺入一個由 `std::shared_ptr` 擁有嘅 `std::vector<long long>`，攞一個指住同一個
+vector 嘅**第二個** `shared_ptr`，再加一個睇住佢嘅 `std::weak_ptr`。印四行：
+
+1. `REF <sum>` — 經第二個 handle 讀嘅總和
+2. `SHARED <k>` — 兩個 handle 都仲在嗰陣嘅 `use_count()`
+3. `ALIVE yes` — 佢哋仲在嗰陣嘅 `!watch.expired()`
+4. `ALIVE no` — 兩個 handle 都 `reset()` 咗之後
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+`unique_ptr` 係一個擁有者。`shared_ptr` 係擁有者嘅數目，擺喺物件隔籬，數目去到零
+嗰陣物件就會 free — 由啱啱最後走嗰個 handle 去做。copy 個 handle 會令數目加一；
+reset 或者銷毀佢會令數目減一。個數目係 atomic 嘅，所以兩條 thread 可以各自安全咁
+揸住一個 handle；但*物件*唔會因此變得 thread-safe，要掂佢仍然要之前幾張地圖嘅
+mutex。
+
+`weak_ptr` 係一個**唔計數**嘅 handle。佢睇到個物件仲喺唔喺度，喺度嘅話可以用
+`lock()` 升級做 `shared_ptr`；佢唔可以令個物件繼續生存。呢個就係打破循環嘅方法 —
+兩個互相揸住對方 `shared_ptr` 嘅物件永遠去唔到零 — 亦係呢條路最後一張地圖講嘅嘢。
+'''
+hints = [
+  "std::shared_ptr<...> mirror = ledger; copy 個 handle，令數目變 2。mirror->begin() 去到同一個 vector。",
+  "weak_ptr 直接由一個 shared_ptr 構造，永遠唔會改個數目；expired() 就係你要問佢嘅全部問題。",
+  "兩個 handle 都 reset() 先會令數目跌到零；淨係第一個 reset 乜都唔會 free，而房入面其中一個提示就係要講點解。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.advanced.12.move"
+title = "帶埋佢走"
+story = "港務長每張單交畀送貨員之前都影印一份，而部影印機係成個避風塘最慢嘅嘢。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行文字。
+
+每行喺一個 `std::vector<Docket> pile` 入面砌一個 `Docket`，然後將每張單交去第二個
+vector `sent`，由 `sent` 將每張嘅文字轉大楷印出嚟，再印 `SENT <n>`、
+`COPIES <c>`、`MOVES <m>`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` 自己數自己被 copy 同 move 咗幾多次：佢嘅 copy constructor 將一個全域
+變數加一，move constructor 加另一個。兩個 vector 一開始就 `reserve` 好，咁
+reallocation 就唔會 copy 或者 move 任何嘢 — 發生嘅 copy 同 move 淨係你寫嗰啲。
+
+個 starter 報 `COPIES 2`。用一個 lvalue 做 `sent.push_back(d)` 會 copy 張單，連個
+字串一齊。`sent.push_back(std::move(d))` 將 `d` 轉型做一個 **rvalue**，揀中
+move constructor，佢會偷走字串嘅 buffer 而唔係複製一份。`std::move` 本身乜都唔
+move；佢係一個講*我用完呢個喇*嘅轉型，之後發生乜就由收貨嘅 constructor 決定。
+
+之後 `d` 係乜？*Valid but unspecified.* 你可以銷毀佢或者賦值畀佢。你唔可以讀佢
+然後預期有乜特定嘢 — 所以呢個程式由 `sent` 印，永遠唔回頭睇 `pile`。
+'''
+hints = [
+  "改一個呼叫：sent.push_back(std::move(d))。程式其他嘢已經識 move。",
+  "move constructor 刻意標咗 noexcept：std::vector 淨係喺 move 唔會拋例外嘅時候先會喺 reallocation 期間 move 元素，否則為咗 exception-safe 會 copy 佢哋。",
+  "兩個 vector 都 reserve(n) 先令啲數準確。冇咗佢，reallocation 會 move（或者 copy）每個已經存咗嘅元素，啲數就會靠增長策略決定。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.advanced.13.template-class"
+title = "乜貨都裝得嘅環"
+story = "個錶記住最後幾個讀數，港務長記住最後幾個船名，而 Alex 將同一個 ring buffer 寫咗兩次。"
+brief = '''
+第一行係一個容量 `cap`。第二行係一串整數；第三行係一串字。
+
+寫**一個** class template `Ring<T>`：一個固定容量嘅 buffer，留住最近推入嘅 `cap`
+樣嘢，覆寫最舊嗰個，而且可以照到達次序行。將啲整數推入一個 `Ring<long long>`，啲
+字推入一個 `Ring<std::string>`，每個環嘅內容印一行，然後印 `DROPPED <k>` — 總共
+有幾多樣嘢被推咗出去。
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+個 starter 編譯唔到：`Ring` 係為 `long long` 寫嘅，啲字冇地方去。class template
+係一個定義，每個型別 instantiate 一次，同 basic 路上面嘅 function template 一模一樣，
+而成個 `Ring<T>` 寫嗰陣都唔知道 `T` 係乜 — 只知道佢可以預設構造、copy 同印出嚟。
+
+都要畀佢 `begin()`/`end()`。個環唔係照到達次序存 — 最舊嗰樣喺寫頭就快要覆寫嘅
+位置 — 所以 iterator 要做算術，而呢部分先值得自己寫，唔係淨係讀。
+'''
+hints = [
+  "class 上面加 template <typename T>，格用 std::vector<T>，push 收 const T&。然後喺兩個用嘅地方寫 Ring<long long> 同 Ring<std::string>。",
+  "最舊嗰樣喺 (head + cap - count) % cap；到達次序第 k 樣係 (oldest + k) % cap。iterator 淨係要帶住 k。",
+  "一個 function template print(const Ring<T>&) 由參數推斷 T，所以一個印嘢函數兩個環都用得。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "cpp.advanced.14.invalidation"
+title = "一路行一路刪"
+story = "港務長一路讀泊位名單一路剔走舢舨，每剔一隻就跳過下一隻。"
+brief = '''
+第一行係 `n t`。第二行係 `n` 個整數。
+
+**就地**由個 vector 刪走每個細過 `t` 嘅值，將剩低嘅印一行（乜都冇剩就印 `-`），
+然後印 `REMOVED <k>`。
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+個 starter 係人人都寫過一次嘅 bug：佢按 index 行，喺 `i` 度 erase，跟住做 `++i`
+— 而滑咗入第 `i` 格嘅元素從來冇人睇過。兩個相鄰嘅細值，第二個就會生存落嚟。呢個
+bug 起碼係有定義嘅。佢嘅 iterator 孖生兄弟就唔係：`erase(it)` 會令 `it` 同佢之後
+每個 iterator 失效，所以入面有 `erase` 嘅
+`for (auto it = v.begin(); ...; ++it)` 係 **undefined behaviour** — 通常會行出個尾，
+有時睇落用得，而咁更差。
+
+`erase` 回傳指住被刪嗰個之後嘅元素嘅 iterator。用佢：中咗就 `it = v.erase(it)`，
+唔中就 `++it`，永遠唔好兩樣都做。C++20 仲有 `std::erase_if(v, predicate)`，一個
+呼叫做晒成份工，應該首先答佢；個迴圈係人哋問 `erase_if` 做乜嗰陣先答嘅答案。
+'''
+hints = [
+  "for 頭唔好寫遞增。淨係喺冇 erase 嗰個分支用 ++it 前進；另一個分支 it = erase(it) 已經前進咗。",
+  "index 版本都整得好 — erase 之後唔好 ++i — 但要識嘅係 iterator 寫法，因為佢喺 std::list 同 std::map 上面都一樣。",
+  "std::erase_if(vector, pred) 回傳刪咗幾多個，正正就係 REMOVED 嗰行。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "cpp.advanced.15.undefined-behaviour"
+title = "編譯器假設咗"
+story = "泵房嘅公升計數器係一個 int，而去到 2147483647 公升，編譯器早就假設咗佢永遠唔會去到。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數，每個都裝得落一個 `long long`。佢哋嘅
+累計總數都裝得落 `long long`。
+
+印兩行：如果沿途每個累計總數都裝得落一個 32 位 `int` 就印 `INT32 OK`，否則印
+`INT32 OVERFLOW <i>`，<i> 係第一個會將佢推出範圍嘅值嘅 index（由 0 開始）；然後印
+`INT64 <total>`。
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+個 starter 用一個 `int` 裝總數，無論發生乜都印 `INT32 OK`。加個明顯嘅 check —
+`if (total + v < total)` — 係整唔好嘅，因為嗰個 check 係用佢想搵嗰個 overflow 嚟
+寫，而**有號 overflow 係 undefined behaviour**。編譯器有權假設 UB 唔會發生，所以對佢
+嚟講，`v` 係正數嘅 `total + v < total` *永遠係 false*，喺 `-O2` 底下 gcc 同 clang
+都會刪走個測試。錯嘅數唔係 optimiser 嘅 bug，係合約。
+
+呢個 land 行嘅規則：undefined behaviour 唔係「某個值」。佢係編譯器假設一樣嘢冇可能，
+再由嗰度推理落去。所以你永遠唔好靠觸發 overflow 嚟偵測佢。你要喺加法*之前*偵測，
+用一個闊啲嘅型別，或者同上下限比較 — `std::numeric_limits<int>` — 而呢個程式嘅
+預期輸出冇靠任何未定義嘅嘢。
+'''
+hints = [
+  "用 long long 裝總數，每次加完同 std::numeric_limits<int>::min() 同 max() 比較。永遠唔會有 int 運算發生。",
+  "淨係記第一個出範圍嘅 index；後面嘅值可能會將總數帶返入範圍，而問題問嘅係佢第一次喺邊度出去。",
+  "如果你一定要加兩個 int 又想知安唔安全：加之前 check v > INT_MAX - total，唔好加完先睇個和嘅正負號。前者有定義；後者就係編譯器會刪走嗰樣。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "cpp.advanced.16.jthread"
+title = "叫停就停"
+story = "夜更個泵一直行到有人叫佢停為止，而直到呢更之前，冇人叫得停佢。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+開兩條 `std::jthread`。第一條加總啲值，存低結果。第二條收一個
+`std::stop_token`，喺上面註冊一個會設定 flag 嘅 `std::stop_callback`，然後一直
+loop 到 `stop_requested()` 為止。喺 `main` 對第二條 thread 呼叫 `request_stop()`，
+join 晒兩條，然後印：
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std::jthread` 就係加咗兩樣嘢嘅 `std::thread`，兩樣都係 RAII。佢嘅 destructor 會
+**join**，所以 starter 嗰個 abort — 一條仲係 joinable 就被銷毀嘅 `std::thread` —
+冇可能發生。佢仲帶住一個 `std::stop_source`：如果 thread 函數第一個參數係
+`std::stop_token`，`jthread` 就會傳一個入去，`request_stop()` 會撥佢，而
+destructor 喺 join 之前會呼叫 `request_stop()`。一條會 check 自己 token 嘅
+thread，係一條你永遠閂得停嘅 thread；唔 check 嗰條就係個 starter。
+
+`stop_callback` 係一條塞住咗嘅 thread 得知消息嘅方法 — 叫停嗰一刻佢就喺叫停嗰條
+thread 上面行，平時嘅工作係叫醒 worker 瞓緊喺上面嘅 condition variable。
+'''
+hints = [
+  "將 summer 嘅 std::thread 改做 std::jthread，加 join 之前個 abort 已經冇咗 — 但都係要 join，喺讀 sum 之前。",
+  "一個第一個參數係 std::stop_token 嘅 lambda，會自動由行佢嗰條 jthread 攞到一個；接駁就係咁多。",
+  "std::stop_callback on_stop(token, fn) 係一個物件：喺 constructor 註冊、喺 destructor 取消註冊，所以佢同個迴圈一樣長命，唔會多。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "cpp.advanced.17.dangling"
+title = "懸空"
+story = "維園嘅泵房，噴水池下面兩層。一條泵 thread 仲讀緊一個收更嗰陣間房已經釋放咗嘅 buffer。"
+brief = '''
+第一行係 `w n`：`w` 個泵同 `n` 個讀數。第二行係啲讀數。
+
+`pump(w, buffer)` 開 `w` 條 thread；第 `i` 條將由 `i * n / w` 到
+`(i + 1) * n / w` 嘅讀數加入 `partial[i]`，而 `pump` 回傳啲 partial。`main` 每個印
+`PUMP <i> <sum>`，再印 `TOTAL <sum>`，然後如果所有嘢做完嗰陣個 buffer 已經釋放咗
+就印 `FREED yes` — 經一個 `std::weak_ptr` 觀察。
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+個 starter 會 abort。`pump` 喺一個本地 vector 入面砌啲 thread，佢哋仲係 joinable
+就回傳，所以個 vector 嘅 destructor 呼叫 `std::terminate`。睇吓佢本來打算做乜：
+嗰啲 thread 揸住 `buffer` 嘅一個 **reference**，而 `pump` 嘅呼叫者就快要由得
+`buffer` 死。一條喺 vector 嘅 destructor 行咗之後仲讀佢嘅 thread，係讀緊已釋放嘅
+記憶體。有時佢攞到舊啲數。有時攞到下一次分配嘅嘢。有時 allocator 已經將啲 page
+交返出去，佢就 segfault。呢個係 undefined behaviour，而且係最貴嗰種，因為佢唔係喺
+錯嘅地方出事。
+
+修正擁有權，唔係修正症狀。個 buffer 係一個
+`std::shared_ptr<const std::vector<long long>>`，每條 thread capture **自己一份
+handle 嘅 copy**，而個 buffer 嘅生命啱啱等於最後一條揸住佢嘅 thread — 無論 `pump`
+點樣回傳、啲 thread 用乜次序完成。回傳之前 join。`main` 留住一個 `weak_ptr`，喺
+`pump` 回傳兼掉咗自己個 handle 之後，`expired()` 就係證據：啲讀數由最後完成嗰個
+泵釋放咗一次，而且冇人仲讀緊。
+
+成個 land 就係呢一個程式。冇嘢 check 過你。你令生命期同用法對得上，而做到呢樣嘅
+工具 — 會計數嘅 smart pointer、會等嘅 join — 就係你喺 basic 路上面見過嘅同一個
+RAII。
+'''
+hints = [
+  "pump 入面改兩樣：by value capture buffer（個 shared_ptr），唔好 by reference capture readings；回傳之前 join 晒每條 thread — 將一個 std::vector<std::jthread> 擺喺自己個 block，收尾大括號度就會 join。",
+  "lambda 嗰份 shared_ptr copy 就係令個 vector 生存嘅嘢；佢喺 thread 函數回傳嗰陣釋放，唔係 pump 回傳嗰陣。呢個就係 reference 同擁有者嘅分別。",
+  "partial 仍然係 by reference capture，而咁係啱嘅：pump 擁有佢，pump 回傳佢之前會 join，而每條 thread 淨係寫自己嗰格。",
+  "main 刻意將自己個 handle move 入 pump。如果佢留住一個，FREED 就會係 no — 個 buffer 會因為 main 仲揸住而生存，而呢個 boss 亦接受你解釋得到呢個另一個答案。",
+]

@@ -1,0 +1,991 @@
+# RUST LAND — BASIC, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/rust/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "rust.basic"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.basic.01.the-move"
+title = "只有一个主人"
+story = "06:40，渣甸坊楼上。柜台上一张收据，上面写着整条街的规矩：一样东西只有一个主人，交出去就是交出去了。"
+brief = '''
+一个 `String` 恰好只有一个主人。`let kept = receipt;` 不是复制它：
+而是**移动**它，从那一行起，`receipt` 就不再是一个你能用的名字 ——
+编译器会以 E0382，borrow of moved value 拒绝。值去了它该去的地方，
+换了新名字。
+
+```
+let kept = receipt;
+```
+
+收据已经做好，两个 `println!` 也已经写好。在 `// FILL` 注释处敲下这次
+移动，让 `kept` 拥有这个字符串。
+
+```
+output: one receipt, one owner
+        22
+```
+'''
+hints = [
+  "let kept = receipt; —— 一个 let，右边是旧名字。",
+  "不要 clone：字符串没有被复制，它换了主人。在这一行之后再用 receipt 就是 E0382。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.basic.02.borrow"
+title = "只是看看"
+story = "波斯富街电车站。售票员把名单上的每个名字读一遍，然后原样交回；除了办事处，从来没有人拥有过它。"
+brief = '''
+`&` 是出借。一个接收 `name: &str` 的函数只是*看一眼*这个字符串；
+调用者保留着它，之后还能用。`&names[i]` 借用的是其中一个元素，而
+`&String` 在调用处会自己变成 `&str`。
+
+```
+total += width(&names[i]);
+```
+
+`width` 和两个 `println!` 都已经写好。在 `// FILL` 注释处敲下调用，
+用 `&` 把每个名字借出去。第二行证明循环结束后这些名字仍然是你的。
+
+```
+input:  MEI
+        BO
+        ALEX
+output: 9
+        MEI,BO,ALEX
+```
+'''
+hints = [
+  "total += width(&names[i]); —— & 放在实参上。",
+  "width 要的是 &str；&String 在调用处会强制转换成 &str，所以 &names[i] 就够了。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.basic.03.mut-borrow"
+title = "借出去让人改"
+story = "Lucky Mac 的小亭把牌子上每个价格都加同样的数。牌子从不离开墙；改它的那只手是借来的。"
+brief = '''
+`&mut` 是为了修改而出借。一个接收 `prices: &mut Vec<i64>` 的函数可以
+原地修改调用者的 vector；调用者在调用处写 `&mut prices`，而 `prices`
+本身必须是 `let mut`。在函数里，`iter_mut()` 交出一个个 `&mut i64`，
+`*p` 就是其中一个背后的那个数。
+
+```
+*p += by;
+bump(&mut prices, by);
+```
+
+`bump` 和打印都已经写好。在两个 `// FILL` 注释处敲下这两行：`bump`
+里面的修改，以及出借这个 vector 的调用。
+
+```
+input:  3
+        10 20 30
+output: 13 23 33
+```
+'''
+hints = [
+  "循环里写 *p += by;，然后在 main 里写 bump(&mut prices, by);。",
+  "p 是一个 &mut i64：星号穿过它够到那个数。调用需要的是 &mut，不是 &，而 prices 声明成 mut 正是为了这个。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.basic.04.clone"
+title = "第二份"
+story = "希慎广场的两张名单：门口那张按到达顺序记，经理那张要排序。给经理那张排序，绝不能碰到门口那张。"
+brief = '''
+移动之后只剩一个主人。当你需要两个时，`.clone()` 做一份深拷贝，从此
+两者互不相干。小而简单的值 —— `i64`、`bool`、`char`、`f64`，以及由它们
+组成的元组 —— 是 `Copy` 的：`let b = a;` 会复制它们，`a` 不用任何
+clone 也照样能用。
+
+```
+let mut sorted = names.clone();
+```
+
+名字已经读好，`sorted.sort()` 和两个 `println!` 也已经写好。在
+`// FILL` 注释处敲下这次 clone，让原来的顺序保留下来。
+
+```
+input:  MEI BO ALEX
+output: MEI BO ALEX
+        ALEX BO MEI
+```
+'''
+hints = [
+  "let mut sorted = names.clone(); —— 要 mut，因为 sort() 原地修改它。",
+  "let mut sorted = names; 也能编译，可那样 names 就没了，第一个 println! 就是 E0382。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.basic.05.exchange"
+title = "交换"
+story = "渣甸坊的两台收银机在换班时互换钱箱，旧钱箱被抽出来，一个空的放回原处。什么都没有被复制；东西只是换了手。"
+brief = '''
+`std::mem` 不做复制就能交换值。`swap(&mut a, &mut b)` 对调两个名字里
+装的东西。`take(&mut a)` 把值移出来，留下该类型的默认值 —— 空的
+`String`、空的 `Vec`、`0` —— 于是你能拥有一个待在 `&mut` 里面的东西。
+`replace(&mut a, v)` 是同一回事，只是留下的是你自己挑的值。
+
+```
+std::mem::swap(&mut a, &mut b);
+let taken = std::mem::take(&mut a);
+```
+
+两行已经读进 `a` 和 `b`。在 `// FILL` 注释处敲下 swap 和 take。
+
+```
+input:  LEFT
+        RIGHT
+output: RIGHT LEFT
+        [RIGHT] []
+```
+'''
+hints = [
+  "std::mem::swap(&mut a, &mut b); 然后 let taken = std::mem::take(&mut a);",
+  "两者都接收 &mut：值留在原地，移动的只是内容。take 之后 a 是一个空的 String，而不是一个被移走的值 —— 它仍然能用。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.basic.06.slices"
+title = "队伍的中间"
+story = "希慎广场的队伍，去掉第一个和最后一个：真正在等的那些人。"
+brief = '''
+`&v[a..b]` 是一个切片：借来的一扇窗，看着 `Vec` 的一部分，从 `a` 开始，
+到 `b` 为止但不包括它，不做任何复制。它的类型是 `&[i64]`，一个接收
+`&[i64]` 的函数，接受整个 vector（`&nums`）和它的任何一扇窗，方式完全
+一样。单独的 `..` 是全部；`a..` 一直到末尾。
+
+```
+let middle = &nums[1..nums.len() - 1];
+```
+
+`total` 和三个 `println!` 都已经写好。在 `// FILL` 注释处敲下这个切片。
+
+```
+input:  5 1 2 3 9
+output: 6
+        20
+        3
+```
+'''
+hints = [
+  "let middle = &nums[1..nums.len() - 1];",
+  "区间的终点不包含在内，所以 len() - 1 刚好停在最后一个元素之前。前面的 & 让它成为一次借用，而不是从 vector 里移出来。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.basic.07.string-str"
+title = "拥有的文字与借来的文字"
+story = "渣甸坊的店招只漆一次，归店铺所有。每个读它的人都是借来看；为今天做的横幅则是一件新东西。"
+brief = '''
+`String` 拥有它的文字，而且能变长；`&str` 借用住在别处的文字。只读的
+函数接收 `&str`；构造新文字的函数返回 `String`。`format!` 构造
+`String` 的方式和 `println!` 构造一行的方式一样，而 `&name`（或
+`name.as_str()`）把一个 `String` 作为 `&str` 借出去。
+
+```
+format!("** {} **", name)
+let line = banner(&name);
+```
+
+在两个 `// FILL` 注释处敲下这两行：`banner` 的函数体，以及 `main` 里的
+调用。
+
+```
+input:  mei
+output: ** mei **
+        9
+```
+'''
+hints = [
+  "不带分号的 format!(\"** {} **\", name) 就是函数的值；main 里写 let line = banner(&name);。",
+  "不带 & 的 banner(name) 想在需要 &str 的地方传一个 String：E0308。这个 & 就是整堂课。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.basic.08.chars-bytes"
+title = "字母和数字"
+story = "维多利亚公园的一个储物柜密码：字母和数字混在一起。管理员把数字加起来，然后喊出第一个字母。"
+brief = '''
+`&str` 是字节；`.chars()` 按字符走它，`.bytes()` / `.as_bytes()` 按
+`u8` 走它。`c.to_digit(10)` 把数字字符变成 `Some(number)`，其他的变成
+`None`，所以 `filter_map` 只留下数字。字节就是数：`b'a'` 是 97，
+字母运算写作 `(byte - b'a' + b'A') as char`。
+
+```
+let digits: Vec<u32> = code.chars().filter_map(|c| c.to_digit(10)).collect();
+let first = (code.as_bytes()[0] - b'a' + b'A') as char;
+```
+
+在两个 `// FILL` 注释处敲下这两行。密码总是以小写字母开头。
+
+```
+input:  a1b2c3
+output: 6
+        A
+```
+'''
+hints = [
+  "code.chars().filter_map(|c| c.to_digit(10)).collect() —— 然后是 (code.as_bytes()[0] - b'a' + b'A') as char。",
+  "to_digit 返回 Option<u32>；filter_map 丢掉那些 None。一个字节减去 b'a'，对 a 来说是 0，再加上 b'A' 就落在大写字母上。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.basic.09.option"
+title = "也许什么都没有"
+story = "安静的早上，时代广场的告示板。可能没有最高出价，也可能没有偶数票号；告示板必须如实说出来，而不是去猜。"
+brief = '''
+`Option<T>` 是 `Some(value)` 或 `None`，编译器逼你说清楚遇到 `None`
+时怎么办。`if let Some(m) = …` 只在有值时才执行一个块。`.unwrap_or(0)`
+给出一个默认值。`.find(…)` 以 `Option<&T>` 返回第一个匹配，而
+`.copied()` 把 `Option<&i64>` 变成 `Option<i64>`。
+
+```
+if let Some(m) = nums.iter().max() { println!("MAX {}", m); }
+let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);
+```
+
+在两个 `// FILL` 注释处敲下这两行。输入为空时，第一行什么都不输出，
+第二行是 `0`。
+
+```
+input:  3 5 8 1
+output: MAX 8
+        8
+```
+'''
+hints = [
+  "if let Some(m) = nums.iter().max() { println!(\"MAX {}\", m); }，然后是 find(...).copied().unwrap_or(0)。",
+  "空迭代器上的 max() 是 None，if let 直接跳过。find 交回的是 Option<&i64>；copied() 把它变成 Option<i64>，unwrap_or(0) 的类型才对得上。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.basic.10.result"
+title = "不是数字的那一行"
+story = "波斯富街的收银机收到一行价格，其中一个是个单词。收银机没有崩溃；它说出是哪一个坏了，以及为什么。"
+brief = '''
+`Result<T, E>` 是 `Ok(value)` 或 `Err(error)`。在一个返回 `Result` 的
+函数里，`?` 运算符解开 `Ok`，而遇到 `Err` 时当场把它**返回**给调用者
+—— 一个字符代替一整个 `match`。`"12".parse::<i64>()` 是一个
+`Result<i64, ParseIntError>`。
+
+```
+out.push(tok.parse::<i64>()?);
+```
+
+`parse_all` 返回那个 vector 或者第一个错误，`main` 对它做 match。在
+`// FILL` 注释处敲下带 `?` 的那一行。
+
+```
+input:  1 2 3
+output: 6
+```
+'''
+hints = [
+  "out.push(tok.parse::<i64>()?);",
+  "? 只能用在返回类型是 Result（或 Option）、且错误类型对得上的函数里 —— 这里是 ParseIntError，正是 parse 给出的那个。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.basic.11.match"
+title = "数字的形状"
+story = "维多利亚公园的一道闸门给票号分类：零、一位数、偶数、奇数。四个分支，什么都漏不下去。"
+brief = '''
+`match` 必须覆盖每一种情况，它的分支是模式：一个字面量、一个区间
+`1..=9`、一个带守卫的绑定 `x if x % 2 == 0`，以及表示其余一切的 `_`。
+第一个吻合的分支胜出，所以顺序很重要。它是一个表达式：每个分支的值就是
+整个 `match` 的值。
+
+```
+0 => "ZERO",
+1..=9 => "ONE DIGIT",
+x if x % 2 == 0 => "EVEN",
+_ => "ODD",
+```
+
+`match` 已经替你开好了头，只有一个写着 `TODO` 的分支。按这个顺序把它
+换成那四个分支。
+
+```
+input:  12
+output: EVEN
+```
+'''
+hints = [
+  "0 => \"ZERO\", 1..=9 => \"ONE DIGIT\", x if x % 2 == 0 => \"EVEN\", _ => \"ODD\",",
+  "带守卫的分支要放在 _ 之前，否则它永远不会执行。1..=9 两端都包含；1..9 会把 9 留给守卫分支。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.basic.12.iterator-chain"
+title = "怡和街一趟走完"
+story = "怡和街，走一趟：留下偶数号的铺面，把门牌号平方，再把所有大于十的加起来。没有下标，没有第二个循环。"
+brief = '''
+迭代器链从左往右读：`.iter()` 走遍 vector，`.filter(|&&x| …)` 留下闭包
+说好的那些，`.map(|x| …)` 做变换，最后的 `.collect()` 或 `.sum()` 把它
+变成一个值。在最后那个调用之前，什么都不会执行。`iter()` 产出
+`&i64`，而 `filter` 看到的是指向它的引用，所以要用 `&&x` 这个模式才
+够得到那个数。
+
+```
+let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();
+let big: i64 = nums.iter().filter(|&&x| x > 10).sum();
+```
+
+在两个 `// FILL` 注释处敲下这两行。
+
+```
+input:  1 2 3 4 11 20
+output: 4 16 400
+        31
+```
+'''
+hints = [
+  "nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect() —— 第二行用 .filter(|&&x| x > 10).sum()。",
+  "let 上的类型告诉 collect() 和 sum() 要构造什么；没有 Vec<i64> 和 i64，编译器推断不出来。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.basic.13.fold-zip-windows"
+title = "成对、连涨和累计"
+story = "波斯富街的电车计数器读一天的人数：有几个小时比前一个小时多，全部的乘积，以及每个数旁边标上它的钟点。"
+brief = '''
+三个屏幕上老是用到的适配器。切片上的 `.windows(2)` 把每一对相邻元素作为
+一个两元素的切片产出。`.fold(start, |acc, x| …)` 让一个累加器贯穿整个
+序列。`.zip(…)` 并排走两个序列，而 `(0..).zip(&nums)` 就是手写出来的
+`enumerate`。
+
+```
+let ups = nums.windows(2).filter(|w| w[1] > w[0]).count();
+let product = nums.iter().fold(1i64, |acc, &x| acc * x);
+let pairs: Vec<String> = (0..).zip(&nums).map(|(i, x)| format!("{}:{}", i, x)).collect();
+```
+
+在三个 `// FILL` 注释处敲下这三行。
+
+```
+input:  1 3 2 5
+output: 2
+        30
+        0:1 1:3 2:2 3:5
+```
+'''
+hints = [
+  "windows(2).filter(|w| w[1] > w[0]).count() —— fold(1i64, |acc, &x| acc * x) —— (0..).zip(&nums).map(|(i, x)| format!(\"{}:{}\", i, x)).collect()",
+  "windows 是切片的方法，所以直接在 nums 上调用，而不是在 nums.iter() 上。fold 里的 1i64 固定了累加器的类型；光写 1 会有歧义。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.basic.14.entry"
+title = "渣甸坊在喊什么"
+story = "一个早上在渣甸坊里喊过的每个词，都数一遍。喊得最响的在前；同样多的按字母顺序。"
+brief = '''
+`HashMap` 的 entry API 就是一行写完的计数器。`counts.entry(key)` 找到某个
+键的位置，不管它存不存在；`.or_insert(0)` 在它不存在时放一个 `0` 进去，
+而且无论哪种情况都交回指向值的 `&mut`；`*… += 1` 把它加一。一次查找，
+不用先 `contains_key`。
+
+```
+*counts.entry(w.to_string()).or_insert(0) += 1;
+```
+
+map、循环、排序和打印都已经写好。在 `// FILL` 注释处敲下 entry 那一行。
+
+```
+input:  a b a c b a
+output: a 3
+        b 2
+        c 1
+```
+'''
+hints = [
+  "*counts.entry(w.to_string()).or_insert(0) += 1;",
+  "键是 String，所以 w（一个 &str）要用 to_string() 变成 String。前面的星号解引用 or_insert 返回的那个 &mut usize。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.basic.15.sort-by"
+title = "排行榜"
+story = "时代广场的游戏机厅贴出当天的榜：最高分在前，两人同分时，名字排在前面的那个在前。第二块榜按名字长短排。"
+brief = '''
+`sort_by` 接收一个返回 `Ordering` 的比较闭包。`b.cmp(&a)` 是降序；
+`.then_with(|| …)` 用第二次比较来打破平局。`sort_by_key` 按闭包取出的
+东西升序排序，而两者都是**稳定**的：键相等的元素保持原来的顺序。浮点数
+没有 `cmp`，要写成 `a.partial_cmp(b).unwrap()`。
+
+```
+rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+by_len.sort_by_key(|r| r.0.len());
+```
+
+在两个 `// FILL` 注释处敲下这两次排序。`by_len` 是在第一次排序之前做的
+一份 clone，所以它的平局保持输入顺序。
+
+```
+input:  MEI 90
+        BO 95
+        ALEX 90
+output: BO ALEX MEI
+        BO MEI ALEX
+```
+'''
+hints = [
+  "rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))); 以及 by_len.sort_by_key(|r| r.0.len());",
+  "cmp 里 b 在 a 前面，这就是降序的由来。cmp 接收一个引用，所以是 &a.1。then_with 只在第一次比较结果为 Equal 时才执行。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.basic.16.heap-reverse"
+title = "最小的先来"
+story = "时代广场的点心窗口先叫最小的票号。那一叠票是一个堆，而 Rust 里的堆，除非你另有交代，总是先交出最大的。"
+brief = '''
+`BinaryHeap` 是一个最大堆：`pop()` 给出最大的。把每个值包进
+`std::cmp::Reverse` 就把顺序翻过来，所以 `BinaryHeap<Reverse<i64>>`
+弹出的是最小的 —— 每道最短路径题和第 k 小题都想要的那个最小堆。
+`while let Some(Reverse(x)) = heap.pop()` 一边清空一边解包。
+
+```
+heap.push(Reverse(x));
+while let Some(Reverse(x)) = heap.pop() { out.push(x); }
+```
+
+在两个 `// FILL` 注释处敲下推入和清空。
+
+```
+input:  5 1 9 3
+output: 1 3 5 9
+```
+'''
+hints = [
+  "heap.push(Reverse(x)); 然后 while let Some(Reverse(x)) = heap.pop() { out.push(x); }",
+  "Reverse 是一个元组结构体，所以 Reverse(x) 既在推入时包装，也在模式里解构。没有它，输出就会是最大的在前。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.basic.17.derive-ord"
+title = "逐个字段比较"
+story = "波斯富街牌子上的票价，先按区再按价格排序。没有人写这个比较；是让编译器去写的。"
+brief = '''
+`sort()`、`max()`、`BinaryHeap` 和 `==` 都需要类型实现比较相关的
+trait。`#[derive(…)]` 为结构体写出它们，**按声明顺序逐个字段**比较：
+`PartialEq, Eq` 用于 `==`，`PartialOrd, Ord` 用于 `<` 和排序，`Clone`
+用于 `.clone()`，`Debug` 用于 `{:?}`。
+
+```
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+```
+
+在 `// FILL` 注释处、`struct Fare` 上面那一行敲下这个属性。没有它，
+`fares.sort()` 编译不过。
+
+```
+input:  2 5 BUS
+        1 9 TRAM
+        1 3 FERRY
+output: FERRY TRAM BUS
+        BUS
+```
+'''
+hints = [
+  "#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)] 紧贴在 struct Fare 上面。",
+  "Ord 需要 Eq 和 PartialOrd，PartialOrd 需要 PartialEq，所以四个都要写上。结构体里字段的顺序就是排序的顺序。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.basic.18.fast-input"
+title = "一口气全读进来"
+story = "每道 HackerRank 题的第一行：n 和 k，然后是 n 个数。小亭一口气把整个输入读进来，再从顶上一个个取词元。"
+brief = '''
+用 `read_to_string` 把标准输入读一次，然后从一个迭代器上取词元：
+`split_ascii_whitespace()` 产出一个个 `&str`，`.next().unwrap().parse()`
+把其中一个变成数，而 `it.by_ref().take(n)` 取接下来的 `n` 个，却不会
+把迭代器吃掉。`let` 上的类型决定 parse 成什么。
+
+```
+let n: usize = it.next().unwrap().parse().unwrap();
+let k: usize = it.next().unwrap().parse().unwrap();
+let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();
+```
+
+在三个 `// FILL` 注释处敲下这三行。程序输出 `n` 个数里前 `k` 个的和。
+
+```
+input:  5 2
+        3 4 5 6 7
+output: 7
+```
+'''
+hints = [
+  "let n: usize = it.next().unwrap().parse().unwrap(); 写两次，然后是 it.by_ref().take(n).map(|t| t.parse().unwrap()).collect()",
+  "parse() 从 let 的类型推断目标，所以 : usize 和 : Vec<i64> 是在干实事的。by_ref() 让 take() 借用迭代器，而不是把它吃掉。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.basic.19.formatting"
+title = "六位小数"
+story = "街市的秤把平均值打到小数点后六位，把读数排成一列，再用前导零盖上个数。"
+brief = '''
+`println!` 里的花括号在冒号后面接格式说明。`{:.6}` 是六位小数。
+`{:<5}` 在五列里左对齐（`>` 右对齐，`^` 居中）。`{:03}` 用零把数字补到
+三位宽。`{:?}` 是调试形式，能打印一整个 `Vec`。
+
+```
+println!("{:.6}", mean);
+println!("{:<5}|", x);
+println!("{:03}", nums.len());
+```
+
+在三个 `// FILL` 注释处敲下这三个 `println!`。
+
+```
+input:  1 2 4
+output: 2.333333
+        1    |
+        2    |
+        4    |
+        003
+```
+'''
+hints = [
+  "println!(\"{:.6}\", mean); —— println!(\"{:<5}|\", x); —— println!(\"{:03}\", nums.len());",
+  "格式说明放在花括号里的冒号后面：.6 是精度，<5 是对齐和宽度，03 是补零和宽度。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.basic.20.overflow"
+title = "i64 到哪里为止"
+story = "轩尼诗道找换店里的两个大数。宽的那台收银机说出真正的乘积；窄的那台说 NONE 而不是撒谎；第三台绕了回去，因为它被告知要这么做。"
+brief = '''
+一个放不下的 `i64` 乘积，在 debug 下会 **panic**，在 release 下会回绕
+—— 不管哪种都是错的。`as i128` 在相乘之前先加宽。`a.checked_mul(b)` 在
+结果放不下时返回 `None`。`a.wrapping_mul(b)` 故意回绕，模 2⁶⁴，这正是
+哈希题想要的。
+
+```
+let wide = a as i128 * b as i128;
+let narrow = a.checked_mul(b);
+println!("{}", a.wrapping_mul(b));
+```
+
+在三个 `// FILL` 注释处敲下这三行。
+
+```
+input:  3000000000 4000000000
+output: NONE
+        12000000000000000000
+        -6446744073709551616
+```
+'''
+hints = [
+  "let wide = a as i128 * b as i128; —— let narrow = a.checked_mul(b); —— println!(\"{}\", a.wrapping_mul(b));",
+  "两个操作数都要在乘法之前转换：(a * b) as i128 会先溢出，再把残骸加宽。checked_ 和 wrapping_ 对 add、sub 和 mul 都有。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.basic.21.lifetime-fn"
+title = "它能用多久"
+story = "怡和街上的两块店招，和一个指向较长那块的函数。它交回的是一个借用，而编译器想知道借的是谁的。"
+brief = '''
+返回引用的函数必须说明它借用的是哪个输入。`<'a>` 声明一个生命周期，
+`&'a str` 把一个参数和它绑在一起，而 `-> &'a str` 承诺结果活得和它一样
+久。两个输入用同一个 `'a`，意思是结果的有效期和两者中**较短**的那个
+一样长。
+
+```
+fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {
+```
+
+函数体已经写好。把标着 `// FILL` 的那行签名换成带标注的那一行；没有
+生命周期它就编译不过（E0106）。
+
+```
+input:  TRAM
+        FERRY
+output: FERRY
+```
+'''
+hints = [
+  "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
+  "只有一个引用参数时，编译器会替你补上生命周期（省略规则）。有两个时，它没法知道结果借的是哪一个，所以得由你来说。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.basic.22.lifetime-struct"
+title = "借用一个名字的车票"
+story = "电车厂的一张日票上写着一个它并不拥有的名字：它指向登记簿。车票不能比它指向的那一页活得更久。"
+brief = '''
+持有引用的结构体需要一个生命周期参数，它的每一个 `impl` 块也一样。
+带有字段 `name: &'a str` 的 `struct Ticket<'a>` 表示一个 `Ticket` 不能比
+它指向的文字活得更久；`impl<'a> Ticket<'a>` 把同一个名字带进方法里。
+
+```
+struct Ticket<'a> {
+impl<'a> Ticket<'a> {
+```
+
+替换那两行标着 `// FILL` 的代码。字段和方法都已经写好，不用改动。
+
+```
+input:  MEI 2
+output: MEI@2
+```
+'''
+hints = [
+  "struct Ticket<'a> { 和 impl<'a> Ticket<'a> {",
+  "字段上的 'a 已经在那里了；它需要在结构体上声明，而 impl 先用 impl<'a> 再声明一次，然后用 Ticket<'a> 把它用上。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.basic.23.trait"
+title = "她自己的 trait"
+story = "铜锣湾的每种交通工具都有票价，每个票价都有标签。电车统一收三；巴士每公里二。标签只写一次，两者共用。"
+brief = '''
+`trait` 给行为命名：一组某个类型承诺提供的方法。`impl Trait
+for Type { … }` 兑现这个承诺，而 trait 给了默认函数体的方法 —— 这里是
+`label` —— 会随之免费得到，它调用的是你写的那个方法。
+
+```
+impl Fare for Tram { fn fare(&self) -> i64 { 3 } }
+impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }
+```
+
+trait、两个结构体和 `main` 都已经写好。在 `// FILL` 注释处敲下两个
+`impl`。
+
+```
+input:  7
+output: 3 HKD
+        14 HKD
+```
+'''
+hints = [
+  "impl Fare for Tram { fn fare(&self) -> i64 { 3 } }，Bus 用同样的形状，写 2 * self.km。",
+  "只有 fare 需要写：label 在 trait 里有默认函数体，是继承来的。方法签名必须和 trait 里的完全一致，包括 &self。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.basic.24.generics"
+title = "只写一次"
+story = "希慎广场服务台的一个函数，找出最大的那个，不管递给它的是数字还是字母。它只写一次，只要求这些东西能比较。"
+brief = '''
+`<T: Bound>` 让函数成为泛型：`T` 代表任何实现了这个约束的类型。
+`PartialOrd` 让函数体能用 `>`；`Copy` 让它能用 `let mut best = xs[0]`
+把元素从切片里复制出来。然后编译器为每一种调用它的类型各生成一份函数。
+
+```
+fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+```
+
+替换标着 `// FILL` 的那行签名。函数体已经写好，`main` 分别用 `&[i64]`
+和 `&[char]` 调用它。
+
+```
+input:  3 9 2
+        b z a
+output: 9
+        z
+```
+'''
+hints = [
+  "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {",
+  "去掉 Copy，xs[0] 就是从借来的切片里移出（E0507）。去掉 PartialOrd，> 就没有东西可调用。约束就是函数体需要的那些，不多也不少。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.basic.25.box-dyn"
+title = "编译器叫得出的大小"
+story = "票务处的一个托盘，电车票和巴士票并排放着。它们大小不同，所以托盘里放的是盒子，每个盒子都知道自己装着什么。"
+brief = '''
+`Vec` 要求每个元素大小相同，而两个结构体不是。`Box<dyn Fare>` 是一个
+指针大小的值，它拥有堆上*某个*实现了 `Fare` 的东西；运行哪个方法在
+运行时才决定（动态分发）。`&dyn Fare` 是借用的形式。
+
+```
+let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];
+```
+
+trait 和两个 `impl` 都已经写好。在 `// FILL` 注释处敲下这个 vector。
+
+```
+input:  7
+output: 17
+        2
+```
+'''
+hints = [
+  "let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];",
+  "let 上的类型把每个 Box<Tram> 和 Box<Bus> 变成 Box<dyn Fare>；没有它，vec! 会拒绝两种不同的元素类型。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.basic.26.rc-refcell"
+title = "通过共享句柄修改"
+story = "时代广场机房里的一本日志，两个文员拿着。谁都不单独拥有它，借用检查从编译器挪到了本子自己身上。"
+brief = '''
+`Rc<T>` 是一个引用计数的主人：`Rc::clone(&log)` 做出指向**同一个**值的
+第二个句柄，而不是一份拷贝。`RefCell<T>` 让你通过共享句柄修改 ——
+`.borrow_mut()` 在运行时检查借用规则，违反时 panic。`Rc<RefCell<…>>`
+就是单线程下共享的、可变的值。
+
+```
+let writer = Rc::clone(&log);
+```
+
+`log` 已经做好，循环通过 `writer` 写入。在 `// FILL` 注释处敲下第二个
+句柄。
+
+```
+input:  1 2 3
+output: 2
+        [2, 4, 6]
+```
+'''
+hints = [
+  "let writer = Rc::clone(&log);",
+  "log.clone() 做的是同一件事；Rc::clone(&log) 这种写法明白地说出只有计数增加了。strong_count 为 2 就是证据。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.basic.27.closures"
+title = "三种闭包"
+story = "Lucky Mac 小亭的服务费：一个闭包加上费用，顺便数它被问了几次。第二个闭包交给一个只要求“能调用”的函数。"
+brief = '''
+闭包捕获它用到的东西。只读的是 `Fn`；**修改**被捕获变量的是 `FnMut`，
+必须用 `let mut` 绑定；把一个值移出去的是 `FnOnce`。函数可以按约束接收
+它们中的任何一种：`f: impl Fn(i64) -> i64`。前面加 `move` 强制按值捕获，
+这正是线程需要的。
+
+```
+let mut charge = |x: i64| { seen += 1; x + fee };
+println!("{}", apply(|x| x * fee, 10));
+```
+
+`apply` 已经写好。在 `// FILL` 注释处敲下那个 `FnMut` 闭包和那次调用。
+
+```
+input:  1 2 3
+output: 3 4 5
+        3
+        20
+```
+'''
+hints = [
+  "let mut charge = |x: i64| { seen += 1; x + fee }; 然后 apply(|x| x * fee, 10)",
+  "只要 charge 还在用，它就一直可变地借用着 seen，所以打印 seen 的 println! 必须在最后一次调用之后 —— 它确实在。传给 apply 的闭包只读 fee，所以它就是普通的 Fn。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.basic.28.threads"
+title = "四台收银机"
+story = "渣甸坊同时开了四台收银机，每台各打各的收据。经理按收银机的顺序把它们收回来，托盘回来时是空的。"
+brief = '''
+`thread::spawn` 启动一个运行闭包的线程，并交回一个 `JoinHandle`。
+`move` 让闭包拥有它所用东西的自己一份，这样线程就不会借用一个可能已经
+消失的栈帧。`.join()` 等待线程结束，并以 `Result` 的形式返回闭包的
+返回值。
+
+```
+handles.push(thread::spawn(move || x * x));
+squares.push(h.join().unwrap());
+```
+
+两个循环都已经写好。把第一行敲在第一个 `// FILL` 注释处，第二行敲在
+第二个处。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "handles.push(thread::spawn(move || x * x)); —— 然后 squares.push(h.join().unwrap());",
+  "按句柄推入的顺序 join，正是这一点让输出保持输入顺序；线程本身想什么时候结束就什么时候结束。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.basic.29.arc-mutex"
+title = "一个钱箱，许多只手"
+story = "时代广场的一个钱箱，每台收银机都伸过来一只手。每只手都拿到自己的一个句柄，而钱箱一次只为一只手打开。"
+brief = '''
+`Arc<T>` 是给线程用的 `Rc`：`Arc::clone(&total)` 给每个线程一个指向
+同一个值的句柄。`Mutex<T>` 守着它：`.lock().unwrap()` 等待锁，返回一个
+能解引用到值的守卫，守卫离开作用域时锁就释放。`*guard += x` 通过它写入。
+
+```
+let total = Arc::clone(&total);
+*total.lock().unwrap() += x;
+```
+
+在 `// FILL` 注释处敲下 `spawn` 之前的 clone，以及它里面加锁的加法。
+遮蔽同一个名字是惯用写法。
+
+```
+input:  1 2 3 4
+output: 10
+        1
+```
+'''
+hints = [
+  "spawn 之前写 let total = Arc::clone(&total);，然后在里面写 *total.lock().unwrap() += x;。",
+  "没有 clone，move 会把唯一的那个 Arc 带进第一个线程，第二次迭代就是 E0382。最后打印的计数是 1，因为每一份 clone 都随它的线程一起被丢弃了。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.basic.30.atomics-rwlock"
+title = "一个字，不用锁"
+story = "维多利亚公园的一个十字转门计数器，每道闸门都给它加一，不用排队；还有一块告示板，读的人多，写的人少。"
+brief = '''
+对单个整数来说，原子类型胜过互斥锁：`AtomicUsize::fetch_add(1,
+Ordering::SeqCst)` 从任何线程给它加一，完全不用锁，而
+`.load(Ordering::SeqCst)` 读取它。对读远多于写的更大的值，`RwLock` 允许
+同时有多个读者（`.read()`）和一个写者（`.write()`），各自像 `Mutex`
+那样返回一个守卫。
+
+```
+hits.fetch_add(1, Ordering::SeqCst);
+board.write().unwrap().push(x);
+```
+
+clone 和 spawn 都已经写好。在 `// FILL` 注释处敲下线程里的加一和写入。
+
+```
+input:  4 2 9
+output: 2 4 9
+        3
+```
+'''
+hints = [
+  "hits.fetch_add(1, Ordering::SeqCst); 和 board.write().unwrap().push(x);",
+  "fetch_add 接收 &self，这就是为什么原子类型不需要 Mutex，也不需要 mut。写守卫在这里是一个临时值，所以锁在这条语句结束时就释放了。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.basic.31.channel"
+title = "一个出餐口"
+story = "时代广场后厨后面的出餐口：一个厨师送，传菜台收，而传菜台知道厨师做完了，因为出餐口在他身后关上了。"
+brief = '''
+`mpsc::channel()` 返回一个发送端和一个接收端。发送端移进一个线程，
+`tx.send(v)` 把一个值递过去；另一边的 `rx.iter()` 按顺序产出所有发送过的
+东西，并且**在每一个发送端都被丢弃时结束** —— 这里就是生产者线程结束、
+它的 `tx` 随之而去的时候。
+
+```
+let (tx, rx) = mpsc::channel::<i64>();
+let got: Vec<i64> = rx.iter().collect();
+```
+
+生产者线程已经写好。在 `// FILL` 注释处敲下这个通道和负责收集的接收。
+
+```
+input:  1 2 3
+output: 10 20 30
+```
+'''
+hints = [
+  "let (tx, rx) = mpsc::channel::<i64>(); 和 let got: Vec<i64> = rx.iter().collect();",
+  "rx.iter() 会阻塞，直到通道关闭，而通道在生产者闭包末尾 tx 被丢弃时关闭 —— 所以 collect 恰好在生产者完成时完成。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.basic.32.producers"
+title = "许多厨师，一个传菜台"
+story = "时代广场后厨的每个厨师都通过同一个出餐口送菜，而传菜台自己手里也有一把出餐口的钥匙，它忘了自己还拿着。在放下它之前，传菜台会一直等一个永远不会来的厨师。"
+brief = '''
+*mpsc* 是多生产者的：`tx.clone()` 给每个线程一个自己的发送端，连到同一个
+通道上。接收循环只在**每一个**发送端都没了之后才结束 —— 而原来那个
+`tx` 还待在 `main` 里。`drop(tx)` 把它放下；没有这一行，程序永远不会
+结束。
+
+```
+let tx = tx.clone();
+drop(tx);
+```
+
+在 `// FILL` 注释处敲下 `spawn` 之前的 clone 和循环之后的 drop。结果按
+下标排序，所以线程运行的先后顺序无关紧要。
+
+```
+input:  1 2 3
+output: 0 10
+        1 20
+        2 30
+        RECV 3
+```
+'''
+hints = [
+  "循环里写 let tx = tx.clone();，循环之后写 drop(tx);。",
+  "没有 clone，move 会把唯一的发送端带进第一个线程，循环第二圈就是 E0382。没有 drop，rx.iter() 会永远等着 main 自己的那个发送端 —— 运行会超时，而不是失败。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.basic.33.worker-pool"
+title = "出餐口"
+story = "12:30 的时代广场。一本点菜簿，三个厨师，一个通回传菜台的出餐口。点菜簿在锁下共享，厨师只拿着它撕下一张单子那么久；点菜簿撕完了，厨师就下班，传菜台清点盘子。"
+brief = '''
+工作池就是两个通道加一把锁。任务从 `job_tx` 下去；工人们共享放在
+`Arc<Mutex<…>>` 后面的一个 `job_rx`，每个人用
+`job_rx.lock().unwrap().recv()` 取一个任务 —— 锁是一个临时值，所以它在
+那条语句结束时就释放，做菜发生在锁的**外面**。一旦每一个 `job_tx` 都被
+丢弃，`recv()` 就返回 `Err`，工人就是这样知道该停下的。结果通过
+`done_tx` 送回来，传菜台一直收，直到每一个 `done_tx` —— 工人们的 clone
+*以及* main 自己的那个 —— 都没了。
+
+```
+let job = job_rx.lock().unwrap().recv();
+drop(job_tx);
+drop(done_tx);
+```
+
+池、循环和收集都已经写好。在 `// FILL` 注释处敲下工人里加锁的接收，以及
+`main` 里的两个 drop。少了任何一个 drop 都是死锁。
+
+```
+input:  1 2 3
+output: 0 2
+        1 5
+        2 10
+```
+'''
+hints = [
+  "工人里写 let job = job_rx.lock().unwrap().recv();；发送完之后写 drop(job_tx); 和 drop(done_tx);。",
+  "lock() 返回的守卫在那个 let 里是一个临时值，所以它在分号处就被丢弃，这个工人做菜的时候，其他工人就能取下一个任务。把它拿着跨过 cook() 会让整个池变成串行。",
+  "drop(job_tx) 让工人的 recv() 变成 Err；drop(done_tx) 让 done_rx.iter() 在工人们丢掉各自的发送端之后能够结束。忘了任何一个，程序都会永远等下去。",
+]

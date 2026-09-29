@@ -1,0 +1,1354 @@
+# ZIG LAND — ADVANCED, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/zig/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "zig.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.advanced.01.lines"
+title = "收費亭記錄簿"
+story = "一號亭嘅更表每架車記一行：收費員聽到嘅名，跟住係佢俾咗嘅錢，有幾多個銀仔就幾多個數。部打印機仲老過條隧道，每版紙尾仍然印住渡輪公司嘅字。"
+brief = '''
+第一行係個數量 `n`。之後嘅 `n` 行每行係一個名，跟住零個或者多個整數，用空格分開。
+
+每架車印一行，格式係 `<NAME> <how many numbers> <their sum>`，最後印
+`BOATS <n>` — 自從部打印機仲係渡輪公司嘅時候，收費廣場每版紙都係用呢行數尾。
+
+```
+input:  2
+        KWAN 3 4 5
+        LEE
+output: KWAN 3 12
+        LEE 0 0
+        BOATS 2
+```
+
+呢度嘅單位係行，唔係 token。對成個輸入做一次 `std.mem.tokenizeAny`，去到空白字元
+就停，而且唔理換行，所以佢話唔到你知一架車喺邊度完、下一架喺邊度開始。先將個輸入
+切做一行一行 — `std.mem.splitScalar(u8, input, '\n')` 畀你一個 iterator，佢嘅
+`next()` 係 `?[]const u8`，一次一行 — 然後**喺嗰行入面**先 tokenize。
+
+嗰啲 slice 個個都係指入 `input` 度。冇嘢係 copy 過嘅：一行就係一個望住你本身已經
+擁有嘅 byte 嘅窗口，所以 `input` 要一直生存到你用晒佢哋為止，亦所以
+`defer gpa.free(input)` 係最後先行嘅嗰樣。
+'''
+hints = [
+  '''splitScalar 用 '\n' 切，每次 next() 畀你一行；對嗰行做 tokenizeAny，用 " \r\t" 做分隔符，就會行晒佢啲 token，唔會行過佢個尾。''',
+  "名係第一個 token，所以喺迴圈之前用一次 fields.next() 攞咗佢；之後 while (fields.next()) |tok| 見到嘅就淨係數字。",
+  "得個名嘅一行會出 0 0，唔使特別處理：個 while 迴圈根本一次都唔會行。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.advanced.02.pointers"
+title = "copy 唔係本尊"
+story = "收費亭主管將每個錢盤嘅數記落張紙嘅副本度，而佢身後牆上面嗰張紙永遠冇變過。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+經一個函數 `load` 將每個值推入同一個 `std.ArrayList(i64)`，然後印三行：
+`LOADED <how many>`、由一個淨係讀嘅函數 `total` 計出嚟嘅 `TOTAL <sum>`，同埋
+`FIRST <value>` — 乜都冇嘅時候就印 `FIRST NONE`。
+
+```
+input:  3
+        4 8 15
+output: LOADED 3
+        TOTAL 27
+        FIRST 4
+```
+
+個 starter 編譯到，印 `LOADED 0`。`load` 係 **by value** 攞個 list，而 Zig 嘅參數
+係唔可以改嘅，所以個 starter 做咗大家跟住會做嘅嘢：`var mine = sheet;` — 將個 list
+個 header copy 一份 — 然後 append 落嗰份度。份 copy 變大咗，份 copy 喺回傳嗰陣死咗，
+而牆上面嗰張紙冇人郁過。
+
+用 `*` 講明：型別係 `*std.ArrayList(i64)` 嘅參數係呼叫者個 list 嘅地址，經佢做
+`sheet.append(gpa, value)` 就會落到呼叫者個 list 度。`total` 應該攞 `[]const i64`
+— 個 list 嘅 `.items` — 因為佢要睇，唔使郁，而型別入面嘅 `const` 就係等編譯器幫你
+守住呢個承諾嘅方法。
+
+`FIRST` 係一個 optional 指標：`?*const i64` 一係係第一個元素嘅地址，一係係 `null`，
+而 `null` 就係 Zig 唔問過你就唔俾你經佢讀嘢嘅嗰個值 — `if (first) |p|` 就係問。
+成個 land 就係呢一句。
+'''
+hints = [
+  "兩個字元就整好 load：signature 入面寫 sheet: *std.ArrayList(i64)，呼叫嗰度寫 &sheet。經指標呼叫 method 唔使箭咀；sheet.append(gpa, v) 都係同一行。",
+  "total 應該攞 []const i64，用 sheet.items 嚟呼叫 — 個 const 係一個承諾，編譯器會 check。",
+  "&sheet.items[0] 係第一個元素嘅地址，有元素先有意思；if (first) |p| 拆開個 optional，p.* 就係佢後面嘅值。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.advanced.03.slices"
+title = "車龍中間"
+story = "六點前四號亭已經塞咗四十架車。主管睇到最前嗰個車頭同最尾嗰盞車尾燈，中間嘅一架都睇唔到。"
+brief = '''
+標準輸入第一行係個數量 `n`，第二行係 `n` 個整數，用空格分開。`n` 至少係 `1`。
+
+印三行：第一個值、最後一個值，同埋嚴格喺佢哋兩個之間所有值嘅總和。少過三個值嘅話，
+嗰個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+slice 就係個序列。`nums[0]` 同 `nums[nums.len - 1]` 係兩頭；`nums[1 .. nums.len - 1]`
+係中間，一個指住同一啲 byte 嘅**新 slice**，冇 copy 過任何嘢，喺佢上面行一個 `for`
+就係總和。切 slice 同攞 index 一樣會 check：`nums[1..0]`，即係得一架車嘅車龍嘅
+中間，會係 `panic: start index 1 is larger than end index 0`，所以對 `nums.len`
+嘅守衛要擺喺切之前，唔係之後。
+
+用 `i64` 加。有一個隱藏 case 嘅中間係 `i32` 裝唔落嘅，而喺 `-O Debug` 入面，一個
+overflow 咗嘅 `i32` 唔會打圈 — 佢會 panic。
+'''
+hints = [
+  "nums[1 .. nums.len - 1] 係兩頭之間嘅 slice；喺佢上面行一個 for 就加得埋。佢同 nums 共用記憶體。",
+  "得一個或者兩個值嘅時候，嗰個範圍係空或者倒轉嘅，而倒轉嘅 slice 喺 Debug 係 panic — 寫佢之前用一個 if 對 nums.len 守住。",
+  "中間係 i64：闊嗰個 case 係加兩個三十億嘅值，用 i32 做累加器會 panic，報 integer overflow。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.advanced.04.strings"
+title = "byte 唔係字"
+story = "收費廣場頭頂塊指示牌將「銅鑼灣」截喺三個 byte，得返一個字。"
+brief = '''
+讀一行。印三行：
+
+1. 佢有幾多個 **byte**
+2. 佢有幾多個 **字元** — UTF-8 code point
+3. 將啲字元倒轉咗嘅嗰行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+嗰行可能有 ASCII 以外嘅字元，噉頭兩個數就唔一樣。Zig 嘅字串係一個 `[]const u8`：
+一個 byte 嘅 slice，`.len` 係 byte 數，一向都係。喺呢個層次，個語言對編碼一無所知；
+一個 `u8` 就係一個 byte。
+
+UTF-8 唔使解碼都好易數：每個 code point 都係由一個**唔係** `10xxxxxx` 形式嘅 byte
+開頭，而每個延續 byte 都係。所以一個 byte `c` 喺 `(c & 0xC0) != 0x80` 嘅時候
+先係一個字元嘅開頭。倒轉嘅係字元，唔係 byte — `std.mem.reverse(u8, line)` 會將
+`銅` 斬開三舊，再倒轉咁印出嚟。
+'''
+hints = [
+  "for (line, 0..) |c, i| 連 index 一齊行啲 byte；(c & 0xC0) != 0x80 就揀得出每個字元嘅第一個 byte。",
+  "將每個字元嘅開頭 index 收入一個 std.ArrayList(usize)；佢嘅長度就係字元數，唔使解碼任何嘢。",
+  "由尾到頭行啲開頭 index，將每個字元嘅 byte — line[from..to] — appendSlice 落一個 std.ArrayList(u8)，然後用 {s} 印佢嘅 .items。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.advanced.05.structs"
+title = "收費亭帳簿"
+story = "二號亭每條車軸都收錢，啲記錄寫喺同一張帳簿表度 — 起碼喺個建議將個 struct 啲函數換咗做一句註解之前係咁。"
+brief = '''
+第一行係 `<NAME> <n>`。之後嘅 `n` 行係 `<ITEM> <CENTS>`。
+
+幫個名砌一個收集啲項目嘅 `Ledger`，然後照到達次序將每個項目以 `<ITEM> <CENTS>`
+印返出嚟，跟住印 `TOTAL <sum>`，再印 `BOAT <name> <count>` — 張帳簿表係渡輪公司
+嘅，佢個名嗰格到而家仍然寫住 `BOAT`。
+
+```
+input:  KWAN 2
+        HAUL 600
+        WASH 2800
+output: HAUL 600
+        WASH 2800
+        TOTAL 3400
+        BOAT KWAN 2
+```
+
+`n` 可以係 `0`，噉輸出就得最後兩行。
+
+Zig 冇 `class`；最接近嘅係一個入面宣告咗函數嘅 `struct`，而佢就係全部。冇
+constructor 會喺你背後行：`init` 係一個你自己寫、回傳個值嘅普通函數。冇隱藏嘅
+`this`：`self` 係第一個參數，寫到明明白白 — 函數要寫落帳簿就係 `*Ledger`，淨係讀
+就係 `*const Ledger` — 嗰個就係 method 上面嘅 `const`，擺咗出嚟俾你睇。亦都冇
+`private:`；一個欄位喺個檔案任何地方都攞得到，令 `main` 唔掂 `items` 嘅，係因為個
+struct 提供咗 `total()` 同 `count()`，冇理由兜過佢哋。
+'''
+hints = [
+  "一個 std.ArrayList(Item) 已經夠；個 struct 喺度係為咗等本帳簿擁有自己啲記錄。add 就係一個 append：self.items.append(gpa, .{ .name = name, .cents = cents })。",
+  "add 用 self: *Ledger，因為佢寫；total 同 count 用 self: *const Ledger，因為佢哋淨係讀。兩種情況 ledger.add(...) 都係同一個呼叫 — Zig 幫你攞個地址。",
+  "啲項目名係 input 嘅 slice，所以填本帳簿唔使本錢，而 input 要生存得長過佢 — main 入面 defer 嘅次序已經保證咗。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.advanced.06.tagged-union"
+title = "邊個揸緊軚"
+story = "自動收費線對每個 tag 都收會員價，包括唔係會員嗰啲，同埋嗰個根本唔係 tag 嘅。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行 `<TYPE> <HOURS>`。
+
+基本收費係 `500 + 100 * HOURS` 仙。每行印以下其中一樣：
+
+* `MEMBER` — 基本收費
+* `CREW` — 基本收費嘅一半，整數除法
+* `JUNIOR` — 永遠係 `200`
+* 其他 — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        MEMBER 4
+        CREW 4
+        JUNIOR 4
+output: 900
+        450
+        200
+```
+
+將個 tag 做成一個有四個 case 嘅 `union(enum)`，其中一個係 `other`。C++ 嘅
+`enum class` 帶唔到 payload，認唔到嘅文字要喺隔籬跟住；Zig 嘅 tagged union 將佢
+帶喺個 case **入面**：`other: []const u8`，而其餘三個 case 乜都唔帶。`union(enum)`
+嘅 case 唔會偷偷轉做整數，亦唔會將啲名漏出去外面個 scope — 正正係 `enum class`
+存在嘅兩個原因。
+
+用一個 `switch` 決定收費。對 tagged union 做 `switch` 一定要 cover 晒每個 case —
+漏咗一個就編譯唔到，唔使開任何警告 flag — 而 `.other => |raw|` 就係將 payload 由
+佢所在嘅 case 攞出嚟嘅方法。
+'''
+hints = [
+  "other: []const u8 係第四個 case，用 .{ .other = raw } 砌佢；三個 void case 就寫 .member、.crew、.junior。",
+  "std.mem.eql(u8, raw, \"MEMBER\") 比較兩個 slice；對 slice 用 == 比較嘅係指標，永遠唔係你想要嘅。",
+  "@divTrunc(base, 2) 係寫明咗嘅整數除法；對 signed 整數直接用 /，如果結果可能除唔盡就編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.advanced.07.maps"
+title = "收費廣場嗌緊乜"
+story = "06:30 嘅收費廣場：每個亭都隔住幾條線嗌緊啲乜，主管想要個排名。"
+brief = '''
+讀晒成個標準輸入，按空白字元切開。
+
+每個唔同嘅字印一次，格式係 `<word> <count>`，按次數由多到少排，次數一樣就按字由細到大排。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+`std.StringHashMap(i64)` 乜都唔按 — 唔按 key、唔按次數、唔按到達次序 — 所以排名係
+另一步：將啲 entry 抄入一個裝細 struct 嘅 `std.ArrayList`，再用一個 comparator 做
+`std.mem.sort`。`getOrPut(word)` 會搵到個位或者插入佢，再用 `found_existing` 話你知
+係邊樣，正正係數數迴圈想要嘅；一個新位嘅 `value_ptr` 喺你寫佢之前係未初始化嘅。
+
+Zig 冇 lambda。comparator 係一個普通函數，用名傳入去，第一個參數就係佢本來會
+capture 嘅 context — 呢度係 `{}`，型別係 `void`，因為佢乜都唔 capture。啲 key 係
+`input` 嘅 slice，所以個 map 一定要喺 `input` free 之前 `deinit`：`defer` 次序啱，
+唔使諗都做到。
+'''
+hints = [
+  "getOrPut(word) 回傳一個有 found_existing 同 value_ptr 嘅位；係新嘅就設 value_ptr.* = 0，然後加一。成個數數迴圈就係咁。",
+  "counts.iterator() 行晒啲 entry；每個都有 key_ptr 同 value_ptr。每個 entry append 一個 Row 落一個 std.ArrayList(Row)。",
+  "comparator 係 fn byRank(_: void, a: Row, b: Row) bool — 先按次數由多到少，再用 std.mem.order(u8, a.word, b.word) == .lt — 而 std.mem.sort(Row, rows.items, {}, byRank) 就用佢嚟排。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.advanced.08.hashtable"
+title = "完全冇次序"
+story = "收費廣場點名嘅結果係照 hash table 鍾意嘅次序返嚟，而主管想要嘅係啲亭真正應嘅次序。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行一個收費亭名。`n` 至少係 `1`，而一個名係
+一段冇空格嘅字元。同一個名可以出現多過一次。
+
+每個唔同嘅名印一次，格式係 `<name> <count>`，**按個名第一次出現嘅次序**。然後印
+`DISTINCT <k>`。
+
+```
+input:  5
+        SAI-WAN
+        TAI-PO
+        SAI-WAN
+        LEI-YUE
+        SAI-WAN
+output: SAI-WAN 3
+        TAI-PO 1
+        LEI-YUE 1
+        DISTINCT 3
+```
+
+個 container 單獨畀唔到你呢樣，而成個任務就係講呢樣。
+
+`std.StringHashMap` 係一個 hash table：平均查詢係 O(1)，但 `iterator()` 會按
+**bucket 次序**將啲 entry 畀返你 — 唔係排好序，唔係插入次序，而且個 table 一變大
+就會變。冇嘢承諾任何次序，所以一個行 hash map 嚟印嘢嘅程式，輸出係靠個 hash 函數
+決定。個 starter 正正係咁做，而且得一個唔同名嘅 case 佢仲會過 — 呢個就係破綻：
+一個分唔到次序嘅測試，唔係次序啱嘅證據。
+
+兩份工擺兩個 container：一個 `std.ArrayList([]const u8)` 記住每個名第一次見到嘅
+次序，一個 `std.StringHashMap(i64)` 負責數。行個 list 嚟印。
+'''
+hints = [
+  "hash table 係用嚟快啲查。list 係用嚟記次序。兩樣都要。",
+  "found_existing 每個名淨係 false 一次 — 就係插入嗰次 — 嗰刻就係將個名 append 落次序 list 嘅時候。",
+  "行個 list 嚟印，逐個名用 count.get(name).? 問個 map 攞次數，永遠唔好行個 map。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.advanced.09.set-and-sort"
+title = "邊個泊喺邊"
+story = "天橋底嘅停車處登記板將同一架貨車喺同一個車位列咗兩次，冇人講得出邊幾行係重複嘅。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行 `<BERTH> <NAME>`。
+
+每個唔同嘅 `<BERTH> <NAME>` 組合印一次，先按車位再按名排，然後印 `DISTINCT <k>`
+同 `DUPES <n - k>`。
+
+```
+input:  4
+        2 KWAN
+        1 LEE
+        2 KWAN
+        1 HO
+output: 1 HO
+        1 LEE
+        2 KWAN
+        DISTINCT 3
+        DUPES 1
+```
+
+Zig 冇裝 pair 嘅有序 set；最接近嘅係兩件各做一份工嘅工具。一個
+`std.StringHashMap(void)` 就係一個 set — 一個啲值唔佔位嘅 map — 用**嗰行本身**
+`2 KWAN` 做 key，任何已經有嘅組合，第二份佢都唔收。一個裝細 struct
+`{ berth, name }` 嘅 `std.ArrayList` 收集個 set 放行嘅嗰啲，再用一個 comparator
+做 `std.mem.sort`，排成先車位後名嘅次序。冇 structured binding 幫你拆開個 pair；
+個 struct 啲欄位本身已經有名。
+'''
+hints = [
+  "std.StringHashMap(void) 就係個 set；getOrPut(line).found_existing 喺同一行第二次出現嗰陣係 true，第一次係 false。",
+  "淨係個 set 放行嘅行先入個 list，所以個 list 嘅長度就係 DISTINCT，n 減佢就係 DUPES。",
+  "comparator 先按車位排，打和就用 std.mem.order(u8, a.name, b.name) == .lt；std.mem.sort(Mooring, moorings.items, {}, byBerthThenName) 就用佢嚟排。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.advanced.10.comptime-fn"
+title = "車道上一次過"
+story = "車軸記錄係一欄數。Alex 話寫四個 for 迴圈。阿美話寫四個有名嘅 for 迴圈，而嗰啲名就係函數。"
+brief = '''
+標準輸入係一行用空格分開嘅整數。
+
+印四行：
+
+1. 雙數值嘅總和（冇就係 `0`）
+2. 每個大過 `10` 嘅值乘二，照次序，用單個空格駁埋 — 冇就印 `-`
+3. 有幾多個唔同嘅值
+4. `FIRST_BIG <i>` — 第一個大過 `10` 嘅值嘅 index（由 0 開始），冇就係 `-1`
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+        FIRST_BIG 4
+```
+
+Zig 冇 `<algorithm>`，亦冇 lambda，而最接近嘅嘢比聽落去更近：一個收**另一個函數做
+`comptime` 參數**嘅函數。`fn sumIf(xs: []const i64, comptime keep: fn (i64) bool) i64`
+就係帶 predicate 嘅 `accumulate`；你用名傳 `isEven` 入去，編譯器印一份 inline 咗個
+呼叫嘅 `sumIf` 出嚟，runtime 冇任何函數指標。寫 `sumIf`、`keepDoubled`、一個用
+`std.mem.sort` 排一份 copy 再行一次相鄰對嘅唔同值計數，同埋 `indexOfFirst`。重點唔係
+個迴圈難寫；而係個名講明咗個迴圈係做乜嘅，而個 predicate 係一個你讀得明嘅值。
+'''
+hints = [
+  "comptime keep: fn (i64) bool 係參數型別；喺主體入面 keep(x) 係一個普通呼叫，而喺呼叫嗰度你傳 isEven，唔使括號。",
+  "keepDoubled 需要有地方寫：回傳一個由呼叫者 deinit 嘅 std.ArrayList(i64)，喺入面 errdefer 佢嘅 deinit，等 append 失敗嗰陣唔會漏。",
+  "gpa.dupe(i64, xs) 就係要排嘅 copy；排好序嘅 slice 啲重複值係相鄰嘅，所以一個值同前一個唔同嗰陣先係新嘅。",
+  "indexOfFirst 回傳 ?usize；if (indexOfFirst(...)) |i| 印中咗嗰個，else 分支印 -1。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.advanced.11.generics"
+title = "寫一次就夠"
+story = "收費廣場嘅錶板將 largest 寫咗四次 — 車軸一次、分鐘一次、車道一次、車道名一次 — 而第五次要喺第一班電車之前交。"
+brief = '''
+標準輸入係兩行：第一行係整數，第二行係字。
+
+寫**一個**兩樣都用得嘅 `largest`，同一個有 `larger()` 同 `smaller()` 嘅型別
+`Pair(T)`。
+
+印最大嘅整數、最大嘅字，然後用頭兩個整數整一個 `Pair`，印
+`PAIR <larger> <smaller>`。打和就當 `a` 係大嗰個。
+
+```
+input:  4 8 15 16
+        tram bus mtr
+output: 16
+        tram
+        PAIR 8 4
+```
+
+個 starter 編譯唔到：`largest` 釘死咗喺 `i64`，所以將啲字傳畀佢就係
+*expected type '[]const i64', found '[][]const u8'*。Zig 嘅泛型函數就係一個有
+**`comptime T: type`** 參數嘅函數：`fn largest(comptime T: type, xs: []const T) T`
+每種用嚟呼叫佢嘅型別都會印一份出嚟，而 `T` 係喺呼叫嗰度寫明 —
+`largest([]const u8, words)` — 唔係推斷出嚟。
+
+字冇 `>`；slice 用 `std.mem.order` 比較。喺個泛型入面，`if (comptime T == []const u8)`
+喺編譯時揀比較方法 — 唔適用嗰個分支連分析都唔會分析，同 template specialisation
+係同一個諗法，只係冇嗰堆機關。
+
+`Pair(T)` 係型別版嘅同一招：一個收 `type`、**回傳一個 struct** 嘅函數。冇另外一套
+class template 語法；型別喺編譯時就係一個值，而函數可以整一個出嚟。
+'''
+hints = [
+  "第一個參數寫 comptime T: type，入面所有 i64 換做 T，呼叫就變成 largest(i64, nums.items) 同 largest([]const u8, words.items)。",
+  "x > best 對 slice 編譯唔到；if (comptime T == []const u8) std.mem.order(u8, x, best) == .gt else x > best 每個實例化都揀啱比較方法。",
+  "fn Pair(comptime T: type) type { return struct { ... }; } — 入面 const Self = @This() 就係而家砌緊嗰個 struct 嘅名，而 Pair(i64){ .a = ..., .b = ... } 就砌一個出嚟。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.advanced.12.function-values"
+title = "閘杆點車數"
+story = "五號亭嘅閘杆數住邊架車揸入、邊架車倒返出去，主管想知收更嗰陣有幾多架，中間發生過乜都好。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行係 `IN` 或者 `OUT`。
+
+keep 住一個永遠唔會跌落零以下嘅累計數，每個指令之後印佢。然後印 `INS <k>` —
+有幾多個指令係 `IN`，用一個泛型 `countIf` 加一個 predicate 函數數 — 同
+`CLOSED <final>`。
+
+```
+input:  4
+        IN
+        IN
+        OUT
+        IN
+output: 1
+        2
+        1
+        2
+        INS 3
+        CLOSED 2
+```
+
+Zig 冇 closure — 冇 lambda，冇 capture — 而最接近嘅嘢係寫出嚟擺喺你睇得到嘅地方。
+個計數器係一個**擁有自己總數嘅 struct**，而 `add` 係 `*Counter` 上面嘅一個 method：
+C++ lambda 本來會用 `[total = 0LL]` capture、再標 `mutable` 嘅狀態，喺度係一個欄位，
+而改佢嘅呼叫係經指標攞個 struct。個 struct 以外，除咗經 `add`，冇嘢掂得到個總數。
+
+個 predicate 係一個**當 `comptime` 參數傳入去嘅函數**：`countIf(commands, isIn)`
+講出 `isIn` 個名，編譯器就 inline 佢。冇嘢要 capture，所以冇嘢 capture 咗，而面試官
+會問嘅 `[&]` 對 `[=]` 嗰條問題，喺度冇地方收埋。
+'''
+hints = [
+  "add 係三行：self.total += delta，喺零度夾住，return self.total。佢寫嘢所以攞 *Counter；count.add(...) 會幫你傳個地址。",
+  "用 var count = Counter{} 宣告嘅 Counter 因為欄位預設值由零開始；const 嘅就加唔到。",
+  "fn countIf(items: []const []const u8, comptime pred: fn ([]const u8) bool) usize 行晒個 slice，數 pred 收嘅項目；用名傳 isIn 入去。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.advanced.13.optional-union"
+title = "唔係數字嗰行"
+story = "車軸計數器嘅讀數交咗一欄數字，中間夾住某人嘅早餐柯打。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行。每行應該係一個整數。
+
+每行印個值乘二，或者 parse 唔到就印 `BAD <line>`。最後印 `SUM <total>`，個總數
+係你印過嗰啲值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+兩個型別裝住答案。`fn parse(text: []const u8) ?i64` 係*一個數，或者乜都冇*：
+`std.fmt.parseInt` 回傳一個 error union，而 `catch return
+null` 將個 error 變做 optional 嘅 `null` 嗰半。佢一係收成個字串，一係乜都唔收，
+所以 `4x` 同 `xx` 一樣會被拒絕。
+
+`fn doubled(text: []const u8) Doubled` 回傳一個 `union(enum) { value: i64,
+bad: []const u8 }` — *乘二咗嘅值，或者失敗嗰行*，正正兩個 case 其中一個，永遠唔會
+兩個都係，亦唔會兩個都唔係。對佢做 `switch` 就會由當時嗰個 case 攞出 payload：
+`.value => |v|`、`.bad => |line|`。`main` 入面一個 `try` 都冇；失敗係一個值，值去
+邊佢就去邊。個 starter 嘅 `main` 已經係嗰個 switch；`parse` 同 `doubled` 係空殼，
+未寫好之前每行都會出 `BAD`。
+'''
+hints = [
+  "std.fmt.parseInt(i64, text, 10) catch return null 就係成個 parse：成功嘅話個值就跌落去做 optional 嘅 payload，任何 error 就令個函數回傳 null。",
+  "optional 用 if (parse(text)) |value| 拆開；else 路就係個 null，.bad case 就喺嗰度砌。",
+  "同一個函數回傳 .{ .value = v } 或者 .{ .bad = text } 係合法嘅，因為回傳型別係一個兩樣都裝得落嘅 union；main 入面個 switch 揀分支，payload 用 |v| 或者 |text| 捉住。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.advanced.14.error-sets"
+title = "你自己嘅錯誤"
+story = "收費服務有四層，每層回傳嘅嘢都唔同，而佢哋上面冇嘢接到任何一樣。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行，每行應該係一個以公里計嘅距離。
+
+`fare(text)` 用 `std.fmt.parseInt` parse — 遇到 `xx` 佢會**失敗**，回傳
+`error.InvalidCharacter`，喺 `fare` 入面轉做佢自己嘅 `error.NotANumber` — 而負數
+距離就用你自己嘅第二個錯誤 `error.NegativeDistance` 拒絕。兩個都嚟自同一個有名嘅
+error set，`FareError`。否則就回傳 `500 + 100 * km`。
+
+每行輸入印一行：收費；parse 唔到就印 `not a number`；距離係負數就印
+`negative distance: <km>`。然後印 `ERRORS <k>`，即係有幾多行失敗。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative distance: -2
+        ERRORS 2
+```
+
+個 starter 編譯到，但遇到 `xx` 就死：`main` 入面嘅 `try fare(text)` 將個 error
+向上交，而 `main` 上面冇人 — 個程式印 `error:
+NotANumber` 同一條 trace，然後以 `1` 結束。Zig 嘅錯誤故事就係咁多：error 係回傳
+型別 `!i64` 入面嘅一個值，每個呼叫嘅地方一係 `try` 佢上去，一係 `catch` 佢。冇嘢會
+unwind 過一個冇講過自己會失敗嘅函數。
+
+Zig 嘅 error 係一個**名**，唔係一個物件：佢冇訊息、冇 payload，所以
+`negative distance: <km>` 係由仲揸住段文字嘅呼叫者砌。`catch |e| switch (e) { ... }`
+就係有兩個 arm 嘅 catch，而個 switch 一定要講晒 set 入面每個 error — C++ 嗰個會靜靜
+吞咗衍生例外嘅 `catch (const
+std::runtime_error&)` 喺度冇對應，因為根本冇繼承層級可以 slice。
+'''
+hints = [
+  "if (fare(text)) |cents| { ... } else |e| switch (e) { ... } 就係有兩個 catch arm 嘅 try block；成功嘅 payload 係 cents，error 係 e。",
+  "訊息由你自己砌：個 error 乜都冇帶，但 text 仲喺 scope 入面，印出嚟就係訊息要嘅 km。",
+  "一個去到 main 頂嘅 error 會印 error: <Name> 同一條 trace，再以 1 結束。個 starter 喺第二行就係咁，而呢個係好結果 — 個程式講咗佢喺邊度停。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.advanced.15.iterators"
+title = "你自己嘅 while 迴圈"
+story = "收費廣場個車軸錶由一更嘅開頭到結尾逐個讀數跳過去，一個都冇存低。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+幫 `Stops` 整一個 iterator，等對佢行 `while` 迴圈會出 `count` 個值，由 `start`
+開始，每次行 `step`。每個值印一行，然後印 `SUM <total>`，由一個 `total` 函數喺
+同一個 `Stops` 攞嘅一個新 iterator 上面計出嚟。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+個 starter 編譯唔到：`main` 呼叫 `stops.iter()`，而 `Stops` 冇呢個函數。Zig 冇
+iterator protocol，亦冇 trait 要繼承。iterator 就係一個**有 `next` method、回傳
+optional 嘅 struct** — 呢度係 `?i64` — 而行佢嘅迴圈係 `while
+(it.next()) |value| { ... }`，遇到第一個 `null` 就停。成份合約就係咁，而
+`std.mem.tokenizeAny` 同你喺呢條路用過嘅每個 `std` iterator 守嘅都係同一份。
+
+`total` 用同一個 `while` 行同一份合約；畀佢一個新 iterator，因為一個已經去到
+`null` 嘅 iterator 會一直停喺度。
+'''
+hints = [
+  "個 iterator 係一個巢狀 struct：const Iter = struct { value, step, left, fn next(self: *Iter) ?i64 }。next 攞 *Iter，因為佢要郁個 iterator。",
+  "left 係 0 嗰陣 next 回傳 null；否則佢記住當前個值、行一步、倒數一個，再回傳佢記住嘅嗰個。",
+  "迴圈變數一定要係 var — var walk = stops.iter() — 否則 next 攞唔到佢個地址；total 用第二個 stops.iter() 砌自己嗰個。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.advanced.16.defer"
+title = "佢自己執手尾"
+story = "收費廣場本記錄簿喺收更嗰陣自己合埋，次序啱晒，有冇人記得都一樣。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+喺 `main` **最頂**宣告兩個 `Guard` 值，叫 `first` 同 `second`，再逐個 `defer`
+佢哋嘅 `drop`，`drop` 會印 `DROP <name>`。喺一個巢狀 block 入面，將啲值餵入一個
+`Tally`，佢被 defer 嘅 `report` 會印 `TALLY <count> <sum>`。block 之後印 `DONE`。
+`main` 自己乜都唔印。
+
+```
+input:  3
+        1 2 3
+output: TALLY 3 6
+        DONE
+        DROP second
+        DROP first
+```
+
+除咗 `DONE`，每一行都係 `defer` 印嘅。Zig 冇 destructor；最接近嘅係 `defer`，而佢
+仲老實啲：釋放嗰行就寫喺攞資源嗰行隔籬，喺個 **block** 完嗰陣行 — 喺收尾大括號、
+喺 `return`、喺一個經 `try` 出去嘅 error — 次序同啲 `defer` **相反**。`Tally` 嘅
+`defer` 喺內層 block，所以 `TALLY` 喺 `DONE` 前面；兩個 guard 嘅 `defer` 喺 `main`
+嘅 block，而 `second` 係最後 defer 嘅，所以佢行先。冇一樣係你安排嘅，係 scope 安排嘅。
+
+有一樣要搞啱：`defer w.flush()` 係 `main` 入面第一個 `defer`，所以佢**最後**先行
+— 喺兩個 guard 將佢哋嗰行寫咗入 buffer 之後。擺佢喺佢哋後面，啲 `DROP` 行就會寫入
+一個冇人 flush 嘅 buffer。`defer gpa.free(input)`、`defer list.deinit(gpa)`、下一張
+地圖嘅 `defer m.unlock(io)`：呢條路上每個釋放都係同一個諗法。
+'''
+hints = [
+  "first 一宣告完就寫 defer first.drop(w);，second 都一樣。drop 你永遠唔使自己叫；main 完嗰陣會叫。",
+  "TALLY 喺 DONE 之前印，全靠內層嗰對大括號：喺入面嘅 defer tally.report(w) 喺佢哋收尾嗰陣行。拎走佢哋，佢就會喺之後先印。",
+  "defer 永遠倒轉行，所以 second 行先過 first — 亦所以最先 defer 嘅 flush 喺佢哋兩個之後先行。",
+  "tally.report 讀嘅係 defer 行嗰刻嘅 tally，唔係寫嗰刻嘅：defer 係一句延後咗嘅 statement，佢講嘅參數喺嗰陣先計。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.advanced.17.past-the-end"
+title = "最後一個亭之後"
+story = "06:00:00，隧道口。六號亭隔籬塊訊號板記住海旁所有會響嘅嘢嘅開炮表，而佢個 checksum 迴圈讀多咗表尾後一格。"
+brief = '''
+第一行係 `n`。之後嘅 `n` 行係開炮表，`<NAME> <SECONDS>`。然後一行 `q`，同
+`q` 個要查嘅名。
+
+每個名印 `<NAME> FIRES AT <seconds>` 或者 `<NAME> UNKNOWN`。然後印
+`LOADED <n> CHECKSUM <sum of every SECONDS in the table>`。
+
+```
+input:  2
+        GUN 3
+        HORN 7
+        3
+        GUN
+        BELL
+        HORN
+output: GUN FIRES AT 3
+        BELL UNKNOWN
+        HORN FIRES AT 7
+        LOADED 2 CHECKSUM 10
+```
+
+個 starter 編譯得乾乾淨淨，但會 panic 兩次，兩個唔同原因，你要兩個都搵出嚟。
+
+第一個係 `lookup`。佢回傳一個 `?*Shell` — 對得上嗰個 entry 嘅地址，或者 `null` —
+而呼叫者睇都唔睇就喺佢上面寫 `.?`。`.?` 即係*我知呢個唔係 null*，而佢係嘅時候，
+`-O Debug` 會用 `panic: attempt to use null value` 停咗個程式。check 個 optional：
+`if (lookup(...))
+|shell|` 係攞到佢後面嘅嘢嘅唯一方法，而 `else` 分支就係 `UNKNOWN` 住嘅地方。
+
+第二個係 checksum 迴圈。佢行 `1..=n`，讀 `table[i]`，而 index `n` 係尾後一格：
+`panic: index out of bounds: index 2, len 2`。整好個迴圈。然後諗吓個 panic 幫你買咗
+乜：呢個任務嘅 C++ 版讀 `table[n]` 唔會 check，攞到嗰個地址啱啱有嘅嘢 — heap 上面
+下一個物件，或者乜都冇 — 然後印一個錯咗某個冇人重現到嘅數嘅 checksum。Zig 喺 Debug
+會 check 每個 index 同每個 `.?`，而喺 `-O ReleaseFast` 兩樣都唔 check：同樣兩行喺
+嗰度會變成 undefined behaviour，同 C++ 一模一樣。呢個 land 嘅交易就係咁：你起緊嘢
+嗰陣個 check 係開住嘅，而等到佢關咗嗰陣，你要做到一次都唔使靠佢。
+'''
+hints = [
+  "綁住 lookup 嘅結果再 check：if (lookup(table, name)) |shell| { ... } else { UNKNOWN }。個 optional 同時係答案同問題。",
+  "有效 index 由 0 到 len - 1。由 1 開始、行到 len 嘅迴圈兩頭都差一，而淨係頂嗰頭會 panic。對個 slice 行 for 就冇 index 可以搞錯。",
+  "兩個 panic 都係 Debug 模式嘅 check。用 -O ReleaseFast 起個 starter，兩行都唔會停：checksum 讀過咗尾，而個 null 會跟到去地址零。個 check 就係你買緊嘅嘢，而個修正就係你俾嘅錢。",
+  "panic 會喺 stderr 印訊息同 stack trace，再以 134 結束；judge 讀嘅係 stdout，所以 panic 之前印咗嘅嘢仍然喺度，仍然係錯。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.advanced.18.threads"
+title = "兩條行車線，一個計數器"
+story = "天橋喺 07:00 開咗第二條行車線，隧道口條車龍終於散得去。收費廣場其他嘢一樣都冇變。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 `std.Thread`，計佢嘅平方，寫入 `out[i]` — 佢自己嘅格，所以冇兩條
+thread 會掂同一個元素。join 晒佢哋，然後每個結果印一行，再印 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+`std.Thread.spawn(.{}, worker, .{ args })` 用嗰啲參數喺一條新嘅 OS thread 上面開
+`worker`，回傳個 handle，或者一個 error；啲參數會 copy 入條 thread，所以傳入去嘅
+slice 係望住 `main` 記憶體嘅一個 view，而傳入去嘅 index 係嗰條 thread 自己嘅。
+冇 closure 會 by reference capture 錯嘢：條 thread 睇得到嘅所有嘢都喺個 tuple 入面，
+你讀得到。
+
+啲 thread 係 scheduler 鍾意乜次序就乜次序咁完成。按 index 寫、join 完先印，先令
+每次行出嚟嘅輸出都一樣。自己印嘢嘅 thread 就唔會。
+'''
+hints = [
+  "std.Thread.spawn(.{}, square, .{ nums, out, i }) 即刻開條 thread 兼回傳佢個 handle；將啲 handle 存喺一個 std.Thread 嘅 slice 度，咁先 join 得佢哋。",
+  "for (threads, 0..) |*t, i| 連 index 一齊行啲 handle 格；t.* = try std.Thread.spawn(...) 逐格填。",
+  "讀 out 之前 join 晒每條 thread。join() 會等到條 thread 完先返，之後啲寫入就睇得到。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.advanced.19.join"
+title = "冇簽退，冇人走得"
+story = "一條行車線 thread 做完更，工頭冇攞佢個 handle 就行咗出收費亭，成個收費廣場就停晒電。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行文字。
+
+每行開一條 thread，將佢轉做大楷寫入佢自己嘅格。join 晒佢哋，照次序印啲行，然後
+印 `DONE`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        DONE
+```
+
+個 starter 編譯唔到，而個錯誤就係呢課。`std.Thread.spawn` 回傳 `!std.Thread` —
+個 handle，或者一個 error — 而個 starter 將佢當一句淨係 statement 咁掉落地：
+*error union is ignored*。Zig 唔准一個可能係 error 嘅值冇人睇過，而佢係幫緊你：
+個 handle 係 `join` 嘅**唯一**方法，而一條冇人 join 嘅 thread，係 `main` 回傳嗰陣
+仲行緊嘅 thread — 個 process 喺佢腳下完結，啲行轉咗一半大楷，或者完全冇轉，睇
+scheduler 心情。C++ 會喺一條仲係 joinable 嘅 `std::thread` 被銷毀嗰陣 abort；Zig 就
+要你親手揸住個 handle，問你打算點處理佢。
+
+所以每個 handle 都要留住，每條 thread 喺讀佢嘅成果之前都要 join（或者 `detach`，
+但幾乎永遠都唔係你想要嘅）。個形狀同 allocator 一樣：`alloc` 一個 `std.Thread` 嘅
+slice，填滿佢，join 佢，`free` 佢 — 而個 join 迴圈企喺 C++ destructor 本來企嘅位置。
+'''
+hints = [
+  "編譯器要你睇 spawn 嘅回傳值。t.* = try std.Thread.spawn(...) 留住個 handle，有 error 就交上去，兩半都老老實實咁處理咗。",
+  "將啲 handle 存喺一個大細係 n 嘅 std.Thread slice 度；印任何嘢之前 for (threads) |t| t.join();。",
+  "先 spawn 晒，再 join 晒。喺 spawn 迴圈入面 join 喺呢度都過到 — 但就變咗一條一條咁行，唔係 thread 嘅用途。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.advanced.20.mutex"
+title = "一個錢盤，八個收費亭"
+story = "每個收費亭都將自己收咗幾多加落廣場牆上面同一個總數，到咗個鐘尾，牆上面個數同佢哋個個都唔夾。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 thread，將佢加落**一個共用嘅總數**。join 晒佢哋，然後印
+`TOTAL <sum>` 同 `THREADS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        THREADS 4
+```
+
+個 starter 編譯到，印 `TOTAL 0`。個 worker **by value** 收 `total` — 一個 copy 入
+thread 參數 tuple 嘅 `i64` — 加落自己嗰份 copy 然後掉咗佢。改做傳一個指標
+`*i64`，你就有另一個 bug，一個喺咁細嘅測試入面唔會現形嘅：幾條 thread 同時做
+`total.* += value` 係一個 **data race**。Zig 嘅 Debug check 捉唔到佢；喺呢度 race
+同喺 C++ 一樣係 undefined behaviour，唔只係個數錯咁簡單。
+
+喺總數隔籬擺一個 `std.Io.Mutex`，每條掂佢嘅 thread 都鎖佢，就係答案：
+`m.lockUncancelable(io)` 攞鎖，`defer m.unlock(io)` 喺 block 尾放返，中間無論發生乜。
+個 worker 收 `io: std.Io` 做參數，因為個 mutex 要用佢 — 喺 0.16，個鎖係 I/O
+runtime 嘅一部分，唔係 thread library 嘅，而 `std.Thread.Mutex` 已經冇咗。個
+`defer` 就係 C++ 嘅 `lock_guard`，寫喺解鎖會發生嘅位置。
+'''
+hints = [
+  "傳 &total，唔好傳 total：worker 嘅參數變做 total: *i64，加法係 total.* += value。條 thread 應該改 main 嘅 total，唔係佢自己嗰份。",
+  "喺 main 寫 var total_mutex: std.Io.Mutex = .init;，tuple 入面傳 &total_mutex，worker 入面加法之前 m.lockUncancelable(io); defer m.unlock(io);。",
+  "join 晒之後讀 total 唔使鎖都安全：join() 係一個同步點，而且已經冇 thread 會再寫。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.advanced.21.counter"
+title = "自己上鎖嘅計數器"
+story = "3 號收費亭嘅車軸計數器記住兩個一定要對得上嘅數，而有兩個人同時讀緊佢哋。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+整完個 `Counter`：`add` 攞鎖、加落總數、將 hit 數加一；`snapshot` 攞鎖、將兩樣
+一齊回傳。每個值開一條 thread，join 晒，然後印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 mutex 住喺 struct **入面**，喺佢守住嘅欄位隔籬，而每個掂嗰啲欄位嘅函數都會
+攞佢。就係呢個形狀：個鎖係物件嘅一部分，唔係靠呼叫者記得嘅嘢。
+
+個 starter 編譯唔到，原因值得諗一分鐘。`snapshot` 收 `self: Counter` — by value，
+淨係讀嘢嘅 method 通常都係咁寫 — 但鎖一個 mutex *會改到個 mutex*，所以
+`self.mutex.lockUncancelable(io)` 要一個 `*std.Io.Mutex`，而由一個 by value 嘅
+`self` 佢淨係攞到一個 `*const`。仲衰啲嘅係，by value 嘅 `self` 係個計數器嘅一份
+**copy**：就算編譯到，佢都係鎖緊個鎖嘅 copy，即係乜都冇鎖到。修正係
+`self: *Counter`。冇 `mutable` 關鍵字可以用，因為根本冇 `const` method 要繞過：
+一個一定要攞鎖嘅 method 喺 signature 度講明，而個 signature 就係成個承諾。
+'''
+hints = [
+  "一個字元就整好個編譯錯誤：fn snapshot(self: *Counter, io: std.Io) Snapshot。counter.snapshot(io) 讀落一樣；Zig 會幫你攞地址。",
+  "by value 嘅 self 會係成個 Counter 嘅 copy，連個 mutex 都係。鎖一份 copy 乜都保護唔到，所以編譯器拒絕你係啱嘅答案，唔係麻煩。",
+  "Counter.add 係一個普通函數，第一個參數係 *Counter，所以 std.Thread.spawn(.{}, Counter.add, .{ &counter, io, value }) 就係 thread 呼叫 method 嘅方法。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.advanced.22.lock-order"
+title = "兩個鎖，一個次序"
+story = "上蓋下面兩個錢盤，兩個鎖，兩個收費亭，兩支閘喺同一秒停晒。"
+brief = '''
+兩個錢盤，`A` 同 `B`，每個係一個 `i64`，各有自己嘅 `std.Io.Mutex`。
+
+標準輸入第一行係起始數額，第二行係一個數量 `n`，跟住 `n` 行
+`<FROM> <TO> <AMOUNT>`，`FROM`/`TO` 係 `{A, B}` 其中之一。
+
+每次轉移用自己一條 thread 行，join 晒佢哋，然後印 `A <level>`、`B <level>`、
+`MOVED <n>`。
+
+```
+input:  100 100
+        2
+        A B 30
+        B A 10
+output: A 80
+        B 120
+        MOVED 2
+```
+
+個 starter 有兩樣嘢錯，但淨係一樣喺輸出睇得到。佢由來源扣咗，但從來冇加落目的地
+— 呢個係睇得到嘅 bug。另一個係形狀：*先鎖來源*，即係兩個方向相反嘅轉移可以各自
+揸住一個鎖，永遠等緊另一個。呢個就係死鎖，測試入面唔會出現；佢會喺某個星期二
+07:59 出現。
+
+Zig 冇一次過攞幾個 mutex 嘅 `scoped_lock`；最接近嘅，係佢實現嗰條規則，人手守住。
+用**一個全域次序**攞兩個鎖 — 每條 thread 都係先 `A` 嘅 mutex 再 `B` 嘅，無論啲錢
+向邊個方向走 — 個循環就形成唔到。兩個 `lockUncancelable`，兩個 `defer unlock`，而
+啲 defer 係倒轉次序放返，正正係 `scoped_lock` 都會用嘅次序。
+'''
+hints = [
+  "掂任何一個數額之前先鎖晒兩個錢盤：先 a 嘅 mutex，再 b 嘅，每條 thread 都係呢個次序，每個後面跟住佢嘅 defer unlock。",
+  "啲錢嘅方向決定邊個數額要減，唔係決定邊個鎖先攞。",
+  "兩個 defer 倒轉次序放返：b 嘅鎖先返，然後 a 嘅。C++ 嘅 scoped_lock 都會用呢個次序，規則一樣 — 每條 thread 都同意同一個次序。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.advanced.23.queue"
+title = "個閘口"
+story = "一個收費亭經個閘口將啲錢送入點鈔房，一個文員逐個攞出嚟，而個文員由 06:40 開始就一直對住一個空閘口等緊。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+一個 producer 將每個值推入一個 `std.Io.Queue(i64)`；一個 consumer 逐個攞出嚟，
+乘二再印。producer 推晒之後，`main` 就**關閉**個 queue，而 consumer 喺個 queue
+清晒兼且關閉咗嘅時候停。await 晒兩個，然後印 `CONSUMED <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        CONSUMED 3
+```
+
+C++ 用一個 `std::queue`、一個 mutex、一個 condition variable 同一個 `done` flag
+砌出呢樣嘢；Zig 0.16 將成樣嘢做成一個型別。`std.Io.Queue(T)` 係一條建喺你自己擁有
+嘅 buffer 上面、有上限嘅 channel：`putOneUncancelable(io, v)` 喺滿嗰陣會等，
+`getOneUncancelable(io)` 喺空嗰陣會等，而 `close(io)` 之後，對一個清晒嘅 queue
+做 `get` 會回傳 `error.Closed` — 呢個就係 consumer 停嘅訊號，個迴圈係 `while
+(q.getOneUncancelable(io)) |v| { ... } else |_| {}`。queue 係 FIFO，所以無論
+scheduler 點做，次序都係輸入次序。
+
+`io.concurrent(func, .{ args })` 喺 runtime 自己嘅 pool 上面開 `func` — 保證有佢
+自己一個並行單位，唔係就呼叫失敗 — 然後交返一個 future 畀你；對佢做
+`.await(io)` 就係 join。個 starter 會 hang。producer 推晒所有嘢就回傳，冇人關閉個
+queue，consumer 為最後一個值醒咗，清晒個 queue，然後等一個永遠唔會嚟嘅下一個。
+每對 producer/consumer 都要有方法講*冇嘢再嚟* — 呢個就係 `close`。
+'''
+hints = [
+  "feeding.await(io) 之後加一行：hatch.close(io)。然後 taking.await(io) 就會返，個程式就會完。",
+  "close 唔會掉走 queue 入面仲有嘅嘢；consumer 會繼續攞到值，直到清晒為止，之後先見到 error.Closed。",
+  "consumer 行緊嗰陣係唯一印嘢嘅，而 main 喺 taking.await(io) 之後先印 CONSUMED — 就係呢個次序令個 writer 唔使鎖都安全。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.advanced.24.atomic"
+title = "一個字，冇鎖"
+story = "車軸個數唔使鎖。點鈔房其他嘢就要，分得清邊樣係邊樣就係呢份工。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一條 thread。每條將自己個值加落一個共用嘅 `std.atomic.Value(i64)`，
+再將另一個共用嘅 `std.atomic.Value(i64)` 加一 — 任何地方都冇 mutex。join 晒佢哋，
+印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+個 starter 編譯唔到：個 worker **by value** 收兩個 atomic，而 `fetchAdd` 要一個
+`*std.atomic.Value(i64)` — by value 嘅參數淨係畀到一個 `*const`。呢個係刻意嘅。
+一個 atomic 係幾條 thread 同意一次一條指令咁更新嘅位置；佢嘅 copy 會係另一個位置，
+共用就冇咗。傳地址。
+
+atomic 唔係平啲嘅 mutex；佢係另一種工具，用嚟喺單一條指令入面讀、改、寫一個機器
+字。`fetchAdd(v, .monotonic)` 就係嗰條指令。兩個欄位一要對得上，個鎖就要返嚟 —
+冇一個 atomic 係「呢兩樣嘢，一齊」嘅，所以之前嘅任務嘅 `Counter` 有 mutex，而呢個冇。
+
+呢度用 `.monotonic` 就夠，因為冇嘢靠呢啲加法相對其他寫入*幾時*睇得到，只係要
+一個都唔好漏。呢句就係跟進問題。
+'''
+hints = [
+  "錯誤訊息話佢要一個 *atomic.Value(i64)，但手上得一個 *const 嘅。將兩個參數都改做指標，tuple 入面傳 &total 同 &hits。",
+  "fetchAdd 回傳之前個值，並且 atomic 咁做加法；_ = 掉咗個回傳值，冇鎖，亦冇 defer。",
+  "total.raw += value 會編譯到，而嗰個就係 race；fetchAdd 係唯一唔係 race 嘅嗰條指令。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.advanced.25.parallel-sum"
+title = "分開個收費廣場"
+story = "一萬二千個車軸讀數，四個收費亭。主管想要每個收費亭嘅份額同總數，而總數每次行都要一樣。"
+brief = '''
+第一行係 `k n`：`k` 條 thread 同 `n` 個值。第二行係嗰 `n` 個值。
+
+將啲值分做 `k` 段連續嘅 chunk — 第 `i` 段由 index `i * n / k` 開始，去到
+`(i + 1) * n / k` 但唔包佢，用整數運算 — 等第 `i` 條 thread 將佢嗰段加入
+`partial[i]`。join 晒佢哋，然後照次序每段印 `CHUNK <i> <sum>`，再印
+`TOTAL <sum of partials>`。
+
+```
+input:  2 5
+        1 2 3 4 5
+output: CHUNK 0 3
+        CHUNK 1 12
+        TOTAL 15
+```
+
+呢個係用 thread 真係會快啲嘅形狀，亦係呢張地圖唯一一個：每條 thread 讀自己嘅
+sub-slice、寫自己嘅格，所以冇鎖、冇 atomic，除咗輸入之外乜都唔共用。交個
+sub-slice 本身畀條 thread — `nums[begin..end]` 係一個 view，而讀嘢嘅就應該攞一個
+view — 再加一個指住佢嗰一格嘅指標。chunk 邊界條公式令個分割啱啱好 — 最後一段永遠
+喺 `n` 完，而 `k > n` 嘅時候有啲 chunk 可以係空嘅，有一個隱藏 case 正正係咁安排；
+一個空 slice 加埋係 `0`，唔使特別處理。
+'''
+hints = [
+  "喺 main 計好 begin 同 end，喺嗰度切：nums[begin..end] 係條 thread 攞到嘅 view，&partial[i] 係佢唯一可以寫嘅格。",
+  "喺 thread 入面用一個本地總和，最後先寫一次 slot.*，咁每條 thread 就啱啱掂共用個 slice 一次。",
+  "k > n 令某啲 chunk 係空 — begin == end — 而 nums[begin..end] 係一個空 slice，佢個 for 迴圈就咁唔行。唔使特別處理。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.advanced.26.futures"
+title = "應承我個數"
+story = "主管叫個跑腿去攞每個數字，自己唔企喺閘口度等；啲數字幾時返就幾時返。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+每個值開一個 `io.concurrent` task，回傳個值嘅平方。將啲 future 收入一個 list，
+**照次序** `await` 佢哋，逐個印。然後將一個得一格嘅 `std.Io.Queue(i64)` 交畀多一條
+thread，由佢將 `n` put 入去，再由攞出嚟嘅嘢印 `READY <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        READY 3
+```
+
+future 係一個仲未到嘅值。`io.concurrent(square, .{ v })` 喺 runtime 嘅 pool 上面開
+`square`，畀你一個裝住佢回傳值嘅 `std.Io.Future(i64)`；`.await(io)` 會等到個值存在，
+然後交畀你，淨係一次。照次序 await 啲 future 就係令輸出有次序嘅原因 — 啲 task
+本身幾時完就幾時完。
+
+Zig 冇 `std::promise`；最接近嘅係同一條喉嘅另一頭，而 0.16 已經有條喉。一個建喺
+**得一格**嘅 buffer 上面嘅 `std.Io.Queue(i64)` 就係一個 promise：一邊將個值放入去，
+另一邊攞出嚟，攞嗰個會等到個值到為止。一條 thread 就係咁唔使 mutex、flag 或者要包
+嘅回傳值咁報告一個結果 — 而佢同三個任務之前個閘口係同一個型別，只係 buffer 得一格。
+
+`io.concurrent` 應承個 task 係自己行嘅 — 如果 runtime 畀唔到一條 thread，佢會以
+`error.ConcurrencyUnavailable` 失敗 — 而 `io.async` 嘅承諾就弱啲：喺一個冇第二條
+thread 畀得你嘅 runtime 上面，個函數*可能*就喺嗰度、喺 `async` 回傳之前就被呼叫。
+你想要 `concurrent` 嘅時候，就大大聲講出嚟。
+'''
+hints = [
+  "try io.concurrent(square, .{v}) 回傳一個 std.Io.Future(i64)；一路推入個 list，永遠唔好 copy 一個 future — 經指標 await 佢，for (squares.items) |*f|。",
+  "每個 future 淨係可以 f.await(io) 一次，而且會等到個值到為止；照次序行個 list，輸出就照次序。",
+  "報告嗰條 thread 攞 &ready 同 n；main 入面嘅 ready.getOneUncancelable(io) 會等到 put 發生咗為止。main 回傳之前 join 條 thread。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.advanced.27.optional-pointer"
+title = "編譯器叫得出嘅大細"
+story = "2 號收費亭插喺釘上面嗰串收費單：每張單扣住下一張，一路落到呢更第一張，而冇人會揸住同一張單兩次。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個以仙計嘅金額。
+
+將佢哋照到達次序裝落一條鏈，每個金額一個 node：
+
+```
+const Entry = struct {
+    cents: i64,
+    next: ?*Entry,
+};
+```
+
+印三行：
+
+1. 照次序嘅金額，用空格分開，冇就印 `-`
+2. `SUM <total>`，由一個喺條鏈上面行嘅**遞迴**函數計
+3. `LAST <cents>` — 最後一個 node 嘅金額 — 或者 `LAST NONE`
+
+```
+input:  5
+        1 2 3 4 5
+output: 1 2 3 4 5
+        SUM 15
+        LAST 5
+```
+
+個 starter 編譯唔到，而個錯誤正正係指標存在嘅原因。寫 `next: Entry`，編譯器就要
+喺記憶體度排好 `Entry`：`cents` 八個 byte，加一個 `Entry` 有幾大 — 而呢個正正係
+佢想計出嚟嘅嘢。*struct 'Entry' depends on itself.*
+
+`?*Entry` 係一個指標，而指標嘅大細編譯器早就知道。Zig 冇 `unique_ptr`；最接近嘅
+係佢執行嗰條規則，人手守住：**allocator 就係擁有者。** `gpa.create(Entry)` 交一個
+node 畀你，`gpa.destroy(node)` 交返佢，啱啱一次，而*邊個* destroy 佢呢個問題靠慣例
+答：條鏈擁有佢啲 node，所以 `main` 回傳之前會行一次條鏈嚟 free 佢。個 `?` 就係編譯器
+會 check 嘅部分：`null` 同時係條鏈嘅尾同空鏈，而冇嘢可以唔 unwrap 就經一個
+`?*Entry` 讀嘢，所以任何地方都冇另外嘅空 case。
+'''
+hints = [
+  "一行就整好個編譯錯誤：next: ?*Entry — 而家個 struct 係十六個 byte，無論佢指住乜。",
+  "由尾砌到頭：node = try gpa.create(Entry); node.* = .{ .cents = v, .next = head }; head = node。舊嘅 head 變咗新 node 嘅尾。",
+  "用 while (walk) |node| : (walk = node.next) 嚟行；個 optional 每步 unwrap 一次，迴圈喺 null 完。遞迴總和兩行搞掂：null 係 0，否則就係 cents 加其餘嘅總和。",
+  "head 一宣告完就寫 defer freeChain(gpa, head)：defer 係喺佢行嗰陣先讀 head，即係 main 嘅尾，嗰陣條鏈已經完整。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.advanced.28.refcount"
+title = "仲有邊個揸住佢"
+story = "兩個錶經一本帳簿讀同一個錢盤，本帳簿要留到最後一個錶走咗為止，一秒都唔可以多。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+將啲值擺入一個由 `Ledger` 擁有嘅 slice，而呢個 `Ledger` 會**數住有幾多個揸住佢**：
+`share()` 派一個 handle 出去兼將個數加一，`release(gpa)` 將個數減一，去到零嗰陣
+就 free 個 slice。攞兩個 handle，再留一個唔計數嘅觀察者。印四行：
+
+1. `REF <sum>` — 經第二個 handle 讀嘅總和
+2. `SHARED <k>` — 兩個 handle 都仲在嗰陣嘅數目
+3. `ALIVE yes` — 佢哋仲在嗰陣嘅 `watch.alive()`
+4. `ALIVE no` — 兩個 handle 都 release 咗之後
+
+```
+input:  3
+        1 2 3
+output: REF 6
+        SHARED 2
+        ALIVE yes
+        ALIVE no
+```
+
+Zig 冇 `shared_ptr`；最接近嘅係 `shared_ptr` 底下嘅真身，寫喺你睇得到嘅地方。上一個
+任務係一個擁有者。呢個係擁有者嘅數目，擺喺物件隔籬，數目去到零嗰陣物件就會 free —
+由啱啱最後走嗰個 handle 去做。`share()` 令數目加一；`release()` 令數目減一。冇嘢會
+幫你做任何一樣：收尾大括號度冇 destructor 會行，所以每個 `share()` 都要配一個你親手
+寫嘅 `release()`，否則個 slice 就會漏，而 `main` 回傳嗰陣 `-O Debug` 嘅 allocator
+會喺 stderr 講出嚟。
+
+個觀察者就係個 `Ledger` 本身，睇佢但唔計數。佢睇得到個 slice 仲喺唔喺度 —
+`items` 係 `?[]i64`，最後一次 release 之後嘅 `null` 就係個型別畀你代表「冇咗」嘅
+**零值** — 而佢唔可以令個 slice 繼續生存。呢個就係打破循環嘅方法，亦係呢條路最後
+一張地圖講嘅嘢。
+'''
+hints = [
+  "share() 兩行搞掂：self.refs += 1; return self。叫兩次就係 SHARED 2，而 mirror.items.? 去到同一個 slice。",
+  "release() 將個數減一，淨係去到零嗰陣先 free 個 slice 兼將 items 設做 null — alive() 讀嘅就係嗰個 null。",
+  "兩個 handle 都要 release；淨係第一個 release 乜都唔會 free，第二個先會。大聲講出點解：呢個任務真正問緊嘅就係呢個。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.advanced.29.take"
+title = "帶埋佢走"
+story = "主管每張單交畀送單員之前都影印一份，而部影印機係成個收費廣場最慢嘅嘢。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 行文字。
+
+每行喺一個 list `pile` 入面砌一個 `Docket`，然後將每張單交去第二個 list `sent`，
+由 `sent` 將每張嘅文字轉大楷印出嚟，再印 `SENT <n>`、`COPIES <c>`、`MOVES <m>`。
+
+```
+input:  2
+        lucky mac
+        percival
+output: LUCKY MAC
+        PERCIVAL
+        SENT 2
+        COPIES 0
+        MOVES 2
+```
+
+`Docket` 擁有自己嘅文字 — 一個佢自己 allocate 嘅 `[]u8` — 而且數住自己發生過乜：
+`copy(gpa)` 複製啲 byte 兼將一個全域變數加一，`take()` 加另一個。個 starter 報
+`COPIES 2`：`sent.append(gpa, try d.copy(gpa))` 複製咗每張單，連啲 byte 一齊。
+
+Zig 冇 move semantics，亦冇 move constructor；最接近嘅係一種紀律，而呢個任務將佢
+寫出嚟。賦值一個 struct 會 copy 佢個 header — 對 `Docket` 嚟講，就係文字嘅指標同
+長度 — 所以 `sent.append
+(gpa, d)` 會留低**兩張**都以為自己擁有同一啲 byte 嘅單，而第二次 `free` 佢哋就係
+crash。`take()` 係老老實實嘅交收：佢回傳一張揸住文字嘅單，將來源留低一個
+**空 slice**，所以來源仍然 free 得 — free 咗等於乜都冇 free — 而且永遠唔會被當成仲
+有文字咁讀。C++ 嘅 *valid but unspecified* moved-from 狀態就係呢樣，寫成一個你自己
+揀嘅值。
+'''
+hints = [
+  "改一個呼叫：sent.append(gpa, d.take())。take 要一個 *Docket，所以個迴圈已經用 |*d| 行個 pile。",
+  "pile 嘅 deinit 迴圈仍然會行過每張單；take 之後每張都揸住一個空 slice，而 deinit 遇到空嘅就唔 free。冇嘢會 free 兩次。",
+  "sent.append(gpa, d.*) 會編譯到，印 COPIES 0 MOVES 0 — 然後 main 嘅尾兩個 list 會 free 同一啲 byte。啲計數器存在，就係為咗老實嘅交收同 double free 睇落唔一樣。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.advanced.30.generic-ring"
+title = "乜貨都裝得嘅環"
+story = "車軸錶記住最後幾個讀數，主管記住最後幾個車牌，而 Alex 將同一個 ring buffer 寫咗兩次。"
+brief = '''
+第一行係一個容量 `cap`。第二行係一串整數；第三行係一串字。
+
+寫**一個** `Ring(comptime T: type) type`：一個固定容量嘅 buffer，留住最近推入嘅
+`cap` 樣嘢，覆寫最舊嗰個，而且可以照到達次序行。將啲整數推入一個 `Ring(i64)`，
+啲字推入一個 `Ring([]const u8)`，每個環嘅內容印一行，然後印 `DROPPED <k>` — 總共
+有幾多樣嘢被推咗出去。
+
+```
+input:  2
+        1 2 3 4
+        hku tram bus
+output: 3 4
+        tram bus
+        DROPPED 3
+```
+
+個 starter 編譯唔到：`Ring` 係為 `i64` 寫嘅，啲字冇地方去。Zig 嘅泛型型別係一個
+**回傳 struct 嘅函數**，同呢條路早前嘅 `Pair(T)` 一模一樣：`fn Ring(comptime T:
+type) type { return struct { ... }; }`，格用 `[]T`，`push` 用 `T`。成個寫嗰陣都唔知道
+`T` 係乜 — 只知道佢可以 copy — 而 `Ring(i64)` 同 `Ring([]const u8)` 係由同一個定義
+印出嚟嘅兩個唔同型別。
+
+都要畀佢一個 iterator。個環唔係照到達次序存 — 最舊嗰樣喺寫頭就快要覆寫嘅位置 —
+所以 `next()` 要做算術，而呢部分先值得自己寫，唔係淨係讀。印嘢要喺 `T` 上面做一個
+`comptime` 分支，因為字係 `{s}`，數字係 `{d}`。
+'''
+hints = [
+  "struct 外面包 fn Ring(comptime T: type) type { return struct { ... }; }，格用 []T，push 用 T，再用 const Self = @This() 喺入面叫個 struct。然後喺兩個用嘅地方寫 Ring(i64).init 同 Ring([]const u8).init。",
+  "最舊嗰樣喺 (head + cap - count) % cap；到達次序第 k 樣係 (oldest + k) % cap。iterator 淨係要帶住 k 同一個指住個環嘅指標。",
+  "fn printRing(w, comptime T: type, ring: *const Ring(T)) 行個 iterator；if (comptime T == []const u8) 揀 {s} 唔揀 {d}，而另一個分支對嗰個 T 從來唔會被分析。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "zig.advanced.31.invalidation"
+title = "一路行一路刪"
+story = "主管一路讀路旁停車處嘅客貨車名單一路剔，每剔一架就跳過下一架。"
+brief = '''
+第一行係 `n t`。第二行係 `n` 個整數。
+
+**就地**由個 list 刪走每個細過 `t` 嘅值，將剩低嘅印一行（乜都冇剩就印 `-`），
+然後印 `REMOVED <k>`。
+
+```
+input:  6 3
+        1 1 2 5 1 4
+output: 5 4
+        REMOVED 4
+```
+
+個 starter 係人人都寫過一次嘅 bug：佢按 index 行，呼叫 `orderedRemove(i)`，跟住
+做 `i += 1` — 而滑咗入第 `i` 格嘅元素從來冇人睇過。兩個相鄰嘅細值，第二個就會
+生存落嚟。呢個 bug 起碼係有定義嘅。佢嘅 slice 孖生兄弟就唔係：`for
+(list.items) |v|` 淨係攞**一次** slice，指標同長度，而喺迴圈入面 `orderedRemove`
+會喺佢腳下縮短個 list。個迴圈繼續行舊嘅長度，讀到新尾之後嗰格 — 個 list 仍然
+擁有、但已經乜意思都冇嘅記憶體 — 而冇 Debug check 會響，因為啲 byte 仲喺個
+allocation 入面。通常睇落用得，而咁更差。
+
+`orderedRemove(i)` 將 `i` 之後所有嘢移前一格，再交返佢刪咗嘅嘢。所以：中咗就刪，
+**唔好**前進；唔中就 `i += 1`；永遠唔好兩樣都做。遞增寫喺分支入面嘅 `while` 迴圈
+就係個形狀，而喺 linked list 同 hash map 上面都係同一個形狀。
+'''
+hints = [
+  "將 while 嘅 : (i += 1) 拎走。淨係喺冇刪嘢嗰個分支用 i += 1 前進；另一個分支 orderedRemove 已經將下一個元素移咗入第 i 格。",
+  "moorings.items.len 每次 check 迴圈條件都會重新讀，所以個 while 先啱：對住個 slice 嘅 for 會喺開頭凍結咗個長度。",
+  "由尾向前行係另一個正確答案 — 喺 i 刪嘢永遠唔會搞亂佢下面嘅格 — 人哋問冇分支嘅版本嗰陣，就答呢個。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "zig.advanced.32.overflow"
+title = "停咗嘅計數器"
+story = "收費廣場嘅公升計數器係一個 i32，去到 2147483647 公升，支閘就落咗嚟，收費亭個螢幕寫住 panic: integer overflow。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數，每個都裝得落一個 `i64`。佢哋嘅累計總數
+都裝得落 `i64`。
+
+印兩行：如果沿途每個累計總數都裝得落一個 `i32` 就印 `INT32 OK`，否則印
+`INT32 OVERFLOW <i>`，<i> 係第一個會將佢推出範圍嘅值嘅 index（由 0 開始）；然後印
+`INT64 <total>`。
+
+```
+input:  3
+        2147483647 1 -5
+output: INT32 OVERFLOW 1
+        INT64 2147483643
+```
+
+個 starter 用一個 `i32` 裝總數，喺第二個值就 panic：`panic: integer overflow`。呢個
+正正係 Zig 做緊呢個 land 應承過嘅嘢 — 喺 `-O Debug`，一個 overflow 嘅整數會講出嚟兼
+停低，而闊嘅 case 仲早一行停，喺嗰個本來會截斷 `5000000000` 嘅 `@intCast` 度。將個
+panic 當係一份禮物，然後讀埋合約其餘部分：`+%` 會 wrap，`+|` 會 saturate，而普通嘅
+`+` 喺 Debug 會 panic，喺 **`-O ReleaseFast` 係 undefined behaviour**，嗰度個 check
+係閂咗嘅，optimiser 會假設佢永遠唔會發生 — 所以 `v` 係正數嘅 `total + v < total`
+喺嗰度*永遠係 false*，個測試會被刪走，同 gcc 同 clang 喺 C++ 刪走佢一模一樣。
+
+所以你永遠唔好靠觸發 overflow 嚟偵測佢。你要喺窄嘅加法*之前*偵測，用一個闊啲嘅
+型別，或者同上下限比較 — `std.math.minInt(i32)` 同 `std.math.maxInt(i32)` — 而呢個
+程式嘅預期輸出冇靠任何一個 build mode 留做未定義嘅嘢。
+'''
+hints = [
+  "用 i64 裝總數，每次加完同 std.math.minInt(i32) 同 maxInt(i32) 比較。永遠唔會有 i32 運算發生，所以冇嘢會 panic，冇嘢係未定義。",
+  "淨係記第一個出範圍嘅 index — 一個只會設一次嘅 ?usize — 因為後面嘅值可能會將總數帶返入範圍，而問題問嘅係佢第一次喺邊度出去。",
+  "如果你一定要加兩個 i32 又想知安唔安全：@addWithOverflow(a, b) 回傳 wrap 咗嘅和同一個進位 bit，喺每個 build mode 都有定義。呢個先係 check；普通個和嘅正負號就係 optimiser 會刪走嗰樣。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "zig.advanced.33.stop-flag"
+title = "叫停就停"
+story = "夜更嗰條行車線一直行到有人叫佢停為止，而直到呢更之前，冇人叫得停佢。"
+brief = '''
+標準輸入係一個數量 `n`，跟住 `n` 個整數。
+
+開兩條 thread。第一條加總啲值，存低結果。第二條收一個**停止 flag**，一個
+`*std.atomic.Value(bool)`，一直 loop 到讀到 `true` 為止；讀到嗰陣，佢會行一個會
+設定第二個 flag 嘅 `onStop` 函數，然後記低佢停咗。喺 `main` 設定停止 flag，
+join 晒兩條，然後印：
+
+```
+input:  3
+        1 2 3
+output: SUM 6
+        STOPPED yes
+        CALLBACK yes
+```
+
+`std.Thread` 冇 `stop_token`，亦冇 `jthread`；最接近嘅係砌成佢哋嘅材料，人手傳入去。
+一個停止要求就係一個由要求者寫、worker 讀嘅 `bool`，而因為有兩條 thread 掂佢，佢係
+一個 atomic：一邊 `stop.store(true, .release)`，另一邊喺 worker 迴圈入面
+`stop.load(.acquire)`。一條會 check 自己 flag 嘅 thread，係一條你永遠閂得停嘅
+thread；唔 check 嗰條就係個 starter 嘅夜更行車線，佢個 `join` 永遠都唔會返。
+
+C++ 嘅 `stop_callback` 喺叫停嗰一刻就喺叫停嗰條 thread 上面行；呢度係 worker 見到
+個 flag 嗰陣自己行 `onStop`，係同一個承諾 — *因為有人叫停，所以有嘢發生* — 由另一邊
+守住。`store` 之後嘅 `join` 就係 `jthread` 嘅 destructor，寫出嚟：先要求，再等。迴圈
+入面嘅 `std.Thread.yield()` 將個 core 讓畀其他想用嘅人；淨係空轉都過到，亦都嘥咗一個
+core。
+'''
+hints = [
+  "行車線 thread 經指標收三個 flag；佢個迴圈係 while (!stop.load(.acquire)) std.Thread.yield() catch {};，迴圈之後呼叫 onStop 再 store stopped。",
+  "設定 flag 之前先 spawn 條行車線，之後先 join。喺 thread 開始之前設定 flag 冇問題 — 佢第一次 check 就會停 — 但冇 store 嘅 join 永遠都唔會返。",
+  "store 用 .release、load 用 .acquire 係一對，令 store 之前發生嘅嘢喺 load 之後睇得到；呢度用 .monotonic 都會過，而面試官會問點解。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "zig.advanced.34.unreachable"
+title = "去唔到"
+story = "07:59，堅拿道天橋。行車線模型將一個分支標做去唔到，朝早啲車去咗到，所有行車線一齊封閉 — 而一條行車線 thread 仲讀緊一個收費廣場已經交返咗嘅 buffer。"
+brief = '''
+第一行係 `w n`：`w` 條行車線同 `n` 個讀數。第二行係啲讀數。
+
+`pump(gpa, w, ledger)` 對住一個有引用計數嘅 `Ledger`（三個任務之前嗰個）揸住嘅讀數開
+`w` 條 thread；第 `i` 條將由 `i * n / w` 到 `(i + 1) * n / w` 嘅讀數加入
+`partial[i]`，而 `pump` 回傳啲 partial。`main` 每個印 `PUMP <i> <sum>`，再印
+`TOTAL <sum>`，然後如果所有嘢做完嗰陣啲讀數已經 release 咗就印 `FREED yes` —
+經本帳簿嘅 `alive()` 觀察。
+
+```
+input:  2 4
+        1 2 3 4
+output: PUMP 0 3
+        PUMP 1 7
+        TOTAL 10
+        FREED yes
+```
+
+個 starter 會失敗兩次，而兩次失敗就係呢個 land 嘅兩半。
+
+第一次係個行車線模型。`pump` 計好每條行車線嘅邊界，然後講
+`if (begin == end) unreachable;` — *冇車嘅行車線冇可能發生*。三條行車線對住兩個
+讀數，佢就發生咗。`unreachable` 唔係註解，亦唔係 assert：佢係 Zig 入面唯一一行解作
+**假設**嘅嘢。喺 `-O Debug`，行到佢就係 `panic: reached unreachable code`，收費廣場
+連原因一齊停喺螢幕上面。喺 `-O ReleaseFast`，編譯器*相信*你 — 個分支被刪走，所有淨係
+會通去佢嘅嘢都一齊被刪走 — 而行到佢嘅程式係未定義嘅，同一個經懸空指標讀嘢嘅 C++
+程式一模一樣咁未定義。個 panic 係同一份合約嘅老實版本。刪走個聲稱，處理個 case：
+一條空嘅行車線加埋係 `0`。
+
+第二次係擁有權。個 starter 嘅 `pump` 喺開啲行車線之前就 **release** 咗本帳簿 —
+*啲 worker 已經有自己個 slice，唔再需要個 handle* — 而嗰次 release 係最後一次，所以
+啲讀數被 free 咗，而啲 worker 照讀。喺 Debug，allocator 會將佢收返嘅記憶體逐個 byte
+塗做 `0xAA`，所以每個讀數返嚟都係 `-6148914691236517206`，而第一條將兩個咁嘅讀數
+加埋嘅行車線，就用 `panic: integer overflow` 令收費廣場停低 — 呢個就係可見 case 顯示
+嘅失敗，嗰度每條行車線都有車，`unreachable` 從來冇行到：一個對輸入入面任何讀數都
+冇可能 overflow 嘅和，同一個指住一行唔係錯處嘅 trace。喺 ReleaseFast，冇塗色亦冇
+check：啲行車線讀到下一次分配擺咗喺嗰度嘅嘢，或者一個 kernel 已經收返嘅 page。呢個
+就係懸空讀取，亦係最貴嗰種 bug，因為佢唔係喺錯嘅地方出事。
+
+修正擁有權，唔係修正症狀。每條行車線開始之前都**攞一份** share，做完就 release，
+所以啲讀數嘅生命啱啱等於最後一條揸住佢哋嘅 thread — 無論啲行車線用乜次序完成。
+`pump` 回傳之前 join，最後先 release `main` 交畀佢嗰個 handle。返到 `main`，`alive()`
+係 `false`：啲讀數由最後一次 release — `pump` 自己嗰次，喺 join 之後 — free 咗一次，
+而且冇人仲讀緊。個數目係 atomic，因為啲行車線嘅 release 會互相 race；本帳簿本身唔係
+thread-safe，亦唔需要係，因為冇人寫啲讀數。
+
+成個 land 就係呢一個程式。每次你錯，啲 check 都截停你，而令你啱嘅工具 — 講明邊個
+揸住佢嘅數目、會等嘅 join、會 release 嘅 `defer` — 就係你喺 basic 路上面見過嘅同一套。
+'''
+hints = [
+  "刪走個 unreachable，由得空嘅行車線行：begin == end 係一個空 slice，佢嘅和係零。一個你證明唔到嘅聲稱，就唔好聲稱。",
+  "每條行車線畀一份 share：用 ledger.share() spawn 佢，等佢 defer ledger.release(gpa)。行車線嗰份 share 就係令啲讀數生存嘅嘢；佢喺行車線個函數回傳嗰陣 release，唔係 pump 回傳嗰陣。",
+  "pump 自己嗰次 release 搬去 pump 開頭嘅一個 defer，咁佢就喺 join 之後行 — 啲讀數讀完之後 — 而佢 release 嘅就係 main 交出嚟嗰個 handle。",
+  "partial 按格交畀啲行車線，而咁係啱嘅：pump 擁有佢，pump 回傳佢之前會 join，而每條行車線淨係寫自己嗰格。如果 main 留住一份 share，FREED 就會係 no — 啲讀數會因為 main 仲揸住而生存，而呢個 boss 亦接受你解釋得到呢個另一個答案。",
+]

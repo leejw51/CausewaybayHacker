@@ -1,0 +1,765 @@
+# LUA LAND — BASIC, in Korean. A translation pack (SPEC §12.1): the prose of
+# `content/lua/basic.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers and printed strings are copied verbatim.
+
+pack   = "lua.basic"
+locale = "ko"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.basic.01.first-incense"
+title = "첫 향"
+story = "21:00, 원사 스트리트. 북은 아직 울리지 않았고, 용은 어둠 속 골목에 누워 있으며, 첫 향은 아직 불붙지 않았다."
+brief = '''
+정확히 이렇게 출력하세요:
+
+```
+hello, causewaybay
+```
+
+소문자, 쉼표 하나, 공백 하나, 한 줄. 그 밖에는 아무것도 없습니다.
+
+`print`는 줄바꿈을 알아서 붙입니다. 그리고 인자 사이에 **탭**을 넣는데, 이것이 사람들이 print에서 가장 먼저 틀리는 점입니다: `print("hello,",
+"causewaybay")`에는 공백이 아니라 탭이 들어갑니다. 문자열 하나, 인자 하나.
+'''
+hints = [
+  "print(\"hello, causewaybay\")가 프로그램 전부입니다.",
+  "문자열은 정확해야 합니다: 소문자, 쉼표 하나, 그 뒤에 공백 하나.",
+  "맨 아래의 `main()` 호출은 그대로 두세요. 한 번도 호출되지 않는 함수는 아무것도 출력하지 않고, 스타터가 바로 그렇습니다.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.basic.02.segment-count"
+title = "마디 세기"
+story = "용 머리를 맡은 이가 골목 아래로 마디 수를 외치는데, 반얀나무 아래 집계판에는 그 수, 그 수의 두 배, 그 수의 제곱이 있어야 할 자리에 0이 있다."
+brief = '''
+`io.read("*l")`은 표준 입력에서 한 줄을 읽어 줄바꿈을 떼고 **문자열**로 돌려줍니다. `tonumber()`는 그 텍스트를 숫자로 바꿉니다(숫자가 아니면 `nil`). Lua는 `"12" * 2`라면 조용히 변환해 주지만, `"12" .. 1`은 `"121"`이고 `"12" < 1`은 에러이므로, 숫자는 들어오는 문에서 변환하고 그 뒤로는 숫자로 둡니다.
+
+```
+local n = tonumber(io.read("*l"))
+```
+
+세 `print` 줄은 적혀 있습니다. `main`의 첫 줄을 보이는 그대로 입력해서, `n`이 처음 값인 `0`이 아니라 그 줄의 숫자가 되게 하세요.
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "스타터는 0을 세 번 출력합니다: n을 한 번도 읽지 않았기 때문입니다. 그 줄은 아직 표준 입력에 남아 있습니다.",
+  "local n = tonumber(io.read(\"*l\"))은 읽기와 변환을 한 번에 합니다. tonumber는 숫자 앞뒤의 공백을 알아서 무시합니다.",
+  "음수 n의 제곱은 양수입니다. 테스트는 알고 있습니다.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.basic.03.types"
+title = "나눠 가진 향"
+story = "릴리 스트리트 모퉁이에서 두 사람이 향 한 다발을 나누는데, 장부에는 각자 몇 개, 남은 개수, 그리고 소수 두 자리로 읽혀야 할 몫이 물음표로 적혀 있다."
+brief = '''
+Lua에는 숫자 타입이 하나 — 64비트 double — 이고 나눗셈도 하나입니다: `7 / 2`는 `3.5`이고, `6 / 2`는 `3`이며 `3`으로 출력됩니다. 정수 나눗셈은 `math.floor(a / b)`이고, `%`는 나머지입니다. 숫자를 소수 자릿수를 고정해 출력하려면 `string.format`에 `%.2f` — 소수점 아래 두 자리 — 와 함께 넘기고, 돌아온 문자열을 출력합니다. (Python이 f-string을 쓰는 자리에서 Lua는 패턴 뒤에 값을 두는 `string.format`을 씁니다.)
+
+```
+print(math.floor(a / b))
+print(a % b)
+print(string.format("%.2f", a / b))
+```
+
+`a`와 `b`는 `io.read("*n", "*n")` — 입력에서 숫자 둘 — 으로 읽혀 있고 앞의 두 print는 적혀 있습니다. 세 번째 `print` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "print(string.format(\"%.2f\", a / b)) — 패턴이 먼저, 그다음 서식을 입힐 값.",
+  "%.2f는 C 서식입니다: f는 실수, .2는 소수점 아래 두 자리. print(a / b)만 쓰면 3.5가 출력되어 한 자리가 모자랍니다.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.basic.04.int-types"
+title = "네 바이트 폭"
+story = "트럭 위의 북 조종기는 박자 수를 네 바이트에 담고 작은 화면에 담을 수 있는 가장 큰 수를 띄우는데, 화면은 꺼져 있다."
+brief = '''
+Lua의 숫자에는 정수 폭이 없지만 `bit` 라이브러리에는 있습니다: 그 모든 연산은 **32비트**에서 일합니다. `bit.tohex(n, 8)`은 `n`을 그 네 바이트, 16진 숫자 여덟 개로, 상위부터 보여 주므로 `bit.tohex(-1, 8)`은 `ffffffff`입니다. 부호 있는 32비트의 가장 큰 값은 `2^31 - 1`입니다(`^`는 거듭제곱 연산자이고, `<<`는 없습니다. 그것은 `bit.lshift`입니다). double의 정확한 셈은 `2^53`에서 멈춥니다. 그 너머를 위해 LuaJIT에는 `LL`이나 `ULL` 접미사가 붙은 64비트 리터럴이 있고, 출력할 때 접미사가 붙어 나옵니다.
+
+```
+print(bit.tohex(n, 8))
+print(2^31 - 1)
+```
+
+`n`은 읽혀 있고, 부호 없는 64비트 최댓값은 `ULL` 리터럴에서 접미사를 떼어 마지막에 출력됩니다. 두 `-- FILL` 표시 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "print(bit.tohex(n, 8)) — 두 번째 인자는 16진 숫자 개수입니다. 8자리가 4바이트입니다.",
+  "2^31 - 1은 2147483647입니다: double이 정확히 담고, print는 소수점 없이 보여 줍니다.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.basic.05.big-int"
+title = "서른두 바이트"
+story = "빅토리아 파크의 모든 등불에는 아무도 못 읽는 서른두 바이트 숫자가 찍혀 있는데, 공원 사무소의 프린터는 그것을 꼬리표 밖으로 넘치는 십진수로 찍는다."
+brief = '''
+해시, 키, 주소: 이 게임이 돌아가는 숫자들은 256비트 폭 — 서른두 바이트 — 입니다. Lua의 숫자는 double이라 그중 쉰세 비트만 담으므로, 256비트 숫자는 들어온 모습 그대로, **숫자의 문자열**로 남고, `hex_of`가 긴 나눗셈으로 한 자리씩 16진수로 바꿉니다(Lua에는 큰 정수가 없습니다. 그 함수는 적혀 있습니다). 남은 것은 채우기입니다: 16진 문자 예순네 개, 왼쪽은 0으로. `#h`는 `h`의 길이이고, `string.rep("0", k)`는 0 `k`개이며, `..`는 두 문자열을 잇습니다.
+
+```
+print(string.rep("0", 64 - #h) .. h)
+```
+
+`s`는 십진수로 읽히고 `h`는 채우지 않은 그 16진수입니다. `-- FILL` 표시 자리에 위의 한 줄을 그대로 입력하세요.
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "print(string.rep(\"0\", 64 - #h) .. h) — 모자란 만큼의 0, 그다음 16진수.",
+  "#h는 문자열의 길이입니다. 개수가 0인 string.rep은 빈 문자열이므로, 64자리 최댓값에는 채우기가 전혀 붙지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.basic.06.floats"
+title = "소수점 아래 세 자리"
+story = "사당 문 앞의 향 저울은 소수 셋째 자리까지 읽고 트럭 위의 싸구려 저울은 단정밀도만 간직하는데, 장부에는 같은 무게가 두 번, 둘 다 틀리게 적혀 있다."
+brief = '''
+Lua의 숫자는 64비트 double — 다른 랜드의 `f64` — 입니다. 32비트 float 타입은 없지만 LuaJIT의 `ffi`가 만들 수 있습니다: `ffi.new("float[1]", x)`는 `x`를 담은 `float` 하나짜리 C 배열이고, 거기서 `[0]`을 읽으면 가장 가까운 `f32`로 반올림된 `x`가 돌아옵니다. `%.3f`를 준 `string.format`은 소수 세 자리를, `%.10f`는 반올림이 보일 만큼 찍습니다. (Python이 `struct`로 pack하고 unpack하는 자리에서 Lua는 C 타입을 거칩니다.)
+
+```
+local x = tonumber(s)
+local y = ffi.new("float[1]", x)[0]
+```
+
+`ffi`는 require되어 있고, `s`는 읽혀 있으며 두 출력은 적혀 있습니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "local x = tonumber(s), 그다음 local y = ffi.new(\"float[1]\", x)[0] — 배열을 만들고 읽는 것이 식 하나입니다.",
+  "\"float[1]\"이 단정밀도입니다. \"double[1]\"은 x와 같은 폭이라 아무것도 바꾸지 않을 겁니다.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.basic.04.strings"
+title = "용의 이름"
+story = "깃발 화가는 용 머리 맡은 이의 이름을 재고, 외치고, 사당 제단 뒤 거울을 위해 거꾸로 쓰길 원하는데, 장부에는 바른 방향으로 한 번만 적혀 있다."
+brief = '''
+문자열은 `#s`로 자기 길이를 알고, `s:upper()`로 대문자 사본을, `s:reverse()`로 뒤집은 사본을 만듭니다. 콜론이 메서드 호출입니다: `s:upper()`는 `string.upper(s)`이고, `s`가 첫 인자로 알아서 넘어갑니다. 문자열은 결코 제자리에서 바뀌지 않습니다 — 이것들은 각각 새 문자열이고, `s`는 원래 그대로입니다.
+
+```
+print(#s)
+print(s:upper())
+print(s:reverse())
+```
+
+`s`는 읽혀 있고 길이는 출력됩니다. 두 번째와 세 번째 `print` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "print(s:upper()) 그다음 print(s:reverse()) — 메서드 호출 둘, 콜론과 빈 괄호.",
+  "점을 쓴 s.upper()는 아무것도 넘기지 않고, string.upper는 문자열이 있어야 할 자리의 nil을 두고 불평합니다.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.basic.08.string-slices"
+title = "앞 몇 글자"
+story = "등불 꼬리표 프린터는 짧은 꼬리표로 거리 이름의 앞 글자들을 가져와 표시를 붙이고, 행렬 안내판의 전체 이름은 있던 그대로 두어야 한다."
+brief = '''
+`s:sub(1, n)`은 부분 문자열입니다: `s`의 앞 `n`글자를 새 문자열로 — 위치는 1부터 세고 양 끝이 포함됩니다. 문자열은 바꿀 수 없으니 부분 문자열은 언제나 복사이고, 조각으로 무엇을 하든 `s`는 손대지 않습니다. `..`는 두 문자열을 이어 새 문자열을 만들고, 그것을 다시 `head`에 대입하는 것이 덧붙이는 방법입니다.
+
+```
+local head = s:sub(1, n)
+head = head .. "!"
+```
+
+`s`와 `n`은 읽혀 있고 두 출력은 적혀 있습니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "local head = s:sub(1, n), 그다음 head = head .. \"!\" — sub는 복사하고, ..는 또 하나를 만듭니다.",
+  "s:sub(0, n)은 s:sub(1, n)과 같습니다. 0은 시작으로 당겨집니다. Lua에는 +=가 없습니다: 이름을 양쪽에 쓰세요.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.basic.09.int-slices"
+title = "위에서 둘"
+story = "행렬 안내판은 둘째와 셋째 마디 번호를 베껴 쓰고 마지막 둘을 뒤에 붙이되, 원래 목록은 적힌 그대로 두라고 한다."
+brief = '''
+Lua에는 슬라이스가 없습니다. 가장 가까운 것은 `unpack(v, i, j)`로, `i`부터 `j`까지의 값을 따로따로 돌려주고, 그것을 감싼 `{ ... }`가 **새 테이블**로 모읍니다 — 그것을 바꿔도 `v`는 절대 바뀌지 않습니다. 위치는 1부터 세고 양 끝이 포함되므로 둘째와 셋째 값은 `2, 3`입니다. `table.insert(t, x)`는 `x`를 끝에 붙입니다. `#v`는 마지막 위치이므로 `v[#v - 1]`과 `v[#v]`가 마지막 둘입니다.
+
+```
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])
+```
+
+`v`는 그 줄의 정수들을 담고 있고 두 출력은 적혀 있습니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "local part = { unpack(v, 2, 3) }, 그다음 table.insert(part, v[#v - 1]); table.insert(part, v[#v]) — 한 줄에 문장 둘, 사이에 세미콜론.",
+  "unpack은 LuaJIT에서 전역입니다(table.unpack은 Lua 5.2입니다). 중괄호로 감싸지 않으면 두 값은 어디로도 가지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.basic.10.byte-slices"
+title = "앞 세 바이트"
+story = "등불 꼬리표 프린터는 용 맡은 이의 이름 앞 세 바이트와 뒤에 표시 하나를 원하고, 글자로 찍기 전에 바이트를 16진수로 보여 준다."
+brief = '''
+Lua의 문자열은 그 자체가 바이트**입니다**: 따로 된 bytes 타입이 없고, `#s`는 바이트를 세며, `s:sub`는 바이트를 자릅니다. `s:byte(i, j)`는 `i`부터 `j`까지의 바이트를 숫자로, 하나당 반환값 하나로 돌려주고, `{ ... }`가 그것을 테이블로 모읍니다. `-1`은 마지막 위치를 뜻하므로 `s:byte(1, -1)`은 모든 바이트입니다. `string.char(...)`는 반대 방향 — 숫자가 들어가고 문자열이 나옴 — 이고, `unpack(t)`은 테이블을 그 함수가 원하는 인자들로 펼칩니다.
+
+```
+local bytes = { head:byte(1, -1) }
+print(string.char(unpack(bytes)))
+```
+
+`head`는 `s`의 앞 세 바이트 끝에 `"!"`를 붙인 것이고, 16진수 줄은 `bytes`에서 출력됩니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "local bytes = { head:byte(1, -1) }, 그다음 print(string.char(unpack(bytes))) — byte는 한쪽으로, char는 다른 쪽으로 갑니다.",
+  "인자 없는 head:byte()는 첫 바이트뿐입니다. 1, -1이 전부를 달라고 합니다.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.basic.05.loops"
+title = "마디 세기"
+story = "용의 마디는 머리부터 1에서 n까지 번호가 붙는데, 마디 번호들의 집계와 세 번째 자리마다 북을 싣는 마디의 집계는 개수 아래 빈 줄이다."
+brief = '''
+숫자 `for`가 대신 세어 줍니다: `for i = 1, n do`는 `i`를 `1`에서 시작해 `n`까지 **포함해** 값마다 본문을 한 번씩 실행합니다 — 마지막 값도 셈에 들어가고, 이것이 Lua가 `range`와 가장 먼저 다른 점입니다. 본문은 `end`에서 끝납니다.
+
+```
+for i = 1, n do
+  total = total + i
+  if i % 3 == 0 then threes = threes + 1 end
+end
+```
+
+`n`은 읽혀 있고, `total`과 `threes`는 `0`에서 시작하며, 루프 본문은 적혀 있습니다. 본문 위에 `for` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for i = 1, n do — 두 번째 숫자는 i의 마지막 값이지, 그 하나 다음이 아닙니다.",
+  "for i = 1, 0은 0번 돕니다: 시작이 끝을 지난 루프에는 실행할 본문이 없습니다.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.basic.06.functions"
+title = "심부름꾼의 품삯"
+story = "향 노점은 심부름꾼에게 트럭까지 한 번 다녀올 때마다 삯을 주고 열 번째 뒤로는 더 싸게 주는데, 그것을 계산하던 장부 페이지는 이름만 있고 아래가 비어 있다."
+brief = '''
+`function`이 함수를 만듭니다: 이름, 괄호 안의 매개변수, 본문, 그리고 `end`. `return`은 호출한 쪽에 값을 돌려줍니다. 본문은 답 전체를 식 하나로 담은 `return` 한 줄이어도 됩니다. `math.min`과 `math.max`는 인자 중 작은 것과 큰 것입니다.
+
+```
+local function fare(rides)
+  return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3
+end
+```
+
+처음 열 번은 한 번에 `5`, 그 뒤는 한 번에 `3`입니다. `main`은 `n`을 읽어 `fare(n)`을 출력합니다. `fare`의 `return` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3 — min은 비싼 횟수를 열 번에서 자르고, max는 나머지가 음수가 되지 않게 합니다.",
+  "함수의 일은 return에서 끝납니다. 본문에서 그 뒤의 것은 실행되지 않고, return은 자기 블록의 마지막 문장이어야 합니다.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.basic.07.structs"
+title = "노점 하나, 필드 셋"
+story = "향 노점 카드에는 이름, 가격, 개수가 있는데, 계산대는 카드를 낱말 셋으로 읽고 아무것도 더하지 않는다."
+brief = '''
+Lua에는 `class`가 없습니다. 객체는 테이블이고, 그 뒤의 메타테이블이 키가 없을 때 어디를 볼지 말해 줍니다. `Stall.__index = Stall`은 모든 노점이 메서드를 `Stall`에서 찾게 하고, `setmetatable({...}, Stall)`이 그것을 붙이며, `function Stall:total()`은 `self`라는 숨은 첫 매개변수가 있는 메서드를 정의합니다 — 정의에도 호출에도 콜론. 안에서는 필드를 `self`를 통해 읽습니다.
+
+```
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  return setmetatable({ name = name, price = price, qty = qty }, Stall)
+end
+
+function Stall:total()
+  return self.price * self.qty
+end
+```
+
+`Stall`, 그 `new`, `main`은 적혀 있습니다. `total`의 `return` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return self.price * self.qty — 필드는 테이블에 살고, 콜론 메서드 안에서는 self가 그 테이블입니다.",
+  "total() 안에서 price 홀로는 이름이 아닙니다. 전역 변수가 될 텐데, 아무도 설정하지 않은 전역은 nil입니다.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.basic.08.enums"
+title = "노선 셋, 색 셋"
+story = "사당 문 옆에 핀으로 꽂힌 MTR 지도에는 노선 셋이 있고, 등불 장수의 아들은 어느 색이 사람들을 집에 데려다주는지 말해야 하는데, 그 아래 게시판은 비어 있다."
+brief = '''
+Lua에는 `enum`이 없습니다. 가장 가까운 것은 이름 붙은 상수의 테이블입니다 — `Line.ISLAND`는 `1`이고, 값은 다른 값처럼 다른 테이블의 키가 될 수 있습니다. 문자열로 인덱스하면 이름을 찾습니다: `Line["ISLAND"]`는 `Line.ISLAND`와 같으므로, 입력의 단어는 대문자로 바꿔 그것으로 인덱스하면 멤버가 됩니다. 없는 이름은 에러가 아니라 `nil`을 줍니다 — 따라가기 전까지는.
+
+```
+local Line = { ISLAND = 1 }
+
+local line = Line[word:upper()]
+```
+
+`Line`, 멤버에서 색깔로 가는 `COLOUR` 테이블, print는 적혀 있습니다. `local line = ...` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "local line = Line[word:upper()] — 대괄호가 문자열로 키를 찾고, 이름은 대문자입니다.",
+  "Line.word는 w-o-r-d라는 철자의 키를 찾을 겁니다. 읽어 들인 문자열을 받는 것은 대괄호 형태뿐입니다.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.basic.09.vector"
+title = "마디 목록"
+story = "용 머리 맡은 이가 마디 무게를 하나씩 외치는데, 장부에는 목록 대신 빈칸 넷이 있다: 추가 뒤, 제거 뒤, 교체 뒤, 정렬 뒤."
+brief = '''
+`1, 2, 3, ...`에 값이 있는 테이블이 리스트이고, 제자리에서 고쳐집니다. `table.insert(t, x)`는 끝에 값을 추가하고, `table.remove(t, i)`는 위치의 값을 빼며(뒤의 것들이 앞으로 당겨집니다), `t[i] = x`는 위치의 값을 바꾸고, `table.sort(t)`는 값을 제자리에서 오름차순으로 정렬합니다. 네 연산, 네 줄, 그리고 리스트는 각 줄 뒤마다 다른 리스트입니다.
+
+```
+table.insert(xs, 100)
+table.remove(xs, 1)
+xs[1] = 7
+table.sort(xs)
+```
+
+`xs`에는 한 줄의 정수들이 들어 있고 각 단계 뒤에 출력됩니다. 네 개의 `-- FILL` 자리 표시자 대신 네 줄을 그 순서대로 입력하세요.
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "table.insert(xs, 100), 다음 table.remove(xs, 1), 다음 xs[1] = 7, 다음 table.sort(xs) — 자리 표시자마다 하나씩, 그 순서로.",
+  "첫 위치는 0이 아니라 1입니다: xs[0] = 7은 리스트가 세지 않는 키에 7을 둡니다. table.sort는 아무것도 돌려주지 않으니 대입하지 마세요.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.basic.16.list"
+title = "주문 사슬"
+story = "심부름꾼은 향 주문을 하나씩 트럭 위 사슬 끝에 끼우고 번호표를 앞에 끼우는데, 사슬이 빈 채로 걸려 있다."
+brief = '''
+Lua에는 deque가 없습니다. 테이블은 같은 두 함수와 위치로 양 끝에서 고쳐집니다. `table.insert(t, 1, x)` — 인자 셋 — 는 `x`를 위치 1에 두고 나머지를 뒤로 밀고, 위치 없는 `table.remove(t)`는 **마지막** 값을 떼며, `t[1] = x`는 맨 앞을 바꾸고, `table.sort(t)`는 제자리에서 정렬하므로 네 번째 줄은 리스트의 것과 같습니다.
+
+```
+table.insert(chain, 1, 0)
+table.remove(chain)
+chain[1] = 9
+table.sort(chain)
+```
+
+`chain`에는 한 줄의 정수들이 들어 있고 각 단계 뒤에 출력됩니다. 네 개의 `-- FILL` 자리 표시자 대신 네 줄을 그 순서대로 입력하세요.
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "table.insert(chain, 1, 0), 다음 table.remove(chain), 다음 chain[1] = 9, 다음 table.sort(chain) — 자리 표시자마다 하나씩, 그 순서로.",
+  "인자가 둘이면 table.insert는 끝에 붙입니다. 위치는 가운데에 갑니다. 위치 없는 table.remove는 끝이고, table.remove(chain, 1)이라면 맨 앞일 겁니다.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.basic.10.maps"
+title = "집계 공책"
+story = "월병 노점의 모든 판매는 단어 하나로 공책에 들어가고, 북이 처음 울릴 때 주인은 월병마다 개수가 적힌 한 줄을 원하는데, 페이지는 외친 순서대로의 단어들뿐이다."
+brief = '''
+테이블은 키로 고쳐집니다. `counts[k] = v`는 키 아래에 값을 저장하고 — 새 키는 추가되고, 있는 키는 덮어써집니다 — `counts[k] = nil`은 키를 지우며(delete는 없습니다. nil이 없음입니다),
+`counts[k] = counts[k] + n`은 키의 값을 읽어 바꿔서 되씁니다. 테이블은 순서를 **전혀** 지키지 않습니다: `pairs`는 제멋대로의 순서로 걷기 때문에, 스타터는 처음 본 순서를 따로 리스트에 담아 두고, 키를 정렬해 출력하려면 리스트로 모아 `table.sort`합니다.
+
+```
+counts["tofu"] = 1
+counts[first] = nil
+counts["tofu"] = counts["tofu"] + 4
+table.sort(ks)
+```
+
+`counts`는 단어별 개수를 담고, `first`는 줄의 첫 단어이며, `order`는 처음 본 순서의 단어들 끝에 `"tofu"`를 붙인 것이고, `show(counts, order)`는 각 수정 뒤에 없어진 키는 건너뛰며 그 순서로 집계를 출력합니다. 처음 세 개의 `-- FILL` 자리 표시자 대신 세 수정을 입력하고, 네 번째 자리에는 마지막 루프 앞에 `table.sort(ks)`를 입력하세요.
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts[\"tofu\"] = 1, 다음 counts[first] = nil, 다음 counts[\"tofu\"] = counts[\"tofu\"] + 4, 다음 마지막 루프 앞에 table.sort(ks).",
+  "nil을 대입하는 것이 키를 지우는 유일한 방법입니다. +=는 없습니다: 값을 읽고, 더하고, 같은 키 아래에 되쓰세요.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.basic.18.hashtable"
+title = "노점 번호"
+story = "공원 사무소는 노점 이름에서 노점 번호로 가는 표를 두는데, 등불 카운터의 모든 조회가 빈손으로 돌아온다."
+brief = '''
+Lua의 테이블은 해시 테이블입니다: 키가 슬롯으로 해시되므로 저장, 삭제, 조회 모두 키가 몇 개든 비용이 같습니다. `numbers[k] = v`는 저장하고(새 키는 추가), `numbers[k] = nil`은 키를 지우며, `numbers[k] = numbers[k] + n`은 키의 값을 제자리에서 고칩니다. 없는 키는 `nil`이고 `nil or -1`은 `-1`입니다: `numbers[w] or -1`이 기본값이 있는 조회입니다 — 그리고 `0 or -1`은 `0`인데, 여기서 거짓은 `nil`과 `false`뿐이기 때문입니다.
+
+```
+numbers["bread"] = 99
+numbers[first] = nil
+numbers[last] = numbers[last] + 10
+print(numbers[w] or -1)
+```
+
+`numbers`는 첫 줄의 각 노점 이름을 사무소가 매기듯 0부터 센 위치에 대응시킵니다. `first`와 `last`는 첫 이름과 마지막 이름입니다. 둘째 줄의 이름들은 수정 뒤에 조회돼 출력되고, 없으면 `-1`입니다. 그다음 전체 테이블이 키로 정렬되어 출력됩니다. 네 개의 `-- FILL` 자리 표시자 대신 네 줄을 그 순서대로 입력하세요.
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "numbers[\"bread\"] = 99, 다음 numbers[first] = nil, 다음 numbers[last] = numbers[last] + 10, 다음 루프 안에 print(numbers[w] or -1).",
+  "or는 왼쪽이 nil이나 false가 아니면 왼쪽을 돌려줍니다. 번호가 0인 노점은 여전히 0입니다. += 줄은 키가 있어야 하는데 last는 있습니다.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.basic.11.sets"
+title = "서로 다른 가격"
+story = "등불 노점은 밤새 같은 가격 셋을 외치고, 게시판은 외침이 몇 번이었는지가 아니라 서로 다른 가격이 몇 개였는지 알고 싶어 한다."
+brief = '''
+Lua에는 집합이 없습니다. 값이 `true`이고 값들 자체를 키로 하는 테이블이 집합입니다. `seen[x] = true`는 값을 넣고(두 번은 한 번), `seen[x] = nil`은 값을 빼며(없었으면 아무것도 안 합니다), "이 값을 바꿔라"는 없습니다 — 집합은 키 하나를 지우고 다른 키를 넣어서 수정합니다. 집합에서 `#seen`은 **0**인데, `#`은 위치 `1, 2, 3, ...`만 세기 때문입니다. 집합은 `pairs`로 세고 나열하며, `pairs`는 모든 키를 특별한 순서 없이 걷습니다.
+
+```
+seen[100] = true
+seen[first] = nil
+seen[100] = nil; seen[101] = true
+for v in pairs(seen) do vals[#vals + 1] = v end
+```
+
+`seen`은 한 줄의 서로 다른 정수들을 담고, `first`는 첫 번째이며, 각 수정 뒤에 `size(seen)`이 출력되고, `vals`는 마지막에 정렬되어 출력됩니다. 네 개의 `-- FILL` 자리 표시자 대신 네 줄을 그 순서대로 입력하세요.
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen[100] = true, 다음 seen[first] = nil, 다음 seen[100] = nil; seen[101] = true, 다음 for v in pairs(seen) do vals[#vals + 1] = v end.",
+  "pairs는 키를 먼저 줍니다. for에 이름이 하나면 받는 것은 그것입니다. 순서는 테이블 자신의 것이고, 그래서 vals를 출력하기 전에 정렬합니다.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.basic.12.stack-queue"
+title = "등불 더미"
+story = "등불은 노점에 쌓여서 위에서 빠지고, 손님은 옆에 줄 서서 앞에서 빠진다. 장부는 두 줄 모두 비어 있게 찍는다."
+brief = '''
+리스트는 스택이고, 맨 위에서 고쳐집니다: `t[#t + 1] = x`는 값을 올리고(마지막 위치 하나 다음이 새 마지막입니다), `table.remove(t)`는 맨 위를 떼며, `t[#t] = x`는 맨 위를 제자리에서 바꿉니다. 같은 테이블도 앞에서 꺼내면 큐가 됩니다, `table.remove(t, 1)` — 그쪽은 적혀 있습니다.
+
+```
+stack[#stack + 1] = 100
+table.remove(stack)
+stack[#stack] = 9
+```
+
+`stack`과 `queue`는 한 줄의 정수들을 담습니다. 스택은 각 단계 뒤에 출력되고, 그다음 큐의 앞이 꺼내져 출력됩니다. 세 개의 `-- FILL` 자리 표시자 대신 세 줄을 그 순서대로 입력하세요.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack[#stack + 1] = 100, 다음 table.remove(stack), 다음 stack[#stack] = 9 — 자리 표시자마다 하나씩, 그 순서로.",
+  "위치 없는 table.remove는 끝, 즉 맨 위를 뗍니다. #stack은 대입을 위해 같은 칸을 가리킵니다.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.basic.13.sorting"
+title = "가격 사다리"
+story = "공원 사무소는 오늘 밤 등불 가격을 게시판에는 싼 순으로, 세금 서류에는 비싼 순으로 원하는데, 노점은 외친 순서대로 적어 두었다."
+brief = '''
+`table.sort(t)`는 테이블을 제자리에서 오름차순으로 정렬하고 아무것도 돌려주지 않습니다. 정렬된 사본은 없습니다: 원본을 두려면 먼저 복사하고, `{ unpack(xs)
+}`, 그 사본을 정렬합니다. 두 번째 인자는 비교자 — 두 값을 받아 첫 번째가 두 번째보다 앞에 오는지 말하는 함수 — 이고, `function(a, b) return a > b end`가 순서를 뒤집습니다.
+
+```
+table.sort(asc)
+table.sort(desc, function(a, b) return a > b end)
+```
+
+`xs`는 읽혀 있고, `asc`와 `desc`는 그 사본이며, 두 print는 적혀 있습니다. 두 자리 표시 대신 두 줄을 보이는 그대로 입력하세요.
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "table.sort(asc)와 table.sort(desc, function(a, b) return a > b end) — 비교자는 end까지 포함한 함수 하나 전체입니다.",
+  "asc = table.sort(asc)는 asc를 nil로 만듭니다: sort는 아무것도 돌려주지 않습니다. 비교자는 엄격해야 합니다: >=는 잘못된 순서 함수가 됩니다.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.basic.22.reverse"
+title = "앞뒤를 뒤집어"
+story = "마감 시트에는 가격 사다리를 위에서 아래로 읽어야 하고 노점 이름은 등불 유리에 거울처럼 칠해져 있는데, 장부에는 둘 다 바른 방향으로 적혀 있다."
+brief = '''
+`table.reverse`는 없습니다. 리스트는 양 끝을 안쪽으로 맞바꿔 **제자리에서** 뒤집고, Lua의 맞바꾸기는 양쪽에 이름이 둘씩 있는 대입 하나입니다: `a, b = b, a`는 오른쪽을 먼저 평가하고 그다음 저장합니다. 맞바꾸기는 길이의 절반, `math.floor(#v / 2)`번이고, `v[#v - i + 1]`이 `v[i]`의 거울입니다. 문자열은 바꿀 수 없으니 새 문자열을 주는 `s:reverse()`로 뒤집습니다.
+
+```
+for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end
+local r = s:reverse()
+```
+
+`v`와 `s`는 읽혀 있고 두 출력은 적혀 있습니다. 두 자리표시자 자리에 위의 두 줄을 그대로 입력하세요.
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end를 한 줄에, 그다음 local r = s:reverse().",
+  "절반 대신 #v까지 가면 모든 쌍을 두 번 맞바꿔 리스트가 원래대로 돌아옵니다.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.basic.14.sort-by-key"
+title = "순위표"
+story = "린파꿍 사당은 오늘 밤 시주 액수로 노점들을 높은 순으로 붙이고, 액수가 같은 둘은 알파벳 순으로 올라가는데, 핀 보드는 들어온 순서대로 보여 준다."
+brief = '''
+`table.sort`는 비교자를 받습니다: 두 행을 받아 첫 번째가 두 번째보다 앞에 오면 `true`를 돌려주는 함수입니다. 한 필드로 정렬하고 다른 필드로 동점을 가르는 것은 그 안의 두 줄입니다 — 점수가 다르면 큰 것이 먼저, 아니면 이름이 작은 것이 먼저. 어느 쪽으로 비교해도 같은 두 행은 `false`를 줘야 합니다. 그러지 않으면 정렬이 잘못된 순서 함수라고 불평합니다.
+
+```
+table.sort(rows, function(a, b)
+  if a.score ~= b.score then return a.score > b.score end
+  return a.name < b.name
+end)
+```
+
+`rows`는 `{ name = ..., score = ... }` 테이블의 리스트이고, 빈 비교자를 가진 `table.sort` 호출과 print는 적혀 있습니다. `FILL` 주석 자리에 비교자의 두 줄을 보이는 그대로 입력하세요.
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "if a.score ~= b.score then return a.score > b.score end, 그다음 return a.name < b.name — 동점 가르기는 점수가 같을 때만 실행됩니다.",
+  "~=는 Lua의 같지 않음입니다. a.score >= b.score를 돌려주면 같은 두 행이 서로 상대보다 앞에 온다고 말하게 되고, sort는 그것을 거부합니다.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.basic.15.closures"
+title = "마진"
+story = "등불 노점은 저녁 시트의 모든 도매가에 같은 마진을 더하는데, 마진을 기억해야 할 함수가 nil로 돌아온다."
+brief = '''
+다른 함수 안에서 정의된 함수는 바깥 함수의 지역 변수를 쓸 수 있고, 바깥 함수가 반환한 뒤에도 계속 씁니다. 그것이 클로저입니다: 안쪽 함수가 `k`를 upvalue로 지니고 다닙니다. 바깥 함수는 안쪽 함수를 돌려줍니다 — 호출한 결과가 아니라, 다른 것과 같은 값인 함수 그 자체를.
+
+```
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  return add
+end
+```
+
+`make_adder`와 그 안의 `local function add(x)`는 적혀 있고, `main`은 결과를 모든 숫자에 적용합니다. 두 자리 표시 대신 두 `return` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "add 안에 return x + k, 그다음 make_adder의 마지막 줄로 return add(괄호 없이).",
+  "return add()는 인자 없이 호출해서 nil + k에서 실패합니다. 이름만 쓰면 함수 그 자체입니다. 스타터의 return nil 때문에 main이 attempt to call local 'add' (a nil value)로 죽습니다.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.basic.16.lambdas"
+title = "짝수 제곱"
+story = "공원 사무소는 짝수 번호 노점에 번호의 제곱만큼 부과하는데, 서기의 시트에는 합계가 있어야 할 자리에 0이 있다."
+brief = '''
+Lua에는 `lambda` 키워드가 없습니다. 이름 없는 작은 함수는 쓰이는 바로 그 자리에 `function(x) return x * x end`처럼 온전히 씁니다. `filter(f, xs)`는 `f`가 `true`라고 한 값만 남기고, `map(f, xs)`는 각 값을 `f(value)`로 바꾸며, `sum(xs)`는 남은 것을 더합니다 — 셋 다 내장이 아니라서 `main` 위에 적혀 있습니다. 안쪽부터 바깥으로 읽으세요.
+
+```
+local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))
+```
+
+`xs`는 읽혀 있고 print는 적혀 있습니다. `local total = ...` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs))) — filter 먼저, 다음 map, 다음 sum.",
+  "익명 함수에는 return과 end가 필요합니다: function(x) x * x end는 문법 에러입니다. Lua의 %는 내림 나머지라서 -4 % 2는 0이고 음수도 셉니다.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.basic.17.threads"
+title = "심부름꾼 열둘이 동시에"
+story = "북이 처음 울릴 때 용을 따라 늘어선 향 심부름꾼 모두가 사당 장부를 위해 자기 마디의 개수를 동시에 제곱하는데, 아무도 그들이 끝나기를 기다리지 않아서 장부는 온통 0으로 돌아온다."
+brief = '''
+LuaJIT에는 스레드가 없습니다. 코루틴이 가장 가까운 것입니다 — 자기 스택을 가진 함수로, 재개될 때 돌고 `yield`마다 멈춥니다. `coroutine.create(f)`는 하나를 만들고 아무것도 실행하지 않습니다. `coroutine.resume(co)`는 그것을 시작하거나 마지막 yield에서 이어 가고, 다시 yield하거나 끝나면 돌아옵니다. `coroutine.status(co)`는 끝나고 나면 `"dead"`이므로, join은 그렇게 될 때까지 재개하는 것입니다. 모든 심부름꾼을 먼저 시작하고, 그다음 모두를 끝내세요 — 시작 루프 안에서 끝내면 한 번에 하나씩 돌게 됩니다.
+
+```
+for _, co in ipairs(workers) do
+  coroutine.resume(co)
+end
+for _, co in ipairs(workers) do
+  while coroutine.status(co) ~= "dead" do coroutine.resume(co) end
+end
+```
+
+`square(i)`는 한 번 yield한 뒤 `results[i]`를 채우고, 워커 리스트는 만들어져 있으며, 두 print는 두 번째 루프 뒤에 실행됩니다. 첫 루프 본문으로 `resume`을, 둘째 루프 본문으로 `while` 줄을 보이는 그대로 입력하세요.
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "첫 루프에 coroutine.resume(co), 둘째 루프에 while coroutine.status(co) ~= \"dead\" do coroutine.resume(co) end.",
+  "한 번도 재개하지 않은 코루틴은 절대 돌지 않고, 한 번만 재개한 코루틴은 제곱을 아직 쓰지 않은 채 yield에서 멈춥니다. 어느 쪽인지는 status가 알려 줍니다.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.basic.18.binary-tree"
+title = "NIL"
+story = "23:59, 사당의 등불판. 등불 번호 트리는 아래에 아무것도 없는 루트 하나이고, 첫 조회가 attempt to index a nil value (field 'left')로 죽는다."
+brief = '''
+이진 탐색 트리는 노드의 왼쪽 서브트리에 더 작은 값을, 오른쪽에 더 큰 값을 둡니다. 삽입은 재귀입니다: 빈 서브트리(`nil`)는 새 `Node`가 되고, 아니면 값은 한쪽으로 내려가며, 돌아온 것을 다시 그 자식으로 저장합니다. 그 자식이 방금 전까지 `nil`이었을 수 있기 때문입니다 — 없는 키는 nil이고, nil은 따라가기 전까지는 에러가 아닙니다. `nil`에서 `.left`를 따라가는 것이 이 길의 이름이 된 바로 그 충돌입니다. `nil` 검사가 먼저이고, 그것은 적혀 있습니다.
+
+```
+if v < n.val then
+  n.left = insert(n.left, v)
+else
+  n.right = insert(n.right, v)
+end
+```
+
+`Node`, `insert`의 `nil` 경우와 `if v < n.val then` / `else` 뼈대, `inorder`, `height`, `main`은 적혀 있습니다. 두 자리 표시 대신 재귀 두 줄을 보이는 그대로 입력하세요.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "if 아래에 n.left = insert(n.left, v), else 아래에 n.right = insert(n.right, v).",
+  "대입이 핵심입니다: insert는 서브트리의 루트를 돌려주는데, 자식이 nil이었다면 그것은 새 Node입니다. 새 Node에는 left나 right 키가 아예 없습니다 — 읽으면 nil이고, 그 안으로 인덱스하기 전까지는 괜찮습니다.",
+]

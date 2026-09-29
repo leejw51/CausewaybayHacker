@@ -1,0 +1,602 @@
+# C++ LAND — VERY BASIC, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/cpp/verybasic.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, the quiz's four choices, sample input and output and
+# the exact strings a program must print are the English pack's and are
+# copied verbatim, never translated.
+
+pack   = "cpp.verybasic"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.verybasic.01.print"
+title = "První slovo děla"
+story = "12:00 u Poledního děla. Záznam o výstřelech má začínat jedním řádkem a ten řádek chybí."
+brief = '''
+Program musí vypsat přesně `hello, causewaybay` a konec řádku. V C++ je to
+jeden příkaz poslaný do standardního výstupního proudu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  (nothing)
+output: hello, causewaybay
+```
+'''
+hints = [
+  "`std::cout << \"hello, causewaybay\" << '\\n';` — proud, řetězec, konec řádku, středník.",
+  "Jednoduché uvozovky dělají znakovou konstantu; řetězec potřebuje dvojité.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.verybasic.02.int-types"
+title = "Číslo, které se do int nevejde"
+story = "Záznam děla počítá granáty vystřelené od roku 1860 v setinách a registr, který ho držel, je široký 32 bitů."
+brief = '''
+Načti `a`. Program potřebuje `big`, 64bitové celé číslo držící `a` krát
+jednu miliardu — hodnotu, kterou `int` neudrží, jakmile je `a` větší než 2.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+output: 3000000000
+```
+'''
+hints = [
+  "`long long big = a * 1000000000LL;` — přípona `LL` dělá 64bitovou i tu konstantu.",
+  "`int` má 32 bitů: pět miliard se nevejde a výsledek je nesmysl.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.verybasic.03.floats"
+title = "Příliv v desetinách"
+story = "Tabulka přílivu dělí jeden odečet druhým a tiskne celá čísla tam, kde správce přístavu chtěl dvě desetinná místa."
+brief = '''
+Načti dvě kladná celá čísla `a` a `b`. Program potřebuje `q`, podíl jako
+`double` — celé číslo dělené celým číslem je celé číslo, pokud se jedno
+z nich napřed nepřevede.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "`double q = static_cast<double>(a) / b;` — před dělením převeď jednu stranu.",
+  "`a / b` se dvěma celými čísly zaokrouhlí dolů na celé číslo dřív, než se z něj stane double.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.verybasic.04.strings"
+title = "Jak dlouhé je jméno"
+story = "Jméno sampanu je namalované na přídi a přístavní záznam chce jeho délku ve znacích."
+brief = '''
+Načti jeden řádek do `s`. Program musí vypsat, kolik znaků drží —
+`std::string` zná svou vlastní délku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  kwan lee
+output: 8
+```
+'''
+hints = [
+  "`std::cout << s.size() << '\\n';` — `size()` je volání, takže potřebuje závorky.",
+  "`sizeof(s)` je velikost samotného objektu řetězce, ne textu v něm.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.verybasic.05.bool-if"
+title = "Sudý, nebo lichý"
+story = "Naviják na skluzu bere sampany po dvou a součet říká, jestli ten poslední jde nahoru sám."
+brief = '''
+Načti `n`. Program potřebuje `even`, `bool`, který je true, když se `n` dělí
+dvěma beze zbytku.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "`bool even = n % 2 == 0;` — `%` je zbytek, `==` porovnání.",
+  "Jedno `=` přiřazuje; porovnání potřebuje dvě.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.verybasic.06.loops"
+title = "Počítání salvy"
+story = "Dělo vystřelí n ran a záznam sčítá jejich čísla, ale smyčka, kterou používá, nikdy nezačne."
+brief = '''
+Načti `n`. Program musí sečíst `1 + 2 + … + n` do `sum`. Tělo smyčky je
+napsané; dírou je hlavička `for`, která projde `i` od 1 do `n`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  10
+output: 55
+```
+'''
+hints = [
+  "`for (long long i = 1; i <= n; ++i) {` — tři části oddělené středníky.",
+  "`<` skončí o jedno dřív; `<=` zahrne i samotné `n`.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.verybasic.07.functions"
+title = "Druhá mocnina"
+story = "Ukazatel ve strojovně čerpadel ukazuje odečet a displej chce jeho druhou mocninu, a funkce, která to má udělat, nevrací nic užitečného."
+brief = '''
+`square` bere číslo a musí vrátit to číslo vynásobené samo sebou. Jeho tělo
+je díra; `main` načte `x` a vypíše `square(x)`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  7
+output: 49
+```
+'''
+hints = [
+  "`return x * x;` — vynásob a výsledek vrať.",
+  "`^` je v C++ bitové XOR, ne mocnina.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.verybasic.08.structs"
+title = "Jeden stánek, dvě pole"
+story = "Rejstřík stánků v tajfunovém útočišti vede u každého stánku jméno a cenu a záznam pro nový stánek je prázdný."
+brief = '''
+`Stall` má `name` a `price`. Program obojí načetl a potřebuje `s`, `Stall`
+z nich postavený — agregát se inicializuje složenými závorkami, pole
+v pořadí.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  fish 40
+output: fish 40
+```
+'''
+hints = [
+  "`Stall s{name, price};` — složené závorky, pole v pořadí, v jakém je struktura deklaruje.",
+  "Jeden inicializátor vyplní jen první pole; cena je pak nula.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.verybasic.09.struct-method"
+title = "Vlastní součet stánku"
+story = "Každý záznam stánku zná svou cenu a množství a jeho `total()` odpovídá na každou otázku nulou."
+brief = '''
+`Stall::total` musí vrátit `price` krát `qty`. Uvnitř členské funkce se
+pole používají jménem. Tělo je díra.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  fish 40 3
+output: fish: 120
+```
+'''
+hints = [
+  "`return price * qty;` — pole, jménem, vynásobená.",
+  "`this` je ukazatel, takže by to bylo `this->price`; holé jméno je jednodušší.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.verybasic.10.enums"
+title = "Dvě linky, dvě barvy"
+story = "Cedule na přestupu nad zastávkou autobusu u útočiště jmenuje dvě linky MTR a drát, který vybírá enumerátor, je přestřižený."
+brief = '''
+Načti jedno slovo, `island` nebo `tsuenwan`. Program potřebuje `line`,
+enumerátor `Line` vybraný podle slova; `switch`, který vypíše barvu, je
+napsaný. Enumerátor `enum class` se vždy píše se svým typem.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "`Line line = word == \"island\" ? Line::Island : Line::TsuenWan;` — podmíněný operátor, enumerátory kvalifikované.",
+  "Bez `Line::` vpředu není `Island` jméno, které by překladač znal.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.verybasic.11.vector"
+title = "Úlovek, kus po kuse"
+story = "Sampany vykládají úlovek po jednom čísle a sčítací vektor zůstává prázdný."
+brief = '''
+Načti řádek celých čísel. Každá hodnota `x` musí být připojena k vektoru
+`xs`, jak se čte; smyčka i výpis jsou napsané.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3 4
+```
+'''
+hints = [
+  "`xs.push_back(x);` — vektor roste vzadu.",
+  "`push` patří `std::stack`; vektor říká `push_back`.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.verybasic.12.vector-edit"
+title = "První ven"
+story = "Fronta na naviják je vektor čísel sampanů a ten první už šel nahoru, ale na seznamu pořád je."
+brief = '''
+`v` drží celá čísla z řádku. Program musí odebrat první prvek — `erase`
+bere iterátor na prvek, který má zahodit — a vypsat zbytek.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 2 3 4
+```
+'''
+hints = [
+  "`v.erase(v.begin());` — `begin()` je iterátor na první prvek.",
+  "`pop_back` odebere ten poslední; žádné `pop_front` na vektoru není.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.verybasic.13.list"
+title = "Na začátek řady"
+story = "Seznam kotvišť v útočišti je spojový seznam a každý nový sampan má jít dopředu."
+brief = '''
+Načti řádek celých čísel. Každé `x` musí být vloženo na ZAČÁTEK `std::list`
+`l`, takže poslední načtené se vypíše první. Smyčka i výpis jsou napsané.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "`l.push_front(x);` — seznam může růst na obou koncích v konstantním čase.",
+  "`push_back` zachová pořadí vstupu; obrací ho právě začátek.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.verybasic.14.maps"
+title = "Sčítací tabule"
+story = "Sčítací tabule tajfunového útočiště počítá každý druh úlovku a počet se nehýbe."
+brief = '''
+Načti řádek slov. Pro každé slovo `w` musí počet v `counts` stoupnout
+o jedna — `std::map` vytvoří chybějící klíč s nulou, když se poprvé
+indexuje. Smyčka i seřazený výpis jsou napsané.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  fish crab fish
+output: crab 1
+        fish 2
+```
+'''
+hints = [
+  "`++counts[w];` — indexování vytvoří klíč na nule, pak inkrement.",
+  "`at()` vyhodí výjimku na klíči, který tam ještě není; `[]` ho vytvoří.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.verybasic.15.hashtable"
+title = "Najdi to, nebo ne"
+story = "Ceny stánků sedí v hashovací tabulce a dotaz na stánek, o kterém nikdo neslyšel, musí odpovědět minus jedna, ne vymyšlenou nulu."
+brief = '''
+`table` mapuje jména stánků na ceny, postavená z prvního řádku. Načti jedno
+jméno `q`. Program potřebuje `price`: hodnotu z tabulky, když tam klíč je,
+`-1`, když není — a `[]` by potichu vložilo nulu.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  fish 40 crab 120
+        fish
+output: 40
+```
+'''
+hints = [
+  "`long long price = table.count(q) ? table[q] : -1;` — nejdřív se zeptej, pak indexuj.",
+  "`table[q]` na chybějícím klíči ho vloží s 0 — dotaz by vypsal 0, ne -1.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.verybasic.16.sets"
+title = "Každé číslo jednou"
+story = "Čísla kotvišť přicházejí s opakováním a rejstřík má držet každé jednou, v pořadí."
+brief = '''
+Načti řádek celých čísel. Každé `x` musí jít do `std::set` `seen`, která
+drží jednu kopii každé hodnoty ve vzestupném pořadí. Výpis velikosti
+a hodnot je napsaný.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3 1 3 2 1
+output: 3
+        1 2 3
+```
+'''
+hints = [
+  "`seen.insert(x);` — množina má `insert` a hodnotu, kterou už má, ignoruje.",
+  "`push_back` je slovo posloupnosti; množina žádný konec nemá.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.verybasic.17.stack"
+title = "Poslední dovnitř, první ven"
+story = "Talíře se u výdeje kuchyně v útočišti vrší a berou se shora, a zásobník žádný talíř nevezme."
+brief = '''
+Načti řádek celých čísel. Každé `x` musí být vloženo na `std::stack` `st`;
+program pak všechno vybere a vypíše hodnoty od té poslední vložené.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "`st.push(x);` — zásobník vkládá a `top()` vidí poslední vložení.",
+  "`push_back` je pro vektor; `std::stack` říká `push`.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.verybasic.18.queue"
+title = "První dovnitř, první ven"
+story = "Zákazníci stojí frontu u nudlového stánku v útočišti a obsluhují se v pořadí, v jakém přišli, ale fronta nikoho nevezme."
+brief = '''
+Načti řádek celých čísel. Každé `x` musí být vloženo do `std::queue` `q`;
+program je pak bere zepředu v pořadí, v jakém přišly.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 1 2 3 4
+```
+'''
+hints = [
+  "`q.push(x);` — dovnitř vzadu, `front()` ke čtení, `pop()` k odebrání.",
+  "`push_front` je slovo `deque`; fronta vkládá jen vzadu.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.verybasic.19.heap"
+title = "Nejmenší jako další"
+story = "Naviják bere jako další pokaždé nejlehčí sampan a halda, která ho má podat, je vzhůru nohama."
+brief = '''
+Načti řádek celých čísel. Program je všechny vloží do `pq` a jednu po druhé
+vybírá, a musí vycházet od nejmenší. `std::priority_queue` je max-halda,
+pokud není deklarovaná se `std::greater` jako komparátorem; deklarace `pq`
+je díra.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "`std::priority_queue<long long, std::vector<long long>, std::greater<long long>> pq;` — typ hodnoty, kontejner, komparátor.",
+  "Komparátor je třetí argument šablony; druhý je kontejner.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.verybasic.20.sorting"
+title = "Podle hloubky"
+story = "Kotviště jsou zapsaná v pořadí, v jakém lodě připluly, a mapa je chce podle hloubky, nejmenší první."
+brief = '''
+`v` drží celá čísla z řádku. Program je musí seřadit vzestupně na místě —
+algoritmus bere dvojici iterátorů, která rozsah ohraničuje.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 2
+output: 1 2 3 5 8
+```
+'''
+hints = [
+  "`std::sort(v.begin(), v.end());` — rozsah jsou dva iterátory.",
+  "`std::greater` řadí sestupně; výchozí je vzestupně.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.verybasic.21.sort-by-key"
+title = "Nejtěžší úlovek první"
+story = "Záznam úlovků vede jméno a váhu každého sampanu a tabule chce největší úlovek nahoře."
+brief = '''
+`rows` drží záznamy `Row{name, score}`. Program je musí seřadit podle
+`score`, nejvyšší první — `std::sort` s komparátorovou lambdou, která říká,
+kdy jde `a` před `b`. Skóre jsou různá.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  3
+        mei 40
+        alex 90
+        sam 65
+output: alex 90
+        sam 65
+        mei 40
+```
+'''
+hints = [
+  "`std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.score > b.score; });` — lambda odpovídá na otázku „jde a první?“.",
+  "`<` by dalo nejmenší první; `>` dá největší první.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.verybasic.22.reverse"
+title = "Odzadu dopředu"
+story = "Odečty přílivu byly zapsané od nejnovějšího a mapa je čte od nejstaršího."
+brief = '''
+`v` drží celá čísla z řádku. Program je musí obrátit na místě — algoritmus
+z `<algorithm>` přes celý rozsah.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 4 3 2 1
+```
+'''
+hints = [
+  "`std::reverse(v.begin(), v.end());` — algoritmus nad rozsahem, ne metoda.",
+  "Vektor žádný člen `reverse()` nemá; `std::list` ano, vektor používá algoritmus.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.verybasic.23.closures"
+title = "Přílivová korekce"
+story = "Ke každému odečtu se přičítá stejná korekce a lambda, která si ji měla pamatovat, ji zapomněla."
+brief = '''
+Načti `k`, pak řádek celých čísel. Program potřebuje `add`, lambdu, která
+zachytí `k` a vrátí svůj argument plus `k`; aplikuje se na každou hodnotu
+a výsledky se vypíšou.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "`auto add = [k](long long x) { return x + k; };` — `[k]` je zachycení.",
+  "S prázdným `[]` lambda `k` vůbec nevidí.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.verybasic.24.lambdas"
+title = "Spočítej sudá kotviště"
+story = "Čísla kotvišť podél zdi přicházejí v seznamu a kancelář chce vědět, kolik je sudých."
+brief = '''
+`v` drží celá čísla z řádku. Program potřebuje `evens`: kolik z nich je
+sudých, spočítané pomocí `std::count_if` s lambdou, která říká, které
+hodnoty počítat.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4 6
+output: 3
+```
+'''
+hints = [
+  "`long long evens = std::count_if(v.begin(), v.end(), [](long long x) { return x % 2 == 0; });` — rozsah, pak test.",
+  "`std::count` počítá hodnotu; `count_if` počítá to, čemu predikát řekne ano.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.verybasic.25.threads"
+title = "Jeden naviják, jedno vlákno"
+story = "Skluz sčítá váhy sampanů na druhém vlákně, zatímco hlavní čeká, a to vlákno nikdy nezačne."
+brief = '''
+`v` drží celá čísla z řádku a `sum_of` je sečte. Program potřebuje `t`,
+`std::thread` běžící lambdu, která uloží `sum_of(v)` do `result`; `main`
+ho připojí a vypíše. Lambda musí zachytávat referencí, aby dosáhla na `v`
+a `result`.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  1 2 3 4
+output: 10
+```
+'''
+hints = [
+  "`std::thread t([&] { result = sum_of(v); });` — vlákno se staví z něčeho volatelného.",
+  "`[&]` zachytává referencí, a díky tomu může lambda zapsat do `result`.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.verybasic.26.mutex"
+title = "Čtyři ruce na jednom počítadle"
+story = "Čtyři vlákna přičítají k jednomu počítadlu ve strojovně čerpadel a zámek, který je má držet na střídačku, je po prvním průchodu držený navždy."
+brief = '''
+Čtyři vlákna každé stotisíckrát přičtou k `counter` jedničku. Každý průchod
+smyčkou musí při přičítání držet mutex `mu` — a na konci průchodu ho
+uvolnit. Zástupný řádek zamkne a nikdy neodemkne, takže druhý průchod čeká
+navždy; lock guard uvolní, když vypadne z rozsahu platnosti.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  (nothing)
+output: 400000
+```
+'''
+hints = [
+  "`std::lock_guard<std::mutex> lock(mu);` — zamkne hned, odemkne, když `lock` umře na `}`.",
+  "`mu.lock()` samotné se nikdy nevrátí zpět; další průchod se zablokuje na mutexu, který tohle vlákno už drží.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.verybasic.27.binary-tree"
+title = "Segfault"
+story = "12:00 u Poledního děla. Tabulka výstřelů je vyhledávací strom a vložení, které má sestoupit pravou stranou, se zastaví u kořene."
+brief = '''
+`insert` vloží `v` do vyhledávacího stromu s kořenem `n`: prázdný případ je
+napsaný a vytvoří nový uzel. Díra je ten jeden řádek, který pošle `v` na
+správnou stranu — doleva, když je menší než `n->val`, jinak doprava —
+a uloží, co rekurze vrátí. Průchod inorder pak vypíše vzestupně.
+
+Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+```
+'''
+hints = [
+  "`if (v < n->val) n->left = insert(n->left, v); else n->right = insert(n->right, v);` — rekurzivně vejdi na jednu stranu a výsledek ulož.",
+  "`n` je ukazatel: `->`, ne `.`; a menší jde doleva.",
+]

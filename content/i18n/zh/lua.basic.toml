@@ -1,0 +1,766 @@
+# LUA LAND — BASIC, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/lua/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "lua.basic"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.basic.01.first-incense"
+title = "第一炷香"
+story = "21:00，浣纱街。鼓还没响，火龙在黑暗的巷子里躺着，第一炷香还没点。"
+brief = '''
+请精确输出：
+
+```
+hello, causewaybay
+```
+
+小写，一个逗号，一个空格，一行。其他什么都不要有。
+
+`print` 会替你加上换行。它还会在各个参数之间放一个 **tab**，这是人们在它身上最先犯的错：`print("hello,",
+"causewaybay")` 里有一个 tab，而不是空格。一个字符串，一个参数。
+'''
+hints = [
+  "print(\"hello, causewaybay\") 就是整个程序。",
+  "字符串必须精确：小写，一个逗号，逗号后面一个空格。",
+  "把底部的 `main()` 调用留着。一个从没被调用的函数什么都不会打印，而起始代码正是这样。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.basic.02.segment-count"
+title = "龙节的数目"
+story = "扛龙头的人沿着巷子喊出龙节的数目，榕树下的计数板上，本该写数目、数目的两倍和数目的平方的地方都是零。"
+brief = '''
+`io.read("*l")` 从标准输入读一行，去掉换行，并把它作为**字符串**返回。`tonumber()` 把文本变成数字（不是数字时返回 `nil`）。Lua 会悄悄替你把 `"12" * 2` 转换过来，但 `"12" .. 1` 是 `"121"`，而 `"12" < 1` 是错误，所以数字要在门口就转换好，之后一直是数字。
+
+```
+local n = tonumber(io.read("*l"))
+```
+
+三个 `print` 行已经写好。照样输入 `main` 的第一行，这样 `n` 就是那一行上的数字，而不是它一开始的 `0`。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "起始代码打印三次 0：n 从来没被读取。那一行还躺在标准输入里。",
+  "local n = tonumber(io.read(\"*l\")) 一步完成读取和转换。tonumber 会替你忽略数字两边的空格。",
+  "负数 n 的平方是正数。测试知道这一点。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.basic.03.types"
+title = "共分一捆香"
+story = "两个扛龙的人在莲花街口分一捆香，账本上有每人几支、剩下几支，还有一个本该精确到两位小数的份额，读出来却是一个问号。"
+brief = '''
+Lua 只有一种数字类型——64 位 double——也只有一种除法：`7 / 2` 是 `3.5`，而 `6 / 2` 是 `3`，打印出来也是 `3`。整数除法是 `math.floor(a / b)`，`%` 是余数。要以固定的小数位数打印一个数字，就把它和一个 `%.2f`——小数点后两位——一起交给 `string.format`，再打印返回的字符串。（Python 写 f-string 的地方，Lua 写 `string.format`，值跟在格式串后面。）
+
+```
+print(math.floor(a / b))
+print(a % b)
+print(string.format("%.2f", a / b))
+```
+
+`a` 和 `b` 用 `io.read("*n", "*n")` 读取——从输入里读两个数字——前两个 print 也已写好。照样输入第三个 `print` 行。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "print(string.format(\"%.2f\", a / b)) — 先是格式串，再是它要格式化的值。",
+  "%.2f 是 C 的格式：f 表示浮点数，.2 表示小数点后两位。单独的 print(a / b) 会打印 3.5，少一位。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.basic.04.int-types"
+title = "四字节宽"
+story = "货车上的鼓点控制器把每个节拍计数存在四个字节里，并在它的小屏幕上打印它能装下的最大数字，而屏幕是黑的。"
+brief = '''
+Lua 的数字没有整数宽度，但 `bit` 库有：它的每个运算都作用在 **32 位**上。`bit.tohex(n, 8)` 把 `n` 显示为那四个字节，八个十六进制数字，高位在前，所以 `bit.tohex(-1, 8)` 是 `ffffffff`。最大的有符号 32 位值是 `2^31 - 1`（`^` 是乘方运算符；没有 `<<`，那是 `bit.lshift`）。double 的精确计数到 `2^53` 为止；超过它，LuaJIT 有带 `LL` 或 `ULL` 后缀的 64 位字面量，打印时会带着后缀。
+
+```
+print(bit.tohex(n, 8))
+print(2^31 - 1)
+```
+
+`n` 已经读好，无符号 64 位最大值在最后打印，来自一个去掉了后缀的 `ULL` 字面量。在两个 `-- FILL` 标记处输入上面那两行。
+
+```
+input:  7
+output: 00000007
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "print(bit.tohex(n, 8)) — 第二个参数是十六进制数字的个数；8 个数字就是 4 个字节。",
+  "2^31 - 1 是 2147483647：double 能精确装下它，print 显示时不带小数点。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.basic.05.big-int"
+title = "三十二字节"
+story = "维多利亚公园的每盏灯笼都印着一个谁也读不懂的三十二字节数字，公园办事处的打印机把它显示成一个十进制数，长得超出了吊牌。"
+brief = '''
+哈希、密钥、地址：这个游戏赖以运行的数字都是 256 位宽——三十二个字节。Lua 的数字是 double，只能装下其中五十三位，所以一个 256 位的数字保持它到达时的样子，一个**数字字符串**，而 `hex_of` 用长除法一位一位地把它变成十六进制（Lua 没有大整数；那个函数已经替你写好）。剩下的是补齐：六十四个十六进制字符，左边补零。`#h` 是 `h` 的长度，`string.rep("0", k)` 是 `k` 个零，`..` 把两个字符串连起来。
+
+```
+print(string.rep("0", 64 - #h) .. h)
+```
+
+`s` 以十进制读入，`h` 是它未补齐的十六进制。在 `-- FILL` 标记处输入上面那一行。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "print(string.rep(\"0\", 64 - #h) .. h) — 缺多少个就补多少个零，然后是十六进制。",
+  "#h 是字符串的长度；次数为 0 的 string.rep 是空字符串，所以 64 个字符的最大值完全不用补。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.basic.06.floats"
+title = "小数点后三位"
+story = "庙门口的香秤精确到三位小数，货车上那台便宜的只保留单精度，账本上同一个重量出现了两次，两次都错。"
+brief = '''
+Lua 的数字是 64 位 double——在别的地方叫 `f64`。没有 32 位浮点类型，但 LuaJIT 的 `ffi` 能造一个：`ffi.new("float[1]", x)` 是一个只有一个 `float` 的 C 数组，装着 `x`，从里面读出 `[0]` 就得到舍入到最接近的 `f32` 的 `x`。带 `%.3f` 的 `string.format` 打印三位小数；`%.10f` 打印的位数足以看出舍入。（Python 打包和解包一个 `struct` 的地方，Lua 经过一个 C 类型。）
+
+```
+local x = tonumber(s)
+local y = ffi.new("float[1]", x)[0]
+```
+
+`ffi` 已经 require，`s` 已经读好，两个 print 也已写好。在两个占位处输入上面那两行。
+
+```
+input:  0.1
+output: 0.100
+        0.1000000015
+```
+'''
+hints = [
+  "local x = tonumber(s)，然后 local y = ffi.new(\"float[1]\", x)[0] — 数组在一个表达式里创建并读出。",
+  "\"float[1]\" 是单精度；\"double[1]\" 和 x 一样宽，什么也不会改变。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.basic.04.strings"
+title = "火龙的名字"
+story = "画横幅的师傅要把扛龙头那人的名字量一量、喊出来，还要倒着写一份，给庙里神台后面的镜子用，账本上只有一份，正着写的。"
+brief = '''
+字符串通过 `#s` 知道自己的长度，用 `s:upper()` 得到大写副本，用 `s:reverse()` 得到反转的副本。冒号就是方法调用：`s:upper()` 就是 `string.upper(s)`，`s` 替你作为第一个参数传了进去。字符串从来不会就地改变——这些每一个都是新字符串，`s` 还是原来的样子。
+
+```
+print(#s)
+print(s:upper())
+print(s:reverse())
+```
+
+`s` 已经读好，长度也已打印。照样输入第二和第三个 `print` 行。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "print(s:upper()) 然后 print(s:reverse()) — 两个方法调用，冒号加空括号。",
+  "用点的 s.upper() 什么也没传，string.upper 会抱怨本该是字符串的地方是个 nil。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.basic.08.string-slices"
+title = "开头几个字母"
+story = "灯笼吊牌打印机取街名的开头几个字母做短吊牌，再加一个记号，而路线牌上的全名必须保持原样。"
+brief = '''
+`s:sub(1, n)` 是子串：`s` 的前 `n` 个字符，作为一个新字符串——位置从 1 数起，两端都包含在内。字符串不能被改变，所以子串永远是副本，不管对那一段做什么，`s` 都不受影响。`..` 把两个字符串连成一个新的，再把它赋回给 `head` 就是追加。
+
+```
+local head = s:sub(1, n)
+head = head .. "!"
+```
+
+`s` 和 `n` 已经读好，两个 print 也已写好。在两个占位处输入上面那两行。
+
+```
+input:  causeway bay
+        8
+output: causeway!
+        causeway bay
+```
+'''
+hints = [
+  "local head = s:sub(1, n)，然后 head = head .. \"!\" — sub 复制一份，.. 再造一份。",
+  "s:sub(0, n) 和 s:sub(1, n) 一样；0 会被夹到开头。Lua 没有 +=：把名字写在两边。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.basic.09.int-slices"
+title = "从头上取两个"
+story = "路线牌要把第二和第三个龙节号码抄出来，后面再接上最后两个，而原来的清单要保持原样。"
+brief = '''
+Lua 没有切片；最接近的是 `unpack(v, i, j)`，它把 `i` 到 `j` 位置上的值作为单独的多个值返回，外面套一个 `{ ... }` 就把它们收进一张**新表**——改它永远不会改到 `v`。位置从 1 数起，两端都包含在内，所以第二和第三个值是 `2, 3`。`table.insert(t, x)` 追加 `x`；`#v` 是最后一个位置，所以 `v[#v - 1]` 和 `v[#v]` 是最后两个。
+
+```
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])
+```
+
+`v` 装着这一行的整数，两个 print 也已写好。在两个占位处输入上面那两行。
+
+```
+input:  1 2 3 4 5
+output: 2 3 4 5
+        1 2 3 4 5
+```
+'''
+hints = [
+  "local part = { unpack(v, 2, 3) }，然后 table.insert(part, v[#v - 1]); table.insert(part, v[#v]) — 一行上两条语句，中间一个分号。",
+  "unpack 在 LuaJIT 里是全局函数（table.unpack 是 Lua 5.2 的）。不在外面套花括号，那两个值就没有去处。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.basic.10.byte-slices"
+title = "前三个字节"
+story = "灯笼吊牌打印机要扛龙人名字的前三个字节，后面加一个记号，它先把这些字节以十六进制显示，再把它们作为字母打印。"
+brief = '''
+Lua 的字符串**就是**它的字节：没有单独的字节类型，`#s` 数的是字节，`s:sub` 切的也是字节。`s:byte(i, j)` 把从 `i` 到 `j` 的字节作为数字交回来，每个一个返回值，`{ ... }` 把它们收进一张表；`-1` 表示最后一个位置，所以 `s:byte(1, -1)` 是每一个字节。`string.char(...)` 是另一个方向——数字进去，字符串出来——而 `unpack(t)` 把一张表展开成它需要的参数。
+
+```
+local bytes = { head:byte(1, -1) }
+print(string.char(unpack(bytes)))
+```
+
+`head` 是 `s` 的前三个字节，末尾加上 `"!"`，十六进制那一行由 `bytes` 打印。在两个占位处输入上面那两行。
+
+```
+input:  kwan lee
+output: 6b776121
+        kwa!
+```
+'''
+hints = [
+  "local bytes = { head:byte(1, -1) }，然后 print(string.char(unpack(bytes))) — byte 走一个方向，char 走另一个方向。",
+  "不带参数的 head:byte() 只是第一个字节；1, -1 要的是全部。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.basic.05.loops"
+title = "数龙节"
+story = "火龙的各节从龙头起编号 1 到 n，龙节号码的总和、以及每隔三节哪几节扛着鼓，这一栏在数目下面是一行空白。"
+brief = '''
+数值 `for` 替你计数：`for i = 1, n do` 让 `i` 从 `1` 开始，对每个值运行一次循环体，一直到 `n`，**并且包含** `n`——最后一个值也算在内，这是 Lua 和 `range` 最先不同的地方。循环体以 `end` 结束。
+
+```
+for i = 1, n do
+  total = total + i
+  if i % 3 == 0 then threes = threes + 1 end
+end
+```
+
+`n` 已经读好，`total` 和 `threes` 从 `0` 开始，循环体也已写好。在循环体上方照样输入 `for` 行。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "for i = 1, n do — 第二个数是 i 的最后一个值，而不是比它大一。",
+  "for i = 1, 0 运行零次：起点已经超过终点的循环没有循环体可运行。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.basic.06.functions"
+title = "跑腿的工钱"
+story = "香档按趟给跑腿的付钱，一趟到货车那边，第十趟之后更便宜，账本上算这笔账的那一页只有一个名字，下面什么都没有。"
+brief = '''
+`function` 创建函数：名字、括号里的参数、函数体，以及 `end`。`return` 把一个值交还给调用者。函数体可以只是一个 `return`，把整个答案写成一个表达式；`math.min` 和 `math.max` 是它们参数中较小和较大的那个。
+
+```
+local function fare(rides)
+  return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3
+end
+```
+
+前十程每程 `5`，之后每程 `3`。`main` 读取 `n` 并打印 `fare(n)`。在 `fare` 里照样输入 `return` 行。
+
+```
+input:  12
+output: 56
+```
+'''
+hints = [
+  "return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3 — min 把贵的程数封顶在十，max 防止其余部分变成负数。",
+  "函数的工作到 return 为止；函数体里它后面的东西都不会运行，而且 return 必须是它所在代码块的最后一条语句。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.basic.07.structs"
+title = "一个摊位，三个字段"
+story = "香档的卡片上有名字、价钱和数量，收银机把卡片读成三个松散的词，什么也没加起来。"
+brief = '''
+Lua 没有 `class`；对象是一张表，它背后的元表说明键缺失时去哪里找。`Stall.__index = Stall` 让每个摊位去 `Stall` 里找它的方法，`setmetatable({...}, Stall)` 把元表挂上去，而 `function Stall:total()` 定义一个方法，它有一个名为 `self` 的隐藏第一参数——定义和调用都用冒号。在方法里面，字段通过 `self` 读取。
+
+```
+local Stall = {}
+Stall.__index = Stall
+
+function Stall.new(name, price, qty)
+  return setmetatable({ name = name, price = price, qty = qty }, Stall)
+end
+
+function Stall:total()
+  return self.price * self.qty
+end
+```
+
+`Stall`、它的 `new` 和 `main` 已经写好。照样输入 `total` 的 `return` 行。
+
+```
+input:  tofu 8 5
+output: tofu: 40
+```
+'''
+hints = [
+  "return self.price * self.qty — 字段住在表里，而在冒号方法里 self 就是那张表。",
+  "在 total() 里单独的 price 不是一个名字；它会是一个全局变量，而没人设置过的全局变量是 nil。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.basic.08.enums"
+title = "三条线，三种颜色"
+story = "庙门旁钉着的港铁地图上有三条线，卖灯笼的小伙子得说出哪种颜色的线载人群回家，而下面的牌子是空白的。"
+brief = '''
+Lua 没有 `enum`；最接近的是一张具名常量的表——`Line.ISLAND` 是 `1`，而一个值可以像别的东西一样做另一张表的键。用字符串做索引就是按名字查找：`Line["ISLAND"]` 和 `Line.ISLAND` 一样，所以输入里的一个词只要转成大写再拿去索引，就成了一个成员。不存在的名字给出 `nil`，不是错误——直到它被跟进为止。
+
+```
+local Line = { ISLAND = 1 }
+
+local line = Line[word:upper()]
+```
+
+`Line`、从成员到颜色的 `COLOUR` 表和 print 都已写好。照样输入 `local line = ...` 这一行。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "local line = Line[word:upper()] — 方括号按字符串查键，而名字是大写的。",
+  "Line.word 会去找一个拼作 w-o-r-d 的键；只有方括号的形式才接受你读进来的字符串。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.basic.09.vector"
+title = "龙节清单"
+story = "扛龙头的人一个一个喊出各节的重量，账本上却不是一个清单，而是四个空白：加入之后、拿掉之后、替换之后、排序之后。"
+brief = '''
+在 `1, 2, 3, ...` 上有值的表就是列表，它是就地编辑的。`table.insert(t, x)` 在末尾加一个值，`table.remove(t, i)` 把某个位置上的值拿出来（后面的往前挪），`t[i] = x` 替换某个位置上的值，`table.sort(t)` 把值就地按升序排好。四个操作，四行，每一步之后列表都是另一个列表。
+
+```
+table.insert(xs, 100)
+table.remove(xs, 1)
+xs[1] = 7
+table.sort(xs)
+```
+
+`xs` 装着这一行的整数，每一步之后都会打印。按顺序在四个 `-- FILL` 占位处输入这四行。
+
+```
+input:  16 8 15 4
+output: 16 8 15 4 100
+        8 15 4 100
+        7 15 4 100
+        4 7 15 100
+```
+'''
+hints = [
+  "table.insert(xs, 100)，然后 table.remove(xs, 1)，然后 xs[1] = 7，然后 table.sort(xs) — 每个占位处一行，按这个顺序。",
+  "第一个位置是 1，不是 0：xs[0] = 7 会把 7 放在一个列表不计算的键上。table.sort 什么也不返回，所以不要拿它赋值。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.basic.16.list"
+title = "点单链"
+story = "跑腿的把每张香的订单夹到货车上那条链子的末尾，再把票号夹到最前面，链子却空空地挂着。"
+brief = '''
+Lua 没有双端队列；一张表的两端都用同样的两个函数加一个位置来编辑。`table.insert(t, 1, x)`——三个参数——把 `x` 放到位置 1，其余的往后挪；不给位置的 `table.remove(t)` 拿走**最后一个**值；`t[1] = x` 替换最前面的；而 `table.sort(t)` 就地排序，所以第四行和列表的一样。
+
+```
+table.insert(chain, 1, 0)
+table.remove(chain)
+chain[1] = 9
+table.sort(chain)
+```
+
+`chain` 装着这一行的整数，每一步之后都会打印。按顺序在四个 `-- FILL` 占位处输入这四行。
+
+```
+input:  3 1 2
+output: 0 3 1 2
+        0 3 1
+        9 3 1
+        1 3 9
+```
+'''
+hints = [
+  "table.insert(chain, 1, 0)，然后 table.remove(chain)，然后 chain[1] = 9，然后 table.sort(chain) — 每个占位处一行，按这个顺序。",
+  "两个参数时 table.insert 是追加；位置放在中间。不给位置的 table.remove 是末尾，table.remove(chain, 1) 才是最前面。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.basic.10.maps"
+title = "记账本"
+story = "月饼档卖出的每一个都以一个词记进本子，鼓声第一次响起时，档主想要每种饼一行、附上数量，而那一页只是按喊出来的顺序排着的一串词。"
+brief = '''
+表按键来编辑。`counts[k] = v` 把一个值存在某个键下——新键被加入，已有的键被覆盖——`counts[k] = nil` 删除一个键（没有 delete；nil 就是不存在），而 `counts[k] = counts[k] + n` 读出某个键下的值，改一改，再写回去。表**不**保持顺序：`pairs` 按它喜欢的任意顺序遍历，所以起始代码用一个自己的列表记住首次出现的顺序，而要按排序打印键，就把它们收进一个列表再 `table.sort`。
+
+```
+counts["tofu"] = 1
+counts[first] = nil
+counts["tofu"] = counts["tofu"] + 4
+table.sort(ks)
+```
+
+`counts` 存着每个词的计数，`first` 是这一行的第一个词，`order` 是按首次出现顺序排列的词，末尾加上 `"tofu"`，`show(counts, order)` 在每次编辑后按那个顺序打印计数，跳过已经不在的键。在前三个 `-- FILL` 占位处输入三次编辑，然后在第四个占位处、最后一个循环之前输入 `table.sort(ks)`。
+
+```
+input:  siu mai har gau siu mai
+output: siu=2 mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=1
+        mai=2 har=1 gau=1 tofu=5
+        gau 1
+        har 1
+        mai 2
+        tofu 5
+```
+'''
+hints = [
+  "counts[\"tofu\"] = 1，然后 counts[first] = nil，然后 counts[\"tofu\"] = counts[\"tofu\"] + 4，然后在最后一个循环之前 table.sort(ks)。",
+  "赋 nil 是删除键的唯一办法。没有 +=：读出值，加上，再写回同一个键下。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.basic.18.hashtable"
+title = "档口编号"
+story = "公园办事处有一张从摊位名到摊位编号的表，而灯笼柜台的每一次查找都什么也没查到。"
+brief = '''
+Lua 的表就是哈希表：键被哈希到一个槽位，所以不管有多少个键，存、删、查的代价都一样。`numbers[k] = v` 存储（新键被加入），`numbers[k] = nil` 删除一个键，`numbers[k] = numbers[k] + n` 就地编辑某个键下的值。缺失的键是 `nil`，而 `nil or -1` 是 `-1`：`numbers[w] or -1` 就是带默认值的查找——而 `0 or -1` 是 `0`，因为在这里只有 `nil` 和 `false` 算假。
+
+```
+numbers["bread"] = 99
+numbers[first] = nil
+numbers[last] = numbers[last] + 10
+print(numbers[w] or -1)
+```
+
+`numbers` 把第一行上的每个摊位名映射到它的位置，像办事处编号那样从 0 数起；`first` 和 `last` 是第一个和最后一个名字。第二行的名字在编辑之后查找并打印，缺失时打印 `-1`；然后整张表按键排序打印出来。按顺序在四个 `-- FILL` 占位处输入这四行。
+
+```
+input:  tofu fish gau
+        gau bread tofu fish
+output: 12
+        99
+        -1
+        1
+        bread=99 fish=1 gau=12
+```
+'''
+hints = [
+  "numbers[\"bread\"] = 99，然后 numbers[first] = nil，然后 numbers[last] = numbers[last] + 10，然后在循环里 print(numbers[w] or -1)。",
+  "除非左边是 nil 或 false，否则 or 交回它的左边；编号为 0 的摊位仍然是 0。+= 那一行需要键存在，而 last 是存在的。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.basic.11.sets"
+title = "不同的价格"
+story = "灯笼摊整晚喊着同样的三个价钱，牌子想知道一共有几种不同的价钱，而不是喊了几次。"
+brief = '''
+Lua 没有集合；一张值都是 `true` 的表就是集合，以那些值本身为键。`seen[x] = true` 放进一个值（放两次等于一次），`seen[x] = nil` 把它拿出来（不在的话什么也不做），而且没有“改这个值”——集合的编辑是删掉一个键再加上另一个。对集合来说 `#seen` 是 **0**，因为 `#` 只数位置 `1, 2, 3, ...`；集合要用 `pairs` 来计数和列出，它以不特定的顺序遍历每个键。
+
+```
+seen[100] = true
+seen[first] = nil
+seen[100] = nil; seen[101] = true
+for v in pairs(seen) do vals[#vals + 1] = v end
+```
+
+`seen` 装着这一行里不同的整数，`first` 是第一个，每次编辑后打印 `size(seen)`，最后 `vals` 排好序打印出来。按顺序在四个 `-- FILL` 占位处输入这四行。
+
+```
+input:  8 3 8 5 3
+output: 4
+        3
+        3
+        3 5 101
+```
+'''
+hints = [
+  "seen[100] = true，然后 seen[first] = nil，然后 seen[100] = nil; seen[101] = true，然后 for v in pairs(seen) do vals[#vals + 1] = v end。",
+  "pairs 先给出键；for 里只有一个名字时，你拿到的就是它。顺序是表自己的，所以 vals 在打印前要先排序。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.basic.12.stack-queue"
+title = "灯笼堆"
+story = "灯笼在摊位上堆起来，从顶上拿走；买家在旁边排队，从前面走；账本把两行都打印成空的。"
+brief = '''
+列表就是栈，在它的顶上编辑：`t[#t + 1] = x` 压进一个值（最后一个位置再往后一位就是新的最后一个），`table.remove(t)` 把顶上那个拿掉，`t[#t] = x` 就地替换顶上那个。同一张表如果改为从前面拿，`table.remove(t, 1)`，就是队列——那一边已经替你写好。
+
+```
+stack[#stack + 1] = 100
+table.remove(stack)
+stack[#stack] = 9
+```
+
+`stack` 和 `queue` 装着这一行的整数；每一步之后打印栈，然后取出队列最前面的那个并打印。按顺序在三个 `-- FILL` 占位处输入这三行。
+
+```
+input:  1 2 3 4
+output: 1 2 3 4 100
+        1 2 3 4
+        1 2 3 9
+        1
+```
+'''
+hints = [
+  "stack[#stack + 1] = 100，然后 table.remove(stack)，然后 stack[#stack] = 9 — 每个占位处一行，按这个顺序。",
+  "不给位置的 table.remove 拿走末尾，也就是顶上；#stack 在赋值时指的是同一个槽位。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.basic.13.sorting"
+title = "价格阶梯"
+story = "公园办事处要今晚的灯笼价钱在牌子上最便宜的在前、在报税表上最贵的在前，而摊位是按叫喊的先后记下来的。"
+brief = '''
+`table.sort(t)` 把表就地按升序排序，什么也不返回。没有排好序的副本：要保留原来的，就先复制一份，`{ unpack(xs)
+}`，再排序副本。第二个参数是比较函数——一个接受两个值的函数，说明第一个是否应排在第二个前面——而 `function(a, b) return a > b end` 把顺序倒过来。
+
+```
+table.sort(asc)
+table.sort(desc, function(a, b) return a > b end)
+```
+
+`xs` 已经读好，`asc` 和 `desc` 是它的副本，两个 print 也已写好。在两个占位处照样输入这两行。
+
+```
+input:  5 3 9 1
+output: 1 3 5 9
+        9 5 3 1
+```
+'''
+hints = [
+  "table.sort(asc) 和 table.sort(desc, function(a, b) return a > b end) — 比较函数是一个完整的函数，end 也要有。",
+  "asc = table.sort(asc) 会把 asc 设成 nil：sort 什么也不返回。比较必须是严格的：>= 会是一个无效的排序函数。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.basic.22.reverse"
+title = "从后往前"
+story = "收档单上的价格阶梯要从上往下读，摊位的名字要镜像地漆在灯笼玻璃上，而账本上两样都是正着的。"
+brief = '''
+没有 `table.reverse`；列表是通过从两端往里交换来**就地**反转的，而 Lua 里的交换是一条两边各有两个名字的赋值：`a, b = b, a` 先求右边的值，再存。交换长度的一半次数，`math.floor(#v / 2)`，而 `v[#v - i + 1]` 是 `v[i]` 的镜像。字符串不能被改变，所以用 `s:reverse()` 反转，它是一个新字符串。
+
+```
+for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end
+local r = s:reverse()
+```
+
+`v` 和 `s` 已经读好，两个 print 也已写好。在两个占位处输入上面那两行。
+
+```
+input:  1 2 3
+        gau
+output: 3 2 1
+        uag
+```
+'''
+hints = [
+  "for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end 单独一行，然后 local r = s:reverse()。",
+  "走到 #v 而不是一半，会把每一对交换两次，列表又回到原样。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.basic.14.sort-by-key"
+title = "排行榜"
+story = "莲花宫按今晚的捐献把摊位钉上榜，多的在前，捐得一样多的两个摊位按字母顺序排；钉板上却是它们进门的顺序。"
+brief = '''
+`table.sort` 接受一个比较函数：一个接受两行的函数，当第一行应排在第二行前面时返回 `true`。按一个字段排序、再用另一个字段打破平局，在它里面就是两行——如果分数不同，大的在前；否则名字小的在前。两个双向比较都相等的行必须给出 `false`，否则排序会抱怨排序函数无效。
+
+```
+table.sort(rows, function(a, b)
+  if a.score ~= b.score then return a.score > b.score end
+  return a.name < b.name
+end)
+```
+
+`rows` 是一个由 `{ name = ..., score = ... }` 表组成的列表，带着空比较函数的 `table.sort` 调用和 print 都已写好。在 `FILL` 注释所在处照样输入比较函数的两行。
+
+```
+input:  3
+        mei 40
+        alex 55
+        ken 40
+output: alex 55
+        ken 40
+        mei 40
+```
+'''
+hints = [
+  "if a.score ~= b.score then return a.score > b.score end，然后 return a.name < b.name — 只有分数相等时才会走到平局判断。",
+  "~= 是 Lua 的不等号。返回 a.score >= b.score 会说两个相等的行各自都排在对方前面，而 sort 拒绝这样。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.basic.15.closures"
+title = "加价"
+story = "灯笼摊给晚间价目单上的每个批发价都加上同样的加价，而本该记住加价的那个函数回来时是 nil。"
+brief = '''
+定义在另一个函数里面的函数可以使用外层函数的局部变量，并且在外层函数返回之后仍然继续使用它们。这就是闭包：内层函数把 `k` 作为上值（upvalue）带在身上。外层函数返回内层函数——函数本身，一个和其他东西一样的值，而不是对它的调用。
+
+```
+local function make_adder(k)
+  local function add(x)
+    return x + k
+  end
+  return add
+end
+```
+
+`make_adder` 和它里面的 `local function add(x)` 已经写好，`main` 把结果应用到每个数字上。在两个占位处照样输入两个 `return` 行。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "在 add 里 return x + k，然后在 make_adder 的最后一行 return add（没有括号）。",
+  "return add() 会不带参数调用它，并在 nil + k 上失败；光秃秃的名字才是函数。起始代码的 return nil 就是 main 以 attempt to call local 'add' (a nil value) 崩溃的原因。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.basic.16.lambdas"
+title = "偶数的平方"
+story = "公园办事处按编号的平方向双数号的摊位收费，文员的单子上本该是总数的地方是个零。"
+brief = '''
+Lua 没有 `lambda` 关键字；一个没有名字的小函数要完整写出来，`function(x) return x * x end`，就写在用它的地方。`filter(f, xs)` 保留 `f` 说 `true` 的那些值，`map(f, xs)` 把每个值换成 `f(value)`，`sum(xs)` 把剩下的加起来——这三个都不是内建的，所以已经在 `main` 上面替你写好。从里往外读。
+
+```
+local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))
+```
+
+`xs` 已经读好，print 也已写好。照样输入 `local total = ...` 这一行。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs))) — 先 filter，再 map，然后 sum。",
+  "匿名函数需要它的 return 和 end：function(x) x * x end 是语法错误。Lua 的 % 是向下取整的，所以 -4 % 2 是 0，负数也算。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.basic.17.threads"
+title = "十二个跑腿同时"
+story = "鼓声第一次响起时，火龙沿线的每个上香跑腿同时为庙里的账本算自己那一节计数的平方，而账本回来全是零，因为没人等他们做完。"
+brief = '''
+LuaJIT 没有线程；协程是最接近的东西——一个有自己的栈的函数，被 resume 时运行，在每个 `yield` 处停下。`coroutine.create(f)` 创建一个，什么也不运行。`coroutine.resume(co)` 启动它，或者让它从上一个 yield 处继续，并在它再次 yield 或结束时返回。协程结束后 `coroutine.status(co)` 是 `"dead"`，所以 join 就是一直 resume 直到它是为止。先启动每一个跑腿，再让每一个跑腿做完——在启动循环里做完会让它们一次只跑一个。
+
+```
+for _, co in ipairs(workers) do
+  coroutine.resume(co)
+end
+for _, co in ipairs(workers) do
+  while coroutine.status(co) ~= "dead" do coroutine.resume(co) end
+end
+```
+
+`square(i)` yield 一次，然后填好 `results[i]`，工作者列表已经建好，两个 print 在第二个循环之后运行。照样把 `resume` 输入为第一个循环的循环体，把 `while` 行输入为第二个循环的循环体。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "第一个循环里 coroutine.resume(co)，第二个循环里 while coroutine.status(co) ~= \"dead\" do coroutine.resume(co) end。",
+  "从不 resume 的协程永远不会运行；只 resume 一次的协程停在它的 yield 处，平方还没写下。状态会告诉你是哪一种。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.basic.18.binary-tree"
+title = "NIL"
+story = "23:59，庙里的灯笼牌：灯笼号码的树只有一个根，下面什么也没有，第一次查找就以 attempt to index a nil value (field 'left') 死掉了。"
+brief = '''
+二叉搜索树把较小的值放在节点的左子树，较大的放在右子树。插入是递归的：空子树（`nil`）变成一个新的 `Node`；否则值沿一边往下走，无论回来的是什么，都要重新存为那个子节点，因为那个子节点刚才可能还是 `nil`——缺失的键是 nil，而 nil 在被跟进之前不是错误。在 `nil` 上跟进 `.left` 就是这整条路得名的那次崩溃；`nil` 检查放在最前面，而且已经写好。
+
+```
+if v < n.val then
+  n.left = insert(n.left, v)
+else
+  n.right = insert(n.right, v)
+end
+```
+
+`Node`、`insert` 的 `nil` 情况和它的 `if v < n.val then` / `else` 骨架、`inorder`、`height` 和 `main` 都已写好。在两个占位处照样输入两行递归。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "在 if 下面 n.left = insert(n.left, v)，在 else 下面 n.right = insert(n.right, v)。",
+  "赋值才是关键：insert 返回子树的根，当子节点是 nil 时那就是一个全新的 Node。新的 Node 根本没有 left 或 right 键——读它们得到 nil，这没问题，直到你往里面索引。",
+]

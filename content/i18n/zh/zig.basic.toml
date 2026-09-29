@@ -1,0 +1,844 @@
+# ZIG LAND — BASIC, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/zig/basic.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+
+pack   = "zig.basic"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.basic.01.first-light"
+title = "第一道光"
+story = "06:00，铜锣湾隧道口。1 号收费亭上方的显示牌亮了，因为有东西写对了地址；可它显示的那一行是空白的。"
+brief = '''
+请精确输出：
+
+```
+hello, causewaybay
+```
+
+小写，一个逗号，一个空格，一行。其他什么都不要有。
+
+Zig 的输出要经过一个 writer。`w` 就是一个，它建在标准输出之上，带一个缓冲区；
+`w.print(fmt, args)` 通过它写出一个格式化的字符串：先是格式，然后是一个参数元组 ——
+没有参数时就是 `.{}`。它可能失败，所以要 `try`。缓冲区只有在被刷新时才会到达终端，
+空位上方的 `defer w.flush()` 会在离开 `main` 时做这件事。
+
+```
+try w.print("hello, causewaybay\n", .{});
+```
+
+把这一行敲在 `// your code here` 处。
+'''
+hints = [
+  "try w.print(\"hello, causewaybay\\n\", .{}); 就是整个程序。writer 和它的 flush 已经写好了。",
+  "字符串必须精确：小写，一个逗号，逗号后面一个空格，末尾是 \\n。",
+  "print 返回一个错误联合，而 Zig 不允许忽略它：前面的 try 不是可有可无的。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.basic.02.bindings"
+title = "收费亭的记事板"
+story = "1 号收费亭的记事板上写着昨夜的车轴数，后面两格空着：回程要用的两倍，以及稽核要用的平方。"
+brief = '''
+Zig 的绑定是 `const` 或 `var`：`const n = try std.fmt.parseInt(i64,
+text, 10);` 从 `text` 里读出一个 64 位整数并把它命名为 `n`，而 `const` 之后不能再改。
+`try w.print("{d}\n", .{n})` 把它打印出来：`{d}` 是十进制数，格式后面的元组负责填进去。
+对这个名字做算术就是普通的算术：`n * 2`、`n * n`。
+
+```
+try w.print("{d}\n", .{n * n});
+```
+
+程序读入 `n`，打印它和它的两倍。把这一行敲在 `// FILL` 处：第三个打印，`n * n`。
+
+```
+input:  12
+output: 12
+        24
+        144
+```
+'''
+hints = [
+  "try w.print(\"{d}\\n\", .{n * n}); —— 和它上面那一行同一个形状，元组里放 n * n。",
+  "i64 装得下 3000000000 的平方；i32 会溢出，而在 Debug 下溢出就是 panic，所以记事板上写的是 i64。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.basic.03.types"
+title = "分账"
+story = "广场把一夜的收入分给开着的收费亭，账本把每一份都写成整数，总是如此，即使它本来不是。"
+brief = '''
+Zig 不允许用 `/` 去除两个有符号整数：它要你说清楚想要哪种取整。`@divTrunc(a, b)`
+向零取整，所以 `7 / 2` 是 `3`，`@rem(a, b)` 是余数 `1`。想得到 `3.5`，两边都必须先
+变成浮点数：`@floatFromInt(a)` 转换一个整数，`@as(f64,
+...)` 说明它变成哪种浮点数。`{d:.2}` 以恰好两位小数打印一个浮点数。
+
+```
+try w.print("{d}\n", .{@divTrunc(a, b)});
+try w.print("{d}\n", .{@rem(a, b)});
+try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});
+```
+
+整数除法和余数已经打印了。在 `// FILL` 处写第三行：以 `f64` 做除法，保留两位小数。
+
+```
+input:  7 2
+output: 3
+        1
+        3.50
+```
+'''
+hints = [
+  "try w.print(\"{d:.2}\\n\", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});",
+  "两个操作数都要转换：Zig 不会用 i64 去除 f64，而 @floatFromInt 需要 @as 才知道要造出哪种浮点数。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.basic.04.int-types"
+title = "计数器的位宽"
+story = "3 号收费亭的车轴计数器是 32 位的，广场的账本是 64 位的；一个计数从一边抄到另一边，只有有人明说，它的值才能保住。"
+brief = '''
+Zig 按位宽给整数命名：`i32` 和 `i64` 是有符号的，`u32` 和 `u64` 是无符号的。值在不同
+位宽之间移动用 `@intCast`，它从结果要去的地方取得目标类型 —— 也就是绑定上的
+`: u64` —— 如果值装不下，在 Debug 下就会 panic。`std.math.maxInt(T)` 是一个位宽能装下
+的最大值。
+
+```
+const b: u64 = @intCast(a);
+try w.print("{d}\n", .{std.math.maxInt(u64)});
+```
+
+`a` 以 `i32` 读入。把转换那一行敲在第一个 `// FILL` 处，把第二个打印行敲在第二个处。
+
+```
+input:  7
+output: 7
+        2147483647
+        18446744073709551615
+```
+'''
+hints = [
+  "const b: u64 = @intCast(a); —— 转换从它落入的绑定上取得位宽。",
+  "std.math.maxInt(u64) 是 18446744073709551615；它上面那一行 i32 的，是同一个调用换了类型。",
+  "a 没被用到时，起始代码编译不过：Zig 拒绝一个没人读的名字，而这个拒绝正指向那个空位。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.basic.05.big-int"
+title = "三十二个字节"
+story = "快易通的标签是 32 字节的密钥，门架读卡器从高位一端一次读一个字节；在字节被放进去之前，缓冲区全是零。"
+brief = '''
+一个 32 字节的整数 —— 标签、密钥、哈希 —— 是一个 `[32]u8`：32 个字节，大端序，最高位
+字节在前，而 `[_]u8{0} ** 32` 就是这个全零的数组。一个 `u64` 填满其中最后八个。右移
+`8 * i` 位把第 `i` 个字节（从低位一端数起）移到最底下 —— 移位量必须是 `u6`，由
+`@intCast` 把它变成 —— 而 `@truncate` 只保留能装进 `u8` 的那个字节。
+
+```
+buf[31 - i] = @truncate(v >> @intCast(8 * i));
+```
+
+对 `i` 的循环和十六进制打印（`{x:0>2}` 把一个字节打印成两位十六进制数）已经写好了。
+把这一行作为循环体敲在 `// FILL` 处。
+
+```
+input:  255
+output: 00000000000000000000000000000000000000000000000000000000000000ff
+```
+'''
+hints = [
+  "buf[31 - i] = @truncate(v >> @intCast(8 * i)); —— 最后一个下标得到最低的字节。",
+  "v >> @intCast(8 * i) 把第 i 个字节滑到最底下；@truncate 把其余的扔掉。没有移位的话，每一格得到的都是同一个最低字节。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.basic.06.floats"
+title = "空气计"
+story = "隧道的空气监测器用 f64 记录，隧道口上方的显示板是 f32，两者在小数点后第十位上对不上。"
+brief = '''
+`f64` 是 64 位浮点数，`f32` 是 32 位的。`std.fmt.parseFloat(f64,
+s)` 把文本解析成 `f64`；把它收窄成 `f32` 用 `@floatCast`，目标类型写在绑定上，而精度
+正是在这次转换中丢失的 —— `0.1` 没有精确的二进制形式，`f32` 保留的位数更少。Zig 打印
+`f32` 时会用能读回同一个 `f32` 的最少位数，这会把损失藏起来，所以第二个打印先把 `y`
+加宽回 `f64`：这样十位小数就会显示出这个浮点数实际存的是什么。
+
+```
+const x = try std.fmt.parseFloat(f64, s);
+const y: f32 = @floatCast(x);
+```
+
+`s` 是读入的那一行，两个打印都用十位小数。把这两行敲在 `// FILL` 处。
+
+```
+input:  0.1
+output: 0.1000000000
+        0.1000000015
+```
+'''
+hints = [
+  "const x = try std.fmt.parseFloat(f64, s); —— 文本变 f64；它可能失败，所以要 try。",
+  "const y: f32 = @floatCast(x); —— 收窄要明写出来，位宽来自绑定；y 打印出来的真实位数更少。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.basic.04.strings"
+title = "车牌"
+story = "一辆货车的车牌在车头用大写字母漆着，后置摄像头把它倒着读回来，而广场的记录里两种写法都没有。"
+brief = '''
+输入的一行是一个 `[]const u8`：一个切片 —— 一个指针加一个长度 —— 你能读但不能写。
+`line.len` 是它的长度。要修改它，先复制一份：`gpa.dupe(u8, line)` 给你一个归你所有的
+`[]u8`，它下面的 `defer gpa.free(...)` 会把这些字节还回去。`for (upper) |*c|` 用指向
+每个字节的指针遍历这份副本，所以 `c.* = ...` 就地写回；`std.mem.reverse(u8, rev)`
+就地把一个切片倒过来。
+
+```
+for (upper) |*c| c.* = std.ascii.toUpper(c.*);
+std.mem.reverse(u8, rev);
+```
+
+`upper` 和 `rev` 都是这一行的副本，离开时已经会被释放。把这两行敲在两个 `// FILL` 处。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+        eel nawk
+```
+'''
+hints = [
+  "for (upper) |*c| c.* = std.ascii.toUpper(c.*); —— 捕获上的星号是指向字节的指针，c.* 是字节本身。",
+  "std.mem.reverse(u8, rev); —— 就地进行，什么都不返回；它能用，是因为 rev 是归你所有的 []u8，而不是输入那种 []const u8。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.basic.08.string-slices"
+title = "短车牌"
+story = "头顶的显示板只放得下车牌的四个字符和后面一个记号，而办事员把整块车牌都抄了进去。"
+brief = '''
+`s[0..4]` 是字符串的一个切片：从 `0` 开始的四个字节，而且它是一个**视图** —— 它和
+`s` 共享内存，不能增长。能往后追加的字符串是 `std.ArrayList(u8)`：
+`appendSlice(gpa, bytes)` 把字节复制到它的末尾，每次调用都要写上 `gpa`，因为 0.16 里的
+列表不会记住自己的分配器。`t.items` 是目前为止的字节。
+
+```
+try t.appendSlice(gpa, s[0..4]);
+try t.appendSlice(gpa, "...");
+```
+
+`s` 是读入的那一行（至少四个字符），`t` 是一个空列表，离开时会被释放。把这两行敲在
+两个 `// FILL` 处。
+
+```
+input:  causewaybay
+output: caus...
+```
+'''
+hints = [
+  "try t.appendSlice(gpa, s[0..4]); —— 从 0 开始，在 4 之前停下；列表把这四个字节复制进去。",
+  "try t.appendSlice(gpa, \"...\"); —— 字符串字面量也是切片，同一个调用就能追加它。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.basic.09.int-slices"
+title = "中间取两个"
+story = "值班记录要把第二和第三个收费亭的计数单独抄出来，再把整行接在后面，而抄出来的是整行两遍。"
+brief = '''
+列表的内容是一个切片 `v.items`，而它的切片是 `v.items[1..3]` —— 元素 1 和 2，到 3 为止
+但不包括 3 —— 它仍然是 `v` 的一个**视图**，什么都不复制。复制靠的是追加：
+`part.appendSlice(gpa, v.items[1..3])` 把这两个复制进你自己的列表，同一个调用换成整个
+`v.items` 就追加全部。
+
+```
+try part.appendSlice(gpa, v.items[1..3]);
+try part.appendSlice(gpa, v.items);
+```
+
+`v` 存着这一行的整数（至少三个），`part` 是一个空列表。把这两行敲在两个 `// FILL` 处。
+
+```
+input:  1 2 3 4
+output: 2 3 1 2 3 4
+```
+'''
+hints = [
+  "try part.appendSlice(gpa, v.items[1..3]); —— 切片的终点是所取最后一个元素的下一个。",
+  "try part.appendSlice(gpa, v.items); —— 整个切片，追加在那两个后面。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.basic.10.byte-slices"
+title = "前三个字节"
+story = "标签读卡器的线路以字节传送车牌，接收端保留前三个，把最后两个接在末尾，而它打印出来的缓冲区是整块车牌。"
+brief = '''
+字节是 `u8`，读入的那一行本来就是一个字节切片，一个 `[]const u8`。上一个节点的两个
+惯用法同样适用：`bytes[0..3]` 是前三个的视图，`bytes[bytes.len - 2 ..]` 是最后两个的
+视图 —— 终点不写就一直到末尾 —— 而 `appendSlice` 把一个视图复制进归你所有的列表。
+`{x:0>2}` 以十六进制打印一个字节；`{s}` 把列表当文本打印。
+
+```
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);
+```
+
+`bytes` 存着这一行（至少三个字节），`head` 是一个空列表。把这两行敲在两个 `// FILL`
+处。十六进制那一行和文本那一行已经替你打印了。
+
+```
+input:  sampan
+output: 73616d616e
+        saman
+```
+'''
+hints = [
+  "try head.appendSlice(gpa, bytes[0..3]); —— 三个字节，复制进列表。",
+  "try head.appendSlice(gpa, bytes[bytes.len - 2 ..]); —— 从末尾往前两个开始，到末尾；.. 后面什么都不写就表示末尾。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.basic.05.loops"
+title = "数车轴"
+story = "3 号收费亭每跳一下数一根车轴，记事板要的是累计总数，以及哪几下落在了每第三根车轴上。"
+brief = '''
+Zig 里计数循环是带继续表达式的 `while`：`while (i
+<= n) : (i += 1)` 先判断，执行循环体，然后做 `i += 1`，再判断。计数器是在它之前声明的
+`var`，所以 `i` 依次经过 `1` 到 `n`，包括 `n`。`@rem(i, 3) == 0` 表示“3 的倍数” ——
+这里有符号整数上没有 `%`。
+
+```
+while (i <= n) : (i += 1) {
+```
+
+循环体已经写好了：它把 `i` 加进 `sum`，并数出 3 的倍数。把这一行 `while` 敲在
+`// FILL` 处，替换掉那个少数一次就停下的。
+
+```
+input:  10
+output: 55
+        3
+```
+'''
+hints = [
+  "while (i <= n) : (i += 1) { —— 判断，循环体，然后是冒号后面的继续表达式。",
+  "是 <= n，不是 < n：计数包括第 n 根车轴。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.basic.06.functions"
+title = "收费表"
+story = "广场对前十根车轴每根收五块，之后每根收三块，而收费牌上只写着 fare。"
+brief = '''
+函数给一件工作起名字：`fn`，它的名字，带类型的参数，返回类型，以及一个以 `return`
+结束的函数体。`fn
+fare(rides: i64) i64` 接收一个数并交回一个数。函数可以在 `if` 里面提前 `return`，
+那一行之后的一切就是另一种情况。Zig 拒绝它能证明永远不会执行的代码行，所以两行真正的
+代码放进去时，占位的 `return` 就要删掉。
+
+```
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;
+```
+
+收费规则：前 10 次每次 5，之后每次 3。`main` 读入 `n` 并打印 `fare(n)`。把这两行作为
+`fare` 的函数体敲在 `// FILL` 处，替换掉 `return rides;`。
+
+```
+input:  13
+output: 59
+```
+'''
+hints = [
+  "if (rides <= 10) return rides * 5; —— 然后在下一行写 return 50 + (rides - 10) * 3;",
+  "十次每次 5 是 50，第十次之后的每一次在此之上再加 3。",
+  "删掉 return rides; —— 上面有两个 return，编译器会把它叫作不可达代码并停下。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.basic.07.structs"
+title = "一个收费亭，三个字段"
+story = "5 号收费亭把车道名、收费额和车辆数写在三块不同的记事板上，没有人把它们放到一块上。"
+brief = '''
+`struct` 把有名字的字段组合成一个值，而在它里面声明的 `fn` 就是方法：`s.total()` 把
+`s` 作为 `self` 传进去，字段通过它来读，`self.price`。构造一个时要写出每个字段，顺序
+任意：`Stall{ .name = name, .price = price, .qty = qty }`。Zig 没有按位置的写法；忘掉
+一个字段是编译错误，而不是零。
+
+```
+return self.price * self.qty;
+const s = Stall{ .name = name, .price = price, .qty = qty };
+```
+
+`Stall` 有名字、价格和数量，`main` 打印 `name: total`。把这两行敲在两个 `// FILL` 处：
+第一行是 `total()` 的函数体，第二行在 `main` 里构造 `s`。
+
+```
+input:  fish 12 3
+output: fish: 36
+```
+'''
+hints = [
+  "total() 里写 return self.price * self.qty;，main 里写 const s = Stall{ .name = name, .price = price, .qty = qty };。",
+  "每个字段都以一个点开头来命名：.name = name。没有顺序会写错，只有名字会漏掉。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.basic.08.enums"
+title = "路线的颜色"
+story = "隧道口的换乘指示牌为驶出的巴士标出三条港铁线，而每条旁边的色条都被涂掉了。"
+brief = '''
+`enum` 是一个封闭的具名值集合：`.island`、`.tsuen_wan`、`.kwun_tong`，此外没有别的。
+对它做 `switch` 是一个表达式，它按所持的值挑出对应的分支，每个分支是
+`.name => value,`。switch 必须覆盖每一个值：`else` 分支覆盖你没点名的那些，而一旦你把
+它们全点了名，Zig 就会拒绝一个永远到不了的 `else` —— 所以两个分支放进去时，
+`else => "",` 就要删掉。
+
+```
+.tsuen_wan => "red",
+.kwun_tong => "green",
+```
+
+`parse` 把这个词变成一个 `Line`，`.island` 分支已经写好了。把这两个分支敲在 `.island`
+下面的 `// FILL` 处，并删掉 `else`。
+
+```
+input:  island
+output: blue
+```
+'''
+hints = [
+  ".tsuen_wan => \"red\", 和 .kwun_tong => \"green\", —— 和 .island 分支同一个形状，连逗号在内。",
+  "类型已知时，枚举值以一个点开头来写：.tsuen_wan，绝不是 Line::TsuenWan。",
+  "删掉 else => \"\", —— 三个都点了名之后，编译器会报告一个不可达的 else 分支并停下。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.basic.09.vector"
+title = "一早上的数，按顺序"
+story = "每个收费亭隔着广场一次喊一个数，而值班文员在最后一个收费亭报完之前没有地方放它们。"
+brief = '''
+`std.ArrayList(i64)` 是可增长的数组，对它做的四件事是增、删、改、排序。
+`append(gpa, x)` 加在末尾；`orderedRemove(i)` 删掉下标 `i` 处的元素，合上空隙，并把这个
+元素交回 —— `_ =` 把它扔掉，因为 Zig 不允许一个值不声不响地掉在地上；`items[i] = x`
+覆盖那里原有的值；`std.mem.sort(i64, xs.items, {}, std.sort.asc(i64))` 把切片按升序排序。
+下标 `0` 是最前面。
+
+```
+try xs.append(gpa, 99);
+_ = xs.orderedRemove(0);
+xs.items[0] = 700;
+std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));
+```
+
+`xs` 存着这一行的整数。把这四行敲在四个 `// FILL` 处：在末尾加 `99`，删掉第一个元素，
+把新的第一个元素设为 `700`，然后排序。先打印列表，再打印它的长度。
+
+```
+input:  4 8 15 16
+output: 15 16 99 700
+        4
+```
+'''
+hints = [
+  "try xs.append(gpa, 99); _ = xs.orderedRemove(0); xs.items[0] = 700; std.mem.sort(i64, xs.items, {}, std.sort.asc(i64)); —— 增、删、改、排序。",
+  "append 可能失败（它可能要分配内存），所以要 try；orderedRemove 返回那个元素，所以赋给 _；排序接收的是切片 xs.items，不是列表。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.basic.16.list"
+title = "排前还是排后"
+story = "车牌尾号是双数的货车排到快易通车道的后面，单数的排到前面，而车道列表只会一直往后面加。"
+brief = '''
+Zig 的 `std.DoublyLinkedList` 是侵入式的 —— 链接住在你自己的结构体里 —— 而且不能排序，
+所以两端的练习都在 ArrayList 上做。`insert(gpa, 0, x)` 把一个值放到最前面，其余的往后
+挪；`pop()` 取下最后一个并以可选值交回，`_ =` 把它丢弃；`items[0]` 是最前面，给它赋值
+就改了第一个元素；`std.mem.sort` 给切片排序。
+
+```
+try l.insert(gpa, 0, 0);
+_ = l.pop();
+l.items[0] = 99;
+std.mem.sort(i64, l.items, {}, std.sort.asc(i64));
+```
+
+`l` 已经按顺序存着这一行的整数。把这四行敲在 `// FILL` 处：在最前面加 `0`，删掉最后
+一个元素，把最前面的覆盖成 `99`，然后排序。列表会被打印出来。
+
+```
+input:  1 2 3 4 5
+output: 1 2 3 4 99
+```
+'''
+hints = [
+  "try l.insert(gpa, 0, 0); _ = l.pop(); l.items[0] = 99; std.mem.sort(i64, l.items, {}, std.sort.asc(i64)); —— 每行一个，按这个顺序。",
+  "insert 依次接收分配器、下标、值；pop 返回 ?i64，而 _ = 表示你不要它。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.basic.10.maps"
+title = "计数板"
+story = "广场的计数板列出了夜里经过的每一种车型，一辆车一个词，而稽核要的是每种车型一行，带一个计数。"
+brief = '''
+Zig 的标准库没有按树排序的映射：`std.StringHashMap(i64)` 就是字典，用 `.init(gpa)` 创建，
+这样它会记住自己的分配器，它的键是 `input` 的切片，而 `input` 活得比它久。`put(k, v)`
+加一个键（或者覆盖已存在的）；`remove(k)` 取出一个并告诉你它原来在不在 —— `_ =` 把这个
+答案扔掉；`getPtr(k)` 是指向一个已存在的键的值的指针，键不存在时是 `null`，所以
+`.?.* = 9` 先解包再通过它写入。哈希映射遍历键时没有顺序，所以脚手架把它们复制出来并
+排好序再打印；下一个节点会让你来写那一行。
+
+```
+try counts.put("crab", 1);
+_ = counts.remove("rice");
+counts.getPtr("fish").?.* = 9;
+```
+
+`counts` 已经统计了这一行的每个词，而且每一行都有 `fish`。把这三行敲在 `// FILL` 处：
+加上 `crab` 为 `1`，删掉 `rice`，再把 `fish` 设为 `9`。排好序的打印已经写好了。
+
+```
+input:  fish rice fish tea
+output: crab 1
+        fish 9
+        tea 1
+```
+'''
+hints = [
+  "try counts.put(\"crab\", 1); _ = counts.remove(\"rice\"); counts.getPtr(\"fish\").?.* = 9; —— 增、删、改。",
+  "put 会创建不存在的键；getPtr 不会，它会交回 null。键必须已经存在时用 getPtr —— .? 就是它确实存在的保证。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.basic.18.hashtable"
+title = "没有顺序的计数"
+story = "隧道饭堂把每道菜记在一张哈希表上，然后按桶碰巧排成的顺序读回来，没有哪两次打印是一样的。"
+brief = '''
+`std.StringHashMapUnmanaged(i64)` 是同一种哈希表，只是分配器不在它里面：它从 `.empty`
+开始，而 `put(gpa, k, v)` —— 和 `getOrPut(gpa, k)`、`deinit(gpa)` 一样 —— 每次调用都要
+写上分配器，就像 ArrayList 那样。`remove(k)` 和 `getPtr(k)` 和之前一样。遍历时它**没有
+特定顺序**，所以键在打印之前要排序：对键的切片做 `std.mem.sort`，用写在 `main` 上面的
+字符串比较函数 `lessStr`。
+
+```
+try counts.put(gpa, "gun", 12);
+_ = counts.remove("siu");
+counts.getPtr("mai").?.* = 0;
+std.mem.sort([]const u8, keys.items, {}, lessStr);
+```
+
+`counts` 已经统计了这一行的每个词，而且每一行都有 `mai`；`keys` 是它的键的列表，按桶
+给出的任意顺序复制出来。把这四行敲在 `// FILL` 处：加上 `gun` 为 `12`，删掉 `siu`，
+把 `mai` 设为 `0`，然后给键排序，这样每次打印都一样。
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        gun 12
+        har 1
+        mai 0
+```
+'''
+hints = [
+  "try counts.put(gpa, \"gun\", 12); _ = counts.remove(\"siu\"); counts.getPtr(\"mai\").?.* = 0; 然后 std.mem.sort([]const u8, keys.items, {}, lessStr); —— 增、删、改、排序。",
+  "unmanaged 映射在 put、getOrPut 和 deinit 上接收 gpa；remove 和 getPtr 不分配任何东西，也不接收它。",
+  "这张表自己没有顺序：键已经替你复制出来了；用 lessStr 给它们排序是第四行，在打印之前。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.basic.11.sets"
+title = "车牌号码"
+story = "车道记录上，一个车牌每经过一次就出现一次，而值班文员想知道实际上到底是几辆车。"
+brief = '''
+Zig 里的集合是值类型为 `void` 的哈希映射：`std.AutoHashMap(i64, void)`，而 `{}` 是
+`void` 唯一的值。`put(x, {})` 加一个值（重复的会被它自己覆盖），`remove(x)` 取出一个
+（不存在的值返回 `false`，`_ =` 把它丢弃）。集合没有“改”：值就是它自己的键，所以把
+`1` 变成 `-1` 是先 `remove` 再 `put`。`count()` 是大小，排好序的遍历已经写好了，因为
+哈希集合没有顺序。
+
+```
+try seen.put(100, {});
+_ = seen.remove(3);
+_ = seen.remove(1); try seen.put(-1, {});
+```
+
+`seen` 已经存着这一行的不同值。把这三行敲在 `// FILL` 处：加上 `100`，删掉 `3`，然后把
+`1` 变成 `-1`。大小和排好序的遍历已经写好了。
+
+```
+input:  3 1 3 2 1
+output: 3
+        -1 2 100
+```
+'''
+hints = [
+  "try seen.put(100, {}); _ = seen.remove(3); _ = seen.remove(1); try seen.put(-1, {}); —— 最后两个调用在同一行。",
+  "在没有 3 的集合上 remove(3) 返回 false，什么都不改；-1 已经在里面时 put(-1, {}) 用 void 覆盖 void：两者都是安全的。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.basic.12.stack-queue"
+title = "后进，先进"
+story = "货车按到达顺序在故障车位里叠起来：最后进去的最先能离开；而最先进入收费车道的最先被服务。"
+brief = '''
+Zig 的标准库没有栈类型，因为 ArrayList 就是栈：`append(gpa,
+x)` 是压栈，`pop()` 取下栈顶并以可选值交回，`items[items.len - 1]` 是栈顶 —— 给它赋值
+就地修改栈顶。队列是 `std.Deque(i64)`：`pushBack(gpa, x)` 在后面，`popFront()` 在前面，
+两个都替你写好了。
+
+```
+try st.append(gpa, 0);
+_ = st.pop();
+st.items[st.items.len - 1] = 99;
+```
+
+每个数都已经压进了 `st` 和 `q`。把这三行敲在 `// FILL` 处：在栈顶加 `0`，再把它弹出来，
+然后把栈顶覆盖成 `99`。然后栈被清空并打印，队列取出前两个。
+
+```
+input:  1 2 3 4
+output: 99 3 2 1
+        1 2
+```
+'''
+hints = [
+  "try st.append(gpa, 0); _ = st.pop(); st.items[st.items.len - 1] = 99; —— 在栈上增、删、改；队列不动。",
+  "items.len - 1 是栈顶，所以给那里赋值，改的就是下一次 pop() 会交回的那个元素。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.basic.13.sorting"
+title = "车道顺序"
+story = "一排收费亭的车轴数是按文员走过的顺序记下来的，而报告要的是从小到大，再从大到小。"
+brief = '''
+`std.mem.sort(T, slice, context, lessThan)` 就地给一个切片排序：元素类型、切片、一个上下文
+（没有时是 `{}`）和一个比较函数。`std.sort.asc(i64)` 是升序的那个，`std.sort.desc(i64)`
+是“大的在前”。
+
+```
+std.mem.sort(i64, v.items, {}, std.sort.asc(i64));
+std.mem.sort(i64, v.items, {}, std.sort.desc(i64));
+```
+
+这些数被读进 `v` 并打印两次。把第一行敲在第一个 `// FILL` 处，第二行敲在第二个处。
+
+```
+input:  3 1 2
+output: 1 2 3
+        3 2 1
+```
+'''
+hints = [
+  "std.mem.sort(i64, v.items, {}, std.sort.asc(i64)); 然后 std.mem.sort(i64, v.items, {}, std.sort.desc(i64));",
+  "std.mem.sort 接收的是切片，不是列表：是 v.items，绝不是 v。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.basic.22.reverse"
+title = "从后往前"
+story = "最后进来的货车应该最先出去，而车位显示板按写下时的顺序读队列，车尾那块车牌也是反的。"
+brief = '''
+`std.mem.reverse(T, slice)` 就地把一个切片倒过来，不管元素是什么类型。输入的字符串是
+`[]const u8`，不能写，所以换一种方式把它倒过来：不复制，从后往前走。
+`std.mem.reverseIterator(s)` 从末尾把字节交出来，`while
+(rit.next()) |c|` 一次取一个，`w.writeByte(c)` 打印一个字节。
+
+```
+std.mem.reverse(i64, v.items);
+var rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.writeByte(c);
+```
+
+`v` 存着第一行的整数，`s` 是第二行。把第一行敲在第一个 `// FILL` 处，另外两行敲在第二个
+处，在替你打印的换行之前。
+
+```
+input:  1 2 3
+        gun
+output: 3 2 1
+        nug
+```
+'''
+hints = [
+  "std.mem.reverse(i64, v.items); —— 就地进行；什么都不返回。",
+  "var rit = std.mem.reverseIterator(s); 然后 while (rit.next()) |c| try w.writeByte(c); —— 迭代器是 var，因为 next() 会移动它。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.basic.14.sort-by-key"
+title = "排行榜"
+story = "广场的板子按开班的顺序列出每个收费亭和它的收入，而主管要收入最高的排在最上面。"
+brief = '''
+`std.mem.sort` 接收一个比较函数：一个接收上下文和两个元素的函数，说明第一个是否该排在
+第二个前面。Zig 没有 lambda，所以比较函数是一个具名的 `fn` —— `fn byScore(_: void, a:
+Row, b: Row) bool` —— 而“按分数降序，再按名字升序”是两行：分数不同时，高的在前；
+分数相同时，`std.mem.lessThan(u8, a.name, b.name)` 把较小的名字放在前面。它们下面占位的
+`return` 要删掉：Zig 拒绝永远不会执行的代码行。
+
+```
+if (a.score != b.score) return a.score > b.score;
+return std.mem.lessThan(u8, a.name, b.name);
+std.mem.sort(Row, rows.items, {}, byScore);
+```
+
+行的读入和打印都写好了。把两行比较代码敲在 `byScore` 里的 `// FILL` 处，把
+`std.mem.sort` 敲在 `main` 里的那一个。
+
+```
+input:  3
+        mei 40
+        alex 55
+        sam 40
+output: alex 55
+        mei 40
+        sam 40
+```
+'''
+hints = [
+  "byScore 里写 if (a.score != b.score) return a.score > b.score; 然后 return std.mem.lessThan(u8, a.name, b.name);，main 里写 std.mem.sort(Row, rows.items, {}, byScore);。",
+  "比较函数回答的是“a 是否排在 b 前面”：分数高的在前，平局时名字小的在前。删掉它下面占位的 return。",
+  "上下文参数是 _: void，因为没有上下文；排序时为它传入 {}。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.basic.15.closures"
+title = "高峰附加费"
+story = "早上清单上的每一笔收费都是按夜间费率收的，主管要用今天的附加费把它们全部改正，而那个数她只从板子上看过一眼。"
+brief = '''
+Zig 没有闭包：函数不能捕获它周围作用域里的名字。最接近的是一个携带这个值的结构体，加上
+一个使用它的方法 —— 把捕获列表写成字段。`Adder{ .k = k }` 在它存活期间一直保存着 `k`，
+而 `add.call(v)` 通过 `self.k` 把它读回来。
+
+```
+return v + self.k;
+const add = Adder{ .k = k };
+```
+
+`k` 和这些数都已读入，循环对每个数调用 `add.call`。把第一行敲在 `call` 里的 `// FILL`
+处，第二行敲在 `main` 里的那一个。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "call 里写 return v + self.k;，main 里写 const add = Adder{ .k = k };。",
+  "结构体就是捕获：k 作为字段放进去一次，之后每次调用都通过 self 把它读回来。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.basic.16.lambdas"
+title = "双数车道，平方"
+story = "双数车道按车道号的平方收费，单数车道不收，而账本上只有一行写总数。"
+brief = '''
+Zig 的标准库里没有 `accumulate`；折叠就是一个接收另一个函数的函数。`fold(xs, start,
+step)` 对每个元素调用 `step(acc, v)` 并保留它的返回值，而 `step` 是一个 `comptime fn`
+参数：任何形状对得上的函数都行，在本该写 lambda 的地方写上它的名字。这里的步骤函数是
+`evenSquare`，而 Zig 里 `if` 是表达式，所以 `return if (cond) a else b;` 是一行。
+
+```
+return if (@rem(v, 2) == 0) acc + v * v else acc;
+const total = fold(xs.items, 0, evenSquare);
+```
+
+`fold` 已经写好，这些数在 `xs` 里，`total` 会被打印。把第一行敲在 `evenSquare` 里的
+`// FILL` 处，第二行敲在 `main` 里的那一个：`v` 是双数时步骤函数加上 `v` 的平方，否则
+原样交回 `acc`。
+
+```
+input:  1 2 3 4 5
+output: 20
+```
+'''
+hints = [
+  "evenSquare 里写 return if (@rem(v, 2) == 0) acc + v * v else acc;，main 里写 const total = fold(xs.items, 0, evenSquare);。",
+  "步骤函数拿到累计总数和一个元素，返回新的总数；@rem(v, 2) == 0 对 -2 和 2 都为真。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.basic.17.threads"
+title = "一车一亭"
+story = "广场上每辆货车都有自己的收费亭，它们同时计数，而总数要等最后一闸杆杆落下之后才读。"
+brief = '''
+`std.Thread.spawn(.{}, f, .{ args })` 在创建的那一刻就让 `f` 在自己的线程上运行，并交回
+这个 `std.Thread`；`join()` 等它结束。参数是一个元组，被复制进去：`x` 按值传递，
+`&results[i]` 是指向这个线程自己那一格的指针，所以没有任何东西是共享的。线程被存进一个
+列表，好把它们全部 join，而在每个 `join()` 都返回之前什么都不打印。
+
+```
+try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));
+for (threads.items) |t| t.join();
+```
+
+`square`、`results`（每个数一格）和打印都已经写好。把第一行敲在循环里的 `// FILL` 处，
+替换掉占位符，把第二行敲在它后面的 `// FILL` 处。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "循环里写 try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));，循环后写 for (threads.items) |t| t.join();。",
+  "spawn 可能失败，append 也可能，所以一行里有两个 try；前面的 .{} 是 spawn 的配置，.{ x, &results[i] } 是参数元组。",
+  "没有 join 的线程，在打印 results 时它那一格可能还是空的；打印之前把它们全部 join。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.basic.18.binary-tree"
+title = "THE NULL"
+story = "06:00，铜锣湾隧道口。夜里的收据是一棵金额树，而文员解包了一个从来不存在的左子节点 —— panic: attempt to use null value，就在铜锣湾唯一一个绝不能错的收费亭上。"
+brief = '''
+二叉搜索树由节点组成，每个节点有一个值和两个可选的子节点指针 `?*Node`，在有东西挂上去
+之前是 `null`：较小的值挂在 `left` 下面，较大的挂在 `right` 下面。插入是递归的：空的
+子树（`null`）变成一个由 `gpa.create` 造出的新节点，否则值沿着一侧往下走 —— 而那一侧
+变成什么都要存回去，因为那一侧片刻之前可能还是 `null`。`n orelse { ... }` 是先处理 null
+情况的写法，而对一个没人检查过的子节点用 `.?` 就是
+`panic: attempt to use null value` —— 那就是 boss，也正是那两行占位代码所做的事。
+
+```
+cur.left = try insert(gpa, cur.left, v);
+cur.right = try insert(gpa, cur.right, v);
+```
+
+`Node`、`null` 情况、`inorder`、`height`、`freeTree` 和 `main` 都已经写好。把两行下降的
+代码敲在两个 `// FILL` 处，替换掉占位符：左边的在 `if` 里，右边的在 `else` 里。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "左边写 cur.left = try insert(gpa, cur.left, v);，右边写 cur.right = try insert(gpa, cur.right, v);。",
+  "把结果存回去：子节点可能是 null，而新节点就是 insert 的返回值。insert 可能分配失败，所以这个调用要 try。",
+  "占位代码在还没有任何东西挂上去之前就用 .? 解包子节点 —— 这就是 panic。真正的那一行把 null 交给 insert，而它的 orelse 就是那个检查。",
+]

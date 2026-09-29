@@ -1,0 +1,566 @@
+# TYPESCRIPT LAND — VERY BASIC, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/typescript/verybasic.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, the quiz choices, sample input and output and the exact
+# strings a program must print are the English pack's and are copied verbatim,
+# never translated.
+
+pack   = "typescript.verybasic"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.verybasic.01.print"
+title = "第一塊螢幕"
+story = "19:00，時代廣場上空。大螢幕黑住咁著起，今晚第一行字要人手打。"
+brief = '''
+個程式要喺一行度準確印出 `hello, causewaybay`。全域 `console` 上面有個方法會寫一行去標準輸出。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+output: hello, causewaybay
+```
+'''
+hints = [
+  "console.log(\"hello, causewaybay\"); — 要有括號，逗號喺字串入面。",
+  "呢度冇 print()；一個從來未見過嘅名，tsc 喺任何嘢行之前就用 TS2304 答你。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.verybasic.02.int-types"
+title = "分開嘅播放清單"
+story = "希慎廣場幅 LED 牆將今晚啲片段分落佢啲板度；排程器要講每塊板分到幾多、仲剩幾多，但佢乜都冇講。"
+brief = '''
+`a` 同 `b` 係整數。個程式要喺一行度印出整數商同餘數，中間隔一個空格。TypeScript 得一個 `number` 型別，冇整數除法運算子：`/` 永遠畀你小數，`Math.trunc` 掉咗個小數部分，`%` 係餘數。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3 1
+```
+'''
+hints = [
+  "console.log(Math.trunc(a / b), a % b); — console.log 會喺參數之間加一個空格。",
+  "a / b 係 3.5，唔係 3：每個數都係 double。而 // 喺度唔係運算子；佢係註解嘅開頭。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.verybasic.03.floats"
+title = "等車時間"
+story = "怡和街個電車牌顯示等車時間到兩個小數位，今晚佢顯示 3.5，最後一個位就空咗。"
+brief = '''
+`x` 同 `y` 係數字。個程式要印出 `x / y`，小數點後面啱啱好兩個位。數字有個方法會用固定嘅小數位數格式化佢，回傳一個字串。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  7 2
+output: 3.50
+```
+'''
+hints = [
+  "console.log((x / y).toFixed(2)); — 個括號令除法先做。",
+  "Math.round(x / y * 100) / 100 仍然係數字，而數字印出嚟係 3.5，唔係 3.50。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.verybasic.04.strings"
+title = "橫額"
+story = "利園 app 個橫額由市場部嗰邊用細楷送過嚟，品牌指引要大楷；橫額係照打嘅樣掛上去。"
+brief = '''
+`s` 係一行文字。印完佢嘅長度之後，個程式要用大楷印出 `s`。有個字串方法會回傳一個每個字母都變咗大楷嘅副本。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: 8
+        KWAN LEE
+```
+'''
+hints = [
+  "console.log(s.toUpperCase()); — camelCase，要用括號呼叫。",
+  "s.upper() 係 Python；字串型別冇呢個方法，tsc 會話你知。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.verybasic.05.bool-if"
+title = "向東定向西"
+story = "怡和街啲到站牌，雙數站向東，單數站向西；喺梯上面嗰個安裝師傅有個站號，要知道係邊一面。"
+brief = '''
+`n` 係正整數。`n` 被二整除就要印 `even`，否則印 `odd`。條件係一個 `if`，用三個字元長嘅嚴格相等運算子將餘數同零比較。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: even
+```
+'''
+hints = [
+  "if (n % 2 === 0) { — 三個等號係比較；一個係賦值。",
+  "n % 2 係數字，tsc 唔肯將數字同字串 \"0\" 比較：兩個型別冇交集。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.verybasic.06.loops"
+title = "點數"
+story = "三十樓個控制室沿住個機架將啲螢幕一加二加三咁加埋，console 個總數顯示零。"
+brief = '''
+`n` 係正整數。個迴圈要行勻由 1 到 `n`（包埋 `n`）嘅每個整數，逐個加落 `total`。一個 `for` 嘅頭有起點、每一輪之前檢查嘅條件，同埋步進。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  4
+output: 10
+```
+'''
+hints = [
+  "for (let i = 1; i <= n; i++) { — 細過或等於，所以 n 本身都會行到。",
+  "for...in 行嘅係物件嘅 key；數字冇 key，tsc 唔會畀佢試。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.verybasic.07.functions"
+title = "時段收費"
+story = "時代廣場塊螢幕今晚頭十個廣告時段每個收五蚊，之後每個收三蚊；收費函數應承咗回傳一個數字，tsc 唔肯 build 佢。"
+brief = '''
+`fare(rides)` 要回傳應收嘅錢：頭十程每程 5，第十程之後每程 3。簽名寫住 `: number`，所以一個乜都冇交返出嚟嘅函數主體編譯唔到。函數用一個關鍵字將個值交返出嚟。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+output: 15
+```
+'''
+hints = [
+  "return Math.min(rides, 10) * 5 + Math.max(rides - 10, 0) * 3;",
+  "一個標明 `: number` 嘅函數，如果印嘢而唔回傳，係編譯唔到嘅：tsc 會話佢一定要回傳一個值。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.verybasic.08.structs"
+title = "一張卡，兩個欄位"
+story = "利園 app 每張產品卡都有名同價錢；個 constructor 從來冇 set 個價錢，build 就停喺應承咗有價錢嗰行。"
+brief = '''
+`Stall` 個 constructor 收到 `name` 同 `price`。個 class 宣告咗 `price: number`，喺 `strict` 之下每個宣告咗嘅欄位都要喺 constructor 入面賦值。佢要用儲 `name` 嘅同一個方法將 `price` 儲落個物件度，咁 `s.price` 先讀得返。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tofu 12
+output: tofu 12
+```
+'''
+hints = [
+  "this.price = price; — this 係個物件；淨係一個名就係個參數。",
+  "this.price = name; 編譯唔到：name 係字串，個欄位係數字。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.verybasic.09.struct-method"
+title = "購物籃嗰行"
+story = "價錢乘數量係利園 app 每個購物籃嘅一行，應該講出嚟嘅方法應承咗回傳數字，但乜都冇回傳。"
+brief = '''
+`Stall.total()` 要回傳價錢乘數量。constructor 嘅 `public` 參數一次過宣告同儲好啲欄位；喺方法入面，物件嘅欄位要經 `this` 攞。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tofu 12 3
+output: tofu: 36
+```
+'''
+hints = [
+  "return this.price * this.qty; — 兩個欄位都經 this。",
+  "方法入面淨係寫 price 唔係個欄位；佢係 class 外面由輸入讀落嘅 price，係字串，tsc 唔會將字串相乘。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.verybasic.10.enums"
+title = "路綫顏色"
+story = "希慎牆上面、銅鑼灣出口頂嗰塊港鐵板寫住三條綫；feed 送嚟嘅係個字，塊板要嘅係佢代表嘅嗰個 enum 成員。"
+brief = '''
+`word` 係 `island`、`tsuenwan`、`kwuntong` 其中一個。個程式要將佢變做對應嘅 `Line` 成員。enum 可以用成員嘅名做索引，但只可以用 tsc 知道係佢其中一個名嘅 key：`keyof typeof Line` 就係嗰組名，而 `as` 話畀 tsc 知個字串係其中一個。呢個斷言喺執行時會被抹走——佢乜都唔檢查，所以個字串最好夾得啱。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  tsuenwan
+output: red
+```
+'''
+hints = [
+  "const line = Line[word.toUpperCase() as keyof typeof Line]; — 啲名係大楷。",
+  "Line[word as keyof typeof Line] 編譯到，因為 `as` 係一個 tsc 信咗你嘅承諾；執行時 Line[\"tsuenwan\"] 係 undefined。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.verybasic.11.vector"
+title = "播放清單"
+story = "控制室收到嘅每段片都照收到嘅次序排上今晚個播放清單，但個清單一直係空。"
+brief = '''
+`xs` 係一個 `number[]`，一開始係空。迴圈入面讀到嘅每個整數 `x` 都要加喺尾，保持輸入嘅次序。array 有一個方法做呢樣嘢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 4
+        3 1 4 1
+```
+'''
+hints = [
+  "xs.push(x); — 一個值，放喺尾。",
+  "unshift(x) 放喺頭，次序就會倒轉。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.verybasic.12.vector-edit"
+title = "抽走咗嘅片段"
+story = "希慎廣場播放清單第一段片喺播之前被抽走咗；佢要走，後面每段都要推前一格。"
+brief = '''
+`xs` 裝住嗰行嘅整數。個程式要刪走 index 0 嘅元素，等其餘嘅向前移。有一個 array 方法係用起始 index 同數量嚟刪嘢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 4 1
+```
+'''
+hints = [
+  "xs.splice(0, 1); — 由 index 0 開始，一個元素。",
+  "delete xs[0] 會喺原本個元素嘅位留低個窿；長度唔會變。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.verybasic.13.list"
+title = "跑馬燈嘅頭"
+story = "突發新聞要擺喺時代廣場螢幕下面條跑馬燈嘅頭，但最新嗰條一直落咗喺尾。"
+brief = '''
+`chain` 係一個 `number[]`；TypeScript 冇 deque，array 兩頭都做到。迴圈入面讀到嘅每個 `x` 都要加喺「頭」，咁最後讀到嗰個就排第一。array 有個方法係做嗰一頭嘅。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 3 2 1
+```
+'''
+hints = [
+  "chain.unshift(x); — push 喺頭嗰邊嘅孖生兄弟。",
+  "push(x) 放喺尾。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.verybasic.14.maps"
+title = "撳咗幾多下"
+story = "利園 app 逐件產品數人撳咗幾多下，每件產品一行；任何嘢第一下撳落去，都搵唔到一行嚟加。"
+brief = '''
+`counts` 係一個 `Map<string, number>`。對每個字 `w`，個程式要將佢嘅計數加一，第一次由零開始。`get` 嘅型別係 `number | undefined`，因為個 key 可能冇，而 `??` 就係冇嗰陣補上要用嘅值。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  siu mai har gau siu mai
+output: gau 1
+        har 1
+        mai 2
+        siu 2
+```
+'''
+hints = [
+  "counts.set(w, (counts.get(w) ?? 0) + 1); — 預設值放喺括號入面，然後先加。",
+  "counts.get(w)! + 1 編譯到——! 話畀 tsc 知個值係有嘅——但執行時 undefined + 1 係 NaN。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.verybasic.15.hashtable"
+title = "查表"
+story = "控制室張表將站名對應到佢塊牌嘅號碼，問一個唔喺度嘅站應該答 -1，而唔係令怡和街塊牌變咗一片空白。"
+brief = '''
+`table` 將名對應到牌號，而牌號可以係 0。對個字 `w`，個程式要印出佢嘅號碼，或者 `w` 唔喺表入面就印 `-1`。`get` 搵唔到 key 就回傳 `undefined`；有一個運算子只會替換 `null` 同 `undefined`，其他一律唔理。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  2
+        tofu 3
+        fish 7
+        egg
+output: -1
+```
+'''
+hints = [
+  "console.log(table.get(w) ?? -1); — ?? 只係喺 undefined 或者 null 嗰陣先出手。",
+  "|| 對每個 falsy 值都會出手，而 0 係 falsy：號碼係 0 嘅牌就會讀做 -1。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.verybasic.16.sets"
+title = "唔同嘅廣告商"
+story = "時代廣場輪播有六個時段，三個唔同嘅廣告商；張發票要知有幾多個唔同，但佢寫六。"
+brief = '''
+`xs` 裝住嗰行嘅整數。個程式要印出有幾多個「唔同」嘅值。`Set` 每樣只留一個，而佢係用一個屬性數，唔係用 `length`。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 5 3 8 5 3
+output: 3
+```
+'''
+hints = [
+  "console.log(new Set(xs).size); — new 起個 set，size 數佢。",
+  "冇 new 嘅 Set 唔可以呼叫；tsc 會問你係咪想包埋 new。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.verybasic.17.stack"
+title = "疊層"
+story = "希慎廣場幅牆上面啲 overlay 一層疊一層，要由頂嗰層拎走；個 renderer 就一直剝最底嗰層。"
+brief = '''
+`stack` 係一個當 stack 用嘅 array。個程式要將「頂」（最後）嗰個元素拎出嚟放落 `top`。有一個 array 方法會刪走並回傳最後一項；佢嘅型別係 `number | undefined`，因為個 stack 可能係空嘅。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 4
+        1 2 3
+```
+'''
+hints = [
+  "const top = stack.pop(); — 冇參數；永遠係最後嗰個。",
+  "stack[stack.length - 1] 讀到頂嗰個，但佢仲留喺堆度。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.verybasic.18.queue"
+title = "快閃店排隊"
+story = "利園快閃店條隊係照排隊嘅先後服務，但個 app 一直叫最新嗰張飛。"
+brief = '''
+`q` 係一個按次序裝住啲飛嘅 array。個程式要將「第一」張拎出嚟放落 `first`。array 用一個方法由頭拎走嘢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4
+output: 1
+        2 3 4
+```
+'''
+hints = [
+  "const first = q.shift(); — shift 由頭拎，pop 由尾拎。",
+  "q[0] 讀到第一張飛，但冇拎走佢。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.verybasic.19.heap"
+title = "最急嘅行先"
+story = "故障以任何次序去到控制室，幅牆每次都應該顯示最急嗰個；裝住佢哋嗰個 list 完全唔知邊個係最急。"
+brief = '''
+TypeScript 嘅標準函式庫冇 heap，所以 starter 帶住一個細細嘅 `MinHeap`：`push` 加一個值然後將佢篩上去，`pop` 拎走最細嗰個。每個 `x` 都要經 heap 自己嘅方法放入去，咁 `pop` 之後先會由最細嗰個開始回傳。直接寫入 `items` 就會跳過篩嗰步，搞亂個次序。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 1 4 2 3
+output: 1 2 3 4 5
+```
+'''
+hints = [
+  "heap.push(x); — heap 自己嘅方法，會將 x 篩上去佢應該喺嘅位。",
+  "heap.items.push(x) 將 x 放喺 array 尾，跳過咗篩嗰步。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.verybasic.20.sorting"
+title = "車費梯級"
+story = "怡和街塊牌上面啲車費係照路綫加入嘅次序排，而塊牌將佢哋當文字咁排：10 排喺 9 前面。"
+brief = '''
+`xs` 裝住嗰行嘅整數。印出嚟之前，個程式要喺原地將 `xs` 由細到大排好。array 嘅 `sort` 收一個 comparator：負數就將第一個參數排先。冇 comparator 嘅話，`sort` 會將啲數字當字串比較。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3 1 4 1
+output: 1 1 3 4
+```
+'''
+hints = [
+  "xs.sort((a, b) => a - b); — a 減 b 係由細到大。",
+  "冇 comparator 嘅 xs.sort() 會將 10 排喺 9 前面，因為 \"1\" 排喺 \"9\" 前面。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.verybasic.21.sort-by-key"
+title = "排行榜"
+story = "時代廣場螢幕上面嘅撳掣遊戲排行榜，應該係分數由高到低、同分就按名排，但佢顯示緊嘅係人哋加入嘅次序。"
+brief = '''
+`rows` 係一個 `[string, number][]`：一個有型別 tuple 嘅 array，先係名，然後係分數。佢要先按分數由高到低排，再按名由細到大排。comparator 係一個箭嘴函數；`||` 只係喺第一個比較得出 0 嗰陣先落去第二個比較，而 `byName` 比較兩個字串。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  3
+        mei 7
+        alex 9
+        bo 7
+output: alex 9
+        bo 7
+        mei 7
+```
+'''
+hints = [
+  "rows.sort((a, b) => b[1] - a[1] || byName(a[0], b[0])); — 分數由高到低，所以 b 行先過 a。",
+  "tuple 嘅第 1 個元素係數字，第 0 個係字串；tsc 知邊個係邊個，byName(a[1], b[1]) 編譯唔到。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.verybasic.22.reverse"
+title = "倒轉頭"
+story = "希慎廣場幅牆啲字由右向左捲，操作員想個字串掛上去之前倒轉晒儲住。"
+brief = '''
+`s` 係一行文字。個程式要將佢倒轉印出嚟。字串自己冇 reverse：將佢 spread 做一個字元 array，倒轉個 array，再 join 返做字串。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  kwan lee
+output: eel nawk
+```
+'''
+hints = [
+  "console.log([...s].reverse().join(\"\")); — spread、reverse，然後用乜都冇嘅分隔 join。",
+  "冇咗個 join，console.log 就會印出個 array 本身，連方括號同引號一齊。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.verybasic.23.closures"
+title = "服務費"
+story = "利園 app 每個價錢都要加同一筆服務費，而應該記住筆服務費嘅函數就唔記得咗。"
+brief = '''
+`makeAdder(k)` 定義咗一個內部函數 `add`，回傳 `x + k`。佢嘅回傳型別 `(x: number) => number` 講明佢要交返一個函數出嚟——就係個內部函數本身，咁 `add(x)` 之後可以照呼叫，而 `k` 仍然記住。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5
+        1 2 3
+output: 6 7 8
+```
+'''
+hints = [
+  "return add; — 淨係個名，唔好有括號。",
+  "return add(); 係呼叫咗佢，冇參數，交返一個數字出嚟，而簽名應承嘅係一個函數。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.verybasic.24.lambdas"
+title = "雙數層"
+story = "停車場雙數樓層嘅螢幕按樓層數嘅平方交租，地庫都計，單數層唔使交；本賬簿要一個總數。"
+brief = '''
+`xs` 裝住嗰行嘅整數。`total` 要係「雙數」值嘅平方總和，用 `filter`、`map` 同 `reduce` 加三個箭嘴函數砌出嚟。`reduce` 要有個起始值，唔係嘅話一個空 array 就冇嘢開始。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3 4 5 6
+output: 56
+```
+'''
+hints = [
+  "const total = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);",
+  "冇咗個 0 嘅 reduce 喺空 array 上面會 throw TypeError：每個值都係單數，冇嘢可以加。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.verybasic.25.threads"
+title = "每塊板一齊嚟"
+story = "希慎廣場幅牆每塊板都 render 自己嘅畫面，而幅牆喺任何一塊做完之前就已經著咗。"
+brief = '''
+呢度冇 thread：得一個 event loop，而 `square` 瞓緊覺嗰陣會將佢交返出去。每個呼叫都已經開始咗，佢哋嘅 promise 喺 `tasks` 入面。印結果之前，`main` 一定要「等」晒佢哋 settle。`Promise` 有個函數會將一個 promise array 變做一個 promise，而 `await` 就等佢。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1 2 3
+output: 1 4 9
+        14
+```
+'''
+hints = [
+  "await Promise.all(tasks); — 一個 promise 包晒全部，然後 await 佢。",
+  "冇 await 嘅 Promise.all(tasks) 起咗個 promise 就直接行過咗；tasks.join() 係 array 方法，乜都冇 join 到。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.verybasic.26.mutex"
+title = "一個計數器，四條 feed"
+story = "四條銷售 feed 加落控制室 console 上面同一個計數器；有把鎖，但冇人喺讀之前等佢。"
+brief = '''
+得一條 thread，都仍然有 race：每個 worker 讀 `counter`、`await`，然後寫返入去，其他 worker 就喺中間嗰條罅度行。`lock` 係一把細細嘅 async 鎖。讀之前，每個 worker 都要「攞」把鎖，等到攞到為止；釋放已經寫咗喺寫入之後。`acquire` 回傳一個 promise，把鎖屬於你嗰陣佢就會 settle。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  1000
+output: 4000
+```
+'''
+hints = [
+  "await lock.acquire(); — 然後讀同寫，然後係已經喺度嘅釋放。",
+  "冇 await 嘅 lock.acquire() 要咗把鎖，但照樣喺攞到之前讀咗個計數器。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.verybasic.27.binary-tree"
+title = "ANY"
+story = "23:59，三十樓控制室：feed 送到嚟嘅型別係 `any`，每個檢查都過晒，時代廣場塊螢幕用四十呎高嘅字顯示 `undefined`。一個型別標註就捉到佢。"
+brief = '''
+啲螢幕 id 放入一棵二元搜尋樹，每個子節點都標註做 `TreeNode | null`——唔係 `any`——所以 tsc 要你將空嘅情況當一個情況處理。`insert(n, v)` 回傳入面有 `v` 嘅嗰棵樹嘅根；`null` 嘅情況同右手邊已經寫好。`v` 細啲嘅話，左子節點要換做插入佢之後嘅結果，咁一個 `null` 子節點先會變做一個節點。
+
+揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+
+```
+input:  5 3 8 1 4
+output: 1 3 4 5 8
+        3
+```
+'''
+hints = [
+  "n.left = insert(n.left, v); — 遞迴會回傳子樹嘅新根；要儲返佢。",
+  "呼叫 insert 但唔儲個結果，個 null 就留返喺原位，而 tsc 睇唔到：啲型別全部夾晒。",
+]

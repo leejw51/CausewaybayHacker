@@ -1,0 +1,1126 @@
+# LUA LAND — ADVANCED, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/lua/advanced.toml`, quest by quest, and nothing else.
+# Code blocks, identifiers, sample input and output and the exact strings a
+# program must print are the English pack's and are copied verbatim, never
+# translated.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "lua.advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.advanced.01.conversions"
+title = "三個樣，一個名"
+story = "浣紗街嘅香燭檔將個價錢寫做文字、數字同埋蚊，喺同一本簿，用同一個名。"
+brief = '''
+讀一行：一個以仙計嘅金額，全部係數字。
+
+印三行：
+
+1. 剪走空白之後嘅文字有幾多個字元
+2. 個金額當數字
+3. 個金額以蚊計，啱啱好兩個小數位
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+金額唔會係負數。用**一個名**做，重新綁三次 — 一個字串，然後一個數字，然後又係一個字串。Lua 嘅 local 乜都裝得落，一 assign 就轉主意；代價就係除咗讀上面嗰行，冇嘢話到你知 `cents` 而家係乜。
+
+計蚊唔好經除法。`1234 / 100` 今日係 `12.34`，而 `0.1 + 0.2` 印出嚟係 `0.3`，比較嗰陣就唔係。`math.floor` 同 `%` 會準確噉畀你兩半，`string.format("%02d", ...)` 幫第二半補位。`tonumber` 係轉換；`#cents` 係個字串仲係字串嗰陣嘅長度。
+'''
+hints = [
+  "cents 仲係字串嗰陣嘅 #cents 就係第一行。",
+  "cents = tonumber(cents) 唔係原地轉換；佢係一個新值綁落舊個名度。之後個字串就冇咗。",
+  "string.format 入面嘅 %02d 係闊度二、補零、十進位。5 仙係 0.05，唔係 0.5。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.advanced.02.control-flow"
+title = "邊條巷"
+story = "啲巷號用粉筆寫咗喺路面，畀火龍行嘅路線用，蓮花宮嗰度執事塊板應該講每條巷有啲乜。佢次次都淨係講個號碼，仲要由零開始。"
+brief = '''
+讀一個整數 `n`。對由 `1` 到 `n` 嘅每個 `i`，印一行：
+
+* `i` 同時除得盡 3 同 5 就印 `FISHVEG`
+* `i` 除得盡 3 就印 `FISH`
+* `i` 除得盡 5 就印 `VEG`
+* 否則印 `i` 本身
+
+然後繼續讀整數，每行一個，直到讀到 `0`，再印 `SKIPPED <k>`，即係一路上讀咗幾多行唔係零嘅。
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+兩個 loop，兩種。第一個喺開始之前已經知要行幾多次：`for i = 1, n do`。第二個唔知：`while true do` 加 `break`，因為次數由你讀到啲乜決定。Lua 嘅數字 `for` 兩頭都係**包埋**嘅 — `for i = 1, n` 行 `n` 次 — 而 starter 由 `0` 開始，呢個就係呢片地個名由來嗰個差一。
+'''
+hints = [
+  "先檢查兩樣都得嘅情況，唔係佢永遠唔會中。除得盡 3 同 5 即係除得盡 15。",
+  "for i = 0, n - 1 早一個開始，早一個停。starter 就係有呢個 bug；佢輸出第一行係 FISHVEG，因為 0 乜都除得盡。",
+  "while true do ... break 係 Lua 寫出口喺中間嘅 loop 嘅方法。仲有 repeat ... until，喺底測試。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.advanced.03.lists"
+title = "條龍嘅中間"
+story = "六十七米長嘅禾草擔喺一行舞龍人膊頭上，龍頭嗰度嘅執事睇到第一個同最後一個，中間乜都睇唔到。"
+brief = '''
+標準輸入第一行係個數 `n`，第二行係 `n` 個整數，用空格分隔。`n` 最少係 `1`，所以永遠有第一個同最後一個值可以印。
+
+印三行：第一個值、最後一個值，同埋佢哋兩個之間（唔包兩頭）所有嘢嘅總和。少過三個值嘅話，個總和係 `0`。
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+Lua 嘅 list 係一個 key 係 `1..n` 嘅 table，`#nums` 係 `n`。第一個元素係 `nums[1]`；最後一個係 `nums[#nums]`。冇 `nums[-1]` 呢回事 — 負數 key 只係一個冇儲過嘢嘅 key，讀佢會靜靜雞畀你 `nil` — 亦都冇 slice：中間就係一個由 `2` 到 `#nums - 1` 嘅 loop，冇中間嘅時候佢行零次，所以其他語言要寫嘅防守喺呢度係免費嘅。
+
+starter 印 `nums[0]`。喺 Lua 呢個唔係錯誤。佢係 `nil`，`print` 會寫個字 `nil`，而程式以 0 結束。呢片地就係因呢樣嘢而得名。
+'''
+hints = [
+  "nums[#nums] 係最後一個元素；nums[#nums - 1] 係佢前面嗰個。負數乜都唔得。",
+  "for i = 2, #nums - 1 係除咗第一同最後嘅所有嘢，得一個值嘅時候就係 for i = 2, 0，自己就行零次。",
+  "io.read(\"*a\") 一次過讀晒，gmatch(\"%S+\") 行過每個 token，咁換行就唔再重要。第一個 token 係個數；跳過佢。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.advanced.04.strings"
+title = "位元組唔係字"
+story = "維園燈籠檔張訂貨單喺三個位元組度切斷 銅鑼灣，印出一個字同一個問號。"
+brief = '''
+讀一行。印三行：
+
+1. 佢以 UTF-8 編碼嘅長度，以**位元組**計
+2. 佢以**字元**計嘅長度
+3. 將佢啲字元倒轉之後嘅嗰行
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+嗰行可能有 ASCII 以外嘅字元，噉頭兩個數就唔一樣。Lua 字串係一串**位元組**，其他乜都唔知：`#s` 係位元組數，`s:reverse()` 倒轉位元組，會將每個多位元組字元切開兩半。字元係你自己定義嘅嘢。UTF-8 入面一個字元係一個開頭位元組，後面跟任意數量嘅延續位元組 — 寫做 pattern 係 `[^\128-\191][\128-\191]*` — 所以數開頭位元組就係字元數，用 `gmatch` 行過啲字元再疊起佢哋就係倒轉。
+
+starter 印兩次位元組數，嗰行就原樣印。唔好用 `line:reverse()` 嚟整第三行：喺 `causeway` 上面佢啱，但喺大家真係會打嘅範例上面，佢印出嚟嘅位元組喺任何編碼都唔係一個字串。
+'''
+hints = [
+  "#line 係位元組。字元要數：gsub 第二個結果係 match 咗幾多次，每個字元一個 match 就係字元數。",
+  "延續位元組係 128..191（10xxxxxx）。一個字元係一個唔係嗰種嘅位元組，後面跟零個或者多個係嗰種嘅：\"[^\\128-\\191][\\128-\\191]*\"。",
+  "table.insert(reversed, 1, ch) 推喺最前，所以最後一個字元會排第一。table.concat 冇分隔符咁駁埋。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.advanced.05.dicts"
+title = "條巷嗌乜"
+story = "九點嘅浣紗街：每個檔口都喺度嗌嘢，書館街嗰頭塊板要個排名。"
+brief = '''
+讀晒成個標準輸入，按空白切開。
+
+每個唔同嘅字印一次，寫做 `<word> <count>`，按次數由多到少排，打和就按個字由細到大。
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+用字做 key 嘅 table 就係計數器，而 `counts[word] + 1` 第一次會出錯 — `attempt to perform arithmetic on a nil value` — 因為冇人寫過嘅 key 係 `nil`。`(counts[word] or 0) + 1` 補返個零。
+
+`pairs` 行過啲 key 嘅時候**完全冇次序**，而且每次行都唔同。將啲 key 抄落一張 list，用一個講明次數由多到少、再按字由細到大嘅比較器 `table.sort` 佢，由張 list 印。第一個參數排先嘅話，比較器就回傳 `true`。
+'''
+hints = [
+  "starter 喺第一個字就死：counts[word] + 1 未寫先讀，而冇嘢可以讀。(counts[word] or 0) 補返個零。",
+  "用 pairs 將啲 key 收埋做一張 list，然後 table.sort 張 list。個 table 本身冇次序可以整。",
+  "function(a, b) if counts[a] ~= counts[b] then return counts[a] > counts[b] end return a < b end — 次數由多到少，然後字由細到大，相等嘅參數永遠唔好畀 true。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.advanced.06.sets"
+title = "兩檔都有嘅"
+story = "兩個燈籠檔，安庶庇街兩邊一邊一個，有個客想知兩邊有咩都買到，唔使過兩次火龍條路。"
+brief = '''
+兩行標準輸入，每行係一個檔口嘅貨品，用空格分隔。一個檔口可能將同一樣嘢列兩次；只計一次。
+
+印三行：
+
+1. `BOTH`，後面跟兩張清單都有嘅所有嘢，排好，用空格分隔 — 或者冇嘅話就
+   `BOTH -`
+2. `ONLY_A <k>`：有幾多樣嘢喺第一張清單但唔喺第二張
+3. `ALL <k>`：兩張清單總共有幾多樣唔同嘅嘢
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+Lua 冇 set 型別。set 係一個 table，佢嘅**key** 係成員，值係 `true`：寫兩次 `tofu` 就係將同一個 key 寫兩次，重複嘅一入去就消失。成員資格係 `a[x]`，係 `true` 或者 `nil`。交集、差集同聯集係三個 loop，行過一個 set 嘅 key 再問另一個 — 寫做 function，三行就係三個呼叫。
+
+`#` 唔會數 set 嘅 key；佢數嘅係 list 部分，而嗰部分係空嘅。用 `pairs` 行 loop 嚟數，印之前將成員排好放入一張 list，因為 `pairs` 冇次序。
+'''
+hints = [
+  "每個 token 都 set[word] = true 就砌好個 set；重複嘅 tofu 係同一個 key 寫兩次。",
+  "交集係行 pairs(a)，留低 b[key] 係 true 嘅 key。差集留低係 nil 嘅。聯集將兩個 set 嘅 key 寫入同一個 table。",
+  "淨係得字串 key 嘅 table，#set 係 0。用 pairs 將啲 key 抄落一張 list，table.sort 佢，#list 就係個數，table.concat(list, \" \") 就係嗰行。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.advanced.07.functions"
+title = "每斤"
+story = "浣紗街每張價錢牌除非另外寫明，否則都係每斤計，而香燭檔部價錢牌打印機堅持次次都要人話佢知。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<NAME> <CENTS>` 或者 `<NAME> <CENTS> <UNIT>`。
+
+寫 `tag(name, cents, unit)`，回傳 `<NAME> $<dollars>/<unit>`，兩個小數位，冇 `unit` 就即係 `catty`，每行印一張牌。
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+Lua 冇預設參數。caller 冇傳嘅參數係 `nil`，而 starter 嘅 `tag` 將佢駁埋：`attempt to concatenate local 'unit' (a nil value)`。慣用寫法係 function 嘅第一行 — `unit = unit or "catty"` — 因為 `or` 會回傳佢左邊，除非嗰個係 `nil` 或者 `false`。呢個就係 Lua 成套預設參數機制，而佢同 `def` 嗰行一樣，都係 function 契約嘅一部分。
+
+將嗰行切做一張 token list，轉好 cents 之後用 `tag(unpack(parts))` 將啲部分交過去。`unpack` 將一張 list 攤開做參數，所以兩個元素同三個元素嘅 list 都啱同一個簽名。
+'''
+hints = [
+  "tag 第一行寫 unit = unit or \"catty\"。成個修正就係咁。",
+  "`x or default` 就係 Lua 嘅預設參數。佢有一個值會失敗：如果 caller 特登傳 false，佢都會換走，呢個就係跟進問題。",
+  "tag(unpack(parts)) 將張 list 攤開；得兩部分嘅話第三個參數係 nil，由 or 補返。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.advanced.08.exceptions"
+title = "唔係數嘅嗰行"
+story = "沙田柚檔個磅印出一列重量，中間夾住某人嘅電話號碼。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行。每行應該係一個整數。
+
+每行印個值乘二，或者 parse 唔到就印 `BAD <line>`。最後印 `SUM <total>`，total 係你印過嘅值嘅總和。
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`tonumber("xx")` 靜靜雞係 `nil`；`tonumber("1.5")` 係 `1.5`，唔係整數；而 starter 嘅 `double` 兩樣都用 `error` 拋出。`error` 係 Lua function 拒絕嘅方法 — 冇 `Result`，function 本身都唔會畀 `(value, ok)` — 而預期收到數字嘅 caller 要用 `pcall` 講明佢點處理：佢幫你呼叫個 function，回傳 `true, result` 或者 `false, message`，而唔係由個錯誤一路爬上去。
+
+`pcall` 淨係包住嗰個會失敗嘅呼叫。包住成個 loop body 會連你自己 `print` 嘅打錯字都吞埋，程式就係咁學識靜靜雞失敗。
+'''
+hints = [
+  "starter 喺 xx 死咗，印 main.lua:3: not an integer: xx。pcall 唔會 crash，而係將呢個訊息當第二個結果交畀你。",
+  "local ok, value = pcall(double, line) — pcall 分開收個 function 同佢嘅參數；pcall(double(line)) 會先呼叫 double，喺 pcall 行之前已經 crash。",
+  "ok 係 false 嘅時候，value 就係個訊息。印 BAD 然後繼續；壞嗰行乜都唔加落總數。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.advanced.09.comprehensions"
+title = "行一次浣紗街"
+story = "Alex 話你可以用三個 for loop 做。條巷得一條龍咁闊，香已經點咗；你得行一次。"
+brief = '''
+標準輸入係一行整數，用空格分隔。
+
+印三行：
+
+1. 雙數值嘅總和（冇就 `0`）
+2. 每個大過 `10` 嘅值，乘二，照次序，用單個空格駁埋 —
+   冇嘅話就 `-`
+3. 有幾多個唔同嘅值
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Lua 冇 comprehension；最接近嘅係一個由 table 砌 table 嘅 function，而呢個節點就係教呢樣。`filter(list, keep)` 同 `map(list, f)` 各寫一次 — 每個都係一個填一個新 table 嘅 loop — 三行就變成呼叫：`sum(filter(nums, even))`、`map(filter(nums, big), double)`，同埋由啲值砌出嚟再數嘅一個 set。判斷式同轉換都係當參數傳入去嘅 function，即係 comprehension 入面嘅 `if` 同 expression。
+
+`table.concat` 收數字亦收字串，所以第二行唔使轉換；但張 list 係空嘅時候就要個 `-`，因為 `table.concat({}, " ")` 係空字串。
+'''
+hints = [
+  "filter(nums, function(v) return v % 2 == 0 end) 留低雙數；佢嘅總和就係第一行。",
+  "map(filter(nums, big), double) — 先 filter，再轉換，同 comprehension 後面嘅 if 同前面嘅 expression 一樣。",
+  "set 係用啲值做 key 嘅 table；#set 唔會數 key，pairs loop 先會。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.advanced.10.dict-comprehensions"
+title = "同一次行，有 key"
+story = "香燭檔啲價錢寫喺一張張紅紙碎上面，按寫嘅次序擺。姨姨要佢哋變做一塊板，仲要兩次。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<ITEM> <PRICE>`。`PRICE` 係整數仙。每樣貨最多出現一次，`n` 最少係 `1` — 永遠有一樣最平嘅貨可以講。
+
+印三行：
+
+1. 每樣價錢**嚴格大過 100** 嘅貨，寫做 `ITEM=PRICE`，按貨名排，
+   用單個空格駁埋 — 冇嘅話就 `-`
+2. 每樣貨，佢嘅價錢**用整數除法除二**，同樣格式，
+   按貨名排
+3. `CHEAPEST <item>` — 最低價錢，打和就按貨名由細到大
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+上一個節點嘅有 key 版本。Lua 冇 dict comprehension；最接近嘅係 `filter_pairs(t, keep)` 同 `map_values(t, f)`，每個都係一個 `pairs` loop，用同樣嘅 key 填一個新 table。第一行留低值大過 100 嘅對；第二行用 `math.floor(v / 2)` 轉換每個值，保留每個 key。兩個都唔係 comprehension，兩個都係一個 function，寫一次。
+
+`pairs` 冇次序，所以 `sorted_keys(t)` — 啲 key 放入一張 list，排好 — 係第三個 helper，每行印出嚟嘅都要經佢。搵最平嗰個，就行過排好嘅 key，只喺價錢嚴格更低嗰陣先換：因為啲 key 係按字母次序嚟，同價嘅第一個就係打和嘅答案。
+'''
+hints = [
+  "keep(key, value) 係 true 嗰陣 filter_pairs 就留低個 key；map_values 喺每個 key 寫 f(value)。兩個都填一個新 table — 永遠唔好寫入你行緊嗰個。",
+  "想用固定次序印一個有 key 嘅 table，sorted_keys(t) 係唯一方法。呢度每行都要經佢，包埋最平嗰行。",
+  "行過排好嘅 key，淨係價錢嚴格更低先換最好嗰個：同價嘅第一個係字母最前嘅，所以打和自己搞掂。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.advanced.11.sorting"
+title = "排名榜"
+story = "火龍會每晚釘出最平嘅香，蓮花宮嘅文員用兩張 list 同一支鉛筆人手排啲檔口。"
+brief = '''
+兩行標準輸入：第一行係檔口名，第二行係佢哋以仙計嘅價錢，次序一樣。最少有一個檔口。
+
+印出按最平先排嘅檔口，寫做 `<rank>. <NAME> <cents>`，排名由 `1` 開始，打和就按名由細到大。然後印 `CHEAPEST <NAME>`。
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+將兩張 list zip 埋做一張記錄 list — `{ name = ..., price = ... }` — 然後用一個按價錢排、打和就按名排嘅比較器 `table.sort` 佢，再由 `ipairs` 幫結果編號。比較器係一個 closure；兩個相等嘅記錄佢一定要回傳 `false`，否則 `table.sort` 會拋出 `invalid order function for sorting`。淨係一個 index loop、冇 sort 嗰個版本，就係喺第三個檔口搞錯打和規則嗰個。
+'''
+hints = [
+  "每個檔口一個記錄，用同一個 index 行過兩張 list 砌出嚟。價錢要 tonumber，唔係當字串嘅話 1200 會排喺 900 前面。",
+  "function(a, b) if a.price ~= b.price then return a.price < b.price end return a.name < b.name end — 價錢，然後名，相等嘅記錄就 false。",
+  "for rank, stall in ipairs(stalls) 免費畀你個排名，由 1 開始。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.advanced.12.classes"
+title = "檔口本簿仔"
+story = "浣紗街每個檔口都有自己一本簿記今晚賣咗乜，而香燭檔嗰本入面每一行都寫咗喺委員會枱上面共用嗰本度。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<ITEM> <CENTS>`。
+
+砌一個收集貨品嘅 `Notebook` class，然後按到嘅次序將每樣貨印返做 `<ITEM> <CENTS>`，然後 `TOTAL <sum>`，最後經 `print(book)` 印本簿本身 — 佢嘅 `__tostring` metamethod 一定要出 `Notebook(items=<n>, total=<sum>)`。
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` 可以係 `0`，噉嗰兩行就係 `TOTAL 0` 同 `Notebook(items=0, total=0)`。
+
+Lua 嘅 class 係一個 method table，設做每個 instance 嘅 metatable，而 `__index` 指返去自己：instance 冇嘅 key 就去 class 度搵。呢個查找就係呢條題目個名嘅由來嗰個 bug。starter 將 `items = {}` 放喺 **class table** 入面，所以任何一本簿嘅 `self.items` 都會跌落去每本簿共用嗰張 list，草稿簿嘅 `PENCIL` 就出現喺真嗰本度。喺 `new` 入面整、儲喺 instance 上面嘅嘢屬於個 instance；喺 class 上面嘅嘢就屬於將來所有 instance。
+
+`print(book)` 會呼叫 `tostring`，而 `tostring` 喺 metatable 度搵 `__tostring`。冇佢你就得到 `table: 0x...`，即係 starter 最後嗰行。
+'''
+hints = [
+  "行 starter，睇輸出第一行：PENCIL 0，嚟自一本冇人寫過佢嘅簿。嗰個就係經 __index 搵到嘅共用 list。",
+  "setmetatable({ items = {} }, Notebook) — 張 list 喺 new 入面每個 instance 整一張，放喺會變成 self 嗰個 table 上面。",
+  "print(book) 會呼叫 tostring(book)，佢用 metatable 嘅 __tostring。Notebook 就係個 metatable，所以要寫嘅 method 就係 function Notebook:__tostring()。令佢睇落似會重新砌返佢嘅 constructor 呼叫；呢個係慣例。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.advanced.13.dataclasses"
+title = "邊個買"
+story = "蓮花宮隔籬個米檔每張飛都收全價，包埋唔係大人嗰啲，同埋唔係飛嗰張。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<TYPE> <KG>`。
+
+基本價係 `500 + 100 * KG` 仙。每行印以下其中一樣：
+
+* `ADULT` — 基本價
+* `STUDENT` — 基本價一半，整數除法
+* `SENIOR` — 永遠係 `200`
+* 其他 — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+將每行 model 做一個記錄 — `Order.new(kind, kg)` — 再用**一個 dispatch table** 決定價錢：一個用 kind 做 key、值係 function 嘅 table，查一次，key 唔喺度就跌落去後備。Lua 冇 `match`；用 tag 做 key 嘅一個 arm table 係佢最接近嘅嘢，而 `arms[order.kind]` 係 `nil` 就係 wildcard 情況。
+
+starter 個 table 得一個 arm，其他每種 kind — 包埋佢應該識嗰三種 — 都跌落去 `UNKNOWN`。每個 arm 都係一個收 order 嘅 function；每個都回傳字串，因為 `450` 同 `"450"` 印出嚟一樣，而 `UNKNOWN` 嗰行點都係文字。
+'''
+hints = [
+  "ARMS 入面每種 kind 一個項目：STUDENT = function(order) ... end，如此類推。key 係 tag，值係 arm。",
+  "math.floor(x / 2) 係整數除法；x / 2 對 900 會畀 450，但對 501 就畀 250.5，而測試要整數仙。",
+  "冇 arm 嘅 kind，ARMS[order.kind] 係 nil，個 if 就跌落去 UNKNOWN — 同 match 最後一個 arm 做同一樣嘢，由個 table 做。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.advanced.14.generators"
+title = "你自己嘅 for loop"
+story = "香燭檔個報價機由開市價起、每次加固定一級咁列出每個價錢，而且邊度都冇留一張清單。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+將 `ticker(start, step, count)` 寫做一個 **coroutine** — `coroutine.wrap` 包住一個 function，由 `start` 開始、每次加 `step`，yield `count` 個值。每個自己一行印出，然後印 `SUM <total>`，用第二個 ticker 交畀 `sum` 計出嚟。
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+最後一行係 `main` 點稱呼 `ticker` 回傳嘅嘢 — table 就叫 `list`，`coroutine.wrap` 畀返嘅 function 就叫 `generator` — 由 starter 現有嘅 `main` 印出。而家佢寫住 `list`，喺 `for value in ticker(...)` 已經以 `attempt to call a table value` 失敗之後一行：generic `for` 會呼叫佢第一個運算元，而 list 係呼叫唔到嘅。
+
+`coroutine.wrap(f)` 唔會行 `f`。佢回傳一個 function，每次呼叫嗰個 function 就行 `f` 到佢下一個 `coroutine.yield(value)`，再將個值畀返。`f` return 咗之後，個 function 乜都唔回傳，`for` 見到 `nil` 就停。所以 `for` 用得佢，`sum` 用得佢，而佢可以出一百萬個值，但從來冇一張一百萬個值嘅 list 存在過。
+
+starter 砌咗張 list 再回傳佢。將個 append 變做 `yield`，刪咗張 list。
+'''
+hints = [
+  "return coroutine.wrap(function() ... end) — body 負責 yield；wrap 將佢變做一個 for 呼叫得嘅 function。",
+  "coroutine.yield(value)，然後向前行。body 喺 yield 度停低，下次呼叫就由佢後面繼續。",
+  "包咗嘅 coroutine 只可以用一次，佢死咗之後再呼叫係錯誤。所以 main 為 sum 砌一個新 ticker，而唔係再用個 loop 抽乾咗嗰個。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.advanced.15.decorators"
+title = "包住咗"
+story = "火龍會想知今晚個價錢 function 被叫咗幾多次，而個 function 唔想知自己被人睇住。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個以公斤計嘅重量。
+
+`price(kg)` 係 `500 + 100 * kg`。用 `counted` 包住佢，令每次呼叫都被數，而 `price` 唔知。每個重量印一個價錢，然後 `CALLS <n>`，然後 `NAME <price.name>` — 一定要寫 `price`。
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+Lua 冇 decorator；最接近嘅係一個收一個 function、回傳一樣呼叫得嘅嘢嚟代替佢嘅 function，而呢個節點就係教呢樣。`price = counted(price, "price")` 將個名重新綁去 `counted` 回傳嘅嘢 — 正正就係 `def` 上面個 `@counted` 做嘅嘢。
+
+個數擺喺邊？Lua function 帶唔到欄位，所以個 wrapper 係一個 **table** — `{ calls = 0 }` — 用一個 `__call` metamethod 令佢呼叫得，佢加個數再呼叫原本嗰個。`price(kg)` 就會經 `__call`，而 `price.calls` 係一個普通欄位讀取。
+
+Lua function 亦冇自己嘅名。個 wrapper 要有人話佢知佢代替緊邊個；starter 從來冇話佢知，最後一行就寫住 `NAME wrapper`。呢個就係人手做嘅 `functools.wraps`：被包住嗰樣嘢嘅身份，抄落代替佢嗰樣嘢上面。
+'''
+hints = [
+  "price = counted(price, \"price\") — 第二個參數係 wrapper 帶住嘅名。成個修正就係咁。",
+  "喺 function 後面寫 price = counted(price)，同喺佢上面放個 decorator 一樣：個名重新綁去 counted 回傳嘅嘢，原本嗰個淨係喺 closure 入面做 upvalue func 生存。",
+  "__call 入面嘅 ... 唔使知係乜都會轉交任何參數，所以個 wrapper 可以重用喺任何 function 上面。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.advanced.16.duck-typing"
+title = "識嘎就係鴨"
+story = "書館街蛋檔一個紅膠袋。冇人問佢係乜；佢哋問入面有幾多件、鴨蛋喺唔喺度，同埋逐件睇一次。"
+brief = '''
+標準輸入係一行貨品，用空格分隔，然後一行，得一個要搵嘅字。
+
+將啲貨放入一個 `Bag`，然後印：
+
+1. `LEN <k>` — 由 `bag:len()` 嚟
+2. 啲貨，每行一件 — 由 `for item in bag:iter()` 嚟
+3. `HAS <WORD> YES` 或者 `HAS <WORD> NO` — 由 `bag:has(word)` 嚟
+4. `LONGEST <item>` — 由 `longest(bag)` 嚟，打和就第一個
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` 冇包住一個 list 型別，亦唔需要。`bag:len()` 係喺呼叫嗰一刻經 metatable 查 key `len`，嗰度有乜就呼叫乜。Lua 從來唔問一樣嘢*係*乜；佢喺需要嗰陣先問個 key 喺唔喺度。starter 三個 method 一個都冇，第一個錯誤係 `attempt to call method 'len' (a nil value)`。
+
+`longest` 係一個獨立 function，收任何有 `iter()` 嘅嘢 — 佢從來冇提過 `Bag`。成個契約就係咁：一個名同一個呼叫。（LuaJIT 唔理 table 上面嘅 `__len` metamethod，所以呢度長度係一個 method，唔係 `#bag`；做嘢嘅得 `__index` 一個 metamethod。）
+'''
+hints = [
+  "function Bag:len() return #self.goods end — 三個 method，冇一個長。",
+  "iter 回傳一個包住計數器嘅 closure：每次呼叫就加一，回傳 self.goods[i]，過咗尾就係 nil，而 nil 正正係令 generic for 停嘅嘢。",
+  "longest 留低同長度嘅第一個，因為佢淨係嚴格更長先換，所以範例寫 duckegg 而唔係後面嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.advanced.17.none"
+title = "20:59 嘅價錢板"
+story = "20:59，浣紗街，鼓仲未響。價錢板問本簿要一個未開嘅檔口，本簿答乜都冇，塊板就印咗個乜都冇嘅價錢。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<STALL> <CENTS>` — 已經開咗嘅檔口 — 然後一個數 `q` 同 `q` 個要查嘅檔口名。
+
+每個查詢印 `<STALL> <cents>`，檔口未開就印 `<STALL> NONE`。然後印 `MISSING <k>` 同 `CHEAPEST <STALL>` — 開咗嘅檔口入面最平嗰個，打和按名 — 冇檔口開就印 `CHEAPEST NONE`。
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+starter 喺 `CHAN` 度 crash：
+
+```
+attempt to index local 'stall' (a nil value)
+```
+
+嗰行就係呢段路嘅大佬。佢從來唔會指住個 bug。佢指住嘅係一個 `nil` 終於被*跟住行落去*嘅地方，而嗰度可以離佢*被整出嚟*嘅地方任何距離 — 喺 starter 入面，佢喺兩個唔同地方被整出嚟。`lookup` 回傳 `board[name]`，檔口唔喺度嘅話設計上就係 `nil`，而 caller 冇問就喺佢身上讀 `.cents`。仲有 `cheapest` 出去嗰陣冇 `return`，所以佢乜都唔回傳，caller 收到嘅就係 `nil`，再對佢做同一樣嘢。
+
+冇人寫過嘅 key 係 `nil`。行到尾都冇 return 嘅 function 回傳 `nil`。兩樣喺嗰一刻都唔係錯誤；兩樣之後都會變成錯誤。兩次嘅修正都一樣：會收到 `nil` 嘅 code，喺 index 之前用 `== nil` 檢查。（Lua 淨係 `nil` 同 `false` 係假，所以呢度寫 `if not stall` 都啱 — 價錢係 `0` 嘅檔口仍然係一個 table — 但 `== nil` 講明你嘅意思。）
+
+令 `lookup` 同 `cheapest` 刻意回傳一個檔口**或者 nil**，喺註解講明，並喺 `nil` 落地嘅地方處理佢。
+'''
+hints = [
+  "讀個 traceback：錯誤喺個 print，但個 nil 早一行由 lookup 出嚟，再早啲由 board[name] 出嚟。",
+  "if stall == nil then 就係個檢查。cents = 0 嘅 table 唔係 nil 亦唔係 false；Lua 淨係 nil 同 false 係假。",
+  "cheapest 行完塊板之後冇 return 就完。Lua 唔會警告；caller 收到 nil，之後先發現。return best，空板就會回傳 nil，因為 best 從來冇設定過。",
+  "pairs 冇次序咁行塊板，所以個比較要自己搞掂打和：cents 低啲，然後名細啲，永遠唔好信邊個檔口先嚟。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.advanced.01.threads"
+title = "十二個跑腿，一條巷"
+story = "21:00，浣紗街。十二個跑香人同一時間攞起自己嗰節，而收數嘅執事喺佢哋任何一個寫之前已經讀咗塊板。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個整數。
+
+每個值整一個 **coroutine**，計佢嘅平方，儲入 `results[i]` — 佢自己嗰格，所以冇兩個跑腿會寫同一個地方。resume 晒佢哋，然後**按 index 次序**印結果，每行一個，然後 `THREADS <n>`。
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Lua 冇 thread；佢有 coroutine，而對其中一個做 `type(co)` 係字串 `thread`，即係最後一行嗰個數。`coroutine.create(f)` 唔會行 `f`。`coroutine.resume(co, ...)` 先行佢，**第一次** resume 嘅參數會變做 `f` 嘅參數，一直行到佢 yield 或者 return — 而 `square` 從來唔 yield，所以 resume 一次就做晒。個結果要寫喺 `main` 之後讀得到嘅地方；每個跑腿一格嘅 table 就係最簡單嘅地方。
+
+starter 啲跑腿一開始就全部 crash，而程式仍然行完兼印嘢。冇參數嘅 `coroutine.resume(co)` 會呼叫 `square(nil, nil)`，對 `nil` 做算術嗰個錯誤落喺 coroutine 入面，`resume` 將佢當回傳值報告 — `false` 同個訊息 — 而 starter 將佢掉咗。`results` 一直係空，每行都寫 `nil`。死咗嘅 coroutine 淨係帶走自己 — 讀 `resume` 嘅第二個結果，唔係你永遠都唔會知。
+'''
+hints = [
+  "coroutine.resume(co, i, nums[i]) — 第一次 resume 嘅參數就係 square 收到嘅嘢，而 starter 乜都冇傳。",
+  "resume 回傳 ok, ... — coroutine 死咗就係 false 加錯誤訊息。檢查佢；starter 啲跑腿全部靜靜雞死喺 `value * value`，value 係 nil。",
+  "results 係 square 嘅 upvalue：巢狀 function 見到嘅 table 同 main 見到嘅係同一個，所以之後睇得到啲寫入。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.advanced.02.lock"
+title = "一個錢櫃，八隻手"
+story = "條巷每個檔口都將錢放入委員會枱上面同一個錢櫃，行完之後錢櫃得一個檔口嘅錢，而每個檔口都發誓自己畀咗。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個整數。
+
+每個值整一個 coroutine，將佢加落**一個共用總數**，再將一個共用嘅次數加一，然後輪流推動佢哋 — 每個跑腿都有一轉，直至全部死晒。然後印 `TOTAL <sum>` 同 `HITS <n>`。
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+starter 喺範例上面必定印 `TOTAL 4`。每個跑腿讀錢櫃、**yield**，然後寫返佢讀到嘅加佢自己個值。到第一個寫嗰陣，四個都已經讀咗 `0`，最後一個寫嘅贏：得一個檔口嘅錢同四次。呢個就係 lost update，而且發生喺一條 thread 上面，語言入面冇鎖畀你唔記得。
+
+Lua 冇 `Lock`，因為冇搶佔。coroutine 一直行到佢講 `coroutine.yield()`，中間冇其他嘢行。critical section 就係任何冇 yield 嘅一段 code，而個 bug 就係讀同寫之間有個 yield。將個 yield 搬離中間 — 先等輪到自己，然後一口氣讀、加、寫 — 錢櫃就啱。當個更新真係要喺中間 yield（例如等一個 socket），鎖就係一個旗：`while busy do coroutine.yield() end`，set 佢，做嘢，清佢。呢個就係 mutex，逐個字寫出嚟。
+
+scheduler 寫咗喺程式入面：一個行過啲跑腿嘅 loop，resume 每個唔係 `dead` 嘅，直至成個一輪都搵唔到一個生嘅。
+'''
+hints = [
+  "行 starter：TOTAL 4，HITS 4。四個跑腿讀 0、yield，每個寫 0 加自己個值。最後一個寫嘅就係總數。",
+  "total = total + value，讀同寫之間冇 yield。個 yield 可以留喺 pay 度；佢淨係唔可以坐喺更新中間。",
+  "唔好寫 local total = total + value：咁會整一個新 local 遮住個 upvalue，外面嗰個 total 永遠唔郁。closure 淨係喺你 assign 落去嗰陣先共用個變數。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.advanced.03.queue"
+title = "邊個閂窗口"
+story = "安庶庇街嘅餃子檔將每張單經個窗口遞入廚房，最後一張之後，櫃面就企喺度等一張永遠唔會嚟嘅下一張。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個整數。
+
+一個 producer coroutine 將每個值乘十推入一個 queue，每推一個就 yield，然後推一個 **sentinel**。主 loop 由 queue 攞嘢，直至見到 sentinel，每個值都印，同時記住總數，然後印 `SUM <total>` 同 `CLOSED`。
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+queue 係一個有頭有尾嘅 table，而 table 冇 `close`。佢上面冇嘢可以話畀 consumer 知冇嘢嚟喇；呢樣要係一件貨。而件貨唔可以係 `nil`，因為 table 入面嘅 `nil` 就係冇嘢。sentinel 係一個獨立嘅值 — `local CLOSED = {}`，一個冇其他人攞住嘅 table — 而 `value == CLOSED` 淨係對嗰一個 table 係真，因為 table 嘅 `==` 係比身份。
+
+starter 從來冇推佢。`take` resume 廚房直到 queue 有嘢，廚房死咗而 queue 又係空嘅時候，佢就放棄，回傳 `nil`；個 loop 印出個字 `nil`，然後將佢加落總數，死咗。喺有 blocking queue 嘅語言，呢個會係一個 hang。喺 Lua 佢係一個被跟住行落去嘅 `nil`。
+
+producer 推 sentinel。永遠唔係 consumer — 知道條流完咗嗰邊，就係結束佢嗰邊。
+'''
+hints = [
+  "一行，喺廚房個 function 最尾：push(hatch, CLOSED)。",
+  "consumer 已經檢查 value == CLOSED。佢一直等緊 producer 從來冇送嘅嘢，結果收到 nil。",
+  "sentinel 係一個新 table，因為 nil 儲唔入 table，亦因為 table 淨係同自己相等。就算啲值都可以係 table，sentinel 仍然安全：冇其他人會有呢一個。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.advanced.04.thread-pool"
+title = "八個搬運工"
+story = "蓮花街嗰頭有四十箱香，八個搬運工。冇人想要四十個搬運工；佢哋想要嗰八個永遠唔會企定。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+行一個有 `w` 個搬運工嘅 **pool**：同一時間最多 `w` 個 coroutine 喺度行，每個搬一份工，途中 yield 一次，然後回傳 `(index, value * value)`。啲工**做完**嗰陣收集結果，按 index 排，每行印一個 `<index> <value>`，然後 `WORKERS <w>`。
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+coroutine 唔係結果。`coroutine.resume(co)` 回傳 `true`，然後係份工 yield 或者 return 嘅嘢 — 個值淨係由呢度門出嚟，而道門喺令份工做完嗰次 resume 先開，即係 pool 碰巧係邊一轉。starter 收集嘅係做完嘅 coroutine 本身 — `thread: 0x...` 嘅值 — 而 sort 試圖對其中一個做 index。
+
+將 index 帶喺結果入面，先令每次行嘅輸出都一樣；按佢排係答案嘅最後一行，唔係第一行。個 pool 就係錢櫃嗰條題目嘅 scheduler 加個上限：補到 `w` 個喺度行，每個畀一轉，將死咗嘅退休，重複到啲工同行緊嘅都空晒。
+'''
+hints = [
+  "starter 死喺 sort 或者 print：attempt to index local 'a' (a thread value)。coroutine 係份工，唔係佢嘅答案。",
+  "local ok, index, value = coroutine.resume(co) — 喺將份工行到 return 嗰次 resume，回傳嘅值跟喺 ok 後面。status 係 dead 嗰陣留住 { index, value }。",
+  "pool 用自己嘅次序做完啲工，而結果入面嘅 index 係每份工由邊度嚟嘅唯一記錄。印之前按佢排。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.advanced.05.asyncio"
+title = "async 到底喺邊度行"
+story = "阿美寫咗四年 async code，從來未見過推動佢嘅嗰樣嘢。今晚個 loop 係一個佢讀得明嘅 while loop，條巷每個跑腿都輪流喺上面行。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個整數。
+
+寫 `double(value)`，令佢 yield 畀 scheduler 一次 — `coroutine.yield()` — 然後回傳個值乘二。每個值整一個 coroutine，用 `gather` 行晒佢哋，按輸入次序印每個結果，然後 `SUM <total>` 同 `TASKS <n>`。
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`coroutine.create(f)` 唔會行 `f`。佢砌一個 **coroutine 物件**交返畀你，入面乜都唔會發生，直至有嘢 resume 佢。starter 嘅 `run` 回傳三個，冇 resume 過，輸出係三行 `thread: 0x...`，跟住係 `attempt to perform arithmetic on a thread value`。
+
+`gather` 就係 event loop，而呢度由你寫：一個行過啲 task 嘅 `while`，按次序 resume 每個未死嘅，一輪又一輪，直到一個都唔剩，將每個 task 嘅**回傳值**儲喺嗰個 task 嘅格入面。結果按你傳入 task 嘅次序出嚟，唔理佢哋用咩次序做完。呢個就係揀佢而唔揀一個將一個 task resume 到死先掂下一個嘅 loop 嘅全部原因：嗰個 loop 啱而且係順序嘅，`gather` 啱而且係交錯嘅。
+
+呢度得一條 thread。`coroutine.yield()` 係一個 task 將條 thread 交返畀個 loop、等另一個用嘅位。冇嘢係平行行嘅；啲嘢係**輪流**行，喺佢哋自己話可以停嘅地方。
+'''
+hints = [
+  "return gather(tasks)，唔係 return tasks — 而 gather 就係你寫嘅 loop：resume 每個未死嘅 task，一次又一次，直至全部死晒。",
+  "令一個 task 死嗰次 resume，佢第二個回傳值就係個 task 嘅 return。儲喺個 task 自己嘅 index；就係咁令結果保持輸入次序。",
+  "如果你要一做完就攞結果，嗰個就係上一條題目嘅 pool，噉你就要自己帶住個 index。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.advanced.06.async-queue"
+title = "邊個話做完"
+story = "三個跑腿清理緊維園燈籠閘口嘅飛隊，執事等個 queue 話佢空咗。佢從來冇講，因為冇人話佢知一張飛搞掂咗。"
+brief = '''
+標準輸入係兩個整數 `w` 同 `n`，然後 `n` 個值。
+
+將 `{ index, value }` 工作放入一個會數未做完嘅 queue。開 `w` 個 consumer coroutine，每個永遠 loop：攞一份工，將 `value * 10` 寫入 `results[index]`，再呼叫 `task_done`。主 function 行 `join` — 嗰個 resume 啲 consumer 直至每個 `put` 都有佢嘅 `task_done` 嘅 scheduler — 然後取消啲 consumer，再按 index 次序印結果同 `CONSUMERS <w>`。
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+未做完嘅數係 `0` 嗰陣 `join` 先返，而淨係 `task_done` 會減佢。starter 啲 consumer 從來冇呼叫佢，所以每份工都處理咗，個數仍然寫住 `4`，每個 consumer 都停喺空 queue 嘅 `get` 度，冇嘢剩低可以改變任何嘢。一個冇偵測嘅 loop 會喺嗰度轉，直至 runner 殺咗個程式。呢個會偵測：成個一輪冇一個 consumer 減過個數就係 deadlock，而 `join` 用 `error` 講出嚟。同窗口嗰條題目一樣嘅 hang，唔同嘅寫法 — 而修正又係一行，喺 consumer 嗰邊。
+
+consumer 係 `while true` loop。佢哋結束係因為 main 喺 join 之後取消佢哋，而呢度取消即係**帶住一個訊號 resume**：queue 空嘅時候 `get` 會 yield，而叫醒佢嗰次 resume 傳入 `"cancel"` 嘅話，`get` 回傳 `nil`，consumer 就 return。停喺一個 yield 度嘅 coroutine，係由佢醒嚟收到嘅值令佢停嘅。
+'''
+hints = [
+  "每份工處理完就 task_done(queue)。join 淨係將 put 同 task_done 對數，其他乜都唔理。",
+  "coroutine.create 乜都冇排程；consumer 喺 join 第一次 resume 佢嗰陣先行，而發現 queue 係空嘅 consumer 會喺 get 入面 yield \"idle\"。",
+  "用 \"cancel\" 叫醒嘅 consumer 由 get 收到 nil 就 return，結束個 while true。乜都唔帶咁 resume 佢只會令佢再停低。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.advanced.07.context-managers"
+title = "捲閘照樣落"
+story = "浣紗街有個檔口每張單都開捲閘，做完就閂。21:40 收到一張壞單嗰個一直開到而家，因為閂閘嗰行喺失敗嗰行後面。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<STALL> <CENTS>`，`CENTS` 應該係整數。
+
+寫 `opened(stall, body)` — 一個將個 block 當 function 收嘅 function — 入去嗰陣印 `OPEN <STALL>`，行 `body`，出嚟嗰陣印 `SHUT <STALL>`，**無論 body 有冇拋出錯誤**。喺 body 入面 parse cents 再加落總數。cents parse 唔到嘅行，喺捲閘落咗之後報告做 `BAD <STALL>`。最後印 `TOTAL <sum>` 同 `REJECTED <k>`。
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+Lua 冇 `with` 亦冇 `finally`；最接近嘅係一個將 body 當 closure 收嘅 function，再喺個呼叫外面包 `pcall`。`pcall` 之前嘅所有嘢係入，之後嘅係出，而出嗰部分兩條路都會行，因為 `pcall` 將個錯誤變做回傳值，而唔係由佢爬過 `SHUT`。starter 冇包就呼叫 `body()`，`WONG` 個捲閘永遠都唔會閂。
+
+捲閘落咗之後，個錯誤再向上拋：`error(err, 0)` 重新拋出佢 — 個 `0` 令 `error` 唔會喺訊息前面多加一個位置 — caller 自己嘅 `pcall` 見到佢就印 `BAD`。唔好喺 `opened` 度吞咗佢：caller 想知。
+'''
+hints = [
+  "local ok, err = pcall(body)，然後 print(SHUT)，然後 if not ok then error(err, 0) end。個 pcall 就係 finally。",
+  "個錯誤穿過 opened 出去 main 嘅 pcall，所以 main 嘅 BAD 照樣印 — 喺 SHUT 之後，因為 SHUT 喺重新拋出之前已經印咗。",
+  "total = total + parse_cents(cents) 先計右邊；parse_cents 拋出嘅時候乜都冇 assign，所以壞嗰行乜都冇加。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.advanced.08.pipeline"
+title = "廚房流水線"
+story = "大坑餃子檔寶哥條線：一個位將張單平方，下一個位記住累計數，冇人等成批做完。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 個整數。
+
+用 **coroutine iterator** 砌一條兩段嘅 pipeline：
+
+1. `squares(values)` yield 每個值嘅平方
+2. `running(stream)` 收任何數字 iterator，記住累計總數，
+   yield `value, total` 對
+
+`main` 將每對印做 `<square> <total>`，然後 `PIPE <n>`。
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+兩段都唔會砌 list。每個 `coroutine.yield` 將一件交畀下一段再停低；`main` 拉，`running` 由 `squares` 拉，`squares` 由輸入拉。未需要嘅嘢唔會計，成條 pipeline 同一時間得一件喺途中。就係咁令同樣三個 function 可以處理一個一億行嘅檔案。
+
+starter 第二段喺應該 `yield` 嘅地方寫咗 `return`，所以佢係一個普通 function，回傳最後總數 — 一個數字 — 而 `main` 嘅 `for` 試圖呼叫佢：`attempt to call a number value`。
+'''
+hints = [
+  "錯誤係 attempt to call a number value — running 回傳咗一個總數，而唔係一個 for 呼叫得嘅 iterator。",
+  "用 coroutine.wrap 包住個 loop，入面寫 coroutine.yield(value, total)。一個 yield 可以帶幾個值，for 會當佢幾個變數收。",
+  "running(squares(nums)) 砌得埋，因為包咗嘅 coroutine 係一個 for 呼叫得嘅 function；running 從來唔知亦唔理佢嘅輸入係另一個 coroutine。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.advanced.09.itertools"
+title = "架上嗰個工具箱"
+story = "蓮花宮委員會張枱有一格冇人開過嘅工具，文員每晚人手數一串串一樣嘅飛。"
+brief = '''
+標準輸入係一行整數。
+
+印三行，每行都用程式頂嘅 `tools` table 砌，唔准自己手寫：
+
+1. `SUMS`，後面跟累計總和 — `tools.accumulate`
+2. `RUNS`，後面跟每串**相鄰**相等值，寫做 `<v>x<k>` —
+   `tools.groupby`
+3. `PAIRS <k>`：有幾多對無序嘅**唔同**值 —
+   對排好嘅唔同值用 `tools.combinations`
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Lua 冇 `itertools`；module 係一個 function table，而 `tools` 就係一個寫喺檔案頂、唔係用 `require` 載入嘅 module。佢三個 function 已經喺度 — 嗰格冇人開過嘅工具 — 每個都回傳一個 coroutine iterator，所以可以直接放入 `for`。
+
+`groupby` 淨係將**相鄰**相等嘅嘢分組。佢唔係計數器，而範例特登揀到兩樣唔一致：`1` 出現四次，分兩串。starter 第二行用一個計數 table，正正喺呢個輸入錯 — 仲按 `pairs` 次序印啲數，即係冇次序。
+
+每個 iterator 都係 lazy 嘅：`accumulate` 每拉一次 yield 一個累計總和，`groupby` yield 個值同佢嗰串（一張 list），所以 `#run` 就係長度。要 `table.concat` 嗰陣就將 iterator 收埋做一張 list；淨係要知幾多就用 loop 數。
+'''
+hints = [
+  "tools.accumulate(nums) 每個元素之後 yield 累計總數；收埋做一張 list 畀 table.concat。",
+  "for value, run in tools.groupby(nums) do — run 係嗰串成員嘅 list，#run 係佢嘅長度。",
+  "tools.combinations(distinct, 2) 每對無序嘅 yield 一次。數佢哋係 n*(n-1)/2，人手 check 一次就知你個 n 啱唔啱。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.advanced.10.functools"
+title = "記住你計過嘅嘢"
+story = "香燭檔喺火龍經過之前，用同樣兩個數由頭計同一晚嘅價錢一萬一千次，次次都由零開始。"
+brief = '''
+標準輸入係 `n k bits`：兩個整數同一串二進位數字。
+
+印四行：
+
+1. `FIB <fib(n)>` — 由一個**遞迴**嘅 `fib` 嚟，用 `memoize` 包住
+2. `PRODUCT <k!>` — 對 `1..k` 用乘法 `reduce`，帶一個初始值，
+   令 `k = 0` 畀 `1`
+3. `BIN <value>` — 用一個收 base 嘅 parser 嘅 `partial` parse `bits`，
+   base 綁做 `2`
+4. `MISSES <m>` — `fib.misses`，個遞迴真正行咗 body 幾多次
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` 最多係 `400`，對 LuaJIT 嘅 stack 嚟講唔算乜。冇 cache 嘅話，`fib(35)` 大約三千萬次呼叫，`fib(90)` 行唔完。有 cache 嘅話，每個 `fib(i)` 行一次，`MISSES` 係 `n + 1`。`memoize` 就係「包住咗」嗰條題目嘅 wrapper，closure 入面加個 cache：一個呼叫得嘅 table，所以 `fib.misses` 係一個欄位，而 `fib = memoize(function ... end)` 令入面嘅遞迴都經個 cache。starter 嘅 `fib` 係普通 function，佢最後一行死喺 `fib.misses`。
+
+`fib(90)` 同 `20!` 都過咗 2^53，而 Lua 數字係 double：過咗嗰度，啲位會靜靜雞唔見。starter 帶住 `big`，一個以 base-10^7 limb list 表示嘅數字，有 `add`、`mul_small` 同 `tostring`；`fib` 加 big，乘積就將一個 big 乘一個細數字。`partial` 將一個 function 前面啲參數凍結，畀你一個新 function；`reduce` 將一個兩參數 function 摺過一個 iterator。兩個都唔聰明。兩個都會被問。
+'''
+hints = [
+  "local fib; fib = memoize(function(n) ... end) — 先宣告個名，咁 body 入面嘅 fib 就係最後裝住個 wrapper 嘅 upvalue。starter 死喺最後一行，因為普通 function 冇 misses 欄位。",
+  "reduce(big.mul_small, range(1, k), big.from(1)) — 第三個參數係起始值，就係佢令空 range 畀 1。",
+  "partial(parse, 2) 回傳一個自己提供 base、收文字嘅 function。unpack(bound, 1, count) 將綁定咗嘅參數放前面；select(\"#\", ...) 就算其中一個係 nil 都數得到。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.advanced.11.protocol"
+title = "佢淨係要識畫自己"
+story = "維園燈籠指南列出檔口同櫃位，由兩個唔同嘅程式砌，而塊板淨係想知佢哋每個都識畫自己。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行，每行係以下其中一樣
+
+* `STALL <NAME> <AISLE>` — 畫做 `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` — 畫做 `COUNTER <NUMBER>`
+
+將一個 protocol `Sign` 宣告做一張 method 名 list — `{ "render" }` — 同埋 `implements(object, protocol)`，物件喺每個名度都有一個 function 就係真。將 `Stall` 同 `Counter` 寫做普通 class — **完全唔提 `Sign`** — 再寫一個 function `show(sign)` 印出畫出嚟嘅嘢。印每個 sign，然後用 `implements(x, Sign)` 數嘅 `SIGNS <n>`，然後用 `is_a(x, Stall)` 數嘅 `STALLS <k>`，佢比較 metatable。
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+protocol 係一個**結構**型別：class 有啲 method 就滿足佢，唔使聲明。Lua 冇名稱呼呢樣，因為佢係 Lua 唯一有嘅型別。個檢查係喺 run time 按名查找，而且一定要係**同呼叫一樣嘅查找**：`object[name]`，經 `__index` 去到啲 method 所在嘅 class。starter 用 `rawget` 檢查，佢淨係睇 instance 本身，喺邊個上面都搵唔到 `render`，就報 `SIGNS 0`。
+
+`show` 喺 run time 經嗰個查找 dispatch — `sign:render()` 搵到 metatable 鏈上面嘅任何 `render`。冇 static dispatch 可以揀；Lua 得一個機制，就係呢個。
+'''
+hints = [
+  "用 object[name] 代替 rawget(object, name)。成個修正就係咁：rawget 跳過 metatable，而啲 method 喺 __index 後面嘅 class 度。",
+  "Stall 同 Counter 邊度都冇提 Sign。佢哋有 render() 就滿足佢；呢個就係結構嘅意思。",
+  "implements 檢查嘅係個名度有冇 function，唔係佢幾多個參數或者回傳乜。Lua 從來唔會檢查呢啲；呼叫嗰陣先知。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.advanced.12.frozen"
+title = "佢係唔會變嘅"
+story = "今晚印好嘅價錢表 18:00 派畀每個檔口，到 21:30 已經有三個喺上面寫過嘢，仲有一個加咗一欄本來冇嘅。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<NAME> <CENTS>`。
+
+將每行砌做一個**凍結**記錄 `Price.new(name, cents)`。然後對每個價錢，試吓覆寫佢嘅 `cents`，嘗試拋出錯誤嗰陣就印 `FROZEN <NAME>`。跟住，一個有一個宣告咗嘅 slot `count` 嘅 `Tally` class：set `tally.count`，然後試吓 set 一個串錯咗嘅 `tally.cuont`，*嗰個*拋出嗰陣就印 `SLOTS YES`。最後 `IN_SET <k>`，一個按**值**做 key 嘅價錢 set 嘅大細，同 `TOTAL <sum>`。
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+Lua table 永遠寫得；凍結一個係 metatable 嘅把戲。將啲欄位放喺一個 caller 永遠見唔到嘅 table，交返一個**空 proxy**，佢嘅 `__index` 係啲欄位 — 每次讀都跌落去 — 而佢嘅 `__newindex` 會拋出錯誤：每次寫入一個 proxy 冇嘅 key 都會去嗰度，而 proxy 一個 key 都冇。喺 assign 外面包 `pcall`，就係唔使死都可以試嘅方法。
+
+set 係另一半。table 做 key 係**按身份**：兩個欄位一樣嘅記錄係兩個 key，starter 嘅 `IN_SET` 寫 `3`。凍結記錄要由啲欄位整個 key — `price:key()` — 先可以代表佢嘅值，而正正因為啲欄位喺佢下面唔會變，咁做先安全。
+
+`Tally` 嘅 slot 又係 `__newindex`，淨係容許宣告咗嘅名：`count` 就 `rawset`，其他就錯誤。屬性名打錯字會喺 assign 嗰陣變成錯誤，而唔係一個冇人讀嘅靜靜雞新欄位。
+'''
+hints = [
+  "Price.new 回傳一個空 table，佢嘅 metatable 有 __index = 啲欄位，同一個會出錯嘅 __newindex。讀會跌落去；寫除咗個 metamethod 冇地方落。",
+  "用 price:key() 做 set 嘅 key，一個由啲欄位砌出嚟嘅字串。table 本身淨係自己嘅 key。",
+  "TOTAL 係原本 cents 嘅總和，淨係因為啲 assign 失敗先成立。喺 starter，到嗰陣每個價錢都係 0，TOTAL 係 0 — 個改動唔單止被容許，仲真係做咗。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.advanced.13.exceptions"
+title = "自己嘅錯誤"
+story = "米檔定價有四層，每層拋出自己嘅嘢，而櫃面前端淨係接住其中一種，就被其他嘅搞冧咗。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行，每行應該係一個以公斤計嘅重量。
+
+定義一個由 **table** 組成嘅錯誤層級：`PriceError` 做 base，`NotANumber` 同 `Negative` 用 `class(PriceError)` 由佢整出嚟。`Negative` 帶住個重量，訊息係 `negative weight: <kg>`；`NotANumber` 嘅訊息係 `not a number`。`price(text)` 轉換段文字，parse 失敗就拋出 `NotANumber`，將失敗留做佢嘅 `cause`，拒絕負數重量，否則回傳 `500 + 100 * kg`。
+
+印每個價錢或者錯誤訊息，然後 `ERRORS <k>`。用 `is_a` 接住 **base class**，一次。
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+`error` 拋出任何值，而 table 係唯一帶得住訊息、cause 同 class 嘅。class 就係佢嘅 metatable；`is_a(err, cls)` 由佢沿住 `parent` 連結向上行，一個 `if is_a(err, PriceError)` 就接住層級入面每個成員。starter 淨係接 `Negative`，所以 `xx` 嗰行用一個冇人接嘅 table 搞冧咗個程式：`(error object is not a string)`。
+
+`print(err)` 印 `tostring(err)`，而 `tostring` **直接喺 metatable 度**搵 `__tostring` — metamethod 唔會經 `__index` 鏈搵 — 所以 `class` 要喺佢整嘅每個 class 上面放一個。`cause` 係 `pcall` 由失敗嘅 parse 交返嚟嘅字串；呢度冇嘢印佢，debugger 就會兩個都顯示，一個喺另一個上面。嗰條鏈就係留住佢嘅原因。
+'''
+hints = [
+  "elseif is_a(result, PriceError) then — base class 接住兩個 subclass，有 base class 嘅意義就喺度。",
+  "print(result) 印 tostring(result)，即係錯誤自己 class 上面嘅 __tostring。handler 唔使格式化。",
+  "測試幾個 class 嗰陣次序重要：放喺佢 base class 測試後面嘅 subclass 測試係死 code，而 Lua 唔會警告你。唔識嘅就重新拋出 — error(result, 0) — 唔好吞咗佢。",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "lua.advanced.14.iterator"
+title = "下一個，直到停"
+story = "維園燈籠閘口部派籌機由一個起點起、每次加固定一級咁派號碼，冇留低任何清單，而排隊板想好似行任何 list 咁 loop 佢。"
+brief = '''
+標準輸入係三個整數：`start`、`step`、`count`。
+
+寫一個 class `Tickets`，**人手實作 iterator protocol**：`next` 回傳下一個值，派晒 `count` 個值就回傳 `nil`，而 `iter` 回傳 generic `for` 需要嘅嘢。每個值自己一行印出，然後印 `SUM <total>`，用第二個 `Tickets` 交畀 `sum` 計出嚟。
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+呢個就係 `coroutine.wrap` 幫你寫嘅嘢。generic `for` 收三樣嘢 — 一個 function `f`、一個 state `s` 同一個控制值 — 每轉之前呼叫 `f(s, control)`，第一個結果係 `nil` 就停。`Tickets.next` 已經係呢個形狀：佢嘅 `self` 就係 state，第二個參數係一個佢可以唔理嘅控制值。所以 `iter` 係一行：`return Tickets.next, self`。`sum`、`collect` 同 `for` 全部跳同一隻舞，冇一個理個 state 係乜。
+
+starter 有 `next` 冇 `iter`，而個 `for` 話 `attempt to call method 'iter' (a nil value)`。喺呢度，由 `next` 嚟嘅 `nil` 就係 `StopIteration`；所以一張飛永遠唔可以係 `nil`，而 `0` 係一張冇問題嘅飛 — `0` 唔係 `nil`。
+
+`iter` 將 `self` 當 state 回傳，係 **iterator** 嘅標誌：佢只可以行一次，之後就用完。**container** 每次都由 `iter` 回傳一個新 state，可以行好多次；呢條路早啲嘅 `Bag` 就係一個。講明你寫緊邊種；分別喺有人第二次 loop 嗰陣先會現形。
+'''
+hints = [
+  "function Tickets:iter() return Tickets.next, self end。兩個值，for 就開始行得。",
+  "nil 係回傳，唔係拋出。for loop 喺佢度停；你永遠見唔到佢。向前行之前先儲低你準備回傳嗰個值，唔係你就差一步。",
+  "for value in obj:iter() 即係 for value in Tickets.next, obj — 個 method 呼叫只係整出嗰對嘢。回傳一個包住 self 嘅 closure 都得；嗰對就係冇多餘 function 嘅 protocol。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "lua.advanced.15.collections"
+title = "啱嘅容器"
+story = "委員會張枱將今晚啲飛放喺一張長長嘅 list，每個關於佢哋嘅問題都由頂讀落嚟答。"
+brief = '''
+三行標準輸入：一行字，一行已經**由細到大排好**嘅整數，同一個整數 `x`。
+
+印四行：
+
+1. `TOP <word> <count>` — 出現得最多嘅字，打和按字由細到大
+   — 由一個計數 table 嚟
+2. `BISECT <l> <r>` — `x` 喺排好嘅整數入面嘅 `bisect_left` 同 `bisect_right`：
+   有幾多個值細過 `x`，同有幾多個唔大過佢
+3. `SMALLEST3`，後面跟最細三個整數 — 由一個 **heap** pop 出嚟
+   — 唔夠三個就少啲
+4. `GROUPS`，後面跟每個字嘅第一個字母嘅 `<letter>:<k>`，字母由細到大
+   — 一個 `__index` 會**喺第一次存取嗰陣整出 list** 嘅 table，
+   用第一個字母做 key
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+Lua 得一種容器，其他每種都係一個 table 加一套紀律。starter 嘅 `TOP` 留住第一個到達最高數嘅字，即係按**插入次序**嘅 `tofu`，而題目話係 `egg`：將啲字排好，講明你嘅意思。佢嘅 `BISECT` 掃描搵 `x` 嘅 index，`x` 唔喺度就跌低；喺排好嘅 list 上面做二分搜尋永遠唔會拋出，而 `left` 同 `right` 相差嘅就係 `x` 有幾多個。佢嘅 `SMALLEST3` 排晒成張 list 嚟由前面讀三個值，而 `k` 細、`n` 唔細嘅時候，heap 存在正正就係為咗避免呢樣。佢嘅 `GROUPS` 按 `pairs` 次序行一個計數 table，即係完全冇次序。
+
+`setmetatable({}, { __index = function(t, k) local v = {}; rawset(t, k, v); return v end })` 就係 Lua 嘅 `defaultdict(list)`：第一次讀一個唔存在嘅 key 就整出張 list 再儲低，所以 `groups[letter][#... + 1]` 永遠唔使檢查。
+'''
+hints = [
+  "行 sorted_keys(counts) 而唔係 words，淨係數嚴格更大先換 top；噉打和就歸字母最前嗰個，即係 egg。",
+  "bisect_left 同 bisect_right 永遠唔會拋出；starter 嘅 index_of 喺 x 唔喺度嗰陣回傳 nil，而其中一個隱藏測試正正係咁。兩個係同一個 loop，將 < 換做 <=。",
+  "heap 係一張 list，i 嘅 parent 係 floor(i / 2)：push 加喺尾再向上游，pop 將最後一件搬去頂再沉落去。三次 pop 就係最細三個，無論 n 係幾多。",
+  "__index metamethod 淨係對唔存在嘅 key 行；入面嘅 rawset 儲低新 list，下次讀就係普通命中。印之前將啲 key 排好 — 有 metatable 嘅 table 一樣係冇次序。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "lua.advanced.16.timeouts"
+title = "唔等喇"
+story = "執事塊板 ping 條巷每個檔口問等候時間，而部讀卡機壞咗嗰個檔口永遠唔答，所以塊板永遠唔會重畫。"
+brief = '''
+標準輸入係一個數 `n`，然後 `n` 行 `<STALL> <SECONDS>`，即時答嘅檔口 `SECONDS` 係 `0`，唔夠時間答嘅係 `1`。
+
+呢度嘅時間係 **tick**：十分之一秒係一次 `coroutine.yield()`，而 `fetch(stall, seconds)` 每秒 yield 十次，然後回傳 `<STALL> OK`。對每個檔口，將佢嘅 `fetch` 當 coroutine 喺 `wait_for(task, 2)` 下面行 — 兩個 tick 嘅期限，0.2 秒 — 按輸入次序印 `<STALL> OK` 或者 `<STALL> TIMEOUT`。然後開一個永遠 loop 嘅 `watch()` coroutine，畀佢一轉，**用 `"cancel"` resume 佢**嚟取消佢，等佢由 handler 印 `CANCELLED`，由每條路都會行嘅 code 印 `CLEANUP`。最後印 `TIMEOUTS <k>`。
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` 最多 resume 個 task `ticks` 次，再報告佢有冇做完；最後一轉之後仍然係 `suspended` 嘅話，就係 timeout，個 task 就咁永遠唔再被 resume。starter 反而將 `fetch` resume 到尾，所以 `WONG` 用晒十個 tick 然後話 `OK`。
+
+取消一個 coroutine，就係將一個值送去佢停住嗰個 yield。`watch` 喺一個 `pcall` 入面 yield，yield 回傳 `"cancel"` 嗰陣就拋出；`pcall` 接住 — 就係印 `CANCELLED` 嗰個 handler — 然後 cleanup 嗰行行，然後個錯誤再拋出，所以送 cancel 嗰次 resume 會收返 `false, "cancelled"`。starter 整咗個 watcher，畀佢一轉，就丟低佢：冇人再 resume 嘅 coroutine 永遠乜都唔行，兩行都唔會印。處理完之後重新拋出 — 吞咗個 cancel，就係一個 task 變成取消唔到嘅原因。
+'''
+hints = [
+  "wait_for(task, 2)：最多 resume 兩次，task 死咗就回傳 true 同結果，否則 false。timeout 咗嘅 task 就咁永遠唔再被 resume。",
+  "coroutine.resume(watcher, \"cancel\") — 個字串就係 watcher 個 yield 回傳嘅嘢，佢自己嘅 code 將佢變做錯誤。將個變數設做 nil 乜都冇取消；只係唔記得咗個 coroutine。",
+  "create 之後第一次 resume 畀 watcher 一轉開始、停喺 yield 度，所以個 cancel 有個 yield 落腳，而唔係落喺一個未開始嘅 function。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "lua.advanced.17.coroutine"
+title = "COROUTINE"
+story = "浣紗街，條龍拉到全長，每節一個跑香人。其中一個永遠唔交出場地，成條龍停喺一節度，鼓仲打緊，而啲總數返嚟乜都冇。"
+brief = '''
+標準輸入係兩個整數 `k` 同 `n`。
+
+將 `1..n` 分做 `k` 段連續嘅 chunk — chunk `i` 係 `floor(n*i/k) + 1` 到 `floor(n*(i+1)/k)`，包埋兩頭 — 每段交畀佢自己嘅 **coroutine**，計佢範圍嘅平方和：一個普通 loop，唔用 library 呼叫，每 100 000 個數 yield 一次，等其他有得行。每個跑腿將結果一口氣、中間冇 yield 咁加落**一個共用總數**，同時記錄喺佢自己嗰格。輪流推動佢哋直至全部死晒。按 index 次序每段印 `CHUNK <i> <sum>`，然後 `TOTAL <sum>`，然後 `THREADS <k>` — coroutine 嘅型別名係 `thread`，嗰個就係個數。
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+starter 失敗嘅原因同時間完全冇關。`local part = coroutine.resume(co, lo, hi)` 留住 `resume` 嘅**第一個**結果，即係 `true`，跟住嗰個答案就跌咗落地；第一行 `CHUNK` 係 `attempt to concatenate local 'part' (a boolean value)`。呢個係細 bug。用錢櫃嗰條題目嘅方法修正：共用總數喺讀同寫之間冇 yield 咁更新，每段嘅格淨係由一個跑腿寫，再用鎖嗰條題目嘅 scheduler — 每個未死嘅跑腿都有一轉，直至一個都唔剩。
+
+大 case 嘅總和會過 2^53，而 Lua 數字係 double：過咗嗰點 `+` 會捨入。每個總和用兩個 limb 帶住 — 一個細過 10^9 嘅低位部分，同一個係其餘嘅高位部分 — 用 `%d%09d` 印。
+
+大嗰樣嘢就係大佬，而佢唔係一個你修得好嘅 bug。用 `k = 4` 同 `n = 4000000` 行佢並計時，然後用 `k = 1` 行。兩次用同樣時間。然後刪咗 loop 入面個 yield 再行：同樣輸出，同樣時間，冇錯誤。coroutine 一直佔住場地，直至佢講 `yield`；一個從來唔講嘅跑腿會一路行到尾，其他三個就等，而冇嘢話你知，因為冇其他嘢需要個場地。呢個就係條龍停喺一節度，鼓仲打緊。四個 coroutine 喺四個核心上面輪流計平方和，喺一個核心上面，再加切換嘅成本。LuaJIT 冇 thread。coroutine 係一個停低嘅位，唔係第二個核心；佢哋係**輪流**行，喺每個跑腿自己話可以停嘅地方。平行工作係第二個 process — `io.popen` — 或者 LÖVE client 嘅 `love.thread`，佢係一個獨立、乜都唔共用、經 channel 溝通嘅 Lua state。
+
+輸出係確定嘅，因為啲 chunk 按 index 印，而總數係啲 chunk 嘅總和，唔係跑腿做完嘅次序。`TOTAL` 由共用總數印，唔好由啲格加埋 — 冇 yield 嘅更新就係呢張地圖講緊嘅嘢，兩個一定要一致。
+'''
+hints = [
+  "resume 先回傳 ok，值喺後面。更好嘅做法：畀 work 一個 index 同一格去寫，同一個共用總數去加，由 scheduler resume 到死；噉就乜都唔使由 resume 出嚟。",
+  "resume 晒全部，一輪又一輪，然後先印。喺跑腿入面印會交錯；喺 loop 之後由啲格印，就唔會。",
+  "兩個 limb：lo 細過 10^9，每次加都將進位搬去 hi。41666791666750000 係 hi 41666791 同 lo 666750000，用 %d%09d 印。",
+  "n*(n+1)*(2n+1)/6 係總數嘅公式。用佢 check 一次 TOTAL，就知 chunk 嘅邊界啱。然後喺大 n 上面比較 k=1 同 k=4 嘅時間：兩個一樣嗰陣，你就見到 coroutine 喇。",
+]

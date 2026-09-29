@@ -324,6 +324,51 @@ hints = [
   "{v for v in nums} je set comprehension; set(nums) je totéž a tady je v pořádku obojí.",
 ]
 
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.advanced.10.dict-comprehensions"
+title = "Stejný průchod, s klíči"
+story = "Ceny stánku jsou na útržcích papíru v pořadí, v jakém je kdo napsal. Teta je chce jako jednu tabuli, a chce ji dvakrát."
+brief = '''
+Na standardním vstupu je počet `n`, pak `n` řádků `<ITEM> <PRICE>`. `PRICE` je
+celý počet centů. Každá položka se objeví nanejvýš jednou a `n` je aspoň
+`1` — vždycky je co jmenovat jako nejlevnější.
+
+Vypiš tři řádky:
+
+1. každou položku s cenou **ostře nad 100**, jako `ITEM=PRICE`, seřazené podle
+   položky, spojené jednotlivými mezerami — nebo `-`, pokud žádné nejsou
+2. každou položku s cenou **napůl celočíselným dělením**, ve stejném formátu,
+   seřazené podle položky
+3. `CHEAPEST <item>` — nejnižší cenu, shodu rozhodne položka vzestupně
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+**Dict comprehension** je list comprehension, kterou už znáš, jen s klíčem:
+`{k: v for ...}` místo `[v for ...]`. První řádek filtruje přes `if` na konci
+a hodnoty nechává, jak jsou; druhý transformuje hodnotu vpředu a nechává
+každý klíč. Obojí je jeden řádek a ani jedno nepotřebuje prázdný dict a cyklus,
+který ho plní.
+
+`sorted(d.items())` ti dá dvojice `(key, value)` v pořadí klíčů, a to je
+přesně to, co chtějí první dva řádky. Pro třetí bere `min` stejné `key=` jako
+řazení — a protože se n-tice porovnává zleva doprava, `min(d, key=lambda k: (d[k],
+k))` rozhodne shodu bez druhého průchodu.
+'''
+hints = [
+  "Dict comprehension je `{key: value for ... }`. `if` jde na konec a filtruje; výraz na hodnotě ji transformuje.",
+  "`sorted(d.items())` řadí podle klíče a vrací dvojice, a to je přesně to, co chce ITEM=PRICE.",
+  "Na shodu řaď podle n-tice: `min(prices, key=lambda k: (prices[k], k))` vezme nejlevnější, a mezi stejnými tu abecedně první.",
+]
+
 # ---------------------------------------------------------------- 11
 [[quest]]
 id    = "python.advanced.11.sorting"

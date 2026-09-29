@@ -594,6 +594,7 @@ at `// FILL`, replacing the placeholder `t`.
 ```
 input:  causewaybay
 output: caus...
+```
 '''
 starter     = '''
 #include <iostream>

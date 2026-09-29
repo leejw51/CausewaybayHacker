@@ -1,0 +1,1122 @@
+# LUA LAND — ADVANCED, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/lua/advanced.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "lua.advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.advanced.01.conversions"
+title = "Tři podoby, jedno jméno"
+story = "Stánek s vonnými tyčinkami na Wun Sha Street drží cenu jako text, jako číslo a jako dolary, v jednom sešitě, pod jedním jménem."
+brief = '''
+Načti jeden řádek: částku v centech, jako číslice.
+
+Vypiš tři řádky:
+
+1. kolik znaků má oříznutý text
+2. částku jako číslo
+3. částku v dolarech s přesně dvěma desetinnými místy
+
+```
+input:  1234
+output: 4
+        1234
+        12.34
+```
+
+Částka je nezáporná. Udělej to s **jedním jménem**, třikrát znovu navázaným — řetězec, pak číslo, pak zase řetězec. Lokální proměnná v Lua drží cokoli a při přiřazení si to rozmyslí; cena za to je, že nic ti neřekne, co `cents` zrovna teď je, kromě přečtení řádku nad tím.
+
+Na dolary nechoď přes dělení. `1234 / 100` je dnes `12.34` a `0.1 + 0.2` je při vypsání `0.3`, ale při porovnání ne. `math.floor` a `%` ti dají obě poloviny přesně a `string.format("%02d", ...)` tu druhou doplní. `tonumber` je převod; `#cents` je délka řetězce, dokud je to ještě řetězec.
+'''
+hints = [
+  "#cents, dokud je cents ještě řetězec, je první řádek.",
+  "cents = tonumber(cents) není převod na místě; je to nová hodnota navázaná na staré jméno. Řetězec je po něm pryč.",
+  "%02d uvnitř string.format je šířka dva, doplněno nulami, desítkově. 5 centů je 0.05, ne 0.5.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.advanced.02.control-flow"
+title = "Která ulička"
+story = "Čísla uliček jsou pro trasu draka napsaná křídou na silnici a pořadatelova tabule u Lin Fa Kung má říkat, co je ve které uličce. Říká pokaždé jen to číslo a začíná od nuly."
+brief = '''
+Načti jedno celé číslo `n`. Pro každé `i` od `1` do `n` vypiš jeden řádek:
+
+* `FISHVEG`, pokud je `i` dělitelné 3 i 5
+* `FISH`, pokud je `i` dělitelné 3
+* `VEG`, pokud je `i` dělitelné 5
+* jinak samotné `i`
+
+Pak čti celá čísla, jedno na řádek, dokud nenačteš `0`, a vypiš `SKIPPED <k>`, kolik nenulových řádků jsi cestou přečetl.
+
+```
+input:  5
+        7
+        8
+        0
+output: 1
+        2
+        FISH
+        4
+        VEG
+        SKIPPED 2
+```
+
+Dvě smyčky, dva druhy. První ví, kolikrát poběží, ještě než začne: `for i = 1, n do`. Druhá to neví: `while true do` s `break`, protože počet rozhodne to, co přečteš. Číselný `for` v Lua je **včetně** na obou koncích — `for i = 1, n` proběhne `n`krát — a starter začíná na `0`, což je ta chyba o jedničku, po které je tahle země pojmenovaná.
+'''
+hints = [
+  "Případ „obojí“ testuj první, jinak se nikdy nespustí. Dělitelné 3 i 5 je dělitelné 15.",
+  "for i = 0, n - 1 začne o jedno dřív a skončí o jedno dřív. Starter tu chybu má; první řádek jeho výstupu je FISHVEG, protože 0 je dělitelná čímkoli.",
+  "while true do ... break je způsob, jak Lua píše smyčku, jejíž výstup je uprostřed. Je tu ještě repeat ... until, který testuje dole.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.advanced.03.lists"
+title = "Prostředek draka"
+story = "Šedesát sedm metrů slámy na ramenou řady nosičů a pořadatel u hlavy vidí prvního nosiče a posledního a nic mezi nimi."
+brief = '''
+Standardní vstup je počet `n` na prvním řádku a pak `n` celých čísel na druhém, oddělených mezerami. `n` je aspoň `1`, takže je vždy co vypsat jako první a poslední hodnotu.
+
+Vypiš tři řádky: první hodnotu, poslední hodnotu a součet všeho striktně mezi nimi. Při méně než třech hodnotách je ten součet `0`.
+
+```
+input:  5
+        4 8 15 16 23
+output: 4
+        23
+        39
+```
+
+Seznam v Lua je tabulka s klíči `1..n` a `#nums` je `n`. První prvek je `nums[1]`; poslední je `nums[#nums]`. Žádné `nums[-1]` není — záporný klíč je jen klíč, pod který nikdo nic neuložil, a jeho přečtení dá bez stížností `nil` — a žádný řez není: prostředek je smyčka od `2` do `#nums - 1`, která proběhne nulakrát, když žádný prostředek není, takže ochrana, kterou jiné jazyky potřebují, je tu zadarmo.
+
+Starter vypisuje `nums[0]`. To v Lua není chyba. Je to `nil`, `print` napíše slovo `nil` a program skončí s 0. Tahle země je pojmenovaná právě po tom.
+'''
+hints = [
+  "nums[#nums] je poslední prvek; nums[#nums - 1] je ten před ním. Nic záporného nefunguje.",
+  "for i = 2, #nums - 1 je všechno kromě prvního a posledního a s jednou hodnotou je to for i = 2, 0, které samo proběhne nulakrát.",
+  "io.read(\"*a\") přečte všechno najednou a gmatch(\"%S+\") projde tokeny, takže na koncích řádků přestane záležet. První token je počet; přeskoč ho.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.advanced.04.strings"
+title = "Bajty nejsou písmena"
+story = "Objednávkový formulář na lampiony u stánku ve Victoria Park usekne 銅鑼灣 po třech bajtech a vytiskne jeden znak a otazník."
+brief = '''
+Načti jeden řádek. Vypiš tři řádky:
+
+1. jeho délku v **bajtech**, zakódovanou jako UTF-8
+2. jeho délku ve **znacích**
+3. řádek s obráceným pořadím znaků
+
+```
+input:  causeway
+output: 8
+        8
+        yawesuac
+```
+
+Řádek může obsahovat znaky mimo ASCII a pak první dvě čísla nejsou stejná. Řetězec v Lua je posloupnost **bajtů** a nic jiného nezná: `#s` je počet bajtů a `s:reverse()` obrací bajty, což každý vícebajtový znak rozřízne napůl. Znaky jsou něco, co si definuješ sám. V UTF-8 je znak jeden úvodní bajt, za kterým následuje libovolný počet pokračovacích bajtů — `[^\128-\191][\128-\191]*` jako vzor — takže počet úvodních bajtů je počet znaků, a projít znaky přes `gmatch` a naskládat je je obrácení.
+
+Starter vypíše počet bajtů dvakrát a řádek tak, jak přišel. Nesahej po `line:reverse()`, abys opravil třetí řádek: na `causeway` je to správně a na ukázce, kterou všichni doopravdy píšou, vypíše bajty, které nejsou řetězcem v žádném kódování.
+'''
+hints = [
+  "#line jsou bajty. Znaky se musí spočítat: gsub vrací počet shod jako svůj druhý výsledek a shoda na každý znak je počet znaků.",
+  "Pokračovací bajt je 128..191 (10xxxxxx). Znak je jeden bajt, který takový není, a za ním nula nebo více takových: \"[^\\128-\\191][\\128-\\191]*\".",
+  "table.insert(reversed, 1, ch) přidá na začátek, takže poslední znak skončí první. table.concat spojuje bez oddělovače.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.advanced.05.dicts"
+title = "Co ulička křičí"
+story = "Wun Sha Street v devět: každý stánek něco vyvolává a tabule na konci u School Street chce pořadí."
+brief = '''
+Přečti celý standardní vstup a rozděl ho podle bílých znaků.
+
+Vypiš každé různé slovo jednou, jako `<word> <count>`, seřazené podle počtu sestupně a shody rozhodne slovo vzestupně.
+
+```
+input:  tram tram bus
+output: tram 2
+        bus 1
+```
+
+Tabulka klíčovaná slovem je počítadlo a `counts[word] + 1` je napoprvé chyba — `attempt to perform arithmetic on a nil value` — protože klíč, který nikdo nezapsal, je `nil`. `(counts[word] or 0) + 1` dodá tu nulu.
+
+`pairs` prochází klíče v **žádném pořadí** a to pořadí se mění běh od běhu. Zkopíruj klíče do seznamu, seřaď ho přes `table.sort` s komparátorem, který říká počet sestupně a pak slovo vzestupně, a vypisuj ze seznamu. Komparátor vrací `true`, když jeho první argument jde první.
+'''
+hints = [
+  "Starter umře na prvním slově: counts[word] + 1 čte dřív, než zapíše, a není co číst. (counts[word] or 0) dodá nulu.",
+  "Posbírej klíče přes pairs do seznamu, pak na seznam dej table.sort. Samotná tabulka žádné pořadí, které by šlo opravit, nemá.",
+  "function(a, b) if counts[a] ~= counts[b] then return counts[a] > counts[b] end return a < b end — počet sestupně, pak slovo vzestupně, a nikdy true pro stejné argumenty.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.advanced.06.sets"
+title = "Co mají oba stánky"
+story = "Dva stánky s lampiony, jeden na každé straně Ormsby Street, a zákaznice, která chce vědět, co může dostat u kteréhokoli z nich, aniž by dvakrát přešla trasu draka."
+brief = '''
+Dva řádky standardního vstupu, každý je zboží jednoho stánku oddělené mezerami. Stánek může uvést tutéž věc dvakrát; počítá se jednou.
+
+Vypiš tři řádky:
+
+1. `BOTH` a za ním všechno, co je na obou seznamech, seřazené, oddělené mezerou — nebo
+   `BOTH -`, když nic takového není
+2. `ONLY_A <k>`: kolik věcí je na prvním seznamu a ne na druhém
+3. `ALL <k>`: kolik různých věcí je na kterémkoli seznamu
+
+```
+input:  choisum tofu gailan tofu
+        gailan egg
+output: BOTH gailan
+        ONLY_A 2
+        ALL 4
+```
+
+Lua nemá typ množiny. Množina je tabulka, jejíž **klíče** jsou prvky a hodnoty jsou `true`: zapsat `tofu` dvakrát znamená dvakrát zapsat tentýž klíč a duplikát zmizí už cestou dovnitř. Členství je `a[x]`, což je `true` nebo `nil`. Průnik, rozdíl a sjednocení jsou tři smyčky přes klíče jedné množiny, které se ptají té druhé — napiš je jako funkce a ty tři řádky jsou tři volání.
+
+`#` klíče množiny nepočítá; počítá seznamovou část, která je prázdná. Počítej smyčkou přes `pairs` a před vypsáním seřaď prvky do seznamu, protože `pairs` žádné pořadí nemá.
+'''
+hints = [
+  "set[word] = true pro každý token sestaví množinu; duplicitní tofu je tentýž klíč zapsaný dvakrát.",
+  "Průnik je smyčka přes pairs(a), která nechá klíče, kde je b[key] true. Rozdíl nechá klíče, kde je nil. Sjednocení zapíše klíče obou množin do jedné tabulky.",
+  "#set je 0 pro tabulku jen s řetězcovými klíči. Zkopíruj klíče přes pairs do seznamu, seřaď ho přes table.sort a #list je počet a table.concat(list, \" \") je řádek.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.advanced.07.functions"
+title = "Za catty"
+story = "Každá cenovka na Wun Sha Street je za catty, pokud neříká jinak, a tiskárna cenovek u stánku s tyčinkami trvá na tom, aby jí to někdo řekl pokaždé."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<NAME> <CENTS>` nebo `<NAME> <CENTS> <UNIT>`.
+
+Napiš `tag(name, cents, unit)`, která vrací `<NAME> $<dollars>/<unit>` se dvěma desetinnými místy, kde chybějící `unit` znamená `catty`, a vypiš jednu cenovku na řádek.
+
+```
+input:  3
+        CHOISUM 1200
+        EGG 250 each
+        GARLIC 800
+output: CHOISUM $12.00/catty
+        EGG $2.50/each
+        GARLIC $8.00/catty
+```
+
+Lua nemá výchozí argumenty. Parametr, který volající vynechal, je `nil` a `tag` ve starteru ho spojuje do řetězce: `attempt to concatenate local 'unit' (a nil value)`. Idiom je první řádek funkce — `unit = unit or "catty"` — protože `or` vrátí svou levou stranu, pokud to není `nil` nebo `false`. To je celý mechanismus výchozích argumentů v Lua a patří ke smlouvě funkce stejně, jako by k ní patřil řádek `def`.
+
+Rozděl řádek na seznam tokenů a předej kusy přes `tag(unpack(parts))`, až převedeš centy. `unpack` rozloží seznam do argumentů, takže dvouprvkový i tříprvkový seznam se vejdou do jedné signatury.
+'''
+hints = [
+  "unit = unit or \"catty\" jako první řádek tag. To je celá oprava.",
+  "`x or default` je výchozí argument v Lua. Selže pro jednu hodnotu: když volající schválně předá false, or ho taky nahradí, a to je navazující otázka.",
+  "tag(unpack(parts)) rozloží seznam; se dvěma částmi je třetí parametr nil a or ho doplní.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.advanced.08.exceptions"
+title = "Řádek, který není číslo"
+story = "Váha u stánku s pomely tiskne sloupec vah a uprostřed je něčí telefonní číslo."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků. Každý řádek má být celé číslo.
+
+Pro každý řádek vypiš buď dvojnásobek hodnoty, nebo `BAD <line>`, pokud se nedá převést. Nakonec vypiš `SUM <total>`, kde total je součet hodnot, které jsi vypsal.
+
+```
+input:  3
+        21
+        xx
+        -4
+output: 42
+        BAD xx
+        -8
+        SUM 34
+```
+
+`tonumber("xx")` je potichu `nil`; `tonumber("1.5")` je `1.5`, což není celé číslo; a `double` ve starteru pro obojí vyhodí chybu přes `error`. `error` je způsob, jak funkce v Lua odmítne — žádný `Result` ani `(value, ok)` od samotné funkce není — a volající, který čekal číslo, musí říct, co s tím udělá, přes `pcall`: ten za tebe funkci zavolá a vrátí `true, result` nebo `false, message`, místo aby nechal chybu stoupat.
+
+Drž `pcall` kolem toho jednoho volání, které může selhat. Obalit celé tělo smyčky by spolklo i překlep ve tvém vlastním `print`, a tak se programy učí selhávat potichu.
+'''
+hints = [
+  "Starter umře na xx s main.lua:3: not an integer: xx. Tu zprávu ti pcall předá jako svůj druhý výsledek, místo aby spadl.",
+  "local ok, value = pcall(double, line) — pcall bere funkci a její argumenty zvlášť; pcall(double(line)) by nejdřív zavolalo double a spadlo, ještě než by pcall vůbec běžel.",
+  "Když je ok false, value je zpráva. Vypiš BAD a pokračuj; špatný řádek k součtu nic nepřidá.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.advanced.09.comprehensions"
+title = "Jedním průchodem po Wun Sha Street"
+story = "Alex říká, že to jde třemi smyčkami for. Ulička je široká na jednoho draka a tyčinky hoří; máš jeden průchod."
+brief = '''
+Standardní vstup je jeden řádek celých čísel oddělených mezerami.
+
+Vypiš tři řádky:
+
+1. součet sudých hodnot (`0`, pokud žádné nejsou)
+2. každou hodnotu větší než `10`, zdvojenou, v pořadí, spojené jednou mezerou —
+   nebo `-`, pokud žádné nejsou
+3. kolik je různých hodnot
+
+```
+input:  1 2 3 4 12 12 30
+output: 60
+        24 24 60
+        6
+```
+
+Lua nemá komprehenze; nejblíž je funkce, která sestaví tabulku z tabulky, a právě to tenhle uzel učí. Napiš `filter(list, keep)` a `map(list, f)` jednou — každá je smyčka, která plní novou tabulku — a z těch tří řádků se stanou volání: `sum(filter(nums, even))`, `map(filter(nums, big), double)` a množina sestavená z hodnot, spočítaná. Predikát a transformace jsou funkce předané jako argumenty, a to je přesně to `if` a ten výraz v komprehenzi.
+
+`table.concat` bere čísla stejně jako řetězce, takže druhý řádek převod nepotřebuje; potřebuje ale `-`, když je seznam prázdný, protože `table.concat({}, " ")` je prázdný řetězec.
+'''
+hints = [
+  "filter(nums, function(v) return v % 2 == 0 end) nechá sudé; jejich součet je první řádek.",
+  "map(filter(nums, big), double) — nejdřív filtruj, pak transformuj, stejně jako if vzadu a výraz vpředu v komprehenzi.",
+  "Množina je tabulka klíčovaná hodnotami; #set klíče nepočítá, smyčka přes pairs ano.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.advanced.10.dict-comprehensions"
+title = "Tentýž průchod, s klíči"
+story = "Ceny u stánku s tyčinkami jsou na útržcích červeného papíru v pořadí, v jakém se psaly. Teta je chce jako jednu tabuli a chce ji dvakrát."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<ITEM> <PRICE>`. `PRICE` je celý počet centů. Každá položka se objeví nejvýš jednou a `n` je aspoň `1` — vždycky je nějaká nejlevnější položka, kterou lze jmenovat.
+
+Vypiš tři řádky:
+
+1. každou položku s cenou **striktně nad 100** jako `ITEM=PRICE`, seřazené podle položky,
+   spojené jednou mezerou — nebo `-`, pokud žádné nejsou
+2. každou položku s cenou **napůl celočíselným dělením**, ve stejném formátu,
+   seřazené podle položky
+3. `CHEAPEST <item>` — nejnižší cena, shody rozhodne položka vzestupně
+
+```
+input:  3
+        LAI-SEE 120
+        CHOY 80
+        BOK-CHOY 250
+output: BOK-CHOY=250 LAI-SEE=120
+        BOK-CHOY=125 CHOY=40 LAI-SEE=60
+        CHEAPEST CHOY
+```
+
+Klíčovaná verze minulého uzlu. Lua nemá slovníkové komprehenze; nejblíž je `filter_pairs(t, keep)` a `map_values(t, f)`, každá je smyčka přes `pairs`, která plní novou tabulku týmiž klíči. První řádek nechá dvojice, kde je hodnota nad 100; druhý přetvoří každou hodnotu přes `math.floor(v / 2)` a nechá každý klíč. Ani jedno není komprehenze a obojí je jedna funkce, napsaná jednou.
+
+`pairs` nemá žádné pořadí, takže `sorted_keys(t)` — klíče v seznamu, seřazené — je třetí pomocník a každý vypsaný řádek jde přes něj. Pro nejlevnější projdi seřazené klíče a nech si první striktně nižší cenu: protože klíče přicházejí abecedně, první ze stejných cen je rozhodnutí shody.
+'''
+hints = [
+  "filter_pairs nechá klíč, když je keep(key, value) true; map_values zapíše f(value) pod každý klíč. Obě plní novou tabulku — nikdy nezapisuj do té, kterou procházíš.",
+  "sorted_keys(t) je jediný způsob, jak vypsat klíčovanou tabulku v pevném pořadí. Každý řádek tady jde přes něj, včetně nejlevnější.",
+  "Projdi seřazené klíče a nejlepší nahraď jen při striktně nižší ceně: první ze stejných cen je abecedně první, takže se shoda rozhodne sama.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.advanced.11.sorting"
+title = "Tabule s pořadím"
+story = "Dračí výbor každý večer vyvěsí nejlevnější tyčinky a úředník u Lin Fa Kung řadí stánky ručně, se dvěma seznamy a tužkou."
+brief = '''
+Dva řádky standardního vstupu: jména stánků na prvním, jejich ceny v centech na druhém, ve stejném pořadí. Aspoň jeden stánek tam je.
+
+Vypiš stánky seřazené od nejlevnějšího jako `<rank>. <NAME> <cents>`, s pořadím od `1` a shody rozhodne jméno vzestupně. Pak vypiš `CHEAPEST <NAME>`.
+
+```
+input:  LAM WONG CHAN
+        1200 900 1200
+output: 1. WONG 900
+        2. CHAN 1200
+        3. LAM 1200
+        CHEAPEST WONG
+```
+
+Spoj oba seznamy do jednoho seznamu záznamů — `{ name = ..., price = ... }` — pak ho seřaď přes `table.sort` s komparátorem, který řadí podle ceny a shodu rozhodne jménem, a `ipairs` výsledek očísluje. Komparátor je uzávěr; pro dva stejné záznamy musí vrátit `false`, jinak `table.sort` vyhodí `invalid order function for sorting`. Verze s holou indexovou smyčkou a bez řazení je ta, která rozhodnutí shody u třetího stánku pokazí.
+'''
+hints = [
+  "Jeden záznam na stánek, sestavený průchodem obou seznamů stejným indexem. Cenu převeď přes tonumber, jinak se 1200 jako řetězec seřadí před 900.",
+  "function(a, b) if a.price ~= b.price then return a.price < b.price end return a.name < b.name end — cena, pak jméno, a false pro stejné záznamy.",
+  "for rank, stall in ipairs(stalls) ti dá pořadí zadarmo, od 1.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.advanced.12.classes"
+title = "Sešit stánku"
+story = "Každý stánek na Wun Sha Street si vede vlastní sešit s nočními prodeji, a v tom od stánku s tyčinkami je každý řádek zapsaný ve společném sešitě na stole výboru."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<ITEM> <CENTS>`.
+
+Sestav třídu `Notebook`, která sbírá položky, pak vypiš každou položku zpátky jako `<ITEM> <CENTS>`, v pořadí, v jakém přišla, pak `TOTAL <sum>` a nakonec samotný sešit přes `print(book)` — jeho metametoda `__tostring` musí vytvořit `Notebook(items=<n>, total=<sum>)`.
+
+```
+input:  2
+        TOFU 600
+        SET 2800
+output: TOFU 600
+        SET 2800
+        TOTAL 3400
+        Notebook(items=2, total=3400)
+```
+
+`n` může být `0` a pak jsou řádky `TOTAL 0` a `Notebook(items=0, total=0)`.
+
+Třída v Lua je tabulka metod nastavená jako metatabulka každé instance, s `__index`, který ukazuje zpátky na ni samotnou: klíč, který instance nemá, se hledá ve třídě. Právě tohle hledání je chyba, po které je tenhle úkol pojmenovaný. Starter dá `items = {}` do **tabulky třídy**, takže `self.items` na kterémkoli sešitě propadne do jednoho seznamu, který sdílejí všechny sešity, a `PENCIL` z pomocného sešitu se objeví ve skutečném. Cokoli se vytvoří v `new` a uloží na instanci, patří instanci; cokoli je na třídě, patří každé instanci, která kdy bude.
+
+`print(book)` zavolá `tostring` a `tostring` hledá `__tostring` v metatabulce. Bez ní dostaneš `table: 0x...`, což je poslední řádek starteru.
+'''
+hints = [
+  "Spusť starter a podívej se na první řádek výstupu: PENCIL 0, ze sešitu, do kterého to nikdo nenapsal. To je ten sdílený seznam, nalezený přes __index.",
+  "setmetatable({ items = {} }, Notebook) — seznam se vytvoří pro každou instanci, v new, na tabulce, která se stane self.",
+  "print(book) zavolá tostring(book), které použije __tostring z metatabulky. Notebook je ta metatabulka, takže function Notebook:__tostring() je ta jedna metoda, kterou je třeba napsat. Ať vypadá jako volání konstruktoru, které by ji znovu sestavilo; taková je konvence.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.advanced.13.dataclasses"
+title = "Kdo kupuje"
+story = "Pult s rýží u Lin Fa Kung účtuje každému lístku plnou cenu, včetně těch, které nejsou dospělí, a toho jednoho, který není lístek."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<TYPE> <KG>`.
+
+Základní cena je `500 + 100 * KG` centů. Pro každý řádek vypiš jedno z:
+
+* `ADULT` — základní cena
+* `STUDENT` — polovina základní ceny, celočíselné dělení
+* `SENIOR` — vždy `200`
+* cokoli jiného — `UNKNOWN <TYPE>`
+
+```
+input:  3
+        ADULT 4
+        STUDENT 4
+        SENIOR 4
+output: 900
+        450
+        200
+```
+
+Namodeluj řádek jako záznam — `Order.new(kind, kg)` — a cenu rozhodni **jednou dispečerskou tabulkou**: tabulkou klíčovanou druhem, jejíž hodnoty jsou funkce, vyhledanou jednou, s propadnutím, když klíč neexistuje. Lua nemá `match`; tabulka větví klíčovaná tagem je to nejbližší, co má, a `arms[order.kind]`, které je `nil`, je případ zástupného znaku.
+
+Tabulka ve starteru má jednu větev a každý jiný druh — včetně těch tří, které má znát — propadne do `UNKNOWN`. Každá větev je funkce objednávky; každá vrací řetězec, protože `450` a `"450"` se vypíšou stejně a řádek `UNKNOWN` je text tak jako tak.
+'''
+hints = [
+  "Jedna položka na druh v ARMS: STUDENT = function(order) ... end a tak dál. Klíč je tag a hodnota je větev.",
+  "math.floor(x / 2) je celočíselné dělení; x / 2 by pro 900 dalo 450, ale pro 501 dalo 250.5, a test chce celé centy.",
+  "ARMS[order.kind] je nil pro druh bez větve a if propadne do UNKNOWN — stejná práce jako poslední větev match, udělaná tabulkou.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.advanced.14.generators"
+title = "Vlastní cyklus for"
+story = "Ticker u stánku s tyčinkami vypisuje každou cenu od té otevírací nahoru v pevných krocích a nikde si žádný jejich seznam nevede."
+brief = '''
+Standardní vstup jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš `ticker(start, step, count)` jako **korutinu** — `coroutine.wrap` kolem funkce, která přes yield vydá `count` hodnot od `start` a posouvá se o `step`. Každou vypiš na vlastní řádek, pak `SUM <total>`, spočítaný předáním druhého tickeru funkci `sum`.
+
+```
+input:  5 2 4
+output: 5
+        7
+        9
+        11
+        SUM 32
+        generator
+```
+
+Poslední řádek je to, jak `main` nazve věc, kterou `ticker` vrací — `list` pro tabulku, `generator` pro funkci, kterou vrátí `coroutine.wrap` — a vypíše ho `main` ve starteru tak, jak je. Teď říká `list`, o řádek poté, co `for value in ticker(...)` už selhalo s `attempt to call a table value`: obecný `for` volá svůj první operand a seznam se volat nedá.
+
+`coroutine.wrap(f)` nespustí `f`. Vrátí funkci a každé její volání spustí `f` až po další `coroutine.yield(value)` a tu hodnotu vrátí. Když `f` skončí, funkce nevrátí nic, `for` uvidí `nil` a zastaví se. Proto na tom `for` funguje, proto na tom funguje `sum` a proto to umí vyrobit milion hodnot, aniž by kdy existoval seznam milionu hodnot.
+
+Starter sestaví seznam a vrátí ho. Udělej z přidávání `yield` a seznam smaž.
+'''
+hints = [
+  "return coroutine.wrap(function() ... end) — tělo dělá yield; wrap z něj udělá funkci, kterou for umí zavolat.",
+  "coroutine.yield(value), pak se posuň. Tělo se u yield zastaví a při dalším volání pokračuje za ním.",
+  "Zabalenou korutinu jde spotřebovat jednou a volat ji po jejím skončení je chyba. Proto main na součet staví nový ticker, místo aby znovu použil ten, který smyčka vyčerpala.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.advanced.15.decorators"
+title = "Zabalené"
+story = "Dračí výbor chce vědět, kolikrát se dnes večer zavolala cenová funkce, a funkce nechce vědět, že ji někdo sleduje."
+brief = '''
+Standardní vstup je počet `n`, pak `n` vah v kg.
+
+`price(kg)` je `500 + 100 * kg`. Zabal ji do `counted` tak, aby se každé volání spočítalo, aniž by o tom `price` věděla. Vypiš jednu cenu na váhu, pak `CALLS <n>`, pak `NAME <price.name>` — které musí říkat `price`.
+
+```
+input:  3
+        1 2 3
+output: 600
+        700
+        800
+        CALLS 3
+        NAME price
+```
+
+Lua nemá dekorátory; nejblíž je funkce, která vezme funkci a vrátí na její místo něco volatelného, a právě to tenhle uzel učí. `price = counted(price, "price")` naváže jméno znovu na to, co `counted` vrátilo — přesně to, co udělá `@counted` nad `def`.
+
+Kde žije počet? Funkce v Lua nemůže nést pole, takže obal je **tabulka** — `{ calls = 0 }` — volatelná díky metametodě `__call`, která zvýší počet a zavolá originál. `price(kg)` pak jde přes `__call` a `price.calls` je obyčejné čtení pole.
+
+Funkce v Lua nemá ani vlastní jméno. Obalu se musí říct, za koho zaskakuje; starter mu to nikdy neřekne a poslední řádek říká `NAME wrapper`. To je `functools.wraps`, udělané ručně: identita zabalené věci, zkopírovaná na věc, která ji nahradila.
+'''
+hints = [
+  "price = counted(price, \"price\") — druhý argument je jméno, které obal nese. To je celá oprava.",
+  "price = counted(price) za funkcí je totéž co dekorátor nad ní: jméno se znovu naváže na cokoli, co counted vrátilo, a originál přežije jen jako upvalue func uvnitř uzávěru.",
+  "... v __call přepošle libovolné argumenty, aniž by je znal, a to dělá obal znovupoužitelným pro jakoukoli funkci.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.advanced.16.duck-typing"
+title = "Když to kváká"
+story = "Červená igelitka od stánku s vejci na School Street. Nikdo se neptal, co to je; ptali se, kolik jich v ní je, jestli jsou tam kachní vejce, a ať se projde jedno po druhém."
+brief = '''
+Standardní vstup je jeden řádek zboží odděleného mezerami, pak jeden řádek s jediným slovem, které se má hledat.
+
+Dej zboží do `Bag` a vypiš:
+
+1. `LEN <k>` — z `bag:len()`
+2. zboží, jedno na řádek — z `for item in bag:iter()`
+3. `HAS <WORD> YES` nebo `HAS <WORD> NO` — z `bag:has(word)`
+4. `LONGEST <item>` — z `longest(bag)`, při shodě to první
+
+```
+input:  egg duckegg tofu
+        duckegg
+output: LEN 3
+        egg
+        duckegg
+        tofu
+        HAS duckegg YES
+        LONGEST duckegg
+```
+
+`Bag` neobaluje žádný seznamový typ a nepotřebuje to. `bag:len()` je vyhledání klíče `len` v okamžiku volání, přes metatabulku, a zavolá se cokoli, co tam je. Lua se nikdy neptá, co věc *je*; ptá se, jestli tam klíč je, ve chvíli, kdy ho potřebuje. Starter nemá ani jednu z těch tří metod a první chyba je `attempt to call method 'len' (a nil value)`.
+
+`longest` je volná funkce, která vezme cokoli s `iter()` — nikdy nezmíní `Bag`. To je celá smlouva: jméno a volání. (LuaJIT u tabulek nerespektuje metametodu `__len`, takže délka je tu metoda, a ne `#bag`; `__index` je ta jediná metametoda, která dělá práci.)
+'''
+hints = [
+  "function Bag:len() return #self.goods end — tři metody a žádná není dlouhá.",
+  "iter vrátí uzávěr nad počítadlem: každé volání ho zvýší a vrátí self.goods[i], což je za koncem nil, a nil je to, co obecný for zastaví.",
+  "longest si nechá první z položek stejné délky, protože nahrazuje jen při striktně větší, a proto ukázka říká duckegg, a ne něco pozdějšího.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.advanced.17.none"
+title = "Tabule ve 20:59"
+story = "20:59 na Wun Sha Street, bubny ještě nezačaly. Cenová tabule se ptá sešitu na stánek, který ještě neotevřel, sešit odpoví ničím a tabule vytiskne cenu toho ničeho."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<STALL> <CENTS>` — stánky, které otevřely — pak počet `q` a `q` jmen stánků k vyhledání.
+
+Pro každý dotaz vypiš `<STALL> <cents>`, nebo `<STALL> NONE`, pokud ten stánek není otevřený. Pak vypiš `MISSING <k>` a `CHEAPEST <STALL>` — otevřený stánek s nejnižší cenou, shody podle jména — nebo `CHEAPEST NONE`, pokud nic otevřené není.
+
+```
+input:  2
+        LAM 1200
+        WONG 900
+        3
+        WONG
+        CHAN
+        LAM
+output: WONG 900
+        CHAN NONE
+        LAM 1200
+        MISSING 1
+        CHEAPEST WONG
+```
+
+Starter spadne na `CHAN`:
+
+```
+attempt to index local 'stall' (a nil value)
+```
+
+Ten řádek je boss tohohle úseku cesty. Nikdy neukazuje na chybu. Ukazuje na místo, kde se po `nil` konečně *šlo*, a to může být libovolně daleko od místa, kde *vzniklo* — a ve starteru vzniklo na dvou různých místech. `lookup` vrací `board[name]`, což je pro stánek, který tam není, záměrně `nil`, a volající z něj čte `.cents`, aniž by se ptal. A `cheapest` nemá na cestě ven žádný `return`, takže nevrací nic, což volající dostane jako `nil` a udělá s tím totéž.
+
+Klíč, který nikdo nezapsal, je `nil`. Funkce, která doběhne na konec, vrací `nil`. Ani jedno v tu chvíli není chyba; obojí se jí stane později. Oprava je v obou případech stejná: kód, který může dostat `nil`, to zkontroluje přes `== nil`, než do toho indexuje. (V Lua jsou nepravdivé jen `nil` a `false`, takže `if not stall` by tu bylo také správně — stánek s cenou `0` je pořád tabulka — ale `== nil` říká, co myslíš.)
+
+Ať `lookup` a `cheapest` vracejí stánek **nebo nil** záměrně, napiš to do komentáře a `nil` ošetři tam, kam dopadne.
+'''
+hints = [
+  "Přečti traceback: chyba je na printu, ale nil vyšlo z lookup o řádek dřív a z board[name] ještě předtím.",
+  "if stall == nil then je ta kontrola. Tabulka s cents = 0 není nil ani false; v Lua jsou nepravdivé jen nil a false.",
+  "cheapest projde tabuli a pak skončí bez return. Lua na to neupozorní; volající dostane nil a zjistí to později. Vrať best a prázdná tabule vrátí nil, protože best se nikdy nenastavilo.",
+  "pairs prochází tabuli v žádném pořadí, a proto musí porovnání shodu rozhodnout samo: nižší centy, pak nižší jméno, a nikdy nevěř tomu, který stánek přišel první.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.advanced.01.threads"
+title = "Dvanáct běžců, jedna ulička"
+story = "21:00 na Wun Sha Street. Dvanáct běžců s tyčinkami se najednou chopí svých článků a pořadatel, který sbírá počty, přečte tabuli dřív, než na ni kterýkoli z nich napsal."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Vytvoř jednu **korutinu** na každou hodnotu, která spočítá její druhou mocninu a uloží ji do `results[i]` — na vlastní místo, takže žádní dva běžci nezapisují na stejné místo. Obnov každou z nich, pak vypiš výsledky **v pořadí indexů**, jeden na řádek, pak `THREADS <n>`.
+
+```
+input:  3
+        2 3 4
+output: 4
+        9
+        16
+        THREADS 3
+```
+
+Lua nemá vlákna; má korutiny a `type(co)` pro kteroukoli z nich je řetězec `thread`, což je počet na posledním řádku. `coroutine.create(f)` nespustí `f`. `coroutine.resume(co, ...)` ho spustí, přičemž argumenty se při **prvním** obnovení stanou parametry `f`, dokud neudělá yield nebo neskončí — a `square` nikdy yield nedělá, takže jedno obnovení je celá práce. Výsledek se musí zapsat někam, kde ho `main` potom přečte; tabulka s místem pro každého běžce je nejjednodušší takové místo.
+
+Běžci ve starteru všichni spadnou v okamžiku, kdy začnou, a program přesto doběhne a vypíše. `coroutine.resume(co)` bez argumentů zavolá `square(nil, nil)`, aritmetika s `nil` dopadne uvnitř korutiny a `resume` to ohlásí jako návratovou hodnotu — `false` a zprávu — kterou starter zahodí. `results` zůstane prázdné a každý řádek říká `nil`. Korutina, která umře, vezme s sebou jen sebe — čti druhý výsledek `resume`, jinak se to nikdy nedozvíš.
+'''
+hints = [
+  "coroutine.resume(co, i, nums[i]) — argumenty prvního obnovení jsou to, co square dostane, a starter nepředává žádné.",
+  "resume vrací ok, ... — false a chybovou zprávu, když korutina umřela. Zkontroluj to; běžci ve starteru všichni potichu umřeli na `value * value` s value rovným nil.",
+  "results je upvalue funkce square: vnořená funkce vidí tutéž tabulku, kterou vidí main, a proto jsou zápisy potom vidět.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.advanced.02.lock"
+title = "Jedna zásuvka, osm rukou"
+story = "Každý stánek v uličce platí do jedné pokladní zásuvky na stole výboru a na konci běhu je v zásuvce peněz za jeden stánek a každý stánek přísahá, že zaplatil."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Vytvoř jednu korutinu na každou hodnotu, která ji přičte k **jednomu sdílenému součtu** a zvýší sdílený počet zásahů, a všechny je střídavě pouštěj dokola — každý běžec dostane tah, dokud nejsou všichni mrtví. Pak vypiš `TOTAL <sum>` a `HITS <n>`.
+
+```
+input:  4
+        1 2 3 4
+output: TOTAL 10
+        HITS 4
+```
+
+Starter na ukázce deterministicky vypíše `TOTAL 4`. Každý běžec přečte zásuvku, udělá **yield** a pak zapíše zpátky, co přečetl, plus svou hodnotu. Než první zapíše, všichni čtyři přečetli `0` a vyhraje poslední zápis: peníze jednoho stánku a čtyři zásahy. To je ztracená aktualizace a stala se na jednom vlákně, bez zámku v jazyce, na který by šlo zapomenout.
+
+V Lua není žádný `Lock`, protože tu není preempce. Korutina běží, dokud neřekne `coroutine.yield()`, a nic jiného mezitím neběží. Kritická sekce je jakýkoli úsek kódu bez yield a chyba je yield mezi čtením a zápisem. Přesuň yield z prostředka — nejdřív počkej na slovo, pak čti, přičti a zapiš v jednom úseku — a zásuvka sedí. Když aktualizace opravdu musí uprostřed udělat yield (třeba čeká na socket), zámek je příznak: `while busy do coroutine.yield() end`, nastav ho, pracuj, zruš ho. To je mutex, vypsaný celý.
+
+Plánovač je napsaný v programu: smyčka přes běžce, která obnoví každého, kdo není `dead`, dokud celé kolo nenajde nikoho živého.
+'''
+hints = [
+  "Spusť starter: TOTAL 4, HITS 4. Čtyři běžci přečtou 0, udělají yield a každý zapíše 0 plus svou hodnotu. Poslední zápis je součet.",
+  "total = total + value bez yield mezi čtením a zápisem. Yield může v pay zůstat; jen nesmí sedět uprostřed aktualizace.",
+  "Nepiš local total = total + value: to udělá novou lokální proměnnou, která zastíní upvalue, a vnější total se nepohne. Uzávěr sdílí proměnnou, jen když do ní přiřazuješ.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.advanced.03.queue"
+title = "Kdo zavře okénko"
+story = "Stánek s knedlíčky na Ormsby Street podává každou objednávku okénkem do kuchyně a po poslední tam pult stojí a čeká na další, která nikdy nepřijde."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Jedna producentská korutina dává každou hodnotu vynásobenou deseti do fronty, po každé udělá yield, a pak do ní dá **zarážku**. Hlavní smyčka bere z fronty, dokud neuvidí zarážku, vypisuje každou hodnotu a drží součet, pak vypíše `SUM <total>` a `CLOSED`.
+
+```
+input:  3
+        1 2 3
+output: 10
+        20
+        30
+        SUM 60
+        CLOSED
+```
+
+Fronta je tabulka se začátkem a koncem a tabulka nemá žádné `close`. Nic na ní neumí konzumentovi říct, že už nic nepřijde; to musí být položka. A ta položka nemůže být `nil`, protože `nil` v tabulce je nepřítomnost položky. Zarážka je hodnota sama pro sebe — `local CLOSED = {}`, tabulka, kterou nikdo jiný nedrží — a `value == CLOSED` je pravda jen pro tu jednu tabulku, protože `==` na tabulkách je identita.
+
+Starter ji nikdy nevloží. `take` obnovuje kuchyni, dokud ve frontě něco není, a když je kuchyně mrtvá a fronta prázdná, vzdá to a vrátí `nil`; smyčka vypíše slovo `nil`, pak ho přičte k součtu a umře. V jazyce s blokujícími frontami by to bylo zaseknutí. V Lua je to `nil`, po kterém se šlo.
+
+Zarážku vkládá producent. Nikdy konzument — strana, která ví, že proud skončil, je ta, která ho ukončí.
+'''
+hints = [
+  "Jeden řádek, na konci funkce kuchyně: push(hatch, CLOSED).",
+  "Konzument už kontroluje value == CLOSED. Čekal na něco, co producent nikdy neposlal, a dostal místo toho nil.",
+  "Zarážka je nová tabulka, protože nil se do tabulky uložit nedá a protože tabulka se rovná jen sama sobě. I kdyby hodnoty mohly být tabulky, zarážka je pořád bezpečná: tuhle nikdo jiný mít nemůže.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.advanced.04.thread-pool"
+title = "Osm nosičů"
+story = "Čtyřicet beden tyčinek na konci Lily Street a osm nosičů. Nikdo nechce čtyřicet nosičů; chtějí, aby těch osm nikdy nestálo."
+brief = '''
+Standardní vstup jsou dvě celá čísla `w` a `n`, pak `n` hodnot.
+
+Pusť **pool** `w` nosičů: nejvýš `w` korutin rozběhnutých najednou, každá nese jednu práci, která cestou jednou udělá yield a pak vrátí `(index, value * value)`. Sbírej výsledky tak, jak práce **končí**, seřaď podle indexu, vypiš `<index> <value>` jeden na řádek, pak `WORKERS <w>`.
+
+```
+input:  2 3
+        2 3 4
+output: 0 4
+        1 9
+        2 16
+        WORKERS 2
+```
+
+Korutina není výsledek. `coroutine.resume(co)` vrátí `true` a pak cokoli, co práce předala přes yield nebo vrátila — to jsou jediné dveře, kterými hodnota vyjde, a otevřou se při obnovení, které práci dokončí, a to je to kolo poolu, na které to zrovna padne. Starter sbírá samotné dokončené korutiny — hodnoty `thread: 0x...` — a řazení se do jedné zkusí indexovat.
+
+Nést index ve výsledku je to, co dělá výstup při každém běhu stejný; řazení podle něj je poslední řádek odpovědi, ne první. Pool je plánovač z úkolu se zásuvkou s horní mezí: doplň na `w` běžících, dej každému jeden tah, vyřaď mrtvé, opakuj, dokud nejsou prázdné práce i běžící.
+'''
+hints = [
+  "Starter umře v řazení nebo v printu: attempt to index local 'a' (a thread value). Korutina je ta práce, ne její odpověď.",
+  "local ok, index, value = coroutine.resume(co) — při obnovení, které práci dožene k jejímu return, následují vrácené hodnoty za ok. Nech si { index, value }, když je status dead.",
+  "Pool dokončuje práce ve vlastním pořadí a index ve výsledku je jediný záznam o tom, odkud která přišla. Před vypsáním podle něj seřaď.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.advanced.05.asyncio"
+title = "Kde async doopravdy běží"
+story = "Mei píše asynchronní kód čtyři roky a ještě ani jednou neviděla, co ho pohání. Dnes večer je ta smyčka cyklus while, který umí přečíst, a každý běžec v uličce se na ní střídá."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Napiš `double(value)` tak, aby jednou předala řízení plánovači — `coroutine.yield()` — a vrátila hodnotu zdvojenou. Udělej jednu korutinu na každou hodnotu, pusť je všechny přes `gather`, vypiš každý výsledek v pořadí vstupu, pak `SUM <total>` a `TASKS <n>`.
+
+```
+input:  3
+        1 2 3
+output: 2
+        4
+        6
+        SUM 12
+        TASKS 3
+```
+
+`coroutine.create(f)` nespustí `f`. Sestaví **objekt korutiny** a vrátí ho a uvnitř se nic nestane, dokud ho něco neobnoví. `run` ve starteru jich vrátí tři, neobnovené, a výstup jsou tři řádky `thread: 0x...` a za nimi `attempt to perform arithmetic on a thread value`.
+
+`gather` je smyčka událostí a tady ji napíšeš ty: `while` přes úlohy, který obnoví každou, která není mrtvá, popořadě, kolo za kolem, dokud žádná nezbude, a návratovou hodnotu **každé úlohy** si nechá na místě té úlohy. Výsledky vyjdou v pořadí, v jakém jsi úlohy předal, ať skončily v jakémkoli pořadí. To je celý důvod sáhnout po ní místo smyčky, která jednu úlohu obnovuje až do smrti, než se dotkne další: ta smyčka by byla správná a sekvenční, `gather` je správný a prokládaný.
+
+Je tu přesně jedno vlákno. `coroutine.yield()` je místo, kde úloha vrátí vlákno smyčce, aby ho mohla použít jiná. Nic neběží paralelně; věci běží **po řadě**, na místech, kde řekly, že se můžou zastavit.
+'''
+hints = [
+  "return gather(tasks) místo return tasks — a gather je smyčka, kterou napíšeš: obnovuj každou úlohu, která není mrtvá, znovu a znovu, dokud žádná nezbude.",
+  "Obnovení, po kterém je úloha mrtvá, je to, jehož druhá návratová hodnota je návratová hodnota úlohy. Ulož ji na vlastní index úlohy; to drží výsledky v pořadí vstupu.",
+  "Kdybys potřeboval výsledky tak, jak končí, to je pool z minulého úkolu, a pak si index neseš sám.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.advanced.06.async-queue"
+title = "Kdo řekne, že je hotovo"
+story = "Tři běžci vyřizují frontu lístků u lampionové brány ve Victoria Park a pořadatel čeká, až fronta řekne, že je prázdná. Nikdy to neřekne, protože jí nikdo neřekl, že je lístek hotový."
+brief = '''
+Standardní vstup jsou dvě celá čísla `w` a `n`, pak `n` hodnot.
+
+Dávej práce `{ index, value }` do fronty, která počítá, co čeká. Spusť `w` konzumentských korutin, které donekonečna berou práci, zapisují `value * 10` do `results[index]` a volají `task_done`. Hlavní funkce spustí `join` — plánovač, který obnovuje konzumenty, dokud každé `put` nedostalo svůj `task_done` — pak konzumenty zruší, pak vypíše výsledky v pořadí indexů a `CONSUMERS <w>`.
+
+```
+input:  3 4
+        1 2 3 4
+output: 10
+        20
+        30
+        40
+        CONSUMERS 3
+```
+
+`join` se vrátí, když je počet čekajících `0`, a snižuje ho jen `task_done`. Konzumenti ve starteru ho nikdy nezavolají, takže každá práce je vyřízená a počet pořád říká `4`, každý konzument stojí v `get` nad prázdnou frontou a nezbylo nic, co by mohlo cokoli změnit. Smyčka bez detektoru by se tam točila, dokud by běhové prostředí program nezabilo. Tahle to pozná: celé kolo, ve kterém žádný konzument počet nesnížil, je deadlock, a `join` to řekne přes `error`. Stejné zaseknutí jako v úkolu s okénkem, jinak napsané — a oprava je zase jeden řádek, na straně konzumenta.
+
+Konzumenti jsou smyčky `while true`. Skončí, protože je main po join zruší, a zrušit tady znamená **obnovit se signálem**: `get` dělá yield, dokud je fronta prázdná, a když obnovení, které ho probudí, předá `"cancel"`, `get` vrátí `nil` a konzument skončí. Korutina zaparkovaná na yield se zastaví hodnotou, se kterou se probudí.
+'''
+hints = [
+  "task_done(queue) po vyřízení každé práce. join počítá puty proti task_done a nic jiného.",
+  "coroutine.create nic neplánuje; konzument poběží poprvé, když ho join obnoví, a konzument, který najde frontu prázdnou, udělá zevnitř get yield \"idle\".",
+  "Konzument probuzený s \"cancel\" dostane z get nil a skončí, čímž skončí i while true. Obnovit ho s ničím by ho jen znovu zaparkovalo.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.advanced.07.context-managers"
+title = "Roleta stejně spadne"
+story = "Stánek na Wun Sha Street otevírá roletu pro každou objednávku a pak ji zavře. Ten, který v 21:40 dostal špatnou objednávku, má otevřeno od té doby, protože zavírací řádek byl za řádkem, který selhal."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<STALL> <CENTS>`, kde `CENTS` má být celé číslo.
+
+Napiš `opened(stall, body)` — funkci, která bere blok jako funkci — která při vstupu vypíše `OPEN <STALL>`, spustí `body` a při výstupu vypíše `SHUT <STALL>`, **ať tělo vyhodilo chybu, nebo ne**. Uvnitř těla převeď centy a přičti je k součtu. Řádek, jehož centy se převést nedají, se ohlásí jako `BAD <STALL>` až po zavření rolety. Nakonec vypiš `TOTAL <sum>` a `REJECTED <k>`.
+
+```
+input:  3
+        LAM 1200
+        WONG xx
+        CHAN 800
+output: OPEN LAM
+        SHUT LAM
+        OPEN WONG
+        SHUT WONG
+        BAD WONG
+        OPEN CHAN
+        SHUT CHAN
+        TOTAL 2000
+        REJECTED 1
+```
+
+Lua nemá `with` ani `finally`; nejblíž je funkce, která bere tělo jako uzávěr, a `pcall` kolem volání. Všechno před `pcall` je vstup, všechno za ním je výstup a výstup proběhne na obou cestách, protože `pcall` udělá z chyby návratovou hodnotu, místo aby ji nechal vystoupat za `SHUT`. Starter volá `body()` holé a roleta u `WONG` se nikdy nezavře.
+
+Až je roleta dole, chyba jde zpátky nahoru: `error(err, 0)` ji vyhodí znovu — `0` brání `error`, aby ke zprávě přidal druhou pozici — a vlastní `pcall` volajícího ji uvidí a vypíše `BAD`. Nepolykej ji v `opened`: volající to chce vědět.
+'''
+hints = [
+  "local ok, err = pcall(body), pak print(SHUT), pak if not ok then error(err, 0) end. Ten pcall je finally.",
+  "Chyba projde přes opened ven do pcall v main, takže BAD z main se pořád vypíše — po SHUT, protože SHUT se vypsalo před opětovným vyhozením.",
+  "total = total + parse_cents(cents) vyhodnotí nejdřív pravou stranu; když parse_cents vyhodí chybu, nic se nepřiřadí, takže špatný řádek nic nepřidá.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.advanced.08.pipeline"
+title = "Kuchař na lince"
+story = "Linka šéfkuchaře Bo u stánku s knedlíčky v Tai Hang: jedna stanice objednávku umocní, další drží průběžný počet a nikdo nečeká na celou várku."
+brief = '''
+Standardní vstup je počet `n` a pak `n` celých čísel.
+
+Sestav dvoustupňovou pipeline z **korutinových iterátorů**:
+
+1. `squares(values)` přes yield vydá každou hodnotu na druhou
+2. `running(stream)` vezme jakýkoli iterátor čísel, drží průběžný součet
+   a přes yield vydává dvojice `value, total`
+
+`main` vypíše každou dvojici jako `<square> <total>`, pak `PIPE <n>`.
+
+```
+input:  3
+        1 2 3
+output: 1 1
+        4 5
+        9 14
+        PIPE 3
+```
+
+Ani jeden stupeň nestaví seznam. Každý `coroutine.yield` předá jednu položku dalšímu stupni a zastaví se; `main` tahá, `running` tahá ze `squares`, `squares` tahá ze vstupu. Nic se nespočítá dřív, než je to potřeba, a celá pipeline má na cestě jednu položku. Díky tomu tytéž tři funkce fungují i na souboru o sto milionech řádků.
+
+Druhý stupeň ve starteru má `return` tam, kde měl mít `yield`, takže je to obyčejná funkce, která vrátí konečný součet — číslo — a `for` v `main` se ho pokusí zavolat: `attempt to call a number value`.
+'''
+hints = [
+  "Chyba je attempt to call a number value — running vrátilo součet místo iterátoru, který by for mohl volat.",
+  "Zabal smyčku do coroutine.wrap a uvnitř dej coroutine.yield(value, total). Yield umí nést několik hodnot a for je dostane jako své několik proměnných.",
+  "running(squares(nums)) se skládá, protože zabalená korutina je funkce, kterou for umí zavolat; running nikdy neví a nezajímá ho, že jeho vstup je jiná korutina.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.advanced.09.itertools"
+title = "Nářadí na polici"
+story = "Stůl výboru u Lin Fa Kung má polici s nářadím, kterou nikdo neotvírá, a úředník každý večer ručně počítá běhy stejných lístků."
+brief = '''
+Standardní vstup je jeden řádek celých čísel.
+
+Vypiš tři řádky, každý sestavený tabulkou `tools` na začátku programu a ničím ručně dělaným:
+
+1. `SUMS` a za ním průběžné součty — `tools.accumulate`
+2. `RUNS` a za ním každý běh **sousedních** stejných hodnot jako `<v>x<k>` —
+   `tools.groupby`
+3. `PAIRS <k>`: kolik je neuspořádaných dvojic **různých** hodnot —
+   `tools.combinations` přes seřazené různé hodnoty
+
+```
+input:  1 1 2 1 1 3
+output: SUMS 1 2 4 5 6 9
+        RUNS 1x2 2x1 1x2 3x1
+        PAIRS 3
+```
+
+Lua nemá `itertools`; modul je tabulka funkcí a `tools` je jeden napsaný na začátku souboru místo načtení přes `require`. Jeho tři funkce už tam jsou — police, kterou nikdo neotvírá — a každá vrací korutinový iterátor, takže jdou rovnou do `for`.
+
+`groupby` seskupuje jen **sousední** stejné položky. Není to počítadlo a ukázka je vybraná tak, aby se ty dva neshodly: `1` se objeví čtyřikrát, ve dvou bězích. Starter pro druhý řádek používá tabulku počtů a na přesně tomhle vstupu se mýlí — a počty vypíše v pořadí `pairs`, což není žádné pořadí.
+
+Každý iterátor je líný: `accumulate` vydá jeden průběžný součet na každé vytažení a `groupby` vydá hodnotu a její běh jako seznam, takže `#run` je délka. Iterátor posbírej do seznamu, když potřebuješ `table.concat`; spočítej ho smyčkou, když potřebuješ jen kolik.
+'''
+hints = [
+  "tools.accumulate(nums) vydá průběžný součet po každém prvku; posbírej ho do seznamu pro table.concat.",
+  "for value, run in tools.groupby(nums) do — run je seznam členů toho běhu a #run je jeho délka.",
+  "tools.combinations(distinct, 2) vydá každou neuspořádanou dvojici jednou. Jejich počet je n*(n-1)/2 a ruční kontrola je způsob, jak poznat, že máš správné n.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.advanced.10.functools"
+title = "Pamatuj si, co jsi spočítal"
+story = "Stánek s tyčinkami počítá tutéž noční cenu ze stejných dvou čísel jedenáct tisíckrát, než drak projde, pokaždé od začátku."
+brief = '''
+Standardní vstup je `n k bits`: dvě celá čísla a řetězec binárních číslic.
+
+Vypiš čtyři řádky:
+
+1. `FIB <fib(n)>` — z **rekurzivní** `fib`, zabalené do `memoize`
+2. `PRODUCT <k!>` — `reduce` s násobením přes `1..k`, s počáteční
+   hodnotou, aby `k = 0` dalo `1`
+3. `BIN <value>` — `bits` převedené přes `partial` parseru, který bere základ,
+   se základem navázaným na `2`
+4. `MISSES <m>` — `fib.misses`, kolikrát rekurze doopravdy spustila tělo
+
+```
+input:  10 5 1010
+output: FIB 55
+        PRODUCT 120
+        BIN 10
+        MISSES 11
+```
+
+`n` je nejvýš `400`, což pro zásobník LuaJIT nic není. Bez cache je `fib(35)` asi třicet milionů volání a `fib(90)` nedoběhne. S ní se každé `fib(i)` spustí jednou a `MISSES` je `n + 1`. `memoize` je obal z úkolu Zabalené s cache v uzávěru: volatelná tabulka, takže `fib.misses` je pole, a `fib = memoize(function ... end)`, aby i rekurze uvnitř šla přes cache. `fib` ve starteru je obyčejná funkce a jeho poslední řádek umře na `fib.misses`.
+
+`fib(90)` a `20!` jsou za 2^53 a číslo v Lua je double: za tou hranicí se číslice potichu ztrácejí. Starter nese `big`, číslo jako seznam dílů se základem 10^7, s `add`, `mul_small` a `tostring`; `fib` sčítá bigy a součin jeden násobí malým číslem. `partial` zmrazí několik úvodních argumentů funkce a dá ti novou; `reduce` složí dvouargumentovou funkci přes iterátor. Ani jedno není chytré. Na obojí se ptají.
+'''
+hints = [
+  "local fib; fib = memoize(function(n) ... end) — nejdřív deklaruj jméno, aby fib uvnitř těla bylo upvalue, které nakonec drží obal. Starter umře na posledním řádku, protože obyčejná funkce nemá pole misses.",
+  "reduce(big.mul_small, range(1, k), big.from(1)) — třetí argument je počáteční hodnota a díky ní dá prázdný rozsah 1.",
+  "partial(parse, 2) vrátí funkci, která základ dodá sama a bere text. unpack(bound, 1, count) dá navázané argumenty na začátek; select(\"#\", ...) je spočítá, i když je jeden z nich nil.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.advanced.11.protocol"
+title = "Stačí, když se vykreslí"
+story = "Adresář lampionů ve Victoria Park vypisuje stánky a přepážky, sestavené dvěma různými programy, a tabule chce vědět jen to, že každý z nich umí nakreslit sám sebe."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků, každý buď
+
+* `STALL <NAME> <AISLE>` — vykreslí se jako `<NAME> / A<AISLE>`
+* `COUNTER <NUMBER>` — vykreslí se jako `COUNTER <NUMBER>`
+
+Deklaruj protokol `Sign` jako seznam jmen metod — `{ "render" }` — a `implements(object, protocol)`, které je pravda, když má objekt pod každým z nich funkci. Napiš `Stall` a `Counter` jako obyčejné třídy — **bez zmínky o `Sign`** — a jedinou funkci `show(sign)`, která vypíše vykreslení. Vypiš každou ceduli, pak `SIGNS <n>` spočítané přes `implements(x, Sign)`, pak `STALLS <k>` spočítané přes `is_a(x, Stall)`, které porovnává metatabulky.
+
+```
+input:  3
+        STALL LAM 4
+        COUNTER 2
+        STALL WONG 1
+output: LAM / A4
+        COUNTER 2
+        WONG / A1
+        SIGNS 3
+        STALLS 2
+```
+
+Protokol je **strukturální** typ: třída ho splní tím, že má ty metody, ne tím, že to řekne. Lua na to nemá jméno, protože je to jediný druh typu, který Lua má. Kontrola je vyhledání podle jména, za běhu, a musí to být **totéž vyhledání, které dělá volání**: `object[name]`, které jde přes `__index` do třídy, kde metody žijí. Starter kontroluje přes `rawget`, který se dívá jen do samotné instance, nenajde `render` na žádné z nich a ohlásí `SIGNS 0`.
+
+`show` rozesílá za běhu přes to vyhledání — `sign:render()` najde to `render`, které má řetěz metatabulek. Žádné statické rozeslání, které by šlo zvolit místo toho, není; Lua má jeden mechanismus a tohle je on.
+'''
+hints = [
+  "object[name] místo rawget(object, name). To je celá oprava: rawget přeskočí metatabulku a metody jsou na třídě za __index.",
+  "Stall ani Counter nikde nezmiňují Sign. Splňují ho tím, že mají render(); to znamená strukturální.",
+  "implements kontroluje, že pod jménem existuje funkce, ne její aritu ani co vrací. Nic v Lua tohle nikdy nekontroluje; zjistí to volání.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.advanced.12.frozen"
+title = "Nemění se"
+story = "Tištěný ceník na noc dostane každý stánek v 18:00 a do 21:30 do něj tři z nich napsaly a jeden přidal sloupec, který tam není."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<NAME> <CENTS>`.
+
+Z každého řádku sestav **zmrazený** záznam `Price.new(name, cents)`. Pak pro každou cenu zkus přepsat její `cents` a vypiš `FROZEN <NAME>`, když pokus vyhodí chybu. Dál třída `Tally` s jedním deklarovaným slotem, `count`: nastav `tally.count`, pak zkus nastavit překlepnuté `tally.cuont` a vypiš `SLOTS YES`, když chybu vyhodí *tohle*. Nakonec `IN_SET <k>`, velikost množiny cen klíčované **hodnotou**, a `TOTAL <sum>`.
+
+```
+input:  3
+        LAM 1200
+        WONG 900
+        LAM 1200
+output: FROZEN LAM
+        FROZEN WONG
+        FROZEN LAM
+        SLOTS YES
+        IN_SET 2
+        TOTAL 3300
+```
+
+Tabulka v Lua je zapisovatelná, vždycky; zmrazit ji je trik s metatabulkou. Drž pole v tabulce, kterou volající nikdy neuvidí, a vrať **prázdnou proxy**, jejíž `__index` jsou ta pole — každé čtení propadne — a jejíž `__newindex` vyhodí chybu: každý zápis do klíče, který proxy nemá, jde tam, a proxy nemá žádný. `pcall` kolem přiřazení je způsob, jak pokus udělat a neumřít.
+
+Množina je druhá polovina. Tabulky jsou klíči **podle identity**: dva záznamy se stejnými poli jsou dva klíče a `IN_SET` ve starteru říká `3`. Zmrazený záznam může zastupovat svou hodnotu, jen když se klíč udělá z polí — `price:key()` — a to je bezpečné právě proto, že se pole pod ním nemůžou změnit.
+
+Slot třídy `Tally` je zase `__newindex`, který povolí jen deklarovaná jména: `rawset` pro `count`, chyba pro cokoli jiného. Překlep ve jménu atributu se stane chybou při přiřazení místo tichého nového pole, které nikdo nečte.
+'''
+hints = [
+  "Price.new vrátí prázdnou tabulku, jejíž metatabulka má __index = pole a __newindex, který vyhodí chybu. Čtení propadne; zápisy nemají kam dopadnout, jen do metametody.",
+  "Klíčuj množinu přes price:key(), řetězec sestavený z polí. Samotná tabulka je klíčem jen sama sobě.",
+  "TOTAL je součet původních centů, což platí jen proto, že přiřazení selhala. Ve starteru je v tu chvíli každá cena 0 a TOTAL je 0 — mutace nebyla jen povolená, ona proběhla.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.advanced.13.exceptions"
+title = "Vlastní chyba"
+story = "Čtyři vrstvy cenotvorby u pultu s rýží vyhazují každá něco svého a přední část pultu jednu z nich chytí a ty ostatní ji položí."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků, každý má být váha v kg.
+
+Definuj hierarchii chyb z **tabulek**: `PriceError` jako základ, s `NotANumber` a `Negative` vyrobenými z něj přes `class(PriceError)`. `Negative` nese váhu a jeho zpráva je `negative weight: <kg>`; zpráva `NotANumber` je `not a number`. `price(text)` převede text, vyhodí `NotANumber` se selháním převodu uloženým jako jeho `cause`, odmítne zápornou váhu a jinak vrátí `500 + 100 * kg`.
+
+Vypiš každou cenu nebo zprávu chyby, pak `ERRORS <k>`. Chytej **základní třídu**, jednou, přes `is_a`.
+
+```
+input:  3
+        4
+        xx
+        -2
+output: 900
+        not a number
+        negative weight: -2
+        ERRORS 2
+```
+
+`error` vyhodí jakoukoli hodnotu a tabulka je ta, která umí nést zprávu, příčinu a třídu. Třída je její metatabulka; `is_a(err, cls)` od ní prochází odkazy `parent` nahoru a jediné `if is_a(err, PriceError)` chytí každého člena hierarchie. Starter chytá `Negative` a nic jiného, takže řádek `xx` položí program nechycenou tabulkou: `(error object is not a string)`.
+
+`print(err)` vypíše `tostring(err)` a `tostring` hledá `__tostring` **přímo v metatabulce** — metametody se přes řetězy `__index` nenacházejí — takže `class` ji musí dát na každou třídu, kterou vyrobí. `cause` je řetězec, který `pcall` vrátil z nepovedeného převodu; nic tady ho nevypisuje a debugger by ukázal obojí, jedno nad druhým. Ten řetěz je důvod si ho nechat.
+'''
+hints = [
+  "elseif is_a(result, PriceError) then — základní třída chytí obě podtřídy, a právě proto základní třídu máš.",
+  "print(result) vypíše tostring(result), což je __tostring na vlastní třídě chyby. Žádné formátování v handleru není potřeba.",
+  "Když testuješ několik tříd, záleží na pořadí: test podtřídy za testem její základní třídy je mrtvý kód a Lua tě neupozorní. Co nepoznáváš, vyhoď znovu — error(result, 0) — místo abys to spolkl.",
+]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "lua.advanced.14.iterator"
+title = "Další, dokud to nezastaví"
+story = "Automat na lístky u lampionové brány ve Victoria Park vydává čísla od začátku v pevných krocích a žádný jejich seznam si nevede, a tabule fronty přes něj chce smyčkovat jako přes jakýkoli seznam."
+brief = '''
+Standardní vstup jsou tři celá čísla: `start`, `step`, `count`.
+
+Napiš třídu `Tickets`, která implementuje **iterátorový protokol ručně**: `next` vrátí další hodnotu, nebo `nil`, když už bylo vydáno `count` hodnot, a `iter` vrátí to, co potřebuje obecný `for`. Vypiš každou hodnotu na vlastní řádek, pak `SUM <total>`, spočítaný předáním druhého `Tickets` funkci `sum`.
+
+```
+input:  2 3 5
+output: 2
+        5
+        8
+        11
+        14
+        SUM 40
+```
+
+Tohle za tebe píše `coroutine.wrap`. Obecný `for` bere tři věci — funkci `f`, stav `s` a řídicí hodnotu — a před každým kolem zavolá `f(s, control)` a zastaví se, když je první výsledek `nil`. `Tickets.next` už má ten tvar: jeho `self` je stav a jeho druhý parametr je řídicí hodnota, kterou může ignorovat. Takže `iter` je jeden řádek: `return Tickets.next, self`. `sum`, `collect` i `for` tančí stejný tanec a žádnému z nich nezáleží na tom, co je stav.
+
+Starter má `next` a žádné `iter` a `for` říká `attempt to call method 'iter' (a nil value)`. `nil` z `next` je tady `StopIteration`; proto lístek nikdy nemůže být `nil` a proto je `0` úplně v pořádku lístek — `0` není `nil`.
+
+`iter`, které vrací `self` jako stav, je znak **iterátoru**: dá se projít jednou a pak je vyčerpaný. **Kontejner** vrací z `iter` pokaždé nový stav a dá se procházet opakovaně; `Bag` z dřívější části téhle cesty byl kontejner. Řekni, co píšeš; rozdíl se ukáže, až bude někdo smyčkovat podruhé.
+'''
+hints = [
+  "function Tickets:iter() return Tickets.next, self end. Dvě hodnoty a for začne fungovat.",
+  "nil se vrací, ne vyhazuje. Smyčka for se na něm zastaví; nikdy ho neuvidíš. Než se posuneš, ulož hodnotu, kterou se chystáš vrátit, jinak jsi o krok vedle.",
+  "for value in obj:iter() je for value in Tickets.next, obj — volání metody jen vyrobí tu dvojici. Vrátit uzávěr nad self by fungovalo taky; dvojice je protokol bez funkce navíc.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "lua.advanced.15.collections"
+title = "Správný kontejner"
+story = "Stůl výboru drží noční lístky v jednom dlouhém seznamu a na každou otázku o nich odpovídá tak, že ho čte odshora."
+brief = '''
+Tři řádky standardního vstupu: řádek slov, řádek celých čísel už **seřazených vzestupně** a jedno celé číslo `x`.
+
+Vypiš čtyři řádky:
+
+1. `TOP <word> <count>` — nejčastější slovo, shody podle slova vzestupně
+   — z tabulky počtů
+2. `BISECT <l> <r>` — `bisect_left` a `bisect_right` pro `x` v seřazených
+   celých číslech: kolik hodnot je pod `x` a kolik jich není nad ním
+3. `SMALLEST3` a za ním tři nejmenší celá čísla — vytažená z **haldy**
+   — nebo méně, pokud jich je méně
+4. `GROUPS` a za ním `<letter>:<k>` pro každé první písmeno slov, písmena
+   vzestupně — tabulka, jejíž `__index` **vytvoří seznam při prvním
+   přístupu**, klíčovaná prvním písmenem
+
+```
+input:  tofu egg tofu egg fish
+        1 3 3 5 8
+        3
+output: TOP egg 2
+        BISECT 1 3
+        SMALLEST3 1 3 3
+        GROUPS e:2 f:1 t:2
+```
+
+Lua dodává jeden kontejner a každý jiný je tabulka plus disciplína. `TOP` ve starteru si nechá první slovo, které dosáhne nejvyššího počtu, což je `tofu`, v **pořadí vložení**, a zadání říká `egg`: seřaď slova a řekni, co myslíš. Jeho `BISECT` hledá index `x` a upadne, když `x` chybí; binární vyhledávání v seřazeném seznamu nikdy chybu nevyhodí a `left` a `right` se liší o to, kolik kopií `x` tam je. Jeho `SMALLEST3` seřadí celý seznam, aby z jeho začátku přečetl tři hodnoty, a právě tomu se halda snaží vyhnout, když je `k` malé a `n` ne. A jeho `GROUPS` prochází tabulku počtů v pořadí `pairs`, což není vůbec žádné pořadí.
+
+`setmetatable({}, { __index = function(t, k) local v = {}; rawset(t, k, v); return v end })` je `defaultdict(list)` v Lua: první čtení chybějícího klíče vytvoří seznam a uloží ho, takže `groups[letter][#... + 1]` nikdy nepotřebuje kontrolu.
+'''
+hints = [
+  "Místo words projdi sorted_keys(counts) a nejvyšší nahraď jen při striktně větším počtu; shoda pak připadne abecedně prvnímu, což je egg.",
+  "bisect_left a bisect_right nikdy chybu nevyhodí; index_of ve starteru vrátí nil, když x chybí, a jeden ze skrytých případů je přesně tohle. Obě jsou tatáž smyčka s < vyměněným za <=.",
+  "Halda je seznam, kde rodič i je floor(i / 2): push přidá na konec a vyplave nahoru, pop přesune poslední položku na vrchol a nechá ji klesnout. Tři popy jsou tři nejmenší, ať je n jakékoli.",
+  "Metametoda __index běží jen pro chybějící klíč; rawset uvnitř uloží nový seznam, takže další čtení je obyčejný zásah. Před vypsáním seřaď klíče — tabulka s metatabulkou je pořád bez pořadí.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "lua.advanced.16.timeouts"
+title = "Přestaň čekat"
+story = "Pořadatelova tabule se ptá každého stánku v uličce na čekací dobu a stánek s nefunkční čtečkou karet nikdy neodpoví, takže se tabule nikdy nepřekreslí."
+brief = '''
+Standardní vstup je počet `n`, pak `n` řádků `<STALL> <SECONDS>`, kde `SECONDS` je `0` pro stánek, který odpoví hned, a `1` pro ten, který neodpoví včas.
+
+Čas je tu v **ticích**: desetina sekundy je jeden `coroutine.yield()` a `fetch(stall, seconds)` udělá deset yieldů za sekundu, než vrátí `<STALL> OK`. Pro každý stánek pusť jeho `fetch` jako korutinu pod `wait_for(task, 2)` — lhůta dva tiky, 0.2 sekundy — a vypiš `<STALL> OK` nebo `<STALL> TIMEOUT`, v pořadí vstupu. Pak spusť korutinu `watch()`, která běží donekonečna, dej jí jeden tah, zruš ji tím, že ji **obnovíš s `"cancel"`**, a nech ji vypsat `CANCELLED` z jejího handleru a `CLEANUP` z kódu, který běží na každé cestě. Nakonec vypiš `TIMEOUTS <k>`.
+
+```
+input:  3
+        LAM 0
+        WONG 1
+        CHAN 0
+output: LAM OK
+        WONG TIMEOUT
+        CHAN OK
+        CANCELLED
+        CLEANUP
+        TIMEOUTS 1
+```
+
+`wait_for` obnoví úlohu nejvýš `ticks`krát a ohlásí, jestli skončila; pokud je po svém posledním tahu pořád `suspended`, je to timeout a úloha se prostě už nikdy neobnoví. Starter místo toho obnovuje `fetch` až do konce, takže `WONG` spotřebuje všech deset tiků a pak řekne `OK`.
+
+Zrušit korutinu znamená doručit hodnotu do yield, na kterém je zaparkovaná. `watch` dělá yield uvnitř `pcall`, a když yield vrátí `"cancel"`, vyhodí chybu; `pcall` ji chytí — to je handler, který vypíše `CANCELLED` — pak proběhne úklidový řádek a pak se chyba vyhodí znovu, takže obnovení, které zrušení doručilo, dostane zpátky `false, "cancelled"`. Starter vytvoří hlídače, dá mu tah a zahodí ho: korutina, kterou už nikdo neobnoví, nespustí nic, nikdy, a ani jeden řádek se nevypíše. Po ošetření vyhoď znovu — spolknout zrušení je způsob, jak se úloha stane nezrušitelnou.
+'''
+hints = [
+  "wait_for(task, 2): obnov nejvýš dvakrát, vrať true a výsledek, pokud je úloha mrtvá, jinak false. Úloha, které vypršel čas, se prostě už nikdy neobnoví.",
+  "coroutine.resume(watcher, \"cancel\") — ten řetězec je to, co vrátí yield hlídače, a jeho vlastní kód z něj udělá chybu. Nastavit proměnnou na nil nic neruší; jen se na korutinu zapomene.",
+  "První obnovení po create dá hlídači tah, aby začal a zaparkoval na yield, takže zrušení má yield, na který dopadne, a ne funkci, která ještě nezačala.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "lua.advanced.17.coroutine"
+title = "Korutina"
+story = "Wun Sha Street, drak v celé délce, jeden běžec s tyčinkami na každý článek. Jeden z nich nikdy nepředá slovo, celý drak se zastaví na jednom článku, zatímco bubny pořád hrají, a součty se vrátí jako vůbec nic."
+brief = '''
+Standardní vstup jsou dvě celá čísla `k` a `n`.
+
+Rozděl `1..n` na `k` souvislých kusů — kus `i` je `floor(n*i/k) + 1` až `floor(n*(i+1)/k)` včetně — a dej každý kus vlastní **korutině**, která sečte druhé mocniny svého rozsahu: obyčejná smyčka, žádné knihovní volání, s yield každých 100 000 čísel, aby se dostalo i na ostatní. Každý běžec přičte svůj výsledek k **jednomu sdílenému součtu** v jednom úseku bez yield a zároveň ho zaznamená na své vlastní místo. Pouštěj je střídavě dokola, dokud nejsou všichni mrtví. Vypiš `CHUNK <i> <sum>` pro každý kus v pořadí indexů, pak `TOTAL <sum>`, pak `THREADS <k>` — jméno typu korutiny je `thread`, a to je ten počet.
+
+```
+input:  3 10
+output: CHUNK 0 14
+        CHUNK 1 77
+        CHUNK 2 294
+        TOTAL 385
+        THREADS 3
+```
+
+Starter selže z důvodu, který s časováním nemá nic společného. `local part = coroutine.resume(co, lo, hi)` si nechá **první** výsledek `resume`, což je `true`, a odpověď, která následovala, spadne na zem; první řádek `CHUNK` je `attempt to concatenate local 'part' (a boolean value)`. To je ta malá chyba. Oprav ji tak, jak to udělal úkol se zásuvkou: sdílený součet aktualizovaný bez yield mezi čtením a zápisem, místo pro každý kus zapisované právě jedním běžcem a plánovač z úkolu se zámkem — každý běžec, který není mrtvý, dostane tah, dokud žádný nezbude.
+
+Součty na velkém případu přesáhnou 2^53 a číslo v Lua je double: za tou hranicí `+` zaokrouhluje. Nes každý součet jako dva díly — dolní část pod 10^9 a horní část se zbytkem — a vypiš je jako `%d%09d`.
+
+Ta velká věc je boss a není to chyba, kterou jde opravit. Spusť to s `k = 4` a `n = 4000000` a změř čas, pak to spusť s `k = 1`. Trvá to stejně dlouho. Pak smaž yield ze smyčky a spusť to znovu: stejný výstup, stejný čas a žádná chyba. Korutina drží slovo, dokud neřekne `yield`; běžec, který to nikdy neřekne, běží až do konce, zatímco ostatní tři čekají, a nic ti to neřekne, protože nic jiného slovo nepotřebovalo. To je drak zastavený na jednom článku, zatímco bubny pořád hrají. Čtyři korutiny na čtyřech jádrech sčítají druhé mocniny po řadě, na jednom jádře, plus cena přepínání. LuaJIT nemá vlákna. Korutina je místo, kde se dá zastavit, ne druhé jádro; běh je **po řadě**, na místech, kde každý běžec řekl, že se může zastavit. Paralelní práce je druhý proces — `io.popen` — nebo `love.thread` z klienta LÖVE, což je samostatný stav Lua, který nic nesdílí a mluví přes kanál.
+
+Výstup je deterministický, protože kusy se vypisují podle indexu a součet je součet kusů, ne pořadí, v jakém běžci skončili. Vypiš `TOTAL` ze sdíleného součtu, ne sečtením míst — aktualizace bez yield je to, o čem tahle mapa je, a ty dva se musí shodovat.
+'''
+hints = [
+  "resume vrací nejdřív ok a hodnoty až za ním. Lepší: dej práci index a místo, kam zapsat, a sdílený součet, do kterého přičítat, a nech plánovač obnovovat až do smrti; pak z resume nemusí vyjít vůbec nic.",
+  "Obnov všechny, kolo za kolem, pak vypiš. Vypisování uvnitř běžců by se prokládalo; vypisování po smyčce, z míst, nemůže.",
+  "Dva díly: lo pod 10^9 s přenosem přesunutým do hi při každém sčítání. 41666791666750000 je hi 41666791 a lo 666750000, vypsané jako %d%09d.",
+  "n*(n+1)*(2n+1)/6 je uzavřený vzorec pro součet. Jednou proti němu zkontroluj TOTAL a víš, že hranice kusů sedí. Pak změř k=1 proti k=4 na velkém n: když se shodují, potkal jsi korutinu.",
+]
