@@ -463,6 +463,11 @@ export class QuestScene implements Scene {
   private briefScroll = 0;
   private briefOverflow = 0;
   private briefRect: Rect = [0, 0, 0, 0];
+  /**
+   * A finger on the brief: where it went down, the scroll it found there,
+   * and whether it has moved far enough to be a scroll rather than a tap.
+   */
+  private briefDrag: { y: number; scroll: number; moved: boolean } | null = null;
   private readonly briefIn = new Tween(seconds("panel"));
   /** The clock arriving, once, when a timed quest opens. */
   private readonly clockIn = new Tween(seconds("clock"), seconds("stagger") * 2);
@@ -2040,6 +2045,34 @@ export class QuestScene implements Scene {
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
     if (this.focus && this.coder?.pointer(x, y, phase)) return;
+    // A finger on the brief: drag to scroll it. The wheel was the only way
+    // in, and a tablet has no wheel — on an iPad a brief longer than its
+    // panel showed its first screen and nothing after it. A quiz's choices
+    // live in the brief too, so a press there is only a pick if it comes
+    // back up without having moved.
+    const drag = this.briefDrag;
+    if (drag) {
+      if (phase === "move") {
+        const dy = y - drag.y;
+        if (Math.abs(dy) > 8) drag.moved = true;
+        if (drag.moved) {
+          this.briefScroll = Math.max(0, Math.min(this.briefOverflow, drag.scroll - dy));
+        }
+        return;
+      }
+      if (phase === "up") {
+        this.briefDrag = null;
+        const hit = drag.moved ? null : this.choiceBtns.hit(x, y);
+        if (hit?.id.startsWith("choice:")) this.pick(Number(hit.id.slice(7)));
+        return;
+      }
+    }
+    // Not on the code page: the brief is not drawn there, and its rect is
+    // where it was last drawn.
+    if (phase === "down" && !this.focus && this.briefOverflow > 0 && inRect(x, y, this.briefRect)) {
+      this.briefDrag = { y, scroll: this.briefScroll, moved: false };
+      return;
+    }
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.bar.hovered = this.bar.hit(x, y)?.id ?? null;
