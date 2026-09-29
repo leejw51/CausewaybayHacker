@@ -709,8 +709,16 @@ def lua_stderr(text: str) -> str:
     """The error line, and not the traceback under it. The traceback ends in
     the interpreter's own frames — `[C]: at 0x…` from Homebrew's LuaJIT,
     `[C]: in ?` from Ubuntu's — and the classifier reads only the first line,
-    which is the same on both."""
+    which is the same on both.
+
+    One message is not: a stack overflow is `luajit: main.lua:3: stack
+    overflow` from Homebrew's and `luajit: stack overflow` from Ubuntu's —
+    where the overflow is caught depends on the build, not the program — so
+    its location is dropped and both write the Ubuntu line."""
+    import re
+
     head = text.split("stack traceback:", 1)[0]
+    head = re.sub(r"^(luajit: )main\.lua:\d+: (stack overflow)$", r"\1\2", head, flags=re.M)
     return head if head.endswith("\n") or not head else head + "\n"
 
 

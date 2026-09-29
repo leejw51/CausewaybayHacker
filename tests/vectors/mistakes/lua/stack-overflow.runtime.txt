@@ -1,1 +1,1 @@
-luajit: main.lua:3: stack overflow
+luajit: stack overflow

@@ -2434,12 +2434,12 @@
         "compile_command": "luajit -b main.lua main.luac",
         "compile_exit": 0,
         "identities": [
-          "luajit: main.lua:3: stack overflow"
+          "luajit: stack overflow"
         ],
         "diagnostics": [],
         "run_command": "luajit main.lua",
         "run_exit": 1,
-        "run_stderr": "luajit: main.lua:3: stack overflow\n"
+        "run_stderr": "luajit: stack overflow\n"
       },
       "captured": "lua/stack-overflow.luajit.txt",
       "captured_runtime": "lua/stack-overflow.runtime.txt"
