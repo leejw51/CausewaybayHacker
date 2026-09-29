@@ -861,10 +861,16 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     });
   const face0 = await faceOf();
   const cols0 = await colsOf();
+  const px0 = await codePx();
   await clickButton(page, "face");
   await page.waitForTimeout(700);
   const face1 = await faceOf();
   const cols1 = await colsOf();
+  // The next face is set at 0.68 of VT323's size (`CODE_FACE_SCALE`), once.
+  // The editor used to apply that factor a second time in CSS, which drew
+  // IOSEVKA at 0.46 — under half the size of the brief beside it.
+  const px1 = await codePx();
+  expect(px1 / px0, `${face1} is scaled once, not twice`).toBeGreaterThan(0.6);
   await clickButton(page, "face");
   await page.waitForTimeout(700);
   const face2 = await faceOf();

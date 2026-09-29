@@ -144,10 +144,10 @@ body {
      the same choice. Without it the face button changed every drawn glyph
      and left the one box people actually type into alone. */
   font-family: var(--cwb-code, "VT323", ui-monospace, monospace);
-  /* And the same size factor the canvas uses: a face drawn at VT323's
-     nominal size is a different size to the eye, and switching would change
-     how big the code looks rather than how much of it fits. */
-  font-size: calc(1em * var(--cwb-code-scale, 1));
+  /* No size factor here. The per-face factor (`CODE_FACE_SCALE`) is already
+     in the size the scene places this overlay at — `fonts.codeSm` is built
+     with it — so multiplying by `--cwb-code-scale` again drew IOSEVKA and
+     JETBRAINS at 0.68 × 0.68, under half the size of everything round them. */
   line-height: 1.15;
 }
 .cwb-editor .cm-gutters {

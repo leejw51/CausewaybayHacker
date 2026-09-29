@@ -159,7 +159,6 @@ export function setCodeFace(face: CodeFace): void {
   try {
     const root = document.documentElement.style;
     root.setProperty("--cwb-code", CODE_STACK());
-    root.setProperty("--cwb-code-scale", String(CODE_FACE_SCALE[face]));
   } catch {
     /* no document in a unit test; the canvas half is what those measure */
   }
