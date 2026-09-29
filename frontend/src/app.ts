@@ -17,13 +17,19 @@ import {
   printf,
   remeasure,
   setCodeFace,
+  getTextScale,
+  setTextScale,
+  TEXT_SCALE_KEY,
+  TEXT_SCALE_MAX,
+  TEXT_SCALE_MIN,
+  TEXT_SCALE_STEP,
   wrap,
   type CodeFace,
 } from "./engine/text";
 import { CODE_FACE_KEY } from "./ui/editor";
-import { readEnumPref } from "./ui/prefs";
+import { readEnumPref, readNumberPref, writePref } from "./ui/prefs";
 import { css, Theme } from "./engine/theme";
-import { btnBox, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
+import { btnBox, btnPad, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
 import { seconds, reducedMotion, Tween } from "./engine/motion";
 import { expInOut } from "./engine/ease";
 import { Backdrop, type Mood } from "./gfx/backdrop";
@@ -33,7 +39,7 @@ import type { Category, Land } from "./net/protocol";
 
 /** What `App#signInAgain` came back with. See its doc for what each means. */
 export type SignInAgain = "ok" | "none" | "refused" | "transient";
-import type { Buttons } from "./ui/chrome";
+import { headerH, type Buttons } from "./ui/chrome";
 import { Chip } from "./audio/sfx";
 import { forget as forgetKey, lastAddress, recall, signMessage } from "./wallet/wallet";
 import { localeInfo, nextLocale, setLocale, t } from "./i18n";
@@ -247,6 +253,8 @@ export class App {
     // The code face, before the first frame: a face chosen last time and
     // applied on the second frame is a screen that visibly re-lays itself.
     setCodeFace(readEnumPref<CodeFace>(CODE_FACE_KEY, CODE_FACES, "game"));
+    // And the text size, for the same reason.
+    setTextScale(readNumberPref(TEXT_SCALE_KEY, 1, TEXT_SCALE_MIN, TEXT_SCALE_MAX));
     try {
       this.crt.enabled = localStorage.getItem(CRT_KEY) !== "off";
     } catch {
@@ -679,6 +687,20 @@ export class App {
     this.scene?.resized?.();
   }
 
+  /**
+   * One step of the player's text size, for every screen at once. Returns the
+   * new multiplier, or null when it was already at the end of its range.
+   */
+  sizeText(dir: 1 | -1): number | null {
+    const before = getTextScale();
+    setTextScale(before + dir * TEXT_SCALE_STEP);
+    const next = getTextScale();
+    if (next === before) return null;
+    writePref(TEXT_SCALE_KEY, String(next));
+    this.remeasure();
+    return next;
+  }
+
   /** Re-read the window on demand — the orientation toggle and the capture hook. */
   remeasure(): void {
     this.layout.measure();
@@ -967,7 +989,7 @@ export class App {
       fonts.button,
       [m.confirm, m.cancel],
       0,
-      fonts.button.size * 2,
+      btnPad(fonts.button),
       layout.minTouchH(),
     );
     const h = askHeight(s, bodyTop, bodyLines, fonts.small.height, bh);
@@ -1092,6 +1114,16 @@ export class App {
         });
         return;
       }
+      // F9 / F10: the text size, smaller and bigger, from any screen. The
+      // A- / A+ buttons on the two code screens set the same preference;
+      // these exist because every other screen is text too.
+      if (name === "f9" || name === "f10") {
+        ev.preventDefault();
+        const next = this.sizeText(name === "f10" ? 1 : -1);
+        this.say(t("quest.fontSize", { percent: Math.round(getTextScale() * 100) }));
+        if (next !== null) this.chip.blip();
+        return;
+      }
       // F2 is the tube. On by default and remembered, because a scanline mask
       // is a taste and somebody reading code through it for an hour may not
       // share ours.
@@ -1214,7 +1246,7 @@ export class App {
     // banner that covers it trades one piece of information for another. It
     // slides down out of the header rather than appearing, so the eye is
     // brought to it instead of having to notice it.
-    const top = Math.round(38 * s) - Math.round((1 - toast.tween.out) * h);
+    const top = headerH(this.layout) - Math.round((1 - toast.tween.out) * h);
     g.fillStyle = toast.alarm ? "rgba(216,40,0,0.92)" : "rgba(28,36,92,0.94)";
     g.fillRect(0, top, vw, h);
     g.fillStyle = "rgba(40,24,16,1)";

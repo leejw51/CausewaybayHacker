@@ -17,19 +17,33 @@ import {
   CODE_FACES,
   ensureFonts,
   getCodeFace,
+  getTextScale,
   printf,
   setCodeFace,
+  TEXT_SCALE_MAX,
+  TEXT_SCALE_MIN,
   width,
   wrap,
 } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
-import { btnBox, rowsIn, clipped, fill, inRect, well, type Ctx, type Rect } from "../engine/ui";
+import {
+  btnBox,
+  btnPad,
+  rowsIn,
+  clipped,
+  fill,
+  inRect,
+  well,
+  type Ctx,
+  type Rect,
+} from "../engine/ui";
 import {
   arriving,
   Buttons,
   footer,
   frame,
   header,
+  headerH,
   landColour,
   titledPanel,
   type Stack,
@@ -49,9 +63,6 @@ import {
   holeGlow,
   HOLE_LOW,
   CODE_FACE_KEY,
-  CODE_FONT_KEY,
-  CODE_FONT_MAX,
-  CODE_FONT_MIN,
   blanksFill,
   solutionBlanks,
   type AnswerProgress,
@@ -80,7 +91,7 @@ import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
 import { clipMessage, copyText, readText } from "../ui/clip";
-import { readEnumPref, readNumberPref, writePref } from "../ui/prefs";
+import { readEnumPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
 import { locale, t, tn, type Locale } from "../i18n";
 import { MapScene } from "./map";
@@ -104,9 +115,7 @@ type Stage = "idle" | RunStage;
  * BRIEF: TOP rather than H and V.
  */
 const STACK_KEY = "quest.stack";
-const FONT_KEY = CODE_FONT_KEY;
 const STACKS = ["auto", "row", "column"] as const;
-/** Half again down, two and a half times up, in steps somebody can feel. */
 /**
  * The fence a Markdown reader wants for each land. `cpp` and `py` are the
  * tags every renderer knows; the file's own extension is not always one.
@@ -122,10 +131,6 @@ const FENCE_LANG: Record<Lang, string> = {
   zig: "zig",
   lua: "lua",
 };
-
-const FONT_MIN = CODE_FONT_MIN;
-const FONT_MAX = CODE_FONT_MAX;
-const FONT_STEP = 0.15;
 
 /**
  * How long typing has to stop before the edit stack takes a copy.
@@ -487,7 +492,6 @@ export class QuestScene implements Scene {
    */
   private readonly choiceBtns = new Buttons();
   private stack: Stack = readEnumPref(STACK_KEY, STACKS, "auto");
-  private fontMul = readNumberPref(FONT_KEY, 1, FONT_MIN, FONT_MAX);
   /** Where the toolbar was this frame, so the panels start under it. */
   private barH = 0;
   /**
@@ -1934,16 +1938,12 @@ export class QuestScene implements Scene {
     this.notice = true;
   }
 
-  private sizeFont(by: number): void {
-    const next = Math.min(
-      FONT_MAX,
-      Math.max(FONT_MIN, Math.round((this.fontMul + by) * 100) / 100),
-    );
-    if (next === this.fontMul) return;
-    this.fontMul = next;
-    writePref(FONT_KEY, String(next));
-    this.error = t("quest.fontSize", { percent: Math.round(next * 100) });
-    this.notice = true;
+  /** One step of the text size — every screen's, not just this editor's. */
+  private sizeFont(dir: 1 | -1): void {
+    // Said by the app, like F9 / F10 — the size is not this screen's news.
+    const next = this.app.sizeText(dir);
+    this.app.say(t("quest.fontSize", { percent: Math.round(getTextScale() * 100) }));
+    if (next !== null) this.app.chip.blip();
   }
 
   // -- input ---------------------------------------------------------------
@@ -2148,10 +2148,10 @@ export class QuestScene implements Scene {
         this.cycleStack();
         break;
       case "fontdown":
-        this.sizeFont(-FONT_STEP);
+        this.sizeFont(-1);
         break;
       case "fontup":
-        this.sizeFont(FONT_STEP);
+        this.sizeFont(1);
         break;
       case "face":
         this.cycleFace();
@@ -2263,7 +2263,11 @@ export class QuestScene implements Scene {
     // fits on one row, so "compact when it wraps" left the phone's landscape
     // exactly as crowded as its portrait was — an eighteen-pixel editor with
     // a full bench under it.
-    this.compactMode = layout.isPhone() || (layout.touch && fullRows > 1);
+    //
+    // And past 100 % text size: the canvas does not grow with the type, so
+    // at 120 % the full register left the editor two lines tall. The larger
+    // size goes to the code and the brief; the controls keep the chrome face.
+    this.compactMode = layout.isPhone() || (layout.touch && fullRows > 1) || getTextScale() > 1.001;
     const toolRows = this.compactMode
       ? rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH())
       : fullRows;
@@ -2295,7 +2299,7 @@ export class QuestScene implements Scene {
       this.barH + Math.round(6 * s) + toast,
     );
 
-    this.drawToolbar(g, [pad, Math.round(38 * s) + pad + toast, toolW, this.barH]);
+    this.drawToolbar(g, [pad, headerH(layout) + pad + toast, toolW, this.barH]);
 
     // The message bar is *part of the layout*, not an overlay: it used to be
     // painted across the bottom of the body over whatever was there, and with
@@ -2383,8 +2387,8 @@ export class QuestScene implements Scene {
       // which axis it is: F1 is already the orientation and two buttons that
       // both read as "vertical" are two buttons nobody can tell apart.
       { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
-      { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= FONT_MIN + 0.001 },
-      { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= FONT_MAX - 0.001 },
+      { id: "fontdown", label: t("quest.fontDown"), dim: getTextScale() <= TEXT_SCALE_MIN + 0.001 },
+      { id: "fontup", label: t("quest.fontUp"), dim: getTextScale() >= TEXT_SCALE_MAX - 0.001 },
       // Says the face it is **in**, and cycles. The same preference the
       // playground's button sets: one answer to "how do I like my code".
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
@@ -2495,7 +2499,7 @@ export class QuestScene implements Scene {
     const pad = Math.round(6 * s);
     const f = fonts.stationSm;
     const done = t("quest.codeDone");
-    const [dw, dh] = btnBox(f, [done], 0, f.size * 2, layout.minTouchH());
+    const [dw, dh] = btnBox(f, [done], 0, btnPad(f), layout.minTouchH());
     const bx = layout.vw - pad - dw;
 
     // The four controls the hands actually use while writing, and ANSWER.
@@ -2601,7 +2605,7 @@ export class QuestScene implements Scene {
     const [ex, ey, ew, eh] = carve.editor;
     well(g, ex, ey, ew, eh);
     const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
-    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
     else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
     if (carve.panel) this.coder?.drawPanel(g, carve.panel, s);
@@ -2907,7 +2911,7 @@ export class QuestScene implements Scene {
     // the far end of the bench and the everyday buttons flow up to it. It is
     // the one control on this screen that spends an attempt, and a control that
     // can be hit on the way to RUN is a control that will be.
-    const [subW] = btnBox(bench, [t("quest.submit")], 0, bench.size * 2, layout.minTouchH());
+    const [subW] = btnBox(bench, [t("quest.submit")], 0, btnPad(bench), layout.minTouchH());
     const gap = Math.round(bench.size * 1.6);
     const rowW = inner[2] - subW - gap;
     // Measured, not assumed. At 1280 across, RESET wraps onto a second line,
@@ -2970,7 +2974,7 @@ export class QuestScene implements Scene {
       fonts.stationSm,
       [t("quest.solve")],
       0,
-      fonts.stationSm.size * 2,
+      btnPad(fonts.stationSm),
       layout.minTouchH(),
     );
     const noteX = inner[0] + solveW + Math.round(10 * s);
@@ -2998,7 +3002,7 @@ export class QuestScene implements Scene {
     // remembered between sessions. Everything else on the screen keeps the UI
     // scale: the panels are furniture and the code is the work.
     if (this.editor && this.benchIn.finished) {
-      this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+      this.overlay?.place(editorRect, fonts.codeSm.size);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
 

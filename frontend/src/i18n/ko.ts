@@ -266,7 +266,7 @@ export const ko: Partial<Catalogue> = {
   "quest.combo": "콤보",
   "quest.bestCombo": "최고 콤보",
   "quest.codeFace": "코드 글꼴 {name}",
-  "quest.fontSize": "코드 크기 {percent}%",
+  "quest.fontSize": "글자 크기 {percent}%",
   "quest.leaveMapTitle": "지도로 돌아갈까요?",
   "quest.leaveLobbyTitle": "로비로 돌아갈까요?",
   "quest.leaveBody": "편집기의 코드가 저장되지 않았습니다. 나가면 사라집니다.",

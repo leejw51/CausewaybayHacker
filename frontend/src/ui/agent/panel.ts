@@ -11,7 +11,17 @@
 import type { App } from "../../app";
 import { elide, ensureFonts, printf, wrap } from "../../engine/text";
 import { css, Theme, type RGBA } from "../../engine/theme";
-import { btnBox, clipped, fill, inRect, rowsIn, well, type Ctx, type Rect } from "../../engine/ui";
+import {
+  btnBox,
+  btnPad,
+  clipped,
+  fill,
+  inRect,
+  rowsIn,
+  well,
+  type Ctx,
+  type Rect,
+} from "../../engine/ui";
 import { Buttons, titledPanel } from "../chrome";
 import { Overlay } from "../overlay";
 import { t } from "../../i18n";
@@ -303,7 +313,7 @@ export class Panel {
       f,
       rowItems.map((i) => i.label),
       0,
-      f.size * 2,
+      btnPad(f),
       layout.minTouchH(),
     );
     const rows = rowsIn(
@@ -391,7 +401,7 @@ export class Panel {
       f,
       items.map((i) => i.label),
       0,
-      f.size * 2,
+      btnPad(f),
       layout.minTouchH(),
     );
     const rows = rowsIn(
@@ -492,7 +502,7 @@ export class Panel {
       f,
       items.map((i) => i.label),
       0,
-      f.size * 2,
+      btnPad(f),
       layout.minTouchH(),
     );
     const rows = rowsIn(

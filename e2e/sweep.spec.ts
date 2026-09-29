@@ -835,9 +835,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   );
   expect(bigger, "A+ makes the code bigger").toBeGreaterThan(beforeFont);
   expect(smaller, "A- takes it back down").toBeLessThan(bigger);
-  // It is the same preference the quest screen keeps, so it survives a visit
-  // to another screen and back.
-  expect(await pref(page, "quest.font")).not.toBe("");
+  // It is one preference for every screen, so it survives a visit to
+  // another screen and back.
+  expect(await pref(page, "ui.text")).not.toBe("");
 
   // The code face, cycled by a button that says which face it is. Measured
   // off the rendered editor: a face button that changes a label and not the
@@ -861,10 +861,16 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     });
   const face0 = await faceOf();
   const cols0 = await colsOf();
+  const px0 = await codePx();
   await clickButton(page, "face");
   await page.waitForTimeout(700);
   const face1 = await faceOf();
   const cols1 = await colsOf();
+  // The next face is set at 0.68 of VT323's size (`CODE_FACE_SCALE`), once.
+  // The editor used to apply that factor a second time in CSS, which drew
+  // IOSEVKA at 0.46 — under half the size of the brief beside it.
+  const px1 = await codePx();
+  expect(px1 / px0, `${face1} is scaled once, not twice`).toBeGreaterThan(0.6);
   await clickButton(page, "face");
   await page.waitForTimeout(700);
   const face2 = await faceOf();
@@ -890,23 +896,28 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   // four looked identical whatever was selected.
   // Sampled just inside the button's left edge rather than at its middle:
   // the middle is where the label is, so a centre pixel reports the colour
-  // of a glyph or of the gap between two, depending on the word.
+  // of a glyph or of the gap between two, depending on the word. Ten virtual
+  // pixels in: past the six-pixel bevel (`panel`), short of the label, which
+  // starts half the button's side padding in — a fraction of the width lands
+  // on one or the other depending on how long the word is.
   const landPixels = async (id: string) => {
-    const box = await page.evaluate(
-      (b) =>
-        window.__cwbCapture!.buttons().find((x) => x.id === b)?.client ?? null,
+    const b = await page.evaluate(
+      (b) => window.__cwbCapture!.buttons().find((x) => x.id === b) ?? null,
       id,
     );
-    if (!box) return null;
-    return page.evaluate(([x, y, w, h]) => {
-      const c = document.querySelector("#game") as HTMLCanvasElement;
-      const g = c.getContext("2d")!;
-      const r = c.getBoundingClientRect();
-      const px = Math.round(((x + w * 0.12 - r.left) / r.width) * c.width);
-      const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
-      const d = g.getImageData(px, py, 1, 1).data;
-      return `${d[0]},${d[1]},${d[2]}`;
-    }, box);
+    if (!b) return null;
+    return page.evaluate(
+      ([[x, y, w, h], vw]) => {
+        const c = document.querySelector("#game") as HTMLCanvasElement;
+        const g = c.getContext("2d")!;
+        const r = c.getBoundingClientRect();
+        const px = Math.round(((x + (w / vw) * 10 - r.left) / r.width) * c.width);
+        const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
+        const d = g.getImageData(px, py, 1, 1).data;
+        return `${d[0]},${d[1]},${d[2]}`;
+      },
+      [b.client, b.rect[2]] as const,
+    );
   };
   const rustLit = await landPixels("rust");
   const goUnlit = await landPixels("go");
@@ -1368,7 +1379,7 @@ test("3f: every language on the login screen, via the LANG button", async ({
   expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
 });
 
-test("5: every code-size step on the quest screen (en)", async ({ page }) => {
+test("5: every text-size step on the quest screen (en)", async ({ page }) => {
   const account = freshAccount();
   const wire = await Wire.as(BACKEND, account);
   try {
@@ -1383,7 +1394,7 @@ test("5: every code-size step on the quest screen (en)", async ({ page }) => {
     const steps: string[] = [];
     let last = "";
     for (let i = 0; i < 20; i++) {
-      const mul = (await pref(page, "quest.font")) ?? "1";
+      const mul = (await pref(page, "ui.text")) ?? "1";
       if (mul === last) break;
       last = mul;
       const pct = Math.round(Number(mul) * 100);
@@ -1396,13 +1407,13 @@ test("5: every code-size step on the quest screen (en)", async ({ page }) => {
     }
     console.log(`[font] steps: ${steps.join(", ")}`);
     expect(steps[0]).toBe("70");
-    expect(steps[steps.length - 1]).toBe("240");
+    expect(steps[steps.length - 1]).toBe("120");
   } finally {
     wire.close();
   }
 });
 
-test("5b: Korean (CJK) at the smallest, default and largest code size, plus the other screens", async ({
+test("5b: Korean (CJK) at the smallest, default and largest text size, plus the other screens", async ({
   page,
 }) => {
   const account = freshAccount();
@@ -1424,15 +1435,15 @@ test("5b: Korean (CJK) at the smallest, default and largest code size, plus the 
     await page.waitForTimeout(300);
     await shot(page, "42-ko-quest-070");
     await editorInsideCanvas(page, "ko 70%");
-    for (let i = 0; i < 14; i++) await clickButton(page, "fontup");
+    for (let i = 0; i < 8; i++) await clickButton(page, "fontup");
     await page.waitForTimeout(300);
-    expect(await pref(page, "quest.font")).toBe("2.4");
-    await shot(page, "42-ko-quest-240");
-    await editorInsideCanvas(page, "ko 240%");
+    expect(await pref(page, "ui.text")).toBe("1.2");
+    await shot(page, "42-ko-quest-120");
+    await editorInsideCanvas(page, "ko 120%");
     // The console drawer and the hint, at the biggest size.
     await clickButton(page, "console");
     await page.waitForTimeout(300);
-    await shot(page, "43-ko-quest-240-console");
+    await shot(page, "43-ko-quest-120-console");
     await clickButton(page, "console");
     // A result and the stats in Korean.
     await setSource(page, WRONG);

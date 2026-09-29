@@ -25,6 +25,7 @@ import { remoteSaveAction } from "../net/remote";
 import {
   BTN_FRAME,
   btnBox,
+  btnPad,
   clipped,
   fill,
   inRect,
@@ -37,17 +38,18 @@ import {
 } from "../engine/ui";
 import { Buttons, footer, frame, header, landColour, titledPanel, landName } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
-import {
-  CODE_FACE_KEY,
-  CODE_FONT_KEY,
-  CODE_FONT_MAX,
-  CODE_FONT_MIN,
-  Editor,
-  MAIN_FILE,
-} from "../ui/editor";
+import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
 import { Coder } from "../ui/agent/coder";
-import { CODE_FACE_NAME, CODE_FACES, getCodeFace, setCodeFace } from "../engine/text";
+import {
+  CODE_FACE_NAME,
+  CODE_FACES,
+  getCodeFace,
+  getTextScale,
+  setCodeFace,
+  TEXT_SCALE_MAX,
+  TEXT_SCALE_MIN,
+} from "../engine/text";
 import { readNumberPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
@@ -296,14 +298,6 @@ export class PlaygroundScene implements Scene {
    * place in the game where a person sits down to *write*.
    */
   private focus = false;
-  /**
-   * How big the code is drawn, as a multiple of the screen's own size.
-   *
-   * The quest screen's control, on the screen people sit at for longest.
-   * Shared with it through one preference, because the size somebody can
-   * read is a fact about them rather than about which screen they are on.
-   */
-  private fontMul = readNumberPref(CODE_FONT_KEY, 1, CODE_FONT_MIN, CODE_FONT_MAX);
 
   private stage: RunStage | "idle" = "idle";
   private attemptId: string | null = null;
@@ -601,17 +595,12 @@ export class PlaygroundScene implements Scene {
     this.clipSaid(t("clip.yourCode"), res, "paste");
   }
 
-  /** One step of code size, kept on the same rails as the quest screen's. */
-  private sizeFont(by: number): void {
-    const next = Math.min(
-      CODE_FONT_MAX,
-      Math.max(CODE_FONT_MIN, Math.round((this.fontMul + by) * 100) / 100),
-    );
-    if (next === this.fontMul) return;
-    this.fontMul = next;
-    writePref(CODE_FONT_KEY, String(next));
-    this.saveNote = t("quest.fontSize", { percent: Math.round(next * 100) });
-    this.app.chip.blip();
+  /** One step of the text size — every screen's, not just this editor's. */
+  private sizeFont(dir: 1 | -1): void {
+    // Said by the app, like F9 / F10 — the size is not this screen's news.
+    const next = this.app.sizeText(dir);
+    this.app.say(t("quest.fontSize", { percent: Math.round(getTextScale() * 100) }));
+    if (next !== null) this.app.chip.blip();
   }
 
   /**
@@ -809,8 +798,8 @@ export class PlaygroundScene implements Scene {
   /** The two size buttons, for the bench and for CODE alike. */
   private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
     return [
-      { id: "fontdown", label: t("quest.fontDown"), dim: this.fontMul <= CODE_FONT_MIN + 0.001 },
-      { id: "fontup", label: t("quest.fontUp"), dim: this.fontMul >= CODE_FONT_MAX - 0.001 },
+      { id: "fontdown", label: t("quest.fontDown"), dim: getTextScale() <= TEXT_SCALE_MIN + 0.001 },
+      { id: "fontup", label: t("quest.fontUp"), dim: getTextScale() >= TEXT_SCALE_MAX - 0.001 },
       // Says the face it is **in**, like every other toggle on this screen.
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
     ];
@@ -1494,7 +1483,7 @@ export class PlaygroundScene implements Scene {
       return;
     }
     if (hit.id === "fontdown" || hit.id === "fontup") {
-      this.sizeFont(hit.id === "fontup" ? 0.1 : -0.1);
+      this.sizeFont(hit.id === "fontup" ? 1 : -1);
       return;
     }
     if (hit.id === "rename") {
@@ -1568,7 +1557,9 @@ export class PlaygroundScene implements Scene {
     // this is a screen somebody works on, and room to read beats room to
     // look. The 7 % inset was spending a twentieth of the window on either
     // side of a bench whose editor was already the thing running out of room.
-    const f = frame(layout, 0.26, 0);
+    // The list is short names and two buttons; a quarter of the screen was
+    // mostly empty panel, in either orientation.
+    const f = frame(layout, layout.isPortrait() ? 0.22 : 0.2, 0);
     const s = f.scale;
     this.buttons.reset();
     this.rows.reset();
@@ -1656,7 +1647,7 @@ export class PlaygroundScene implements Scene {
       fonts.button,
       listItems.map((b) => b.label),
       0,
-      fonts.button.size * 2,
+      btnPad(fonts.button),
       this.app.layout.minTouchH(),
     );
     const listGap = Math.round(6 * s);
@@ -1879,7 +1870,7 @@ export class PlaygroundScene implements Scene {
     const f = fonts.stationSm;
     const pad = Math.round(6 * s);
     const done = t("pg.codeDone");
-    const [dw, dh] = btnBox(f, [done], 0, f.size * 2, layout.minTouchH());
+    const [dw, dh] = btnBox(f, [done], 0, btnPad(f), layout.minTouchH());
     const bx = layout.vw - pad - dw;
 
     const items = [
@@ -2114,7 +2105,7 @@ export class PlaygroundScene implements Scene {
     well(g, pad, top, editorW, editorH);
     const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
     this.editorRect = editorRect;
-    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
     else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
     if (panel) this.coder?.drawPanel(g, panel, s);
@@ -2146,7 +2137,6 @@ export class PlaygroundScene implements Scene {
       this.keyOverlay?.hide();
     }
 
-    const btnH = Math.max(layout.minTouchH(), fonts.button.height + 20);
     const gap = Math.round(8 * s);
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     // A share of the panel, but never more of it than there is output to
@@ -2158,40 +2148,15 @@ export class PlaygroundScene implements Scene {
       Math.round(inner[3] * (layout.isPortrait() ? 0.3 : 0.28)),
       fonts.codeSm.height * 8 + fonts.stationSm.height + Math.round(16 * s),
     );
-    // The language buttons are laid out first and taken out of the row's
-    // width, like SUBMIT on the quest screen: they are a *state*, not an
-    // action, and the chosen one is painted lit so the screen says which file
-    // you are in twice over. One box per land, each as wide as its own label.
+    // One box per land, each as wide as its own label. They are a *state*,
+    // not an action, and the chosen one is painted lit in its land's colour.
     const langBoxes = LANGS.map((land) => {
       const label = t(`pg.${land}` as "pg.rust");
-      const [bw, bh] = btnBox(fonts.button, [label], 0, fonts.button.size * 2, layout.minTouchH());
+      const [bw, bh] = btnBox(fonts.button, [label], 0, btnPad(fonts.button), layout.minTouchH());
       return { land, label, bw, bh };
     });
     const langH = langBoxes[0].bh;
-    const langGap = Math.round(fonts.button.size * 0.5);
-    const langsW = langBoxes.reduce((n, b) => n + b.bw, 0) + langGap * (langBoxes.length - 1);
-    // **Wrapped, not run off the edge.** The four were laid in one run from
-    // the panel's right edge and simply kept going left; in Korean, where
-    // the labels are wider, RUST ended up outside the bench entirely — drawn
-    // past the left edge of a phone screen, unreachable. Lay them into as
-    // many rows as they need.
-    const langLines: Array<typeof langBoxes> = [];
-    {
-      let line: typeof langBoxes = [];
-      let used = 0;
-      for (const box of langBoxes) {
-        const add = box.bw + (line.length ? langGap : 0);
-        if (line.length && used + add > inner[2]) {
-          langLines.push(line);
-          line = [];
-          used = 0;
-        }
-        line.push(box);
-        used += box.bw + (line.length > 1 ? langGap : 0);
-      }
-      if (line.length) langLines.push(line);
-    }
-    const langRowsH = langLines.length * langH + (langLines.length - 1) * langGap;
+    const flowGap = Math.round(fonts.button.size * 0.5);
     const minOut = fonts.codeSm.height * 3 + Math.round(10 * s);
     // Its label and one whole line of what you typed. Anything less is a box
     // that says STDIN over a sliver of a character, which is how it looked
@@ -2236,35 +2201,25 @@ export class PlaygroundScene implements Scene {
     // to write, and the bench is better off one button shorter.
     const editorFloor = fonts.codeSm.height * 5 + Math.round(12 * s);
     let actions = [...core, ...optional];
+    // **One flow, not two bands.** The lands used to get rows of their own,
+    // right-aligned, and the actions rows of their own under them: two
+    // half-empty last rows, which on a desktop was a whole row of nothing
+    // between the stdin box and the output. Actions first, so RUN is where
+    // the band starts; the lands follow in the same wrap.
+    const flowLabels = (items: typeof actions) => [
+      ...items.map((a) => a.label),
+      ...langBoxes.map((b) => b.label),
+    ];
     const bandFor = (items: typeof actions) => {
-      const ls = items.map((a) => a.label);
-      const besideW0 = inner[2] - langsW - langGap * 2;
-      const side = besideW0 > 0 && rowsIn(fonts.button, ls, besideW0, layout.minTouchH()) === 1;
-      const w = side ? besideW0 : inner[2];
-      const r = rowsIn(fonts.button, ls, w, layout.minTouchH());
-      const g0 = Math.round(fonts.button.size * 0.5);
-      return r * btnH + (r - 1) * g0 + (side ? 0 : langRowsH + g0);
+      const r = rowsIn(fonts.button, flowLabels(items), inner[2], layout.minTouchH());
+      return r * langH + (r - 1) * flowGap;
     };
     for (let drop = 0; drop < optional.length; drop++) {
       const room = inner[3] - bandFor(actions) - minStdin - minOut - gap * 3;
       if (room >= editorFloor) break;
       actions = [...core, ...optional.slice(0, optional.length - 1 - drop)];
     }
-    const labels = actions.map((a) => a.label);
-    // Beside the actions only when *all* of them still fit on one row next to
-    // the four lands — not merely when RUN does. The old test asked about one
-    // label and answered for the whole band, so in landscape, where the bench
-    // is the narrow half of the frame, the lands took the width and the
-    // actions came back seven rows of one button each: 380 pixels of buttons
-    // over a panel 476 tall, and an editor at its 60-pixel floor. That is the
-    // screen that was reported as very hard to use.
-    const besideW = inner[2] - langsW - langGap * 2;
-    const beside = besideW > 0 && rowsIn(fonts.button, labels, besideW, layout.minTouchH()) === 1;
-    const rowW = beside ? besideW : inner[2];
-    const rows = rowsIn(fonts.button, labels, rowW, layout.minTouchH());
-    const rowGap = Math.round(fonts.button.size * 0.5);
-    const langBand = beside ? 0 : langRowsH + rowGap;
-    const bandH = rows * btnH + (rows - 1) * rowGap + langBand;
+    const bandH = bandFor(actions);
 
     // **The editor is served first.** It used to be served last — whatever a
     // fixed stdin box, a percentage-of-panel output panel and however many
@@ -2292,7 +2247,7 @@ export class PlaygroundScene implements Scene {
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
     this.editorRect = editorRect;
     if (this.editor && this.benchIn.finished) {
-      this.overlay?.place(editorRect, fonts.codeSm.size * this.fontMul);
+      this.overlay?.place(editorRect, fonts.codeSm.size);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
 
@@ -2320,22 +2275,32 @@ export class PlaygroundScene implements Scene {
     if (this.benchIn.finished) this.stdinOverlay?.place(stdinRect, fonts.codeSm.size);
     else this.stdinOverlay?.hide();
 
-    const rowY = stdinY + stdinRoom + gap + langBand;
-    this.buttons.row(
-      fonts.button,
-      [inner[0], rowY, rowW, bandH - langBand],
-      actions,
-      layout.minTouchH(),
-    );
-
-    // RUST | GO | C++ | PYTHON, at the far end of the band, laid right to left
-    // so the last land sits flush with the edge whatever the labels measure.
-    const langTop = beside ? rowY + Math.round((btnH - langH) / 2) : rowY - langBand;
-    langLines.forEach((line, li) => {
-      const langY = langTop + li * (langH + langGap);
-      let bx = inner[0] + inner[2];
-      for (const { land: id, label, bw } of [...line].reverse()) {
-        bx -= bw;
+    const rowY = stdinY + stdinRoom + gap;
+    {
+      let cx = inner[0];
+      let cy = rowY;
+      const place = (bw: number): [number, number] => {
+        if (cx > inner[0] && cx + bw > inner[0] + inner[2]) {
+          cx = inner[0];
+          cy += langH + flowGap;
+        }
+        const at: [number, number] = [cx, cy];
+        cx += bw + flowGap;
+        return at;
+      };
+      for (const item of actions) {
+        const [bw, bh] = btnBox(
+          fonts.button,
+          [item.label],
+          0,
+          btnPad(fonts.button),
+          layout.minTouchH(),
+        );
+        const [bx, by] = place(bw);
+        this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
+      }
+      for (const { land: id, label, bw } of langBoxes) {
+        const [bx, langY] = place(bw);
         const on = this.held.lang === id;
         const hover = this.buttons.hovered === id;
         if (on) {
@@ -2357,15 +2322,10 @@ export class PlaygroundScene implements Scene {
         // the row says which compiler will run this file. `painted` keeps
         // `Buttons.draw` from putting a plain button over the top of it.
         this.buttons.add({ id, rect: [bx, langY, bw, langH], label, painted: true });
-        bx -= langGap;
       }
-    });
+    }
 
-    // The actions start at `rowY` and are `bandH - langBand` tall — the land
-    // band sits *above* `rowY`, and `rowY` already stepped over it. Adding the
-    // whole of `bandH` here counted that band twice and pushed the output
-    // panel off the bottom of the bench by exactly its height.
-    const outTop = rowY + (bandH - langBand) + gap;
+    const outTop = rowY + bandH + gap;
     this.drawOutput(g, [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)], s);
   }
 

@@ -84,6 +84,16 @@ const BTN_AIR = 6;
  * from the Latin metrics clips Korean. The browser gives us the same answer
  * from the font's own line box, which `text.ts` already uses as the height.
  */
+/**
+ * The side padding of a button, both sides together. It was twice the font
+ * size — 48 pixels of air around every label at the default size, and in a
+ * band of fifteen buttons that air was a whole extra row. One and a quarter
+ * still keeps the label clear of the bevel.
+ */
+export function btnPad(font: Font): number {
+  return Math.round(font.size * 1.25);
+}
+
 export function btnBox(
   font: Font,
   labels: string[],
@@ -109,7 +119,7 @@ export function rowsIn(font: Font, labels: string[], w: number, minH = 0): numbe
   let x = 0;
   let rows = 1;
   for (const label of labels) {
-    const [bw] = btnBox(font, [label], 0, font.size * 2, minH);
+    const [bw] = btnBox(font, [label], 0, btnPad(font), minH);
     if (x > 0 && x + bw > w) {
       rows++;
       x = 0;

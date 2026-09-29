@@ -43,7 +43,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, printf } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, clipped, fill, neonPrint, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, neonPrint, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, RUST } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { readPref, writePref } from "../ui/prefs";
@@ -274,7 +274,7 @@ export class TitleScene implements Scene {
     const gap = Math.round(fonts.stationSm.size * 0.5);
     let total = -gap;
     for (const l of lang) {
-      total += btnBox(fonts.stationSm, [l.label], 0, fonts.stationSm.size * 2)[0] + gap;
+      total += btnBox(fonts.stationSm, [l.label], 0, btnPad(fonts.stationSm))[0] + gap;
     }
     const margin = Math.round(layout.vw * 0.04);
     const rowW = Math.min(layout.vw - margin * 2, total);

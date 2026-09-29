@@ -280,7 +280,7 @@ export const cs: Partial<Catalogue> = {
   "quest.combo": "KOMBO",
   "quest.bestCombo": "NEJLEPŠÍ",
   "quest.codeFace": "písmo kódu {name}",
-  "quest.fontSize": "velikost kódu {percent} %",
+  "quest.fontSize": "velikost písma {percent} %",
   "quest.leaveMapTitle": "ZPĚT NA MAPU?",
   "quest.leaveLobbyTitle": "ZPĚT DO HALY?",
   "quest.leaveBody": "Kód v editoru není uložený. Odchodem o něj přijdeš.",

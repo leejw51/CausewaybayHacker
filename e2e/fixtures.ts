@@ -293,8 +293,23 @@ export async function clickButton(
           "not carry the capture hook.",
       );
     if (found.at) {
-      await page.mouse.click(found.at[0], found.at[1]);
-      return;
+      // Only a button that has stopped moving. A panel sliding back in — the
+      // playground's bench after DONE — reports where the button *is* this
+      // frame, and a press sent there lands where it *was* by the time the
+      // scene sees it.
+      await page.waitForTimeout(150);
+      const again = await page.evaluate(
+        (wanted) => window.__cwbCapture?.buttonAt(wanted) ?? null,
+        id,
+      );
+      if (
+        again &&
+        Math.abs(again[0] - found.at[0]) < 1 &&
+        Math.abs(again[1] - found.at[1]) < 1
+      ) {
+        await page.mouse.click(again[0], again[1]);
+        return;
+      }
     }
     if (Date.now() > deadline)
       throw new Error(

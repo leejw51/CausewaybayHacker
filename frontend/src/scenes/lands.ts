@@ -10,7 +10,7 @@
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -1389,7 +1389,7 @@ export class LandsScene implements Scene {
         fonts.button,
         LOCALES.map((l) => l.label),
         0,
-        fonts.button.size * 2,
+        btnPad(fonts.button),
         layout.minTouchH(),
       );
       const lw = Math.min(lwRaw, Math.round(right[2] * 0.36));
@@ -1397,7 +1397,7 @@ export class LandsScene implements Scene {
         fonts.button,
         [t("lands.autoSelect")],
         0,
-        fonts.button.size * 2,
+        btnPad(fonts.button),
         layout.minTouchH(),
       );
       const abw = Math.max(aw, Math.round(right[2] * 0.4));
