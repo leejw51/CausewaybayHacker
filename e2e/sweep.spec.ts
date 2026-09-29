@@ -890,23 +890,28 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   // four looked identical whatever was selected.
   // Sampled just inside the button's left edge rather than at its middle:
   // the middle is where the label is, so a centre pixel reports the colour
-  // of a glyph or of the gap between two, depending on the word.
+  // of a glyph or of the gap between two, depending on the word. Ten virtual
+  // pixels in: past the six-pixel bevel (`panel`), short of the label, which
+  // starts half the button's side padding in — a fraction of the width lands
+  // on one or the other depending on how long the word is.
   const landPixels = async (id: string) => {
-    const box = await page.evaluate(
-      (b) =>
-        window.__cwbCapture!.buttons().find((x) => x.id === b)?.client ?? null,
+    const b = await page.evaluate(
+      (b) => window.__cwbCapture!.buttons().find((x) => x.id === b) ?? null,
       id,
     );
-    if (!box) return null;
-    return page.evaluate(([x, y, w, h]) => {
-      const c = document.querySelector("#game") as HTMLCanvasElement;
-      const g = c.getContext("2d")!;
-      const r = c.getBoundingClientRect();
-      const px = Math.round(((x + w * 0.06 - r.left) / r.width) * c.width);
-      const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
-      const d = g.getImageData(px, py, 1, 1).data;
-      return `${d[0]},${d[1]},${d[2]}`;
-    }, box);
+    if (!b) return null;
+    return page.evaluate(
+      ([[x, y, w, h], vw]) => {
+        const c = document.querySelector("#game") as HTMLCanvasElement;
+        const g = c.getContext("2d")!;
+        const r = c.getBoundingClientRect();
+        const px = Math.round(((x + (w / vw) * 10 - r.left) / r.width) * c.width);
+        const py = Math.round(((y + h * 0.5 - r.top) / r.height) * c.height);
+        const d = g.getImageData(px, py, 1, 1).data;
+        return `${d[0]},${d[1]},${d[2]}`;
+      },
+      [b.client, b.rect[2]] as const,
+    );
   };
   const rustLit = await landPixels("rust");
   const goUnlit = await landPixels("go");
