@@ -89,8 +89,143 @@ const back = () => (cjk ? `"${cjk}",${CJK}` : CJK);
  * missing glyph inside the game's own two typefaces before it reaches the
  * CJK face or the machine's.
  */
-const PIXEL = () => `"PressStart2P","VT323",ui-monospace,monospace,${back()}`;
-const BODY = () => `"VT323","PressStart2P",ui-monospace,monospace,${back()}`;
+const PIXEL = () => `${lead()}"PressStart2P","VT323",ui-monospace,monospace,${back()}`;
+const BODY = () => `${lead()}"VT323","PressStart2P",ui-monospace,monospace,${back()}`;
+
+/**
+ * The faces the whole interface can be set in, in the order F8 and the map's
+ * FONT chip cycle them. `game` is Press Start 2P over VT323 and stays the
+ * default. The others are one face for every role, and each is put at the
+ * **front** of both stacks, so the two game faces still stand behind it for
+ * a glyph it lacks — and NeoDunggeunmo and Galmuri, which carry Hangul, draw
+ * Korean themselves before the CJK face is asked.
+ *
+ * The multipliers were measured, not guessed (cap height and advance of each
+ * face at 100px in Chromium). Press Start 2P is a square face — cap height and
+ * advance both a full em — so a face swapped into its roles is set larger to
+ * keep a label's height, and ends up narrower; VT323 is a tall narrow one, so
+ * a face swapped into the body roles is matched on cap height.
+ */
+export const UI_FACES = ["game", "dos", "dunggeunmo", "galmuri", "comic"] as const;
+export type UiFace = (typeof UI_FACES)[number];
+
+interface UiFaceSpec {
+  /** The family put in front of both stacks, or null for the game's own pair. */
+  family: string | null;
+  /** Against Press Start 2P, for the chrome roles. */
+  pixel: number;
+  /** Against VT323, for the body roles. */
+  body: number;
+}
+
+const UI_FACE_SPEC: Record<UiFace, UiFaceSpec> = {
+  game: { family: null, pixel: 1, body: 1 },
+  // IBM VGA 8x16: cap 0.625 em, advance 0.5 em.
+  dos: { family: "DOSVGA", pixel: 1.25, body: 0.9 },
+  // Neo둥근모: the same 8x16 cell, and Hangul in it.
+  dunggeunmo: { family: "NeoDunggeunmo", pixel: 1.25, body: 0.9 },
+  // Galmuri11: cap 0.917 em on a 12-pixel grid, proportional Latin. Set a
+  // little over its cap-height match: its strokes are one pixel, and at the
+  // matched size a brief in it read smaller than the same brief in VT323.
+  galmuri: { family: "Galmuri11", pixel: 1, body: 0.75 },
+  // Comic Mono: cap 0.715 em, advance 0.545 em.
+  comic: { family: "ComicMono", pixel: 1.2, body: 0.78 },
+};
+
+/** What each is called on the chip and in the toast. Its own name. */
+export const UI_FACE_NAME: Record<UiFace, string> = {
+  game: "ARCADE",
+  dos: "DOS",
+  dunggeunmo: "DUNGGEUNMO",
+  galmuri: "GALMURI",
+  comic: "COMIC",
+};
+
+export const UI_FACE_KEY = "ui.face";
+let uiFace: UiFace = "game";
+const lead = () => {
+  const fam = UI_FACE_SPEC[uiFace].family;
+  return fam ? `"${fam}",` : "";
+};
+
+/**
+ * The downloadable faces that are not in `style.css`, by family. Fetched on
+ * first use and never before: Galmuri is half a megabyte of Hangul, and a
+ * player who never picks it should never pay for it.
+ */
+const FACE_FILES: Record<string, string> = {
+  DOSVGA: "/fonts/IBM-VGA-8x16.woff",
+  NeoDunggeunmo: "/fonts/neodgm.woff2",
+  NeoDunggeunmoCode: "/fonts/neodgm_code.woff2",
+  Galmuri11: "/fonts/Galmuri11.woff2",
+  GalmuriMono11: "/fonts/GalmuriMono11.woff2",
+  ComicMono: "/fonts/ComicMono.ttf",
+};
+const faceLoads = new Map<string, Promise<boolean>>();
+
+/**
+ * Fetch one family and add it to the document, once. Resolves false rather
+ * than throwing: a face that will not download is a cosmetic failure, and the
+ * stack behind it still draws every word.
+ */
+function loadFamily(family: string): Promise<boolean> {
+  const file = FACE_FILES[family];
+  if (!file) return Promise.resolve(true);
+  let p = faceLoads.get(family);
+  if (!p) {
+    p = (async () => {
+      try {
+        if (typeof FontFace === "undefined" || !document.fonts) return false;
+        const face = new FontFace(family, `url(${file})`, { display: "block" });
+        await face.load();
+        document.fonts.add(face);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    faceLoads.set(family, p);
+  }
+  return p;
+}
+
+/**
+ * Whatever the chosen interface and code faces need, loaded. `boot` waits on
+ * this with the two game faces, for the same reason it waits on those: a
+ * screen measured against the fallback is a screen that jumps when the real
+ * face lands.
+ */
+export async function facesReady(): Promise<void> {
+  const want = [UI_FACE_SPEC[uiFace].family, CODE_FACE_FAMILY[codeFace]].filter(
+    (f): f is string => !!f,
+  );
+  await Promise.all(want.map(loadFamily));
+}
+
+/**
+ * Name the interface face without waiting for it: the saved choice, at
+ * startup, before `boot` loads it (`facesReady`) and measures.
+ */
+export function restoreUiFace(face: UiFace): void {
+  uiFace = face;
+  remeasure();
+  try {
+    document.documentElement.style.setProperty("--cwb-body", BODY());
+  } catch {
+    /* no document in a unit test */
+  }
+}
+
+/** Set the interface face. Loads it first, so nothing is measured without it. */
+export async function setUiFace(face: UiFace): Promise<void> {
+  const fam = UI_FACE_SPEC[face].family;
+  if (fam) await loadFamily(fam);
+  restoreUiFace(face);
+}
+
+export function getUiFace(): UiFace {
+  return uiFace;
+}
 
 /**
  * The faces a code pane can be set in, in the order the button cycles them.
@@ -105,7 +240,15 @@ const BODY = () => `"VT323","PressStart2P",ui-monospace,monospace,${back()}`;
  * Each names the next face in the stack, so a glyph one subset lacks is
  * drawn by the game's own face before it reaches the machine's.
  */
-export const CODE_FACES = ["game", "iosevka", "jetbrains"] as const;
+export const CODE_FACES = [
+  "game",
+  "iosevka",
+  "jetbrains",
+  "dos",
+  "dunggeunmo",
+  "galmuri",
+  "comic",
+] as const;
 export type CodeFace = (typeof CODE_FACES)[number];
 
 /**
@@ -125,6 +268,12 @@ export const CODE_FACE_SCALE: Record<CodeFace, number> = {
   game: 1,
   iosevka: 0.68,
   jetbrains: 0.68,
+  // The four below are matched on cap height to VT323 (0.56 em), from the
+  // same measurement as `UI_FACE_SPEC`.
+  dos: 0.85,
+  dunggeunmo: 0.85,
+  galmuri: 0.62,
+  comic: 0.78,
 };
 
 /** What to call each on the button. Its own name, not a description. */
@@ -132,6 +281,21 @@ export const CODE_FACE_NAME: Record<CodeFace, string> = {
   game: "VT323",
   iosevka: "IOSEVKA",
   jetbrains: "JETBRAINS",
+  dos: "DOS",
+  dunggeunmo: "DUNGGEUNMO",
+  galmuri: "GALMURI",
+  comic: "COMIC",
+};
+
+/** The family each code face is fetched as, for the ones `style.css` lacks. */
+const CODE_FACE_FAMILY: Record<CodeFace, string | null> = {
+  game: null,
+  iosevka: null,
+  jetbrains: null,
+  dos: "DOSVGA",
+  dunggeunmo: "NeoDunggeunmoCode",
+  galmuri: "GalmuriMono11",
+  comic: "ComicMono",
 };
 
 let codeFace: CodeFace = "game";
@@ -143,8 +307,22 @@ const CODE_STACK = (): string => {
   if (codeFace === "jetbrains") {
     return `"JetBrainsMonoCode","VT323",ui-monospace,monospace,${back()}`;
   }
-  return BODY();
+  const fam = CODE_FACE_FAMILY[codeFace];
+  if (fam) return `"${fam}","VT323",ui-monospace,monospace,${back()}`;
+  // The game face is VT323 *whatever the interface is set in*: the code
+  // button and the interface chip are two choices, and the first one's
+  // default must not move because somebody made the second.
+  return `"VT323","PressStart2P",ui-monospace,monospace,${back()}`;
 };
+
+/**
+ * Load a code face's file, for a caller that wants to wait for it before
+ * switching (the face button), so the pane is not measured without it.
+ */
+export function loadCodeFace(face: CodeFace): Promise<boolean> {
+  const fam = CODE_FACE_FAMILY[face];
+  return fam ? loadFamily(fam) : Promise.resolve(true);
+}
 
 /** Which face code is drawn in. */
 export function setCodeFace(face: CodeFace): void {
@@ -194,9 +372,14 @@ export function getTextScale(): number {
   return textMul;
 }
 
-/** The two stacks, for the font-coverage test. */
-export function fontStacks(): { pixel: string; body: string } {
-  return { pixel: PIXEL(), body: BODY() };
+/** The stacks, for the font-coverage and face tests. */
+export function fontStacks(): { pixel: string; body: string; code: string } {
+  return { pixel: PIXEL(), body: BODY(), code: CODE_STACK() };
+}
+
+/** Every downloadable face's file, for the test that they are all shipped. */
+export function faceFiles(): string[] {
+  return Object.values(FACE_FILES);
 }
 
 export type FontName =
@@ -327,7 +510,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   // The active CJK family is part of the key. Without it, switching language
   // hands back the record built for the previous one and every Korean string
   // on screen is measured — and drawn — in a stack that cannot render it.
-  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}\n${codeFace}`;
+  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}\n${codeFace}\n${uiFace}`;
   if (key === scaleKey && fonts) return fonts;
   scaleKey = key;
   widths = new Map();
@@ -344,15 +527,21 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
    * so it moves the code with everything else.
    */
   const at = (n: number) => Math.max(n, floorPx * s);
+  // The chrome roles and the body roles, in the chosen interface face. The
+  // game's own pair keeps Press Start 2P's eight-pixel grid; the others are
+  // set at their measured multiple of it (`UI_FACE_SPEC`), whole pixels.
+  const spec = UI_FACE_SPEC[uiFace];
+  const P = (n: number) => (spec.family ? Math.round(at(n) * spec.pixel) : at(snap8(n)));
+  const B = (n: number) => (spec.family ? Math.round(at(n) * spec.body) : at(n));
   fonts = {
-    title: make(at(snap8(40 * s)), pixel),
-    subtitle: make(at(40 * s), body),
-    ui: make(at(snap8(20 * s)), pixel),
-    small: make(at(30 * s), body),
+    title: make(P(40 * s), pixel),
+    subtitle: make(B(40 * s), body),
+    ui: make(P(20 * s), pixel),
+    small: make(B(30 * s), body),
     code: make(28 * s * faceScale, code),
     codeSm: make(22 * s * faceScale, code),
-    bubble: make(at(30 * s), body),
-    station: make(at(snap8(20 * s)), pixel),
+    bubble: make(B(30 * s), body),
+    station: make(P(20 * s), pixel),
     // The small chrome face — panel titles, the footer key bar, captions, the
     // quest toolbar — is VT323 at 20 rather than Press Start 2P at 8, and the
     // swap is free: the two have the *same advance width* (8 virtual px), so
@@ -360,15 +549,15 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     // syllable goes 7.2 -> 18.1. Eight-pixel Press Start 2P was the least
     // readable thing in the game and the labels of the controls were written
     // in it.
-    stationSm: make(at(20 * s), body),
+    stationSm: make(B(20 * s), body),
     // 20 rather than 16: a control whose label you cannot read at arm's
     // length is not a control. Press Start 2P is on an eight-pixel grid, so
     // this lands on 16 or 24 depending on the scale rather than anywhere in
     // between, and the rows that hold these buttons wrap by measurement
     // (`Buttons.row`, `rowsIn`) rather than by a fixed count.
-    button: make(at(snap8(20 * s)), pixel),
-    stamp: make(at(snap8(24 * s)), pixel),
-    help: make(at(32 * s), body),
+    button: make(P(20 * s), pixel),
+    stamp: make(P(24 * s), pixel),
+    help: make(B(32 * s), body),
   };
   return fonts;
 }
@@ -438,7 +627,7 @@ export function remeasure(): void {
 const sized = new Map<string, Font>();
 export function bodyFontAt(px: number): Font {
   const n = Math.max(8, Math.round(px));
-  const key = `${n}\n${cjk}`;
+  const key = `${n}\n${cjk}\n${uiFace}`;
   let f = sized.get(key);
   if (!f) {
     f = make(n, BODY());

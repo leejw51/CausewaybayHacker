@@ -37,6 +37,8 @@ export const en = {
   "app.fullscreenOn": "fullscreen: on",
   "app.fullscreenOff": "fullscreen: off",
   "app.language": "language: {name}",
+  "app.uiFace": "font: {name}",
+  "app.fontChip": "FONT {name}",
   "chrome.logout": "LOG OUT",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.difficulty": "DIFFICULTY",

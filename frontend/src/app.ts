@@ -18,6 +18,13 @@ import {
   remeasure,
   setCodeFace,
   getTextScale,
+  getUiFace,
+  restoreUiFace,
+  setUiFace,
+  UI_FACE_KEY,
+  UI_FACE_NAME,
+  UI_FACES,
+  type UiFace,
   setTextScale,
   TEXT_SCALE_KEY,
   TEXT_SCALE_MAX,
@@ -253,6 +260,8 @@ export class App {
     // The code face, before the first frame: a face chosen last time and
     // applied on the second frame is a screen that visibly re-lays itself.
     setCodeFace(readEnumPref<CodeFace>(CODE_FACE_KEY, CODE_FACES, "game"));
+    // The interface face: named now, fetched by `boot` before it measures.
+    restoreUiFace(readEnumPref<UiFace>(UI_FACE_KEY, UI_FACES, "game"));
     // And the text size, for the same reason.
     setTextScale(readNumberPref(TEXT_SCALE_KEY, 1, TEXT_SCALE_MIN, TEXT_SCALE_MAX));
     try {
@@ -701,6 +710,20 @@ export class App {
     return next;
   }
 
+  /**
+   * The next interface face, for every screen at once: F8 and the map's FONT
+   * chip. It waits for the file before switching, so no frame is measured
+   * against a face that has not arrived.
+   */
+  async cycleUiFace(): Promise<void> {
+    const next = UI_FACES[(UI_FACES.indexOf(getUiFace()) + 1) % UI_FACES.length];
+    await setUiFace(next);
+    writePref(UI_FACE_KEY, next);
+    this.remeasure();
+    this.say(t("app.uiFace", { name: UI_FACE_NAME[next] }));
+    this.chip.blip();
+  }
+
   /** Re-read the window on demand — the orientation toggle and the capture hook. */
   remeasure(): void {
     this.layout.measure();
@@ -1112,6 +1135,12 @@ export class App {
         void this.toggleFullscreen().then((on) => {
           this.say(on ? t("app.fullscreenOn") : t("app.fullscreenOff"));
         });
+        return;
+      }
+      // F8: the interface face, from any screen, like F7's language.
+      if (name === "f8") {
+        ev.preventDefault();
+        void this.cycleUiFace();
         return;
       }
       // F9 / F10: the text size, smaller and bigger, from any screen. The

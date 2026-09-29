@@ -25,7 +25,7 @@
  * it.
  */
 import type { App, Scene } from "../app";
-import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
+import { elide, ensureFonts, getUiFace, printf, UI_FACE_NAME, width, wrap } from "../engine/text";
 import { css, Theme, TRACK_HAZE } from "../engine/theme";
 import { btnBox, btnPad, clipped, fill, panel, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -581,6 +581,14 @@ export class MapScene implements Scene {
         lit: false,
         group: phone ? 2 : 3,
       },
+      // The interface face, beside the language and for the same reason:
+      // F8 does it from anywhere, and a chip is how anyone finds that out.
+      {
+        id: "uiface",
+        label: t("app.fontChip", { name: UI_FACE_NAME[getUiFace()] }),
+        lit: false,
+        group: phone ? 2 : 3,
+      },
     ];
   }
 
@@ -816,6 +824,7 @@ export class MapScene implements Scene {
     // `switchTo(this.land, "search")` to `world.map` as a category.
     else if (kind === "aux") void openAux(this.app, id);
     else if (id === "lang") void setLocale(nextLocale());
+    else if (id === "uiface") void this.app.cycleUiFace();
     else if (kind === "land") this.switchTo(value as Land, this.category);
     else if (kind === "cat") this.switchTo(this.land, value as Category);
   }
@@ -1229,6 +1238,7 @@ export class MapScene implements Scene {
       { id: "play", label: PLAY_LABEL() },
       ...AUX_BAR().map((a) => ({ id: a.id, label: a.label })),
       { id: "lang", label: LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH" },
+      { id: "uiface", label: t("app.fontChip", { name: UI_FACE_NAME[getUiFace()] }) },
       { id: "close", label: t("map.close"), strong: true },
     ];
     const held = this.sheet.list().slice();

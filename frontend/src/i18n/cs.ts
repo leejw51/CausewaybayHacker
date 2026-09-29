@@ -43,6 +43,8 @@ export const cs: Partial<Catalogue> = {
   "app.fullscreenOn": "celá obrazovka: zapnuto",
   "app.fullscreenOff": "celá obrazovka: vypnuto",
   "app.language": "jazyk: {name}",
+  "app.uiFace": "písmo: {name}",
+  "app.fontChip": "PÍSMO {name}",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.logout": "ODHLÁSIT",
   "chrome.difficulty": "OBTÍŽNOST",

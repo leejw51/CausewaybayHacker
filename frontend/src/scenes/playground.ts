@@ -45,6 +45,7 @@ import {
   CODE_FACE_NAME,
   CODE_FACES,
   getCodeFace,
+  loadCodeFace,
   getTextScale,
   setCodeFace,
   TEXT_SCALE_MAX,
@@ -610,9 +611,14 @@ export class PlaygroundScene implements Scene {
    * for the same reason: this is a fact about the person, not about which
    * screen they are on.
    */
-  private cycleFace(): void {
-    const at = CODE_FACES.indexOf(getCodeFace());
-    const next = CODE_FACES[(at + 1) % CODE_FACES.length];
+  private async cycleFace(): Promise<void> {
+    const from = getCodeFace();
+    const next = CODE_FACES[(CODE_FACES.indexOf(from) + 1) % CODE_FACES.length];
+    // Fetched before it is named, so the pane is never measured without it.
+    // A second press while the first is still downloading is dropped rather
+    // than skipping a face.
+    await loadCodeFace(next);
+    if (getCodeFace() !== from) return;
     setCodeFace(next);
     writePref(CODE_FACE_KEY, next);
     this.app.remeasure();
@@ -1479,7 +1485,7 @@ export class PlaygroundScene implements Scene {
     if (hit.id === "copyin") return void this.clip("copyin");
     if (hit.id === "pastein") return void this.clip("in");
     if (hit.id === "face") {
-      this.cycleFace();
+      void this.cycleFace();
       return;
     }
     if (hit.id === "fontdown" || hit.id === "fontup") {

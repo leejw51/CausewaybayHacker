@@ -46,6 +46,8 @@ export const yue: Partial<Catalogue> = {
   "app.fullscreenOn": "全螢幕：開",
   "app.fullscreenOff": "全螢幕：閂",
   "app.language": "語言：{name}",
+  "app.uiFace": "字款：{name}",
+  "app.fontChip": "字款 {name}",
   "chrome.xp": "LV {level} · {xp} XP",
   "chrome.logout": "登出",
   "chrome.difficulty": "難度",
