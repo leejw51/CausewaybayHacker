@@ -309,7 +309,12 @@ return {
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
   ["updated on another device"] = "喺另一部裝置更新咗",
-  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "喺另一部裝置儲存咗 -- 呢度未儲存嘅輸入會保留，下一次儲存以呢度為準",
+  ["took the other device's version"] = "用咗另一部裝置嘅版本",
+  ["saved on another device: choose which version to keep"] = "喺另一部裝置儲存咗 -- 揀要保留邊個版本",
+  ["SAVED ON ANOTHER DEVICE"] = "喺另一部裝置儲存咗",
+  ["This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?"] = "呢個草稿啱啱喺另一部裝置儲存咗，而呢度有未儲存嘅修改。用另一部裝置嘅版本，定係保留你嘅版本再覆蓋儲存？",
+  ["TAKE THEIRS  T"] = "用對方嘅  T",
+  ["KEEP MINE  K"] = "保留我嘅  K",
   ["the room changed on another device"] = "對話喺另一部裝置有變",
   ["UNDO"] = "還原",
   ["REDO"] = "重做",

@@ -87,7 +87,14 @@ function M.new(opts)
   self.client:on("progress.update", function(payload)
     self:apply_xp(payload and payload.xp)
   end)
-  for _, event in ipairs({ "run.stage", "run.log", "progress.update", "award" }) do
+  -- §4.22, §4.23: a pad or its room changed on another of this user's
+  -- connections. The playground subscribes to both through the session, and
+  -- until they were listed here neither ever reached it: a save on the
+  -- browser never arrived in this client at all.
+  for _, event in ipairs({
+    "run.stage", "run.log", "progress.update", "award",
+    "playground.updated", "playground.chat.updated",
+  }) do
     self.client:on(event, function(payload, env)
       self:fire(event, payload, env)
     end)

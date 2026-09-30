@@ -315,6 +315,27 @@ return function()
     T.eq(h.session.token, nil)
   end)
 
+  T.section("session — §4.22, §4.23: another window's pad reaches the playground")
+
+  T.case("playground.updated and playground.chat.updated are handed to the scene", function()
+    -- The playground subscribes through the session. These two were missing
+    -- from what the session relays, so a save on the browser never reached
+    -- this client: the pad on screen simply stayed as it was.
+    local h = harness({ token = "t0" })
+    h.client:connect(); h.client:update()
+    h.server():reply(h.server():sent("auth.resume")[1].id, "auth.resume.ok",
+      { token = "t1", user = { address = "0x9858Ef", name = "mei" } })
+    h.client:update()
+    local pad, room
+    h.session:on("playground.updated", function(p) pad = p end)
+    h.session:on("playground.chat.updated", function(p) room = p end)
+    h.server():event("playground.updated", { snippet = { id = "pg_a", source = "x" } })
+    h.server():event("playground.chat.updated", { id = "pg_a", cleared = true })
+    h.client:update()
+    T.eq(pad and pad.snippet.id, "pg_a", "the saved pad arrived")
+    T.eq(room and room.cleared, true, "and so did the room's change")
+  end)
+
   T.case("server.bye reason=shutdown keeps the token and reconnects", function()
     local h = harness({ token = "t0" })
     h.client:connect(); h.client:update()

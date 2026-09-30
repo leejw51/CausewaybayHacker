@@ -7645,7 +7645,7 @@ longer a number to report but a rule, and a new quest lands with its five
 translations or the content job goes red.
 
 
-## 2026-09-30 — The playground keeps its draft in the browser, and asks before a save from elsewhere wins
+## 2026-09-30 — The playground keeps its draft in the browser, and both clients ask before a save from elsewhere wins
 
 The scratchpad's local mirror moves from `sessionStorage` to `localStorage`
 (the dev mock's world with it). `sessionStorage` survived a reload and
@@ -7674,10 +7674,23 @@ already fans a save out to the account's other connections, and SPEC §6's
 one port with one channel is the design. An SSE stream would need a second
 auth story to carry the same event.
 
-`e2e/playground-sync.spec.ts` covers it — a closed tab brings the draft back
+The LÖVE client asks the same question (**TAKE THEIRS  T** / **KEEP MINE  K**,
+keys or buttons, typing and every shortcut held off until it is answered).
+Driving it against a live server found that it had never received
+`playground.updated` at all: `Session` relays a fixed list of events to the
+scenes, and neither `playground.updated` nor `playground.chat.updated` was on
+it, so a save on the browser simply never arrived in this client. Both are
+relayed now, with a test in `test_session.lua`. The LÖVE client keeps no local
+draft file: it autosaves every four seconds and saves again on leaving the
+screen, and that is unchanged.
+
+`e2e/playground-sync.spec.ts` covers the web client — a closed tab brings the draft back
 (a new page in the same context, which `sessionStorage` fails), a clean pad
 takes a save, a dirty one asks and both answers do what they say, and a
 reopened dirty draft asks — in both orientations. It signs in with a published
 fixture key, so it needs no wallet binary, and `e2e/with-server.mjs` starts a
 throwaway server for it: `make test-sync`, part of `make test` and its own CI
-job.
+job. The LÖVE client is covered headless by `tests/test_playground_sync.lua`
+(the real scene with a stand-in session) and live by
+`tests/drive/pgsync.lua`, where a second session inside the drive plays the
+other device; it runs in the `love2d-window` CI job.

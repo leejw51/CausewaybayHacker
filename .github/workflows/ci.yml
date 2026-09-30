@@ -449,6 +449,9 @@ jobs:
           xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
           xvfb-run -a make -C love2d drive SCRIPT=tests/drive/loginerror.lua ARGS="--home $(mktemp -d)"
           xvfb-run -a make -C love2d drive SCRIPT=tests/drive/pgcode.lua ARGS="--home $(mktemp -d)"
+          # A save from another device (a second session inside the drive):
+          # a clean pad takes it, a dirty one asks, T and K do what they say.
+          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/pgsync.lua ARGS="--home $(mktemp -d)"
 
       - name: Server log
         if: always()
