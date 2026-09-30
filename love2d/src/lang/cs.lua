@@ -324,7 +324,12 @@ return {
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
   ["updated on another device"] = "aktualizováno na jiném zařízení",
-  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "uloženo na jiném zařízení -- neuložené psaní zde zůstává; příští uložení odsud vyhrává",
+  ["took the other device's version"] = "převzata verze z jiného zařízení",
+  ["saved on another device: choose which version to keep"] = "uloženo na jiném zařízení -- vyberte, kterou verzi ponechat",
+  ["SAVED ON ANOTHER DEVICE"] = "ULOŽENO NA JINÉM ZAŘÍZENÍ",
+  ["This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?"] = "Tento blok byl právě uložen na jiném zařízení a vy tu máte neuložené změny. Převzít verzi z druhého zařízení, nebo ponechat svou a uložit ji přes ni?",
+  ["TAKE THEIRS  T"] = "PŘEVZÍT JEJICH  T",
+  ["KEEP MINE  K"] = "PONECHAT MOJI  K",
   ["the room changed on another device"] = "místnost se změnila na jiném zařízení",
   ["UNDO"] = "ZPĚT",
   ["REDO"] = "ZNOVU",

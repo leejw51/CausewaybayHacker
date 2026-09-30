@@ -77,10 +77,10 @@ return function()
     T.nope(source:find('SFX.play("rejected")', 1, true), "and no rejection chime")
   end)
 
-  T.case("a save from another device is taken when clean, said when dirty, ignored when another pad", function()
+  T.case("a save from another device is taken when clean, asked about when dirty, ignored when another pad", function()
     local Playground = require("src.scenes.playground")
     T.eq(Playground.remote_save_action("pg_a", "pg_a", false), "apply")
-    T.eq(Playground.remote_save_action("pg_a", "pg_a", true), "notify")
+    T.eq(Playground.remote_save_action("pg_a", "pg_a", true), "ask")
     T.eq(Playground.remote_save_action("pg_a", "pg_b", false), "ignore")
     T.eq(Playground.remote_save_action("pg_a", "pg_b", true), "ignore")
     -- An unsaved pad has no id and can never be the one that was saved.

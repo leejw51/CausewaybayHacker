@@ -46,18 +46,25 @@ describe("the playground's local mirror", () => {
     expect(direct).toHaveLength(0);
   });
 
-  it("keeps the draft in the tab, beside the session that owns it", () => {
-    // `sessionStorage`, so a tab practising as another identity cannot see it,
-    // and so it still survives the reload the mirror exists for.
+  it("keeps the draft in the browser, so a closed tab does not lose it", () => {
+    // `localStorage`: a reload, a closed tab and an iPad that threw the page
+    // away in the background all come back to the draft. The address in the
+    // key is what keeps another account from seeing it.
     const write = SOURCE.slice(SOURCE.indexOf("private writeLocal("));
-    expect(write.slice(0, write.indexOf("\n  }"))).toContain("sessionStorage.setItem(key,");
+    expect(write.slice(0, write.indexOf("\n  }"))).toContain("localStorage.setItem(");
+    expect(write.slice(0, write.indexOf("\n  }"))).not.toContain("sessionStorage");
     const read = SOURCE.slice(SOURCE.indexOf("private restoreLocal("));
-    expect(read.slice(0, read.indexOf("\n  }"))).toContain("sessionStorage.getItem(key)");
+    expect(read.slice(0, read.indexOf("\n  }"))).toContain("localStorage.getItem(key)");
   });
 
-  it("uses localStorage for one thing only: deleting the old shared key", () => {
-    const calls = [...SOURCE.matchAll(/localStorage\.(\w+)\(/g)].map((m) => m[1]);
-    expect(calls).toEqual(["removeItem"]);
+  it("reads sessionStorage only to move an old draft over", () => {
+    const calls = [...SOURCE.matchAll(/sessionStorage\.(\w+)\(/g)].map((m) => m[1]);
+    expect(calls).toEqual(["getItem", "removeItem"]);
+  });
+
+  it("mirrors the server's copy beside the draft, so a reload can tell it moved", () => {
+    const write = SOURCE.slice(SOURCE.indexOf("private writeLocal("));
+    expect(write.slice(0, write.indexOf("\n  }"))).toContain("saved: this.savedCopy()");
   });
 
   it("drops the old shared key rather than guessing whose draft it was", () => {
@@ -106,12 +113,23 @@ describe("what a reconnect asks for again", () => {
   });
 
   it("hands the re-read pad to the same path a live update takes", () => {
-    // `remoteSaved` is what decides apply-or-notify from `dirty`; a second
+    // `remoteSaved` is what decides apply-or-ask from `dirty`; a second
     // copy of that decision here would be the one that drifts.
     const body = SOURCE.slice(SOURCE.indexOf("private async resync("));
     const fn = body.slice(0, body.indexOf("\n  }"));
-    expect(fn).toContain("this.remoteSaved(res.snippet)");
+    expect(fn).toContain("this.checkServerCopy()");
     expect(fn).not.toContain("this.load(");
+    const check = SOURCE.slice(SOURCE.indexOf("private async checkServerCopy("));
+    const checkFn = check.slice(0, check.indexOf("\n  }"));
+    expect(checkFn).toContain("this.remoteSaved(res.snippet)");
+    expect(checkFn).not.toContain("this.load(");
+  });
+
+  it("never autosaves over another device's save while the question is open", () => {
+    const body = SOURCE.slice(SOURCE.indexOf("private async save("));
+    expect(body.slice(0, body.indexOf("\n  }"))).toContain(
+      "if (this.saving || this.conflict) return;",
+    );
   });
 });
 

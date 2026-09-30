@@ -305,7 +305,12 @@ return {
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
   ["updated on another device"] = "別の端末で更新されました",
-  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "別の端末で保存されました -- ここでの未保存の入力は残り、次の保存が優先されます",
+  ["took the other device's version"] = "別の端末の版を使いました",
+  ["saved on another device: choose which version to keep"] = "別の端末で保存されました -- 残す版を選んでください",
+  ["SAVED ON ANOTHER DEVICE"] = "別の端末で保存されました",
+  ["This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?"] = "このパッドは別の端末で保存されましたが、ここには未保存の変更があります。別の端末の版を使いますか、それともこちらを残して上書き保存しますか？",
+  ["TAKE THEIRS  T"] = "あちらを使う  T",
+  ["KEEP MINE  K"] = "こちらを残す  K",
   ["the room changed on another device"] = "別の端末で会話が変わりました",
   ["UNDO"] = "元に戻す",
   ["REDO"] = "やり直す",

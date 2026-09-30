@@ -375,8 +375,13 @@ export const en = {
   "pg.format": "FORMAT",
   "pg.save": "SAVE",
   "pg.updatedElsewhere": "updated on another device",
-  "pg.updatedElsewhereUnsaved":
-    "saved on another device — your unsaved typing here is kept; the next save from here wins",
+  "pg.conflictTitle": "SAVED ON ANOTHER DEVICE",
+  "pg.conflictBody":
+    "This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?",
+  "pg.conflictTheirs": "TAKE THEIRS",
+  "pg.conflictMine": "KEEP MINE",
+  "pg.conflictNote": "saved on another device — choose which version to keep",
+  "pg.tookTheirs": "took the other device's version",
   "agent.roomUpdated": "the room changed on another device",
   "pg.saveDirty": "SAVE *",
   "pg.full": "FULL",

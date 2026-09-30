@@ -13,9 +13,14 @@
  * The other rule is that **the text is the whole point**. There is no starter
  * to fall back on and nothing on the server to re-derive it from, so it is
  * saved three times over: on a debounce while typing, when the window loses
- * focus, and when the screen is left — and it is mirrored into this tab's
- * `sessionStorage` on every keystroke, so a reload or a dropped socket cannot
- * cost work either.
+ * focus, and when the screen is left — and it is mirrored into this browser's
+ * `localStorage` on every keystroke, so a reload, a closed tab or a dropped
+ * socket cannot cost work either.
+ *
+ * And **nothing is overwritten without asking**. A save from another of this
+ * player's devices arrives as `playground.updated` (§4.22); a clean pad takes
+ * it, and a pad with unsaved typing stops and asks — the other device's text,
+ * or this one's over the top of it (`remoteSaveAction`, `resolveConflict`).
  */
 import type { App, Scene } from "../app";
 import {
@@ -81,25 +86,28 @@ import {
 import { INDEX_PREF } from "./login";
 import { deterministicUsername } from "../wallet/username";
 
-/** Where the open scratchpad is mirrored, so a reload opens it again. */
 /**
- * Where the local mirror of the open pad lives: **in this tab, under this
+ * Where the local mirror of the open pad lives: **in this browser, under this
  * account**.
  *
- * It used to be one key in `localStorage` for the whole origin. With two tabs
- * signed in as two accounts — which is what the account index is for — one
- * account's unsaved draft was on offer to the other's playground, carrying
- * `id` with it: a snippet id belonging to somebody else, which the next
- * autosave would try to save into. The server scopes every snippet by address
- * and refuses (`snippets::get` — "somebody else's snippet is not found, not
- * forbidden"), so nothing could be corrupted; it would show the wrong text and
- * then fail.
+ * `localStorage`, so the draft outlives the tab: a reload, a tab closed by
+ * accident, a browser restarted, an iPad that evicted the page in the
+ * background. It was `sessionStorage` for a while, which survives a reload
+ * and nothing else — and a tablet that throws a background tab away does not
+ * reload it, it opens it again, fresh, with the session store empty.
  *
- * Two changes, and both are needed. `sessionStorage` puts the draft in the tab,
- * beside the tab that owns it — it still survives the
- * reload this exists for, and stops being visible to a tab practising as
- * somebody else. The address stays in the key because one tab can sign out and
- * back in as another account, and the draft must not follow it across.
+ * The address is in the key, and that is what keeps it safe to share across
+ * tabs. With one origin-wide key, two tabs signed in as two accounts handed
+ * one account's unsaved draft to the other, carrying a snippet id that was not
+ * theirs into the next autosave (the server refused it — `snippets::get`
+ * scopes by address — so it showed the wrong text and then failed). Keyed by
+ * address, another account never sees the draft, and one tab signing out and
+ * back in as somebody else does not carry it across.
+ *
+ * What sharing does mean: two tabs open as the *same* account keep one mirror
+ * between them, and the last keystroke is what a reload brings back. The
+ * server copy is still the real one, and each tab's own saves still go
+ * through `remoteSaved` on the other.
  */
 const LOCAL_KEY = (address: string) => `cwbhacker.playground.${address.toLowerCase()}`;
 
@@ -108,11 +116,7 @@ const LOCAL_KEY = (address: string) => `cwbhacker.playground.${address.toLowerCa
  *
  * Removed rather than migrated. Whose draft it is cannot be known from the
  * outside, and handing it to whichever account opens the playground first
- * would be the bug this is fixing, with a coin toss in front of it. What is
- * lost is at most the few seconds since the last autosave, and only for
- * somebody who upgrades mid-keystroke.
- *
- * It is the one `localStorage` call left in this file, and it only deletes.
+ * would be the bug the per-account key fixed, with a coin toss in front of it.
  */
 const LEGACY_LOCAL_KEY = "cwbhacker.playground";
 /** How long after the last keystroke the autosave fires. */
@@ -204,6 +208,9 @@ type Held = {
   dirty?: boolean;
 };
 
+/** The four things a save carries, as the server last confirmed them. */
+type SavedCopy = { source: string; lang: Lang; name: string; stdin: string };
+
 /**
  * The name an unsaved pad wears until somebody gives it one.
  *
@@ -273,6 +280,19 @@ export class PlaygroundScene implements Scene {
   private savedName = "";
   /** The input the server last confirmed, beside the source and the name. */
   private savedStdin = "";
+  /**
+   * Whether the `saved*` fields describe the server's copy of the held pad.
+   * Only then are they mirrored, because a reload compares the server with
+   * them, and a made-up baseline would ask "which one?" about nothing.
+   */
+  private baselineKnown = false;
+  /**
+   * A save of this pad from another device that arrived while this one had
+   * unsaved typing, waiting for the player to choose (`resolveConflict`).
+   * While it waits nothing is saved from here: an autosave would be the
+   * choice made for them.
+   */
+  private conflict: Snippet | null = null;
   private dirtyFor = 0;
   private dirty = false;
   private saving = false;
@@ -892,6 +912,10 @@ export class PlaygroundScene implements Scene {
     // snapshot over text that never got saved is exactly the loss this screen
     // is not allowed to have.
     if (this.held.id && !this.dirty) void this.load(this.held.id, true);
+    // And when there is: the pad may have been saved on another device while
+    // this one was closed or reloading, and that is the same question a live
+    // `playground.updated` asks — never an autosave over the top of it.
+    else if (this.held.id && this.baselineKnown) void this.checkServerCopy();
   }
 
   leave(): void {
@@ -1000,9 +1024,16 @@ export class PlaygroundScene implements Scene {
     const key = this.localKey();
     if (!key) return;
     try {
-      sessionStorage.setItem(key, JSON.stringify({ ...this.held, dirty: this.dirty }));
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...this.held,
+          dirty: this.dirty,
+          ...(this.held.id && this.baselineKnown ? { saved: this.savedCopy() } : {}),
+        }),
+      );
     } catch {
-      /* private browsing: the server copy is still the real one */
+      /* private browsing, or the store is full: the server copy is still the real one */
     }
   }
 
@@ -1012,9 +1043,16 @@ export class PlaygroundScene implements Scene {
     try {
       // The unowned, origin-wide key from before this, on the way past.
       localStorage.removeItem(LEGACY_LOCAL_KEY);
-      const raw = sessionStorage.getItem(key);
+      let raw = localStorage.getItem(key);
+      if (!raw) {
+        // A draft this tab mirrored while the mirror was `sessionStorage`,
+        // moved over once rather than dropped on the upgrade.
+        raw = sessionStorage.getItem(key);
+        sessionStorage.removeItem(key);
+        if (raw) localStorage.setItem(key, raw);
+      }
       if (!raw) return;
-      const v = JSON.parse(raw) as Partial<Held>;
+      const v = JSON.parse(raw) as Partial<Held> & { saved?: Partial<SavedCopy> };
       if (typeof v.source !== "string") return;
       this.padSerial++;
       this.held = {
@@ -1028,9 +1066,36 @@ export class PlaygroundScene implements Scene {
       // Unsaved text from last time is still unsaved: it stays on screen, it is
       // not fetched over, and the first autosave pushes it up.
       this.dirty = this.held.dirty === true;
+      // What the server held when this draft was last in step with it. It is
+      // what tells a reload whether the pad moved on another device while
+      // this one was away (`checkServerCopy`); a mirror written before it was
+      // kept simply has none, and is pushed up as it always was.
+      const saved = v.saved;
+      if (
+        saved &&
+        typeof saved.source === "string" &&
+        isLang(saved.lang) &&
+        typeof saved.name === "string"
+      ) {
+        this.savedSource = saved.source;
+        this.savedLang = saved.lang;
+        this.savedName = saved.name;
+        this.savedStdin = typeof saved.stdin === "string" ? saved.stdin : "";
+        this.baselineKnown = true;
+      }
     } catch {
       /* a corrupt mirror is not worth a screen full of error */
     }
+  }
+
+  /** What the server last confirmed, as one value. */
+  private savedCopy(): SavedCopy {
+    return {
+      source: this.savedSource,
+      lang: this.savedLang,
+      name: this.savedName,
+      stdin: this.savedStdin,
+    };
   }
 
   // -- the server ----------------------------------------------------------
@@ -1065,25 +1130,28 @@ export class PlaygroundScene implements Scene {
   private async resync(): Promise<void> {
     for (const step of resyncSteps(this.held.id)) {
       if (step === "list") await this.refreshList();
-      if (step === "pad" && this.held.id) {
-        try {
-          const res = await this.app.client.request("playground.load", { id: this.held.id });
-          const saved = {
-            source: this.savedSource,
-            lang: this.savedLang,
-            name: this.savedName,
-            stdin: this.savedStdin,
-          };
-          if (snippetDiffers(res.snippet, saved)) this.remoteSaved(res.snippet);
-        } catch (e) {
-          // Deleted on another device during the outage, or a server that
-          // has not got §4.9c: the pad on screen is still the pad on screen.
-          if (e instanceof WireError) {
-            console.warn("playground resync:", e.payload.code, e.payload.message);
-          }
-        }
-      }
+      if (step === "pad") await this.checkServerCopy();
       if (step === "room" && this.held.id) this.padSerial++;
+    }
+  }
+
+  /**
+   * Ask the server for the open pad and, when it is not the copy this screen
+   * last saved (`snippetDiffers`), hand it to `remoteSaved` — the same path
+   * a live `playground.updated` takes, so a clean buffer takes the saved text
+   * and a dirty one is asked which to keep.
+   */
+  private async checkServerCopy(): Promise<void> {
+    if (!this.held.id) return;
+    try {
+      const res = await this.app.client.request("playground.load", { id: this.held.id });
+      if (snippetDiffers(res.snippet, this.savedCopy())) this.remoteSaved(res.snippet);
+    } catch (e) {
+      // Deleted on another device while this one was away, or a server that
+      // has not got §4.9c: the pad on screen is still the pad on screen.
+      if (e instanceof WireError) {
+        console.warn("playground resync:", e.payload.code, e.payload.message);
+      }
     }
   }
 
@@ -1104,6 +1172,7 @@ export class PlaygroundScene implements Scene {
       this.savedLang = res.snippet.lang;
       this.savedName = res.snippet.name;
       this.savedStdin = res.snippet.stdin ?? this.held.stdin;
+      this.baselineKnown = true;
       this.dirty = false;
       this.land = res.snippet.lang;
       this.editor?.load(res.snippet.lang, res.snippet.source);
@@ -1123,7 +1192,9 @@ export class PlaygroundScene implements Scene {
    * every two seconds is a denial of service with good intentions.
    */
   private async save(): Promise<void> {
-    if (this.saving) return;
+    // Not while another device's save is waiting on a choice: this would be
+    // "keep mine", chosen by a timer.
+    if (this.saving || this.conflict) return;
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
     this.writeLocal();
@@ -1163,6 +1234,7 @@ export class PlaygroundScene implements Scene {
       this.savedLang = this.held.lang;
       this.savedName = res.snippet.name;
       this.savedStdin = res.snippet.stdin ?? this.held.stdin;
+      this.baselineKnown = true;
       this.dirty = false;
       this.saveNote = t("pg.saved");
       this.writeLocal();
@@ -1260,8 +1332,8 @@ export class PlaygroundScene implements Scene {
    * Taken when nothing here is unsaved: the text, the input, the name and
    * the language, exactly as a `playground.load` would set them, with the
    * caret kept where it was (`replaceAll` narrows the change). When there
-   * is unsaved typing here it is only said, and the next save from here is
-   * the one that wins — see `remoteSaveAction`.
+   * is unsaved typing here, the screen stops and asks which one to keep —
+   * see `remoteSaveAction` and `resolveConflict`.
    */
   private remoteSaved(snippet: Snippet): void {
     const action = remoteSaveAction(this.held.id, snippet.id, this.dirty);
@@ -1274,28 +1346,25 @@ export class PlaygroundScene implements Scene {
       (snippet.stdin ?? "") !== this.stdinEl.value ||
       snippet.name !== this.held.name ||
       snippet.lang !== this.held.lang;
-    if (!changed) return;
+    if (!changed) {
+      // The other device saved exactly what is on screen here: nothing to
+      // choose between, and this pad is as saved as that one.
+      this.takeSnippet(snippet);
+      this.conflict = null;
+      return;
+    }
     if (action === "apply") {
-      if (snippet.lang !== this.held.lang) {
-        this.held.lang = snippet.lang;
-        this.land = snippet.lang;
-        this.editor?.load(snippet.lang, snippet.source);
-      } else {
-        this.editor?.replaceAll(snippet.source);
-      }
-      this.held.source = snippet.source;
-      this.held.name = snippet.name;
-      this.held.stdin = snippet.stdin ?? "";
-      this.stdinEl.value = this.held.stdin;
-      this.savedSource = snippet.source;
-      this.savedLang = snippet.lang;
-      this.savedName = snippet.name;
-      this.savedStdin = this.held.stdin;
-      this.dirty = false;
-      this.writeLocal();
+      this.takeSnippet(snippet);
       this.saveNote = t("pg.updatedElsewhere");
     } else {
-      this.saveNote = t("pg.updatedElsewhereUnsaved");
+      // A second save from over there while the question is open replaces
+      // the first: "theirs" is always their latest.
+      this.conflict = snippet;
+      this.saveNote = t("pg.conflictNote");
+      // Out of CODE mode's keyboard: the question is the only thing on screen
+      // until it is answered.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
     }
     void this.refreshList();
     // The effect: a burst over the editor and a chime, so a change that
@@ -1303,6 +1372,58 @@ export class PlaygroundScene implements Scene {
     const [x, y, w, h] = this.editorRect;
     if (w > 0) this.fx?.play(burstPlan(x + w / 2, y + Math.min(h / 2, 80), 36));
     this.app.chip.coin();
+  }
+
+  /** Make `snippet` the pad on screen and the server's copy of it, clean. */
+  private takeSnippet(snippet: Snippet): void {
+    if (snippet.lang !== this.held.lang) {
+      this.held.lang = snippet.lang;
+      this.land = snippet.lang;
+      this.editor?.load(snippet.lang, snippet.source);
+    } else if ((this.editor?.source ?? this.held.source) !== snippet.source) {
+      this.editor?.replaceAll(snippet.source);
+    }
+    this.held.source = snippet.source;
+    this.held.name = snippet.name;
+    this.held.stdin = snippet.stdin ?? "";
+    this.stdinEl.value = this.held.stdin;
+    this.savedSource = snippet.source;
+    this.savedLang = snippet.lang;
+    this.savedName = snippet.name;
+    this.savedStdin = this.held.stdin;
+    this.baselineKnown = true;
+    this.dirty = false;
+    this.dirtyFor = 0;
+    this.writeLocal();
+  }
+
+  /**
+   * The answer to "saved on another device — which one?".
+   *
+   *   * `theirs`: the other device's pad replaces what is here, unsaved
+   *     typing and all. It was asked for, so it is not a loss.
+   *   * `mine`: what is here is saved over the server's copy, and from there
+   *     reaches the other device like any save. The baseline moves to what
+   *     the server now holds first, so the save cannot mistake this text for
+   *     the copy it already has and skip itself.
+   */
+  private resolveConflict(choice: "theirs" | "mine"): void {
+    const snippet = this.conflict;
+    if (!snippet) return;
+    this.conflict = null;
+    if (choice === "theirs") {
+      this.takeSnippet(snippet);
+      this.saveNote = t("pg.tookTheirs");
+    } else {
+      this.savedSource = snippet.source;
+      this.savedLang = snippet.lang;
+      this.savedName = snippet.name;
+      this.savedStdin = snippet.stdin ?? "";
+      this.dirty = true;
+      this.dirtyFor = 0;
+      void this.save();
+    }
+    this.app.chip.select();
   }
 
   private fresh(): void {
@@ -1369,6 +1490,13 @@ export class PlaygroundScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
+    // The question is modal: no shortcut may save, run or leave around it.
+    // The browser's own keys (reload, zoom) are left alone; only the save
+    // chord is swallowed, or it would open the browser's "save page".
+    if (this.conflict) {
+      if (name === "s" && (ev.ctrlKey || ev.metaKey)) ev.preventDefault();
+      return;
+    }
     // Ctrl/Cmd+Shift+A: the agent, from anywhere on the screen — CODE mode
     // with the panel up and the caret in its field.
     if (name === "a" && (ev.ctrlKey || ev.metaKey) && ev.shiftKey && this.coder) {
@@ -1411,6 +1539,14 @@ export class PlaygroundScene implements Scene {
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    if (this.conflict) {
+      // Only the two answers are registered while the question is open.
+      const id = this.buttons.hit(x, y)?.id ?? null;
+      if (phase === "move") this.buttons.hovered = id;
+      else if (phase === "down" && id === "conflict-theirs") this.resolveConflict("theirs");
+      else if (phase === "down" && id === "conflict-mine") this.resolveConflict("mine");
+      return;
+    }
     // The agent's panel first: it is drawn over the bench and its buttons
     // are its own.
     if (this.focus && this.coder?.pointer(x, y, phase)) return;
@@ -1571,6 +1707,7 @@ export class PlaygroundScene implements Scene {
       this.drawFocus(g, layout.uiScale());
       this.buttons.draw(g, ensureFonts(layout.uiScale()).stationSm);
       this.coder?.draw();
+      if (this.conflict) this.drawConflict(g);
       return;
     }
     // The panel is CODE mode's; its fields must not linger over the bench.
@@ -1591,6 +1728,68 @@ export class PlaygroundScene implements Scene {
     this.buttons.draw(g, ensureFonts(s).button);
     footer(g, layout, t("pg.footer"));
     this.coder?.draw();
+    if (this.conflict) this.drawConflict(g);
+  }
+
+  /**
+   * "Saved on another device — which one?", over everything, until answered.
+   *
+   * Modal on purpose. The fields are DOM laid over the canvas, so a question
+   * drawn on the canvas beside a live editor would be under it — and an
+   * editor that can still be typed into while the question is open makes the
+   * answer out of date as it is given. So every field is put away for the
+   * frame, and the only buttons registered are the two answers: nothing else
+   * on the screen can be hit until one of them is.
+   */
+  private drawConflict(g: Ctx): void {
+    const { layout } = this.app;
+    for (const o of [
+      this.overlay,
+      this.stdinOverlay,
+      this.nameOverlay,
+      this.searchOverlay,
+      this.keyOverlay,
+    ]) {
+      o?.hide();
+    }
+    this.coder?.panel.hideFields();
+    this.buttons.reset();
+    this.rows.reset();
+    fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.72);
+
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const body = fonts.small;
+    const minH = layout.minTouchH();
+    const w = Math.min(layout.vw - Math.round(32 * s), Math.round(760 * s));
+    const pad = Math.round(12 * s);
+    const lines = wrap(body, t("pg.conflictBody"), w - 2 * pad - 28);
+    const choices = [
+      { id: "conflict-theirs", label: t("pg.conflictTheirs"), primary: true },
+      { id: "conflict-mine", label: t("pg.conflictMine"), strong: true },
+    ];
+    const inner = w - 2 * pad - 28;
+    const [, bh] = btnBox(fonts.button, [choices[0].label], 0, btnPad(fonts.button), minH);
+    const rowsN = rowsIn(
+      fonts.button,
+      choices.map((c) => c.label),
+      inner,
+      minH,
+    );
+    const buttonsH = rowsN * bh + (rowsN - 1) * Math.round(fonts.button.size * 0.5);
+    const titleH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+    const h = 14 + titleH + 16 + lines.length * body.height + pad + buttonsH + 16 + pad;
+    const x = Math.round((layout.vw - w) / 2);
+    const y = Math.round((layout.vh - h) / 2);
+    const box = titledPanel(g, [x, y, w, h], t("pg.conflictTitle"), Theme.coin);
+    g.fillStyle = css(Theme.cream);
+    let ly = box[1];
+    for (const line of lines) {
+      printf(g, body, line, box[0], ly, box[2], "left");
+      ly += body.height;
+    }
+    this.buttons.row(fonts.button, [box[0], ly + pad, box[2], buttonsH], choices, minH);
+    this.buttons.draw(g, fonts.button);
   }
 
   /**

@@ -1270,7 +1270,10 @@ is §5.9 in full — id, name, lang, source, stdin — so a window with that pad
 open can take it without a `playground.load`. A window with a different pad
 open ignores it (the list, if shown, is worth refreshing). Whether to replace
 what is on screen is the client's call: the reference clients apply it when
-their editor has nothing unsaved, and only say so when it has.
+their editor has nothing unsaved. When it has, they stop and ask — take the
+saved pad, or keep what is on screen and save it over the top — and save
+nothing until it is answered; a client that cannot ask should at least say
+so rather than let its next autosave decide.
 
 ### 4.23 `playground.chat.updated`
 

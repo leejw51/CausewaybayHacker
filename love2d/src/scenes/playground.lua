@@ -27,6 +27,11 @@
 -- §4.9c: saved per user, server-side, so the same scratchpad opens in the
 -- browser and here. Autosave is on a timer and `playground.save` is idempotent
 -- by contract, so an unchanged buffer costs nothing.
+--
+-- And **nothing is overwritten without asking**. A save of this pad on
+-- another device arrives as `playground.updated` (§4.22): a clean pad takes
+-- it, and a pad with unsaved typing stops and asks -- TAKE THEIRS or KEEP
+-- MINE -- and saves nothing until it is answered (`resolve_conflict`).
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -140,6 +145,12 @@ function Playground.new(app)
     -- The Rust coder: the AI agent that flies over the code
     -- (`src/agent/coder.lua`). Made in `enter`, because it wants the editor.
     coder = nil,
+    -- A save of this pad from another device that arrived while this one had
+    -- unsaved typing, waiting for the player to choose (`resolve_conflict`).
+    -- While it waits nothing is saved from here: an autosave would be the
+    -- choice made for them by a timer.
+    conflict = nil,
+    conflict_rects = nil,
   }, Playground)
 end
 
@@ -259,6 +270,9 @@ end
 --- the moment somebody says something in a pad that has never had one.
 function Playground:save()
   if not self.editor then return end
+  -- Not while another device's save is waiting on a choice: this would be
+  -- KEEP MINE, chosen by the autosave or by leaving the screen.
+  if self.conflict then return end
   if self.save_inflight then
     -- One in flight already: remember that the text has moved on since, so
     -- the reply starts another. Without this, `leave`'s save — the one that
@@ -351,16 +365,53 @@ end
 ---
 ---   * "ignore": a different pad, or none held.
 ---   * "apply": this pad, and nothing unsaved here — take the saved text.
----   * "notify": this pad, but unsaved typing here. Say so, leave the buffer
----     alone; the next save from here wins. Replacing text under fingers that
----     are typing is the one thing this must never do.
+---   * "ask": this pad, but unsaved typing here. Leave the buffer alone and
+---     ask which to keep -- the other device's save, or this text saved over
+---     it. Replacing text under fingers that are typing is the one thing this
+---     must never do, and neither is letting the next autosave from here throw
+---     the other device's work away without a word.
 function Playground.remote_save_action(held_id, snippet_id, dirty)
   if held_id == nil or held_id ~= snippet_id then return "ignore" end
-  return dirty and "notify" or "apply"
+  return dirty and "ask" or "apply"
+end
+
+--- Make `snippet` the pad on screen, clean: what `open` would do, without
+--- moving to another pad.
+function Playground:take_snippet(snippet)
+  local source = snippet.source or ""
+  self.lang = snippet.lang or self.lang
+  self.editor.lang = self.lang
+  self.name = snippet.name
+  self.stdin = snippet.stdin or ""
+  if source ~= self.editor:text() then self.editor:set_text(source) end
+  self.editor.dirty = false
+  self.dirty_at = nil
+  self.saved_at = Anim.now()
+end
+
+--- The answer to "saved on another device -- which one?".
+---
+---   * "theirs": the other device's pad replaces what is here, unsaved typing
+---     and all. It was asked for, so it is not a loss.
+---   * "mine": what is here is saved over the server's copy, and from there
+---     reaches the other device like any save.
+function Playground:resolve_conflict(choice)
+  local snippet = self.conflict
+  if not snippet then return end
+  self.conflict = nil
+  self.conflict_rects = nil
+  if choice == "theirs" then
+    self:take_snippet(snippet)
+    self.note = I18n.t("took the other device's version")
+  else
+    self.editor.dirty = true
+    self:save()
+  end
+  SFX.play("select")
 end
 
 --- This pad was saved on another device (§4.22): taken as `open` would take
---- it when nothing here is unsaved, only said when there is.
+--- it when nothing here is unsaved, and asked about when there is.
 function Playground:remote_saved(snippet)
   if not snippet or not self.editor then return end
   local action = Playground.remote_save_action(self.snippet_id, snippet.id, self.editor.dirty)
@@ -373,19 +424,21 @@ function Playground:remote_saved(snippet)
     or (snippet.stdin or "") ~= (self.stdin or "")
     or snippet.name ~= self.name
     or snippet.lang ~= self.lang
-  if not changed then return end
+  if not changed then
+    -- The other device saved exactly what is on screen here: nothing to
+    -- choose between, and this pad is as saved as that one.
+    self:take_snippet(snippet)
+    self.conflict = nil
+    return
+  end
   if action == "apply" then
-    self.lang = snippet.lang or self.lang
-    self.editor.lang = self.lang
-    self.name = snippet.name
-    self.stdin = snippet.stdin or ""
-    if source ~= self.editor:text() then self.editor:set_text(source) end
-    self.editor.dirty = false
-    self.dirty_at = nil
-    self.saved_at = Anim.now()
+    self:take_snippet(snippet)
     self.note = I18n.t("updated on another device")
   else
-    self.note = I18n.t("saved on another device: unsaved typing here is kept, and the next save from here wins")
+    -- A second save from over there while the question is open replaces
+    -- the first: "theirs" is always their latest.
+    self.conflict = snippet
+    self.note = I18n.t("saved on another device: choose which version to keep")
   end
   self:list()
   -- The effect: a burst over the code and a chime, so a change that arrived
@@ -630,7 +683,52 @@ function Playground:panes()
 end
 
 function Playground:draw()
-  if self.big then return self:draw_big() end
+  if self.big then self:draw_big() else self:draw_bench() end
+  if self.conflict then self:draw_conflict() end
+end
+
+--- "Saved on another device -- which one?", over everything, until answered.
+---
+--- Modal on purpose: the keys and the pointer go to the two answers and to
+--- nothing else (`keypressed`, `textinput`, `mousepressed`), because an
+--- editor that can still be typed into while the question is open makes the
+--- answer out of date as it is given.
+function Playground:draw_conflict()
+  local vw, vh = Layout.vw, Layout.vh
+  UI.setColor(Theme.void, 0.72)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local w = math.min(vw - 32, 620)
+  local pad = 16
+  local title = I18n.t("SAVED ON ANOTHER DEVICE")
+  local body = I18n.t("This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?")
+  local lines = UI.wrap(body, w - 2 * pad, 8)
+  local line_h = UI.lineHeight(8) + 4
+  local bh = UI.chipHeight()
+  local title_h = UI.lineHeight(10)
+  local h = pad + title_h + 12 + #lines * line_h + 16 + bh + pad
+  local x = math.floor((vw - w) / 2)
+  local y = math.floor((vh - h) / 2)
+  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.96), tint = Theme.coin })
+  local ty = y + pad
+  UI.text(title, x + pad, ty, UI.fitSize(title, w - 2 * pad, 10, 6), Theme.coin)
+  ty = ty + title_h + 12
+  for _, line in ipairs(lines) do
+    UI.text(line, x + pad, ty, 8, Theme.cream)
+    ty = ty + line_h
+  end
+  local gap = 12
+  local bw = math.floor((w - 2 * pad - gap) / 2)
+  local by = y + h - pad - bh
+  local theirs = { x = x + pad, y = by, w = bw, h = bh }
+  local mine = { x = x + pad + bw + gap, y = by, w = bw, h = bh }
+  UI.button(theirs.x, theirs.y, theirs.w, theirs.h, I18n.t("TAKE THEIRS  T"), "hot", UI.CHIP_SIZE)
+  UI.button(mine.x, mine.y, mine.w, mine.h, I18n.t("KEEP MINE  K"), "normal", UI.CHIP_SIZE)
+  self.conflict_rects = { theirs = theirs, mine = mine }
+end
+
+function Playground:draw_bench()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick(
     Layout.isPortrait() and "bg_playground_p" or "bg_playground",
@@ -1440,6 +1538,13 @@ end
 -- -------------------------------------------------------------------- input
 
 function Playground:textinput(text)
+  -- Nothing reaches the program while the question is open; the T or K that
+  -- answered it is not a character of anybody's code.
+  if self.conflict then return end
+  if self.eat_text then
+    self.eat_text = false
+    return
+  end
   -- The room's field first while it is open: whatever is being typed into
   -- the panel is not being typed into the program.
   if self.coder and self.coder:textinput(text) then return end
@@ -1844,6 +1949,20 @@ function Playground:keypressed(key, mods)
   mods = mods or {}
   local cmd = mods.ctrl or mods.gui
 
+  -- The question is modal: T (or Enter) takes theirs, K keeps mine, and no
+  -- other key may save, run, type or leave around it.
+  if self.conflict then
+    if key == "t" or key == "return" or key == "kpenter" then
+      self:resolve_conflict("theirs")
+    elseif key == "k" then
+      self:resolve_conflict("mine")
+    end
+    -- LÖVE sends the letter again as `textinput` after this; by then the
+    -- question is closed, and the T or K would be typed into the code.
+    if key == "t" or key == "k" then self.eat_text = true end
+    return true
+  end
+
   -- Ctrl/Cmd-Shift-A opens and closes the coder from anywhere on the screen,
   -- the browser's accelerator.
   if key == "a" and cmd and mods.shift then
@@ -1964,6 +2083,13 @@ function Playground:mousepressed(x, y, button)
   -- under it, and a press on the sprite holds it still. A press anywhere else
   -- lets a held sprite go and then **carries on** to whatever it was aimed
   -- at, which is why this is not a plain "handled" gate.
+  -- The question first, and only the question, while it is open.
+  if self.conflict then
+    local r = self.conflict_rects or {}
+    if inside(r.theirs) then self:resolve_conflict("theirs")
+    elseif inside(r.mine) then self:resolve_conflict("mine") end
+    return
+  end
   if self.coder and self.coder:mousepressed(x, y, button) then return end
   if self.big then
     if inside(self.done_rect) then self.big = false; SFX.play("select"); return end

@@ -303,7 +303,12 @@ return {
   -- deep it goes. `stack` is the data structure programmers already name
   -- in their own language, so the word is translated rather than kept.
   ["updated on another device"] = "다른 기기에서 업데이트됨",
-  ["saved on another device: unsaved typing here is kept, and the next save from here wins"] = "다른 기기에서 저장됨 -- 여기서 저장하지 않은 입력은 유지되고, 다음 저장이 우선합니다",
+  ["took the other device's version"] = "다른 기기의 버전을 가져왔습니다",
+  ["saved on another device: choose which version to keep"] = "다른 기기에서 저장됨 -- 유지할 버전을 고르세요",
+  ["SAVED ON ANOTHER DEVICE"] = "다른 기기에서 저장됨",
+  ["This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?"] = "이 패드가 다른 기기에서 방금 저장되었고, 여기에는 저장하지 않은 변경이 있습니다. 다른 기기의 버전을 가져올까요, 아니면 내 것을 유지하고 그 위에 저장할까요?",
+  ["TAKE THEIRS  T"] = "저쪽 버전  T",
+  ["KEEP MINE  K"] = "내 버전  K",
   ["the room changed on another device"] = "다른 기기에서 대화가 바뀌었습니다",
   ["UNDO"] = "되돌리기",
   ["REDO"] = "다시 실행",
