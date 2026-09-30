@@ -10,7 +10,7 @@
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, btnPad, clipped, fill, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, inRect, pixBtn, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -401,6 +401,13 @@ export class LandsScene implements Scene {
    */
   private scroll = 0;
   private overflow = 0;
+  /** Where the land column was last drawn, for a finger on it. */
+  private colRect: Rect = [0, 0, 0, 0];
+  /**
+   * A finger on the column: where it went down, the scroll it found there,
+   * and whether it has moved far enough to be a scroll rather than a tap.
+   */
+  private colDrag: { y: number; scroll: number; moved: boolean } | null = null;
   /**
    * The land the scroll was last dragged onto, so the drag happens once per
    * change of selection rather than once per frame. `null` until the first
@@ -779,6 +786,31 @@ export class LandsScene implements Scene {
   }
 
   pointer(x: number, y: number, phase: "down" | "move" | "up"): void {
+    // A finger on the land column: drag to scroll it. The wheel was the only
+    // way down it, and an iPad without its trackpad has no wheel — the lands
+    // below the fold could not be reached. A press on a plate is still a pick
+    // if it comes back up without having moved.
+    const drag = this.colDrag;
+    if (drag) {
+      if (phase === "move") {
+        const dy = y - drag.y;
+        if (Math.abs(dy) > 8) drag.moved = true;
+        if (drag.moved) {
+          this.scroll = Math.max(0, Math.min(this.overflow, drag.scroll - dy));
+        }
+        return;
+      }
+      if (phase === "up") {
+        this.colDrag = null;
+        const hit = drag.moved ? null : this.landBtns.hit(x, y);
+        if (hit) this.press(hit.id);
+        return;
+      }
+    }
+    if (phase === "down" && this.overflow > 0 && inRect(x, y, this.colRect)) {
+      this.colDrag = { y, scroll: this.scroll, moved: false };
+      return;
+    }
     if (phase === "move") {
       const wasLand = this.landBtns.hovered;
       this.landBtns.hovered = this.landBtns.hit(x, y)?.id ?? null;
@@ -794,27 +826,30 @@ export class LandsScene implements Scene {
     }
     if (phase !== "down") return;
     const hit = this.landBtns.hit(x, y) ?? this.catBtns.hit(x, y);
-    if (!hit) return;
+    if (hit) this.press(hit.id);
+  }
+
+  private press(id: string): void {
     this.app.chip.select();
-    if (hit.id.startsWith("land:")) {
-      this.land = hit.id.slice(5) as Land;
+    if (id.startsWith("land:")) {
+      this.land = id.slice(5) as Land;
       this.app.land = this.land;
       return;
     }
-    if (hit.id === "auto") {
+    if (id === "auto") {
       void this.autoSelect();
       return;
     }
-    if (hit.id === "playground") {
+    if (id === "playground") {
       void this.app.go(new PlaygroundScene(this.app), "forward");
       return;
     }
-    if (hit.id === "lang") {
+    if (id === "lang") {
       void setLocale(nextLocale());
       return;
     }
-    if (hit.id.startsWith("cat:")) {
-      const category = hit.id.slice(4) as Category;
+    if (id.startsWith("cat:")) {
+      const category = id.slice(4) as Category;
       void this.app.go(new MapScene(this.app, this.land, category), "forward");
     }
   }
@@ -924,6 +959,7 @@ export class LandsScene implements Scene {
     arriving(g, f, "left", this.leftIn, () => {
       const gap = Math.round(10 * s);
       const [lx, ly, lw, lh] = f.left;
+      this.colRect = f.left;
       // Equal. The chosen land is not a *bigger* plate, it is a *brighter* one
       // — see `drawLandPlate`. A column that resizes its plates as you switch
       // between them draws the eye to the movement rather than to the choice,
