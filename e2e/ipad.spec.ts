@@ -1,5 +1,7 @@
 import { mkdirSync } from "node:fs";
 import {
+  atScreen,
+  clickButton,
   expect,
   freshAccount,
   login,
@@ -25,6 +27,7 @@ test.describe("desktop", () => {
     );
     expect(ids).toContain("land:rust");
     expect(ids).toContain("find");
+    expect(ids.filter((id) => id === "auto")).toHaveLength(1);
   });
 });
 
@@ -52,6 +55,7 @@ test.describe("iPad", () => {
       );
       expect(ids).toContain("menu");
       expect(ids).toContain("find");
+      expect(ids.filter((id) => id === "auto")).toHaveLength(1);
       expect(ids).not.toContain("land:rust");
 
       // FIND: a number keeps the streets whose number starts with it.
@@ -71,4 +75,18 @@ test.describe("iPad", () => {
       expect(px).toBeGreaterThanOrEqual(16);
     });
   }
+
+  test("AUTO SELECT on the map opens the first uncleared stage", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await login(page, freshAccount());
+    await pickLand(page, "remix");
+    await pickCategory(page, "basic");
+    await page.waitForTimeout(800);
+    // A fresh account: the first stage not cleared is VERY BASIC 01, on
+    // another road, so the button opens it straight away.
+    await clickButton(page, "auto");
+    await atScreen(page, "quest");
+  });
 });

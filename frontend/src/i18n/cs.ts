@@ -207,6 +207,7 @@ export const cs: Partial<Catalogue> = {
   "map.none": "v této ulici zatím nic není",
   "map.filter": "číslo/název",
   "map.filterNone": "nic neodpovídá „{q}“",
+  "map.auto": "AUTO",
   "map.failed": "mapu se nepodařilo načíst",
   "map.stars": "HVĚZDY",
   "map.tries": "POKUSY",

@@ -197,6 +197,7 @@ export const yue: Partial<Catalogue> = {
   "map.none": "呢條街仲乜都冇",
   "map.filter": "編號/名",
   "map.filterNone": "冇街啱“{q}”",
+  "map.auto": "自動揀",
   "map.failed": "讀唔到張地圖",
   "map.stars": "星",
   "map.tries": "試過",

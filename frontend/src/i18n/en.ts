@@ -208,6 +208,7 @@ export const en = {
   "map.none": "no streets here yet",
   "map.filter": "# or name",
   "map.filterNone": "nothing matches “{q}”",
+  "map.auto": "AUTO",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
   "map.tries": "TRIES",

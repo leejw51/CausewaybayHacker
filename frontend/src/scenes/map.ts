@@ -105,6 +105,8 @@ const PLATE: Record<Land, string> = {
  * where they left them, not at node 1. Six entries, quest ids only, and it does
  * not outlive the tab.
  */
+/** AUTO SELECT, in a word where the language has a short one: it shares a row. */
+const AUTO_LABEL = (): string => t("map.auto");
 /** What `barLayout` measures the FIND well by: the placeholder, in the field's own type. */
 const FIND_ROOM = (): string => t("map.filter");
 const MENU_LABEL = (): string => t("map.allMaps");
@@ -237,6 +239,7 @@ export class MapScene implements Scene {
     null;
   /** One reset at a time; the button is a request, not a queue. */
   private resetting = false;
+  private autoBusy = false;
   /** Each node's arrival — all at once, so the overworld is there to read. */
   private pops: Tween[] = [];
   private readonly plateIn = new Tween(seconds("panel"));
@@ -389,6 +392,42 @@ export class MapScene implements Scene {
       if (!n) void this.refresh();
     });
     await this.refresh();
+  }
+
+  /**
+   * AUTO SELECT, from the map: the lands screen's button (§4.14d), asked for
+   * this land. A pick on this road is walked to like a tapped coin, so the
+   * player sees where it is; a pick on another road opens straight away.
+   */
+  private async autoSelect(): Promise<void> {
+    if (this.autoBusy) return;
+    this.autoBusy = true;
+    try {
+      const { next } = await this.app.client.request("stats.next", { land: this.land });
+      if (!next) return;
+      if (next.category === this.category) {
+        const i = this.nodes.findIndex((n) => n.quest_id === next.quest_id);
+        if (i >= 0) {
+          // Clear a filter that would hide it: the pick is the answer.
+          if (!this.shown(i)) {
+            this.findEl.value = "";
+            this.query = "";
+          }
+          this.selected = i;
+          this.choose(this.nodes[i]);
+          return;
+        }
+      }
+      this.app.chip.select();
+      void this.app.go(
+        new QuestScene(this.app, next.land, next.category, next.quest_id),
+        "forward",
+      );
+    } catch {
+      this.status = t("lands.autoNone");
+    } finally {
+      this.autoBusy = false;
+    }
   }
 
   /** Park the cursor for this map, so coming back costs nothing. */
@@ -595,6 +634,7 @@ export class MapScene implements Scene {
           lit: c === this.category,
           group: 1,
         })),
+        { id: "auto", label: AUTO_LABEL(), lit: false, group: 2 },
         { id: "find", label: FIND_ROOM(), lit: false, group: 2 },
       ];
     }
@@ -642,6 +682,7 @@ export class MapScene implements Scene {
       },
       // FIND on the row of ways out, which has the room: a row of its own
       // took the height from a map that had least of it to give.
+      { id: "auto", label: AUTO_LABEL(), lit: false, group: 2 },
       { id: "find", label: FIND_ROOM(), lit: false, group: 2 },
       // Search, stats and AI mode. They were on F4/F5/F6 and nowhere else,
       // which meant three finished screens that a player could only reach by
@@ -920,6 +961,7 @@ export class MapScene implements Scene {
       else void this.app.go(new LandsScene(this.app), "back");
     } else if (id === "close") this.sheetOpen = false;
     else if (id === "find") this.findEl.focus();
+    else if (id === "auto") void this.autoSelect();
     else if (id === "enter") this.choose(this.nodes[this.selected]);
     else if (id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
     else if (id === "reset") void this.resetRoad();

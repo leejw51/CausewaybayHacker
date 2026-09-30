@@ -183,6 +183,7 @@ export const zh: Partial<Catalogue> = {
   "map.none": "这条街上还什么都没有",
   "map.filter": "编号/名称",
   "map.filterNone": "没有匹配“{q}”的街道",
+  "map.auto": "自动选择",
   "map.failed": "读不到地图",
   "map.stars": "星",
   "map.tries": "尝试",
