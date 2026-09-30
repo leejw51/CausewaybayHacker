@@ -855,22 +855,18 @@ export class LandsScene implements Scene {
   }
 
   /**
-   * Go straight to the stage this player is worst at (§4.14c).
-   *
-   * The ranking is the server's: it is the same list `progress.json` carries,
-   * and a client that computed its own would disagree with the file the player
-   * can read. An empty answer is the normal one for somebody who has failed
-   * nothing — it says so and stays put, rather than sending them somewhere
-   * arbitrary or showing an error for having done well.
+   * Go straight to what this land has next for this player (§4.14d): the
+   * first street not cleared, then the ones they failed and still owe, then
+   * round the land evenly. The rule is the server's, so the LÖVE client's
+   * button sends the same player to the same street.
    */
   private async autoSelect(): Promise<void> {
     if (this.autoBusy) return;
     this.autoBusy = true;
     this.autoNote = t("lands.autoWorking");
     try {
-      const { weakest } = await this.app.client.request("stats.weakest", { limit: 1 });
-      const pick = weakest[0];
-      if (!pick) {
+      const { next } = await this.app.client.request("stats.next", { land: this.land });
+      if (!next) {
         this.autoNote = t("lands.autoNone");
         return;
       }
@@ -881,7 +877,7 @@ export class LandsScene implements Scene {
       // screen it opens by key, and this method was already async.
       const { QuestScene } = await import("./quest");
       await this.app.go(
-        new QuestScene(this.app, pick.land, pick.category, pick.quest_id),
+        new QuestScene(this.app, next.land, next.category, next.quest_id),
         "forward",
       );
     } catch {

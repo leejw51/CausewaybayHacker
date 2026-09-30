@@ -445,6 +445,18 @@ export interface Weak {
   reason: "stuck" | "costly";
 }
 
+/** §4.14d. What AUTO SELECT plays next in one land, and which tier chose it. */
+export interface Next {
+  quest_id: string;
+  land: Land;
+  category: Category;
+  node: number;
+  title: string;
+  reason: "first" | "review" | "rotate";
+  /** Failed submits still to be paid back with clean clears; 0 outside `review`. */
+  owed: number;
+}
+
 /**
  * §5.13. Where the server last saw this player. `category` and `quest_id` are
  * null when they were in a lobby rather than on a stage — a real place to be,
@@ -682,6 +694,7 @@ export interface Requests {
   "stats.mistakes": { limit?: number; include_learned?: boolean };
   /** §4.14c */
   "stats.weakest": { limit?: number };
+  "stats.next": { land: Land };
   /** §4.14b. Documented in PROTOCOL but absent from this file until now. */
   "stats.awards": Record<string, never>;
   "stats.history": { quest_id?: string; limit?: number };
@@ -782,6 +795,7 @@ export interface Responses {
   /** §4.14c. An empty list is the normal answer for a player who has failed
    *  nothing — never an error. */
   "stats.weakest": { weakest: Weak[] };
+  "stats.next": { next: Next | null };
   "stats.awards": { awards: Award[] };
   "stats.history": { attempts: AttemptBrief[] };
   "ai.plan": { drill: Drill };

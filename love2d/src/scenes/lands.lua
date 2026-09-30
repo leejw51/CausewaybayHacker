@@ -188,7 +188,7 @@ function Lands:tile_rect()
   return { x = pad, y = top, w = vw - pad * 2, h = h }
 end
 
---- The band under the cards: WEAKEST — the browser's AUTO SELECT. The
+--- The band under the cards: AUTO SELECT, as in the browser. The
 --- playground moved up into its own tile; `P` still opens it from anywhere
 --- on this screen, and the footer says so.
 function Lands.band_height()
@@ -206,7 +206,7 @@ function Lands:button_rects()
   local pad = 16
   local bh = Lands.band_height()
   local y = Lands.band_top()
-  local label = I18n.t("WEAKEST") .. "  W"
+  local label = I18n.t("AUTO SELECT") .. "  W"
   local bw = math.min(vw - pad * 2, math.max(200, UI.textWidth(label, 10) + 40))
   local x = math.floor((vw - bw) / 2)
   return {
@@ -292,7 +292,7 @@ function Lands:draw()
   end
 
   self.app:footer(self.auto_note
-    or I18n.t("ARROWS choose   ENTER go   W weakest   P playground"))
+    or I18n.t("ARROWS choose   ENTER go   W auto   P playground"))
 end
 
 --- One card, drawn into whatever rectangle it is handed.
@@ -445,21 +445,22 @@ function Lands:draw_card(x, y, w, h, land, fallback, selected)
   end
 end
 
--- Go straight to the stage this player fails most (§4.14c).
---
--- An empty answer is the normal one for somebody who has failed nothing: it
--- says so and stays put, rather than sending them somewhere arbitrary or
--- reporting an error for having done well.
+-- Go straight to what the land under the cursor has next (§4.14d): the
+-- first street not cleared, then the ones failed and still owed, then round
+-- the land evenly. The rule is the server's, so this and the web client send
+-- the same player to the same street.
 function Lands:auto_select()
   if self.auto_busy then return end
+  local land = self:land_at(self.cursor)
+  if not land then return end
   self.auto_busy = true
-  self.auto_note = I18n.t("looking for the stage beating you most…")
+  self.auto_note = I18n.t("looking for your next stage…")
   SFX.play("select")
-  self.app.session:request("stats.weakest", { limit = 1 }, function(ok, payload)
+  self.app.session:request("stats.next", { land = land.land }, function(ok, payload)
     self.auto_busy = false
-    local pick = ok and payload.weakest and payload.weakest[1]
-    if not pick then
-      self.auto_note = I18n.t("nothing has beaten you yet — pick a land")
+    local pick = ok and payload.next
+    if type(pick) ~= "table" then
+      self.auto_note = I18n.t("this land has no stages yet")
       return
     end
     self.auto_note = nil

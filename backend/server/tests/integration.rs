@@ -1621,3 +1621,33 @@ async fn a_place_is_only_recorded_once_the_move_actually_worked() {
         "the failed open must not have moved them, nor destroyed where they were"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stats_next_walks_the_road_in_order() {
+    // PROTOCOL §4.14d. `core/tests/practice.rs` covers the tiers; this is the
+    // wire: the land in the payload is the land answered for, and a real
+    // submit moves the answer on.
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let src = content_src(tmp.path());
+    let server = start(&home, &src).await;
+
+    let mut alice = Client::connect(server.port).await;
+    alice.login(ALICE_KEY).await;
+
+    let first = alice.ok("stats.next", json!({ "land": "rust" })).await;
+    assert_eq!(first["next"]["quest_id"], HELLO);
+    assert_eq!(first["next"]["reason"], "first");
+
+    assert_eq!(
+        alice.submit(HELLO, &quest_field(HELLO, "solution")).await["cleared"],
+        true
+    );
+    let second = alice.ok("stats.next", json!({ "land": "rust" })).await;
+    assert_eq!(second["next"]["quest_id"], SUM);
+
+    let none = alice.ok("stats.next", json!({ "land": "cobol" })).await;
+    assert!(none["next"].is_null(), "{none}");
+
+    server.stop().await;
+}

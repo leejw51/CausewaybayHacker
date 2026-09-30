@@ -1114,6 +1114,31 @@ submits, not cleared) or `"costly"` (cleared, but it took failures); every
 nothing has no weakest quest, and a client that treats `[]` as a fault will
 show a broken button to the only people who have earned it.
 
+### 4.14d `stats.next`
+
+What AUTO SELECT plays next in one land.
+
+```json
+→ payload: { "land": "rust" }
+← payload: { "next": Next | null }         null only for a land with no quests
+```
+
+`Next` carries `quest_id`, `land`, `category`, `node`, `title`, `reason` and
+`owed`. Three tiers, each consulted only when the one before is empty:
+
+1. `"first"` — the first quest not cleared, in road order (`verybasic`,
+   `basic`, `advanced`, `hacker`) then `node`.
+2. `"review"` — all cleared, and some quests still *owe*: failed submits minus
+   clean clears after the first. A random pick weighted by `owed`, so the
+   quest failed most comes up most — until it has been cleared cleanly as many
+   times as it was failed.
+3. `"rotate"` — nothing owed. A random pick among the five quests practised
+   longest ago, so repetition goes round the land evenly.
+
+Tiers 2 and 3 skip the quest submitted last unless it is the only one. Only
+submits count, never RUN (§4.9b). The rule is the server's for the same reason
+§4.14c's is: two clients must send the player to the same street.
+
 ### 4.14b `stats.awards`
 
 The shelf, as opposed to the fanfare.

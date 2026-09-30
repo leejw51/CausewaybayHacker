@@ -20,6 +20,7 @@ pub mod interviews;
 pub mod mistakes;
 pub mod paths;
 pub mod position;
+pub mod practice;
 pub mod progress;
 pub mod quests;
 pub mod search;

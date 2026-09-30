@@ -9,8 +9,8 @@
 use cwbhacker_core::error::{bad_request, not_found, unauthorized, Error, Result};
 use cwbhacker_core::Connection;
 use cwbhacker_core::{
-    attempts, auth, awards, drills, edits, eth, interviews, mistakes, position, progress, quests,
-    search, snapshot, stats, users, world,
+    attempts, auth, awards, drills, edits, eth, interviews, mistakes, position, practice, progress,
+    quests, search, snapshot, stats, users, world,
 };
 use serde_json::json;
 
@@ -608,6 +608,21 @@ pub fn stats_weakest(
     Ok(json!({
         "weakest": snapshot::weakest(&conn, address, limit as usize)?
     }))
+}
+
+/// §4.14d. What to play next in one land: the first uncleared quest, then
+/// the ones still owing clean clears, then round the land evenly. The rule
+/// is `practice::next`'s, on the server for the same reason `weakest` is —
+/// both clients send the player to the same street.
+pub fn stats_next(
+    state: &Shared,
+    session: &Session,
+    payload: &serde_json::Value,
+) -> Result<serde_json::Value> {
+    let address = session.address()?;
+    let land = str_field(payload, "land")?;
+    let conn = state.store.conn();
+    Ok(json!({ "next": practice::next(&conn, address, &land)? }))
 }
 
 pub fn search_query(

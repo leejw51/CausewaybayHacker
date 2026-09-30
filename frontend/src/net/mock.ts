@@ -798,6 +798,28 @@ export function mockTransport(): TransportFactory {
         // nothing (§4.14c) — which is every player of the mock.
         case "stats.weakest":
           return ok(id, type, { weakest: [] });
+        // Tier one of §4.14d only: the mock has one short road and nobody
+        // plays it long enough to reach review or rotation.
+        case "stats.next": {
+          const rows = progressFor(address!);
+          const q =
+            p.land !== "rust"
+              ? undefined
+              : (QUESTS.find((q) => rows.get(q.id)!.state !== "cleared") ?? QUESTS[0]);
+          return ok(id, type, {
+            next: q
+              ? {
+                  quest_id: q.id,
+                  land: "rust",
+                  category: "basic",
+                  node: q.node,
+                  title: q.title,
+                  reason: "first",
+                  owed: 0,
+                }
+              : null,
+          });
+        }
         case "stats.history":
           return ok(id, type, { attempts: [] });
         case "search.query":
