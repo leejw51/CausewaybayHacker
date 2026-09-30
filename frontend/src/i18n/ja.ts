@@ -192,6 +192,7 @@ export const ja: Partial<Catalogue> = {
   "map.none": "このストリートにはまだ何もありません",
   "map.filter": "番号・名前",
   "map.filterNone": "「{q}」に合うストリートはありません",
+  "map.auto": "自動選択",
   "map.failed": "マップを読み込めませんでした",
   "map.stars": "スター",
   "map.tries": "挑戦",
