@@ -348,10 +348,12 @@ authentication, and recovers the address from the signature with real
 secp256k1 rather than trusting the claim. Each of those exists to fail a
 client that got PROTOCOL §8 wrong.
 
-Its world is mirrored into `sessionStorage`, so "clear it, reload, it is still
-cleared" — the milestone-1 acceptance test — can be exercised before the
-server exists. The real server keeps that in SQLite; the mock keeps it in a
-tab, and nothing in the game is ever read from it by a scene.
+Its world is mirrored into `localStorage` (it was `sessionStorage` until
+2026-09-30, when everything the web client keeps moved to the browser's
+store), so "clear it, reload, it is still cleared" — the milestone-1
+acceptance test — can be exercised before the server exists. The real server
+keeps that in SQLite; the mock keeps it in the browser, and nothing in the
+game is ever read from it by a scene.
 
 ## 2026-09-11 — FE: the browser sends the application-level `ping` anyway
 
@@ -7642,3 +7644,40 @@ gate names every land now and runs with `--require-complete`: coverage is no
 longer a number to report but a rule, and a new quest lands with its five
 translations or the content job goes red.
 
+
+## 2026-09-30 — The playground keeps its draft in the browser, and asks before a save from elsewhere wins
+
+The scratchpad's local mirror moves from `sessionStorage` to `localStorage`
+(the dev mock's world with it). `sessionStorage` survived a reload and
+nothing else, and an iPad that throws a background tab away does not reload
+it — it opens it fresh, with the session store empty, and the unsaved text
+was gone. The key keeps the account's address, so the cross-account leak the
+move to `sessionStorage` was fixing does not come back; what sharing now
+means is that two tabs open as the same account keep one mirror, and a reload
+brings back the last keystroke of either. A draft mirrored under the old
+store is moved over once, not dropped.
+
+A save from another of the player's devices already arrived over the
+websocket as `playground.updated` (§4.22). A clean pad took it; a pad with
+unsaved typing said "saved on another device" in the status line and let its
+own next autosave, 2.5 s later, silently throw the other device's work away.
+Now it stops and asks — **TAKE THEIRS** or **KEEP MINE** — as a modal over
+the bench (button ids `conflict-theirs`, `conflict-mine`), with every field
+put away and nothing saved from the pad until it is answered. The mirror
+also keeps the server copy the draft was last in step with, so a device that
+comes back to a dirty draft (a reload, a tab reopened) asks the same question
+when the pad moved while it was away, instead of autosaving over it.
+
+The push stays on the websocket rather than a separate SSE endpoint: the
+socket is where the server's auth lives (challenge, sign, login), the hub
+already fans a save out to the account's other connections, and SPEC §6's
+one port with one channel is the design. An SSE stream would need a second
+auth story to carry the same event.
+
+`e2e/playground-sync.spec.ts` covers it — a closed tab brings the draft back
+(a new page in the same context, which `sessionStorage` fails), a clean pad
+takes a save, a dirty one asks and both answers do what they say, and a
+reopened dirty draft asks — in both orientations. It signs in with a published
+fixture key, so it needs no wallet binary, and `e2e/with-server.mjs` starts a
+throwaway server for it: `make test-sync`, part of `make test` and its own CI
+job.

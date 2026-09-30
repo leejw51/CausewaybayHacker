@@ -149,7 +149,7 @@ DIST_SRC := frontend/src frontend/public frontend/index.html \
 dist_stale = [ ! -f frontend/dist/index.html ] || \
              [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
 
-.PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe \
+.PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe test-sync \
         fmt-check check version package release package-server package-server-verify package-gui package-love \
         test-love test-e2e smoke fmt lint doctor clean clean-home
 
@@ -306,13 +306,23 @@ test-all-list: ## what test-all would run, and why anything would not
 # calling it `test` is how they would drift.
 #
 # The LÖVE suite is headless and needs `luajit`, not a LÖVE binary or a window.
-test: test-be test-fe test-love ## the Rust, TypeScript and LÖVE suites (see test-all)
+#
+# `test-sync` is the one browser suite in `test`: it starts its own server, so
+# it needs no `make start` and no wallet — only a Chromium (`npx playwright
+# install chromium` in e2e/, which it does for you).
+test: test-be test-fe test-love test-sync ## the Rust, TypeScript, LÖVE and playground-sync suites (see test-all)
 test-be: ## the Rust suite (add ARGS="-- --ignored" for the content check)
 	cd backend && cargo test --workspace $(ARGS)
 test-fe: ## the TypeScript suite
 	cd frontend && npm test
 test-love: ## the LÖVE client, headless
 	$(MAKE) -C love2d test-headless
+test-sync: ## playwright: the playground draft survives, and a save on one device reaches another (starts its own server)
+	cd frontend && npm run build:e2e
+	cd backend && cargo build -p cwbhacker
+	@test -d e2e/node_modules/@playwright/test || ( cd e2e && npm ci )
+	cd e2e && npx playwright install chromium
+	node e2e/with-server.mjs playground-sync.spec.ts
 test-e2e: ## playwright, both orientations (needs `make start`)
 	cd e2e && npx playwright test
 smoke: ## drive the live server against PROTOCOL.md §8 (needs `make start`)

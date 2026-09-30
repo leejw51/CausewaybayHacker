@@ -374,8 +374,13 @@ export const cs: Partial<Catalogue> = {
   "pg.format": "FORMÁT",
   "pg.save": "ULOŽIT",
   "pg.updatedElsewhere": "aktualizováno na jiném zařízení",
-  "pg.updatedElsewhereUnsaved":
-    "uloženo na jiném zařízení — neuložené psaní zde zůstává; příští uložení odsud vyhrává",
+  "pg.conflictTitle": "ULOŽENO NA JINÉM ZAŘÍZENÍ",
+  "pg.conflictBody":
+    "Tento blok byl právě uložen na jiném zařízení a vy tu máte neuložené změny. Převzít verzi z druhého zařízení, nebo ponechat svou a uložit ji přes ni?",
+  "pg.conflictTheirs": "PŘEVZÍT JEJICH",
+  "pg.conflictMine": "PONECHAT MOJI",
+  "pg.conflictNote": "uloženo na jiném zařízení — vyberte, kterou verzi ponechat",
+  "pg.tookTheirs": "převzata verze z jiného zařízení",
   "agent.roomUpdated": "místnost se změnila na jiném zařízení",
   "pg.saveDirty": "ULOŽIT *",
   "pg.full": "CELÁ",

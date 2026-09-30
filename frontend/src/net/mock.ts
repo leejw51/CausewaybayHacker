@@ -191,12 +191,13 @@ function recoverAddress(message: string, signature: string): string {
 }
 
 /**
- * The mock's whole world, mirrored into `sessionStorage` so a *reload* keeps it.
+ * The mock's whole world, mirrored into `localStorage` so a *reload* keeps it
+ * — and a closed tab, like everything else the client keeps.
  *
  * That matters more than it looks: "clear it, reload, it is still cleared" is
  * the milestone-1 acceptance test (PLAN.md), and a mock whose state evaporated
  * with the page would make that test unwritable until the real server existed.
- * The real server keeps this in SQLite; this keeps it in a tab. Nonces are
+ * The real server keeps this in SQLite; this keeps it in the browser. Nonces are
  * deliberately *not* persisted — they are single-use and live 120 seconds.
  */
 const WORLD_KEY = "cwbhacker.mockworld";
@@ -221,7 +222,7 @@ type Saved = {
 
 function loadWorld(): void {
   try {
-    const raw = sessionStorage.getItem(WORLD_KEY);
+    const raw = localStorage.getItem(WORLD_KEY);
     if (!raw) return;
     const s = JSON.parse(raw) as Saved;
     world.tokens = new Map(s.tokens);
@@ -254,7 +255,7 @@ function saveWorld(): void {
       progress: [...world.progress].map(([a, rows]) => [a, [...rows]]),
       positions: [...world.positions],
     };
-    sessionStorage.setItem(WORLD_KEY, JSON.stringify(s));
+    localStorage.setItem(WORLD_KEY, JSON.stringify(s));
   } catch {
     /* storage disabled: the mock still works, it just forgets on reload */
   }

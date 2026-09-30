@@ -356,8 +356,13 @@ export const ko: Partial<Catalogue> = {
   "pg.format": "정렬",
   "pg.save": "저장",
   "pg.updatedElsewhere": "다른 기기에서 업데이트됨",
-  "pg.updatedElsewhereUnsaved":
-    "다른 기기에서 저장됨 — 여기서 저장하지 않은 입력은 유지되고, 다음 저장이 우선합니다",
+  "pg.conflictTitle": "다른 기기에서 저장됨",
+  "pg.conflictBody":
+    "이 패드가 다른 기기에서 방금 저장되었고, 여기에는 저장하지 않은 변경이 있습니다. 다른 기기의 버전을 가져올까요, 아니면 내 것을 유지하고 그 위에 저장할까요?",
+  "pg.conflictTheirs": "저쪽 버전 사용",
+  "pg.conflictMine": "내 버전 유지",
+  "pg.conflictNote": "다른 기기에서 저장됨 — 유지할 버전을 고르세요",
+  "pg.tookTheirs": "다른 기기의 버전을 가져왔습니다",
   "agent.roomUpdated": "다른 기기에서 대화가 바뀌었습니다",
   "pg.saveDirty": "저장 *",
   "pg.full": "전체화면",

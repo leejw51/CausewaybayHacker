@@ -344,8 +344,13 @@ export const zh: Partial<Catalogue> = {
   "pg.format": "格式化",
   "pg.save": "保存",
   "pg.updatedElsewhere": "已在另一台设备上更新",
-  "pg.updatedElsewhereUnsaved":
-    "已在另一台设备上保存 — 这里未保存的输入会保留，下一次保存以这里为准",
+  "pg.conflictTitle": "已在另一台设备上保存",
+  "pg.conflictBody":
+    "这个草稿刚在另一台设备上保存，而这里有未保存的修改。使用另一台设备的版本，还是保留你的版本并覆盖保存？",
+  "pg.conflictTheirs": "使用对方的",
+  "pg.conflictMine": "保留我的",
+  "pg.conflictNote": "已在另一台设备上保存 — 请选择保留哪个版本",
+  "pg.tookTheirs": "已使用另一台设备的版本",
   "agent.roomUpdated": "对话在另一台设备上有了变化",
   "pg.saveDirty": "保存 *",
   "pg.full": "全屏",

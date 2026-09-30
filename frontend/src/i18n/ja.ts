@@ -355,8 +355,13 @@ export const ja: Partial<Catalogue> = {
   "pg.format": "整形",
   "pg.save": "保存",
   "pg.updatedElsewhere": "別の端末で更新されました",
-  "pg.updatedElsewhereUnsaved":
-    "別の端末で保存されました — ここでの未保存の入力は残り、次の保存が優先されます",
+  "pg.conflictTitle": "別の端末で保存されました",
+  "pg.conflictBody":
+    "このパッドは別の端末で保存されましたが、ここには未保存の変更があります。別の端末の版を使いますか、それともこちらを残して上書き保存しますか？",
+  "pg.conflictTheirs": "あちらを使う",
+  "pg.conflictMine": "こちらを残す",
+  "pg.conflictNote": "別の端末で保存されました — 残す版を選んでください",
+  "pg.tookTheirs": "別の端末の版を使いました",
   "agent.roomUpdated": "別の端末で会話が変わりました",
   "pg.saveDirty": "保存 *",
   "pg.full": "全画面",
