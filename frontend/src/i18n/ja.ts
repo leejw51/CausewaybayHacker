@@ -190,6 +190,8 @@ export const ja: Partial<Catalogue> = {
   "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "このストリートにはまだ何もありません",
+  "map.filter": "番号・名前",
+  "map.filterNone": "「{q}」に合うストリートはありません",
   "map.failed": "マップを読み込めませんでした",
   "map.stars": "スター",
   "map.tries": "挑戦",

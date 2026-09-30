@@ -206,6 +206,8 @@ export const en = {
   "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "no streets here yet",
+  "map.filter": "# or name",
+  "map.filterNone": "nothing matches “{q}”",
   "map.failed": "could not read the map",
   "map.stars": "STARS",
   "map.tries": "TRIES",

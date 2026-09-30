@@ -191,6 +191,8 @@ export const ko: Partial<Catalogue> = {
   "map.lua": "LUA",
   "map.remix": "REMIX",
   "map.none": "아직 이 거리에는 아무것도 없습니다",
+  "map.filter": "번호·이름",
+  "map.filterNone": "“{q}”에 맞는 거리가 없습니다",
   "map.failed": "지도를 읽지 못했습니다",
   "map.stars": "별",
   "map.tries": "시도",
