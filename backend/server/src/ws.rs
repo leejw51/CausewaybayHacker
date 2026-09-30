@@ -495,6 +495,7 @@ async fn dispatch(
         "stats.summary" => handlers::stats_summary(state, session),
         "stats.mistakes" => handlers::stats_mistakes(state, session, payload),
         "stats.weakest" => handlers::stats_weakest(state, session, payload),
+        "stats.next" => handlers::stats_next(state, session, payload),
         "stats.history" => handlers::stats_history(state, session, payload),
         "stats.awards" => handlers::stats_awards(state, session),
         "interview.start" => handlers::interview_start(state, session, payload),
