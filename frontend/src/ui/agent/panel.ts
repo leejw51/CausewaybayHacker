@@ -279,7 +279,7 @@ export class Panel {
     g: Ctx,
     rect: Rect,
     s: number,
-    ctx: { provider: Provider; busy: boolean; canImage: boolean; canWrite?: boolean },
+    ctx: { provider: Provider; busy: boolean; canImage: boolean },
   ): void {
     this.provider = ctx.provider;
     const { layout } = this.app;
@@ -460,7 +460,7 @@ export class Panel {
     g: Ctx,
     rect: Rect,
     s: number,
-    ctx: { provider: Provider; busy: boolean; canImage: boolean; canWrite?: boolean },
+    ctx: { provider: Provider; busy: boolean; canImage: boolean },
   ): void {
     const { layout } = this.app;
     const fonts = ensureFonts(s);
@@ -492,9 +492,7 @@ export class Panel {
             { id: "deletemsg", label: t("agent.delete"), dim: ctx.busy },
           ]
         : []),
-      // Not where the coder only explains: WRITE is the one verb that asks
-      // for a program, and there it could only be refused.
-      ...(ctx.canWrite === false ? [] : [{ id: "write", label: t("agent.write"), dim: ctx.busy }]),
+      { id: "write", label: t("agent.write"), dim: ctx.busy },
       { id: "review", label: t("agent.review"), dim: ctx.busy },
       ...(ctx.canImage ? [{ id: "image", label: t("agent.image"), dim: ctx.busy }] : []),
       { id: "stop", label: t("agent.stop"), dim: !ctx.busy, strong: ctx.busy },

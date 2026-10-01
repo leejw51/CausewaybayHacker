@@ -103,21 +103,58 @@ export interface Bench {
    */
   task?: (() => TaskBrief | null) | null;
   /**
-   * **Explain, do not fix.** On a graded screen the person asked for help
-   * understanding, and a program that rewrites itself while they read is the
-   * answer handed over. When set, the agent gets `read_code` and
-   * `comment_code` and nothing that can change a line of the program: no
-   * edit, no write, no insert, no format. The comment tool builds the
-   * comment itself from plain text, so there is no input it can be given
-   * that lands as code.
+   * **A tutor, who does what was asked.** On a graded screen the agent also
+   * gets `comment_code`, and its orders say: asked to explain, it explains
+   * in comments and leaves the program alone; asked to fix or to solve, it
+   * fixes or solves. Which one is the person's call, not the screen's.
    */
-  explainOnly?: boolean;
+  tutor?: boolean;
   /**
    * Put `text` above line `line` (1-based; one past the last line appends)
-   * as comment lines in the file's language, indented like that line.
-   * Required when `explainOnly` is set.
+   * as comment lines in the file's language, indented like that line. The
+   * comment tool builds the comment itself from plain text, so there is no
+   * input it can be given that lands as code. Required when `tutor` is set.
    */
   comment?: ((line: number, text: string) => Promise<{ ok: boolean; why?: string }>) | null;
+  /**
+   * A model turn is starting: the line numbers it uses are the file's as of
+   * now. See `LineShift`.
+   */
+  newTurn?: () => void;
+}
+
+/**
+ * The model's line numbers, read against the file it was looking at.
+ *
+ * One turn can ask for several comments, every one numbered against the file
+ * as it was when the turn began — and each comment put in pushes the lines
+ * under it down. Taken literally, the second of three notes about lines 15,
+ * 16 and 17 landed *inside* the first, between its head and its wrapped
+ * tail, and the three came out interleaved. So the insertions of the turn so
+ * far are kept, and a line is moved down past every one put in above it —
+ * or at it, so a second note about the same line goes under the first and
+ * the two read in the order they were written.
+ *
+ * Only comments are tracked; anything else that changes the file in the
+ * turn makes the old numbering unknowable, and `reset` is called for it.
+ */
+export class LineShift {
+  private ins: Array<[number, number]> = [];
+
+  map(line: number): number {
+    let out = line;
+    for (const [at, n] of this.ins) if (at <= line) out += n;
+    return out;
+  }
+
+  /** `n` lines went in above the model's `line`. */
+  add(line: number, n: number): void {
+    this.ins.push([line, n]);
+  }
+
+  reset(): void {
+    this.ins = [];
+  }
 }
 
 /**
@@ -209,7 +246,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "comment_code",
     description:
-      "Explain by writing a comment into the program, above one line. Give plain text — no comment markers, no code to replace anything; the game writes it as comment lines in the file's language, indented like that line. This is the only way you can put anything in the editor, and it never changes the program.",
+      "Explain by writing a comment into the program, above one line. Give plain text — no comment markers; the game writes it as comment lines in the file's language, indented like that line. It never changes the program. Number lines as the file was when this turn began; several comments in one turn are placed for you.",
     input_schema: {
       type: "object",
       properties: {
@@ -277,13 +314,8 @@ export const TOOLS: ToolDef[] = [
 
 /** The tools this bench can actually honour. */
 export function toolsFor(bench: Bench): ToolDef[] {
-  // Explaining: read the file, write comments into it, nothing else.
-  if (bench.explainOnly)
-    return TOOLS.filter(
-      (t) => t.name === "read_code" || (t.name === "comment_code" && !!bench.comment),
-    );
   return TOOLS.filter((t) => {
-    if (t.name === "comment_code") return false;
+    if (t.name === "comment_code") return bench.tutor === true && !!bench.comment;
     if (t.name === "run_code") return bench.run !== null;
     if (t.name === "format_code") return bench.format !== null;
     if (t.name === "search_notes") return bench.search !== null;
@@ -334,8 +366,6 @@ export async function runTool(
           : { text: res.why ?? "That line is not in the file.", error: true };
       }
       case "edit_code": {
-        if (bench.explainOnly)
-          return { text: "This screen only explains; it cannot change the code.", error: true };
         const find = str("find");
         if (!find) return { text: "`find` is empty.", error: true };
         const res = await bench.edit(find, str("replace"));
@@ -344,8 +374,6 @@ export async function runTool(
           : { text: res.why ?? "That span is not in the file exactly once.", error: true };
       }
       case "write_code": {
-        if (bench.explainOnly)
-          return { text: "This screen only explains; it cannot change the code.", error: true };
         const source = str("source");
         if (!source.trim()) return { text: "`source` is empty.", error: true };
         const r = await bench.write(source);
@@ -357,8 +385,6 @@ export async function runTool(
           : { text: `Typed ${r.total} characters; the file is now the new program.`, error: false };
       }
       case "insert_code": {
-        if (bench.explainOnly)
-          return { text: "This screen only explains; it cannot change the code.", error: true };
         const text = str("text");
         if (!text) return { text: "`text` is empty.", error: true };
         const r = await bench.insert(text);
@@ -381,7 +407,7 @@ export async function runTool(
         return { text: lines.join("\n"), error: false };
       }
       case "format_code": {
-        if (!bench.format || bench.explainOnly)
+        if (!bench.format)
           return { text: "There is no formatter for this language here.", error: true };
         const r = await bench.format();
         if (r.problem)

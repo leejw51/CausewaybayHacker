@@ -703,9 +703,9 @@ export class QuestScene implements Scene {
         // count, and `solution` is only ever in the payload for a quest this
         // player has already cleared.
         task: () => this.taskBrief(),
-        // A tutor, not a ghostwriter: on a graded screen it explains in
-        // comments and the fixing is the person's (`Bench.explainOnly`).
-        explainOnly: true,
+        // A tutor (`Bench.tutor`): asked to explain, it explains in
+        // comments and leaves the code alone; asked to fix, it fixes.
+        tutor: true,
         roomId: () => null,
         roomKey: () => "quest",
         ensureRoom: async () => null,
@@ -2663,7 +2663,7 @@ export class QuestScene implements Scene {
       { id: "complete", label: t("quest.completeLine"), dim: !this.canComplete() },
       { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
       // ASK AI on the code page too, where the question is asked: it opens
-      // the room beside the code, and the answer comes back as comments.
+      // the room beside the code.
       ...(this.coder ? [{ id: "agent", label: t("agent.ask"), strong: this.coder.open }] : []),
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
