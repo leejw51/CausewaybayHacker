@@ -445,6 +445,15 @@ export class QuestScene implements Scene {
    */
   private lastPushed: string | null = null;
   /**
+   * A prompt to the coder is under way (`agentTurn`). The idle push waits it
+   * out: the model thinks for seconds between two tool calls, and every one
+   * of those pauses would otherwise be an entry, so a fix in three edits
+   * took three UNDOs to take out.
+   */
+  private inTurn = false;
+  /** Pushes that must land in order: the one before a prompt, then its own. */
+  private pushChain: Promise<void> = Promise.resolve();
+  /**
    * What the editor was opened with — the draft the server had, or the
    * starter. The baseline `unsaved()` measures against, and it moves every
    * time the server takes a copy (§4.8: a run or a submit is a save).
@@ -725,6 +734,7 @@ export class QuestScene implements Scene {
           return { changed: res.changed };
         },
         touched: () => this.touched(),
+        turn: (open) => this.agentTurn(open),
         chip: this.app.chip,
         fx: () => this.fx,
       });
@@ -750,6 +760,7 @@ export class QuestScene implements Scene {
     for (const off of this.offs) off();
     this.offs.length = 0;
     this.cancelPush();
+    this.inTurn = false;
     this.overlay?.destroy();
     this.fx?.destroy();
     this.coder?.leave();
@@ -1613,7 +1624,7 @@ export class QuestScene implements Scene {
    */
   private async editStep(kind: "edit.undo" | "edit.redo"): Promise<void> {
     if (!this.quest || !this.editor || this.editGone) return;
-    const live = editControls(this.edit, this.editBusy);
+    const live = editControls(this.edit, this.editBusy || this.inTurn);
     if (!(kind === "edit.undo" ? live.undo : live.redo)) return;
     this.editBusy = true;
     try {
@@ -1656,7 +1667,7 @@ export class QuestScene implements Scene {
    */
   private async clearStack(): Promise<void> {
     if (!this.quest || this.editGone) return;
-    if (!editControls(this.edit, this.editBusy).clear) return;
+    if (!editControls(this.edit, this.editBusy || this.inTurn).clear) return;
     const ok = await this.app.ask({
       title: t("quest.clearStack"),
       body: t("quest.clearStackAsk"),
@@ -1685,7 +1696,7 @@ export class QuestScene implements Scene {
    */
   private touched(): void {
     this.answerTick();
-    if (this.editGone) return;
+    if (this.editGone || this.inTurn) return;
     this.cancelPush();
     this.pushTimer = window.setTimeout(() => {
       this.pushTimer = null;
@@ -1697,6 +1708,28 @@ export class QuestScene implements Scene {
       if (this.editBusy) return this.touched();
       void this.pushEdit(this.editor.source);
     }, PUSH_IDLE_MS);
+  }
+
+  /**
+   * A prompt to the coder began or ended: one entry on the stack for it.
+   *
+   * At the start the person's own pending typing goes on as a step of its
+   * own, rather than joining the coder's; at the end everything the coder
+   * did goes on as one. In between `touched` takes no copies and the stack's
+   * buttons are dim — an UNDO from the stack mid-prompt would put text under
+   * a coder that is still typing into it.
+   */
+  private agentTurn(open: boolean): void {
+    this.inTurn = open;
+    this.cancelPush();
+    if (!this.editor || this.editGone) return;
+    const source = this.editor.source;
+    this.pushChain = this.pushChain.then(async () => {
+      // Another stack call in flight (a push from the last pause) is waited
+      // for rather than dropped: `pushEdit` refuses while one is.
+      while (this.editBusy && this.editor) await new Promise((r) => setTimeout(r, 50));
+      await this.pushEdit(source);
+    });
   }
 
   private cancelPush(): void {
@@ -2548,7 +2581,7 @@ export class QuestScene implements Scene {
       ? hintsRemaining(this.quest.hints_total, this.quest.hints_used)
       : 0;
     const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
-    const steps = editControls(this.edit, this.editBusy);
+    const steps = editControls(this.edit, this.editBusy || this.inTurn);
     return [
       {
         id: "run",
@@ -2624,7 +2657,7 @@ export class QuestScene implements Scene {
     // irreversible ones — is one tap away on the quest screen. CODE is for
     // writing, and a row that carried all twelve would be the crowding this
     // mode exists to escape.
-    const steps = editControls(this.edit, this.editBusy);
+    const steps = editControls(this.edit, this.editBusy || this.inTurn);
     const items = [
       {
         id: "run",

@@ -94,6 +94,12 @@ export interface Host {
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
   /** The editor's text changed under the agent's hands: autosave, mirror. */
   touched(): void;
+  /**
+   * A prompt began (true) or ended (false). For a screen with an undo
+   * history of its own beside CodeMirror's — the practice page's server
+   * stack — which has to keep the whole prompt to one step of it as well.
+   */
+  turn?: (open: boolean) => void;
   /** A small sound. */
   chip: { blip(): void; fail(): void; coin(): void; select(): void; type(): void };
   /**
@@ -809,6 +815,7 @@ export class Coder {
     // for this question comes out with one UNDO and goes back with one REDO.
     const editor = this.editor;
     editor.beginTurn();
+    this.host.turn?.(true);
     try {
       // The room first, so the message has somewhere to be kept.
       if (!this.room) {
@@ -845,6 +852,7 @@ export class Coder {
       }
     } finally {
       editor.endTurn();
+      this.host.turn?.(false);
       this.asking = null;
       if (this.live) {
         this.live.live = false;
