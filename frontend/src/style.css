@@ -337,6 +337,73 @@ body {
   border-radius: 2px;
 }
 
+/* The light code theme (`ui/codetheme.ts`): the same pane on cream paper,
+   with every colour above taken down to something that reads on it. The
+   syntax colours are custom properties `ui/editor.ts` falls back to the
+   palette from, so dark is untouched and only this block knows light. */
+:root[data-code-theme="light"] .cwb-editor {
+  --cwb-syn-keyword: #b82868;
+  --cwb-syn-name: #281810;
+  --cwb-syn-fn: #0860a0;
+  --cwb-syn-type: #8c5000;
+  --cwb-syn-string: #187018;
+  --cwb-syn-number: #a04800;
+  --cwb-syn-comment: #887868;
+  --cwb-syn-operator: #684028;
+  --cwb-syn-invalid: #c02000;
+  --cwb-syn-caret: #0860a0;
+  background: rgba(252, 244, 224, 0.98);
+}
+:root[data-code-theme="light"] .cwb-editor .cm-editor {
+  color: #281810;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-gutters {
+  background: rgba(240, 226, 192, 0.95);
+  color: #988870;
+  border-right-color: #b06828;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-activeLine {
+  background: rgba(8, 96, 160, 0.06);
+}
+:root[data-code-theme="light"] .cwb-editor .cm-activeLineGutter {
+  background: rgba(8, 96, 160, 0.12);
+  color: #483828;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-cursor {
+  border-left-color: #0860a0;
+  box-shadow: none;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-matchingBracket {
+  color: #0860a0 !important;
+  background: rgba(8, 96, 160, 0.14);
+  outline-color: rgba(8, 96, 160, 0.55);
+  text-shadow: none;
+  animation: none;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-nonmatchingBracket {
+  color: #c02000 !important;
+  text-shadow: none;
+}
+:root[data-code-theme="light"] .cwb-editor .cm-selectionBackground,
+:root[data-code-theme="light"] .cwb-editor .cm-content ::selection {
+  background: rgba(184, 40, 104, 0.22) !important;
+}
+:root[data-code-theme="light"] .cwb-editor .cwb-ghost {
+  color: rgba(40, 24, 16, 0.42);
+}
+:root[data-code-theme="light"] .cwb-editor .cwb-blank {
+  color: rgba(160, 104, 0, 0.95);
+}
+:root[data-code-theme="light"] .cwb-editor .cwb-blank-now {
+  text-shadow: 0 0 6px rgba(160, 104, 0, 0.35);
+}
+:root[data-code-theme="light"] .cwb-editor .cwb-hint {
+  color: rgba(8, 96, 160, 0.5);
+}
+:root[data-code-theme="light"] .cwb-editor .cwb-wrong {
+  background: rgba(216, 40, 0, 0.2);
+}
+
 .cwb-hidden {
   display: none !important;
 }

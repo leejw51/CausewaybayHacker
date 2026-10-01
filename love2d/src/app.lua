@@ -220,6 +220,8 @@ function App:load()
   -- applied on the second is a screen that visibly re-lays itself.
   local face = Store.saved_face()
   if face then Assets.setCodeFace(face) end
+  local code_theme = Store.saved_code_theme()
+  if code_theme then Theme.setCodeTheme(code_theme) end
 
   -- A missing key library is *not* fatal: the login screen renders the
   -- reason and the build command, because "run `make -C love2d ffi`" is a

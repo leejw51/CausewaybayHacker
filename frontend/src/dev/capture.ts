@@ -68,6 +68,17 @@ export interface CaptureApi {
   /** The Rust coder's sprite on this screen, with its centre in client pixels. */
   agent(): (AgentProbe & { cx: number; cy: number }) | null;
   /**
+   * The run console on this screen: its rect in virtual and client pixels,
+   * how many lines it holds past what it shows, and how far back it is
+   * scrolled (0 is the live tail). Null when no console is open.
+   */
+  consoleRect(): {
+    rect: readonly [number, number, number, number];
+    client: [number, number, number, number];
+    overflow: number;
+    scroll: number;
+  } | null;
+  /**
    * Every button the current screen is hit-testing, by id.
    *
    * A canvas control has no DOM node, so an automated run either has this or a
@@ -357,6 +368,17 @@ export function install(app: App): void {
       if (!p) return null;
       const [cx, cy] = app.layout.toClient(p.x, p.y);
       return { ...p, cx, cy };
+    },
+    consoleRect: () => {
+      const p = app.currentScene?.console?.() ?? null;
+      if (!p) return null;
+      const [x, y, w, h] = p.rect;
+      const [left, top] = app.layout.toClient(x, y);
+      const [right, bottom] = app.layout.toClient(x + w, y + h);
+      return {
+        ...p,
+        client: [left, top, right - left, bottom - top] as [number, number, number, number],
+      };
     },
     crt: (on?: boolean) => {
       if (on !== undefined && on !== app.crt.enabled) app.toggleCrt();

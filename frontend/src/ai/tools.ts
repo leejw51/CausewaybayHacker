@@ -11,6 +11,7 @@
  * code" is the editor's text and that is the whole project.
  */
 import type { Lang } from "../net/protocol";
+import { commentLines } from "./notes";
 
 export interface ToolDef {
   name: string;
@@ -101,6 +102,91 @@ export interface Bench {
    * run and not the one the panel opened on.
    */
   task?: (() => TaskBrief | null) | null;
+  /**
+   * **A tutor, who does what was asked.** On a graded screen the agent also
+   * gets `comment_code`, and its orders say: asked to explain, it explains
+   * in comments and leaves the program alone; asked to fix or to solve, it
+   * fixes or solves. Which one is the person's call, not the screen's.
+   */
+  tutor?: boolean;
+  /**
+   * Put `text` above line `line` (1-based; one past the last line appends)
+   * as comment lines in the file's language, indented like that line. The
+   * comment tool builds the comment itself from plain text, so there is no
+   * input it can be given that lands as code. Required when `tutor` is set.
+   */
+  comment?: ((line: number, text: string) => Promise<{ ok: boolean; why?: string }>) | null;
+  /**
+   * A model turn is starting: the line numbers it uses are the file's as of
+   * now. See `LineShift`.
+   */
+  newTurn?: () => void;
+}
+
+/**
+ * The model's line numbers, read against the file it was looking at.
+ *
+ * One turn can ask for several comments, every one numbered against the file
+ * as it was when the turn began — and each comment put in pushes the lines
+ * under it down. Taken literally, the second of three notes about lines 15,
+ * 16 and 17 landed *inside* the first, between its head and its wrapped
+ * tail, and the three came out interleaved. So the insertions of the turn so
+ * far are kept, and a line is moved down past every one put in above it —
+ * or at it, so a second note about the same line goes under the first and
+ * the two read in the order they were written.
+ *
+ * Only comments are tracked; anything else that changes the file in the
+ * turn makes the old numbering unknowable, and `reset` is called for it.
+ */
+export class LineShift {
+  private ins: Array<[number, number]> = [];
+
+  map(line: number): number {
+    let out = line;
+    for (const [at, n] of this.ins) if (at <= line) out += n;
+    return out;
+  }
+
+  /** `n` lines went in above the model's `line`. */
+  add(line: number, n: number): void {
+    this.ins.push([line, n]);
+  }
+
+  reset(): void {
+    this.ins = [];
+  }
+}
+
+/**
+ * Where an explanation goes and what is typed there: `text` as comment lines
+ * (`ai/notes.ts`'s, with the coder's `AI:` mark), above `line` and indented
+ * like it. Pure, so the one guarantee that matters — nothing typed is code —
+ * is a unit test and not a hope.
+ *
+ * Null when the line is out of range or there is nothing to say.
+ */
+export function commentInsert(
+  lang: Lang,
+  source: string,
+  line: number,
+  text: string,
+): { at: number; text: string } | null {
+  const lines = source.split("\n");
+  if (!Number.isInteger(line) || line < 1 || line > lines.length + 1) return null;
+  // Indented like the line it explains — or, past the end, like the last.
+  const ref = lines[Math.min(line, lines.length) - 1] ?? "";
+  const indent = /^[ \t]*/.exec(ref)?.[0] ?? "";
+  const body = commentLines(text, lang);
+  if (body.length === 0) return null;
+  const typed = body.map((l) => indent + l).join("\n");
+  if (line > lines.length) {
+    // After the last line: a newline first, unless the file already ends in one.
+    const lead = source === "" || source.endsWith("\n") ? "" : "\n";
+    return { at: source.length, text: `${lead}${typed}\n` };
+  }
+  let at = 0;
+  for (let i = 0; i < line - 1; i++) at += lines[i].length + 1;
+  return { at, text: `${typed}\n` };
 }
 
 export const TOOLS: ToolDef[] = [
@@ -158,6 +244,27 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "comment_code",
+    description:
+      "Explain by writing a comment into the program, above one line. Give plain text — no comment markers; the game writes it as comment lines in the file's language, indented like that line. It never changes the program. Number lines as the file was when this turn began; several comments in one turn are placed for you.",
+    input_schema: {
+      type: "object",
+      properties: {
+        line: {
+          type: "integer",
+          description:
+            "The 1-based line the explanation is about; the comment goes just above it. One past the last line appends at the end.",
+        },
+        text: {
+          type: "string",
+          description:
+            "The explanation, in the person's language. Short lines; several lines are fine.",
+        },
+      },
+      required: ["line", "text"],
+    },
+  },
+  {
     name: "run_code",
     description:
       "Compile and run the program as the RUN button does, and get back the outcome, stdout and stderr (the compiler's own errors on a failed build). After writing code, run it and fix what the compiler says before answering.",
@@ -208,6 +315,7 @@ export const TOOLS: ToolDef[] = [
 /** The tools this bench can actually honour. */
 export function toolsFor(bench: Bench): ToolDef[] {
   return TOOLS.filter((t) => {
+    if (t.name === "comment_code") return bench.tutor === true && !!bench.comment;
     if (t.name === "run_code") return bench.run !== null;
     if (t.name === "format_code") return bench.format !== null;
     if (t.name === "search_notes") return bench.search !== null;
@@ -247,6 +355,16 @@ export async function runTool(
     switch (name) {
       case "read_code":
         return { text: `${bench.file}:\n${numbered(bench.read())}`, error: false };
+      case "comment_code": {
+        if (!bench.comment) return { text: "This screen cannot take comments.", error: true };
+        const line = Number(input.line);
+        const text = str("text");
+        if (!text.trim()) return { text: "`text` is empty.", error: true };
+        const res = await bench.comment(line, text);
+        return res.ok
+          ? { text: `Commented above line ${line}. The program itself is unchanged.`, error: false }
+          : { text: res.why ?? "That line is not in the file.", error: true };
+      }
       case "edit_code": {
         const find = str("find");
         if (!find) return { text: "`find` is empty.", error: true };

@@ -43,7 +43,13 @@ import { advise, nextTip, TIPS } from "../../ai/tips";
 import { commentLines } from "../../ai/notes";
 import { helpAt, type CodeContext } from "../../ai/help";
 import { completeAt } from "../../ai/complete";
-import type { Bench, RunReport, TaskBrief } from "../../ai/tools";
+import {
+  commentInsert,
+  LineShift,
+  type Bench,
+  type RunReport,
+  type TaskBrief,
+} from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
 import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
 import type { CodeFx } from "../codefx";
@@ -78,11 +84,22 @@ export interface Host {
    * nobody anything. Asked on every ask, so the answer is current.
    */
   task?: () => TaskBrief | null;
+  /**
+   * A tutor (`Bench.tutor`): the practice screen's agent also writes
+   * comments, and explains or fixes as the person asks.
+   */
+  tutor?: boolean;
   /** RUN as the button does, or null where a run would count against the player. */
   run: ((source: string, stdin?: string) => Promise<RunReport>) | null;
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
   /** The editor's text changed under the agent's hands: autosave, mirror. */
   touched(): void;
+  /**
+   * A prompt began (true) or ended (false). For a screen with an undo
+   * history of its own beside CodeMirror's — the practice page's server
+   * stack — which has to keep the whole prompt to one step of it as well.
+   */
+  turn?: (open: boolean) => void;
   /** A small sound. */
   chip: { blip(): void; fail(): void; coin(): void; select(): void; type(): void };
   /**
@@ -142,6 +159,8 @@ export class Coder {
   readonly panel: Panel;
   private session: Session | null = null;
   private readonly typist = new Typist();
+  /** The turn's comments so far, to read the model's line numbers by (`LineShift`). */
+  private readonly shift = new LineShift();
   /**
    * The ask in flight, from before its room is made until its reply is in:
    * a second press meanwhile is dropped, and the tools that need a provider
@@ -601,8 +620,14 @@ export class Coder {
         return MAIN_FILE[host.lang()];
       },
       read: () => this.editor?.source ?? "",
-      write: (source) => typeIn(source, (ed) => ed.clearAll()),
-      insert: (text) => typeIn(text),
+      write: (source) => {
+        this.shift.reset();
+        return typeIn(source, (ed) => ed.clearAll());
+      },
+      insert: (text) => {
+        this.shift.reset();
+        return typeIn(text);
+      },
       edit: async (find, replace) => {
         const ed = this.editor;
         if (!ed) return { ok: false, why: "no editor" };
@@ -615,6 +640,7 @@ export class Coder {
           };
         if (src.indexOf(find, at + 1) >= 0)
           return { ok: false, why: "`find` occurs more than once; include more surrounding text." };
+        this.shift.reset();
         const r = await typeIn(replace, () => {
           ed.cut(at, at + find.length);
           host.touched();
@@ -622,13 +648,35 @@ export class Coder {
         return r.stopped ? { ok: false, why: "stopped by the person" } : { ok: true };
       },
       task: host.task ? () => host.task!() : null,
+      tutor: host.tutor === true,
+      newTurn: () => this.shift.reset(),
+      comment: async (line, text) => {
+        const ed = this.editor;
+        if (!ed) return { ok: false, why: "no editor" };
+        const ins = commentInsert(host.lang(), ed.source, this.shift.map(line), text);
+        if (!ins)
+          return {
+            ok: false,
+            why: `There is no line ${line}; the file has ${ed.source.split("\n").length}. Call read_code.`,
+          };
+        // A zero-width cut is a caret move under the same lock as the typing.
+        const r = await typeIn(ins.text, () => ed.cut(ins.at, ins.at));
+        if (r.stopped) return { ok: false, why: "stopped by the person" };
+        this.shift.add(line, ins.text.split("\n").length - 1);
+        return { ok: true };
+      },
       run: host.run
         ? async (stdin) => {
             const r = await host.run!(this.editor?.source ?? "", stdin);
             return r;
           }
         : null,
-      format: host.format,
+      format: host.format
+        ? () => {
+            this.shift.reset();
+            return host.format!();
+          }
+        : null,
       // Decided when asked, not when mounted: a fresh pad has no room until
       // its first save, and the room arrives while this bench is in use.
       get search() {
@@ -767,6 +815,7 @@ export class Coder {
     // for this question comes out with one UNDO and goes back with one REDO.
     const editor = this.editor;
     editor.beginTurn();
+    this.host.turn?.(true);
     try {
       // The room first, so the message has somewhere to be kept.
       if (!this.room) {
@@ -803,6 +852,7 @@ export class Coder {
       }
     } finally {
       editor.endTurn();
+      this.host.turn?.(false);
       this.asking = null;
       if (this.live) {
         this.live.live = false;
@@ -826,7 +876,9 @@ export class Coder {
    * with no editor to write into.
    */
   private noteInCode(reply: string): void {
-    if (!readNotes() || this.typist.busy) return;
+    // Explaining, the comments are the tool's and already in the file; the
+    // reply is the line that says where they are, and twice is litter.
+    if (!readNotes() || this.typist.busy || this.host.tutor) return;
     const editor = this.editor;
     if (!editor) return;
     const lines = commentLines(reply, this.host.lang());

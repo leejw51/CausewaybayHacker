@@ -27,7 +27,15 @@ import {
   needsKey,
   ollamaHost,
 } from "../src/ai/prefs";
-import { numbered, runTool, toolsFor, type Bench, type TaskBrief } from "../src/ai/tools";
+import {
+  commentInsert,
+  LineShift,
+  numbered,
+  runTool,
+  toolsFor,
+  type Bench,
+  type TaskBrief,
+} from "../src/ai/tools";
 import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
 import { commentLines } from "../src/ai/notes";
 
@@ -787,5 +795,109 @@ describe("the answer, as a comment in the file", () => {
     const lines = commentLines("First thought.\n\nSecond thought.", "go");
     for (const line of lines) expect(line.startsWith("//")).toBe(true);
     expect(lines.join(" ")).toContain("Second thought.");
+  });
+});
+
+describe("the tutor (the practice screen)", () => {
+  const src = 'fn main() {\n    let x = 1;\n    println!("{}", x);\n}\n';
+
+  it("puts the explanation above the line, indented like it, as comments", () => {
+    const ins = commentInsert("rust", src, 3, "This prints x.\nTry {:?} for a Vec.")!;
+    const out = src.slice(0, ins.at) + ins.text + src.slice(ins.at);
+    const lines = out.split("\n");
+    expect(lines[2]).toBe("    // AI: This prints x.");
+    expect(lines[3].startsWith("    // ")).toBe(true);
+    expect(lines[4]).toBe('    println!("{}", x);');
+    // The program is the program, comments taken out.
+    expect(
+      out
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("//"))
+        .join("\n"),
+    ).toBe(src);
+  });
+
+  it("never lets a line through as code, whatever the text", () => {
+    for (const lang of ["rust", "python", "lua", "go"] as const) {
+      const evil = "fine\n}\nfn main() { panic!() }\r\nx = 1\n\n*/ end";
+      const ins = commentInsert(lang, src, 2, evil)!;
+      const mark = lang === "python" ? "#" : lang === "lua" ? "--" : "//";
+      for (const l of ins.text.split("\n").filter((l) => l !== ""))
+        expect(l.trim().startsWith(mark)).toBe(true);
+    }
+  });
+
+  it("appends past the last line and refuses a line that is not there", () => {
+    const end = commentInsert("go", "package main", 2, "done")!;
+    expect(end).toEqual({ at: 12, text: "\n// AI: done\n" });
+    expect(commentInsert("go", src, 0, "x")).toBeNull();
+    expect(commentInsert("go", src, 99, "x")).toBeNull();
+    expect(commentInsert("go", src, 1.5, "x")).toBeNull();
+    expect(commentInsert("go", src, 1, "   ")).toBeNull();
+  });
+
+  it("adds comment_code to the tools, and only for a tutor", () => {
+    const b = bench({
+      tutor: true,
+      comment: async () => ({ ok: true }),
+      format: async () => ({ changed: false }),
+    });
+    const names = toolsFor(b).map((t) => t.name);
+    expect(names).toContain("comment_code");
+    // Asked to fix, it can: the editing tools are all still there.
+    for (const n of ["read_code", "edit_code", "write_code", "insert_code", "format_code"])
+      expect(names).toContain(n);
+    expect(toolsFor(bench()).map((t) => t.name)).not.toContain("comment_code");
+    expect(toolsFor(bench({ tutor: true })).map((t) => t.name)).not.toContain("comment_code");
+  });
+
+  it("can fix when asked: an edit goes through on a tutor's bench", async () => {
+    const b = bench({ tutor: true, comment: async () => ({ ok: true }) });
+    const r = await runTool(b, "edit_code", { find: '"hi"', replace: '"bye"' });
+    expect(r.error).toBe(false);
+    expect(b.read()).toContain('"bye"');
+  });
+
+  it("tells the model to comment when asked to explain and to fix when asked to fix", () => {
+    const p = systemPrompt(bench({ tutor: true }), false);
+    expect(p).toContain("comment_code");
+    expect(p).toContain("do NOT change the program");
+    expect(p).toContain("fix it, solve it");
+    expect(p).toContain("edit_code");
+    // Not a word of it on the playground.
+    expect(systemPrompt(bench(), false)).not.toContain("tutor");
+  });
+
+  it("places a turn's comments by the file the model saw, not the file as it grows", () => {
+    // The screenshot's bug: three notes about lines 15, 16 and 17, asked for
+    // in one turn, each wrapping to two lines. Taken literally the second
+    // landed inside the first and the three came out interleaved.
+    let file =
+      Array.from({ length: 20 }, (_, i) => `    let l${i + 1} = ${i + 1};`).join("\n") + "\n";
+    const shift = new LineShift();
+    const long = (n: number) => `note ${n} ` + "word ".repeat(20);
+    for (const line of [15, 16, 17]) {
+      const ins = commentInsert("rust", file, shift.map(line), long(line))!;
+      file = file.slice(0, ins.at) + ins.text + file.slice(ins.at);
+      shift.add(line, ins.text.split("\n").length - 1);
+    }
+    const lines = file.split("\n");
+    // Each note is whole, and sits right above the line it is about.
+    for (const n of [15, 16, 17]) {
+      const at = lines.indexOf(`    let l${n} = ${n};`);
+      const above = lines.slice(0, at).reverse();
+      const block = above.slice(0, above.findIndex((l) => l.includes("AI:")) + 1).reverse();
+      expect(block[0]).toContain(`AI: note ${n}`);
+      for (const l of block) expect(l.trim().startsWith("//")).toBe(true);
+    }
+    // And a second note about the same line goes under the first.
+    const again = new LineShift();
+    let f2 = "a\nb\n";
+    for (const t of ["first", "second"]) {
+      const ins = commentInsert("python", f2, again.map(2), t)!;
+      f2 = f2.slice(0, ins.at) + ins.text + f2.slice(ins.at);
+      again.add(2, ins.text.split("\n").length - 1);
+    }
+    expect(f2).toBe("a\n# AI: first\n# AI: second\nb\n");
   });
 });

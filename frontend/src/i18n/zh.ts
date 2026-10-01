@@ -364,6 +364,8 @@ export const zh: Partial<Catalogue> = {
   "pg.copyIn": "复制输入",
   "pg.pasteIn": "粘贴输入",
   "pg.codeFace": "代码字体 {name}",
+  "code.themeDark": "深色",
+  "code.themeLight": "浅色",
   "pg.code": "代码",
   "pg.codeDone": "完成",
   "pg.maps": "地图",

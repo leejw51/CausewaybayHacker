@@ -376,6 +376,8 @@ export const ko: Partial<Catalogue> = {
   "pg.copyIn": "입력 복사",
   "pg.pasteIn": "입력 붙여넣기",
   "pg.codeFace": "코드 글꼴 {name}",
+  "code.themeDark": "다크",
+  "code.themeLight": "라이트",
   "pg.code": "코드",
   "pg.codeDone": "완료",
   "pg.maps": "지도",

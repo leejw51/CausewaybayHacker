@@ -34,6 +34,7 @@ import {
   type CodeFace,
 } from "./engine/text";
 import { CODE_FACE_KEY } from "./ui/editor";
+import { CODE_THEME_KEY, CODE_THEMES, setCodeTheme, type CodeTheme } from "./ui/codetheme";
 import { readEnumPref, readNumberPref, writePref } from "./ui/prefs";
 import { css, Theme } from "./engine/theme";
 import { btnBox, btnPad, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
@@ -82,6 +83,15 @@ export interface Scene {
   controls?(): Buttons[];
   /** The Rust coder's sprite, if this screen has one, for the capture hook. */
   agent?(): AgentProbe | null;
+  /** The run console, if this screen has one open, for the capture hook. */
+  console?(): ConsoleProbe | null;
+}
+
+/** Where the console is (virtual pixels), how far it can scroll and has. */
+export interface ConsoleProbe {
+  rect: readonly [number, number, number, number];
+  overflow: number;
+  scroll: number;
 }
 
 /** Where the coder is and what it is doing, in virtual pixels. */
@@ -260,6 +270,8 @@ export class App {
     // The code face, before the first frame: a face chosen last time and
     // applied on the second frame is a screen that visibly re-lays itself.
     setCodeFace(readEnumPref<CodeFace>(CODE_FACE_KEY, CODE_FACES, "game"));
+    // And the paper under it, for the same reason.
+    setCodeTheme(readEnumPref<CodeTheme>(CODE_THEME_KEY, CODE_THEMES, "dark"));
     // The interface face: named now, fetched by `boot` before it measures.
     restoreUiFace(readEnumPref<UiFace>(UI_FACE_KEY, UI_FACES, "game"));
     // And the text size, for the same reason.

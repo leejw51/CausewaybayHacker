@@ -907,6 +907,10 @@ function Playground:draw_big()
     -- every other toggle on this strip.
     { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()],
       every = { "JETBRAINS" }, state = "normal" },
+    -- Light or dark, for the code pane alone. The same: it says the one
+    -- it is **in**.
+    { id = "theme", label = Playground.theme_label(),
+      every = { I18n.t("DARK"), I18n.t("LIGHT") }, state = "normal" },
     { id = "copyin", label = I18n.t("COPY INPUT"), every = { I18n.t("COPY INPUT") },
       state = (self.stdin or "") ~= "" and "normal" or "disabled" },
     { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
@@ -1302,6 +1306,12 @@ function Playground:draw_code(rect, bare)
   self.mono_font = font
 
   love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
+  -- The light theme's page, over the code rows only: the strip under them is
+  -- the game's, and stays the game's colour.
+  if Theme.pane.paper then
+    UI.setColor(Theme.pane.paper)
+    love.graphics.rectangle("fill", rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
+  end
   love.graphics.setFont(font)
   -- **The leftover goes above the text, not below it.** A pane is a whole
   -- number of lines and a rectangle is not, so up to a line's worth of height
@@ -1328,20 +1338,20 @@ function Playground:draw_code(rect, bare)
     if not line then break end
     local y = y0 + (row - 1) * line_h
     if index == self.editor.line then
-      UI.setColor(Theme.cream, 0.06)
+      UI.setColor(Theme.pane.active)
       love.graphics.rectangle("fill", rect.x + 3, y, rect.w - 6, line_h)
     end
     if sel_l1 and index >= sel_l1 and index <= sel_l2 then
       local from = (index == sel_l1) and sel_c1 or 1
       local to = (index == sel_l2) and sel_c2 or (#line + 1)
       local sx = x0 + gutter - shift + font:getWidth(line:sub(1, from - 1))
-      UI.setColor(Theme.coin, 0.28)
+      UI.setColor(Theme.pane.select)
       love.graphics.rectangle("fill", sx, y,
         math.max(2, font:getWidth(line:sub(from, to - 1))), line_h)
     end
     -- The line numbers do not move with the text: they are a ruler, and a
     -- ruler that slides is not one. Painted over whatever scrolled under it.
-    UI.setColor(Theme.void, 0.92)
+    UI.setColor(Theme.pane.gutter)
     love.graphics.rectangle("fill", rect.x + 3, y, gutter + 5, line_h)
     UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
@@ -1355,7 +1365,7 @@ function Playground:draw_code(rect, bare)
     end
     if index == self.editor.line and self.focus == "editor"
       and (love.timer.getTime() * 2) % 2 < 1.2 then
-      UI.setColor(Theme.coin)
+      UI.setColor(Theme.pane.caret)
       love.graphics.rectangle("fill",
         x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1)), y, 2, line_h)
     end
@@ -1628,6 +1638,26 @@ function Playground:cycle_face()
   Assets.setCodeFace(next_face)
   require("src.store").set_face(next_face)
   self.note = Assets.CODE_FACE_NAME[next_face]
+  SFX.play("select")
+end
+
+--- What the THEME button says: the theme the pane is in now.
+function Playground.theme_label()
+  return Theme.codeTheme() == "light" and I18n.t("LIGHT") or I18n.t("DARK")
+end
+
+--- The code pane's light or dark, cycled and remembered. One preference for
+--- both code panes, like the face.
+function Playground:cycle_theme()
+  local themes = Theme.CODE_THEMES
+  local at = 1
+  for i, name in ipairs(themes) do
+    if name == Theme.codeTheme() then at = i end
+  end
+  local next_theme = themes[(at % #themes) + 1]
+  Theme.setCodeTheme(next_theme)
+  require("src.store").set_code_theme(next_theme)
+  self.note = Playground.theme_label()
   SFX.play("select")
 end
 
@@ -2105,6 +2135,7 @@ function Playground:mousepressed(x, y, button)
     if inside(r.pastecode) then self:clip("paste"); return end
     if inside(r.copyout) then self:clip("out"); return end
     if inside(r.face) then self:cycle_face(); return end
+    if inside(r.theme) then self:cycle_theme(); return end
     if inside(r.copyin) then self:clip("copyin"); return end
     if inside(r.pastein) then self:clip("in"); return end
     if inside(r.poster) then self:poster(); return end

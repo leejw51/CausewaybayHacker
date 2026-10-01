@@ -395,6 +395,8 @@ export const en = {
   "pg.copyIn": "COPY INPUT",
   "pg.pasteIn": "PASTE INPUT",
   "pg.codeFace": "code face {name}",
+  "code.themeDark": "DARK",
+  "code.themeLight": "LIGHT",
   "pg.code": "CODE",
   "pg.codeDone": "DONE",
   "pg.maps": "MAPS",

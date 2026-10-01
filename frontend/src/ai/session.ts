@@ -62,7 +62,7 @@ const clip = (text: string): string =>
  * unsolved quest's answer to come through, because the client does not have
  * it either.
  */
-function taskLines(task: TaskBrief): string[] {
+function taskLines(task: TaskBrief, tutor = false): string[] {
   const out = [
     "",
     "The person is not writing whatever they like: this screen is a graded exercise, and this is it.",
@@ -108,7 +108,9 @@ function taskLines(task: TaskBrief): string[] {
   }
   out.push(
     "",
-    "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does.",
+    tutor
+      ? "On a graded screen: do what they asked, and only that. A question — why, what, explain, a hint, comment it — is answered in comments with comment_code, and the program stays exactly as they wrote it. A request to fix it, solve it, finish it or write it is done, in the editor, and then said in a sentence."
+      : "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does.",
   );
   return out;
 }
@@ -122,6 +124,37 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "",
     'The whole project is ONE source file, the one in the editor. There are no other files, no build system to configure, no dependencies beyond the standard library (Rust: std only, no crates; Go: standard library; C++: the standard library, compiled with -std=c++20; Python 3: the standard library; TypeScript: tsc in strict mode with no @types/node — only process, console, the timers and fs.readFileSync are declared, so stdin is read with `const input: string = require("fs").readFileSync(0, "utf8");` and output goes through console.log; Zig 0.16: std only, no build.zig, one main.zig built with -O Debug, `pub fn main(init: std.process.Init) !void`, stdin read with `var r = std.Io.File.stdin().readerStreaming(init.io, &buf);` and `const input = try r.interface.allocRemaining(init.gpa, .unlimited);`, output through a buffered `std.Io.File.stdout().writerStreaming(init.io, &buf)` whose `.interface` must be `flush()`ed before main returns, and std.debug.print goes to stderr, never to the answer; Lua: LuaJIT 2.1, which is the Lua 5.1 dialect — no `//` integer division, `unpack` not `table.unpack`, the `bit` library for bit operations — stdin read with `io.read("*a")` and output through print or io.write).',
     "",
+    ...workRules(canRun),
+    ...(bench.tutor ? tutorRules() : []),
+    ...(task ? taskLines(task, bench.tutor === true) : []),
+    "",
+    `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
+    "```",
+    numbered(bench.read()),
+    "```",
+  ].join("\n");
+}
+
+/**
+ * The practice screen's orders, on top of the pair's: a tutor who writes in
+ * the margin when asked to explain, and fixes when asked to fix. The person
+ * says which; the agent does not decide for them that help means the answer,
+ * or that a request for the answer means a lecture.
+ */
+function tutorRules(): string[] {
+  return [
+    "",
+    "On this screen you are a tutor, and you do what the person asks:",
+    "- If they ask you to explain — why it fails, what a line does, what the compiler means, a hint, to comment it — explain with comment_code, just above the line it is about, and do NOT change the program: no edit_code, no write_code. Plain text; the game adds the comment markers. One to four lines per spot, a few spots at most.",
+    "- If they ask you to fix it, solve it, finish it or write it, do that with edit_code or write_code, as on any other screen.",
+    "- If it is not clear which, explain in comments; they can still ask you to fix it.",
+    "- Write comments and your chat reply in the language the person wrote to you in. Your chat reply is one or two sentences.",
+  ];
+}
+
+/** The pair's orders, on every screen: a pair who writes and runs code. */
+function workRules(canRun: boolean): string[] {
+  return [
     "How to work:",
     "- For a small change, use edit_code with the exact span. For a new program or a rewrite, use write_code. Both are typed into the editor character by character while the person watches, so write only what is needed and no filler comments.",
     canRun
@@ -132,13 +165,7 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "- Keep the person's style, names and formatting unless asked. Keep the program's existing behaviour unless asked.",
     "- Never invent an API. If unsure, prefer the plain standard-library way.",
     "- A picture is not a program. When the person asks for a picture, image, drawing or photo, call make_image with a prompt; do not write code that prints one, and do not describe it instead.",
-    ...(task ? taskLines(task) : []),
-    "",
-    `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
-    "```",
-    numbered(bench.read()),
-    "```",
-  ].join("\n");
+  ];
 }
 
 export class Session {
@@ -249,6 +276,8 @@ export class Session {
           break;
         }
         const results: Part[] = [];
+        // This turn's line numbers are the file's as of now (`LineShift`).
+        this.bench.newTurn?.();
         for (const u of turn.toolUses) {
           if (abort.signal.aborted) break;
           const mood: Mood =

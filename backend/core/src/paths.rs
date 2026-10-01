@@ -178,24 +178,45 @@ pub fn ensure_dir(dir: &Path) -> Result<()> {
 
 /// Write a file that is owner-only from the moment it exists: `fs::write`
 /// followed by a chmod leaves a window in which it sits behind the umask.
+///
+/// And whole from the moment it exists: the text goes into a fresh file
+/// beside it, which is then renamed over it. Truncating in place left a
+/// window in which a reader — a player opening `progress.json` while a write
+/// was landing — found it empty or cut short.
 pub fn write_private(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
     use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    // Two writes of one file at once (a clear and a socket close) each get
+    // their own temporary, and the later rename wins whole.
+    static NEXT: AtomicU64 = AtomicU64::new(0);
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
     }
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let tmp = path.with_file_name(format!(
+        ".{name}.{}.{}.tmp",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
     let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
+    options.write(true).create_new(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(path)?;
-    // The mode above applies only on creation; tighten a pre-existing file.
-    set_private(path, 0o600)?;
-    file.write_all(contents.as_ref())?;
-    file.flush()?;
-    Ok(())
+    let written = (|| -> Result<()> {
+        let mut file = options.open(&tmp)?;
+        file.write_all(contents.as_ref())?;
+        file.flush()?;
+        drop(file);
+        std::fs::rename(&tmp, path)?;
+        Ok(())
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    written
 }
 
 /// Tighten permissions. A no-op where the platform has no Unix modes.
