@@ -763,6 +763,10 @@ export class Coder {
     }
     this.panel.status = "";
     this.asking = { provider, key };
+    // One prompt, one step of history: whatever the coder does to the file
+    // for this question comes out with one UNDO and goes back with one REDO.
+    const editor = this.editor;
+    editor.beginTurn();
     try {
       // The room first, so the message has somewhere to be kept.
       if (!this.room) {
@@ -798,6 +802,7 @@ export class Coder {
         this.host.chip.fail();
       }
     } finally {
+      editor.endTurn();
       this.asking = null;
       if (this.live) {
         this.live.live = false;

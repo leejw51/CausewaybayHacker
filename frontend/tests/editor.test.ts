@@ -681,6 +681,80 @@ describe("the editor's own history as buttons", () => {
   });
 });
 
+describe("one prompt to the coder, one step of history", () => {
+  it("takes the whole turn out with one UNDO, however long it thought, and leaves the person's steps alone", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const { EditorView } = await import("@codemirror/view");
+    const ed = new Editor("rust", "a");
+    try {
+      const view = EditorView.findFromDOM(ed.dom)!;
+      const type = (pos: number, text: string) =>
+        view.dispatch({ changes: { from: pos, insert: text }, userEvent: "input.type" });
+      type(1, "b");
+      expect(ed.source).toBe("ab");
+
+      ed.beginTurn();
+      // A write: the file cleared and typed in a character at a time.
+      ed.setLocked(true);
+      ed.clearAll();
+      for (const ch of "fn main() {}\n") ed.typeAt(ch);
+      ed.setLocked(false);
+      // The model thinks for longer than CodeMirror's grouping delay.
+      await new Promise((r) => setTimeout(r, 600));
+      // An edit, a FORMAT and the answer as a comment, in the same prompt.
+      const at = ed.source.indexOf("{}");
+      ed.cut(at, at + 2);
+      for (const ch of "{ }") ed.typeAt(ch);
+      ed.replaceAll("fn main() {}\n");
+      ed.seek(0);
+      ed.noteAbove(["// AI: done"]);
+      ed.endTurn();
+      const after = ed.source;
+      expect(after).toBe("fn main() {}\n// AI: done\n");
+
+      // The person's next keystroke is a step of its own.
+      type(ed.source.length, "c");
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe(after);
+      // One UNDO takes the whole prompt out...
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("ab");
+      // ...one REDO puts it all back, so the two are the compare...
+      expect(ed.redo()).toBe(true);
+      expect(ed.source).toBe(after);
+      expect(ed.undo()).toBe(true);
+      // ...and the person's own history from before the prompt is intact.
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("a");
+      expect(ed.canUndo).toBe(false);
+    } finally {
+      ed.destroy();
+    }
+  });
+
+  it("gives two prompts two steps, and a prompt that changes nothing none", async () => {
+    const { Editor } = await import("../src/ui/editor");
+    const ed = new Editor("rust", "");
+    try {
+      ed.beginTurn();
+      ed.typeAt("x");
+      ed.endTurn();
+      ed.beginTurn();
+      ed.typeAt("y");
+      ed.endTurn();
+      ed.beginTurn();
+      ed.endTurn();
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("x");
+      expect(ed.undo()).toBe(true);
+      expect(ed.source).toBe("");
+      expect(ed.canUndo).toBe(false);
+    } finally {
+      ed.destroy();
+    }
+  });
+});
+
 describe("the coder's answer, put in above the caret", () => {
   it("goes in above the caret's line, indented like it, and comes out in one undo", async () => {
     const { Editor } = await import("../src/ui/editor");

@@ -21,6 +21,7 @@
  * what the caret is standing in can ask, and decide elsewhere.
  */
 import {
+  Annotation,
   Compartment,
   EditorState,
   Prec,
@@ -51,6 +52,7 @@ import {
   historyKeymap,
   indentWithTab,
   insertNewline,
+  isolateHistory,
   redo,
   redoDepth,
   undo,
@@ -1212,9 +1214,24 @@ export function bracketPairAt(state: EditorState, head: number): [number, number
   return m.start.from < m.end.from ? [m.start.from, m.end.from] : [m.end.from, m.start.from];
 }
 
+/**
+ * One prompt to the coder is one step of history (see `beginTurn`).
+ *
+ * The value is when the turn began, and every dispatch the coder makes in it
+ * is stamped with that time. CodeMirror joins a change into the previous
+ * history event only inside `newGroupDelay` of it, and a model that thinks
+ * for six seconds between a write and an edit would otherwise split the
+ * prompt into as many steps as it made tool calls — or, typed a character at
+ * a time, into a step per character. A constant clock and a `joinToEvent`
+ * that says yes to the turn's own changes make the whole of it one event:
+ * one UNDO takes the AI's work out, one REDO puts it back, and flipping the
+ * two is how the before and the after are compared.
+ */
+const agentTurn = Annotation.define<number>();
+
 const base: Extension = [
   lineNumbers(),
-  history(),
+  history({ joinToEvent: (tr, adjacent) => adjacent || tr.annotation(agentTurn) !== undefined }),
   drawSelection(),
   rectangularSelection(),
   indentOnInput(),
@@ -1343,7 +1360,12 @@ export class Editor {
     };
     const lang = this.lang;
     for (const tr of u.transactions) {
-      if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) continue;
+      if (!tr.docChanged) continue;
+      if (
+        tr.annotation(Transaction.userEvent) === undefined &&
+        tr.annotation(agentTurn) === undefined
+      )
+        continue;
       tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
         const text = inserted.toString();
         if (toA > fromA) {
@@ -1485,6 +1507,15 @@ export class Editor {
           autocomplete: "off",
         }),
         MODE[lang](),
+        // Inside a turn a caret move is not history. CodeMirror closes an
+        // event on the first selection recorded after it, so a click between
+        // two of the coder's tool calls — or its own `seek` before a note —
+        // would split one prompt into two UNDOs.
+        EditorState.transactionExtender.of((tr) =>
+          this.turnAt !== null && !tr.docChanged && tr.selection
+            ? { annotations: Transaction.addToHistory.of(false) }
+            : null,
+        ),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange?.();
           this.harvest(u);
@@ -1496,6 +1527,7 @@ export class Editor {
   /** Swap language and document together: a new quest is a new state. */
   load(lang: Lang, doc: string): void {
     this.lang = lang;
+    this.turnAt = null;
     this.lastPair = null;
     // A new document: the caret's first place in it is not a move from the
     // old one.
@@ -1518,7 +1550,7 @@ export class Editor {
   replaceAll(next: string): void {
     const edit = narrowEdit(this.view.state.doc.toString(), next);
     if (!edit) return;
-    this.view.dispatch({ changes: edit, scrollIntoView: true });
+    this.view.dispatch({ changes: edit, scrollIntoView: true, annotations: this.turnMarks() });
   }
 
   get source(): string {
@@ -1526,7 +1558,8 @@ export class Editor {
   }
 
   /**
-   * CodeMirror's own history, per keystroke, as buttons.
+   * CodeMirror's own history, per keystroke, as buttons — and per prompt
+   * for what the coder wrote (`beginTurn`).
    *
    * This is the fine-grained one — the same steps Ctrl+Z takes — and it lives
    * in the tab and nowhere else. The quest screen's UNDO/REDO are a different
@@ -1591,6 +1624,7 @@ export class Editor {
       changes: { from: at, insert: text },
       selection: { anchor: at + text.length },
       scrollIntoView: true,
+      annotations: this.turnMarks(),
     });
   }
 
@@ -1726,6 +1760,54 @@ export class Editor {
     }
   }
 
+  /**
+   * Open one prompt's worth of history: everything the coder does to the
+   * file from here to `endTurn` — the write, the edits, a FORMAT, the answer
+   * left as a comment — is one UNDO and one REDO.
+   *
+   * Isolated on both ends, so the person's last keystroke before the prompt
+   * and their first one after it stay steps of their own. A turn that
+   * changes nothing leaves nothing behind: history only records changes.
+   *
+   * What it does not hold together: a person who types into the file in a
+   * gap between two of the coder's tool calls, while the lock is off. Their
+   * keystroke is an event of its own and the rest of the turn joins it, so
+   * that prompt takes two UNDOs instead of one. Rare, and nothing is lost.
+   * A click in that gap does not split it (see the extender in `stateFor`).
+   */
+  beginTurn(): void {
+    this.turnAt = Date.now();
+    this.view.dispatch({ annotations: isolateHistory.of("full") });
+  }
+
+  /** Close the step `beginTurn` opened. Harmless when none is open. */
+  endTurn(): void {
+    if (this.turnAt === null) return;
+    this.turnAt = null;
+    this.view.dispatch({ annotations: isolateHistory.of("full") });
+  }
+
+  /** When the open turn began, or null between turns. */
+  private turnAt: number | null = null;
+
+  /** What a dispatch inside a turn carries so it joins the turn's event. */
+  private turnMarks(): Annotation<unknown>[] {
+    const at = this.turnAt;
+    return at === null ? [] : [agentTurn.of(at), Transaction.time.of(at)];
+  }
+
+  /**
+   * The coder's own edits: tagged `*.agent` between turns, as the lock and
+   * the sparks expect, and inside a turn carried by the turn's marks
+   * instead — CodeMirror joins only `input.type` and `delete` events, and an
+   * `input.type` would set `indentOnInput` re-indenting the coder's braces.
+   * The lock lets an untagged dispatch through, and `harvest` reads the
+   * turn's mark as the event it stands in for.
+   */
+  private agentEvent(ev: string): { userEvent?: string; annotations?: Annotation<unknown>[] } {
+    return this.turnAt === null ? { userEvent: ev } : { annotations: this.turnMarks() };
+  }
+
   /** Type `text` at the caret and leave the caret after it. */
   typeAt(text: string): void {
     const head = this.view.state.selection.main.head;
@@ -1733,7 +1815,7 @@ export class Editor {
       changes: { from: head, insert: text },
       selection: { anchor: head + text.length },
       scrollIntoView: true,
-      userEvent: "input.agent",
+      ...this.agentEvent("input.agent"),
     });
   }
 
@@ -1741,7 +1823,11 @@ export class Editor {
   clearAll(): void {
     const len = this.view.state.doc.length;
     if (len === 0) return;
-    this.view.dispatch({ changes: { from: 0, to: len }, selection: { anchor: 0 } });
+    this.view.dispatch({
+      changes: { from: 0, to: len },
+      selection: { anchor: 0 },
+      annotations: this.turnMarks(),
+    });
   }
 
   /**
@@ -1756,7 +1842,7 @@ export class Editor {
       changes: { from, to },
       selection: { anchor: from },
       scrollIntoView: true,
-      userEvent: "delete.agent",
+      ...this.agentEvent("delete.agent"),
     });
     return true;
   }
@@ -1793,7 +1879,7 @@ export class Editor {
       changes: { from: line.from, insert },
       selection: { anchor: head + insert.length },
       scrollIntoView: true,
-      userEvent: "input.agent",
+      ...this.agentEvent("input.agent"),
     });
   }
 
