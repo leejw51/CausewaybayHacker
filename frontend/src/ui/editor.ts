@@ -155,17 +155,28 @@ const hex = (c: readonly [number, number, number, number]) =>
     )
     .join("");
 
+/**
+ * A palette colour as a custom property with the palette as its fallback, so
+ * the dark theme is the colour it always was and `style.css` can swap a light
+ * one in under `[data-code-theme="light"]` (`ui/codetheme.ts`).
+ */
+const syn = (name: string, c: readonly [number, number, number, number]) =>
+  `var(--cwb-syn-${name}, ${hex(c)})`;
+
 /** Wonder Boy candy applied to a syntax tree: coin, cyan, pink, cream. */
 const retro = HighlightStyle.define([
-  { tag: t.keyword, color: hex(Theme.pink) },
-  { tag: [t.name, t.deleted, t.character, t.propertyName, t.macroName], color: hex(Theme.cream) },
-  { tag: [t.function(t.variableName), t.labelName], color: hex(Theme.cyan) },
-  { tag: [t.typeName, t.className, t.namespace], color: hex(Theme.coin) },
-  { tag: [t.string, t.special(t.string)], color: hex(Theme.grass) },
-  { tag: [t.number, t.bool, t.null], color: hex(Theme.coin) },
-  { tag: [t.comment, t.meta], color: hex(Theme.dim), fontStyle: "italic" },
-  { tag: t.operator, color: hex(Theme.panel) },
-  { tag: t.invalid, color: hex(Theme.red) },
+  { tag: t.keyword, color: syn("keyword", Theme.pink) },
+  {
+    tag: [t.name, t.deleted, t.character, t.propertyName, t.macroName],
+    color: syn("name", Theme.cream),
+  },
+  { tag: [t.function(t.variableName), t.labelName], color: syn("fn", Theme.cyan) },
+  { tag: [t.typeName, t.className, t.namespace], color: syn("type", Theme.coin) },
+  { tag: [t.string, t.special(t.string)], color: syn("string", Theme.grass) },
+  { tag: [t.number, t.bool, t.null], color: syn("number", Theme.coin) },
+  { tag: [t.comment, t.meta], color: syn("comment", Theme.dim), fontStyle: "italic" },
+  { tag: t.operator, color: syn("operator", Theme.panel) },
+  { tag: t.invalid, color: syn("invalid", Theme.red) },
 ]);
 
 /**
@@ -1245,7 +1256,7 @@ const base: Extension = [
   keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
   EditorView.theme({
     "&": { height: "100%", backgroundColor: "transparent" },
-    ".cm-content": { caretColor: hex(Theme.cyan) },
+    ".cm-content": { caretColor: syn("caret", Theme.cyan) },
     "&.cm-focused": { outline: "none" },
   }),
 ];

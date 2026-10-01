@@ -331,6 +331,9 @@ function Store.replay(records)
       -- one window; folding it into `display.set` would rewrite it on every
       -- F1 press.
       folded.face = record.face
+    elseif kind == "theme.set" and type(record.theme) == "string" then
+      -- The code pane's light or dark, beside the face and for its reason.
+      folded.theme = record.theme
     elseif kind == "lang.set" and type(record.lang) == "string" then
       -- **Its own record, not a field on `display.set`.** The orientation,
       -- the fullscreen pin and the type size are one setting — how this
@@ -437,6 +440,8 @@ function Store.fold(record)
     state.display = folded.display
   elseif record.kind == "face.set" then
     state.face = folded.face
+  elseif record.kind == "theme.set" then
+    state.theme = folded.theme
   elseif record.kind == "lang.set" then
     state.lang = folded.lang
   elseif record.kind == "story.seen" then
@@ -759,6 +764,15 @@ end
 
 function Store.set_face(face)
   return Store.append({ kind = "face.set", face = face })
+end
+
+--- The code pane's theme, "dark" or "light", across launches.
+function Store.saved_code_theme()
+  return state and state.theme or nil
+end
+
+function Store.set_code_theme(theme)
+  return Store.append({ kind = "theme.set", theme = theme })
 end
 
 -- --------------------------------------------------------------- the opening

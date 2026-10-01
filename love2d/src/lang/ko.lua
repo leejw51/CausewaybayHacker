@@ -256,6 +256,8 @@ return {
   ["BLANKS"] = "빈칸 따라치기",
   ["ANSWER ONLY"] = "답만 타이핑",
   ["+LINE"] = "한 줄",
+  ["DARK"] = "다크",
+  ["LIGHT"] = "라이트",
   ["ESC done   F5 run   F2 format"] = "ESC 완료   F5 실행   F2 정렬",
   ["FORMAT"] = "정렬",
   ["CODE"] = "코드",

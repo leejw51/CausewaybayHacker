@@ -27,7 +27,14 @@ import {
   needsKey,
   ollamaHost,
 } from "../src/ai/prefs";
-import { numbered, runTool, toolsFor, type Bench, type TaskBrief } from "../src/ai/tools";
+import {
+  commentInsert,
+  numbered,
+  runTool,
+  toolsFor,
+  type Bench,
+  type TaskBrief,
+} from "../src/ai/tools";
 import { systemPrompt, MAX_ROUNDS } from "../src/ai/session";
 import { commentLines } from "../src/ai/notes";
 
@@ -787,5 +794,78 @@ describe("the answer, as a comment in the file", () => {
     const lines = commentLines("First thought.\n\nSecond thought.", "go");
     for (const line of lines) expect(line.startsWith("//")).toBe(true);
     expect(lines.join(" ")).toContain("Second thought.");
+  });
+});
+
+describe("explain-only (the practice screen)", () => {
+  const src = 'fn main() {\n    let x = 1;\n    println!("{}", x);\n}\n';
+
+  it("puts the explanation above the line, indented like it, as comments", () => {
+    const ins = commentInsert("rust", src, 3, "This prints x.\nTry {:?} for a Vec.")!;
+    const out = src.slice(0, ins.at) + ins.text + src.slice(ins.at);
+    const lines = out.split("\n");
+    expect(lines[2]).toBe("    // AI: This prints x.");
+    expect(lines[3].startsWith("    // ")).toBe(true);
+    expect(lines[4]).toBe('    println!("{}", x);');
+    // The program is the program, comments taken out.
+    expect(
+      out
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("//"))
+        .join("\n"),
+    ).toBe(src);
+  });
+
+  it("never lets a line through as code, whatever the text", () => {
+    for (const lang of ["rust", "python", "lua", "go"] as const) {
+      const evil = "fine\n}\nfn main() { panic!() }\r\nx = 1\n\n*/ end";
+      const ins = commentInsert(lang, src, 2, evil)!;
+      const mark = lang === "python" ? "#" : lang === "lua" ? "--" : "//";
+      for (const l of ins.text.split("\n").filter((l) => l !== ""))
+        expect(l.trim().startsWith(mark)).toBe(true);
+    }
+  });
+
+  it("appends past the last line and refuses a line that is not there", () => {
+    const end = commentInsert("go", "package main", 2, "done")!;
+    expect(end).toEqual({ at: 12, text: "\n// AI: done\n" });
+    expect(commentInsert("go", src, 0, "x")).toBeNull();
+    expect(commentInsert("go", src, 99, "x")).toBeNull();
+    expect(commentInsert("go", src, 1.5, "x")).toBeNull();
+    expect(commentInsert("go", src, 1, "   ")).toBeNull();
+  });
+
+  it("offers only read_code and comment_code", () => {
+    const b = bench({
+      explainOnly: true,
+      comment: async () => ({ ok: true }),
+      format: async () => ({ changed: false }),
+    });
+    expect(toolsFor(b).map((t) => t.name)).toEqual(["read_code", "comment_code"]);
+    // And nowhere else.
+    expect(toolsFor(bench()).map((t) => t.name)).not.toContain("comment_code");
+  });
+
+  it("refuses a change to the code even when asked by name", async () => {
+    const b = bench({ explainOnly: true, comment: async () => ({ ok: true }) });
+    const before = b.read();
+    for (const [name, input] of [
+      ["edit_code", { find: "hi", replace: "bye" }],
+      ["write_code", { source: "fn main() {}" }],
+      ["insert_code", { text: "x" }],
+      ["format_code", {}],
+    ] as const) {
+      const r = await runTool(b, name, input);
+      expect(r.error).toBe(true);
+    }
+    expect(b.read()).toBe(before);
+    expect((await runTool(b, "comment_code", { line: 2, text: "why" })).error).toBe(false);
+  });
+
+  it("tells the model to explain in comments and never to fix", () => {
+    const p = systemPrompt(bench({ explainOnly: true }), false);
+    expect(p).toContain("comment_code");
+    expect(p).toContain("Never write the corrected code");
+    expect(p).not.toContain("edit_code");
   });
 });

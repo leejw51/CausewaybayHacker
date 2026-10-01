@@ -84,6 +84,72 @@ T.code = {
   punct = { 208 / 255, 196 / 255, 172 / 255, 1 },
 }
 
+-- The rest of what a code pane is painted with: the page under the text, the
+-- ruler, the active line, the selection, the caret, the bracket outline, the
+-- answer's ghost and its holes, and the scrollbar. `paper = nil` means "the
+-- well as it is" — the dark pane is drawn exactly as it was before there
+-- was a choice.
+T.pane = {
+  paper = nil,
+  gutter = { T.void[1], T.void[2], T.void[3], 0.92 },
+  active = { T.cream[1], T.cream[2], T.cream[3], 0.06 },
+  select = { T.coin[1], T.coin[2], T.coin[3], 0.28 },
+  caret = T.coin,
+  match = T.cyan,
+  ghost = { T.cream[1], T.cream[2], T.cream[3], 0.42 },
+  hole = T.coin,
+  scroll = { T.cream[1], T.cream[2], T.cream[3], 0.25 },
+}
+
+--- The two code themes, in the order the THEME button cycles them.
+---
+--- **The code pane only.** The panels, the buttons and the console around it
+--- are the game, and the game is drawn at night; what changes is the one
+--- surface somebody reads their own program on, which some people read
+--- better as ink on paper. The light page is the palette's own cream, and
+--- every syntax colour is the dark one taken down until it holds its own on
+--- it — the same hues, so a keyword is still the pink one.
+T.CODE_THEMES = { "dark", "light" }
+local CODE = {
+  dark = { code = T.code, pane = T.pane },
+  light = {
+    code = {
+      text = T.ink,
+      keyword = { 176 / 255, 32 / 255, 96 / 255, 1 },
+      type = { 16 / 255, 96 / 255, 168 / 255, 1 },
+      string = { 32 / 255, 120 / 255, 24 / 255, 1 },
+      number = { 168 / 255, 96 / 255, 0 / 255, 1 },
+      comment = { 136 / 255, 124 / 255, 108 / 255, 1 },
+      macro = { 184 / 255, 72 / 255, 8 / 255, 1 },
+      punct = { 88 / 255, 72 / 255, 56 / 255, 1 },
+    },
+    pane = {
+      paper = { 252 / 255, 244 / 255, 224 / 255, 1 },
+      gutter = { 232 / 255, 216 / 255, 184 / 255, 1 },
+      active = { T.ink[1], T.ink[2], T.ink[3], 0.06 },
+      select = { T.sky[1], T.sky[2], T.sky[3], 0.32 },
+      caret = T.ink,
+      match = { 16 / 255, 96 / 255, 168 / 255, 1 },
+      ghost = { T.ink[1], T.ink[2], T.ink[3], 0.36 },
+      hole = T.brick,
+      scroll = { T.ink[1], T.ink[2], T.ink[3], 0.3 },
+    },
+  },
+}
+local code_theme = "dark"
+
+--- Which theme `T.code` and `T.pane` hold. Swapped in place of the tables
+--- rather than copied into them, so a caller that read `T.code[kind]` a
+--- frame ago reads the new colour on the next one.
+function T.setCodeTheme(name)
+  local theme = CODE[name]
+  if not theme then return end
+  code_theme = name
+  T.code, T.pane = theme.code, theme.pane
+end
+
+function T.codeTheme() return code_theme end
+
 -- The verdict colours from §5.4's closed set.
 T.verdict = {
   accepted = T.admit,

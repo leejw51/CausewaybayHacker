@@ -62,7 +62,7 @@ const clip = (text: string): string =>
  * unsolved quest's answer to come through, because the client does not have
  * it either.
  */
-function taskLines(task: TaskBrief): string[] {
+function taskLines(task: TaskBrief, explainOnly = false): string[] {
   const out = [
     "",
     "The person is not writing whatever they like: this screen is a graded exercise, and this is it.",
@@ -108,7 +108,9 @@ function taskLines(task: TaskBrief): string[] {
   }
   out.push(
     "",
-    "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does.",
+    explainOnly
+      ? "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about — and leave the fixing to them, even when they ask you to fix it. Point them at the line and the idea; never write the corrected code."
+      : "On a graded screen: answer the question they asked. Explain, name the line, say what the compiler is complaining about. They learn nothing from a program that appeared while they were reading, so write the whole answer into the editor only when they ask you for it outright — and then say what it does.",
   );
   return out;
 }
@@ -122,6 +124,37 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "",
     'The whole project is ONE source file, the one in the editor. There are no other files, no build system to configure, no dependencies beyond the standard library (Rust: std only, no crates; Go: standard library; C++: the standard library, compiled with -std=c++20; Python 3: the standard library; TypeScript: tsc in strict mode with no @types/node — only process, console, the timers and fs.readFileSync are declared, so stdin is read with `const input: string = require("fs").readFileSync(0, "utf8");` and output goes through console.log; Zig 0.16: std only, no build.zig, one main.zig built with -O Debug, `pub fn main(init: std.process.Init) !void`, stdin read with `var r = std.Io.File.stdin().readerStreaming(init.io, &buf);` and `const input = try r.interface.allocRemaining(init.gpa, .unlimited);`, output through a buffered `std.Io.File.stdout().writerStreaming(init.io, &buf)` whose `.interface` must be `flush()`ed before main returns, and std.debug.print goes to stderr, never to the answer; Lua: LuaJIT 2.1, which is the Lua 5.1 dialect — no `//` integer division, `unpack` not `table.unpack`, the `bit` library for bit operations — stdin read with `io.read("*a")` and output through print or io.write).',
     "",
+    ...(bench.explainOnly ? explainRules() : workRules(canRun)),
+    ...(task ? taskLines(task, bench.explainOnly === true) : []),
+    "",
+    `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
+    "```",
+    numbered(bench.read()),
+    "```",
+  ].join("\n");
+}
+
+/**
+ * The practice screen's orders: a tutor who writes in the margin. The person
+ * asked to understand, so the explanation goes **into the file as comments**
+ * — beside the line it is about, where they will still see it when they go
+ * back to typing — and the program itself is theirs to fix.
+ */
+function explainRules(): string[] {
+  return [
+    "How to work on this screen — you EXPLAIN, you do not fix:",
+    "- You cannot change the program. You have read_code and comment_code, and nothing else: no editing, no rewriting, no formatting, no running.",
+    "- Put your explanation in the code with comment_code, just above the line it is about: what that line does, why the compiler or the test objects to it, and the idea or the standard-library call that would help. Plain text — the game adds the comment markers.",
+    "- Never write the corrected code, not in a comment and not in your prose, even if they ask. A hint names the concept and the line; it is not the line rewritten. They learn by fixing it themselves.",
+    "- Write the comments and your short chat reply in the language the person wrote to you in.",
+    "- Keep it short: one to four comment lines per spot, at most a few spots per answer. Your chat reply is one or two sentences saying where you left notes.",
+    "- Never invent an API. If unsure, prefer the plain standard-library way.",
+  ];
+}
+
+/** The playground's orders: a pair who writes and runs code. */
+function workRules(canRun: boolean): string[] {
+  return [
     "How to work:",
     "- For a small change, use edit_code with the exact span. For a new program or a rewrite, use write_code. Both are typed into the editor character by character while the person watches, so write only what is needed and no filler comments.",
     canRun
@@ -132,13 +165,7 @@ export function systemPrompt(bench: Bench, canRun: boolean): string {
     "- Keep the person's style, names and formatting unless asked. Keep the program's existing behaviour unless asked.",
     "- Never invent an API. If unsure, prefer the plain standard-library way.",
     "- A picture is not a program. When the person asks for a picture, image, drawing or photo, call make_image with a prompt; do not write code that prints one, and do not describe it instead.",
-    ...(task ? taskLines(task) : []),
-    "",
-    `The file is ${bench.file}. Its current text, with line numbers (do not include the numbers in edits):`,
-    "```",
-    numbered(bench.read()),
-    "```",
-  ].join("\n");
+  ];
 }
 
 export class Session {

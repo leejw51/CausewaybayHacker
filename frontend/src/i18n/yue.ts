@@ -379,6 +379,8 @@ export const yue: Partial<Catalogue> = {
   "pg.copyIn": "複製輸入",
   "pg.pasteIn": "貼上輸入",
   "pg.codeFace": "代碼字體 {name}",
+  "code.themeDark": "深色",
+  "code.themeLight": "淺色",
   "pg.code": "代碼",
   "pg.codeDone": "完成",
   "pg.maps": "地圖",

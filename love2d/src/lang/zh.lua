@@ -259,6 +259,8 @@ return {
   ["BLANKS"] = "填空",
   ["ANSWER ONLY"] = "只打答案",
   ["+LINE"] = "补一行",
+  ["DARK"] = "深色",
+  ["LIGHT"] = "浅色",
   ["ESC done   F5 run   F2 format"] = "ESC 完成   F5 运行   F2 格式化",
   ["FORMAT"] = "格式化",
   ["CODE"] = "代码",

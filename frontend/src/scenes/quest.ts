@@ -73,6 +73,13 @@ import {
 import { burstPlan, coinPlan, fillPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { CodeFx } from "../ui/codefx";
+import {
+  CODE_THEME_KEY,
+  codeWellFace,
+  getCodeTheme,
+  nextCodeTheme,
+  setCodeTheme,
+} from "../ui/codetheme";
 import { Coder } from "../ui/agent/coder";
 import type { TaskBrief } from "../ai/tools";
 import { WireError } from "../net/client";
@@ -465,6 +472,19 @@ export class QuestScene implements Scene {
   private logRect: Rect = [0, 0, 0, 0];
   /** A finger down on the log: where, and how far back it was then. */
   private logDrag: { y: number; scroll: number } | null = null;
+  /**
+   * Wheel travel not yet worth a whole line. A trackpad sends a stream of
+   * two- and three-pixel steps; rounded one at a time, every one of them was
+   * zero lines and the console never moved.
+   */
+  private logWheel = 0;
+  /**
+   * Set when a run comes back: the next frame opens the console at the top.
+   * The log streamed in pinned to its tail, which for a compile error is
+   * `aborting due to 2 previous errors` — and the two are above it. The
+   * playground's output does the same (`outputToTop`).
+   */
+  private logToTop = false;
   private queued = 0;
   private briefScroll = 0;
   private briefOverflow = 0;
@@ -683,6 +703,9 @@ export class QuestScene implements Scene {
         // count, and `solution` is only ever in the payload for a quest this
         // player has already cleared.
         task: () => this.taskBrief(),
+        // A tutor, not a ghostwriter: on a graded screen it explains in
+        // comments and the fixing is the person's (`Bench.explainOnly`).
+        explainOnly: true,
         roomId: () => null,
         roomKey: () => "quest",
         ensureRoom: async () => null,
@@ -807,6 +830,7 @@ export class QuestScene implements Scene {
       if (kind === "quest.run") {
         this.runResult = res.attempt;
         this.logScroll = 0;
+        this.logToTop = true;
         // A chime, not a fanfare. The fanfare belongs to CLEARED.
         if (this.samplePassed(res.attempt)) this.app.chip.coin();
         else this.app.chip.fail();
@@ -1955,6 +1979,14 @@ export class QuestScene implements Scene {
     this.notice = true;
   }
 
+  /** Light or dark paper under the code. Shared with the playground. */
+  private flipTheme(): void {
+    const next = nextCodeTheme();
+    setCodeTheme(next);
+    writePref(CODE_THEME_KEY, next);
+    this.app.remeasure();
+  }
+
   /** One step of the text size — every screen's, not just this editor's. */
   private sizeFont(dir: 1 | -1): void {
     // Said by the app, like F9 / F10 — the size is not this screen's news.
@@ -2041,6 +2073,11 @@ export class QuestScene implements Scene {
 
   agent() {
     return this.coder?.probe() ?? null;
+  }
+
+  console() {
+    if (!this.consoleOpen || this.logRect[2] === 0) return null;
+    return { rect: this.logRect, overflow: this.logOverflow, scroll: this.logScroll };
   }
 
   controls(): Buttons[] {
@@ -2225,6 +2262,9 @@ export class QuestScene implements Scene {
       case "face":
         void this.cycleFace();
         break;
+      case "theme":
+        this.flipTheme();
+        break;
     }
   }
 
@@ -2273,7 +2313,13 @@ export class QuestScene implements Scene {
       this.briefScroll = Math.max(0, Math.min(this.briefOverflow, this.briefScroll + dy));
     } else if (this.consoleOpen) {
       // The console scrolls backwards: positive is "further into the past".
-      this.logScroll = Math.max(0, this.logScroll - Math.round(dy / 8));
+      // Whole lines, from the travel kept between events, so a trackpad's
+      // small steps add up rather than each rounding away to nothing.
+      const lineH = ensureFonts(this.app.layout.uiScale()).codeSm.height;
+      this.logWheel -= dy;
+      const lines = Math.trunc(this.logWheel / lineH);
+      this.logWheel -= lines * lineH;
+      this.logScroll = Math.max(0, Math.min(this.logOverflow, this.logScroll + lines));
     }
   }
 
@@ -2461,6 +2507,8 @@ export class QuestScene implements Scene {
       // Says the face it is **in**, and cycles. The same preference the
       // playground's button sets: one answer to "how do I like my code".
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
+      // The paper under the code — the playground's preference too.
+      { id: "theme", label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark") },
       { id: "focus", label: t("quest.code") },
     ].filter((i) => keep(i.id));
   }
@@ -2614,6 +2662,9 @@ export class QuestScene implements Scene {
       // editor's key — a person writing code reaches for it to indent.
       { id: "complete", label: t("quest.completeLine"), dim: !this.canComplete() },
       { id: "console", label: this.consoleOpen ? t("quest.hideLog") : t("quest.log") },
+      // ASK AI on the code page too, where the question is asked: it opens
+      // the room beside the code, and the answer comes back as comments.
+      ...(this.coder ? [{ id: "agent", label: t("agent.ask"), strong: this.coder.open }] : []),
     ];
     const rowW = Math.max(f.size * 4, bx - pad * 2);
     const rows = rowsIn(
@@ -2670,18 +2721,30 @@ export class QuestScene implements Scene {
 
     const top = strip + Math.round(6 * s);
     let body: Rect = [pad, top, layout.vw - pad * 2, layout.vh - top - pad];
-    // The log, under the code. RUN is on this page, and a RUN whose answer
-    // is only on the other page was a button that seemed to do nothing.
+    // The log, beside or under the code. RUN is on this page, and a RUN whose
+    // answer is only on the other page was a button that seemed to do nothing.
+    //
+    // Landscape puts it **beside** the code, the full height of it: a strip
+    // under the code on a wide screen was a third of the height, and after
+    // the run report it had room for two lines — `aborting due to 2 previous
+    // errors` and nothing of the two. Portrait has the height to spare and
+    // not the width, so it stays underneath.
     if (this.consoleOpen) {
-      const ch = Math.round(body[3] * (layout.isPortrait() ? 0.36 : 0.32));
       const gap = Math.round(6 * s);
-      body = [body[0], body[1], body[2], body[3] - ch - gap];
-      this.drawConsole(g, [body[0], body[1] + body[3] + gap, body[2], ch]);
+      if (layout.isPortrait()) {
+        const ch = Math.round(body[3] * 0.36);
+        body = [body[0], body[1], body[2], body[3] - ch - gap];
+        this.drawConsole(g, [body[0], body[1] + body[3] + gap, body[2], ch]);
+      } else {
+        const cw = Math.round(body[2] * 0.4);
+        body = [body[0], body[1], body[2] - cw - gap, body[3]];
+        this.drawConsole(g, [body[0] + body[2] + gap, body[1], cw, body[3]]);
+      }
     } else this.logRect = [0, 0, 0, 0];
     // The agent's panel takes its share when it is open (docs/agent.md §7).
     const carve = this.coder?.split(body, layout.isPortrait(), s) ?? { editor: body, panel: null };
     const [ex, ey, ew, eh] = carve.editor;
-    well(g, ex, ey, ew, eh);
+    well(g, ex, ey, ew, eh, codeWellFace());
     const editorRect: Rect = [ex + 4, ey + 4, ew - 8, eh - 8];
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
     else this.overlay?.hide();
@@ -3071,7 +3134,7 @@ export class QuestScene implements Scene {
       inner[3] - bandH - solveGap - noteH - consoleH - Math.round(16 * s),
     );
 
-    well(g, inner[0], inner[1], inner[2], editorH);
+    well(g, inner[0], inner[1], inner[2], editorH, codeWellFace());
     const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
     // CodeMirror is a DOM element outside the canvas transform, so it waits
     // for its well to land rather than hanging in the air while the panel
@@ -3358,6 +3421,10 @@ export class QuestScene implements Scene {
     }
     this.logRect = [x, y, w, h];
     this.logOverflow = Math.max(0, flat.length - rows);
+    if (this.logToTop) {
+      this.logToTop = false;
+      this.logScroll = this.logOverflow;
+    }
     this.logScroll = Math.min(this.logScroll, this.logOverflow);
     const start = Math.max(0, flat.length - rows - this.logScroll);
     clipped(g, x + pad, y + pad, w - pad * 2, h - pad * 2, () => {

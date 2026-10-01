@@ -277,6 +277,8 @@ return {
   ["BLANKS"] = "DOPLŇOVAČKA",
   ["ANSWER ONLY"] = "JEN ŘEŠENÍ",
   ["+LINE"] = "+ŘÁDEK",
+  ["DARK"] = "TMAVÝ",
+  ["LIGHT"] = "SVĚTLÝ",
   ["ESC done   F5 run   F2 format"] = "ESC HOTOVO   F5 SPUSTIT   F2 FORMÁT",
   ["FORMAT"] = "FORMÁT",
   ["CODE"] = "KÓD",

@@ -1176,6 +1176,26 @@ function Quest:cycle_face()
   SFX.play("select")
 end
 
+--- What the THEME button says: the theme the pane is in now.
+function Quest.theme_label()
+  return Theme.codeTheme() == "light" and I18n.t("LIGHT") or I18n.t("DARK")
+end
+
+--- The code pane's light or dark, cycled and remembered — the playground's
+--- preference too, like the face.
+function Quest:cycle_theme()
+  local themes = Theme.CODE_THEMES
+  local at = 1
+  for i, name in ipairs(themes) do
+    if name == Theme.codeTheme() then at = i end
+  end
+  local next_theme = themes[(at % #themes) + 1]
+  Theme.setCodeTheme(next_theme)
+  require("src.store").set_code_theme(next_theme)
+  self.solve_note = Quest.theme_label()
+  SFX.play("select")
+end
+
 --- CODE on. ESC, or the DONE button, comes back.
 function Quest:enter_code()
   if not self.quest then return end
@@ -1549,7 +1569,7 @@ function Quest:draw_ghost(want, index, k, x, y, font)
   end
   local segs = Quest.ghost_segments(self.answer_text or want, self.blanks, from, upto, now)
   if #segs == 0 then
-    UI.setColor(Theme.withAlpha(Theme.cream, 0.42))
+    UI.setColor(Theme.pane.ghost)
     love.graphics.print(want:sub(k + 1), x, y)
     return
   end
@@ -1557,9 +1577,9 @@ function Quest:draw_ghost(want, index, k, x, y, font)
   local rest = Quest.HOLE_LOW + 0.3 + 0.12 * g
   for _, seg in ipairs(segs) do
     if seg.hole then
-      UI.setColor(Theme.withAlpha(Theme.coin, seg.now and g or rest))
+      UI.setColor(Theme.withAlpha(Theme.pane.hole, seg.now and g or rest))
     else
-      UI.setColor(Theme.withAlpha(Theme.cream, 0.42))
+      UI.setColor(Theme.pane.ghost)
     end
     love.graphics.print(seg.text, x, y)
     x = x + font:getWidth(seg.text)
@@ -2032,6 +2052,9 @@ function Quest:draw_code()
     -- band, which is already the thing that took the editor's room at the
     -- largest type step.
     { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()], state = "normal" },
+    -- Light or dark, for the code pane alone, beside the face for the same
+    -- reason it is here.
+    { id = "theme", label = Quest.theme_label(), state = "normal" },
   }
   self.code_rects = {}
   local x, y = pad, pad
@@ -2760,6 +2783,12 @@ function Quest:draw_editor(rect, tint, bare)
   self.mono_font = font
 
   love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - 6)
+  -- The light theme's page, under the code rows and not the band or the
+  -- console: those are the game's, and stay the game's colour.
+  if Theme.pane.paper then
+    UI.setColor(Theme.pane.paper)
+    love.graphics.rectangle("fill", rect.x + 3, rect.y + 3, rect.w - 6, room + 6)
+  end
   love.graphics.setFont(font)
 
   -- **The leftover goes above the text, not below it.** A pane is a whole
@@ -2796,7 +2825,7 @@ function Quest:draw_editor(rect, tint, bare)
     local y = y0 + (row - 1) * line_h
 
     if index == self.editor.line then
-      UI.setColor(Theme.cream, 0.06)
+      UI.setColor(Theme.pane.active)
       love.graphics.rectangle("fill", rect.x + 3, y, rect.w - 6, line_h)
     end
 
@@ -2807,7 +2836,7 @@ function Quest:draw_editor(rect, tint, bare)
       local sx = x0 + gutter - shift + font:getWidth(line:sub(1, from - 1))
       local sw = font:getWidth(line:sub(from, to - 1))
       if to > #line and index < sel_l2 then sw = sw + font:getWidth(" ") end
-      UI.setColor(Theme.coin, 0.28)
+      UI.setColor(Theme.pane.select)
       love.graphics.rectangle("fill", sx, y, math.max(2, sw), line_h)
     end
 
@@ -2815,7 +2844,7 @@ function Quest:draw_editor(rect, tint, bare)
     -- closed — said in the gutter as well as on the bracket, because the
     -- bracket itself may have scrolled off to the right.
     -- The ruler stays put while the text slides under it.
-    UI.setColor(Theme.void, 0.92)
+    UI.setColor(Theme.pane.gutter)
     love.graphics.rectangle("fill", rect.x + 3, y, gutter + 5, line_h)
     UI.setColor(self.pane:gutter_color(index))
     love.graphics.print(("%4d"):format(index), x0, y)
@@ -2859,7 +2888,7 @@ function Quest:draw_editor(rect, tint, bare)
     if index == self.editor.line and self.focus == "editor" then
       local caret = x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1))
       if (love.timer.getTime() * 2) % 2 < 1.2 then
-        UI.setColor(Theme.coin)
+        UI.setColor(Theme.pane.caret)
         love.graphics.rectangle("fill", caret, y, 2, line_h)
       end
     end
@@ -2888,7 +2917,7 @@ function Quest:draw_editor(rect, tint, bare)
     local track_h = rect.h - 8
     local knob = math.max(16, track_h * rows / total)
     local ky = rect.y + 4 + (track_h - knob) * (self.editor.scroll / math.max(1, total - rows))
-    UI.setColor(Theme.cream, 0.25)
+    UI.setColor(Theme.pane.scroll)
     love.graphics.rectangle("fill", rect.x + rect.w - 6, ky, 3, knob)
     love.graphics.setColor(1, 1, 1, 1)
   end
@@ -3591,6 +3620,7 @@ function Quest:mousepressed(x, y, button)
     if inside(r.solution) then self:toggle_solution(); return end
     if inside(r.complete) then self:complete_line(); return end
     if inside(r.face) then self:cycle_face(); return end
+    if inside(r.theme) then self:cycle_theme(); return end
     -- Anything else is a click into the code, and it goes through the same
     -- pane the framed screen uses — so the caret lands where it was aimed,
     -- a drag selects, and a double click takes a word, here as there.

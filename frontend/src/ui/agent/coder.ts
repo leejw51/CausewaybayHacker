@@ -43,7 +43,7 @@ import { advise, nextTip, TIPS } from "../../ai/tips";
 import { commentLines } from "../../ai/notes";
 import { helpAt, type CodeContext } from "../../ai/help";
 import { completeAt } from "../../ai/complete";
-import type { Bench, RunReport, TaskBrief } from "../../ai/tools";
+import { commentInsert, type Bench, type RunReport, type TaskBrief } from "../../ai/tools";
 import { image as makeImage } from "../../ai/providers";
 import { burstPlan, coinPlan, pointerPlan } from "../../engine/burst";
 import type { CodeFx } from "../codefx";
@@ -78,6 +78,11 @@ export interface Host {
    * nobody anything. Asked on every ask, so the answer is current.
    */
   task?: () => TaskBrief | null;
+  /**
+   * Explain only (`Bench.explainOnly`): the practice screen's agent writes
+   * comments and cannot change a line of the program.
+   */
+  explainOnly?: boolean;
   /** RUN as the button does, or null where a run would count against the player. */
   run: ((source: string, stdin?: string) => Promise<RunReport>) | null;
   format: (() => Promise<{ changed: boolean; problem?: string }>) | null;
@@ -622,6 +627,20 @@ export class Coder {
         return r.stopped ? { ok: false, why: "stopped by the person" } : { ok: true };
       },
       task: host.task ? () => host.task!() : null,
+      explainOnly: host.explainOnly === true,
+      comment: async (line, text) => {
+        const ed = this.editor;
+        if (!ed) return { ok: false, why: "no editor" };
+        const ins = commentInsert(host.lang(), ed.source, line, text);
+        if (!ins)
+          return {
+            ok: false,
+            why: `There is no line ${line}; the file has ${ed.source.split("\n").length}. Call read_code.`,
+          };
+        // A zero-width cut is a caret move under the same lock as the typing.
+        const r = await typeIn(ins.text, () => ed.cut(ins.at, ins.at));
+        return r.stopped ? { ok: false, why: "stopped by the person" } : { ok: true };
+      },
       run: host.run
         ? async (stdin) => {
             const r = await host.run!(this.editor?.source ?? "", stdin);
@@ -826,7 +845,9 @@ export class Coder {
    * with no editor to write into.
    */
   private noteInCode(reply: string): void {
-    if (!readNotes() || this.typist.busy) return;
+    // Explaining, the comments are the tool's and already in the file; the
+    // reply is the line that says where they are, and twice is litter.
+    if (!readNotes() || this.typist.busy || this.host.explainOnly) return;
     const editor = this.editor;
     if (!editor) return;
     const lines = commentLines(reply, this.host.lang());
@@ -1410,6 +1431,7 @@ export class Coder {
       provider: readProvider(),
       busy: this.mood !== "idle" || this.typist.busy,
       canImage: this.host.roomId() !== null,
+      canWrite: !this.host.explainOnly,
     });
   }
 

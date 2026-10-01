@@ -54,6 +54,13 @@ import { Buttons, footer, frame, header, landColour, titledPanel, landName } fro
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
+import {
+  CODE_THEME_KEY,
+  codeWellFace,
+  getCodeTheme,
+  nextCodeTheme,
+  setCodeTheme,
+} from "../ui/codetheme";
 import { Coder } from "../ui/agent/coder";
 import {
   CODE_FACE_NAME,
@@ -350,6 +357,8 @@ export class PlaygroundScene implements Scene {
   private outputRect: Rect = [0, 0, 0, 0];
   /** A finger down on the output: where, and how far back it was then. */
   private outputDrag: { y: number; scroll: number } | null = null;
+  /** Wheel travel not yet a whole line: a trackpad's steps, kept to add up. */
+  private outputWheel = 0;
   /** Where the editor was last drawn, for an effect over it. */
   private editorRect: Rect = [0, 0, 0, 0];
   /**
@@ -660,6 +669,15 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /** Light or dark paper under the code: the quest screen's preference too. */
+  private flipTheme(): void {
+    const next = nextCodeTheme();
+    setCodeTheme(next);
+    writePref(CODE_THEME_KEY, next);
+    this.app.remeasure();
+    this.app.chip.blip();
+  }
+
   /**
    * POSTER: the pad as one square PNG, signed by the wallet, saved to disk.
    *
@@ -842,6 +860,8 @@ export class PlaygroundScene implements Scene {
       { id: "fontup", label: t("quest.fontUp"), dim: getTextScale() >= TEXT_SCALE_MAX - 0.001 },
       // Says the face it is **in**, like every other toggle on this screen.
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
+      // The paper under the code, saying which it is on, like the face.
+      { id: "theme", label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark") },
     ];
   }
 
@@ -1532,6 +1552,11 @@ export class PlaygroundScene implements Scene {
     return this.coder?.probe() ?? null;
   }
 
+  console() {
+    if (this.outputRect[2] === 0) return null;
+    return { rect: this.outputRect, overflow: this.outputOverflow, scroll: this.outputScroll };
+  }
+
   controls(): Buttons[] {
     return this.coder
       ? [this.buttons, this.rows, this.coder.controls()]
@@ -1554,7 +1579,7 @@ export class PlaygroundScene implements Scene {
     // tablet, and a panel that can scroll and cannot be scrolled shows the
     // first screen of a compiler's answer and nothing after it.
     if (phase === "move" && this.outputDrag !== null) {
-      const lineH = ensureFonts(this.app.layout.scale).codeSm.height;
+      const lineH = ensureFonts(this.app.layout.uiScale()).codeSm.height;
       const moved = Math.round((y - this.outputDrag.y) / lineH);
       if (moved !== 0) {
         this.outputScroll = Math.max(
@@ -1641,6 +1666,10 @@ export class PlaygroundScene implements Scene {
       void this.cycleFace();
       return;
     }
+    if (hit.id === "theme") {
+      this.flipTheme();
+      return;
+    }
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 1 : -1);
       return;
@@ -1684,10 +1713,13 @@ export class PlaygroundScene implements Scene {
     if (inRect(x, y, this.outputRect)) {
       // Same convention as the quest console: positive dy is "further into
       // the past", so it *increases* how far back from the live tail we are.
-      this.outputScroll = Math.max(
-        0,
-        Math.min(this.outputOverflow, this.outputScroll - Math.round(dy / 8)),
-      );
+      // Whole lines from the kept travel: rounded one event at a time, a
+      // trackpad's two-pixel steps were each zero and nothing moved.
+      const lineH = ensureFonts(this.app.layout.uiScale()).codeSm.height;
+      this.outputWheel -= dy;
+      const lines = Math.trunc(this.outputWheel / lineH);
+      this.outputWheel -= lines * lineH;
+      this.outputScroll = Math.max(0, Math.min(this.outputOverflow, this.outputScroll + lines));
     }
   }
 
@@ -2348,7 +2380,7 @@ export class PlaygroundScene implements Scene {
     } else {
       this.outputRect = [0, 0, 0, 0];
     }
-    well(g, pad, top, editorW, editorH);
+    well(g, pad, top, editorW, editorH, codeWellFace());
     const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
     this.editorRect = editorRect;
     if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
@@ -2384,6 +2416,14 @@ export class PlaygroundScene implements Scene {
     }
 
     const gap = Math.round(8 * s);
+    // **Wide, the output is a column beside the code**, level with the
+    // editor and the input, and the buttons run the full width under all
+    // three. Under the band, as it still is when tall, a landscape bench had
+    // room for two lines of it: a compile error showed `aborting due to 2
+    // previous errors` and neither of the two.
+    const wide = !layout.isPortrait();
+    const outW = wide ? Math.round(inner[2] * 0.4) : 0;
+    const colW = wide ? inner[2] - outW - gap : inner[2];
     const stdinH = Math.max(Math.round(46 * s), fonts.codeSm.height * 2 + Math.round(16 * s));
     // A share of the panel, but never more of it than there is output to
     // read: eight lines and the timing line under them. Past that the pane
@@ -2461,7 +2501,7 @@ export class PlaygroundScene implements Scene {
       return r * langH + (r - 1) * flowGap;
     };
     for (let drop = 0; drop < optional.length; drop++) {
-      const room = inner[3] - bandFor(actions) - minStdin - minOut - gap * 3;
+      const room = inner[3] - bandFor(actions) - minStdin - (wide ? gap * 2 : minOut + gap * 3);
       if (room >= editorFloor) break;
       actions = [...core, ...optional.slice(0, optional.length - 1 - drop)];
     }
@@ -2474,9 +2514,9 @@ export class PlaygroundScene implements Scene {
     // and the shortfall comes out of the output first, because the output
     // scrolls and the thing being typed into does not.
     const wantEditor = Math.round(inner[3] * (layout.isPortrait() ? 0.34 : 0.36));
-    let outRoom = outH;
+    let outRoom = wide ? 0 : outH;
     let stdinRoom = stdinH;
-    let editorH = inner[3] - bandH - stdinRoom - outRoom - gap * 3;
+    let editorH = inner[3] - bandH - stdinRoom - outRoom - gap * (wide ? 2 : 3);
     if (editorH < wantEditor) {
       const fromOut = Math.min(wantEditor - editorH, Math.max(0, outRoom - minOut));
       outRoom -= fromOut;
@@ -2489,8 +2529,8 @@ export class PlaygroundScene implements Scene {
     }
     editorH = Math.max(60, editorH);
 
-    well(g, inner[0], inner[1], inner[2], editorH);
-    const editorRect: Rect = [inner[0] + 4, inner[1] + 4, inner[2] - 8, editorH - 8];
+    well(g, inner[0], inner[1], colW, editorH, codeWellFace());
+    const editorRect: Rect = [inner[0] + 4, inner[1] + 4, colW - 8, editorH - 8];
     this.editorRect = editorRect;
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size);
@@ -2501,7 +2541,7 @@ export class PlaygroundScene implements Scene {
     // there is no test case to supply the input, so without this there is no
     // way to write a program that reads anything.
     const stdinY = inner[1] + editorH + gap;
-    well(g, inner[0], stdinY, inner[2], stdinRoom, [0.06, 0.05, 0.14, 0.98]);
+    well(g, inner[0], stdinY, colW, stdinRoom, [0.06, 0.05, 0.14, 0.98]);
     g.fillStyle = css(Theme.dim);
     printf(
       g,
@@ -2509,13 +2549,13 @@ export class PlaygroundScene implements Scene {
       t("pg.stdin"),
       inner[0] + Math.round(6 * s),
       stdinY + Math.round(4 * s),
-      inner[2],
+      colW,
       "left",
     );
     const stdinRect: Rect = [
       inner[0] + 4,
       stdinY + fonts.stationSm.height + Math.round(4 * s),
-      inner[2] - 8,
+      colW - 8,
       stdinRoom - fonts.stationSm.height - Math.round(8 * s),
     ];
     if (this.benchIn.finished) this.stdinOverlay?.place(stdinRect, fonts.codeSm.size);
@@ -2571,8 +2611,16 @@ export class PlaygroundScene implements Scene {
       }
     }
 
-    const outTop = rowY + bandH + gap;
-    this.drawOutput(g, [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)], s);
+    if (wide) {
+      this.drawOutput(g, [inner[0] + colW + gap, inner[1], outW, rowY - gap - inner[1]], s);
+    } else {
+      const outTop = rowY + bandH + gap;
+      this.drawOutput(
+        g,
+        [inner[0], outTop, inner[2], Math.max(24, inner[1] + inner[3] - outTop)],
+        s,
+      );
+    }
   }
 
   /** What the program printed, and what the compiler thought of it. */

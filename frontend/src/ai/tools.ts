@@ -11,6 +11,7 @@
  * code" is the editor's text and that is the whole project.
  */
 import type { Lang } from "../net/protocol";
+import { commentLines } from "./notes";
 
 export interface ToolDef {
   name: string;
@@ -101,6 +102,54 @@ export interface Bench {
    * run and not the one the panel opened on.
    */
   task?: (() => TaskBrief | null) | null;
+  /**
+   * **Explain, do not fix.** On a graded screen the person asked for help
+   * understanding, and a program that rewrites itself while they read is the
+   * answer handed over. When set, the agent gets `read_code` and
+   * `comment_code` and nothing that can change a line of the program: no
+   * edit, no write, no insert, no format. The comment tool builds the
+   * comment itself from plain text, so there is no input it can be given
+   * that lands as code.
+   */
+  explainOnly?: boolean;
+  /**
+   * Put `text` above line `line` (1-based; one past the last line appends)
+   * as comment lines in the file's language, indented like that line.
+   * Required when `explainOnly` is set.
+   */
+  comment?: ((line: number, text: string) => Promise<{ ok: boolean; why?: string }>) | null;
+}
+
+/**
+ * Where an explanation goes and what is typed there: `text` as comment lines
+ * (`ai/notes.ts`'s, with the coder's `AI:` mark), above `line` and indented
+ * like it. Pure, so the one guarantee that matters — nothing typed is code —
+ * is a unit test and not a hope.
+ *
+ * Null when the line is out of range or there is nothing to say.
+ */
+export function commentInsert(
+  lang: Lang,
+  source: string,
+  line: number,
+  text: string,
+): { at: number; text: string } | null {
+  const lines = source.split("\n");
+  if (!Number.isInteger(line) || line < 1 || line > lines.length + 1) return null;
+  // Indented like the line it explains — or, past the end, like the last.
+  const ref = lines[Math.min(line, lines.length) - 1] ?? "";
+  const indent = /^[ \t]*/.exec(ref)?.[0] ?? "";
+  const body = commentLines(text, lang);
+  if (body.length === 0) return null;
+  const typed = body.map((l) => indent + l).join("\n");
+  if (line > lines.length) {
+    // After the last line: a newline first, unless the file already ends in one.
+    const lead = source === "" || source.endsWith("\n") ? "" : "\n";
+    return { at: source.length, text: `${lead}${typed}\n` };
+  }
+  let at = 0;
+  for (let i = 0; i < line - 1; i++) at += lines[i].length + 1;
+  return { at, text: `${typed}\n` };
 }
 
 export const TOOLS: ToolDef[] = [
@@ -158,6 +207,27 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "comment_code",
+    description:
+      "Explain by writing a comment into the program, above one line. Give plain text — no comment markers, no code to replace anything; the game writes it as comment lines in the file's language, indented like that line. This is the only way you can put anything in the editor, and it never changes the program.",
+    input_schema: {
+      type: "object",
+      properties: {
+        line: {
+          type: "integer",
+          description:
+            "The 1-based line the explanation is about; the comment goes just above it. One past the last line appends at the end.",
+        },
+        text: {
+          type: "string",
+          description:
+            "The explanation, in the person's language. Short lines; several lines are fine.",
+        },
+      },
+      required: ["line", "text"],
+    },
+  },
+  {
     name: "run_code",
     description:
       "Compile and run the program as the RUN button does, and get back the outcome, stdout and stderr (the compiler's own errors on a failed build). After writing code, run it and fix what the compiler says before answering.",
@@ -207,7 +277,13 @@ export const TOOLS: ToolDef[] = [
 
 /** The tools this bench can actually honour. */
 export function toolsFor(bench: Bench): ToolDef[] {
+  // Explaining: read the file, write comments into it, nothing else.
+  if (bench.explainOnly)
+    return TOOLS.filter(
+      (t) => t.name === "read_code" || (t.name === "comment_code" && !!bench.comment),
+    );
   return TOOLS.filter((t) => {
+    if (t.name === "comment_code") return false;
     if (t.name === "run_code") return bench.run !== null;
     if (t.name === "format_code") return bench.format !== null;
     if (t.name === "search_notes") return bench.search !== null;
@@ -247,7 +323,19 @@ export async function runTool(
     switch (name) {
       case "read_code":
         return { text: `${bench.file}:\n${numbered(bench.read())}`, error: false };
+      case "comment_code": {
+        if (!bench.comment) return { text: "This screen cannot take comments.", error: true };
+        const line = Number(input.line);
+        const text = str("text");
+        if (!text.trim()) return { text: "`text` is empty.", error: true };
+        const res = await bench.comment(line, text);
+        return res.ok
+          ? { text: `Commented above line ${line}. The program itself is unchanged.`, error: false }
+          : { text: res.why ?? "That line is not in the file.", error: true };
+      }
       case "edit_code": {
+        if (bench.explainOnly)
+          return { text: "This screen only explains; it cannot change the code.", error: true };
         const find = str("find");
         if (!find) return { text: "`find` is empty.", error: true };
         const res = await bench.edit(find, str("replace"));
@@ -256,6 +344,8 @@ export async function runTool(
           : { text: res.why ?? "That span is not in the file exactly once.", error: true };
       }
       case "write_code": {
+        if (bench.explainOnly)
+          return { text: "This screen only explains; it cannot change the code.", error: true };
         const source = str("source");
         if (!source.trim()) return { text: "`source` is empty.", error: true };
         const r = await bench.write(source);
@@ -267,6 +357,8 @@ export async function runTool(
           : { text: `Typed ${r.total} characters; the file is now the new program.`, error: false };
       }
       case "insert_code": {
+        if (bench.explainOnly)
+          return { text: "This screen only explains; it cannot change the code.", error: true };
         const text = str("text");
         if (!text) return { text: "`text` is empty.", error: true };
         const r = await bench.insert(text);
@@ -289,7 +381,7 @@ export async function runTool(
         return { text: lines.join("\n"), error: false };
       }
       case "format_code": {
-        if (!bench.format)
+        if (!bench.format || bench.explainOnly)
           return { text: "There is no formatter for this language here.", error: true };
         const r = await bench.format();
         if (r.problem)

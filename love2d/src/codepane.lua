@@ -189,7 +189,7 @@ function Pane:draw_brackets()
   if here and here.partner then
     for _, entry in ipairs({ here, here.partner }) do
       local x, y, w, h = self:cell(entry.line, entry.col)
-      if x then outline(x, y, w, h, Theme.cyan, 0.9) end
+      if x then outline(x, y, w, h, Theme.pane.match, 0.9) end
     end
   end
 end

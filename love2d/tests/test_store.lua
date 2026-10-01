@@ -501,6 +501,16 @@ return function()
     }).story, true)
   end)
 
+  T.case("the code pane's theme is remembered, and the last choice wins", function()
+    T.eq(Store.replay({}).theme, nil)
+    T.eq(Store.replay({
+      { kind = "theme.set", theme = "light" },
+      { kind = "face.set", face = "jetbrains" },
+      { kind = "theme.set", theme = "dark" },
+    }).theme, "dark")
+    T.eq(Store.replay({ { kind = "theme.set", theme = 7 } }).theme, nil)
+  end)
+
   T.section("store — replay is a pure fold")
 
   T.case("replay can be driven with no filesystem at all", function()

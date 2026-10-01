@@ -394,6 +394,8 @@ export const cs: Partial<Catalogue> = {
   "pg.copyIn": "KOPÍROVAT VSTUP",
   "pg.pasteIn": "VLOŽIT VSTUP",
   "pg.codeFace": "písmo kódu {name}",
+  "code.themeDark": "TMAVÉ",
+  "code.themeLight": "SVĚTLÉ",
   "pg.code": "KÓD",
   "pg.codeDone": "HOTOVO",
   "pg.maps": "MAPY",
