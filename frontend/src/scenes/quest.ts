@@ -544,6 +544,14 @@ export class QuestScene implements Scene {
    */
   private compactMode = false;
   /**
+   * The tight register: the full toolbar less the two ONLY toggles. On a
+   * touch screen the toolbar is one row or it is compact, and the toggles
+   * were the two labels that tipped an iPad in landscape over — losing it
+   * the clipboard chips and SOLVE for a convenience. So they are the first
+   * thing to go, and the bar that is left is exactly the bar it had before.
+   */
+  private tightMode = false;
+  /**
    * CODE: the editor and nothing else. On a phone the brief, the bench and
    * the toolbar leave the code four lines, and four lines is not a place to
    * write a program. In this mode the editor has the screen and one button —
@@ -552,6 +560,14 @@ export class QuestScene implements Scene {
    * one tap away.
    */
   private focus = false;
+  /**
+   * Which of the two panels has the split page: both, the brief alone, or
+   * the bench alone. Two toolbar toggles set it. Not remembered — the stack
+   * pref is, because beside-or-above is always a fine way to open a quest,
+   * and "the brief alone" is not: a quest that opens with no editor on the
+   * screen reads as a broken quest.
+   */
+  private view: "both" | "brief" | "code" = "both";
   /**
    * ANSWER mode: the reference solution behind what the player types.
    *
@@ -2049,7 +2065,13 @@ export class QuestScene implements Scene {
       if (name === "end") return void (this.logScroll = 0);
     }
     // 1–4 answer the quiz while the editor does not have the keyboard.
-    if (!this.focus && this.quest?.quiz && !this.quizRight && /^[1-4]$/.test(name)) {
+    if (
+      !this.focus &&
+      this.view !== "code" &&
+      this.quest?.quiz &&
+      !this.quizRight &&
+      /^[1-4]$/.test(name)
+    ) {
       this.pick(Number(name) - 1);
       return;
     }
@@ -2286,6 +2308,12 @@ export class QuestScene implements Scene {
       case "stack":
         this.cycleStack();
         break;
+      case "briefonly":
+        this.view = this.view === "brief" ? "both" : "brief";
+        break;
+      case "codeonly":
+        this.view = this.view === "code" ? "both" : "code";
+        break;
       case "fontdown":
         this.sizeFont(-1);
         break;
@@ -2406,7 +2434,16 @@ export class QuestScene implements Scene {
     // not have, and the last thing in them lands outside it.
     const pad = Math.round(10 * s);
     const toolW = layout.vw - pad * 2;
-    const fullRows = rowsIn(fonts.stationSm, this.toolLabels(false), toolW, layout.minTouchH());
+    const fullRows = rowsIn(
+      fonts.stationSm,
+      this.toolLabels(false, true),
+      toolW,
+      layout.minTouchH(),
+    );
+    const bareRows =
+      fullRows > 1
+        ? rowsIn(fonts.stationSm, this.toolLabels(false, false), toolW, layout.minTouchH())
+        : fullRows;
     // **A phone is compact in both orientations.** Held sideways the toolbar
     // fits on one row, so "compact when it wraps" left the phone's landscape
     // exactly as crowded as its portrait was — an eighteen-pixel editor with
@@ -2415,10 +2452,13 @@ export class QuestScene implements Scene {
     // And past 100 % text size: the canvas does not grow with the type, so
     // at 120 % the full register left the editor two lines tall. The larger
     // size goes to the code and the brief; the controls keep the chrome face.
-    this.compactMode = layout.isPhone() || (layout.touch && fullRows > 1) || getTextScale() > 1.001;
+    this.compactMode = layout.isPhone() || (layout.touch && bareRows > 1) || getTextScale() > 1.001;
+    this.tightMode = !this.compactMode && layout.touch && fullRows > 1;
     const toolRows = this.compactMode
       ? rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH())
-      : fullRows;
+      : this.tightMode
+        ? bareRows
+        : fullRows;
     const toolRowH = Math.max(layout.minTouchH(), fonts.stationSm.height + 20);
     const toolGap = Math.round(fonts.stationSm.size * 0.5);
     this.barH = toolRows * toolRowH + (toolRows - 1) * toolGap;
@@ -2460,16 +2500,38 @@ export class QuestScene implements Scene {
       : [];
     const msgH = this.error ? msgLines.length * fonts.small.height + Math.round(8 * s) : 0;
     const room = msgH > 0 ? msgH + Math.round(6 * s) : 0;
-    const left: Rect = [f.left[0], f.left[1], f.left[2], f.left[3] - room];
-    const right: Rect = [f.right[0], f.right[1], f.right[2], f.right[3] - room];
+    const whole: Rect = [f.body[0], f.body[1], f.body[2], f.body[3] - room];
+    const left: Rect =
+      this.view === "brief" ? whole : [f.left[0], f.left[1], f.left[2], f.left[3] - room];
+    const right: Rect =
+      this.view === "code" ? whole : [f.right[0], f.right[1], f.right[2], f.right[3] - room];
 
-    arriving(g, f, "left", this.briefIn, () => {
-      // The clock takes the top of the brief column and the brief starts under
-      // it; on an untimed quest it takes nothing and nothing moves.
-      const used = this.drawClock(g, left, s);
-      this.drawBrief(g, [left[0], left[1] + used, left[2], left[3] - used] as Rect, accent);
-    });
-    arriving(g, f, "right", this.benchIn, () => this.drawWorkbench(g, right, accent));
+    if (this.view !== "code") {
+      arriving(g, f, "left", this.briefIn, () => {
+        // The clock takes the top of the brief column and the brief starts under
+        // it; on an untimed quest it takes nothing and nothing moves.
+        const used = this.drawClock(g, left, s);
+        this.drawBrief(g, [left[0], left[1] + used, left[2], left[3] - used] as Rect, accent);
+      });
+    } else {
+      // Not drawn, so not there to be scrolled: the wheel and a finger both
+      // test the rect from the last frame that drew it.
+      this.briefRect = [0, 0, 0, 0];
+      this.briefOverflow = 0;
+      this.briefScroll = 0;
+    }
+    if (this.view !== "brief") {
+      arriving(g, f, "right", this.benchIn, () => {
+        // The countdown goes where the brief column would have put it — a
+        // timed quest with the code full-page is still a timed quest.
+        const used = this.view === "code" ? this.drawClock(g, right, s) : 0;
+        this.drawWorkbench(g, [right[0], right[1] + used, right[2], right[3] - used], accent);
+      });
+    } else {
+      // The editor is a DOM element over the canvas, not paint on it: left
+      // where the bench last put it, it would float over the brief.
+      this.overlay?.hide();
+    }
 
     this.buttons.draw(g, this.compactMode ? fonts.stationSm : fonts.button);
     this.bar.draw(g, fonts.stationSm);
@@ -2507,7 +2569,8 @@ export class QuestScene implements Scene {
    */
   private toolItems(
     compact = this.compactMode,
-  ): Array<{ id: string; label: string; dim?: boolean }> {
+    toggles = !this.tightMode,
+  ): Array<{ id: string; label: string; dim?: boolean; strong?: boolean }> {
     const noOutput = !this.runResult && this.log.lines.length === 0;
     // In the compact register the clipboard chips and LOBBY go: on a phone
     // the keyboard has its own paste, the map is one tap away, and three
@@ -2535,6 +2598,16 @@ export class QuestScene implements Scene {
       // which axis it is: F1 is already the orientation and two buttons that
       // both read as "vertical" are two buttons nobody can tell apart.
       { id: "stack", label: this.side ? t("quest.briefSide") : t("quest.briefTop") },
+      // One panel with the whole page. Lit while it has it; the same press
+      // gives the other panel back. Not in the compact register, where CODE
+      // already does the half of this that a phone needs, and not in the
+      // tight one (`tightMode`), where they are what would not fit.
+      ...(toggles
+        ? [
+            { id: "briefonly", label: t("quest.briefOnly"), strong: this.view === "brief" },
+            { id: "codeonly", label: t("quest.codeOnly"), strong: this.view === "code" },
+          ]
+        : []),
       { id: "fontdown", label: t("quest.fontDown"), dim: getTextScale() <= TEXT_SCALE_MIN + 0.001 },
       { id: "fontup", label: t("quest.fontUp"), dim: getTextScale() >= TEXT_SCALE_MAX - 0.001 },
       // Says the face it is **in**, and cycles. The same preference the
@@ -2546,8 +2619,8 @@ export class QuestScene implements Scene {
     ].filter((i) => keep(i.id));
   }
 
-  private toolLabels(compact = this.compactMode): string[] {
-    return this.toolItems(compact).map((i) => i.label);
+  private toolLabels(compact = this.compactMode, toggles = !this.tightMode): string[] {
+    return this.toolItems(compact, toggles).map((i) => i.label);
   }
 
   /**

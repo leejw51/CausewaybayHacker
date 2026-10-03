@@ -274,6 +274,8 @@ export const en = {
   "quest.paste": "PASTE",
   "quest.briefSide": "BRIEF: SIDE",
   "quest.briefTop": "BRIEF: TOP",
+  "quest.briefOnly": "ONLY JOB",
+  "quest.codeOnly": "ONLY CODE",
   "quest.fontDown": "A-",
   "quest.fontUp": "A+",
   "quest.code": "CODE",

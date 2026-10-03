@@ -261,6 +261,8 @@ export const yue: Partial<Catalogue> = {
   "quest.paste": "貼上",
   "quest.briefSide": "任務：喺側",
   "quest.briefTop": "任務：喺上",
+  "quest.briefOnly": "淨係任務",
+  "quest.codeOnly": "淨係代碼",
   "quest.fontDown": "細",
   "quest.fontUp": "大",
   "quest.code": "代碼",

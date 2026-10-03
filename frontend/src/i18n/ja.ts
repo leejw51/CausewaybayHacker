@@ -257,6 +257,8 @@ export const ja: Partial<Catalogue> = {
   "quest.paste": "貼り付け",
   "quest.briefSide": "課題: 横",
   "quest.briefTop": "課題: 上",
+  "quest.briefOnly": "課題のみ",
+  "quest.codeOnly": "コードのみ",
   "quest.fontDown": "小",
   "quest.fontUp": "大",
   "quest.code": "コード",

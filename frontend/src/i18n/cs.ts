@@ -272,6 +272,8 @@ export const cs: Partial<Catalogue> = {
   "quest.paste": "VLOŽIT",
   "quest.briefSide": "ZADÁNÍ: VEDLE",
   "quest.briefTop": "ZADÁNÍ: NAHOŘE",
+  "quest.briefOnly": "JEN ZADÁNÍ",
+  "quest.codeOnly": "JEN KÓD",
   "quest.fontDown": "A-",
   "quest.fontUp": "A+",
   "quest.code": "KÓD",

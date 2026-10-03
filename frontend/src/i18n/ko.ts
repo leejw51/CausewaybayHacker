@@ -258,6 +258,8 @@ export const ko: Partial<Catalogue> = {
   "quest.paste": "붙여넣기",
   "quest.briefSide": "과제: 옆",
   "quest.briefTop": "과제: 위",
+  "quest.briefOnly": "과제만",
+  "quest.codeOnly": "코드만",
   "quest.fontDown": "가-",
   "quest.fontUp": "가+",
   "quest.code": "코드",

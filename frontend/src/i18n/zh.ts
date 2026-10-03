@@ -246,6 +246,8 @@ export const zh: Partial<Catalogue> = {
   "quest.paste": "粘贴",
   "quest.briefSide": "任务：在旁",
   "quest.briefTop": "任务：在上",
+  "quest.briefOnly": "仅任务",
+  "quest.codeOnly": "仅代码",
   "quest.fontDown": "小",
   "quest.fontUp": "大",
   "quest.code": "代码",
