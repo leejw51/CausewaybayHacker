@@ -159,6 +159,8 @@ export const yue: Partial<Catalogue> = {
   "lands.advancedBlurb":
     "即場寫程式測試，唔計時。一條題目，成個程式，睇得到嘅例子同埋隱藏嘅例子 — 真正用到啲文法，然後係同時發生嘅午市高峰。",
   "lands.hackerBlurb": "面試。一間房、一個鐘，冇人幫你寫完你嗰行。",
+  "lands.frameworksBlurb":
+    "返工。呢度冇嘢係由零寫起嘅：anyhow、serde、tokio、clap，條街每個檔案開頭都用嘅 crate。",
   "lands.category": "{land} — 分類",
   "lands.clearedOf": "{total} 條入面通關咗 {cleared} 條",
   "lands.record": "{total} 條通咗 {cleared} 條   ★{stars}",
@@ -185,6 +187,7 @@ export const yue: Partial<Catalogue> = {
   "map.basic": "基礎",
   "map.advanced": "進階",
   "map.hacker": "黑客",
+  "map.frameworks": "框架",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -533,6 +536,7 @@ export const yue: Partial<Catalogue> = {
   "search.basic": "基礎",
   "search.adv": "進階",
   "search.hacker": "黑客",
+  "search.frameworks": "框架",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",

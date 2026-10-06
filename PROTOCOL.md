@@ -392,6 +392,10 @@ The land/category select screen.
 
 `open` is false when the category's first node is still locked.
 
+A land reports the roads it has (SPEC §0): four for a language land, five for
+`rust` (`frameworks` last), two for `remix`. A client draws what is reported
+and keys its own fixed order on the category name.
+
 ### 4.7 `world.map`
 
 One overworld.
@@ -634,6 +638,15 @@ somebody *deliberately* writes something broken to see what the compiler says,
 which is the last thing that should be counted against them.
 
 The limits in SPEC §5.3 apply unchanged — the playground is the same runner.
+
+**A Rust pad has the crate shelf.** When the machine has built it (`cwbhacker
+warm`, SPEC §5.1), a `lang: "rust"` run is built by cargo against every crate
+on the shelf — `use serde::Deserialize`, `#[tokio::main]`, `clap`, `regex`,
+`chrono` and the rest work with nothing to declare, exactly as on the
+FRAMEWORKS road. On a machine whose shelf is cold the pad is plain `rustc`, as
+before, rather than refused: `std` still runs, and a `use serde` there fails
+with the compiler's own unresolved-import error while the boot report and
+`doctor` name the command that fixes it.
 
 **Snippets** are saved per user, server-side, so the same scratchpad opens in
 the browser and in the LÖVE client.
@@ -1127,7 +1140,7 @@ What AUTO SELECT plays next in one land.
 `owed`. Three tiers, each consulted only when the one before is empty:
 
 1. `"first"` — the first quest not cleared, in road order (`verybasic`,
-   `basic`, `advanced`, `hacker`) then `node`.
+   `basic`, `advanced`, `hacker`, `frameworks`) then `node`.
 2. `"review"` — all cleared, and some quests still *owe*: failed submits minus
    clean clears after the first. A random pick weighted by `owed`, so the
    quest failed most comes up most — until it has been cleared cleanly as many
@@ -1378,7 +1391,9 @@ type MapNode = {
 
 ```ts
 type Quest = {
-  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"zig"|"lua"|"remix"; category: "verybasic"|"basic"|"advanced"|"hacker";
+  id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"zig"|"lua"|"remix";
+  /** SPEC §0. `frameworks` — the crates road — is reported for `rust` only. */
+  category: "verybasic"|"basic"|"advanced"|"hacker"|"frameworks";
   /** The language the quest is judged in (SPEC §12): the runner, the file
    *  name, the editor's grammar and the formatter all key on it, and a
    *  submit's `lang` must equal it (§4.9). The land's own name everywhere

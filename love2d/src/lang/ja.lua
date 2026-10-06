@@ -250,6 +250,7 @@ return {
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "正しい行を選んで、その行を打つ  (1–4)",
   ["RIGHT — NOW TYPE IT"] = "正解 — その行を打とう",
   ["ADVANCED"] = "応用",
+  ["FRAMEWORKS"] = "フレームワーク",
   ["OPEN"] = "公開",
 
   -- PROTOCOL §4.11b — the answer, and what it costs.

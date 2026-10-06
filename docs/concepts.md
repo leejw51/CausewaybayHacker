@@ -61,7 +61,7 @@ Rules:
 | `panics` | crashing on purpose, and catching it | `panic!`, `unwrap`/`expect` | `panic`, `recover`, `defer` | `assert`, `std::terminate`, `abort` | `assert`, an uncaught exception |
 | `zero-values` | what an uninitialised value is, and absence | `Default`, `Option::None` | zero values; nil map, slice, interface | uninitialised is garbage; `{}`, `std::optional` | `None`, empty containers are falsy |
 | `testing` | proving it yourself before the interviewer does | `#[test]`, `assert_eq!` | `testing`, table-driven tests | `assert`, a checking `main` | `assert`, `unittest` |
-| `serialization` | a value in and out of a wire format | — (no deps offline) | `encoding/json`, struct tags | — (no deps offline) | `json` |
+| `serialization` | a value in and out of a wire format | `serde`, `serde_json`, `toml` (the FRAMEWORKS road, off the crate shelf) | `encoding/json`, struct tags | — (no deps offline) | `json` |
 | `comprehensions` | building a container from an expression in one line | — | — | — | list/dict/set comprehensions, generator expressions |
 | `generators` | a sequence produced lazily, one item on demand | — | — | — | `yield`, `itertools` |
 | `decorators` | functions wrapping functions | — | — | — | `@property`, `functools.wraps` |
@@ -203,7 +203,7 @@ not a habit: the content check that runs every reference solution
 zero. A kind may be at zero only while the pack that would cover it is
 unwritten, and that is a tracked gap, not an accepted state.
 
-As of the twenty-four packs in `content/`, every kind in the table above reaches
+As of the twenty-five packs in `content/`, every kind in the table above reaches
 quests, and every one of the 78 slugs is used by a quest *and* named by a kind.
 `other` is the only row at zero, and that is by design — it has no concepts.
 The eight slugs added with the C++ and Python lands, and the twelve added with

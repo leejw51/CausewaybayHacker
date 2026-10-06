@@ -248,6 +248,7 @@ return {
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "맞는 줄을 고르고, 그 줄을 치세요  (1–4)",
   ["RIGHT — NOW TYPE IT"] = "정답 — 이제 그 줄을 치세요",
   ["ADVANCED"] = "심화",
+  ["FRAMEWORKS"] = "프레임워크",
   ["OPEN"] = "열림",
 
   -- PROTOCOL §4.11b — the answer, and what it costs.

@@ -125,6 +125,10 @@ const PACKS_COMPILED = [
   "content/rust/basic.toml",
   "content/rust/advanced.toml",
   "content/rust/hacker.toml",
+  // RUST LAND's fifth road builds against the crate shelf with cargo; the
+  // gate warms the shelf itself (`backend/runner/shelf/`), which needs the
+  // network the first time and nothing after.
+  "content/rust/frameworks.toml",
   "content/go/verybasic.toml",
   "content/go/basic.toml",
   "content/go/advanced.toml",

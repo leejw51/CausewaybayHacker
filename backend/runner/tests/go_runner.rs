@@ -362,7 +362,7 @@ fn go_stdio_is_no_longer_refused_before_dispatch() {
         { "name": "any", "stdin": "", "expect": "x", "visible": true }
     ]));
     assert_eq!(
-        cwbhacker_runner::unsupported("go", &stdio_spec),
+        cwbhacker_runner::unsupported("go", &stdio_spec, std::path::Path::new("")),
         None,
         "the Go land is built; the gate must be open"
     );

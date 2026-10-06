@@ -55,8 +55,22 @@ pub fn run(
     // genuinely arbitrary code, so it is the last place to relax any of them:
     // same runner, same timeout, same output cap, same stripped environment,
     // same process group.
-    let spec = TestSpec::playground(&stdin, PLAYGROUND_TIMEOUT_MS, PLAYGROUND_COMPILE_TIMEOUT_MS);
-    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec) {
+    let mut spec =
+        TestSpec::playground(&stdin, PLAYGROUND_TIMEOUT_MS, PLAYGROUND_COMPILE_TIMEOUT_MS);
+    let home = state.store.home();
+    // A Rust scratchpad has the whole crate shelf (SPEC §5.1) whenever this
+    // machine has built it: `use serde::Deserialize` works there as it does
+    // on the FRAMEWORKS road, with no key to set. Cold, the pad stays plain
+    // `rustc` rather than refusing — a scratchpad that will not run `fn
+    // main` because `tokio` was never compiled is worse than one that cannot
+    // `use tokio`; the boot report and `doctor` say how to warm it.
+    if lang == "rust" && cwbhacker_runner::shelf::is_warm(&home.build_lang_dir("rust")) {
+        spec.crates = cwbhacker_runner::shelf::names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+    }
+    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec, &home.build_lang_dir(&lang)) {
         return Err(unavailable(reason, 2));
     }
 
@@ -74,7 +88,6 @@ pub fn run(
     });
     streamer.stage("queued", queued);
 
-    let home = state.store.home();
     let events = streamer.clone();
     let submission = Submission {
         attempt_id: &attempt_id,

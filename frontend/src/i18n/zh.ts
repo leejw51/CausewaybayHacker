@@ -145,6 +145,8 @@ export const zh: Partial<Catalogue> = {
   "lands.advancedBlurb":
     "现场编程测试，不计时。一道题，一整个程序，可见用例和隐藏用例 — 把语法真正用起来，然后是同时发生的午市高峰。",
   "lands.hackerBlurb": "面试。一个房间，一只钟，没有谁替你把行写完。",
+  "lands.frameworksBlurb":
+    "上班。这里没有什么是从零写起的：anyhow、serde、tokio、clap，街上每个文件开头都用的那些 crate。",
   "lands.category": "{land} — 分类",
   "lands.clearedOf": "{total} 条中通关 {cleared} 条",
   "lands.record": "{total} 条中通关 {cleared} 条   ★{stars}",
@@ -171,6 +173,7 @@ export const zh: Partial<Catalogue> = {
   "map.basic": "基础",
   "map.advanced": "进阶",
   "map.hacker": "黑客",
+  "map.frameworks": "框架",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -518,6 +521,7 @@ export const zh: Partial<Catalogue> = {
   "search.basic": "基础",
   "search.adv": "进阶",
   "search.hacker": "黑客",
+  "search.frameworks": "框架",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",

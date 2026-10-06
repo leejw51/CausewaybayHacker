@@ -389,13 +389,16 @@ fn cpp_stdio_is_open_and_the_other_harnesses_are_refused() {
     let stdio_spec = stdio(serde_json::json!([
         { "name": "any", "stdin": "", "expect": "x", "visible": true }
     ]));
-    assert_eq!(cwbhacker_runner::unsupported("cpp", &stdio_spec), None);
+    assert_eq!(
+        cwbhacker_runner::unsupported("cpp", &stdio_spec, std::path::Path::new("")),
+        None
+    );
     for harness in ["cargo", "gotest"] {
         let wrong = spec(serde_json::json!({
             "harness": harness,
             "cases": [ { "name": "t", "visible": true } ]
         }));
-        let reason = cwbhacker_runner::unsupported("cpp", &wrong)
+        let reason = cwbhacker_runner::unsupported("cpp", &wrong, std::path::Path::new(""))
             .unwrap_or_else(|| panic!("the {harness} harness must be refused for cpp"));
         assert!(reason.contains("cpp"), "{reason}");
     }

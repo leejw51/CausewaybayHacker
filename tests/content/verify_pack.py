@@ -60,7 +60,100 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix|zig|lua)\.(verybasic|basic|advanced|hacker)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix|zig|lua)\.(verybasic|basic|advanced|hacker|frameworks)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+
+# The crate shelf (SPEC §5.1): `backend/runner/shelf/Cargo.toml` names every
+# crate a Rust quest may `use`, pinned, and the lockfile beside it is copied
+# into every such build. The runner embeds the same two files; this script
+# reads them off disk, so there is one shelf and not a copy of it here.
+SHELF = REPO / "backend" / "runner" / "shelf"
+
+
+def shelf_names():
+    """The keys of the shelf's `[dependencies]` table, in order."""
+    return [line.split("=")[0].strip() for line in shelf_dependency_lines()]
+
+
+def shelf_dependency_lines():
+    lines = (SHELF / "Cargo.toml").read_text().splitlines()
+    out, inside = [], False
+    for line in lines:
+        s = line.strip()
+        if s.startswith("["):
+            inside = s == "[dependencies]"
+            continue
+        if inside and s and not s.startswith("#"):
+            out.append(s)
+    return out
+
+
+def shelf_digest():
+    """sha256 over Cargo.toml then Cargo.lock — what the runner's marker holds too."""
+    import hashlib
+    h = hashlib.sha256()
+    h.update((SHELF / "Cargo.toml").read_bytes())
+    h.update((SHELF / "Cargo.lock").read_bytes())
+    return h.hexdigest()
+
+
+def cargo_env():
+    """A quest build's environment (runner `toolchain_env`): the caches under
+    CACHE, and nothing of this shell's `RUSTFLAGS` or `~/.cargo/config`, which
+    would change every artifact's hash and make the warm shelf cold."""
+    e = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(CACHE),
+        "RUSTUP_HOME": os.environ.get("RUSTUP_HOME", str(pathlib.Path.home() / ".rustup")),
+        "CARGO_HOME": str(CACHE / "cargo-home"),
+        "CARGO_TARGET_DIR": str(CACHE / "target"),
+        "CARGO_TERM_COLOR": "never",
+    }
+    for name in ("RUSTUP_TOOLCHAIN", "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+                 "NO_PROXY", "no_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "CARGO_HTTP_CAINFO"):
+        if name in os.environ:
+            e[name] = os.environ[name]
+    return e
+
+
+_shelf_warm = False
+
+
+def ensure_shelf():
+    """Build the shelf into CACHE once per cache — `cwbhacker warm`, for the
+    gate. The marker holds the digest, so a shelf edited since is rebuilt;
+    the network is needed only when it is."""
+    global _shelf_warm
+    if _shelf_warm:
+        return
+    marker = CACHE / "shelf.ok"
+    if marker.exists() and marker.read_text().strip() == shelf_digest():
+        _shelf_warm = True
+        return
+    shelf = CACHE / "shelf"
+    (shelf / "src").mkdir(parents=True, exist_ok=True)
+    for name in ("Cargo.toml", "Cargo.lock"):
+        shutil.copyfile(SHELF / name, shelf / name)
+    shutil.copyfile(SHELF / "src" / "lib.rs", shelf / "src" / "lib.rs")
+    if marker.exists():
+        marker.unlink()
+    print("  warming the crate shelf (cargo fetch + build --release; the network, once) ...",
+          flush=True)
+    for args in (["fetch", "--locked"], ["build", "--release", "--locked"]):
+        p = subprocess.run(["cargo", *args], cwd=shelf, env=cargo_env(),
+                           capture_output=True, text=True, timeout=1800)
+        if p.returncode != 0:
+            raise SystemExit(f"cargo {' '.join(args)} on the shelf failed:\n{p.stderr[-4000:]}")
+    marker.write_text(shelf_digest() + "\n")
+    _shelf_warm = True
+
+
+def crate_manifest(name):
+    """The runner's manifest for a stdio quest with crates (`cargo.rs`): a
+    binary named for the build, and the shelf's whole dependency table."""
+    deps = "\n".join(shelf_dependency_lines())
+    return (f'[package]\nname = "{name}"\nversion = "0.0.0"\nedition = "2021"\npublish = false\n\n'
+            f'[[bin]]\nname = "{name}"\npath = "src/main.rs"\n\n'
+            f'[dependencies]\n{deps}\n\n[workspace]\n')
 
 # REMIX LAND (SPEC §12): the same program three times, one trio of nodes per
 # concept, always in this order. `lang` on the quest says which toolchain
@@ -145,10 +238,34 @@ def go_env():
     return e
 
 
-def build(lang, src, workdir):
+def build(lang, src, workdir, crates=()):
     """Compile source. Returns (ok, stderr)."""
     workdir.mkdir(parents=True, exist_ok=True)
-    if lang == "rust":
+    if lang == "rust" and crates:
+        # A stdio quest with crates (SPEC §5.1): the runner's `cargo build
+        # --release --offline` against the whole shelf, with the lockfile
+        # copied in, in the shared target directory the shelf was warmed
+        # into. The package is named for this build — cargo uplifts a binary
+        # to `target/release/<name>` with no hash in it, and two builds of
+        # one name would be one file — and the executable is moved out to
+        # `prog` so the cache does not keep a program per quest.
+        ensure_shelf()
+        name = "quest-" + re.sub(r"[^A-Za-z0-9_-]", "-", workdir.name) + f"-{os.getpid()}"
+        (workdir / "src").mkdir(exist_ok=True)
+        (workdir / "src" / "main.rs").write_text(src)
+        (workdir / "Cargo.toml").write_text(crate_manifest(name))
+        shutil.copyfile(SHELF / "Cargo.lock", workdir / "Cargo.lock")
+        p = subprocess.run(
+            ["cargo", "build", "--release", "--offline"],
+            cwd=workdir, capture_output=True, text=True, timeout=600, env=cargo_env())
+        if p.returncode == 0:
+            shutil.move(CACHE / "target" / "release" / name, workdir / "prog")
+            for leftover in (CACHE / "target" / "release" / "deps").glob(f"{name}-*"):
+                leftover.unlink()
+            fingerprints = CACHE / "target" / "release" / ".fingerprint"
+            for leftover in fingerprints.glob(f"{name}-*") if fingerprints.is_dir() else []:
+                shutil.rmtree(leftover, ignore_errors=True)
+    elif lang == "rust":
         f = workdir / "main.rs"
         f.write_text(src)
         p = subprocess.run(
@@ -284,7 +401,7 @@ def judge(lang, src, q, workdir):
     t = q["tests"]
     mode = t.get("match", "trim")
     cases = t["cases"]
-    ok, err = build(lang, src, workdir)
+    ok, err = build(lang, src, workdir, crates=t.get("crates", ()))
     if not ok:
         return "compile_error", 0, len(cases), err.strip().splitlines()[:1]
     passed = 0
@@ -446,6 +563,24 @@ def structural(pack, path, vocab):
             if not norm(mode if not mode.startswith("float") else "trim", c["expect"]).strip():
                 errs.append(f"{qid}: case {c['name']} expect is empty after {mode} "
                             f"— an empty main() would pass it")
+        # `crates` (SPEC §5.2): rust only, every name on the shelf, and the
+        # FRAMEWORKS road's reason to exist — a quest there names at least
+        # one, or it is an ADVANCED quest filed on the wrong road and judged
+        # by `rustc` alone, where its `use serde` does not compile.
+        crates = t.get("crates", [])
+        if crates and quest_lang(pack, q) != "rust":
+            errs.append(f"{qid}: crates on a {quest_lang(pack, q)} quest; the shelf is rust's")
+        if not isinstance(crates, list) or any(not isinstance(c, str) or not c.strip() for c in crates):
+            errs.append(f"{qid}: tests.crates must be a list of crate names")
+        else:
+            for c in crates:
+                if c not in shelf_names():
+                    errs.append(f"{qid}: crate {c!r} is not on the shelf "
+                                f"(backend/runner/shelf/Cargo.toml)")
+        if cat == "frameworks" and not crates:
+            errs.append(f"{qid}: a frameworks quest names the crates it is about in tests.crates")
+        if cat == "frameworks" and land != "rust":
+            errs.append(f"{qid}: the frameworks road is rust's alone")
         if cat == "hacker" and not q.get("time_limit_s"):
             errs.append(f"{qid}: hacker quest without time_limit_s")
         if cat != "hacker" and q.get("time_limit_s"):

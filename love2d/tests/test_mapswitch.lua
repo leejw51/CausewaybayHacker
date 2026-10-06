@@ -188,18 +188,21 @@ return function()
   end)
 
   T.case("Q cycles the category in one action, wrapping", function()
-    -- Four roads now (SPEC §0, PROTOCOL §5.3): VERY BASIC walks first.
+    -- Five roads on RUST (SPEC §0, PROTOCOL §5.3): VERY BASIC walks first,
+    -- FRAMEWORKS last.
     local map, asked = fake_map("rust", "basic")
     map:cycle_category()
     T.eq(map.category, "advanced")
     map:cycle_category()
     T.eq(map.category, "hacker")
     map:cycle_category()
+    T.eq(map.category, "frameworks", "the crates road, after the interview")
+    map:cycle_category()
     T.eq(map.category, "verybasic", "and round again, through the quiz road")
     map:cycle_category()
     T.eq(map.category, "basic")
     T.eq(map.land, "rust", "the land never moved")
-    T.same(asked, { "rust.advanced", "rust.hacker", "rust.verybasic", "rust.basic" })
+    T.same(asked, { "rust.advanced", "rust.hacker", "rust.frameworks", "rust.verybasic", "rust.basic" })
   end)
 
   T.case("switching to the map you are already on does nothing", function()

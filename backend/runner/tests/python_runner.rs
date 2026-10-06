@@ -335,13 +335,16 @@ fn python_stdio_is_open_and_the_other_harnesses_are_refused() {
     let stdio_spec = stdio(serde_json::json!([
         { "name": "any", "stdin": "", "expect": "x", "visible": true }
     ]));
-    assert_eq!(cwbhacker_runner::unsupported("python", &stdio_spec), None);
+    assert_eq!(
+        cwbhacker_runner::unsupported("python", &stdio_spec, std::path::Path::new("")),
+        None
+    );
     for harness in ["cargo", "gotest"] {
         let wrong = spec(serde_json::json!({
             "harness": harness,
             "cases": [ { "name": "t", "visible": true } ]
         }));
-        let reason = cwbhacker_runner::unsupported("python", &wrong)
+        let reason = cwbhacker_runner::unsupported("python", &wrong, std::path::Path::new(""))
             .unwrap_or_else(|| panic!("the {harness} harness must be refused for python"));
         assert!(reason.contains("python"), "{reason}");
     }
@@ -360,7 +363,7 @@ fn pytorch_stdio_is_open_only_where_torch_is_importable() {
     let stdio_spec = stdio(serde_json::json!([
         { "name": "any", "stdin": "", "expect": "x", "visible": true }
     ]));
-    let refusal = cwbhacker_runner::unsupported("pytorch", &stdio_spec);
+    let refusal = cwbhacker_runner::unsupported("pytorch", &stdio_spec, std::path::Path::new(""));
     assert_eq!(
         refusal.is_none(),
         cwbhacker_runner::format::torch_is_installed(),
@@ -378,7 +381,7 @@ fn pytorch_stdio_is_open_only_where_torch_is_importable() {
             "harness": harness,
             "cases": [ { "name": "t", "visible": true } ]
         }));
-        let reason = cwbhacker_runner::unsupported("pytorch", &wrong)
+        let reason = cwbhacker_runner::unsupported("pytorch", &wrong, std::path::Path::new(""))
             .unwrap_or_else(|| panic!("the {harness} harness must be refused for pytorch"));
         assert!(reason.contains("pytorch"), "{reason}");
     }

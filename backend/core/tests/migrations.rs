@@ -864,16 +864,13 @@ fn migration_0022_opens_the_seventh_land_and_gives_every_quest_a_language() {
 }
 
 #[test]
-fn the_newest_migration_opens_the_eighth_and_ninth_lands() {
-    // The "newest migration" pin: fails loudly if a 0024 is added without a
-    // test of its own here. 0023 is two more toolchains, `zig` and `lua`,
-    // and to the database that is two names in four CHECK constraints —
-    // `quests.land`, `quests.lang`, `attempts.lang`, `snippets.lang` — with
-    // everything 0022 built (the `lang` fill-in trigger, the narrowed FTS
-    // update trigger) carried across the rebuild.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 22);
-    let conn = database_at_version(previous);
+fn migration_0023_opens_the_eighth_and_ninth_lands() {
+    // 0023 is two more toolchains, `zig` and `lua`, and to the database that
+    // is two names in four CHECK constraints — `quests.land`, `quests.lang`,
+    // `attempts.lang`, `snippets.lang` — with everything 0022 built (the
+    // `lang` fill-in trigger, the narrowed FTS update trigger) carried
+    // across the rebuild.
+    let conn = database_at_version(22);
     conn.execute(
         "INSERT INTO users (address, address_eip55, name, created_at, last_seen_at, settings)
            VALUES ('0xaa', '0xAA', 'old hand', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}')",
@@ -1008,6 +1005,111 @@ fn the_newest_migration_opens_the_eighth_and_ninth_lands() {
     let hits: i64 = conn
         .query_row(
             "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'lantern'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS update trigger came back with the table");
+    let total: i64 = conn
+        .query_row("SELECT count(*) FROM quest_fts", [], |r| r.get(0))
+        .unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM quests", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(total, rows, "one FTS row per quest, no more and no fewer");
+}
+
+#[test]
+fn the_newest_migration_opens_the_fifth_road() {
+    // The "newest migration" pin: fails loudly if a 0025 is added without a
+    // test of its own here. 0024 is one name in one CHECK constraint,
+    // `quests.category`, for Rust Land's FRAMEWORKS road — with everything
+    // 0023 built (the `lang` fill-in trigger, the `OF`-narrowed FTS update
+    // trigger, the rowids the index keys on) carried across the rebuild.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 23);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.advanced.01.a', 'p', 'rust', 'advanced', 1, 'tram', 'b', 's', 1, 's', 's',
+                 '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('rust.frameworks.01.a', 'p', 'rust', 'frameworks', 1, 't', 'b', 's', 1, 's',
+                     's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "0023 has no frameworks in its CHECK"
+    );
+
+    db::prepare(&conn).unwrap();
+
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.frameworks.01.a', 'p', 'rust', 'frameworks', 1, 'serde', 'b', 's', 2, 's',
+                 's', '{\"crates\":[\"serde\"]}', 'c')",
+        [],
+    )
+    .expect("quests takes frameworks");
+    let lang: String = conn
+        .query_row(
+            "SELECT lang FROM quests WHERE id = 'rust.frameworks.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(lang, "rust", "the fill-in trigger survived the rebuild");
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('rust.expert.01.a', 'p', 'rust', 'expert', 1, 't', 'b', 's', 1, 's', 's', '{}',
+                     'c')",
+            [],
+        )
+        .is_err(),
+        "the CHECK is widened, not removed"
+    );
+
+    // What was there is still there, and the index knows the new row and
+    // hears about a title change but not a lang change.
+    let kept: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quests WHERE id = 'rust.advanced.01.a' AND lang = 'rust'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, 1, "the rebuild carried the quests across");
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'serde'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS insert trigger came back with the table");
+    conn.execute(
+        "UPDATE quests SET lang = 'rust' WHERE id = 'rust.frameworks.01.a'",
+        [],
+    )
+    .expect("a lang update does not go near the FTS index");
+    conn.execute(
+        "UPDATE quests SET title = 'tokio' WHERE id = 'rust.frameworks.01.a'",
+        [],
+    )
+    .unwrap();
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'tokio'",
             [],
             |r| r.get(0),
         )

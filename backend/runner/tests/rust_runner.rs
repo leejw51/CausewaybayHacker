@@ -376,19 +376,195 @@ fn unsupported_names_what_this_build_cannot_judge() {
     let stdio_spec = stdio(serde_json::json!([
         { "name": "any", "stdin": "", "expect": "x", "visible": true }
     ]));
-    assert_eq!(cwbhacker_runner::unsupported("rust", &stdio_spec), None);
+    assert_eq!(
+        cwbhacker_runner::unsupported("rust", &stdio_spec, std::path::Path::new("")),
+        None
+    );
 
     // Both lands are built; the gate is open for stdio in either.
-    assert_eq!(cwbhacker_runner::unsupported("go", &stdio_spec), None);
+    assert_eq!(
+        cwbhacker_runner::unsupported("go", &stdio_spec, std::path::Path::new("")),
+        None
+    );
 
     // The cargo harness is built: the gate is open for it in the Rust land…
     let cargo_spec = spec(serde_json::json!({
         "harness": "cargo",
         "cases": [ { "name": "any", "stdin": "", "expect": "x", "visible": true } ]
     }));
-    assert_eq!(cwbhacker_runner::unsupported("rust", &cargo_spec), None);
+    assert_eq!(
+        cwbhacker_runner::unsupported("rust", &cargo_spec, std::path::Path::new("")),
+        None
+    );
     // …and shut in the Go one, which is an authoring mistake, not a gap.
-    assert!(cwbhacker_runner::unsupported("go", &cargo_spec).is_some());
+    assert!(cwbhacker_runner::unsupported("go", &cargo_spec, std::path::Path::new("")).is_some());
 
-    assert!(cwbhacker_runner::unsupported("cobol", &stdio_spec).is_some());
+    assert!(
+        cwbhacker_runner::unsupported("cobol", &stdio_spec, std::path::Path::new("")).is_some()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The crate shelf (SPEC §5.1): a stdio quest that names `crates`.
+// ---------------------------------------------------------------------------
+
+fn crate_spec(crates: serde_json::Value) -> TestSpec {
+    spec(serde_json::json!({
+        "harness": "stdio",
+        "timeout_ms": 5000,
+        "crates": crates,
+        "cases": [
+            { "name": "sum", "stdin": "[{\"amount\":30},{\"amount\":12}]\n", "expect": "TOTAL 42\n", "visible": true }
+        ]
+    }))
+}
+
+#[test]
+fn a_crate_quest_is_refused_until_the_shelf_is_warm() {
+    let tmp = tempfile::tempdir().unwrap();
+    let s = crate_spec(serde_json::json!(["serde", "serde_json"]));
+    let why = cwbhacker_runner::unsupported("rust", &s, tmp.path())
+        .expect("a cold shelf refuses a crate quest before an attempt row exists");
+    assert!(why.contains("cwbhacker warm"), "{why}");
+    assert!(why.contains("FRAMEWORKS"), "{why}");
+    // The same quest with no crates is a plain rustc build and needs nothing.
+    let plain = spec(serde_json::json!({
+        "harness": "stdio",
+        "cases": [ { "name": "x", "stdin": "", "expect": "x", "visible": true } ]
+    }));
+    assert_eq!(
+        cwbhacker_runner::unsupported("rust", &plain, tmp.path()),
+        None
+    );
+    // A marker from exactly this shelf opens the road …
+    std::fs::write(
+        cwbhacker_runner::shelf::marker_path(tmp.path()),
+        format!("{}\n", cwbhacker_runner::shelf::digest()),
+    )
+    .unwrap();
+    assert_eq!(cwbhacker_runner::unsupported("rust", &s, tmp.path()), None);
+    // … and crates stay a Rust key whatever the shelf's state.
+    assert!(cwbhacker_runner::unsupported("go", &s, tmp.path())
+        .unwrap()
+        .contains("rust key"));
+}
+
+#[test]
+fn a_crate_off_the_shelf_is_refused_at_parse() {
+    let err = TestSpec::parse(&serde_json::json!({
+        "harness": "stdio",
+        "crates": ["serde", "diesel"],
+        "cases": [ { "name": "x", "stdin": "", "expect": "x", "visible": true } ]
+    }))
+    .expect_err("diesel is not on the shelf");
+    let text = format!("{err:?}");
+    assert!(text.contains("diesel"), "{text}");
+    assert!(
+        text.contains("tokio"),
+        "the refusal names the shelf: {text}"
+    );
+    // The key's shape is checked too.
+    assert!(TestSpec::parse(&serde_json::json!({
+        "harness": "stdio",
+        "crates": "serde",
+        "cases": [ { "name": "x", "stdin": "", "expect": "x", "visible": true } ]
+    }))
+    .is_err());
+    // And a crate quest's compile budget is cargo's, not rustc's.
+    let s = crate_spec(serde_json::json!(["tokio"]));
+    assert_eq!(s.compile_timeout_ms, 60_000);
+    assert_eq!(s.crates, vec!["tokio".to_string()]);
+}
+
+#[test]
+fn the_bin_manifest_names_the_attempt_and_carries_the_whole_shelf() {
+    let m = cwbhacker_runner::cargo::generated_bin_manifest("att_7", &["serde".to_string()]);
+    assert!(m.contains("name = \"quest-att_7\""), "{m}");
+    assert!(m.contains("[[bin]]"), "{m}");
+    assert!(m.contains("path = \"src/main.rs\""), "{m}");
+    assert!(!m.contains("[lib]"), "{m}");
+    assert!(m.contains("[workspace]"), "{m}");
+    // Every shelf crate, not the one the quest named: one dependency graph.
+    for name in cwbhacker_runner::shelf::names() {
+        assert!(m.contains(&format!("\n{name} = ")), "{name} missing:\n{m}");
+    }
+    // The library shape is unchanged, and still carries no dependencies.
+    let lib = cwbhacker_runner::cargo::generated_manifest("att_7");
+    assert!(
+        lib.contains("[lib]") && !lib.contains("[dependencies]"),
+        "{lib}"
+    );
+}
+
+/// The real thing: the shelf warmed into a fresh cache (the network, and
+/// the whole of `tokio` compiled), then a `serde_json` + `tokio` program
+/// built offline against it and judged, then one that does not compile.
+#[test]
+#[ignore = "fetches and compiles the whole crate shelf; run it with --ignored"]
+fn a_crate_quest_builds_against_the_warm_shelf_and_is_judged() {
+    let h = harness();
+    std::fs::create_dir_all(&h.cache).unwrap();
+    cwbhacker_runner::shelf::warm(&h.cache, &|line| eprintln!("{line}")).expect("the shelf warms");
+    assert!(cwbhacker_runner::shelf::is_warm(&h.cache));
+
+    let s = crate_spec(serde_json::json!(["serde", "serde_json", "tokio"]));
+    assert_eq!(cwbhacker_runner::unsupported("rust", &s, &h.cache), None);
+    let source = r#"
+use serde::Deserialize;
+#[derive(Deserialize)]
+struct Order { amount: i64 }
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let mut input = String::new();
+    std::io::Read::read_to_string(&mut std::io::stdin(), &mut input)?;
+    let orders: Vec<Order> = serde_json::from_str(&input)?;
+    let total = tokio::spawn(async move { orders.iter().map(|o| o.amount).sum::<i64>() }).await?;
+    println!("TOTAL {total}");
+    Ok(())
+}
+"#;
+    let run_in = |source: &str| {
+        let stages = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let st = stages.clone();
+        let submission = Submission {
+            attempt_id: "att_shelf",
+            lang: "rust",
+            source,
+            spec: &s,
+            workdir: h.workdir.clone(),
+            cache_root: h.cache.clone(),
+            events: Arc::new(move |event| {
+                if let Event::Stage(stage) = event {
+                    st.lock().unwrap().push(stage.to_string())
+                }
+            }),
+        };
+        let _ = std::fs::remove_dir_all(&h.workdir);
+        let report = cwbhacker_runner::run(&submission);
+        let seen = stages.lock().unwrap().clone();
+        (report, seen)
+    };
+
+    let (report, stages) = run_in(source);
+    assert_eq!(report.verdict, Verdict::Accepted, "{report:?}");
+    assert_eq!(report.tests_passed, 1);
+    assert_eq!(stages, vec!["compiling", "running", "judging"]);
+    assert!(
+        h.workdir.join("prog").is_file(),
+        "the binary moved into the attempt"
+    );
+    assert!(
+        h.workdir.join("Cargo.lock").is_file(),
+        "the shelf's lockfile was copied in"
+    );
+
+    // A type error in the player's file: compile_error, with rustc's JSON
+    // kept for the classifier (E0308, as rustc spells it).
+    let (report, _) = run_in(&source.replace("let total = tokio", "let total: String = tokio"));
+    assert_eq!(report.verdict, Verdict::CompileError, "{report:?}");
+    assert!(
+        report.compiler_stderr.contains("E0308"),
+        "{}",
+        report.compiler_stderr
+    );
 }

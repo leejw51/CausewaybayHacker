@@ -239,9 +239,12 @@ interview, and its thirty-four questions are that interview's.
 | **BASIC** | the morning walk | Re-learning to read, one line at a time. Every node is a shopfront, a kiosk or a till whose code is whole but for one to four lines. The node says what the construct is and shows the exact line; Mei types it and it compiles. Grammar activation, not a quiz, and untimed: the syntax, back in the fingers. On the street it is Rust's own grammar — who owns the receipt and who is only looking, two tills swapping drawers, how long a borrow is good for, four tills at once, and one hatch between the kitchen and the pass. |
 | **ADVANCED** | the walk into the lunch rush | The live coding test, untimed: a brief, a whole program, hidden cases. Simple problems that use the grammar BASIC activated — ownership, slices, errors, traits and interfaces, pointers, iterators, generics: the road the game opened with, kept whole. Then 12:30. Two tills on one counter, riders on shared bikes, an MTR interchange. Nothing fails because it is hard; it fails because two of it happened at the same time. |
 | **HACKER** | the interview | HKU, Chow Yei Ching Building, a room with a clock on the wall. Twenty-eight questions a real interview draws from — hashing, windows, trees, heaps, backtracking, graphs, DP, bits — worked alone, under time. Skynet's last defence is the thing it convinced everyone they could no longer do without help: solve a stated problem, under time, alone. |
+| **FRAMEWORKS** | the job | Rust Land only. The interview is passed and Mei is back on the payment path at the fintech off Gloucester Road, where nothing is written from scratch and every file starts with `use`. One or two crates per node, each the way it is used at work: errors with a name, the shape of the wire, a command line, dates, a seeded shuffle, a parallel sum, a channel with a timeout, tasks that join in order, and at 17:30 the settlement — the day's transfers in, one line per account out, in four crates at once. Untimed; the clock on this road is the bank's, not the player's. |
 
 `BASIC` is untimed on purpose — the point is reading, not speed. `HACKER`
 carries `time_limit_s`, because the clock is the antagonist of that road.
+`FRAMEWORKS` is untimed too: the antagonist there is the dependency — the
+crate that is right, used wrong.
 
 ---
 
@@ -254,6 +257,7 @@ One per map, always the last node, `map.kind = "boss"`.
 | `rust.basic` | 27 | **THE AUTOCOMPLETE** | The ghost text itself, at the Percival Street phone kiosk. It finishes every line before Mei has one. Beaten by writing something it has no completion for: a binary search tree, inserted by hand, node by node. (The trait she named herself is on the ADVANCED road now, as *A TRAIT OF HER OWN*.) |
 | `rust.advanced` | 33 | **DEADLOCK** | Under Times Square, in the plant room. Two locks, two threads, and the escalators stopped. Beaten by ordering. |
 | `rust.hacker` | 28 | **THE WHITEBOARD** | Room 7-32, HKU. No syntax highlighting, no completion, a clock — and a cache that has to evict the right thing. |
+| `rust.frameworks` | 23 | **THE SETTLEMENT** | 17:30 on the payment path off Gloucester Road. The day's transfers arrive as one JSON file and the bank wants one line per account by 18:00: serde for the shape, chrono for the date, anyhow for the first bad transfer, tokio for the tasks — joined in order, so the one reported is the first one wrong. |
 | `go.basic` | 27 | **NULLPTR** | A nil child pointer, followed. The tree of orders at Lucky Mac has a branch that is not there yet, and the insert has to look before it walks. (The front till at 11:55 is on the ADVANCED road now, as *THE FRONT TILL*.) |
 | `go.advanced` | 33 | **THE RACE** | Causeway Bay interchange, platform 2. Two counters, one number, and the number is wrong by an amount nobody can reproduce. |
 | `go.hacker` | 28 | **THE CLOCK** | The second interview. Same room, and this time the clock is shorter. |

@@ -169,6 +169,8 @@ export const en = {
   "lands.advancedBlurb":
     "The live coding test, untimed. A brief, a whole program, visible and hidden cases — the grammar applied, then the lunch rush of it happening all at once.",
   "lands.hackerBlurb": "The interview. One room, one clock, and nothing finishing your lines.",
+  "lands.frameworksBlurb":
+    "The job. Nothing here is written from scratch: anyhow, serde, tokio, clap, the crates every file on the street starts with.",
   "lands.category": "{land} — CATEGORY",
   "lands.clearedOf": "{cleared} / {total} CLEARED",
   "lands.record": "{cleared}/{total} CLEARED   ★{stars}",
@@ -196,6 +198,7 @@ export const en = {
   "map.basic": "BASIC",
   "map.advanced": "ADVANCED",
   "map.hacker": "HACKER",
+  "map.frameworks": "FRAMEWORKS",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -559,6 +562,7 @@ export const en = {
   "search.basic": "BASIC",
   "search.adv": "ADV",
   "search.hacker": "HACKER",
+  "search.frameworks": "FRAMEWORKS",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",

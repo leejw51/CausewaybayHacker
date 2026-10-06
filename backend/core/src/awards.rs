@@ -47,7 +47,9 @@ pub struct Award {
 pub fn category_weight(category: &str) -> i64 {
     match category {
         "hacker" => 3,
-        "advanced" => 2,
+        // FRAMEWORKS is ADVANCED's shape — a brief, a whole program, hidden
+        // cases — with a crate in it, and untimed; it pays the same.
+        "advanced" | "frameworks" => 2,
         // `basic` and `verybasic` alike: one typed line is one typed line.
         _ => 1,
     }

@@ -1,0 +1,29 @@
+# A FRAMEWORKS quest that names no crates. The road exists because of the
+# crate shelf (SPEC §5.1); a quest here without `tests.crates` is an ADVANCED
+# quest filed on the wrong road — and would be judged by `rustc` alone, where
+# its `use serde` does not compile.
+pack = "rust.frameworks"
+land = "rust"
+category = "frameworks"
+version = 1
+
+[[quest]]
+id = "rust.frameworks.01.bare"
+node = 1
+title = "BARE"
+difficulty = 2
+story = "The terminals on Yee Wo Street post JSON."
+concepts = ["serialization", "structs"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = "Parse it."
+starter = '''fn main() {}
+'''
+solution = '''fn main() { println!("1"); }
+'''
+hints = ["one", "two"]
+[quest.tests]
+harness = "stdio"
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "one", stdin = "", expect = "1\n", visible = true } ]

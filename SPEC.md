@@ -50,7 +50,14 @@ Skynet's plan all along — and takes it back one street at a time.
   ownership, errors, traits, iterators — then threads, mutexes, lifetimes,
   channels), `hacker` (HackerRank-style timed quests). A land may have fewer
   than four: the clients draw the roads `world.lands` reports, and REMIX
-  LAND has the two grammar roads only, `verybasic` and `basic`.
+  LAND has the two grammar roads only, `verybasic` and `basic`. RUST LAND
+  has a fifth, `frameworks` — the job after the interview: ADVANCED's shape
+  with a dependency in it, one or two crates per node (anyhow, thiserror,
+  serde, clap, regex, chrono, itertools, rayon, crossbeam, tokio, …),
+  untimed, built by cargo against the pinned **crate shelf** (§5.1) rather
+  than by `rustc` alone. It is Rust's alone because the shelf is a cargo
+  shelf; no other land has one. The order the roads are walked is
+  `verybasic`, `basic`, `advanced`, `hacker`, `frameworks`.
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
 * A node holds one **quest**. A quest is code the player writes, that the server
@@ -268,7 +275,7 @@ CREATE TABLE quests (
   id            TEXT PRIMARY KEY,          -- 'rust.basic.03.shadowing' (§4.1)
   pack          TEXT NOT NULL,             -- content pack that supplied it
   land          TEXT NOT NULL CHECK (land IN ('rust','go')),
-  category      TEXT NOT NULL CHECK (category IN ('verybasic','basic','advanced','hacker')),
+  category      TEXT NOT NULL CHECK (category IN ('verybasic','basic','advanced','hacker','frameworks')),
   node          INTEGER NOT NULL,          -- position on the map, 1-based
   title         TEXT NOT NULL,
   brief         TEXT NOT NULL,             -- markdown shown in the quest panel
@@ -689,10 +696,46 @@ One attempt, one directory under `~/.causewaybayhacker/build/<lang>/<attempt_id>
 rustc --edition 2021 -O --error-format=json main.rs -o prog
 ```
 
-A quest that needs `cargo` (dependencies, `#[test]`) sets `harness: "cargo"` in
-its test spec and gets a minimal generated `Cargo.toml`; `CARGO_HOME` and
+A quest that needs `cargo` for `#[test]` sets `harness: "cargo"` in its test
+spec and gets a minimal generated `Cargo.toml`; `CARGO_HOME` and
 `CARGO_TARGET_DIR` point into `build/rust/` so the first run is the slow one and
 the rest are not.
+
+A quest that needs **crates** — the FRAMEWORKS road (§0) — stays a stdio quest
+and names them in its test spec, `crates: ["serde", "serde_json"]` (§5.2). It
+is then built by
+
+```
+cargo build --release --offline --message-format=json
+```
+
+in a generated package whose `[dependencies]` table is the **whole crate
+shelf**, `backend/runner/shelf/Cargo.toml`, with the shelf's `Cargo.lock`
+copied beside it, and the binary is judged exactly as a `rustc` one is. The
+shelf is the closed list of crates a quest may `use`, one pinned version and
+one feature set each; a `crates` name that is not on it is refused when the
+spec is parsed. Every crate quest depends on the whole shelf rather than the
+subset it names because cargo unifies features per build: two subsets could
+resolve `tokio` or `serde` differently and miss the warm artifacts, and a
+cold `tokio` inside the compile budget is a `timeout` on a correct answer.
+
+The playground (PROTOCOL §4.9c) takes the shelf too: a Rust scratchpad run on
+a machine whose shelf is warm is a crate build against the whole shelf, so
+`use serde` works there with nothing declared; cold, it stays plain `rustc`
+rather than refusing, because a pad that cannot run `fn main` is worse than
+one that cannot `use tokio`.
+
+The shelf is built once per machine by **`cwbhacker warm`** — `cargo fetch`
+and `cargo build --release` of the shelf package into `build/rust/`, the one
+step with the network on — which then writes `build/rust/shelf.ok` holding the
+sha256 of the two shelf files. `unsupported("rust", spec, build_dir)` reads it
+back and **refuses a crate quest** while it is missing or holds another
+digest (the server was rebuilt from a newer shelf, or `prune --builds` ran),
+before an attempt row exists and with the command in the message; `doctor`
+prints the same state. The content gate (`tests/content/verify_pack.py`)
+warms a cache of its own the same way. Adding a crate is a line in the shelf
+manifest, `cargo generate-lockfile` there, a note in `docs/decisions.md`, and
+`cwbhacker warm` wherever the server runs.
 
 **Go**
 
@@ -936,6 +979,7 @@ rust-only / go-only; `unsupported()` returns a message for any other pairing.
 ```json
 {
   "harness": "stdio",            // "stdio" | "cargo" | "gotest" — cargo is rust-only, gotest go-only; cpp, python, pytorch, typescript, zig and lua are stdio-only
+  "crates": ["serde", "serde_json"],   // rust only, optional: names on the crate shelf (§5.1); non-empty means cargo against the shelf
   "timeout_ms": 5000,
   "compile_timeout_ms": 30000,
   "max_stdout_bytes": 262144,
@@ -952,6 +996,10 @@ rust-only / go-only; `unsupported()` returns a message for any other pairing.
 * `match: "trim"` strips trailing whitespace per line and at the end. This is
   the default because "your answer is right but has a trailing newline" is not
   a lesson worth teaching.
+* `crates` is what the quest is *about*, checked against the shelf; it does
+  not change what is compiled (every crate quest builds against the whole
+  shelf, §5.1). The default `compile_timeout_ms` for a stdio quest with crates
+  is 60 s, as for the `cargo` harness, because it is one.
 
 ### 5.3 Limits, and what this is not
 
@@ -1404,7 +1452,7 @@ frontend/           vite + ts + three.js
   src/wallet/       bip39/bip32/secp256k1 derivation and signing
   public/art/       sprites, backgrounds, manifest.json
 content/            quest packs (TOML), one file per land+category
-  rust/{basic,advanced,hacker}.toml
+  rust/{verybasic,basic,advanced,hacker,frameworks}.toml   frameworks: the crates road, rust only
   go/{basic,advanced,hacker}.toml
   cpp/{basic,advanced,hacker}.toml
   python/{basic,advanced,hacker}.toml
@@ -1413,6 +1461,7 @@ content/            quest packs (TOML), one file per land+category
   zig/{verybasic,basic,advanced,hacker}.toml
   lua/{verybasic,basic,advanced,hacker}.toml
   i18n/<locale>/<land>.<category>.toml   translations of the packs above (§12.1)
+backend/runner/shelf/   the crate shelf: Cargo.toml + Cargo.lock every FRAMEWORKS quest builds against (§5.1)
 docs/               decisions.md, story.md, art.md
 tests/vectors/      shared fixtures: addresses, signatures, mistake sources (five
                     compilers; pytorch shares python's)
@@ -1540,6 +1589,11 @@ Rules:
   blind about the output format. No `expect` may be empty once its `match`
   normalisation is applied — an empty expectation is cleared by an empty
   `fn main() {}`, which clears the map for free.
+* `tests.crates` names the crates a quest is about (§5.2), each on the shelf.
+  A `frameworks` quest must carry at least one — the importer refuses one
+  without, because without the key it would be judged by `rustc` alone and
+  its `use serde` would not compile — and only a Rust quest may carry any.
+  The `frameworks` category is accepted for `land = "rust"` only.
 * `time_limit_s` is a **quest-level** key, set on `hacker` quests and omitted
   elsewhere. It is the player's clock, and is not `tests.timeout_ms`, which is
   one run's wall clock — a quest can give you twenty minutes to write something

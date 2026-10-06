@@ -1,0 +1,30 @@
+# A quest naming a crate the shelf does not carry. The shelf
+# (backend/runner/shelf/Cargo.toml) is the closed list; a name off it would
+# be an `--offline` miss forty seconds into the build, so it is refused at
+# parse — by the runner, and by the gate before that.
+pack = "rust.frameworks"
+land = "rust"
+category = "frameworks"
+version = 1
+
+[[quest]]
+id = "rust.frameworks.01.fetch"
+node = 1
+title = "FETCH"
+difficulty = 2
+story = "The settlement reader wants the internet."
+concepts = ["serialization", "io"]
+requires = []
+map = { x = 0.1, y = 0.1, kind = "quest" }
+brief = "Fetch it."
+starter = '''fn main() {}
+'''
+solution = '''fn main() { println!("1"); }
+'''
+hints = ["one", "two"]
+[quest.tests]
+harness = "stdio"
+crates = ["serde", "diesel"]
+timeout_ms = 5000
+match = "trim"
+cases = [ { name = "one", stdin = "", expect = "1\n", visible = true } ]

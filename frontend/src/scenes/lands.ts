@@ -24,6 +24,7 @@ import {
 import { seconds, Tween } from "../engine/motion";
 import {
   LANDS,
+  roadsOf,
   type Category,
   type CategorySummary,
   type Land,
@@ -324,6 +325,7 @@ const CAT_LINE: Record<Category, () => string> = {
   basic: () => t("lands.basicBlurb"),
   advanced: () => t("lands.advancedBlurb"),
   hacker: () => t("lands.hackerBlurb"),
+  frameworks: () => t("lands.frameworksBlurb"),
 };
 
 /**
@@ -1074,8 +1076,10 @@ export class LandsScene implements Scene {
     arriving(g, f, "right", this.rightIn, () => {
       const row = this.lands.find((l) => l.land === this.land);
       // A fixed order, not the server's. `world.lands` does not promise one, and
-      // a map whose rows move between sessions is a map you cannot learn.
-      const ORDER: Category[] = ["verybasic", "basic", "advanced", "hacker"];
+      // a map whose rows move between sessions is a map you cannot learn. The
+      // rows are the roads this land has (SPEC §0): a fifth one on RUST, two
+      // on REMIX, four everywhere else.
+      const ORDER = roadsOf(this.land);
       const cats: CategorySummary[] = row
         ? ORDER.map((c) => row.categories.find((x) => x.category === c)).filter(
             (c): c is CategorySummary => c !== undefined,

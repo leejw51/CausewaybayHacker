@@ -123,12 +123,12 @@ func TestAddsZero(t *testing.T) {
 fn the_gate_is_open_for_gotest() {
     let s = gotest(serde_json::json!([{ "name": "TestAddsTwoNumbers", "visible": true }]));
     assert_eq!(
-        cwbhacker_runner::unsupported("go", &s),
+        cwbhacker_runner::unsupported("go", &s, std::path::Path::new("")),
         None,
         "the gotest harness is built; the gate must be open"
     );
     // …and is still not a Rust harness.
-    assert!(cwbhacker_runner::unsupported("rust", &s).is_some());
+    assert!(cwbhacker_runner::unsupported("rust", &s, std::path::Path::new("")).is_some());
 }
 
 #[test]

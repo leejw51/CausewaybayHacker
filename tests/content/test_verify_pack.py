@@ -74,6 +74,39 @@ class QuizRules(unittest.TestCase):
         self.assertTrue(any("only verybasic" in e for e in errs), errs)
 
 
+class FrameworksRoad(unittest.TestCase):
+    def test_a_frameworks_quest_names_its_crates(self):
+        errs = structural("frameworks-no-crates.toml")
+        self.assertTrue(any("names the crates" in e for e in errs), errs)
+
+    def test_a_crate_off_the_shelf_is_refused(self):
+        errs = structural("crates-off-shelf.toml")
+        self.assertTrue(any("'diesel' is not on the shelf" in e for e in errs), errs)
+        # …and the same quest with shelf crates passes the crate rules.
+        errs = structural("crates-off-shelf.toml", tests={**tomllib.loads(
+            (FIX / "crates-off-shelf.toml").read_text())["quest"][0]["tests"],
+            "crates": ["serde", "serde_json"]})
+        self.assertEqual([e for e in errs if "crate" in e], [], errs)
+
+    def test_the_shelf_is_read_off_the_runner_manifest(self):
+        names = vp.shelf_names()
+        for crate in ("anyhow", "serde", "tokio", "clap"):
+            self.assertIn(crate, names)
+        self.assertEqual(len(vp.shelf_digest()), 64)
+
+    def test_the_road_is_rusts_alone(self):
+        pack = tomllib.loads((FIX / "frameworks-no-crates.toml").read_text())
+        pack["land"] = "go"
+        pack["pack"] = "go.frameworks"
+        pack["quest"][0]["id"] = "go.frameworks.01.bare"
+        pack["quest"][0]["tests"]["crates"] = ["serde"]
+        fake = HERE.parent.parent / "content" / "go" / "frameworks.toml"
+        vocab, _ = vp.load_vocab()
+        errs, _ = vp.structural(pack, fake, vocab)
+        self.assertTrue(any("rust's alone" in e for e in errs), errs)
+        self.assertTrue(any("the shelf is rust's" in e for e in errs), errs)
+
+
 class ShortnessGate(unittest.TestCase):
     def test_basic_allows_four_lines_and_verybasic_one(self):
         self.assertEqual(vp.MAX_ADDED["basic"], 4)

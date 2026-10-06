@@ -61,6 +61,15 @@ fn check_land(land: &str) {
     let tmp = tempfile::tempdir().unwrap();
     let mut broken = Vec::new();
     let mut checked = 0;
+    if land == "rust" {
+        // The FRAMEWORKS road builds against the crate shelf (SPEC §5.1),
+        // and this cache is fresh: warm it the way `cwbhacker warm` does,
+        // with the network, or every crate quest is refused as cold.
+        // `run` below points every submission's `cache_root` at `tmp/cache`.
+        let cache = tmp.path().join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        cwbhacker_runner::shelf::warm(&cache, &|_| {}).expect("the crate shelf warms");
+    }
 
     for entry in std::fs::read_dir(&root).unwrap() {
         let path = entry.unwrap().path();

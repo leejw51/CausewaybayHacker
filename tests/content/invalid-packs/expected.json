@@ -87,6 +87,20 @@
       "why": "The quiz is the answer on that road. A brief that shows the line, or a starter that carries it, makes the choice a formality — and a wrong choice that also passes makes it a lie (verify_pack swaps each wrong choice into the solution and judges it).",
       "detect": "the brief says `println!(\"hello, causewaybay\");` in prose",
       "note": "An authoring rule enforced by `tests/content/verify_pack.py` (structural: 'given away'); `tests/content/test_verify_pack.py` pins it."
+    },
+    {
+      "file": "frameworks-no-crates.toml",
+      "rule": "SPEC §12: a `frameworks` quest names at least one crate in `tests.crates`",
+      "why": "The road exists because of the crate shelf (SPEC §5.1). Without the key the quest is judged by `rustc` alone and its `use serde` does not compile; it is an ADVANCED quest filed on the wrong road.",
+      "detect": "category is frameworks and the test spec has no `crates`",
+      "note": "Refused by the importer (`content::validate`) and by `tests/content/verify_pack.py`."
+    },
+    {
+      "file": "crates-off-shelf.toml",
+      "rule": "SPEC §5.2: every name in `tests.crates` is on the shelf, backend/runner/shelf/Cargo.toml",
+      "why": "A crate off the shelf is an `--offline` miss forty seconds into the build, filed as the server's fault. Refused at parse instead, with the shelf's list in the message.",
+      "detect": "crates names `diesel`",
+      "note": "Refused by the runner's `TestSpec::parse` (so by a submit) and by `tests/content/verify_pack.py`; the importer checks only the key's shape, because the shelf lives in the runner crate."
     }
   ],
   "also_worth_refusing_but_not_fixtured_here": {

@@ -245,7 +245,13 @@ export class StatsScene implements Scene {
     if (parts.length < 2) return;
     const [land, category] = parts as [Land, Category];
     if (!isLand(land)) return;
-    if (category !== "basic" && category !== "advanced" && category !== "hacker") return;
+    if (
+      category !== "basic" &&
+      category !== "advanced" &&
+      category !== "hacker" &&
+      category !== "frameworks"
+    )
+      return;
     this.app.chip.select();
     void this.app.go(new QuestScene(this.app, land, category, questId), "forward");
   }

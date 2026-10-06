@@ -1,0 +1,3437 @@
+# RUST LAND — FRAMEWORKS. The job. The interview at HKU is over and Mei is
+# back on the payment path at the fintech off Gloucester Road, where nothing
+# is written from scratch and every file starts with `use`. This road is the
+# crates every Rust codebase on the street is built on — anyhow, thiserror,
+# serde, serde_json, toml, clap, regex, chrono, itertools, indexmap, rand,
+# rayon, parking_lot, crossbeam, tokio, futures, log — one or two per node,
+# each the way it is actually used: a brief, a whole program, hidden cases,
+# untimed. ADVANCED's shape with a dependency in it.
+#
+# Every quest here names `crates` in its test spec (SPEC §5.1, §5.2). That is
+# what sends it to cargo instead of `rustc`: it is built against the crate
+# shelf in `backend/runner/shelf/`, offline, with the shelf's lockfile — so
+# the versions are the pinned ones and the build is the warm one. A machine
+# that has not run `cwbhacker warm` refuses the road with that command in the
+# message rather than handing a correct answer a `timeout`.
+#
+# Every quest has a deterministic answer on purpose. Random numbers are
+# seeded, dates are parsed and never read off the clock, tasks are joined in
+# spawn order or their results sorted, and a timeout is a hundred times
+# longer than the thing it waits for. A quest whose output depends on the
+# scheduler is a quest that fails CI at random, and that is not a lesson.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+
+pack = "rust.frameworks"
+land = "rust"
+category = "frameworks"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "rust.frameworks.01.anyhow-context"
+node        = 1
+title       = "ONE QUESTION MARK"
+difficulty  = 2
+story       = "First morning back on the payment path. The settlement reader off Gloucester Road dies on line 3 of a 4,000-line file and says only 'invalid digit found in string'."
+concepts    = ["error-handling", "imports", "io"]
+requires    = []
+map          = { x = 0.134, y = 0.25, kind = "quest" }
+brief       = '''
+Read lines of `<ACCOUNT> <CENTS>` from standard input and print the total in
+cents, as `TOTAL <n>`.
+
+If a line is not two fields, or the cents will not parse as an `i64`, print
+one line instead and exit normally:
+
+```
+ERROR: line 3: invalid digit found in string
+```
+
+That is `anyhow`'s own rendering of an error with one layer of context:
+`format!("{:#}", err)` prints the context, a colon, and the cause. The
+context is `line <n>` (1-based). Nothing else is printed in the error case.
+
+```
+input:  A 100
+        B 250
+        C 7
+output: TOTAL 357
+```
+
+Use `anyhow::Result` as the return type of the function that does the work,
+`?` to propagate, and `.with_context(|| ...)` to say which line. The starter
+unwraps and panics, which prints a stack trace and exits with 101 — not a
+message anybody on the floor can read.
+'''
+starter     = '''
+use std::io::Read;
+
+fn total(input: &str) -> i64 {
+    let mut sum = 0;
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let _account = parts.next().unwrap();
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        sum += cents;
+    }
+    sum
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    println!("TOTAL {}", total(&input));
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use anyhow::{anyhow, Context, Result};
+
+fn total(input: &str) -> Result<i64> {
+    let mut sum = 0;
+    for (i, line) in input.lines().enumerate() {
+        let n = i + 1;
+        let mut parts = line.split_whitespace();
+        let _account = parts
+            .next()
+            .ok_or_else(|| anyhow!("empty line"))
+            .with_context(|| format!("line {n}"))?;
+        let cents: i64 = parts
+            .next()
+            .ok_or_else(|| anyhow!("missing amount"))
+            .with_context(|| format!("line {n}"))?
+            .parse()
+            .with_context(|| format!("line {n}"))?;
+        sum += cents;
+    }
+    Ok(sum)
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    match total(&input) {
+        Ok(sum) => println!("TOTAL {sum}"),
+        Err(err) => println!("ERROR: {err:#}"),
+    }
+}
+'''
+hints = [
+  "`use anyhow::{Context, Result};` — `Result<T>` is `Result<T, anyhow::Error>`, and `?` converts any `std::error::Error` into it.",
+  "`.with_context(|| format!(\"line {n}\"))` works on a `Result` *and* on an `Option` (the `Option` becomes an error with that message). Attach it before the `?`.",
+  "`{:#}` on an `anyhow::Error` prints `context: cause` on one line; plain `{}` prints the outermost context only.",
+  "A missing field is `None`, not a parse error: turn it into an error with `.ok_or_else(|| anyhow!(\"missing amount\"))` and give it the same `line n` context.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["anyhow"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-lines", stdin = "A 100\nB 250\nC 7\n", expect = "TOTAL 357\n", visible = true },
+  { name = "bad-digit", stdin = "A 100\nB 250\nC 7x\nD 1\n", expect = "ERROR: line 3: invalid digit found in string\n", visible = true },
+  { name = "missing-amount", stdin = "A 100\nB\n", expect = "ERROR: line 2: missing amount\n", visible = false },
+  { name = "negative-and-empty-input", stdin = "A -40\nB 40\n", expect = "TOTAL 0\n", visible = false },
+  { name = "first-line-bad", stdin = "A ten\n", expect = "ERROR: line 1: invalid digit found in string\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "rust.frameworks.02.thiserror-enum"
+node        = 2
+title       = "AN ERROR WITH A NAME"
+difficulty  = 2
+story       = "The transfer service answers every refusal with the same string, 'bad transfer', and the support desk two floors up has started phoning the engineers to ask which kind."
+concepts    = ["error-handling", "enums", "traits"]
+requires    = ["rust.frameworks.01.anyhow-context"]
+map          = { x = 0.267, y = 0.139, kind = "quest" }
+brief       = '''
+Two accounts, `A` and `B`, start with the balances on line one. Then `n` on
+line two, then `n` transfers `<FROM> <TO> <CENTS>`.
+
+Apply them in order. For each print `OK <FROM> <TO> <CENTS>`, or the error —
+and the errors are a `thiserror` enum with three variants, whose `Display`
+is exactly:
+
+* `unknown account X` — `FROM` or `TO` is not `A` or `B` (check `FROM` first)
+* `insufficient funds in A: need 300, have 100`
+* `nothing to move` — the amount is zero or negative
+
+After the transfers print `A <balance>` and `B <balance>`.
+
+```
+input:  100 100
+        3
+        A B 30
+        B C 5
+        A B 300
+output: OK A B 30
+        unknown account C
+        insufficient funds in A: need 300, have 70
+        A 70
+        B 130
+```
+
+Define the enum with `#[derive(Debug, thiserror::Error)]` and put each
+message in its `#[error("...")]` attribute, with the fields interpolated —
+`{0}` for a tuple variant, `{need}` for a named field. `transfer` returns
+`Result<(), TransferError>`, and `main` prints with `{}`. The starter has the
+logic and prints `bad transfer` for everything.
+'''
+starter     = '''
+use std::io::Read;
+
+fn transfer(a: &mut i64, b: &mut i64, from: &str, to: &str, cents: i64) -> Result<(), String> {
+    if cents <= 0 {
+        return Err("bad transfer".to_string());
+    }
+    let (src, dst) = match (from, to) {
+        ("A", "B") => (a, b),
+        ("B", "A") => (b, a),
+        _ => return Err("bad transfer".to_string()),
+    };
+    if *src < cents {
+        return Err("bad transfer".to_string());
+    }
+    *src -= cents;
+    *dst += cents;
+    Ok(())
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut first = lines.next().unwrap().split_whitespace();
+    let mut a: i64 = first.next().unwrap().parse().unwrap();
+    let mut b: i64 = first.next().unwrap().parse().unwrap();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let from = parts.next().unwrap();
+        let to = parts.next().unwrap();
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        match transfer(&mut a, &mut b, from, to, cents) {
+            Ok(()) => println!("OK {from} {to} {cents}"),
+            Err(e) => println!("{e}"),
+        }
+    }
+    println!("A {a}");
+    println!("B {b}");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+enum TransferError {
+    #[error("unknown account {0}")]
+    UnknownAccount(String),
+    #[error("insufficient funds in {account}: need {need}, have {have}")]
+    Insufficient { account: String, need: i64, have: i64 },
+    #[error("nothing to move")]
+    NothingToMove,
+}
+
+fn transfer(a: &mut i64, b: &mut i64, from: &str, to: &str, cents: i64) -> Result<(), TransferError> {
+    for name in [from, to] {
+        if name != "A" && name != "B" {
+            return Err(TransferError::UnknownAccount(name.to_string()));
+        }
+    }
+    if cents <= 0 {
+        return Err(TransferError::NothingToMove);
+    }
+    let (src, dst) = if from == "A" { (a, b) } else { (b, a) };
+    if *src < cents {
+        return Err(TransferError::Insufficient {
+            account: from.to_string(),
+            need: cents,
+            have: *src,
+        });
+    }
+    *src -= cents;
+    *dst += cents;
+    Ok(())
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let mut first = lines.next().unwrap().split_whitespace();
+    let mut a: i64 = first.next().unwrap().parse().unwrap();
+    let mut b: i64 = first.next().unwrap().parse().unwrap();
+    let n: usize = lines.next().unwrap().trim().parse().unwrap();
+    for _ in 0..n {
+        let line = lines.next().unwrap();
+        let mut parts = line.split_whitespace();
+        let from = parts.next().unwrap();
+        let to = parts.next().unwrap();
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        match transfer(&mut a, &mut b, from, to, cents) {
+            Ok(()) => println!("OK {from} {to} {cents}"),
+            Err(e) => println!("{e}"),
+        }
+    }
+    println!("A {a}");
+    println!("B {b}");
+}
+'''
+hints = [
+  "`#[derive(Debug, thiserror::Error)]` on an enum, and `#[error(\"...\")]` on each variant, is the whole of `impl Display` and `impl std::error::Error`.",
+  "`{0}` in the attribute is the first field of a tuple variant; `{need}` and `{have}` are named fields of a struct variant.",
+  "Check the two account names before the amount, and `FROM` before `TO`: the hidden cases send `C B 0`, and the brief says which error wins.",
+  "The signature changes to `Result<(), TransferError>`; `println!(\"{e}\")` in `main` then prints the attribute's text.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["thiserror"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-kinds", stdin = "100 100\n3\nA B 30\nB C 5\nA B 300\n", expect = "OK A B 30\nunknown account C\ninsufficient funds in A: need 300, have 70\nA 70\nB 130\n", visible = true },
+  { name = "nothing-to-move", stdin = "50 50\n2\nA B 0\nB A -3\n", expect = "nothing to move\nnothing to move\nA 50\nB 50\n", visible = false },
+  { name = "account-before-amount", stdin = "50 50\n2\nC B 0\nA Z 10\n", expect = "unknown account C\nunknown account Z\nA 50\nB 50\n", visible = false },
+  { name = "exact-balance", stdin = "10 0\n2\nA B 10\nA B 1\n", expect = "OK A B 10\ninsufficient funds in A: need 1, have 0\nA 0\nB 10\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "rust.frameworks.03.serde-derive"
+node        = 3
+title       = "THE SHAPE OF THE WIRE"
+difficulty  = 2
+story       = "The card terminals on Yee Wo Street post their orders as JSON. The old reader found the amounts by counting commas, and a merchant with a comma in its name has been getting paid in the wrong column."
+concepts    = ["serialization", "structs", "imports"]
+requires    = ["rust.frameworks.02.thiserror-enum"]
+map          = { x = 0.423, y = 0.242, kind = "quest" }
+brief       = '''
+Standard input is one JSON array of orders. Each order is an object with
+`"id"` (a number), `"merchant"` (a string) and `"cents"` (a number).
+
+Print one line per order, in the order they came, `<id> <merchant> <cents>`,
+then `TOTAL <sum of cents>`.
+
+```
+input:  [{"id": 1, "merchant": "Lucky Mac", "cents": 3800},
+         {"id": 2, "merchant": "Tsui Wah, Causeway Bay", "cents": 12500}]
+output: 1 Lucky Mac 3800
+        2 Tsui Wah, Causeway Bay 12500
+        TOTAL 16300
+```
+
+Define `struct Order` with those three fields, `#[derive(Deserialize)]` it,
+and let `serde_json::from_str::<Vec<Order>>` do the reading. The starter
+splits on commas. Objects may have their keys in any order and any amount of
+whitespace, and a string may contain a comma — that is the point.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut total = 0i64;
+    for item in input.split('}') {
+        let item = item.trim().trim_start_matches(['[', ',']).trim().trim_start_matches('{');
+        if item.is_empty() || item == "]" {
+            continue;
+        }
+        let mut id = String::new();
+        let mut merchant = String::new();
+        let mut cents = 0i64;
+        for field in item.split(',') {
+            let (key, value) = field.split_once(':').unwrap();
+            let value = value.trim().trim_matches('"');
+            match key.trim().trim_matches('"') {
+                "id" => id = value.to_string(),
+                "merchant" => merchant = value.to_string(),
+                "cents" => cents = value.parse().unwrap_or(0),
+                _ => {}
+            }
+        }
+        total += cents;
+        println!("{id} {merchant} {cents}");
+    }
+    println!("TOTAL {total}");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct Order {
+    id: u64,
+    merchant: String,
+    cents: i64,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let orders: Vec<Order> = serde_json::from_str(&input).expect("orders are JSON");
+    let mut total = 0i64;
+    for order in &orders {
+        total += order.cents;
+        println!("{} {} {}", order.id, order.merchant, order.cents);
+    }
+    println!("TOTAL {total}");
+}
+'''
+hints = [
+  "`use serde::Deserialize;` and `#[derive(Deserialize)]` on the struct — the field names are the JSON keys, and the types say what each must be.",
+  "`let orders: Vec<Order> = serde_json::from_str(&input)?;` — the type on the left is what tells serde what to build.",
+  "Key order and whitespace are JSON's business, not yours; serde reads any object with those three keys. Printing is the same loop as before.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["serde", "serde_json"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-orders", stdin = "[{\"id\": 1, \"merchant\": \"Lucky Mac\", \"cents\": 3800},\n {\"id\": 2, \"merchant\": \"Tsui Wah, Causeway Bay\", \"cents\": 12500}]\n", expect = "1 Lucky Mac 3800\n2 Tsui Wah, Causeway Bay 12500\nTOTAL 16300\n", visible = true },
+  { name = "keys-in-any-order", stdin = "[{\"cents\":500,\"merchant\":\"Sogo\",\"id\":9},{\"merchant\":\"Hysan Place\",\"id\":10,\"cents\":1}]", expect = "9 Sogo 500\n10 Hysan Place 1\nTOTAL 501\n", visible = false },
+  { name = "empty-array", stdin = "[]\n", expect = "TOTAL 0\n", visible = false },
+  { name = "one-order-much-whitespace", stdin = "[\n  {\n    \"id\" : 7 ,\n    \"merchant\" : \"Times Square\" ,\n    \"cents\" : 250\n  }\n]\n", expect = "7 Times Square 250\nTOTAL 250\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "rust.frameworks.04.serde-attributes"
+node        = 4
+title       = "WHAT THE BANK READS"
+difficulty  = 3
+story       = "The bank bounces the Yee Wo Street settlement file twice a week: every card that was never authorised goes out as `\"authCode\":null`, and the one terminal that posts no fee stops the reader before the file is written at all."
+concepts    = ["serialization", "structs", "zero-values"]
+requires    = ["rust.frameworks.03.serde-derive"]
+map          = { x = 0.568, y = 0.131, kind = "quest" }
+brief       = '''
+Standard input is one JSON array of settlement records from the terminals.
+Each record has `"terminalId"` (string), `"merchant"` (string),
+`"amountCents"` (number), and may or may not have `"feeCents"` (number) and
+`"authCode"` (string). Keys may come in any order.
+
+Print one line per record, in input order: the record as the bank wants it,
+compact JSON from `serde_json::to_string`, keys in this order and spelled
+exactly so — `terminalId`, `merchant`, `amountCents`, `feeCents`, `authCode`.
+A missing `feeCents` is written as `0`; a missing `authCode` is **left out**,
+never written as `null`. Then `NET <sum of amountCents minus feeCents>`.
+
+```
+input:  [{"terminalId": "YW-07", "merchant": "Lucky Mac", "amountCents": 3800, "feeCents": 40, "authCode": "A1B2"},
+         {"terminalId": "PS-02", "merchant": "Tsui Wah", "amountCents": 12500}]
+output: {"terminalId":"YW-07","merchant":"Lucky Mac","amountCents":3800,"feeCents":40,"authCode":"A1B2"}
+        {"terminalId":"PS-02","merchant":"Tsui Wah","amountCents":12500,"feeCents":0}
+        NET 16260
+```
+
+One struct does both directions: `#[derive(Serialize, Deserialize)]` with
+snake_case fields, `#[serde(rename_all = "camelCase")]` on the struct,
+`#[serde(default)]` on `fee_cents`, and `auth_code: Option<String>` with
+`#[serde(skip_serializing_if = "Option::is_none")]`. `to_string` writes the
+fields in the order the struct declares them, so the output is exact. The
+starter renames every field by hand, cannot read a record without a fee, and
+writes `null`.
+'''
+starter     = '''
+use std::io::Read;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Settlement {
+    #[serde(rename = "terminalId")]
+    terminal_id: String,
+    merchant: String,
+    #[serde(rename = "amountCents")]
+    amount_cents: i64,
+    #[serde(rename = "feeCents")]
+    fee_cents: i64,
+    #[serde(rename = "authCode")]
+    auth_code: Option<String>,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let records: Vec<Settlement> = serde_json::from_str(&input).expect("records are JSON");
+    let mut net = 0i64;
+    for record in &records {
+        net += record.amount_cents - record.fee_cents;
+        println!("{}", serde_json::to_string(record).unwrap());
+    }
+    println!("NET {net}");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Settlement {
+    terminal_id: String,
+    merchant: String,
+    amount_cents: i64,
+    #[serde(default)]
+    fee_cents: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    auth_code: Option<String>,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let records: Vec<Settlement> = serde_json::from_str(&input).expect("records are JSON");
+    let mut net = 0i64;
+    for record in &records {
+        net += record.amount_cents - record.fee_cents;
+        println!("{}", serde_json::to_string(record).unwrap());
+    }
+    println!("NET {net}");
+}
+'''
+hints = [
+  "`use serde::{Deserialize, Serialize};` — one struct, both derives. `#[serde(rename_all = \"camelCase\")]` on the struct replaces every per-field `rename`.",
+  "`#[serde(default)]` on `fee_cents: i64` fills a missing key with `i64::default()`, which is `0`. Without it a record with no fee is a deserialize error.",
+  "An `Option<String>` already reads a missing key as `None`; it is the *writing* that needs `#[serde(skip_serializing_if = \"Option::is_none\")]`, or it serializes as `null`.",
+  "`serde_json::to_string(record)` gives compact JSON with the struct's field order; `println!` it, one record per line.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["serde", "serde_json"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "fee-and-code-sometimes", stdin = "[{\"terminalId\": \"YW-07\", \"merchant\": \"Lucky Mac\", \"amountCents\": 3800, \"feeCents\": 40, \"authCode\": \"A1B2\"},\n {\"terminalId\": \"PS-02\", \"merchant\": \"Tsui Wah\", \"amountCents\": 12500}]\n", expect = "{\"terminalId\":\"YW-07\",\"merchant\":\"Lucky Mac\",\"amountCents\":3800,\"feeCents\":40,\"authCode\":\"A1B2\"}\n{\"terminalId\":\"PS-02\",\"merchant\":\"Tsui Wah\",\"amountCents\":12500,\"feeCents\":0}\nNET 16260\n", visible = true },
+  { name = "everything-present", stdin = "[{\"terminalId\": \"HP-01\", \"merchant\": \"Hysan Place\", \"amountCents\": 900, \"feeCents\": 9, \"authCode\": \"Z9\"}]\n", expect = "{\"terminalId\":\"HP-01\",\"merchant\":\"Hysan Place\",\"amountCents\":900,\"feeCents\":9,\"authCode\":\"Z9\"}\nNET 891\n", visible = false },
+  { name = "no-code-no-fee-keys-shuffled", stdin = "[{\"amountCents\": 250, \"terminalId\": \"TS-03\", \"merchant\": \"Times Square\"},\n {\"merchant\": \"SOGO\", \"feeCents\": 5, \"amountCents\": 1000, \"terminalId\": \"SG-01\"}]\n", expect = "{\"terminalId\":\"TS-03\",\"merchant\":\"Times Square\",\"amountCents\":250,\"feeCents\":0}\n{\"terminalId\":\"SG-01\",\"merchant\":\"SOGO\",\"amountCents\":1000,\"feeCents\":5}\nNET 1245\n", visible = false },
+  { name = "empty-batch", stdin = "[]\n", expect = "NET 0\n", visible = false },
+  { name = "comma-in-merchant", stdin = "[{\"terminalId\": \"YW-01\", \"merchant\": \"Tsui Wah, Causeway Bay\", \"amountCents\": 60, \"authCode\": \"Q1\"}]\n", expect = "{\"terminalId\":\"YW-01\",\"merchant\":\"Tsui Wah, Causeway Bay\",\"amountCents\":60,\"feeCents\":0,\"authCode\":\"Q1\"}\nNET 60\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "rust.frameworks.05.json-value-walk"
+node        = 5
+title       = "EVERY LEAF A LINE"
+difficulty  = 3
+story       = "A new terminal vendor on Percival Street posts a nested object nobody has written a struct for, and the support desk wants to see what is in it today, not after the struct."
+concepts    = ["serialization", "recursion", "pattern-matching", "enums"]
+requires    = ["rust.frameworks.04.serde-attributes"]
+map          = { x = 0.724, y = 0.233, kind = "quest" }
+brief       = '''
+Standard input is one JSON document whose top level is an object or an
+array. Print every leaf value as `<path> = <value>`, one per line.
+
+* An object's keys are visited in **sorted order** (byte order of the key —
+  which is how `serde_json::Value::Object` iterates); an array's elements in
+  index order.
+* The path is the keys joined with `.`, and `[i]` for an array index:
+  `terminal.id`, `orders[0].cents`, `[1][0]` for an array inside a root
+  array. Keys contain no dots or brackets.
+* A string prints without its quotes. A number, `true`, `false` and `null`
+  print as JSON writes them (`1.5` stays `1.5`, `null` is the word `null`).
+* An empty object or empty array has no leaves and prints nothing.
+
+```
+input:  {"batch": "2024-06-01", "terminal": {"id": "YW-07", "online": true},
+         "orders": [{"cents": 3800, "merchant": "Lucky Mac"}, {"cents": 250}], "note": null}
+output: batch = 2024-06-01
+        note = null
+        orders[0].cents = 3800
+        orders[0].merchant = Lucky Mac
+        orders[1].cents = 250
+        terminal.id = YW-07
+        terminal.online = true
+```
+
+Parse with `serde_json::from_str::<serde_json::Value>` and write a recursive
+`walk(path: &str, value: &Value)` that matches `Value::Object`,
+`Value::Array` and the rest. The starter walks the top level only and prints
+whatever it finds there, so a nested object comes out as one line of JSON
+and a root array is a panic.
+'''
+starter     = '''
+use std::io::Read;
+
+use serde_json::Value;
+
+fn show(value: &Value) -> String {
+    match value.as_str() {
+        Some(s) => s.to_string(),
+        None => value.to_string(),
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let doc: Value = serde_json::from_str(&input).expect("input is JSON");
+    let top = doc.as_object().expect("top level is an object");
+    for (key, value) in top {
+        println!("{key} = {}", show(value));
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use serde_json::Value;
+
+fn walk(path: &str, value: &Value) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                let next = if path.is_empty() { key.clone() } else { format!("{path}.{key}") };
+                walk(&next, child);
+            }
+        }
+        Value::Array(items) => {
+            for (i, child) in items.iter().enumerate() {
+                walk(&format!("{path}[{i}]"), child);
+            }
+        }
+        Value::String(s) => println!("{path} = {s}"),
+        other => println!("{path} = {other}"),
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let doc: Value = serde_json::from_str(&input).expect("input is JSON");
+    walk("", &doc);
+}
+'''
+hints = [
+  "`use serde_json::Value;` and `let doc: Value = serde_json::from_str(&input)?;` — `Value` is an enum: `Null`, `Bool`, `Number`, `String`, `Array(Vec<Value>)`, `Object(Map<String, Value>)`.",
+  "Recursion carries the path: `fn walk(path: &str, value: &Value)`. For an object, `for (key, child) in map` is already in sorted key order; for an array, `iter().enumerate()` gives the index.",
+  "The path grows one piece per level: `format!(\"{path}.{key}\")` unless `path` is empty (then just the key), and `format!(\"{path}[{i}]\")` for an index.",
+  "`Value::String(s) => println!(\"{path} = {s}\")` prints a string bare; `other => println!(\"{path} = {other}\")` uses `Value`'s own `Display`, which is compact JSON — `null`, `true`, `1.5`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["serde_json"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "nested-object-and-array", stdin = "{\"batch\": \"2024-06-01\", \"terminal\": {\"id\": \"YW-07\", \"online\": true},\n \"orders\": [{\"cents\": 3800, \"merchant\": \"Lucky Mac\"}, {\"cents\": 250}], \"note\": null}\n", expect = "batch = 2024-06-01\nnote = null\norders[0].cents = 3800\norders[0].merchant = Lucky Mac\norders[1].cents = 250\nterminal.id = YW-07\nterminal.online = true\n", visible = true },
+  { name = "flat-object-sorted", stdin = "{\"zeta\": 1, \"alpha\": \"a b\", \"Mid\": -1.5, \"ok\": false}\n", expect = "Mid = -1.5\nalpha = a b\nok = false\nzeta = 1\n", visible = false },
+  { name = "root-array-of-arrays", stdin = "[{\"a\": 1}, [2, 3], \"x\"]\n", expect = "[0].a = 1\n[1][0] = 2\n[1][1] = 3\n[2] = x\n", visible = false },
+  { name = "empty-containers-print-nothing", stdin = "{\"a\": {}, \"b\": [], \"c\": {\"d\": []}, \"e\": 1.0}\n", expect = "e = 1.0\n", visible = false },
+  { name = "deep", stdin = "{\"a\": {\"b\": {\"c\": [{\"d\": [true, null]}]}}}\n", expect = "a.b.c[0].d[0] = true\na.b.c[0].d[1] = null\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "rust.frameworks.06.toml-config"
+node        = 6
+title       = "THE SERVICE FILE"
+difficulty  = 3
+story       = "The settlement service on Gloucester Road indexes its config table by hand, and the second `[[upstream]]` overwrote the first; every settlement since Tuesday has gone to the fallback."
+concepts    = ["serialization", "structs", "zero-values", "error-handling"]
+requires    = ["rust.frameworks.05.json-value-walk"]
+map          = { x = 0.874, y = 0.123, kind = "quest" }
+brief       = '''
+Standard input is a service config in TOML:
+
+* top level: `name` (string, required), `port` (integer, default `8080`)
+* table `[limits]` (required): `max_cents` (integer, required), `retries`
+  (integer, default `3`)
+* array of tables `[[upstream]]`, zero or more, each with `name` and `url`
+  (strings, required) and `timeout_ms` (integer, default `1000`)
+
+Print the summary — one `SERVICE` line, one `LIMIT` line, then one
+`UPSTREAM` line per table in file order:
+
+```
+input:  name = 'settlement'
+        port = 9000
+
+        [limits]
+        max_cents = 500000
+
+        [[upstream]]
+        name = 'clearing'
+        url = 'https://clearing.example/settle'
+        timeout_ms = 2000
+
+        [[upstream]]
+        name = 'fallback'
+        url = 'https://fallback.example/settle'
+output: SERVICE settlement on port 9000
+        LIMIT 500000 cents, 3 retries
+        UPSTREAM clearing https://clearing.example/settle 2000 ms
+        UPSTREAM fallback https://fallback.example/settle 1000 ms
+```
+
+If the input is not valid TOML, or does not have that shape (a required key
+missing, a value of the wrong type), print exactly `ERROR: config rejected`
+as the only line and exit normally. Do not print toml's own message.
+
+Describe the shape as structs — `Config`, `Limits`, `Upstream` — each
+`#[derive(Deserialize)]`, the defaults with `#[serde(default)]` or
+`#[serde(default = "fn_name")]`, and read it with
+`toml::from_str::<Config>(&input)`, matching on the `Result`. The starter
+reads a `toml::Table` and indexes into it, which works for a complete file
+and panics on everything else.
+'''
+starter     = '''
+use std::io::Read;
+
+use toml::Table;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let cfg: Table = toml::from_str(&input).expect("config is TOML");
+    let name = cfg["name"].as_str().unwrap();
+    let port = cfg["port"].as_integer().unwrap();
+    println!("SERVICE {name} on port {port}");
+    let limits = cfg["limits"].as_table().unwrap();
+    let max_cents = limits["max_cents"].as_integer().unwrap();
+    let retries = limits["retries"].as_integer().unwrap();
+    println!("LIMIT {max_cents} cents, {retries} retries");
+    for up in cfg["upstream"].as_array().unwrap() {
+        let name = up["name"].as_str().unwrap();
+        let url = up["url"].as_str().unwrap();
+        let timeout_ms = up["timeout_ms"].as_integer().unwrap();
+        println!("UPSTREAM {name} {url} {timeout_ms} ms");
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    name: String,
+    #[serde(default = "default_port")]
+    port: u16,
+    limits: Limits,
+    #[serde(default)]
+    upstream: Vec<Upstream>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Limits {
+    max_cents: i64,
+    #[serde(default = "default_retries")]
+    retries: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct Upstream {
+    name: String,
+    url: String,
+    #[serde(default = "default_timeout_ms")]
+    timeout_ms: u64,
+}
+
+fn default_port() -> u16 {
+    8080
+}
+
+fn default_retries() -> u32 {
+    3
+}
+
+fn default_timeout_ms() -> u64 {
+    1000
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let cfg: Config = match toml::from_str(&input) {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            println!("ERROR: config rejected");
+            return;
+        }
+    };
+    println!("SERVICE {} on port {}", cfg.name, cfg.port);
+    println!("LIMIT {} cents, {} retries", cfg.limits.max_cents, cfg.limits.retries);
+    for up in &cfg.upstream {
+        println!("UPSTREAM {} {} {} ms", up.name, up.url, up.timeout_ms);
+    }
+}
+'''
+hints = [
+  "`use serde::Deserialize;` — toml is a serde format like serde_json, so `toml::from_str::<Config>(&input)` builds the same kind of derived struct. A `[table]` is a struct field; `[[array_of_tables]]` is a `Vec<Struct>` field.",
+  "A default that is not the type's `Default` is a function: `#[serde(default = \"default_port\")]` with `fn default_port() -> u16 { 8080 }`. Plain `#[serde(default)]` on the `Vec` makes a missing `[[upstream]]` an empty list.",
+  "`toml::from_str` returns `Result<Config, toml::de::Error>`; a missing required key, a wrong type and a syntax error all land in `Err`. Match on it and print your own line — never `{}` the error.",
+  "`match toml::from_str::<Config>(&input) { Ok(cfg) => cfg, Err(_) => { println!(\"ERROR: config rejected\"); return; } }`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["toml", "serde"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-upstreams-one-default", stdin = "name = 'settlement'\nport = 9000\n\n[limits]\nmax_cents = 500000\n\n[[upstream]]\nname = 'clearing'\nurl = 'https://clearing.example/settle'\ntimeout_ms = 2000\n\n[[upstream]]\nname = 'fallback'\nurl = 'https://fallback.example/settle'\n", expect = "SERVICE settlement on port 9000\nLIMIT 500000 cents, 3 retries\nUPSTREAM clearing https://clearing.example/settle 2000 ms\nUPSTREAM fallback https://fallback.example/settle 1000 ms\n", visible = true },
+  { name = "everything-given", stdin = "name = 'refunds'\nport = 8443\n[limits]\nmax_cents = 100\nretries = 7\n[[upstream]]\nname = 'clearing'\nurl = 'https://clearing.example/refund'\ntimeout_ms = 500\n", expect = "SERVICE refunds on port 8443\nLIMIT 100 cents, 7 retries\nUPSTREAM clearing https://clearing.example/refund 500 ms\n", visible = false },
+  { name = "all-defaults-no-upstream", stdin = "name = 'ledger'\n\n[limits]\nmax_cents = 1\n", expect = "SERVICE ledger on port 8080\nLIMIT 1 cents, 3 retries\n", visible = false },
+  { name = "not-toml", stdin = "name = 'ledger'\nport =\n[limits]\nmax_cents = 1\n", expect = "ERROR: config rejected\n", visible = false },
+  { name = "missing-required-key", stdin = "port = 8080\n[limits]\nmax_cents = 1\n", expect = "ERROR: config rejected\n", visible = false },
+  { name = "wrong-type", stdin = "name = 'ledger'\nport = 'eighty'\n[limits]\nmax_cents = 1\n", expect = "ERROR: config rejected\n", visible = false },
+  { name = "comments-and-dotted-key", stdin = "# the settlement box\nname = 'settlement' # on the 12th floor\nlimits.max_cents = 42\n", expect = "SERVICE settlement on port 8080\nLIMIT 42 cents, 3 retries\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "rust.frameworks.07.clap-derive"
+node        = 7
+title       = "ONE LINE OF FLAGS"
+difficulty  = 3
+story       = "The ops tool on the settlement box takes `--limit`, and somebody at the Gloucester Road desk typed `--limti 50`; the tool took that for the batch name and ran against all of them."
+concepts    = ["structs", "error-handling", "strings", "imports"]
+requires    = ["rust.frameworks.06.toml-config"]
+map          = { x = 0.867, y = 0.439, kind = "quest" }
+brief       = '''
+`settle` is a command-line tool with:
+
+* one required positional `BATCH` (a string)
+* `--limit <N>`, an unsigned integer, default `100`
+* `--dry-run`, a flag
+
+The harness passes no arguments, so the command lines come from standard
+input: each non-empty line is one command line, split on whitespace (the
+tool's own name is not on the line). For each, print one line:
+
+* on success, `batch=<BATCH> limit=<N> dry-run=<true|false>`
+* on failure, `ERROR: ` and the `Debug` form of clap's `ErrorKind` —
+  `ERROR: MissingRequiredArgument`, `ERROR: ValueValidation`,
+  `ERROR: UnknownArgument`, `ERROR: InvalidValue` (an option with no value
+  after it)
+
+```
+input:  2024-06-01 --limit 50
+        --dry-run 2024-06-02
+        2024-06-03 --limit ten
+output: batch=2024-06-01 limit=50 dry-run=false
+        batch=2024-06-02 limit=100 dry-run=true
+        ERROR: ValueValidation
+```
+
+Declare the interface as a struct with `#[derive(clap::Parser)]` —
+`#[arg(long, default_value_t = 100)]` and `#[arg(long)]` on a `bool` — and
+parse each line with
+`Cli::try_parse_from(std::iter::once("settle").chain(words))`. `Err(e)`
+carries `e.kind()`. Options may come before or after the positional, and
+`--limit=7` is the same as `--limit 7`. Do not send `--help`. The starter
+is a hand-rolled loop that accepts anything.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut batch = String::new();
+        let mut limit: u32 = 100;
+        let mut dry_run = false;
+        let mut words = line.split_whitespace();
+        while let Some(word) = words.next() {
+            match word {
+                "--dry-run" => dry_run = true,
+                "--limit" => limit = words.next().unwrap().parse().unwrap(),
+                _ => batch = word.to_string(),
+            }
+        }
+        println!("batch={batch} limit={limit} dry-run={dry_run}");
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use clap::Parser;
+
+#[derive(Debug, Parser)]
+#[command(name = "settle")]
+struct Cli {
+    /// The settlement batch to run.
+    batch: String,
+    /// Most records to settle in one run.
+    #[arg(long, default_value_t = 100)]
+    limit: u32,
+    /// Report what would be settled and move nothing.
+    #[arg(long)]
+    dry_run: bool,
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let words = line.split_whitespace();
+        match Cli::try_parse_from(std::iter::once("settle").chain(words)) {
+            Ok(cli) => println!(
+                "batch={} limit={} dry-run={}",
+                cli.batch, cli.limit, cli.dry_run
+            ),
+            Err(e) => println!("ERROR: {:?}", e.kind()),
+        }
+    }
+}
+'''
+hints = [
+  "`use clap::Parser;` and `#[derive(Parser)]` on a struct: a bare field is a positional, `#[arg(long)]` makes `--field-name`, and the field's type is the value parser — `u32` refuses `ten` for you.",
+  "`#[arg(long, default_value_t = 100)] limit: u32` is the default as a typed value; `#[arg(long)] dry_run: bool` is a flag, present or not, spelled `--dry-run` on the line.",
+  "`Cli::parse()` reads the real argv, which is empty here. `Cli::try_parse_from(iter)` takes any iterator of strings whose first item is the program name: `std::iter::once(\"settle\").chain(line.split_whitespace())`.",
+  "`Err(e) => println!(\"ERROR: {:?}\", e.kind())` — `ErrorKind` is a plain enum, and its `Debug` is the variant name.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["clap"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-good-one-bad-number", stdin = "2024-06-01 --limit 50\n--dry-run 2024-06-02\n2024-06-03 --limit ten\n", expect = "batch=2024-06-01 limit=50 dry-run=false\nbatch=2024-06-02 limit=100 dry-run=true\nERROR: ValueValidation\n", visible = true },
+  { name = "missing-batch", stdin = "--dry-run\n--limit 5\n", expect = "ERROR: MissingRequiredArgument\nERROR: MissingRequiredArgument\n", visible = false },
+  { name = "typo-and-extra", stdin = "b1 --limti 50\nb1 b2\nb1 --limit 50 --verbose\n", expect = "ERROR: UnknownArgument\nERROR: UnknownArgument\nERROR: UnknownArgument\n", visible = false },
+  { name = "equals-form-and-blank-lines", stdin = "\nb1 --limit=7 --dry-run\n\nb2\n", expect = "batch=b1 limit=7 dry-run=true\nbatch=b2 limit=100 dry-run=false\n", visible = false },
+  { name = "limit-not-a-whole-number", stdin = "b1 --limit 2.5\nb1 --limit\n", expect = "ERROR: ValueValidation\nERROR: InvalidValue\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "rust.frameworks.08.clap-subcommands"
+node        = 8
+title       = "THREE VERBS, ONE TOOL"
+difficulty  = 3
+story       = "The ops tool on the Gloucester Road settlement box grew `pay`, `refund` and `balance` as three if-branches off the first word; `refudn` fell through to the last branch and the desk read a balance where it expected a refusal."
+concepts    = ["enums", "pattern-matching", "error-handling", "imports"]
+requires    = ["rust.frameworks.07.clap-derive"]
+map          = { x = 0.723, y = 0.345, kind = "quest" }
+brief       = '''
+`till` is a command-line tool with three subcommands:
+
+* `pay <TO> <CENTS>` — `TO` a string, `CENTS` an unsigned integer; prints
+  `PAY <CENTS> to <TO>`
+* `refund <ID> [--reason <WORD>]` — prints `REFUND <ID>`, or
+  `REFUND <ID> because <WORD>` when a reason is given
+* `balance [ACCOUNT]` — `ACCOUNT` defaults to `main`; prints
+  `BALANCE <ACCOUNT>`
+
+As before, the harness passes no arguments: each non-empty line of standard
+input is one command line, split on whitespace, without the tool's name. One
+output line per command line. On failure print `ERROR: ` and the `Debug`
+form of clap's `ErrorKind`: an unknown first word is
+`ERROR: InvalidSubcommand`; a subcommand missing a positional is
+`ERROR: MissingRequiredArgument`; a `CENTS` that is not an integer is
+`ERROR: ValueValidation`; an option the subcommand does not have is
+`ERROR: UnknownArgument`.
+
+```
+input:  pay yw-07 3800
+        refund r-1041 --reason duplicate
+        balance
+        topup yw-07 100
+output: PAY 3800 to yw-07
+        REFUND r-1041 because duplicate
+        BALANCE main
+        ERROR: InvalidSubcommand
+```
+
+Use `#[derive(Parser)]` on a struct with one field marked
+`#[command(subcommand)]` whose type is an enum with
+`#[derive(Subcommand)]`; each variant's fields are that subcommand's
+arguments, and the variant name lowercased is the word on the line. Put
+`#[command(disable_help_subcommand = true)]` on the struct so `help` is not a
+fourth verb. Do not send `--help`. The starter matches on the first word and
+indexes the rest.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let words: Vec<&str> = line.split_whitespace().collect();
+        if words.is_empty() {
+            continue;
+        }
+        match words[0] {
+            "pay" => {
+                let cents: u64 = words[2].parse().unwrap();
+                println!("PAY {cents} to {}", words[1]);
+            }
+            "refund" => {
+                if words.len() >= 4 && words[2] == "--reason" {
+                    println!("REFUND {} because {}", words[1], words[3]);
+                } else {
+                    println!("REFUND {}", words[1]);
+                }
+            }
+            "balance" => {
+                let account = words.get(1).copied().unwrap_or("main");
+                println!("BALANCE {account}");
+            }
+            _ => println!("ERROR: InvalidSubcommand"),
+        }
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Debug, Parser)]
+#[command(name = "till", disable_help_subcommand = true)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Pay a merchant.
+    Pay { to: String, cents: u64 },
+    /// Reverse a settled payment.
+    Refund {
+        id: String,
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    /// Show an account's balance.
+    Balance {
+        #[arg(default_value = "main")]
+        account: String,
+    },
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let words = line.split_whitespace();
+        match Cli::try_parse_from(std::iter::once("till").chain(words)) {
+            Ok(cli) => match cli.command {
+                Command::Pay { to, cents } => println!("PAY {cents} to {to}"),
+                Command::Refund { id, reason: Some(why) } => println!("REFUND {id} because {why}"),
+                Command::Refund { id, reason: None } => println!("REFUND {id}"),
+                Command::Balance { account } => println!("BALANCE {account}"),
+            },
+            Err(e) => println!("ERROR: {:?}", e.kind()),
+        }
+    }
+}
+'''
+hints = [
+  "`use clap::{Parser, Subcommand};` — the struct gets one field `#[command(subcommand)] command: Command`, and `Command` is an enum with `#[derive(Subcommand)]`.",
+  "A struct-like variant `Pay { to: String, cents: i64 }` is a subcommand with two positionals; `#[arg(long)] reason: Option<String>` is an optional `--reason`; `#[arg(default_value = \"main\")] account: String` is an optional positional.",
+  "`#[command(name = \"till\", disable_help_subcommand = true)]` on the struct — otherwise clap adds a `help` subcommand of its own, and the line `help` prints `DisplayHelp` instead of `InvalidSubcommand`.",
+  "After `try_parse_from`, match on `cli.command`: `Command::Refund { id, reason: Some(why) } => ...` and `Command::Refund { id, reason: None } => ...` are two arms of one match.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["clap"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-verbs-and-a-typo", stdin = "pay yw-07 3800\nrefund r-1041 --reason duplicate\nbalance\ntopup yw-07 100\n", expect = "PAY 3800 to yw-07\nREFUND r-1041 because duplicate\nBALANCE main\nERROR: InvalidSubcommand\n", visible = true },
+  { name = "missing-positionals", stdin = "pay yw-07\npay\nrefund\n", expect = "ERROR: MissingRequiredArgument\nERROR: MissingRequiredArgument\nERROR: MissingRequiredArgument\n", visible = false },
+  { name = "cents-not-a-number", stdin = "pay yw-07 ten\npay yw-07 3.5\npay yw-07 0\n", expect = "ERROR: ValueValidation\nERROR: ValueValidation\nPAY 0 to yw-07\n", visible = false },
+  { name = "option-the-verb-lacks", stdin = "refund r-7 --why lost\nbalance ps-02 --reason x\nrefund r-7\n", expect = "ERROR: UnknownArgument\nERROR: UnknownArgument\nREFUND r-7\n", visible = false },
+  { name = "help-is-not-a-verb", stdin = "help\nbalance ps-02\n\nrefudn r-1\n", expect = "ERROR: InvalidSubcommand\nBALANCE ps-02\nERROR: InvalidSubcommand\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.frameworks.09.regex-captures"
+node        = 9
+title       = "THE DOLLARS IN PROSE"
+difficulty  = 3
+story       = "The support desk pastes customer emails into refund tickets and the amounts sit in the prose. The scanner that pulls them out stops at the first comma, so a customer charged HK$1,234.50 at SOGO has been offered a dollar back."
+concepts    = ["strings", "iteration", "types"]
+requires    = ["rust.frameworks.08.clap-subcommands"]
+map          = { x = 0.58, y = 0.45, kind = "quest" }
+brief       = '''
+Standard input is free text, one ticket line per line. Find every Hong Kong
+dollar amount in it. An amount is `HK$` followed directly by a whole-dollar
+part and an optional cents part:
+
+* whole dollars: either plain digits (`80`, `1234`) or digits grouped in
+  threes with commas (`1,234`, `12,345,678` — one to three digits, then one
+  or more `,ddd` groups);
+* cents: a `.` and exactly two digits (`.50`). A `.` with no two digits after
+  it is not part of the amount (`HK$38.` is 38 dollars).
+
+Anything else — `US$9.99`, a bare `HK$` — is not an amount.
+
+For every amount, in reading order, print `<line> <text> <cents>`: the
+1-based line number, the amount exactly as it appeared in the text, and its
+value in cents as an integer. After the last line print `TOTAL <cents>`.
+A ticket with no amounts prints only the total; empty input prints `TOTAL 0`.
+
+```
+input:  Charged HK$1,234.50 twice at SOGO; the second HK$1,234.50 is a duplicate.
+        Refund HK$80 and the HK$12.05 fee. The US$9.99 line is not ours.
+output: 1 HK$1,234.50 123450
+        1 HK$1,234.50 123450
+        2 HK$80 8000
+        2 HK$12.05 1205
+        TOTAL 256105
+```
+
+Build one `regex::Regex` with named groups for the dollars and the cents,
+compile it **once** before the loop (compiling is the expensive part; a
+`Regex` in a loop body is the classic mistake), and walk each line with
+`captures_iter`. Work in integer cents: `f64` dollars times 100 is how
+`HK$0.29` becomes 28 cents. The starter scans by hand, stops at the first
+comma, and multiplies floats.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut total = 0i64;
+    for (i, line) in input.lines().enumerate() {
+        for (at, _) in line.match_indices("HK$") {
+            let rest = &line[at + 3..];
+            let end = rest.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(rest.len());
+            let number = rest[..end].trim_end_matches('.');
+            if number.is_empty() {
+                continue;
+            }
+            let value: f64 = match number.parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let amount = (value * 100.0) as i64;
+            total += amount;
+            println!("{} HK${} {}", i + 1, number, amount);
+        }
+    }
+    println!("TOTAL {total}");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use regex::Regex;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let re = Regex::new(r"HK\$(?P<dollars>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<cents>\d{2}))?").unwrap();
+    let mut total = 0i64;
+    for (i, line) in input.lines().enumerate() {
+        for caps in re.captures_iter(line) {
+            let dollars: i64 = caps["dollars"].replace(',', "").parse().unwrap();
+            let cents: i64 = caps.name("cents").map_or(0, |m| m.as_str().parse().unwrap());
+            let amount = dollars * 100 + cents;
+            total += amount;
+            println!("{} {} {}", i + 1, &caps[0], amount);
+        }
+    }
+    println!("TOTAL {total}");
+}
+'''
+hints = [
+  "`use regex::Regex;` and `let re = Regex::new(r\"...\").unwrap();` once, above the loop. `re.captures_iter(line)` yields one `Captures` per match, left to right.",
+  "Named groups: `(?P<dollars>...)` and `(?P<cents>...)`. In the pattern, `\\$` is a literal dollar sign and the grouped form must come first in the alternation with a `+` on the comma groups, or `HK$1234.50` matches as `HK$123` — the regex crate takes the first alternative that matches, not the longest.",
+  "The pattern: `HK\\$(?P<dollars>\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(?P<cents>\\d{2}))?`. `&caps[0]` is the whole match, `caps[\"dollars\"]` the group text, and `caps.name(\"cents\")` is an `Option<Match>` because the group may not have taken part.",
+  "`let dollars: i64 = caps[\"dollars\"].replace(',', \"\").parse().unwrap();` then `let cents: i64 = caps.name(\"cents\").map_or(0, |m| m.as_str().parse().unwrap());` and the amount is `dollars * 100 + cents`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["regex"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "duplicate-charge", stdin = "Charged HK$1,234.50 twice at SOGO; the second HK$1,234.50 is a duplicate.\nRefund HK$80 and the HK$12.05 fee. The US$9.99 line is not ours.\n", expect = "1 HK$1,234.50 123450\n1 HK$1,234.50 123450\n2 HK$80 8000\n2 HK$12.05 1205\nTOTAL 256105\n", visible = true },
+  { name = "trailing-dot-and-rounding", stdin = "Lucky Mac, Times Square: HK$38.\nHK$0.29 rounding difference on the tram card top-up (HK$150.00)\n", expect = "1 HK$38 3800\n2 HK$0.29 29\n2 HK$150.00 15000\nTOTAL 18829\n", visible = false },
+  { name = "no-amounts", stdin = "No amounts in this ticket, only a HK$ sign and a question.\n", expect = "TOTAL 0\n", visible = false },
+  { name = "thousands-groups", stdin = "Hysan Place parking HK$1234.50 then HK$12,345,678.99 by mistake\n", expect = "1 HK$1234.50 123450\n1 HK$12,345,678.99 1234567899\nTOTAL 1234691349\n", visible = false },
+  { name = "empty-input", stdin = "", expect = "TOTAL 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "rust.frameworks.10.chrono-settlement"
+node        = 10
+title       = "THE NEXT BUSINESS DAY"
+difficulty  = 3
+story       = "A Friday card batch from the Times Square terminals went to the bank on Gloucester Road dated Saturday, and the bank is not open on Saturday. The settlement calendar is a hand-written month table, and February in it has 28 days every year."
+concepts    = ["types", "error-handling", "io"]
+requires    = ["rust.frameworks.09.regex-captures"]
+map          = { x = 0.416, y = 0.337, kind = "quest" }
+brief       = '''
+Each line of standard input is a value date as `YYYY-MM-DD`. Blank lines are
+ignored. For every date print one line:
+
+```
+<value date> -> <settlement date> +<days>
+```
+
+where the settlement date is the first day **after** the value date that is
+a Monday to Friday (a Friday settles on Monday, a Saturday on Monday, a
+Sunday on Monday), `<days>` is the number of calendar days between the two,
+and both dates are printed as `%d %b %Y %a` — `03 Oct 2026 Sat`.
+
+A line that is not a real date in that format — `2026-13-01`, `2026-02-29`,
+`2026-04-31`, `yesterday` — prints `ERROR: bad date <line>` with the line's
+text trimmed, and the program goes on to the next line.
+
+```
+input:  2026-10-02
+        2026-10-03
+        2026-10-07
+        2026-13-01
+output: 02 Oct 2026 Fri -> 05 Oct 2026 Mon +3
+        03 Oct 2026 Sat -> 05 Oct 2026 Mon +2
+        07 Oct 2026 Wed -> 08 Oct 2026 Thu +1
+        ERROR: bad date 2026-13-01
+```
+
+Use `chrono::NaiveDate`: `parse_from_str` to read, `weekday()` to test,
+`checked_add_days` to step, `signed_duration_since(...).num_days()` for the
+gap, and `format` to print. Never read the clock. The starter has its own
+month table and its own weekday formula, and one of them is wrong in leap
+years.
+'''
+starter     = '''
+use std::io::Read;
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+const DAYS_IN_MONTH: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const WEEKDAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+#[derive(Clone, Copy)]
+struct Date {
+    year: i32,
+    month: u32,
+    day: u32,
+}
+
+fn parse(text: &str) -> Option<Date> {
+    let mut parts = text.split('-');
+    let year = parts.next()?.parse().ok()?;
+    let month = parts.next()?.parse().ok()?;
+    let day = parts.next()?.parse().ok()?;
+    if parts.next().is_some() || !(1..=12).contains(&month) || day == 0 {
+        return None;
+    }
+    Some(Date { year, month, day })
+}
+
+// Zeller's congruence: 0 = Sunday.
+fn weekday(d: Date) -> usize {
+    let (mut y, mut m) = (d.year, d.month as i32);
+    if m < 3 {
+        m += 12;
+        y -= 1;
+    }
+    let k = y % 100;
+    let j = y / 100;
+    let h = (d.day as i32 + 13 * (m + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+    ((h + 6) % 7) as usize
+}
+
+fn next_day(d: Date) -> Date {
+    if d.day < DAYS_IN_MONTH[d.month as usize - 1] {
+        Date { day: d.day + 1, ..d }
+    } else if d.month < 12 {
+        Date { year: d.year, month: d.month + 1, day: 1 }
+    } else {
+        Date { year: d.year + 1, month: 1, day: 1 }
+    }
+}
+
+fn show(d: Date) -> String {
+    format!("{:02} {} {} {}", d.day, MONTHS[d.month as usize - 1], d.year, WEEKDAYS[weekday(d)])
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let text = line.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let Some(value) = parse(text) else {
+            println!("ERROR: bad date {text}");
+            continue;
+        };
+        let mut settles = next_day(value);
+        let mut gap = 1;
+        while weekday(settles) == 0 || weekday(settles) == 6 {
+            settles = next_day(settles);
+            gap += 1;
+        }
+        println!("{} -> {} +{}", show(value), show(settles), gap);
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use chrono::{Datelike, Days, NaiveDate, Weekday};
+
+fn next_business_day(value: NaiveDate) -> NaiveDate {
+    let mut day = value;
+    loop {
+        day = day.checked_add_days(Days::new(1)).expect("date in range");
+        if !matches!(day.weekday(), Weekday::Sat | Weekday::Sun) {
+            return day;
+        }
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let text = line.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let value = match NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+            Ok(date) => date,
+            Err(_) => {
+                println!("ERROR: bad date {text}");
+                continue;
+            }
+        };
+        let settles = next_business_day(value);
+        let gap = settles.signed_duration_since(value).num_days();
+        println!(
+            "{} -> {} +{}",
+            value.format("%d %b %Y %a"),
+            settles.format("%d %b %Y %a"),
+            gap
+        );
+    }
+}
+'''
+hints = [
+  "`use chrono::{Datelike, Days, NaiveDate, Weekday};` — `weekday()` comes from the `Datelike` trait, so without that import it does not exist.",
+  "`NaiveDate::parse_from_str(text, \"%Y-%m-%d\")` is a `Result`; it is `Err` for `2026-02-29` and `2026-04-31` as well as for `yesterday`, so one `match` covers every bad line.",
+  "Step with `date.checked_add_days(Days::new(1)).unwrap()` until `!matches!(day.weekday(), Weekday::Sat | Weekday::Sun)`; the gap is `settles.signed_duration_since(value).num_days()`.",
+  "`value.format(\"%d %b %Y %a\")` prints `02 Oct 2026 Fri` straight into `println!` — `%a` is the weekday's three-letter name.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["chrono"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "friday-saturday-midweek-bad-month", stdin = "2026-10-02\n2026-10-03\n2026-10-07\n2026-13-01\n", expect = "02 Oct 2026 Fri -> 05 Oct 2026 Mon +3\n03 Oct 2026 Sat -> 05 Oct 2026 Mon +2\n07 Oct 2026 Wed -> 08 Oct 2026 Thu +1\nERROR: bad date 2026-13-01\n", visible = true },
+  { name = "leap-year", stdin = "2028-02-28\n2028-02-29\n2026-02-29\n", expect = "28 Feb 2028 Mon -> 29 Feb 2028 Tue +1\n29 Feb 2028 Tue -> 01 Mar 2028 Wed +1\nERROR: bad date 2026-02-29\n", visible = false },
+  { name = "year-end-sunday-and-impossible-days", stdin = "2026-12-31\n2026-10-04\n\n2026-04-31\nyesterday\n", expect = "31 Dec 2026 Thu -> 01 Jan 2027 Fri +1\n04 Oct 2026 Sun -> 05 Oct 2026 Mon +1\nERROR: bad date 2026-04-31\nERROR: bad date yesterday\n", visible = false },
+  { name = "plain-week", stdin = "2026-10-05\n2026-10-06\n2026-10-08\n2026-10-09\n", expect = "05 Oct 2026 Mon -> 06 Oct 2026 Tue +1\n06 Oct 2026 Tue -> 07 Oct 2026 Wed +1\n08 Oct 2026 Thu -> 09 Oct 2026 Fri +1\n09 Oct 2026 Fri -> 12 Oct 2026 Mon +3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "rust.frameworks.11.itertools-chunk-by"
+node        = 11
+title       = "ONE LINE PER ACCOUNT"
+difficulty  = 3
+story       = "The end-of-day statement from the Percival Street terminals lists every transfer in the order the tills closed. The report that folds them into one line per account only merges neighbours, so an account that paid in the morning and again after lunch shows up twice."
+concepts    = ["iteration", "sorting", "collections"]
+requires    = ["rust.frameworks.10.chrono-settlement"]
+map          = { x = 0.277, y = 0.457, kind = "quest" }
+brief       = '''
+Standard input is transfers, one per line, `<ACCOUNT> <CENTS>` — the account
+is one token with no spaces, the cents a non-negative integer. Blank lines
+are ignored. Transfers for one account may appear anywhere in the input.
+
+Print one line per account, accounts in ascending string order, as
+`<ACCOUNT> <a>+<b>+...=<sum>` — the amounts in the order they appeared in the
+input, joined with `+`, then `=` and their sum (a single transfer prints as
+`C-031 80=80`). Then one footer line, `<k> accounts, <total> cents`, with the
+number of distinct accounts and the sum of everything. Empty input prints
+only `0 accounts, 0 cents`.
+
+```
+input:  B-204 500
+        A-117 1200
+        B-204 250
+        C-031 80
+        A-117 60
+output: A-117 1200+60=1260
+        B-204 500+250=750
+        C-031 80=80
+        3 accounts, 2090 cents
+```
+
+This is `itertools::Itertools`: `sorted_by_key` to bring each account's
+transfers together (it is a stable sort, so the amounts keep their input
+order), `chunk_by` to walk the runs, `join` to print them, `unique` to count
+the accounts. `chunk_by` only groups *adjacent* equal keys — that is the
+whole reason the sort comes first. The starter does the adjacent grouping
+by hand on the unsorted input.
+'''
+starter     = '''
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let transfers: Vec<(&str, i64)> = input
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let (account, cents) = line.trim().split_once(' ').expect("account and cents");
+            (account, cents.trim().parse().expect("cents are an integer"))
+        })
+        .collect();
+
+    let mut accounts = 0;
+    let mut total = 0i64;
+    let mut current: Option<&str> = None;
+    let mut amounts: Vec<String> = Vec::new();
+    let mut sum = 0i64;
+    for (account, cents) in &transfers {
+        if current != Some(account) {
+            if let Some(name) = current {
+                println!("{name} {}={sum}", amounts.join("+"));
+            }
+            current = Some(account);
+            accounts += 1;
+            amounts.clear();
+            sum = 0;
+        }
+        amounts.push(cents.to_string());
+        sum += cents;
+        total += cents;
+    }
+    if let Some(name) = current {
+        println!("{name} {}={sum}", amounts.join("+"));
+    }
+    println!("{accounts} accounts, {total} cents");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use itertools::Itertools;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let transfers: Vec<(&str, i64)> = input
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let (account, cents) = line.trim().split_once(' ').expect("account and cents");
+            (account, cents.trim().parse().expect("cents are an integer"))
+        })
+        .collect();
+
+    let accounts = transfers.iter().map(|(account, _)| account).unique().count();
+    let mut total = 0i64;
+    let grouped = transfers
+        .iter()
+        .sorted_by_key(|(account, _)| *account)
+        .chunk_by(|(account, _)| *account);
+    for (account, group) in &grouped {
+        let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();
+        let sum: i64 = amounts.iter().sum();
+        total += sum;
+        println!("{account} {}={sum}", amounts.iter().join("+"));
+    }
+    println!("{accounts} accounts, {total} cents");
+}
+'''
+hints = [
+  "`use itertools::Itertools;` puts `sorted_by_key`, `chunk_by`, `join` and `unique` on every iterator.",
+  "`transfers.iter().sorted_by_key(|(account, _)| *account)` returns an iterator over the sorted items — stable, so two transfers of one account keep their order — and `.chunk_by(|(account, _)| *account)` on that groups the runs.",
+  "`ChunkBy` is iterated by reference: `let grouped = ...chunk_by(...); for (account, group) in &grouped { ... }`. `group` is an iterator over that account's transfers.",
+  "Inside the loop: `let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();` then `println!(\"{account} {}={}\", amounts.iter().join(\"+\"), amounts.iter().sum::<i64>())`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["itertools"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-accounts-interleaved", stdin = "B-204 500\nA-117 1200\nB-204 250\nC-031 80\nA-117 60\n", expect = "A-117 1200+60=1260\nB-204 500+250=750\nC-031 80=80\n3 accounts, 2090 cents\n", visible = true },
+  { name = "one-account", stdin = "A-117 300\nA-117 300\nA-117 1\n", expect = "A-117 300+300+1=601\n1 accounts, 601 cents\n", visible = false },
+  { name = "empty-input", stdin = "\n", expect = "0 accounts, 0 cents\n", visible = false },
+  { name = "returns-three-times", stdin = "Z-900 10\nA-001 20\nZ-900 30\nM-500 40\nA-001 50\nZ-900 60\n", expect = "A-001 20+50=70\nM-500 40=40\nZ-900 10+30+60=100\n3 accounts, 210 cents\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "rust.frameworks.12.indexmap-first-seen"
+node        = 12
+title       = "THE ORDER THEY CAME"
+difficulty  = 2
+story       = "The merchant tally for the Yee Wo Street terminals is a HashMap, and the morning report lists the merchants in a different order every time it runs. Finance wants them in the order they first took a card, and nobody can say which merchant that was."
+concepts    = ["collections", "iteration"]
+requires    = ["rust.frameworks.11.itertools-chunk-by"]
+map          = { x = 0.127, y = 0.344, kind = "quest" }
+brief       = '''
+Each line of standard input is a merchant name (it may contain spaces;
+surrounding whitespace is trimmed; blank lines are ignored). Count how many
+times each merchant appears.
+
+Print `<merchant> <count>` for every distinct merchant **in the order they
+were first seen**, then `DISTINCT <k>`. If there was at least one merchant,
+also print `FIRST <merchant>` (the first merchant seen) and
+`TOP <merchant> <count>` (the highest count; on a tie, the one first seen).
+Empty input prints only `DISTINCT 0`.
+
+```
+input:  Lucky Mac
+        SOGO
+        Lucky Mac
+        Hysan Place
+        Times Square
+        SOGO
+        Jardine's Bazaar
+        Lucky Mac
+output: Lucky Mac 3
+        SOGO 2
+        Hysan Place 1
+        Times Square 1
+        Jardine's Bazaar 1
+        DISTINCT 5
+        FIRST Lucky Mac
+        TOP Lucky Mac 3
+```
+
+`indexmap::IndexMap` is a hash map that remembers insertion order: `entry`
+and `or_insert` as on `HashMap`, iteration in the order keys were inserted,
+`get_index(0)` for the first one. The starter is the same program on
+`std::collections::HashMap`, which iterates in whatever order the hasher
+feels like today.
+'''
+starter     = '''
+use std::collections::HashMap;
+use std::io::Read;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut counts: HashMap<&str, u64> = HashMap::new();
+    let mut first: Option<&str> = None;
+    for line in input.lines() {
+        let merchant = line.trim();
+        if merchant.is_empty() {
+            continue;
+        }
+        first.get_or_insert(merchant);
+        *counts.entry(merchant).or_insert(0) += 1;
+    }
+    for (merchant, count) in &counts {
+        println!("{merchant} {count}");
+    }
+    println!("DISTINCT {}", counts.len());
+    if let Some(first) = first {
+        println!("FIRST {first}");
+    }
+    if let Some((merchant, count)) = counts.iter().max_by_key(|(_, count)| **count) {
+        println!("TOP {merchant} {count}");
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use indexmap::IndexMap;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut counts: IndexMap<&str, u64> = IndexMap::new();
+    for line in input.lines() {
+        let merchant = line.trim();
+        if merchant.is_empty() {
+            continue;
+        }
+        *counts.entry(merchant).or_insert(0) += 1;
+    }
+    for (merchant, count) in &counts {
+        println!("{merchant} {count}");
+    }
+    println!("DISTINCT {}", counts.len());
+    if let Some((first, _)) = counts.get_index(0) {
+        println!("FIRST {first}");
+    }
+    let mut top: Option<(&str, u64)> = None;
+    for (merchant, count) in &counts {
+        if top.map_or(true, |(_, best)| *count > best) {
+            top = Some((merchant, *count));
+        }
+    }
+    if let Some((merchant, count)) = top {
+        println!("TOP {merchant} {count}");
+    }
+}
+'''
+hints = [
+  "`use indexmap::IndexMap;` — `IndexMap<&str, u64>` has the same `entry(key).or_insert(0)` as `HashMap`, and iterating `&counts` walks the keys in insertion order.",
+  "`counts.get_index(0)` is `Option<(&K, &V)>`: the first merchant ever inserted. No second variable needed to remember it.",
+  "For `TOP`, walk `&counts` in order and replace the best only when `*count > best` — strictly greater, so the earliest of a tie stays. `max_by_key` returns the *last* maximum, which is the wrong one here.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["indexmap"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "eight-cards-five-merchants", stdin = "Lucky Mac\nSOGO\nLucky Mac\nHysan Place\nTimes Square\nSOGO\nJardine's Bazaar\nLucky Mac\n", expect = "Lucky Mac 3\nSOGO 2\nHysan Place 1\nTimes Square 1\nJardine's Bazaar 1\nDISTINCT 5\nFIRST Lucky Mac\nTOP Lucky Mac 3\n", visible = true },
+  { name = "tie-goes-to-first-seen", stdin = "Percival Street Noodles\nYee Wo Street Pharmacy\nTram Stop Kiosk\nVictoria Park Cafe\nGloucester Road Parking\nYee Wo Street Pharmacy\nPercival Street Noodles\n", expect = "Percival Street Noodles 2\nYee Wo Street Pharmacy 2\nTram Stop Kiosk 1\nVictoria Park Cafe 1\nGloucester Road Parking 1\nDISTINCT 5\nFIRST Percival Street Noodles\nTOP Percival Street Noodles 2\n", visible = false },
+  { name = "empty-input", stdin = "\n", expect = "DISTINCT 0\n", visible = false },
+  { name = "trimmed-names-and-late-tie", stdin = "zeta\nalpha\nmike\n  kilo\nbravo\nalpha\nalpha\nzeta\nzeta\n", expect = "zeta 3\nalpha 3\nmike 1\nkilo 1\nbravo 1\nDISTINCT 5\nFIRST zeta\nTOP zeta 3\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.frameworks.13.rand-seeded-shuffle"
+node        = 13
+title       = "THE SAME DRAW TWICE"
+difficulty  = 3
+story       = "The fraud desk off Gloucester Road pulls a random sample of the day's Yee Wo Street merchants for a manual check. The auditor asks which merchants were in yesterday's sample, and the program that drew them cannot draw them again."
+concepts    = ["imports", "traits", "slices"]
+requires    = ["rust.frameworks.12.indexmap-first-seen"]
+map          = { x = 0.122, y = 0.671, kind = "quest" }
+brief       = '''
+Standard input is two lines. The first is a seed, an unsigned 64-bit
+integer; the second is `<n> <k>`, with `1 <= n <= 99` and `0 <= k <= 20`.
+
+Build the deck `M01 M02 ... Mnn` (two-digit, zero-padded), then with
+**one** random generator seeded from the seed:
+
+1. shuffle the deck once, in place, and print `DECK <ids joined by one space>`;
+2. draw `k` integers, each uniform in `1..=100` as a `u32`, printing
+   `DRAW <x>` for each in order;
+3. print `CHECK <first id of the shuffled deck>`.
+
+The generator is `rand::rngs::StdRng` built with `SeedableRng::seed_from_u64`,
+consumed in exactly that order — the shuffle first, then the draws — so the
+same seed always prints the same lines. If the seed is not a `u64`, print
+`ERROR: bad seed <text>` (trimmed) and nothing else.
+
+```
+input:  20261006
+        6 3
+output: DECK M06 M02 M05 M01 M03 M04
+        DRAW 4
+        DRAW 26
+        DRAW 79
+        CHECK M06
+```
+
+The shuffle is `rand::seq::SliceRandom::shuffle`, the draws are
+`rand::RngExt::random_range` — both traits, both imported. The starter uses
+`rand::rng()`, the thread-local generator seeded from the operating system,
+and prints a different sample every run.
+'''
+starter     = '''
+use std::io::Read;
+
+use rand::seq::SliceRandom;
+use rand::RngExt;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let seed_text = lines.next().unwrap_or("").trim();
+    let _seed: u64 = match seed_text.parse() {
+        Ok(seed) => seed,
+        Err(_) => {
+            println!("ERROR: bad seed {seed_text}");
+            return;
+        }
+    };
+    let mut rest = lines.next().unwrap_or("").split_whitespace();
+    let n: usize = rest.next().unwrap().parse().unwrap();
+    let k: usize = rest.next().unwrap().parse().unwrap();
+
+    // TODO: the auditor wants the same sample back from the same seed.
+    let mut rng = rand::rng();
+    let mut deck: Vec<String> = (1..=n).map(|i| format!("M{i:02}")).collect();
+    deck.shuffle(&mut rng);
+    println!("DECK {}", deck.join(" "));
+    for _ in 0..k {
+        let draw: u32 = rng.random_range(1..=100);
+        println!("DRAW {draw}");
+    }
+    println!("CHECK {}", &deck[0]);
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::{RngExt, SeedableRng};
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let seed_text = lines.next().unwrap_or("").trim();
+    let seed: u64 = match seed_text.parse() {
+        Ok(seed) => seed,
+        Err(_) => {
+            println!("ERROR: bad seed {seed_text}");
+            return;
+        }
+    };
+    let mut rest = lines.next().unwrap_or("").split_whitespace();
+    let n: usize = rest.next().unwrap().parse().unwrap();
+    let k: usize = rest.next().unwrap().parse().unwrap();
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut deck: Vec<String> = (1..=n).map(|i| format!("M{i:02}")).collect();
+    deck.shuffle(&mut rng);
+    println!("DECK {}", deck.join(" "));
+    for _ in 0..k {
+        let draw: u32 = rng.random_range(1..=100);
+        println!("DRAW {draw}");
+    }
+    println!("CHECK {}", &deck[0]);
+}
+'''
+hints = [
+  "`use rand::rngs::StdRng; use rand::{RngExt, SeedableRng}; use rand::seq::SliceRandom;` — in rand 0.10 the methods live on `RngExt` and `SliceRandom`, and `seed_from_u64` on `SeedableRng`.",
+  "`let mut rng = StdRng::seed_from_u64(seed);` is the whole fix: one generator, built from the seed, passed as `&mut rng` to everything that draws.",
+  "`deck.shuffle(&mut rng);` then `let draw: u32 = rng.random_range(1..=100);` — the type annotation decides which integers come out of the stream, so it has to be `u32`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["rand"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "six-cards-three-draws", stdin = "20261006\n6 3\n", expect = "DECK M06 M02 M05 M01 M03 M04\nDRAW 4\nDRAW 26\nDRAW 79\nCHECK M06\n", visible = true },
+  { name = "seed-zero", stdin = "0\n10 5\n", expect = "DECK M02 M01 M08 M04 M07 M05 M06 M10 M09 M03\nDRAW 74\nDRAW 56\nDRAW 78\nDRAW 81\nDRAW 3\nCHECK M02\n", visible = false },
+  { name = "max-seed", stdin = "18446744073709551615\n12 2\n", expect = "DECK M05 M11 M12 M09 M02 M04 M08 M06 M10 M07 M03 M01\nDRAW 7\nDRAW 26\nCHECK M05\n", visible = false },
+  { name = "bad-seed", stdin = "tuesday\n6 3\n", expect = "ERROR: bad seed tuesday\n", visible = false },
+  { name = "no-draws", stdin = "20261006\n6 0\n", expect = "DECK M06 M02 M05 M01 M03 M04\nCHECK M06\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.frameworks.14.rayon-fee-run"
+node        = 14
+title       = "EVERY CARD AT ONCE"
+difficulty  = 3
+story       = "The month-end fee run walks the Yee Wo Street terminals' cards one at a time on one core of a sixteen-core box off Gloucester Road, and when it finishes the bank's figure is higher than ours by a cent or so per card."
+concepts    = ["iteration", "concurrency", "sorting"]
+requires    = ["rust.frameworks.13.rand-seeded-shuffle"]
+map          = { x = 0.272, y = 0.556, kind = "quest" }
+brief       = '''
+Standard input is zero or more lines of `<CARD> <CENTS>`: a card id (no
+spaces, unique) and an amount in cents, `0 <= CENTS <= 10_000_000_000`.
+
+The fee on one payment is **1.5% of the amount, rounded up to the next
+whole cent, plus 30 cents flat**. In integers: `(cents * 15 + 999) / 1000 + 30`.
+A 199-cent payment is 2.985 cents of rate, rounded up to 3, plus 30 — a fee
+of 33. A zero-cent payment still pays the flat 30.
+
+Print one line per card, `<CARD> <FEE>`, **sorted by card id**, then
+`TOTAL <sum of the fees>`. Empty input prints only `TOTAL 0`.
+
+```
+input:  C3 199
+        A1 10000
+        B2 3800
+output: A1 180
+        B2 87
+        C3 33
+        TOTAL 300
+```
+
+Do the per-card work in parallel with `rayon`: `use rayon::prelude::*;`,
+then `.par_iter()` where a sequential `.iter()` was. `.map(..).collect()`
+into a `Vec` and `.map(..).sum()` both work on a parallel iterator; the
+`Vec` comes back in input order, so sort it before printing — never print
+from inside the parallel part. The starter is the sequential version, and
+its fee rounds the wrong way.
+'''
+starter     = '''
+use std::io::Read;
+
+fn fee(cents: i64) -> i64 {
+    cents * 15 / 1000 + 30
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let payments: Vec<(&str, i64)> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let (card, cents) = l.trim().split_once(' ').expect("card and cents");
+            (card, cents.trim().parse().expect("cents"))
+        })
+        .collect();
+
+    let mut fees: Vec<(&str, i64)> = payments
+        .iter()
+        .map(|&(card, cents)| (card, fee(cents)))
+        .collect();
+    fees.sort();
+    let total: i64 = fees.iter().map(|&(_, f)| f).sum();
+
+    for (card, f) in &fees {
+        println!("{card} {f}");
+    }
+    println!("TOTAL {total}");
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use rayon::prelude::*;
+
+fn fee(cents: i64) -> i64 {
+    (cents * 15 + 999) / 1000 + 30
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let payments: Vec<(&str, i64)> = input
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let (card, cents) = l.trim().split_once(' ').expect("card and cents");
+            (card, cents.trim().parse().expect("cents"))
+        })
+        .collect();
+
+    let mut fees: Vec<(&str, i64)> = payments
+        .par_iter()
+        .map(|&(card, cents)| (card, fee(cents)))
+        .collect();
+    fees.par_sort_unstable();
+    let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();
+
+    for (card, f) in &fees {
+        println!("{card} {f}");
+    }
+    println!("TOTAL {total}");
+}
+'''
+hints = [
+  "`use rayon::prelude::*;` puts `par_iter()` on every `Vec` and slice. The closure you already have does not change; `.map(...).collect()` and `.map(...).sum()` exist on the parallel iterator too.",
+  "Rounding up in integers is `(x + 999) / 1000`, not `x / 1000`. The starter rounds down, and the hidden cases have amounts whose 1.5% is not a whole cent.",
+  "A parallel `collect()` into a `Vec` keeps input order, but the brief wants card order: `fees.par_sort_unstable()` (or plain `sort()`) before the print loop, which stays sequential.",
+  "`let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();` — the type on the left tells `sum` what to add into.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["rayon"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-cards", stdin = "C3 199\nA1 10000\nB2 3800\n", expect = "A1 180\nB2 87\nC3 33\nTOTAL 300\n", visible = true },
+  { name = "empty-input", stdin = "", expect = "TOTAL 0\n", visible = false },
+  { name = "zero-one-cent-and-a-big-one", stdin = "Z 0\nY 1\nX 1000\nW 123456789\n", expect = "W 1851882\nX 45\nY 31\nZ 30\nTOTAL 1851988\n", visible = false },
+  { name = "forty-cards", stdin = "D7 27190224\nC5 956\nC2 893\nD9 42876338\nA9 6453363\nC6 34579289\nD4 30473532\nD0 18979420\nA1 260\nA0 285\nA2 165\nD6 702\nB3 435\nC9 51684\nD1 61270\nA5 13432\nD8 30247669\nD5 4559303\nC0 65101\nC3 1382181\nB1 56457\nB0 75632\nA7 20386015\nA8 42272387\nA3 34564\nC4 5558\nD2 39428735\nB2 69363\nC7 116\nC1 16896370\nB4 270\nB9 90145\nC8 2215935\nA4 943\nB8 85487\nB6 51346\nB7 73567\nB5 937\nD3 57283\nA6 91\n", expect = "A0 35\nA1 34\nA2 33\nA3 549\nA4 45\nA5 232\nA6 32\nA7 305821\nA8 634116\nA9 96831\nB0 1165\nB1 877\nB2 1071\nB3 37\nB4 35\nB5 45\nB6 801\nB7 1134\nB8 1313\nB9 1383\nC0 1007\nC1 253476\nC2 44\nC3 20763\nC4 114\nC5 45\nC6 518720\nC7 32\nC8 33270\nC9 806\nD0 284722\nD1 950\nD2 591462\nD3 890\nD4 457133\nD5 68420\nD6 41\nD7 407884\nD8 453746\nD9 643176\nTOTAL 4782290\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.frameworks.15.parking-lot-ledger"
+node        = 15
+title       = "FOUR TILLS, ONE LEDGER"
+difficulty  = 3
+story       = "The four tills at Hysan Place post into one ledger at close. Each merchant's line holds what the last till to finish saw, and nothing the other three added."
+concepts    = ["shared-state", "collections", "concurrency"]
+requires    = ["rust.frameworks.14.rayon-fee-run"]
+map          = { x = 0.428, y = 0.662, kind = "quest" }
+brief       = '''
+Line one is `<TILLS>`, `1 <= TILLS <= 8`. Every line after it is a payment,
+`<MERCHANT> <CENTS>` (a merchant token with no spaces, `CENTS > 0`). There
+may be no payments at all.
+
+Payment `i` (0-based, counting payment lines only) belongs to till
+`i % TILLS`. Each till is a thread; each adds its payments into **one shared
+ledger**, a `Mutex<HashMap<String, (i64, u32)>>` of total cents and count
+per merchant. When every till has finished, print one line per merchant,
+`<MERCHANT> <TOTAL> <COUNT>`, sorted by merchant, then `PAYMENTS <n>` with
+the number of payment lines.
+
+```
+input:  2
+        sogo 500
+        luckymac 3800
+        sogo 1200
+        tsuiwah 4500
+        luckymac 200
+output: luckymac 4000 2
+        sogo 1700 2
+        tsuiwah 4500 1
+        PAYMENTS 5
+```
+
+Use `parking_lot::Mutex`. Its `lock()` cannot fail, so it hands back the
+guard itself — there is no `.unwrap()`, no poisoning, and `into_inner()` is
+the value, not a `Result`. Spawn the tills with `std::thread::scope` so they
+can borrow the ledger without an `Arc`. The starter is the `std::sync` version
+and merges each till's figures into the ledger in a way that drops what the
+other tills already wrote — read the merge, not the lock.
+'''
+starter     = '''
+use std::collections::HashMap;
+use std::io::Read;
+use std::sync::Mutex;
+use std::thread;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let tills: usize = lines.next().expect("till count").trim().parse().expect("till count");
+    let payments: Vec<(&str, i64)> = lines
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let (merchant, cents) = l.trim().split_once(' ').expect("merchant and cents");
+            (merchant, cents.trim().parse().expect("cents"))
+        })
+        .collect();
+
+    let ledger: Mutex<HashMap<String, (i64, u32)>> = Mutex::new(HashMap::new());
+    thread::scope(|s| {
+        for till in 0..tills {
+            let ledger = &ledger;
+            let payments = &payments;
+            s.spawn(move || {
+                let mut local: HashMap<String, (i64, u32)> = HashMap::new();
+                for &(merchant, cents) in payments.iter().skip(till).step_by(tills) {
+                    let entry = local.entry(merchant.to_string()).or_insert((0, 0));
+                    entry.0 += cents;
+                    entry.1 += 1;
+                }
+                let mut shared = ledger.lock().unwrap();
+                shared.extend(local);
+            });
+        }
+    });
+
+    let ledger = ledger.into_inner().unwrap();
+    let mut rows: Vec<(String, (i64, u32))> = ledger.into_iter().collect();
+    rows.sort();
+    for (merchant, (total, count)) in &rows {
+        println!("{merchant} {total} {count}");
+    }
+    println!("PAYMENTS {}", payments.len());
+}
+'''
+solution    = '''
+use std::collections::HashMap;
+use std::io::Read;
+use std::thread;
+
+use parking_lot::Mutex;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let tills: usize = lines.next().expect("till count").trim().parse().expect("till count");
+    let payments: Vec<(&str, i64)> = lines
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let (merchant, cents) = l.trim().split_once(' ').expect("merchant and cents");
+            (merchant, cents.trim().parse().expect("cents"))
+        })
+        .collect();
+
+    let ledger: Mutex<HashMap<String, (i64, u32)>> = Mutex::new(HashMap::new());
+    thread::scope(|s| {
+        for till in 0..tills {
+            let ledger = &ledger;
+            let payments = &payments;
+            s.spawn(move || {
+                let mut local: HashMap<String, (i64, u32)> = HashMap::new();
+                for &(merchant, cents) in payments.iter().skip(till).step_by(tills) {
+                    let entry = local.entry(merchant.to_string()).or_insert((0, 0));
+                    entry.0 += cents;
+                    entry.1 += 1;
+                }
+                // One lock per till, held only for the merge: the guard
+                // drops at the end of this block.
+                let mut shared = ledger.lock();
+                for (merchant, (cents, count)) in local {
+                    let entry = shared.entry(merchant).or_insert((0, 0));
+                    entry.0 += cents;
+                    entry.1 += count;
+                }
+            });
+        }
+    });
+
+    let ledger = ledger.into_inner();
+    let mut rows: Vec<(String, (i64, u32))> = ledger.into_iter().collect();
+    rows.sort();
+    for (merchant, (total, count)) in &rows {
+        println!("{merchant} {total} {count}");
+    }
+    println!("PAYMENTS {}", payments.len());
+}
+'''
+hints = [
+  "`use parking_lot::Mutex;` in place of `std::sync::Mutex`. `ledger.lock()` is the guard — delete every `.unwrap()` after it, and `into_inner()` is the map itself.",
+  "`HashMap::extend` *replaces* a key that is already there. When till 1 writes `luckymac` after till 0 did, till 0's total is gone. That is the starter's bug, and it shows on any merchant that two tills both saw.",
+  "Merge with `entry`: `let e = shared.entry(merchant).or_insert((0, 0)); e.0 += cents; e.1 += count;` — one `lock()` per till, taken after the local map is complete, so the lock is held for the merge and nothing else.",
+  "`let mut shared = ledger.lock();` then the `for (merchant, (cents, count)) in local` loop; the guard is a local and drops when the thread's closure ends.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["parking_lot"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "two-tills-shared-merchant", stdin = "2\nsogo 500\nluckymac 3800\nsogo 1200\ntsuiwah 4500\nluckymac 200\n", expect = "luckymac 4000 2\nsogo 1700 2\ntsuiwah 4500 1\nPAYMENTS 5\n", visible = true },
+  { name = "one-till", stdin = "1\nhysan 10\nsogo 20\nhysan 30\n", expect = "hysan 40 2\nsogo 20 1\nPAYMENTS 3\n", visible = false },
+  { name = "eight-tills-merchants-collide", stdin = "8\nhysan 1\nsogo 2\ntsuiwah 3\nluckymac 4\ntram 5\nmtr 6\nsogo 7\ntram 8\nhysan 9\nsogo 10\n", expect = "hysan 10 2\nluckymac 4 1\nmtr 6 1\nsogo 19 3\ntram 13 2\ntsuiwah 3 1\nPAYMENTS 10\n", visible = false },
+  { name = "no-payments", stdin = "3\n", expect = "PAYMENTS 0\n", visible = false },
+  { name = "same-merchant-every-till", stdin = "4\nhysan 1\nhysan 2\nhysan 3\nhysan 4\nhysan 5\nhysan 6\nhysan 7\nhysan 8\nhysan 9\nhysan 10\nhysan 11\nhysan 12\n", expect = "hysan 78 12\nPAYMENTS 12\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "rust.frameworks.16.crossbeam-hatch"
+node        = 16
+title       = "THE HATCH CLOSES"
+difficulty  = 3
+story       = "Three Yee Wo Street terminals post into one hatch at the Gloucester Road office, and nothing tells the hatch they have gone home. The night batch is still waiting at six in the morning."
+concepts    = ["channels", "cancellation", "concurrency"]
+requires    = ["rust.frameworks.15.parking-lot-ledger"]
+map          = { x = 0.567, y = 0.546, kind = "quest" }
+brief       = '''
+Line one is `<PRODUCERS>`, `1 <= PRODUCERS <= 8`. Every line after it is a
+payment slip, `<CARD> <CENTS>`. Slip `i` (0-based, slips only) belongs to
+producer `i % PRODUCERS`. A slip that is not exactly two fields, or whose
+cents is not an `i64`, is a bad slip: the producer skips it and sends
+nothing.
+
+Each producer is a thread that sends its good slips, one message each, down
+**one** `crossbeam::channel::bounded(4)` channel. One consumer — the main
+thread — reads the channel with `for msg in rx` until every sender is gone,
+then prints:
+
+* `MESSAGES <n>` — messages received
+* `TOTAL <sum of cents>`
+* `LARGEST <CARD> <CENTS>` — the single largest slip; on a tie, the smaller
+  card id (string order). With no messages, `LARGEST -`.
+
+```
+input:  3
+        K1 1200
+        K2 350
+        K3 oops
+        K4 1200
+        K5 90
+output: MESSAGES 4
+        TOTAL 2840
+        LARGEST K1 1200
+```
+
+`for msg in rx` ends only when the **last** `Sender` is dropped. Each
+producer gets a `tx.clone()`, and those drop when the threads finish — but
+the original `tx` is still sitting in `main`, so the loop never ends and the
+run is a timeout. Drop it before you start reading. The starter does not.
+'''
+starter     = '''
+use std::io::Read;
+use std::thread;
+
+use crossbeam::channel::bounded;
+
+struct Slip {
+    card: String,
+    cents: i64,
+}
+
+fn parse(line: &str) -> Option<Slip> {
+    let mut parts = line.split_whitespace();
+    let card = parts.next()?.to_string();
+    let cents = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(Slip { card, cents })
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let producers: usize = lines.next().expect("producer count").trim().parse().expect("producer count");
+    let slips: Vec<&str> = lines.filter(|l| !l.trim().is_empty()).collect();
+
+    let (tx, rx) = bounded::<Slip>(4);
+    let mut count = 0usize;
+    let mut total = 0i64;
+    let mut largest: Option<(i64, String)> = None;
+
+    thread::scope(|s| {
+        for p in 0..producers {
+            let tx = tx.clone();
+            let slips = &slips;
+            s.spawn(move || {
+                for line in slips.iter().skip(p).step_by(producers) {
+                    if let Some(slip) = parse(line) {
+                        tx.send(slip).expect("consumer alive");
+                    }
+                }
+            });
+        }
+
+        for slip in rx {
+            count += 1;
+            total += slip.cents;
+            let better = match &largest {
+                None => true,
+                Some((c, card)) => slip.cents > *c || (slip.cents == *c && slip.card < *card),
+            };
+            if better {
+                largest = Some((slip.cents, slip.card));
+            }
+        }
+    });
+
+    println!("MESSAGES {count}");
+    println!("TOTAL {total}");
+    match largest {
+        Some((cents, card)) => println!("LARGEST {card} {cents}"),
+        None => println!("LARGEST -"),
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::thread;
+
+use crossbeam::channel::bounded;
+
+struct Slip {
+    card: String,
+    cents: i64,
+}
+
+fn parse(line: &str) -> Option<Slip> {
+    let mut parts = line.split_whitespace();
+    let card = parts.next()?.to_string();
+    let cents = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(Slip { card, cents })
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let producers: usize = lines.next().expect("producer count").trim().parse().expect("producer count");
+    let slips: Vec<&str> = lines.filter(|l| !l.trim().is_empty()).collect();
+
+    let (tx, rx) = bounded::<Slip>(4);
+    let mut count = 0usize;
+    let mut total = 0i64;
+    let mut largest: Option<(i64, String)> = None;
+
+    thread::scope(|s| {
+        for p in 0..producers {
+            let tx = tx.clone();
+            let slips = &slips;
+            s.spawn(move || {
+                for line in slips.iter().skip(p).step_by(producers) {
+                    if let Some(slip) = parse(line) {
+                        tx.send(slip).expect("consumer alive");
+                    }
+                }
+            });
+        }
+        // Every producer holds its own clone. This one is ours, and while
+        // it lives the channel is never "closed" — so let go of it before
+        // reading.
+        drop(tx);
+
+        for slip in rx {
+            count += 1;
+            total += slip.cents;
+            let better = match &largest {
+                None => true,
+                Some((c, card)) => slip.cents > *c || (slip.cents == *c && slip.card < *card),
+            };
+            if better {
+                largest = Some((slip.cents, slip.card));
+            }
+        }
+    });
+
+    println!("MESSAGES {count}");
+    println!("TOTAL {total}");
+    match largest {
+        Some((cents, card)) => println!("LARGEST {card} {cents}"),
+        None => println!("LARGEST -"),
+    }
+}
+'''
+hints = [
+  "`use crossbeam::channel::bounded;` — `bounded(4)` gives `(Sender, Receiver)`; `Sender` is `Clone`, and a `Receiver` is an iterator that ends when the channel is closed.",
+  "A channel closes when *every* `Sender` has been dropped. Count them: one clone per producer, plus the one `bounded` handed you, which `main` still owns while it sits in `for slip in rx`.",
+  "The consumer must not run before the producers are spawned (they need the clones), and the original must be gone before the consumer starts: spawn, then `drop(tx);`, then the loop.",
+  "`drop(tx);` right after the `for p in 0..producers` loop, inside the `thread::scope` closure. Nothing else changes.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["crossbeam"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-producers-one-bad-slip", stdin = "3\nK1 1200\nK2 350\nK3 oops\nK4 1200\nK5 90\n", expect = "MESSAGES 4\nTOTAL 2840\nLARGEST K1 1200\n", visible = true },
+  { name = "eight-producers-two-good-slips", stdin = "8\nB2 7\nB1 7\nbad\nB3 7 extra\n", expect = "MESSAGES 2\nTOTAL 14\nLARGEST B1 7\n", visible = false },
+  { name = "nothing-valid", stdin = "2\nX\nY abc\n", expect = "MESSAGES 0\nTOTAL 0\nLARGEST -\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "rust.frameworks.17.crossbeam-select-timeout"
+node        = 17
+title       = "THREE HUNDRED MILLISECONDS"
+difficulty  = 3
+story       = "One card issuer behind the Gloucester Road gateway stopped answering at 11:52. The SOGO terminals showed PLEASE WAIT until two, because the gateway waited too."
+concepts    = ["channels", "cancellation", "concurrency"]
+requires    = ["rust.frameworks.16.crossbeam-hatch"]
+map          = { x = 0.729, y = 0.659, kind = "quest" }
+brief       = '''
+Standard input is zero or more lines `<CARD> <MS>`, at most twenty of them:
+a card id and how long that card's issuer takes to answer, in milliseconds.
+`MS` is either **at most 3** (an issuer that is up) or **at least 3000** (one
+that is not); at most three lines per run are the slow kind.
+
+Take the cards in order. For each, start a worker thread that sleeps `MS`
+milliseconds and then sends the card id back on a channel. Wait **at most
+300 ms** for the answer: print `<CARD> APPROVED` if it came, `<CARD> TIMEOUT`
+if it did not, and move on to the next card at once. After the last card
+print `APPROVED <a> TIMEOUT <t>`.
+
+```
+input:  V1 0
+        V2 3000
+        V3 2
+output: V1 APPROVED
+        V2 TIMEOUT
+        V3 APPROVED
+        APPROVED 2 TIMEOUT 1
+```
+
+The wait is `crossbeam::channel::select!` over two receivers: the worker's,
+and `after(Duration::from_millis(300))`, a channel that delivers one message
+when the time is up. Give **each card its own** `bounded(1)` channel, so a
+slow issuer's answer arriving three seconds late cannot be mistaken for the
+next card's. The worker sends with `let _ = tx.send(..)`: by then nobody may
+be listening, and that is fine. Spawn workers with `std::thread::spawn` and
+never join them — `main` returning ends the process, sleeping workers and
+all. The starter calls `rx.recv()` with no timeout and waits the full three
+seconds, then approves the card.
+'''
+starter     = '''
+use std::io::Read;
+use std::thread;
+use std::time::Duration;
+
+use crossbeam::channel::bounded;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut approved = 0usize;
+    let mut timed_out = 0usize;
+
+    for line in input.lines().filter(|l| !l.trim().is_empty()) {
+        let (card, ms) = line.trim().split_once(' ').expect("card and ms");
+        let card = card.to_string();
+        let ms: u64 = ms.trim().parse().expect("ms");
+
+        let (tx, rx) = bounded::<String>(1);
+        let issuer_card = card.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(ms));
+            let _ = tx.send(issuer_card);
+        });
+
+        match rx.recv() {
+            Ok(answer) => {
+                approved += 1;
+                println!("{answer} APPROVED");
+            }
+            Err(_) => {
+                timed_out += 1;
+                println!("{card} TIMEOUT");
+            }
+        }
+    }
+    println!("APPROVED {approved} TIMEOUT {timed_out}");
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::thread;
+use std::time::Duration;
+
+use crossbeam::channel::{after, bounded, select};
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut approved = 0usize;
+    let mut timed_out = 0usize;
+
+    for line in input.lines().filter(|l| !l.trim().is_empty()) {
+        let (card, ms) = line.trim().split_once(' ').expect("card and ms");
+        let card = card.to_string();
+        let ms: u64 = ms.trim().parse().expect("ms");
+
+        // A channel per card: a late answer lands in a channel nobody
+        // reads any more, instead of in the next card's.
+        let (tx, rx) = bounded::<String>(1);
+        let issuer_card = card.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(ms));
+            let _ = tx.send(issuer_card);
+        });
+
+        let timeout = after(Duration::from_millis(300));
+        select! {
+            recv(rx) -> answer => {
+                let answer = answer.expect("worker sent before dropping");
+                approved += 1;
+                println!("{answer} APPROVED");
+            }
+            recv(timeout) -> _ => {
+                timed_out += 1;
+                println!("{card} TIMEOUT");
+            }
+        }
+    }
+    println!("APPROVED {approved} TIMEOUT {timed_out}");
+    // Slow workers are still asleep. Returning from main ends them.
+}
+'''
+hints = [
+  "`use crossbeam::channel::{after, bounded, select};` — `after(d)` is a `Receiver<Instant>` that gets exactly one message, `d` from now. It is a channel like any other, which is what lets `select!` wait on it.",
+  "`select!` takes `recv(rx) -> msg => { .. }` arms and runs whichever receiver is ready first. Put the worker's receiver in one arm and the `after` receiver in the other.",
+  "`recv(rx) -> answer` gives a `Result`: `Ok(card)` from the worker. The timeout arm's message is an `Instant` you do not need: `recv(after(Duration::from_millis(300))) -> _ => { .. }`.",
+  "`select! { recv(rx) -> answer => { approved += 1; println!(\"{} APPROVED\", answer.unwrap()); } recv(after(Duration::from_millis(300))) -> _ => { timed_out += 1; println!(\"{card} TIMEOUT\"); } }`",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["crossbeam"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "one-slow-issuer", stdin = "V1 0\nV2 3000\nV3 2\n", expect = "V1 APPROVED\nV2 TIMEOUT\nV3 APPROVED\nAPPROVED 2 TIMEOUT 1\n", visible = true },
+  { name = "all-fast", stdin = "A 0\nB 1\nC 3\nD 0\n", expect = "A APPROVED\nB APPROVED\nC APPROVED\nD APPROVED\nAPPROVED 4 TIMEOUT 0\n", visible = false },
+  { name = "three-slow", stdin = "S1 3000\nS2 4000\nF1 1\nS3 3000\n", expect = "S1 TIMEOUT\nS2 TIMEOUT\nF1 APPROVED\nS3 TIMEOUT\nAPPROVED 1 TIMEOUT 3\n", visible = false },
+  { name = "no-cards", stdin = "", expect = "APPROVED 0 TIMEOUT 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "rust.frameworks.18.tokio-spawn-join"
+node        = 18
+title       = "ONE TASK PER LINE"
+difficulty  = 3
+story       = "The settlement checker off Gloucester Road prints each line the moment the acquirer answers it. This morning's file came back with line 40 above line 1, and the reconciliation desk at SOGO sent it straight back."
+concepts    = ["async", "concurrency", "iteration"]
+requires    = ["rust.frameworks.17.crossbeam-select-timeout"]
+map          = { x = 0.874, y = 0.552, kind = "quest" }
+brief       = '''
+Standard input is up to 50 lines of `<MERCHANT> <CENTS>`: one word, then a
+non-negative integer. Blank lines are skipped.
+
+Every line is checked by its own `tokio::spawn`ed task. A check is two
+things done together with `tokio::join!`: the tag (the merchant upper-cased)
+and the fee (`cents * 15 / 1000`, rounded down). The acquirer's round trip
+is simulated — `tokio::time::sleep` for `(cents % 5) * 50` milliseconds
+before the two run — and the starter already has it; keep it. It is why the
+tasks do not finish in the order they started.
+
+Print one line per input line, **in input order**, `<n> <TAG> <cents> <fee>`
+with `n` 1-based, then `TOTAL <sum of cents> <sum of fees>`. Empty input
+prints only `TOTAL 0 0`.
+
+```
+input:  lucky-mac 3804
+        sogo 12502
+        tsui-wah 700
+output: 1 LUCKY-MAC 3804 57
+        2 SOGO 12502 187
+        3 TSUI-WAH 700 10
+        TOTAL 17006 254
+```
+
+The main function is `#[tokio::main] async fn main()`. Keep every
+`JoinHandle` in a `Vec` and `.await` them in the order they were pushed; a
+task returns its result, it does not print. The starter prints from inside
+the task, as each one finishes — which is the order of the sleeps, not the
+order of the file.
+'''
+starter     = '''
+use std::io::Read;
+use std::time::Duration;
+
+async fn check(n: usize, merchant: String, cents: i64) -> (i64, i64) {
+    // the acquirer's round trip
+    tokio::time::sleep(Duration::from_millis((cents % 5) as u64 * 50)).await;
+    let tag = merchant.to_uppercase();
+    let fee = cents * 15 / 1000;
+    println!("{n} {tag} {cents} {fee}");
+    (cents, fee)
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut handles = Vec::new();
+    let mut n = 0;
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(merchant) = parts.next() else { continue };
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        n += 1;
+        handles.push(tokio::spawn(check(n, merchant.to_string(), cents)));
+    }
+    let (mut total, mut fees) = (0, 0);
+    for handle in handles {
+        let (cents, fee) = handle.await.expect("task panicked");
+        total += cents;
+        fees += fee;
+    }
+    println!("TOTAL {total} {fees}");
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::time::Duration;
+
+async fn tag(merchant: &str) -> String {
+    merchant.to_uppercase()
+}
+
+async fn fee(cents: i64) -> i64 {
+    cents * 15 / 1000
+}
+
+async fn check(merchant: String, cents: i64) -> (String, i64, i64) {
+    // the acquirer's round trip
+    tokio::time::sleep(Duration::from_millis((cents % 5) as u64 * 50)).await;
+    let (tag, fee) = tokio::join!(tag(&merchant), fee(cents));
+    (tag, cents, fee)
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut handles = Vec::new();
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(merchant) = parts.next() else { continue };
+        let cents: i64 = parts.next().unwrap().parse().unwrap();
+        handles.push(tokio::spawn(check(merchant.to_string(), cents)));
+    }
+    let (mut total, mut fees) = (0, 0);
+    for (i, handle) in handles.into_iter().enumerate() {
+        let (tag, cents, fee) = handle.await.expect("task panicked");
+        total += cents;
+        fees += fee;
+        println!("{} {tag} {cents} {fee}", i + 1);
+    }
+    println!("TOTAL {total} {fees}");
+}
+'''
+hints = [
+  "`tokio::spawn(fut)` returns a `JoinHandle<T>` where `T` is what the future returns. Make the task *return* its line's data instead of printing it.",
+  "`tokio::join!(a, b)` runs two futures on the same task and gives back `(a_result, b_result)` — the tag and the fee, inside `check`.",
+  "A `Vec<JoinHandle<_>>` awaited front to back is the input order, whatever order the tasks actually finished in: `for (i, h) in handles.into_iter().enumerate() { let (tag, cents, fee) = h.await.unwrap(); println!(...); }`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["tokio"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-merchants", stdin = "lucky-mac 3804\nsogo 12502\ntsui-wah 700\n", expect = "1 LUCKY-MAC 3804 57\n2 SOGO 12502 187\n3 TSUI-WAH 700 10\nTOTAL 17006 254\n", visible = true },
+  { name = "ties-and-zero", stdin = "hysan 99\ntimes-square 0\nsogo 104\nmtr 1003\ntram 260\n", expect = "1 HYSAN 99 1\n2 TIMES-SQUARE 0 0\n3 SOGO 104 1\n4 MTR 1003 15\n5 TRAM 260 3\nTOTAL 1466 20\n", visible = false },
+  { name = "one-line", stdin = "victoria-park 1\n", expect = "1 VICTORIA-PARK 1 0\nTOTAL 1 0\n", visible = false },
+  { name = "empty-input", stdin = "", expect = "TOTAL 0 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "rust.frameworks.19.tokio-mpsc-drop-sender"
+node        = 19
+title       = "THE LAST TILL CLOSES"
+difficulty  = 3
+story       = "Four tills at Hysan Place feed one drawer count over a channel. The count never prints: the counting task is still waiting on a till that stopped sending at closing time."
+concepts    = ["async", "channels", "cancellation"]
+requires    = ["rust.frameworks.18.tokio-spawn-join"]
+map          = { x = 0.869, y = 0.873, kind = "quest" }
+brief       = '''
+Line one is `P`, the number of tills (1 to 8). Every following line is
+`<TILL> <CENTS>`: a till number and an integer amount. A line whose till is
+not in `1..=P` is dropped on the floor — not sent, not counted.
+
+Each till is a producer task: `tokio::spawn` one per till, holding a clone of
+the sender of a `tokio::sync::mpsc::channel(4)`, and sending `(till, cents)`
+for each of its lines, in file order. The one consumer, in `main`, receives
+with `while let Some((till, cents)) = rx.recv().await` and tallies.
+
+When the channel is drained print, for each till 1 to P,
+`TILL <k> <count> <sum>`, then `TOTAL <count> <sum>` over all of them.
+
+```
+input:  3
+        1 1200
+        2 3000
+        1 800
+        3 50
+        2 1000
+output: TILL 1 2 2000
+        TILL 2 2 4000
+        TILL 3 1 50
+        TOTAL 5 6050
+```
+
+`recv()` returns `None` only when **every** sender is gone. The producers
+drop their clones when they return; the original `tx` in `main` is still
+alive, so the loop never ends. The starter is that program. Fix it and the
+output does not depend on which till sent first — the tally is the same
+whatever order the messages arrive in.
+'''
+starter     = '''
+use std::io::Read;
+
+use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let tills: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut queues: Vec<Vec<i64>> = vec![Vec::new(); tills];
+    for line in lines {
+        let mut parts = line.split_whitespace();
+        let (Some(till), Some(cents)) = (parts.next(), parts.next()) else { continue };
+        let till: usize = till.parse().unwrap();
+        let cents: i64 = cents.parse().unwrap();
+        if (1..=tills).contains(&till) {
+            queues[till - 1].push(cents);
+        }
+    }
+
+    let (tx, mut rx) = mpsc::channel::<(usize, i64)>(4);
+    for (i, queue) in queues.into_iter().enumerate() {
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            for cents in queue {
+                tx.send((i + 1, cents)).await.expect("consumer is listening");
+            }
+        });
+    }
+
+    let mut count = vec![0usize; tills];
+    let mut sum = vec![0i64; tills];
+    while let Some((till, cents)) = rx.recv().await {
+        count[till - 1] += 1;
+        sum[till - 1] += cents;
+    }
+    for k in 0..tills {
+        println!("TILL {} {} {}", k + 1, count[k], sum[k]);
+    }
+    println!("TOTAL {} {}", count.iter().sum::<usize>(), sum.iter().sum::<i64>());
+}
+'''
+solution    = '''
+use std::io::Read;
+
+use tokio::sync::mpsc;
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let tills: usize = lines.next().unwrap().trim().parse().unwrap();
+
+    let mut queues: Vec<Vec<i64>> = vec![Vec::new(); tills];
+    for line in lines {
+        let mut parts = line.split_whitespace();
+        let (Some(till), Some(cents)) = (parts.next(), parts.next()) else { continue };
+        let till: usize = till.parse().unwrap();
+        let cents: i64 = cents.parse().unwrap();
+        if (1..=tills).contains(&till) {
+            queues[till - 1].push(cents);
+        }
+    }
+
+    let (tx, mut rx) = mpsc::channel::<(usize, i64)>(4);
+    for (i, queue) in queues.into_iter().enumerate() {
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            for cents in queue {
+                tx.send((i + 1, cents)).await.expect("consumer is listening");
+            }
+            // `tx` (this till's clone) is dropped here, when the till closes
+        });
+    }
+    // the clones are with the tills; this one would keep the channel open
+    drop(tx);
+
+    let mut count = vec![0usize; tills];
+    let mut sum = vec![0i64; tills];
+    while let Some((till, cents)) = rx.recv().await {
+        count[till - 1] += 1;
+        sum[till - 1] += cents;
+    }
+    for k in 0..tills {
+        println!("TILL {} {} {}", k + 1, count[k], sum[k]);
+    }
+    println!("TOTAL {} {}", count.iter().sum::<usize>(), sum.iter().sum::<i64>());
+}
+'''
+hints = [
+  "`tokio::sync::mpsc::channel(4)` gives `(Sender, Receiver)`. `Receiver::recv().await` is `Some(msg)` while any `Sender` exists and `None` once the last one is dropped.",
+  "Count the senders: one clone per till, moved into its task and dropped when the task returns — and the original in `main`, which nobody drops.",
+  "`drop(tx);` right after the spawn loop. Then `while let Some(..) = rx.recv().await` ends exactly when the last till has finished sending.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["tokio"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-tills", stdin = "3\n1 1200\n2 3000\n1 800\n3 50\n2 1000\n", expect = "TILL 1 2 2000\nTILL 2 2 4000\nTILL 3 1 50\nTOTAL 5 6050\n", visible = true },
+  { name = "idle-till-and-stray-lines", stdin = "4\n1 10\n5 999\n0 999\n4 20\n1 30\n", expect = "TILL 1 2 40\nTILL 2 0 0\nTILL 3 0 0\nTILL 4 1 20\nTOTAL 3 60\n", visible = false },
+  { name = "more-than-the-buffer", stdin = "2\n1 1\n2 2\n1 3\n2 4\n1 5\n2 6\n1 7\n2 8\n1 9\n2 10\n1 11\n2 12\n1 13\n2 14\n1 15\n2 16\n1 17\n2 18\n1 19\n2 20\n", expect = "TILL 1 10 100\nTILL 2 10 110\nTOTAL 20 210\n", visible = false },
+  { name = "one-till-no-lines", stdin = "1\n", expect = "TILL 1 0 0\nTOTAL 0 0\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "rust.frameworks.20.tokio-timeout-select"
+node        = 20
+title       = "ONE SECOND, THEN NO"
+difficulty  = 3
+story       = "The terminal at the Times Square Lucky Mac waits on the acquirer for as long as the acquirer takes. On a slow afternoon that was three seconds a tap, and the queue reached the escalator."
+concepts    = ["async", "cancellation", "pattern-matching"]
+requires    = ["rust.frameworks.19.tokio-mpsc-drop-sender"]
+map          = { x = 0.721, y = 0.752, kind = "quest" }
+brief       = '''
+Standard input is up to 8 lines of `<ID> <PRIMARY> <BACKUP>`: a
+non-negative integer and two words, each `fast` or `slow`. At most two lines
+are `slow slow`.
+
+Every tap is authorised by two acquirers at once. Each answers the code
+`id * 37 % 1000` after a delay — simulate the delay with `tokio::time::sleep`:
+
+* primary: `fast` 10 ms, `slow` 3 s
+* backup: `fast` 100 ms, `slow` 3 s
+
+The first to answer wins: `tokio::select!` over the two futures. The whole
+race is wrapped in `tokio::time::timeout` of **one second**. Handle the lines one
+at a time, in order, and print for each:
+
+* `DONE <id> primary <code>` or `DONE <id> backup <code>` — who won
+* `TIMEOUT <id>` — neither answered in time
+
+```
+input:  7 fast fast
+        8 slow fast
+        9 slow slow
+output: DONE 7 primary 259
+        DONE 8 backup 296
+        TIMEOUT 9
+```
+
+`timeout(dur, fut).await` is `Ok(value)` or `Err(Elapsed)`; when it is `Err`
+the future inside has been dropped, sleep and all — the 3 s is never waited
+out. The starter awaits the primary alone, with no timeout, and never asks
+the backup.
+'''
+starter     = '''
+use std::io::Read;
+use std::time::Duration;
+
+use tokio::time::sleep;
+
+async fn primary(id: u64, speed: &str) -> u64 {
+    let wait = if speed == "slow" { Duration::from_secs(3) } else { Duration::from_millis(10) };
+    sleep(wait).await;
+    id * 37 % 1000
+}
+
+async fn backup(id: u64, speed: &str) -> u64 {
+    let wait = if speed == "slow" { Duration::from_secs(3) } else { Duration::from_millis(100) };
+    sleep(wait).await;
+    id * 37 % 1000
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(id) = parts.next() else { continue };
+        let id: u64 = id.parse().unwrap();
+        let primary_speed = parts.next().unwrap();
+        let _backup_speed = parts.next().unwrap(); // the backup is not wired up yet
+        let code = primary(id, primary_speed).await;
+        println!("DONE {id} primary {code}");
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::time::Duration;
+
+use tokio::time::{sleep, timeout};
+
+async fn primary(id: u64, speed: &str) -> u64 {
+    let wait = if speed == "slow" { Duration::from_secs(3) } else { Duration::from_millis(10) };
+    sleep(wait).await;
+    id * 37 % 1000
+}
+
+async fn backup(id: u64, speed: &str) -> u64 {
+    let wait = if speed == "slow" { Duration::from_secs(3) } else { Duration::from_millis(100) };
+    sleep(wait).await;
+    id * 37 % 1000
+}
+
+/// Whichever acquirer answers first; the other future is dropped.
+async fn authorise(id: u64, primary_speed: &str, backup_speed: &str) -> (&'static str, u64) {
+    tokio::select! {
+        code = primary(id, primary_speed) => ("primary", code),
+        code = backup(id, backup_speed) => ("backup", code),
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(id) = parts.next() else { continue };
+        let id: u64 = id.parse().unwrap();
+        let primary_speed = parts.next().unwrap();
+        let backup_speed = parts.next().unwrap();
+        match timeout(Duration::from_secs(1), authorise(id, primary_speed, backup_speed)).await {
+            Ok((who, code)) => println!("DONE {id} {who} {code}"),
+            Err(_elapsed) => println!("TIMEOUT {id}"),
+        }
+    }
+}
+'''
+hints = [
+  "`use tokio::time::{sleep, timeout};` — `timeout(Duration::from_secs(1), fut).await` gives `Result<T, Elapsed>`, and dropping the inner future is what cancels it.",
+  "`tokio::select! { a = fut_a => ..., b = fut_b => ... }` polls both and runs the arm of the first to finish; the other future is dropped there and then.",
+  "Put the `select!` in an `async fn authorise(...) -> (&'static str, u64)` and wrap *that* in the timeout, so one deadline covers both acquirers.",
+  "`match timeout(..).await { Ok((who, code)) => println!(\"DONE {id} {who} {code}\"), Err(_) => println!(\"TIMEOUT {id}\") }`.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["tokio"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-taps", stdin = "7 fast fast\n8 slow fast\n9 slow slow\n", expect = "DONE 7 primary 259\nDONE 8 backup 296\nTIMEOUT 9\n", visible = true },
+  { name = "all-fast", stdin = "1 fast fast\n2 fast slow\n3 fast fast\n", expect = "DONE 1 primary 37\nDONE 2 primary 74\nDONE 3 primary 111\n", visible = false },
+  { name = "backup-carries-the-afternoon", stdin = "40 slow fast\n41 slow fast\n123456 fast slow\n", expect = "DONE 40 backup 480\nDONE 41 backup 517\nDONE 123456 primary 872\n", visible = false },
+  { name = "two-timeouts", stdin = "9 slow slow\n7 fast fast\n9 slow slow\n", expect = "TIMEOUT 9\nDONE 7 primary 259\nTIMEOUT 9\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "rust.frameworks.21.futures-join-all"
+node        = 21
+title       = "EIGHTY AT ONCE"
+difficulty  = 4
+story       = "The nightly risk score walks the Yee Wo Street merchants one after another, a hundred milliseconds each. At eighty merchants it no longer finishes inside the settlement window and the whole street posts a day late."
+concepts    = ["async", "concurrency", "sorting", "error-handling"]
+requires    = ["rust.frameworks.20.tokio-timeout-select"]
+map          = { x = 0.569, y = 0.878, kind = "quest" }
+brief       = '''
+Standard input is up to 100 lines of `<ID> <CENTS>`: two non-negative
+integers. Three passes over them, each one an `async fn` per line that
+already exists in the starter:
+
+1. **Score.** `score(id, cents)` takes 100 ms (a `sleep`) and returns
+   `(id * 7 + cents) % 100`. Run every score at once with
+   `futures::future::join_all`, which returns the results in the order the
+   futures were given. Print `<id> <score>` per line, in input order.
+2. **Bucket.** `bucket(cents)` takes 20 ms and returns `cents / 10000`. The
+   bucket service allows four in flight at a time: build the stream with
+   `futures::stream::iter(..).map(..).buffer_unordered(4)`, `collect` it to
+   a `Vec`, sort ascending, and print `BUCKETS <b1> <b2> ...` on one line
+   (`BUCKETS` alone when there are no lines).
+3. **Limit.** `check(id, cents)` is `Err(id)` when `cents > 500000`, else
+   `Ok(cents)`. Run them with `futures::future::try_join_all`: print
+   `OK <sum of cents>`, or `REJECTED <id>` for the first over-limit line in
+   input order.
+
+```
+input:  1 3800
+        2 12500
+        3 250000
+output: 1 7
+        2 14
+        3 21
+        BUCKETS 0 1 25
+        OK 266300
+```
+
+A hundred lines must finish in well under a second. The starter awaits the
+same three functions one line at a time, which is a hundred milliseconds per
+merchant; above fifty merchants the judge's five seconds are gone.
+'''
+starter     = '''
+use std::io::Read;
+use std::time::Duration;
+
+use tokio::time::sleep;
+
+const LIMIT: i64 = 500_000;
+
+async fn score(id: i64, cents: i64) -> i64 {
+    sleep(Duration::from_millis(100)).await;
+    (id * 7 + cents) % 100
+}
+
+async fn bucket(cents: i64) -> i64 {
+    sleep(Duration::from_millis(20)).await;
+    cents / 10_000
+}
+
+async fn check(id: i64, cents: i64) -> Result<i64, i64> {
+    if cents > LIMIT { Err(id) } else { Ok(cents) }
+}
+
+fn parse(input: &str) -> Vec<(i64, i64)> {
+    input
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let id = parts.next()?.parse().ok()?;
+            let cents = parts.next()?.parse().ok()?;
+            Some((id, cents))
+        })
+        .collect()
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let rows = parse(&input);
+
+    for &(id, cents) in &rows {
+        let s = score(id, cents).await;
+        println!("{id} {s}");
+    }
+
+    let mut buckets = Vec::new();
+    for &(_, cents) in &rows {
+        buckets.push(bucket(cents).await);
+    }
+    buckets.sort_unstable();
+    let list: Vec<String> = buckets.iter().map(|b| b.to_string()).collect();
+    println!("{}", ["BUCKETS".to_string()].into_iter().chain(list).collect::<Vec<_>>().join(" "));
+
+    let mut total = 0;
+    let mut rejected = None;
+    for &(id, cents) in &rows {
+        match check(id, cents).await {
+            Ok(c) => total += c,
+            Err(id) => {
+                rejected = Some(id);
+                break;
+            }
+        }
+    }
+    match rejected {
+        Some(id) => println!("REJECTED {id}"),
+        None => println!("OK {total}"),
+    }
+}
+'''
+solution    = '''
+use std::io::Read;
+use std::time::Duration;
+
+use futures::future::{join_all, try_join_all};
+use futures::stream::{self, StreamExt};
+use tokio::time::sleep;
+
+const LIMIT: i64 = 500_000;
+
+async fn score(id: i64, cents: i64) -> i64 {
+    sleep(Duration::from_millis(100)).await;
+    (id * 7 + cents) % 100
+}
+
+async fn bucket(cents: i64) -> i64 {
+    sleep(Duration::from_millis(20)).await;
+    cents / 10_000
+}
+
+async fn check(id: i64, cents: i64) -> Result<i64, i64> {
+    if cents > LIMIT { Err(id) } else { Ok(cents) }
+}
+
+fn parse(input: &str) -> Vec<(i64, i64)> {
+    input
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let id = parts.next()?.parse().ok()?;
+            let cents = parts.next()?.parse().ok()?;
+            Some((id, cents))
+        })
+        .collect()
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let rows = parse(&input);
+
+    // all at once; the Vec comes back in the order the futures went in
+    let scores = join_all(rows.iter().map(|&(id, cents)| score(id, cents))).await;
+    for (&(id, _), s) in rows.iter().zip(&scores) {
+        println!("{id} {s}");
+    }
+
+    // four in flight, results in completion order — so sort before printing
+    let mut buckets: Vec<i64> = stream::iter(&rows)
+        .map(|&(_, cents)| bucket(cents))
+        .buffer_unordered(4)
+        .collect()
+        .await;
+    buckets.sort_unstable();
+    let list: Vec<String> = buckets.iter().map(|b| b.to_string()).collect();
+    println!("{}", ["BUCKETS".to_string()].into_iter().chain(list).collect::<Vec<_>>().join(" "));
+
+    // the first Err wins and the rest are dropped
+    match try_join_all(rows.iter().map(|&(id, cents)| check(id, cents))).await {
+        Ok(amounts) => println!("OK {}", amounts.iter().sum::<i64>()),
+        Err(id) => println!("REJECTED {id}"),
+    }
+}
+'''
+hints = [
+  "`use futures::future::{join_all, try_join_all}; use futures::stream::{self, StreamExt};` — `join_all(iter_of_futures).await` is a `Vec` of results in the same order as the input.",
+  "`stream::iter(&rows).map(|&(_, c)| bucket(c)).buffer_unordered(4).collect::<Vec<_>>().await` keeps four futures running and yields each as it finishes; `.sort_unstable()` afterwards makes the order yours again.",
+  "`try_join_all(..).await` is `Ok(Vec<T>)` when every future is `Ok`, or the first `Err` — `check` never awaits anything, so the first in input order is the first to be polled.",
+  "`let scores = join_all(rows.iter().map(|&(id, c)| score(id, c))).await;` then `rows.iter().zip(&scores)` to print.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["futures", "tokio"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "three-merchants", stdin = "1 3800\n2 12500\n3 250000\n", expect = "1 7\n2 14\n3 21\nBUCKETS 0 1 25\nOK 266300\n", visible = true },
+  { name = "eighty-merchants", stdin = "1 7919\n2 15838\n3 23757\n4 31676\n5 39595\n6 47514\n7 55433\n8 63352\n9 71271\n10 79190\n11 87109\n12 95028\n13 102947\n14 110866\n15 118785\n16 126704\n17 134623\n18 142542\n19 150461\n20 158380\n21 166299\n22 174218\n23 182137\n24 190056\n25 197975\n26 205894\n27 213813\n28 221732\n29 229651\n30 237570\n31 245489\n32 253408\n33 261327\n34 269246\n35 277165\n36 285084\n37 293003\n38 300922\n39 308841\n40 316760\n41 324679\n42 332598\n43 340517\n44 348436\n45 356355\n46 364274\n47 372193\n48 380112\n49 388031\n50 395950\n51 403869\n52 411788\n53 419707\n54 427626\n55 435545\n56 443464\n57 451383\n58 459302\n59 467221\n60 475140\n61 3059\n62 10978\n63 18897\n64 26816\n65 34735\n66 42654\n67 50573\n68 58492\n69 66411\n70 74330\n71 82249\n72 90168\n73 98087\n74 106006\n75 113925\n76 121844\n77 129763\n78 137682\n79 145601\n80 153520\n", expect = "1 26\n2 52\n3 78\n4 4\n5 30\n6 56\n7 82\n8 8\n9 34\n10 60\n11 86\n12 12\n13 38\n14 64\n15 90\n16 16\n17 42\n18 68\n19 94\n20 20\n21 46\n22 72\n23 98\n24 24\n25 50\n26 76\n27 2\n28 28\n29 54\n30 80\n31 6\n32 32\n33 58\n34 84\n35 10\n36 36\n37 62\n38 88\n39 14\n40 40\n41 66\n42 92\n43 18\n44 44\n45 70\n46 96\n47 22\n48 48\n49 74\n50 0\n51 26\n52 52\n53 78\n54 4\n55 30\n56 56\n57 82\n58 8\n59 34\n60 60\n61 86\n62 12\n63 38\n64 64\n65 90\n66 16\n67 42\n68 68\n69 94\n70 20\n71 46\n72 72\n73 98\n74 24\n75 50\n76 76\n77 2\n78 28\n79 54\n80 80\nBUCKETS 0 0 1 1 1 2 2 3 3 3 4 4 5 5 5 6 6 7 7 7 8 8 9 9 9 10 10 11 11 11 12 12 12 13 13 14 14 15 15 15 16 17 18 19 19 20 21 22 22 23 24 25 26 26 27 28 29 30 30 31 32 33 34 34 35 36 37 38 38 39 40 41 41 42 43 44 45 45 46 47\nOK 16057560\n", visible = false },
+  { name = "over-the-limit", stdin = "5 500000\n6 500001\n7 600000\n", expect = "5 35\n6 43\n7 49\nBUCKETS 50 50 60\nREJECTED 6\n", visible = false },
+  { name = "no-merchants", stdin = "", expect = "BUCKETS\nOK 0\n", visible = false },
+  { name = "forty-with-a-late-rejection", stdin = "101 3301\n102 6602\n103 9903\n104 13204\n105 16505\n106 19806\n107 23107\n108 26408\n109 29709\n110 33010\n111 36311\n112 39612\n113 42913\n114 46214\n115 49515\n116 52816\n117 56117\n118 59418\n119 62719\n120 66020\n121 69321\n122 72622\n123 75923\n124 79224\n125 82525\n126 85826\n127 89127\n128 92428\n129 95729\n130 99030\n131 102331\n132 105632\n133 108933\n134 112234\n135 500001\n136 118836\n137 122137\n138 900000\n139 128739\n140 132040\n", expect = "101 8\n102 16\n103 24\n104 32\n105 40\n106 48\n107 56\n108 64\n109 72\n110 80\n111 88\n112 96\n113 4\n114 12\n115 20\n116 28\n117 36\n118 44\n119 52\n120 60\n121 68\n122 76\n123 84\n124 92\n125 0\n126 8\n127 16\n128 24\n129 32\n130 40\n131 48\n132 56\n133 64\n134 72\n135 46\n136 88\n137 96\n138 66\n139 12\n140 20\nBUCKETS 0 0 0 1 1 1 2 2 2 3 3 3 4 4 4 5 5 5 6 6 6 7 7 7 8 8 8 9 9 9 10 10 10 11 11 12 12 13 50 90\nREJECTED 135\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "rust.frameworks.22.log-trait"
+node        = 22
+title       = "WHAT THE FLOOR HEARS"
+difficulty  = 3
+story       = "The settlement service on Gloucester Road logs with a bare print behind a stack of ifs. Somebody set it to warn for the Percival Street rollout, and the errors stopped appearing while the debug lines kept coming."
+concepts    = ["traits", "io", "imports"]
+requires    = ["rust.frameworks.21.futures-join-all"]
+map          = { x = 0.417, y = 0.751, kind = "quest" }
+brief       = '''
+Line one is a level word, in any case: `off`, `error`, `warn`, `info`,
+`debug` or `trace`. Any other word prints `unknown level <word>` and nothing
+else. Every following line is `<ACCOUNT> <AMOUNT>`.
+
+Walk the lines, numbering them from 1, and log through the `log` crate's
+macros, each with an explicit target:
+
+* `trace!(target: "io", "read {raw:?}")` — the raw line, `Debug`-quoted
+* `error!(target: "settle", "line {n}: not a number: {amount}")` when the
+  amount is not an `i64`; the line is skipped
+* `info!(target: "settle", "line {n}: {account} {cents}")`
+* `warn!(target: "settle", "line {n}: large amount {cents}")` when
+  `cents > 100000`, after the `info!`
+* `debug!(target: "settle", "total so far {total}")` after adding it
+
+Then, whatever the level, `println!("TOTAL {total}")`.
+
+A record is printed to **standard output** as `[LEVEL] target: message`,
+and only when its level is at or above the chosen one — `error` is the top,
+`trace` the bottom, `off` prints nothing but the total.
+
+```
+input:  info
+        A 100
+        B 250000
+        C 7x
+        D 1
+output: [INFO] settle: line 1: A 100
+        [INFO] settle: line 2: B 250000
+        [WARN] settle: line 2: large amount 250000
+        [ERROR] settle: line 3: not a number: 7x
+        [INFO] settle: line 4: D 1
+        TOTAL 250101
+```
+
+Implement `log::Log` for a unit struct — `enabled` compares the record's
+level with `log::max_level()`, `log` prints when enabled, `flush` flushes
+stdout — put one in a `static LOGGER`, `log::set_logger(&LOGGER)`, and
+`log::set_max_level` with the word parsed as a `LevelFilter`. The starter
+has its own level table and compares it the wrong way round.
+'''
+starter     = '''
+use std::io::Read;
+
+fn rank(level: &str) -> u8 {
+    match level {
+        "off" => 0,
+        "error" => 1,
+        "warn" => 2,
+        "info" => 3,
+        "debug" => 4,
+        "trace" => 5,
+        _ => 3,
+    }
+}
+
+fn emit(min: u8, level: &str, target: &str, message: String) {
+    // show everything at least as high as the chosen level
+    if rank(level) >= min {
+        println!("[{}] {target}: {message}", level.to_uppercase());
+    }
+}
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let word = lines.next().unwrap_or("").trim().to_lowercase();
+    let min = rank(&word);
+
+    let mut total = 0i64;
+    for (i, raw) in lines.enumerate() {
+        let n = i + 1;
+        emit(min, "trace", "io", format!("read {raw:?}"));
+        let mut parts = raw.split_whitespace();
+        let account = parts.next().unwrap_or("");
+        let amount = parts.next().unwrap_or("");
+        let cents: i64 = match amount.parse() {
+            Ok(c) => c,
+            Err(_) => {
+                emit(min, "error", "settle", format!("line {n}: not a number: {amount}"));
+                continue;
+            }
+        };
+        emit(min, "info", "settle", format!("line {n}: {account} {cents}"));
+        if cents > 100_000 {
+            emit(min, "warn", "settle", format!("line {n}: large amount {cents}"));
+        }
+        total += cents;
+        emit(min, "debug", "settle", format!("total so far {total}"));
+    }
+    println!("TOTAL {total}");
+}
+'''
+solution    = '''
+use std::io::{Read, Write};
+
+use log::{debug, error, info, trace, warn, LevelFilter, Log, Metadata, Record};
+
+/// Every record at or above the max level, one line each, on stdout.
+struct StdoutLogger;
+
+impl Log for StdoutLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        // Error is the smallest Level; a record passes when it is no
+        // further down than the filter
+        metadata.level() <= log::max_level()
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            println!("[{}] {}: {}", record.level(), record.target(), record.args());
+        }
+    }
+
+    fn flush(&self) {
+        std::io::stdout().flush().ok();
+    }
+}
+
+static LOGGER: StdoutLogger = StdoutLogger;
+
+fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let mut lines = input.lines();
+    let word = lines.next().unwrap_or("").trim();
+    let Ok(level) = word.parse::<LevelFilter>() else {
+        println!("unknown level {word}");
+        return;
+    };
+    log::set_logger(&LOGGER).expect("no logger was set before this one");
+    log::set_max_level(level);
+
+    let mut total = 0i64;
+    for (i, raw) in lines.enumerate() {
+        let n = i + 1;
+        trace!(target: "io", "read {raw:?}");
+        let mut parts = raw.split_whitespace();
+        let account = parts.next().unwrap_or("");
+        let amount = parts.next().unwrap_or("");
+        let cents: i64 = match amount.parse() {
+            Ok(c) => c,
+            Err(_) => {
+                error!(target: "settle", "line {n}: not a number: {amount}");
+                continue;
+            }
+        };
+        info!(target: "settle", "line {n}: {account} {cents}");
+        if cents > 100_000 {
+            warn!(target: "settle", "line {n}: large amount {cents}");
+        }
+        total += cents;
+        debug!(target: "settle", "total so far {total}");
+    }
+    log::logger().flush();
+    println!("TOTAL {total}");
+}
+'''
+hints = [
+  "`use log::{Log, Metadata, Record, LevelFilter};` — `impl Log for YourStruct` is three methods: `enabled`, `log`, `flush`. `\"warn\".parse::<LevelFilter>()` reads the word, any case.",
+  "`static LOGGER: StdoutLogger = StdoutLogger; log::set_logger(&LOGGER).unwrap(); log::set_max_level(level);` — `set_logger` wants a `&'static dyn Log`, which is why it is a `static`, not a `let`.",
+  "`Level` orders `Error < Warn < Info < Debug < Trace`, so a record is wanted when `record.level() <= log::max_level()`. The macros already check `max_level()` before they call you.",
+  "`println!(\"[{}] {}: {}\", record.level(), record.target(), record.args())` — `Level` displays as `ERROR`, `WARN`, ...; the `target:` you pass in each macro is what `record.target()` returns.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["log"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "info", stdin = "info\nA 100\nB 250000\nC 7x\nD 1\n", expect = "[INFO] settle: line 1: A 100\n[INFO] settle: line 2: B 250000\n[WARN] settle: line 2: large amount 250000\n[ERROR] settle: line 3: not a number: 7x\n[INFO] settle: line 4: D 1\nTOTAL 250101\n", visible = true },
+  { name = "warn-keeps-the-errors", stdin = "warn\nA 100\nB 250000\nC 7x\nD 1\n", expect = "[WARN] settle: line 2: large amount 250000\n[ERROR] settle: line 3: not a number: 7x\nTOTAL 250101\n", visible = false },
+  { name = "trace-in-capitals", stdin = "TRACE\nA 100\nB x\n", expect = "[TRACE] io: read \"A 100\"\n[INFO] settle: line 1: A 100\n[DEBUG] settle: total so far 100\n[TRACE] io: read \"B x\"\n[ERROR] settle: line 2: not a number: x\nTOTAL 100\n", visible = false },
+  { name = "off-is-only-the-total", stdin = "off\nA 100\nB 250000\nC 7x\n", expect = "TOTAL 250100\n", visible = false },
+  { name = "error-only", stdin = "error\nA 100\nB 250000\nC 7x\n", expect = "[ERROR] settle: line 3: not a number: 7x\nTOTAL 250100\n", visible = false },
+  { name = "unknown-level", stdin = "loud\nA 100\n", expect = "unknown level loud\n", visible = false },
+]
+
+# ---------------------------------------------------------------- 23  BOSS
+
+[[quest]]
+id          = "rust.frameworks.23.the-settlement"
+node        = 23
+title       = "THE SETTLEMENT"
+difficulty  = 5
+story       = "17:30 on the payment path off Gloucester Road. The day's transfers arrive as one JSON file, the bank wants one line per account by 18:00, and the file that goes out tonight is the one the auditors read in March."
+concepts    = ["async", "serialization", "error-handling", "shared-state"]
+requires    = ["rust.frameworks.22.log-trait"]
+map          = { x = 0.271, y = 0.859, kind = "boss" }
+brief       = '''
+Standard input is one JSON object: `"date"` (a string, `YYYY-MM-DD`) and
+`"transfers"`, an array of `{"from", "to", "cents"}`.
+
+Print the settlement:
+
+```
+input:  {"date": "2026-10-06", "transfers": [
+          {"from": "LUCKYMAC", "to": "BANK", "cents": 3800},
+          {"from": "SOGO", "to": "BANK", "cents": 12500},
+          {"from": "BANK", "to": "LUCKYMAC", "cents": 300}]}
+output: SETTLEMENT Tue 06 Oct 2026
+        BANK 16000
+        LUCKYMAC -3500
+        SOGO -12500
+        MOVED 3
+```
+
+The first line is the date formatted `%a %d %b %Y`. Then one line per
+account that appears anywhere, **sorted by name**, with its net: everything
+it received minus everything it paid. Then `MOVED <number of transfers>`.
+
+Or one `ERROR:` line and nothing else, checked in this order:
+
+* the input is not that shape at all — `ERROR: not a settlement`
+* the date will not parse — `ERROR: bad date 2026-13-01`
+* then each transfer in order, 1-based — `ERROR: transfer 2: nothing to move`
+  for a `cents` that is zero or negative, `ERROR: transfer 1: BANK pays itself`
+  when `from` equals `to`
+
+Build it from the road behind you: `serde` for the shape, `chrono` for the
+date, `anyhow` with context for the errors, and `tokio` — one task per
+transfer that validates it and posts both sides into an
+`Arc<tokio::sync::Mutex<BTreeMap<String, i64>>>`, joined **in order** so the
+first bad transfer is the one reported. The starter parses and spawns but
+credits only the receiving side, never validates, and prints the date as it
+came.
+'''
+starter     = '''
+use std::collections::BTreeMap;
+use std::io::Read;
+use std::sync::Arc;
+
+use serde::Deserialize;
+use tokio::sync::Mutex;
+
+#[derive(Debug, Deserialize)]
+struct Transfer {
+    from: String,
+    to: String,
+    cents: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct Settlement {
+    date: String,
+    transfers: Vec<Transfer>,
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let settlement: Settlement = serde_json::from_str(&input).unwrap();
+
+    let book = Arc::new(Mutex::new(BTreeMap::<String, i64>::new()));
+    let mut handles = Vec::new();
+    for transfer in settlement.transfers {
+        let book = Arc::clone(&book);
+        handles.push(tokio::spawn(async move {
+            let mut book = book.lock().await;
+            *book.entry(transfer.to).or_insert(0) += transfer.cents;
+        }));
+    }
+    let moved = handles.len();
+    for handle in handles {
+        handle.await.unwrap();
+    }
+
+    println!("SETTLEMENT {}", settlement.date);
+    for (account, net) in book.lock().await.iter() {
+        println!("{account} {net}");
+    }
+    println!("MOVED {moved}");
+}
+'''
+solution    = '''
+use std::collections::BTreeMap;
+use std::io::Read;
+use std::sync::Arc;
+
+use anyhow::{anyhow, bail, Context, Result};
+use chrono::NaiveDate;
+use serde::Deserialize;
+use tokio::sync::Mutex;
+
+#[derive(Debug, Deserialize)]
+struct Transfer {
+    from: String,
+    to: String,
+    cents: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct Settlement {
+    date: String,
+    transfers: Vec<Transfer>,
+}
+
+type Book = Arc<Mutex<BTreeMap<String, i64>>>;
+
+async fn post(book: Book, transfer: Transfer) -> Result<()> {
+    if transfer.cents <= 0 {
+        bail!("nothing to move");
+    }
+    if transfer.from == transfer.to {
+        bail!("{} pays itself", transfer.from);
+    }
+    let mut book = book.lock().await;
+    *book.entry(transfer.from).or_insert(0) -= transfer.cents;
+    *book.entry(transfer.to).or_insert(0) += transfer.cents;
+    Ok(())
+}
+
+async fn settle(input: &str) -> Result<String> {
+    let settlement: Settlement =
+        serde_json::from_str(input).map_err(|_| anyhow!("not a settlement"))?;
+    let date = NaiveDate::parse_from_str(&settlement.date, "%Y-%m-%d")
+        .map_err(|_| anyhow!("bad date {}", settlement.date))?;
+
+    let book: Book = Arc::new(Mutex::new(BTreeMap::new()));
+    let handles: Vec<_> = settlement
+        .transfers
+        .into_iter()
+        .map(|transfer| tokio::spawn(post(Arc::clone(&book), transfer)))
+        .collect();
+    let moved = handles.len();
+    for (i, handle) in handles.into_iter().enumerate() {
+        handle
+            .await
+            .context("a task panicked")?
+            .with_context(|| format!("transfer {}", i + 1))?;
+    }
+
+    let mut out = format!("SETTLEMENT {}\n", date.format("%a %d %b %Y"));
+    for (account, net) in book.lock().await.iter() {
+        out.push_str(&format!("{account} {net}\n"));
+    }
+    out.push_str(&format!("MOVED {moved}"));
+    Ok(out)
+}
+
+#[tokio::main]
+async fn main() {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    match settle(&input).await {
+        Ok(report) => println!("{report}"),
+        Err(err) => println!("ERROR: {err:#}"),
+    }
+}
+'''
+hints = [
+  "Four crates, one program. `serde_json::from_str::<Settlement>` for the shape, `NaiveDate::parse_from_str(&s, \"%Y-%m-%d\")` for the date, `date.format(\"%a %d %b %Y\")` to print it.",
+  "The errors are `anyhow`: `.map_err(|_| anyhow!(\"not a settlement\"))` where the crate's own message must not leak, `bail!(...)` inside the task, `.with_context(|| format!(\"transfer {}\", i + 1))` as you join — and `{err:#}` prints `context: cause`.",
+  "Each task is `tokio::spawn(post(Arc::clone(&book), transfer))` returning `anyhow::Result<()>`; `handle.await` gives you a `Result<Result<()>, JoinError>`, so it is two `?`s — the first with a context of its own.",
+  "Join the handles **in the order you spawned them** and stop at the first `Err`: that is what makes `transfer 2` the one reported when transfers 2 and 3 are both bad. The map is a `BTreeMap`, so the accounts come out sorted for free.",
+]
+
+[quest.tests]
+harness    = "stdio"
+crates     = ["tokio", "serde", "serde_json", "anyhow", "chrono"]
+timeout_ms = 5000
+compile_timeout_ms = 60000
+max_stdout_bytes = 262144
+match      = "trim"
+cases = [
+  { name = "tuesday", stdin = "{\"date\": \"2026-10-06\", \"transfers\": [\n  {\"from\": \"LUCKYMAC\", \"to\": \"BANK\", \"cents\": 3800},\n  {\"from\": \"SOGO\", \"to\": \"BANK\", \"cents\": 12500},\n  {\"from\": \"BANK\", \"to\": \"LUCKYMAC\", \"cents\": 300}]}\n", expect = "SETTLEMENT Tue 06 Oct 2026\nBANK 16000\nLUCKYMAC -3500\nSOGO -12500\nMOVED 3\n", visible = true },
+  { name = "nothing-to-move", stdin = "{\"date\": \"2026-10-07\", \"transfers\": [{\"from\": \"A\", \"to\": \"B\", \"cents\": 5}, {\"from\": \"B\", \"to\": \"A\", \"cents\": 0}, {\"from\": \"C\", \"to\": \"C\", \"cents\": 1}]}", expect = "ERROR: transfer 2: nothing to move\n", visible = false },
+  { name = "pays-itself", stdin = "{\"date\": \"2026-10-07\", \"transfers\": [{\"from\": \"BANK\", \"to\": \"BANK\", \"cents\": 10}]}", expect = "ERROR: transfer 1: BANK pays itself\n", visible = false },
+  { name = "bad-date", stdin = "{\"date\": \"2026-13-01\", \"transfers\": [{\"from\": \"A\", \"to\": \"A\", \"cents\": 0}]}", expect = "ERROR: bad date 2026-13-01\n", visible = false },
+  { name = "not-a-settlement", stdin = "[1, 2, 3]\n", expect = "ERROR: not a settlement\n", visible = false },
+  { name = "empty-day", stdin = "{\"date\": \"2026-02-28\", \"transfers\": []}", expect = "SETTLEMENT Sat 28 Feb 2026\nMOVED 0\n", visible = false },
+  { name = "many-accounts-net-zero", stdin = "{\"date\": \"2026-01-01\", \"transfers\": [{\"from\": \"X\", \"to\": \"Y\", \"cents\": 100}, {\"from\": \"Y\", \"to\": \"Z\", \"cents\": 100}, {\"from\": \"Z\", \"to\": \"X\", \"cents\": 100}, {\"from\": \"A\", \"to\": \"Z\", \"cents\": 1}]}", expect = "SETTLEMENT Thu 01 Jan 2026\nA -1\nX 0\nY 0\nZ 1\nMOVED 4\n", visible = false },
+]

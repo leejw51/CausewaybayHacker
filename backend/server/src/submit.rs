@@ -168,7 +168,8 @@ pub fn run(
     // from (SPEC §7). A fabricated verdict there teaches the player to fix
     // something they never did, and there is no way to tell it afterwards
     // from something they really got wrong.
-    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec) {
+    let home = state.store.home();
+    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec, &home.build_lang_dir(&lang)) {
         return Err(unavailable(reason, 2));
     }
 
@@ -191,7 +192,6 @@ pub fn run(
     });
     streamer.stage("queued", queued);
 
-    let home = state.store.home();
     let events = streamer.clone();
     let submission = Submission {
         attempt_id: &attempt_id,

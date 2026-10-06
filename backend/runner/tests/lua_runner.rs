@@ -368,7 +368,7 @@ fn the_other_harnesses_are_refused() {
 #[test]
 fn the_gate_agrees_with_the_probe() {
     let stdio = one_case();
-    let refused = cwbhacker_runner::unsupported("lua", &stdio);
+    let refused = cwbhacker_runner::unsupported("lua", &stdio, std::path::Path::new(""));
     if installed() {
         assert_eq!(refused, None, "luajit is here, so the land is open");
     } else {
@@ -376,7 +376,7 @@ fn the_gate_agrees_with_the_probe() {
         assert!(why.contains("luajit"), "{why}");
     }
     let gotest = spec(serde_json::json!({ "harness": "gotest", "timeout_ms": 5000, "cases": [] }));
-    assert!(cwbhacker_runner::unsupported("lua", &gotest).is_some());
+    assert!(cwbhacker_runner::unsupported("lua", &gotest, std::path::Path::new("")).is_some());
     let row = cwbhacker_runner::format::toolchains()
         .into_iter()
         .find(|t| t.land == "lua")

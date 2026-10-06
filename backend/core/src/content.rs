@@ -391,9 +391,17 @@ pub fn validate(pack: &Pack) -> Result<()> {
     }
     if !matches!(
         pack.category.as_str(),
-        "verybasic" | "basic" | "advanced" | "hacker"
+        "verybasic" | "basic" | "advanced" | "hacker" | "frameworks"
     ) {
         return Err(bad_request(format!("unknown category '{}'", pack.category)));
+    }
+    if pack.category == "frameworks" && pack.land != "rust" {
+        // The fifth road is Rust Land's (SPEC §0): the crate shelf behind it
+        // is a cargo shelf, and no other land has one.
+        return Err(bad_request(format!(
+            "the frameworks road is rust's; '{}' has no crate shelf",
+            pack.land
+        )));
     }
     let mut nodes = BTreeSet::new();
     let mut ids = BTreeSet::new();
@@ -517,6 +525,37 @@ pub fn validate(pack: &Pack) -> Result<()> {
                 return Err(bad_request(format!(
                     "quest '{}' has a {harness} case with no name; a case here names \
                      the test that must pass",
+                    quest.id
+                )));
+            }
+        }
+        // FRAMEWORKS is the crates road: a quest there names what it is
+        // about in `tests.crates`, and the runner builds it against the
+        // shelf because of it. One without the key would be an ADVANCED
+        // quest filed on the wrong road — and judged by `rustc` alone, so
+        // its `use serde` would not compile. The names themselves are
+        // checked against the shelf by the runner and the content gate.
+        let crates = tests.get("crates").and_then(|c| c.as_array());
+        if pack.category == "frameworks" && crates.is_none_or(|c| c.is_empty()) {
+            return Err(bad_request(format!(
+                "quest '{}' is a frameworks quest with no tests.crates; \
+                 name the crates it is about",
+                quest.id
+            )));
+        }
+        if let Some(list) = crates {
+            if list
+                .iter()
+                .any(|c| c.as_str().is_none_or(|s| s.trim().is_empty()))
+            {
+                return Err(bad_request(format!(
+                    "quest '{}' has a tests.crates entry that is not a crate name",
+                    quest.id
+                )));
+            }
+            if quest_lang(&pack.land, quest) != "rust" {
+                return Err(bad_request(format!(
+                    "quest '{}' names crates but is not a rust quest; the crate shelf is rust's",
                     quest.id
                 )));
             }

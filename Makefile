@@ -151,7 +151,7 @@ dist_stale = [ ! -f frontend/dist/index.html ] || \
 
 .PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe test-sync \
         fmt-check check version package release package-server package-server-verify package-gui package-love \
-        test-love test-e2e smoke fmt lint doctor clean clean-home
+        test-love test-e2e smoke fmt lint doctor warm clean clean-home
 
 ##@ Running
 
@@ -447,6 +447,10 @@ package-love: ## just the .love archive (any platform with zip)
 	@mkdir -p "$(DIST)"
 	@cp love2d/build/causewaybay-hacker.love "$(DIST)/causewaybay-hacker-$(VERSION).love"
 	@echo "  $(DIST)/causewaybay-hacker-$(VERSION).love"
+
+warm: ## build the crate shelf the FRAMEWORKS road links against (needs the network once)
+	@test -x $(BACK_BIN) || ( cd backend && $(BACK_BUILD) -p cwbhacker 2>&1 | tail -3 ) || exit 1
+	CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) warm
 
 doctor: ## check the toolchains and the server's own view of things
 	@command -v cargo >/dev/null && cargo --version   || echo "MISSING: rust   — https://rustup.rs"

@@ -1,6 +1,14 @@
 //! The `cargo` harness (SPEC §5.1, §5.2): a generated minimal `Cargo.toml`,
 //! `cargo test --offline`, and the suite loop over what libtest reported.
 //!
+//! Also, since the FRAMEWORKS road, the **crate build** ([`run_bin`]): a stdio
+//! quest that names `crates` is one `main.rs` too, but it is built by cargo
+//! against the crate shelf (`shelf.rs`) rather than by `rustc` alone, and the
+//! binary cargo produces is then judged exactly as a `rustc` one is — the
+//! same `harness::judge`, the same cases, the same limits. What this file
+//! lends it is everything around the compiler: the manifest, the environment,
+//! the JSON stream unwrapped for the player and kept for the classifier.
+//!
 //! It is **two phases on purpose**, and the reason is SPEC §5.3. A plain
 //! `cargo test` compiles and runs in one process, so either the compiler runs
 //! under a 1 GiB address-space cap and a stripped `PATH` — which is not a
@@ -50,7 +58,13 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700));
     }
-    std::fs::write(root.join("Cargo.toml"), manifest(sub.attempt_id))?;
+    std::fs::write(
+        root.join("Cargo.toml"),
+        manifest(sub.attempt_id, Shape::Lib, &sub.spec.crates),
+    )?;
+    if !sub.spec.crates.is_empty() {
+        std::fs::write(root.join("Cargo.lock"), crate::shelf::LOCKFILE)?;
+    }
     std::fs::write(root.join(PLAYER_FILE), sub.source)?;
     if let Some(tests) = &sub.spec.test_source {
         std::fs::create_dir_all(root.join("tests"))?;
@@ -128,8 +142,122 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
     Ok(suite::assemble(sub, compile_ms, compiler_stderr, run))
 }
 
+/// A stdio quest with crates: `main.rs` built by cargo against the whole
+/// shelf, offline, then judged on stdin and stdout like any other.
+///
+/// The player's file is `src/main.rs`, so a diagnostic's `file_name` is
+/// `src/main.rs` where a `rustc` build's is `main.rs`; nothing downstream
+/// keys on the name, and the line numbers are the player's own. The binary
+/// is moved out of the shared target directory into the attempt's own
+/// directory as `prog`, where the `rustc` path puts its, so what is left
+/// behind in `target/` for `prune --builds` is one hashed `deps/` entry and
+/// not an executable per attempt.
+pub fn run_bin(sub: &Submission) -> Report {
+    match build_and_judge(sub) {
+        Ok(report) => report,
+        Err(e) => Report::internal(format!("runner: {e}")),
+    }
+}
+
+fn build_and_judge(sub: &Submission) -> std::io::Result<Report> {
+    let root = &sub.workdir;
+    std::fs::create_dir_all(root.join("src"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700));
+    }
+    std::fs::write(
+        root.join("Cargo.toml"),
+        manifest(sub.attempt_id, Shape::Bin, &sub.spec.crates),
+    )?;
+    // The shelf's lockfile, so cargo resolves nothing: the versions are the
+    // warm build's versions, and `--offline` has nothing to miss.
+    std::fs::write(root.join("Cargo.lock"), crate::shelf::LOCKFILE)?;
+    std::fs::write(root.join(BIN_FILE), sub.source)?;
+
+    (sub.events)(Event::Stage("compiling"));
+    let lines = CompileLines::new(sub.events.clone(), cargo_line);
+    let compile_logs = lines.sink();
+
+    let mut cargo = Command::new("cargo");
+    cargo
+        .current_dir(root)
+        .arg("build")
+        .arg("--release")
+        .arg("--offline")
+        .arg("--message-format=json");
+    toolchain_env(&mut cargo, sub);
+
+    let compile = proc::run(
+        cargo,
+        b"",
+        &Limits {
+            timeout: Duration::from_millis(sub.spec.compile_timeout_ms),
+            max_stdout: 8 << 20,
+            max_stderr: 4 << 20,
+            apply_rlimits: false,
+            address_space: false,
+        },
+        "cargo-json",
+        "cargo-stderr",
+        compile_logs,
+    );
+    lines.flush();
+    let compile = compile?;
+    let compile_ms = compile.elapsed_ms as i64;
+    let cargo_stdout = String::from_utf8_lossy(&compile.stdout).to_string();
+    let cargo_stderr = String::from_utf8_lossy(&compile.stderr).to_string();
+
+    if compile.timed_out {
+        return Ok(suite::no_binary(
+            sub,
+            Verdict::Timeout,
+            compile_ms,
+            player_diagnostics(&cargo_stdout),
+            "the compiler ran out of time".into(),
+            None,
+        ));
+    }
+
+    let parsed = parse_cargo_json(&cargo_stdout);
+    let compiler_stderr = parsed.player_json.join("\n");
+    let built = parsed.executables.first().cloned();
+
+    let Some(built) = built.filter(|_| compile.exit_code == Some(0)) else {
+        return Ok(compile_failure(
+            sub,
+            compile_ms,
+            compiler_stderr,
+            &parsed,
+            &cargo_stderr,
+            compile.exit_code.map(i64::from),
+        ));
+    };
+
+    let binary = root.join("prog");
+    if std::fs::rename(&built, &binary).is_err() {
+        std::fs::copy(&built, &binary)?;
+        let _ = std::fs::remove_file(&built);
+    }
+
+    (sub.events)(Event::Stage("running"));
+    crate::harness::judge(sub, &binary, compile_ms, compiler_stderr)
+}
+
+/// Where a crate quest's `main.rs` goes.
+const BIN_FILE: &str = "src/main.rs";
+
+/// What a generated package is: a library with tests (the `cargo` harness) or
+/// a binary (a stdio quest with crates).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Shape {
+    Lib,
+    Bin,
+}
+
 /// SPEC §12 in miniature: the smallest package that compiles one file and its
-/// tests.
+/// tests — or, for a `Bin`, one file into one program.
 ///
 /// Two things here are load-bearing.
 ///
@@ -147,26 +275,52 @@ fn compile_and_judge(sub: &Submission) -> std::io::Result<Report> {
 /// shared a target directory, and two users submitting at the same moment is
 /// an ordinary Tuesday for a server. The quest's tests still say
 /// `use quest::add;`, because the lib target's name never changes.
-fn manifest(attempt_id: &str) -> String {
-    format!(
-        "\
-[package]
-name = \"quest-{}\"
-version = \"0.0.0\"
-edition = \"2021\"
-publish = false
-
+///
+/// **A binary carries the attempt id too**, for the same reason one floor
+/// down: cargo uplifts an executable to `target/release/<bin name>` with no
+/// hash in it, so a fixed name would be one file two attempts write.
+///
+/// **`crates` non-empty means the whole shelf.** The dependency table is the
+/// shelf's, verbatim (`shelf::dependencies_block`), whatever subset the quest
+/// named — one dependency graph for every crate quest, so the lockfile copied
+/// beside this manifest fits and the warm artifacts are the ones linked.
+fn manifest(attempt_id: &str, shape: Shape, crates: &[String]) -> String {
+    let name = slug(attempt_id);
+    let target = match shape {
+        Shape::Lib => "\
 [lib]
 name = \"quest\"
 path = \"src/lib.rs\"
 # A doctest is a third way to run code and a fourth way to fail, and no quest
 # is judged on one.
 doctest = false
+"
+        .to_string(),
+        Shape::Bin => format!(
+            "\
+[[bin]]
+name = \"quest-{name}\"
+path = \"src/main.rs\"
+"
+        ),
+    };
+    let dependencies = if crates.is_empty() {
+        String::new()
+    } else {
+        format!("\n{}", crate::shelf::dependencies_block())
+    };
+    format!(
+        "\
+[package]
+name = \"quest-{name}\"
+version = \"0.0.0\"
+edition = \"2021\"
+publish = false
 
+{target}{dependencies}
 # Not a member of anything. See above.
 [workspace]
-",
-        slug(attempt_id)
+"
     )
 }
 
@@ -214,7 +368,10 @@ struct CargoOutput {
     /// message. They are **never** forwarded verbatim: the rendered form
     /// quotes the source, and the quest's tests are not the player's to read.
     quest_errors: Vec<QuestError>,
+    /// Test binaries (`profile.test`), for the `cargo` harness.
     binaries: Vec<PathBuf>,
+    /// Programs (`target.kind` has `bin`, not a test build), for [`run_bin`].
+    executables: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -297,10 +454,16 @@ fn parse_cargo_json(stdout: &str) -> CargoOutput {
                     .and_then(|p| p.get("test"))
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                if let (true, Some(exe)) =
-                    (is_test, value.get("executable").and_then(|v| v.as_str()))
-                {
-                    out.binaries.push(PathBuf::from(exe));
+                let is_bin = value
+                    .get("target")
+                    .and_then(|t| t.get("kind"))
+                    .and_then(|k| k.as_array())
+                    .map(|kinds| kinds.iter().any(|k| k.as_str() == Some("bin")))
+                    .unwrap_or(false);
+                match (is_test, value.get("executable").and_then(|v| v.as_str())) {
+                    (true, Some(exe)) => out.binaries.push(PathBuf::from(exe)),
+                    (false, Some(exe)) if is_bin => out.executables.push(PathBuf::from(exe)),
+                    _ => {}
                 }
             }
             // `build-finished`, `build-script-executed`, and whatever cargo
@@ -725,5 +888,11 @@ pub fn is_installed() -> bool {
 /// Exposed for the tests, which assert the generated manifest keeps the
 /// package out of any workspace above it.
 pub fn generated_manifest(attempt_id: &str) -> String {
-    manifest(attempt_id)
+    manifest(attempt_id, Shape::Lib, &[])
+}
+
+/// The manifest of a stdio quest with crates, for the tests: a binary named
+/// for the attempt, and the shelf's whole dependency table.
+pub fn generated_bin_manifest(attempt_id: &str, crates: &[String]) -> String {
+    manifest(attempt_id, Shape::Bin, crates)
 }

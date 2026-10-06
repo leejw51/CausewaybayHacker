@@ -126,6 +126,14 @@ pub struct TestSpec {
     /// making a promise about the schedule that the schedule does not make
     /// back. See `docs/decisions.md`.
     pub race: bool,
+    /// Rust only: the crates this quest is about, each a name on the shelf
+    /// (`shelf.rs`, SPEC §5.1). Empty means `rustc` on one file, offline, as
+    /// every quest outside the FRAMEWORKS road is. Non-empty means cargo,
+    /// against the **whole** shelf — the names do not change what is
+    /// compiled, only what the quest claims to teach and what the pack is
+    /// checked for — and the build is refused until the shelf on this
+    /// machine is warm.
+    pub crates: Vec<String>,
 }
 
 impl TestSpec {
@@ -154,6 +162,7 @@ impl TestSpec {
             test_source: None,
             only_declared: false,
             race: false,
+            crates: Vec::new(),
         }
     }
 
@@ -196,6 +205,33 @@ impl TestSpec {
                 "test_source belongs to the cargo and gotest harnesses; \
                  a stdio quest has no test file",
             ));
+        }
+        let crates: Vec<String> = match value.get("crates") {
+            None => Vec::new(),
+            Some(list) => list
+                .as_array()
+                .ok_or_else(|| bad_request("tests.crates must be an array of crate names"))?
+                .iter()
+                .map(|c| {
+                    c.as_str()
+                        .filter(|s| !s.trim().is_empty())
+                        .map(|s| s.trim().to_string())
+                        .ok_or_else(|| {
+                            bad_request("tests.crates holds something that is not a crate name")
+                        })
+                })
+                .collect::<Result<_>>()?,
+        };
+        if harness == Harness::Gotest && !crates.is_empty() {
+            return Err(bad_request(
+                "crates is a rust key; the gotest harness has no crate shelf",
+            ));
+        }
+        if let Some(why) = crate::shelf::unknown(&crates) {
+            // Refused here, at parse, rather than by cargo's `--offline` miss
+            // forty seconds in: the pack named a crate the shelf does not
+            // carry, and that is an authoring error with a one-line fix.
+            return Err(bad_request(why));
         }
         let cases = value
             .get("cases")
@@ -246,9 +282,13 @@ impl TestSpec {
                 // hand anybody. Sixty is not a promise that the compile is
                 // slow; it is the budget before the runner calls a *compiler*
                 // hung.
+                //
+                // A stdio quest with crates is a cargo build too — against a
+                // warm shelf it is a second or two, but it links `tokio`, and
+                // the budget is for the day the machine is slow.
                 .unwrap_or(match harness {
-                    Harness::Stdio => 30_000,
-                    Harness::Cargo | Harness::Gotest => 60_000,
+                    Harness::Stdio if crates.is_empty() => 30_000,
+                    Harness::Stdio | Harness::Cargo | Harness::Gotest => 60_000,
                 }),
             max_stdout_bytes: value
                 .get("max_stdout_bytes")
@@ -268,6 +308,7 @@ impl TestSpec {
                 .filter(|s| !s.trim().is_empty())
                 .map(str::to_string),
             race,
+            crates,
         })
     }
 }

@@ -22,12 +22,13 @@ local BLURB = {
   basic = "grammar. one construct, one to four lines, untimed.",
   advanced = "the live coding test, untimed. whole programs, hidden cases.",
   hacker = "timed. the whiteboard is watching.",
+  frameworks = "the job. anyhow, serde, tokio, clap: the crates every file starts with.",
 }
 
 -- SPEC §0's order. `world.lands` does not promise one, and which row is drawn
 -- first is presentation rather than a rule — but a category list that
 -- reorders itself between two calls is a category list a player mis-clicks.
-local ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4 }
+local ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4, frameworks = 5 }
 
 local function ordered(categories)
   local out = {}

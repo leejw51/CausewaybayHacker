@@ -121,6 +121,11 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0023_zig_lua",
         include_str!("../migrations/0023_zig_lua.sql"),
     ),
+    (
+        24,
+        "0024_frameworks",
+        include_str!("../migrations/0024_frameworks.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

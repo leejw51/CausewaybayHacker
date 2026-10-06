@@ -140,12 +140,12 @@ fn cargo_is_available_at_all() {
 fn the_gate_is_open_for_cargo() {
     let s = cargo_spec(serde_json::json!([{ "name": "adds_two_numbers", "visible": true }]));
     assert_eq!(
-        cwbhacker_runner::unsupported("rust", &s),
+        cwbhacker_runner::unsupported("rust", &s, std::path::Path::new("")),
         None,
         "the cargo harness is built; the gate must be open"
     );
     // …and is still not a Go harness.
-    assert!(cwbhacker_runner::unsupported("go", &s).is_some());
+    assert!(cwbhacker_runner::unsupported("go", &s, std::path::Path::new("")).is_some());
 }
 
 #[test]

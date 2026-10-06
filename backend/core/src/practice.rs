@@ -80,7 +80,8 @@ pub fn next_with(
           GROUP BY q.id
           ORDER BY CASE q.category
                      WHEN 'verybasic' THEN 0 WHEN 'basic' THEN 1
-                     WHEN 'advanced' THEN 2 WHEN 'hacker' THEN 3 ELSE 4 END,
+                     WHEN 'advanced' THEN 2 WHEN 'hacker' THEN 3
+                     WHEN 'frameworks' THEN 4 ELSE 5 END,
                    q.node",
     )?;
     let rows: Vec<Row> = stmt

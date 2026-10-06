@@ -1,0 +1,1026 @@
+# RUST LAND — FRAMEWORKS, in Japanese. A translation pack (SPEC §12.1): the prose
+# of `content/rust/frameworks.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a program
+# must print are the English pack's and are copied verbatim, never translated.
+# Crate names (anyhow, serde, tokio, clap…) are names and stay as they are.
+
+pack   = "rust.frameworks"
+locale = "ja"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.frameworks.01.anyhow-context"
+title = "疑問符ひとつ"
+story = "決済パスに戻って最初の朝。グロスター・ロード裏の決済リーダーが四千行のファイルの三行目で落ちて、言うのは「invalid digit found in string」だけだ。"
+brief = '''
+標準入力から `<ACCOUNT> <CENTS>` の行を読み込み、合計をセント単位で
+`TOTAL <n>` として出力してください。
+
+行が二つのフィールドでない、またはセントが `i64` として解析できない場合は、
+代わりに次の一行を出力して正常終了してください:
+
+```
+ERROR: line 3: invalid digit found in string
+```
+
+これは `anyhow` 自身による、一層のコンテキストを持つエラーの表示です:
+`format!("{:#}", err)` はコンテキスト、コロン、原因の順に出力します。
+コンテキストは `line <n>`(1 始まり)です。エラーの場合、それ以外は何も
+出力しません。
+
+```
+input:  A 100
+        B 250
+        C 7
+output: TOTAL 357
+```
+
+実際の処理をする関数の戻り値型に `anyhow::Result` を使い、`?` で伝播し、
+`.with_context(|| ...)` でどの行かを言ってください。スターターは unwrap して
+パニックし、スタックトレースを出して 101 で終了します — フロアの誰にも
+読めるメッセージではありません。
+'''
+hints = [
+  "`use anyhow::{Context, Result};` — `Result<T>` は `Result<T, anyhow::Error>` で、`?` はどんな `std::error::Error` でもそれに変換します。",
+  "`.with_context(|| format!(\"line {n}\"))` は `Result` にも `Option` にも使えます(`Option` はそのメッセージを持つエラーになります)。`?` の前に付けてください。",
+  "`anyhow::Error` に対する `{:#}` は `context: cause` を一行で出力します。素の `{}` は最も外側のコンテキストだけです。",
+  "欠けたフィールドは `None` であって解析エラーではありません: `.ok_or_else(|| anyhow!(\"missing amount\"))` でエラーにし、同じ `line n` のコンテキストを付けてください。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.frameworks.02.thiserror-enum"
+title = "名前のあるエラー"
+story = "送金サービスはどの拒否にも同じ文字列「bad transfer」で答え、二階上のサポートデスクはどの種類なのかを訊くためにエンジニアへ電話をかけ始めた。"
+brief = '''
+二つの口座 `A` と `B` は、一行目の残高から始まります。次に二行目に `n`、
+その後に `n` 件の送金 `<FROM> <TO> <CENTS>` が続きます。
+
+順番に適用してください。各件について `OK <FROM> <TO> <CENTS>` か、エラーを
+出力します — エラーは三つのバリアントを持つ `thiserror` の enum で、その
+`Display` は正確に次のとおりです:
+
+* `unknown account X` — `FROM` か `TO` が `A` でも `B` でもない(`FROM` を先に調べる)
+* `insufficient funds in A: need 300, have 100`
+* `nothing to move` — 金額がゼロか負
+
+送金のあとに `A <balance>` と `B <balance>` を出力してください。
+
+```
+input:  100 100
+        3
+        A B 30
+        B C 5
+        A B 300
+output: OK A B 30
+        unknown account C
+        insufficient funds in A: need 300, have 70
+        A 70
+        B 130
+```
+
+enum を `#[derive(Debug, thiserror::Error)]` で定義し、各メッセージをその
+`#[error("...")]` 属性に、フィールドを補間して置いてください — タプル
+バリアントには `{0}`、名前付きフィールドには `{need}` です。`transfer` は
+`Result<(), TransferError>` を返し、`main` は `{}` で出力します。スターターには
+ロジックがあり、すべてに `bad transfer` を出力します。
+'''
+hints = [
+  "enum に `#[derive(Debug, thiserror::Error)]`、各バリアントに `#[error(\"...\")]` — それが `impl Display` と `impl std::error::Error` のすべてです。",
+  "属性の中の `{0}` はタプルバリアントの最初のフィールド、`{need}` と `{have}` は構造体バリアントの名前付きフィールドです。",
+  "金額より先に二つの口座名を、そして `TO` より先に `FROM` を調べてください: 隠れたケースは `C B 0` を送ってきて、どのエラーが勝つかは課題文が言っています。",
+  "シグネチャは `Result<(), TransferError>` に変わり、`main` の `println!(\"{e}\")` が属性のテキストを出力します。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.frameworks.03.serde-derive"
+title = "ワイヤーの形"
+story = "怡和街のカード端末は注文を JSON で送ってくる。古いリーダーはカンマを数えて金額を見つけていて、名前にカンマのある店は間違った列で支払いを受けていた。"
+brief = '''
+標準入力は注文の JSON 配列ひとつです。各注文は `"id"`(数値)、`"merchant"`
+(文字列)、`"cents"`(数値)を持つオブジェクトです。
+
+注文ごとに一行、届いた順に `<id> <merchant> <cents>` を出力し、その後に
+`TOTAL <sum of cents>` を出力してください。
+
+```
+input:  [{"id": 1, "merchant": "Lucky Mac", "cents": 3800},
+         {"id": 2, "merchant": "Tsui Wah, Causeway Bay", "cents": 12500}]
+output: 1 Lucky Mac 3800
+        2 Tsui Wah, Causeway Bay 12500
+        TOTAL 16300
+```
+
+その三つのフィールドを持つ `struct Order` を定義して `#[derive(Deserialize)]`
+を付け、読み取りは `serde_json::from_str::<Vec<Order>>` に任せてください。
+スターターはカンマで分割しています。オブジェクトのキーはどの順でも、空白は
+いくらあってもよく、文字列にはカンマが含まれうる — それが要点です。
+'''
+hints = [
+  "`use serde::Deserialize;` と struct への `#[derive(Deserialize)]` — フィールド名が JSON のキーで、型がそれぞれ何であるべきかを言います。",
+  "`let orders: Vec<Order> = serde_json::from_str(&input)?;` — 左側の型が、serde に何を組み立てるかを教えます。",
+  "キーの順序と空白は JSON の問題であって、あなたの問題ではありません。serde はその三つのキーを持つどんなオブジェクトでも読みます。出力は前と同じループです。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.frameworks.04.serde-attributes"
+title = "銀行が読むもの"
+story = "銀行は怡和街の決済ファイルを週に二度はね返す: 承認されなかったカードはすべて `\"authCode\":null` として出ていき、手数料を送らない一台の端末が、ファイルが書かれる前にリーダーを止めてしまう。"
+brief = '''
+標準入力は端末からの決済レコードの JSON 配列ひとつです。各レコードは
+`"terminalId"`(文字列)、`"merchant"`(文字列)、`"amountCents"`(数値)を持ち、
+`"feeCents"`(数値)と `"authCode"`(文字列)は持つことも持たないこともあります。
+キーはどの順で来てもかまいません。
+
+レコードごとに一行、入力順に出力してください: 銀行が望む形のレコード、
+`serde_json::to_string` によるコンパクトな JSON で、キーはこの順、綴りも正確に
+このとおり — `terminalId`、`merchant`、`amountCents`、`feeCents`、`authCode`。
+欠けた `feeCents` は `0` と書き、欠けた `authCode` は**省く**こと、決して
+`null` と書かないこと。その後に `NET <sum of amountCents minus feeCents>` を
+出力してください。
+
+```
+input:  [{"terminalId": "YW-07", "merchant": "Lucky Mac", "amountCents": 3800, "feeCents": 40, "authCode": "A1B2"},
+         {"terminalId": "PS-02", "merchant": "Tsui Wah", "amountCents": 12500}]
+output: {"terminalId":"YW-07","merchant":"Lucky Mac","amountCents":3800,"feeCents":40,"authCode":"A1B2"}
+        {"terminalId":"PS-02","merchant":"Tsui Wah","amountCents":12500,"feeCents":0}
+        NET 16260
+```
+
+ひとつの struct が両方向を担います: snake_case のフィールドに
+`#[derive(Serialize, Deserialize)]`、struct に `#[serde(rename_all = "camelCase")]`、
+`fee_cents` に `#[serde(default)]`、そして `auth_code: Option<String>` に
+`#[serde(skip_serializing_if = "Option::is_none")]` です。`to_string` は struct が
+宣言した順にフィールドを書くので、出力は正確になります。スターターはすべての
+フィールドを手で rename し、手数料のないレコードを読めず、`null` を書きます。
+'''
+hints = [
+  "`use serde::{Deserialize, Serialize};` — struct ひとつ、derive 二つ。struct への `#[serde(rename_all = \"camelCase\")]` が、フィールドごとの `rename` をすべて置き換えます。",
+  "`fee_cents: i64` への `#[serde(default)]` は、欠けたキーを `i64::default()`、つまり `0` で埋めます。これがないと手数料のないレコードはデシリアライズエラーです。",
+  "`Option<String>` は欠けたキーをすでに `None` として読みます。`#[serde(skip_serializing_if = \"Option::is_none\")]` が要るのは*書く*側で、なければ `null` としてシリアライズされます。",
+  "`serde_json::to_string(record)` は struct のフィールド順でコンパクトな JSON を返します。それを `println!` で、レコードごとに一行ずつ。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.frameworks.05.json-value-walk"
+title = "葉ごとに一行"
+story = "パーシバル・ストリートの新しい端末ベンダーが、誰も struct を書いていないネストしたオブジェクトを送ってくる。サポートデスクは中身を今日見たいのであって、struct ができてからではない。"
+brief = '''
+標準入力は、トップレベルがオブジェクトか配列である JSON 文書ひとつです。
+すべての葉の値を `<path> = <value>` として、一行にひとつずつ出力してください。
+
+* オブジェクトのキーは**ソート順**(キーのバイト順 — `serde_json::Value::Object`
+  がイテレートする順です)で訪れ、配列の要素は添字順で訪れます。
+* パスはキーを `.` で結んだもので、配列の添字は `[i]` です: `terminal.id`、
+  `orders[0].cents`、ルート配列の中の配列なら `[1][0]`。キーにドットや角括弧は
+  含まれません。
+* 文字列は引用符なしで出力します。数値、`true`、`false`、`null` は JSON が書く
+  とおりに出力します(`1.5` は `1.5` のまま、`null` は `null` という語)。
+* 空のオブジェクトや空の配列には葉がなく、何も出力しません。
+
+```
+input:  {"batch": "2024-06-01", "terminal": {"id": "YW-07", "online": true},
+         "orders": [{"cents": 3800, "merchant": "Lucky Mac"}, {"cents": 250}], "note": null}
+output: batch = 2024-06-01
+        note = null
+        orders[0].cents = 3800
+        orders[0].merchant = Lucky Mac
+        orders[1].cents = 250
+        terminal.id = YW-07
+        terminal.online = true
+```
+
+`serde_json::from_str::<serde_json::Value>` で解析し、`Value::Object`、
+`Value::Array`、そしてそれ以外にマッチする再帰的な
+`walk(path: &str, value: &Value)` を書いてください。スターターはトップレベル
+だけを歩いてそこにあるものをそのまま出力するので、ネストしたオブジェクトは
+JSON 一行として出てきて、ルート配列はパニックになります。
+'''
+hints = [
+  "`use serde_json::Value;` と `let doc: Value = serde_json::from_str(&input)?;` — `Value` は enum です: `Null`、`Bool`、`Number`、`String`、`Array(Vec<Value>)`、`Object(Map<String, Value>)`。",
+  "再帰がパスを運びます: `fn walk(path: &str, value: &Value)`。オブジェクトでは `for (key, child) in map` がすでにキーのソート順で、配列では `iter().enumerate()` が添字を与えます。",
+  "パスは一段につき一片ずつ伸びます: `path` が空でなければ `format!(\"{path}.{key}\")`(空ならキーだけ)、添字には `format!(\"{path}[{i}]\")` です。",
+  "`Value::String(s) => println!(\"{path} = {s}\")` が文字列を裸で出力し、`other => println!(\"{path} = {other}\")` は `Value` 自身の `Display` を使います。それはコンパクトな JSON です — `null`、`true`、`1.5`。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.frameworks.06.toml-config"
+title = "サービスの設定ファイル"
+story = "グロスター・ロードの決済サービスは設定テーブルを手で添字参照していて、二つ目の `[[upstream]]` が一つ目を上書きした。火曜日以来、すべての決済がフォールバックに行っている。"
+brief = '''
+標準入力は TOML のサービス設定です:
+
+* トップレベル: `name`(文字列、必須)、`port`(整数、デフォルト `8080`)
+* テーブル `[limits]`(必須): `max_cents`(整数、必須)、`retries`(整数、
+  デフォルト `3`)
+* テーブルの配列 `[[upstream]]`、ゼロ個以上、それぞれ `name` と `url`(文字列、
+  必須)と `timeout_ms`(整数、デフォルト `1000`)
+
+サマリーを出力してください — `SERVICE` 行ひとつ、`LIMIT` 行ひとつ、そして
+テーブルごとにファイル順で `UPSTREAM` 行ひとつ:
+
+```
+input:  name = 'settlement'
+        port = 9000
+
+        [limits]
+        max_cents = 500000
+
+        [[upstream]]
+        name = 'clearing'
+        url = 'https://clearing.example/settle'
+        timeout_ms = 2000
+
+        [[upstream]]
+        name = 'fallback'
+        url = 'https://fallback.example/settle'
+output: SERVICE settlement on port 9000
+        LIMIT 500000 cents, 3 retries
+        UPSTREAM clearing https://clearing.example/settle 2000 ms
+        UPSTREAM fallback https://fallback.example/settle 1000 ms
+```
+
+入力が有効な TOML でない、またはその形をしていない(必須キーの欠落、型の違う
+値)場合は、唯一の行として正確に `ERROR: config rejected` を出力し、正常終了
+してください。toml 自身のメッセージは出力しないこと。
+
+形を struct で記述してください — `Config`、`Limits`、`Upstream`、それぞれ
+`#[derive(Deserialize)]`、デフォルトは `#[serde(default)]` か
+`#[serde(default = "fn_name")]` で — そして `toml::from_str::<Config>(&input)`
+で読み、`Result` に対して match してください。スターターは `toml::Table` を
+読んで添字参照しており、完全なファイルには動きますが、それ以外のすべてで
+パニックします。
+'''
+hints = [
+  "`use serde::Deserialize;` — toml は serde_json と同じく serde のフォーマットなので、`toml::from_str::<Config>(&input)` は同じ種類の derive した struct を組み立てます。`[table]` は struct のフィールド、`[[array_of_tables]]` は `Vec<Struct>` のフィールドです。",
+  "型の `Default` ではないデフォルトは関数です: `#[serde(default = \"default_port\")]` と `fn default_port() -> u16 { 8080 }`。`Vec` への素の `#[serde(default)]` は、欠けた `[[upstream]]` を空のリストにします。",
+  "`toml::from_str` は `Result<Config, toml::de::Error>` を返します。必須キーの欠落、型違い、構文エラーのすべてが `Err` に落ちます。それに対して match して自分の行を出力してください — エラーを `{}` しないこと。",
+  "`match toml::from_str::<Config>(&input) { Ok(cfg) => cfg, Err(_) => { println!(\"ERROR: config rejected\"); return; } }`。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.frameworks.07.clap-derive"
+title = "フラグの一行"
+story = "決済ボックスの運用ツールは `--limit` を取る。グロスター・ロードのデスクの誰かが `--limti 50` と打ち、ツールはそれをバッチ名と受け取って、全バッチに対して実行した。"
+brief = '''
+`settle` は次を持つコマンドラインツールです:
+
+* 必須の位置引数 `BATCH` ひとつ(文字列)
+* `--limit <N>`、符号なし整数、デフォルト `100`
+* `--dry-run`、フラグ
+
+ハーネスは引数を渡さないので、コマンドラインは標準入力から来ます: 空でない
+各行がコマンドライン一本で、空白で分割します(ツール自身の名前は行にあり
+ません)。各行について一行出力してください:
+
+* 成功なら `batch=<BATCH> limit=<N> dry-run=<true|false>`
+* 失敗なら `ERROR: ` と clap の `ErrorKind` の `Debug` 形式 —
+  `ERROR: MissingRequiredArgument`、`ERROR: ValueValidation`、
+  `ERROR: UnknownArgument`、`ERROR: InvalidValue`(後ろに値のないオプション)
+
+```
+input:  2024-06-01 --limit 50
+        --dry-run 2024-06-02
+        2024-06-03 --limit ten
+output: batch=2024-06-01 limit=50 dry-run=false
+        batch=2024-06-02 limit=100 dry-run=true
+        ERROR: ValueValidation
+```
+
+インターフェースを `#[derive(clap::Parser)]` 付きの struct として宣言し —
+`#[arg(long, default_value_t = 100)]`、そして `bool` に `#[arg(long)]` — 各行を
+`Cli::try_parse_from(std::iter::once("settle").chain(words))` で解析してください。
+`Err(e)` は `e.kind()` を持っています。オプションは位置引数の前にも後にも来る
+ことがあり、`--limit=7` は `--limit 7` と同じです。`--help` は送らないこと。
+スターターは何でも受け付ける手書きのループです。
+'''
+hints = [
+  "`use clap::Parser;` と struct への `#[derive(Parser)]`: 素のフィールドは位置引数、`#[arg(long)]` は `--field-name` を作り、フィールドの型が値のパーサーです — `u32` はあなたの代わりに `ten` を拒みます。",
+  "`#[arg(long, default_value_t = 100)] limit: u32` が型付きの値としてのデフォルトで、`#[arg(long)] dry_run: bool` はあるかないかのフラグ、行の上では `--dry-run` と綴ります。",
+  "`Cli::parse()` は本物の argv を読みますが、ここでは空です。`Cli::try_parse_from(iter)` は最初の要素がプログラム名である任意の文字列イテレータを取ります: `std::iter::once(\"settle\").chain(line.split_whitespace())`。",
+  "`Err(e) => println!(\"ERROR: {:?}\", e.kind())` — `ErrorKind` は素朴な enum で、その `Debug` はバリアント名です。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.frameworks.08.clap-subcommands"
+title = "三つの動詞、ひとつのツール"
+story = "グロスター・ロードの決済ボックスの運用ツールは、最初の単語で分岐する三つの if として `pay`、`refund`、`balance` を増やしてきた。`refudn` は最後の分岐に落ち、デスクは拒否を期待したところで残高を読んだ。"
+brief = '''
+`till` は三つのサブコマンドを持つコマンドラインツールです:
+
+* `pay <TO> <CENTS>` — `TO` は文字列、`CENTS` は符号なし整数。
+  `PAY <CENTS> to <TO>` を出力
+* `refund <ID> [--reason <WORD>]` — `REFUND <ID>` を、理由が与えられたときは
+  `REFUND <ID> because <WORD>` を出力
+* `balance [ACCOUNT]` — `ACCOUNT` のデフォルトは `main`。`BALANCE <ACCOUNT>`
+  を出力
+
+前回と同じく、ハーネスは引数を渡しません: 標準入力の空でない各行がコマンド
+ライン一本で、空白で分割し、ツール名は付きません。コマンドライン一本につき
+出力一行。失敗時は `ERROR: ` と clap の `ErrorKind` の `Debug` 形式を出力
+します: 知らない最初の単語は `ERROR: InvalidSubcommand`、位置引数の欠けた
+サブコマンドは `ERROR: MissingRequiredArgument`、整数でない `CENTS` は
+`ERROR: ValueValidation`、サブコマンドが持たないオプションは
+`ERROR: UnknownArgument` です。
+
+```
+input:  pay yw-07 3800
+        refund r-1041 --reason duplicate
+        balance
+        topup yw-07 100
+output: PAY 3800 to yw-07
+        REFUND r-1041 because duplicate
+        BALANCE main
+        ERROR: InvalidSubcommand
+```
+
+`#[command(subcommand)]` を付けたフィールドひとつを持つ struct に
+`#[derive(Parser)]` を使い、そのフィールドの型は `#[derive(Subcommand)]` 付きの
+enum にします。各バリアントのフィールドがそのサブコマンドの引数で、バリアント名
+を小文字にしたものが行の上の単語です。`help` が四つ目の動詞にならないよう、
+struct に `#[command(disable_help_subcommand = true)]` を置いてください。
+`--help` は送らないこと。スターターは最初の単語に match し、残りを添字参照
+しています。
+'''
+hints = [
+  "`use clap::{Parser, Subcommand};` — struct はフィールドひとつ `#[command(subcommand)] command: Command` を持ち、`Command` は `#[derive(Subcommand)]` 付きの enum です。",
+  "構造体風のバリアント `Pay { to: String, cents: i64 }` は位置引数二つのサブコマンドで、`#[arg(long)] reason: Option<String>` は省略可能な `--reason`、`#[arg(default_value = \"main\")] account: String` は省略可能な位置引数です。",
+  "struct に `#[command(name = \"till\", disable_help_subcommand = true)]` — これがないと clap は自前の `help` サブコマンドを足し、`help` という行は `InvalidSubcommand` ではなく `DisplayHelp` を出力します。",
+  "`try_parse_from` のあと、`cli.command` に対して match します: `Command::Refund { id, reason: Some(why) } => ...` と `Command::Refund { id, reason: None } => ...` は、ひとつの match の二つのアームです。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.frameworks.09.regex-captures"
+title = "文章の中のドル"
+story = "サポートデスクは顧客のメールを返金チケットに貼り付け、金額は文章の中に埋まっている。それを取り出すスキャナは最初のカンマで止まるので、SOGO で HK$1,234.50 を請求された顧客に一ドルの返金が提示されていた。"
+brief = '''
+標準入力は自由なテキストで、一行がチケット一行です。その中の香港ドルの金額を
+すべて見つけてください。金額とは、`HK$` の直後に整数ドル部と、省略可能な
+セント部が続くものです:
+
+* 整数ドル: 素の数字(`80`、`1234`)か、カンマで三桁ずつ区切った数字
+  (`1,234`、`12,345,678` — 一桁から三桁、その後に `,ddd` のグループが一つ以上);
+* セント: `.` とちょうど二桁(`.50`)。後ろに二桁が続かない `.` は金額の一部では
+  ありません(`HK$38.` は 38 ドルです)。
+
+それ以外 — `US$9.99`、裸の `HK$` — は金額ではありません。
+
+すべての金額について、読む順に `<line> <text> <cents>` を出力してください:
+1 始まりの行番号、テキストに現れたとおりの金額、そしてその値を整数のセントで。
+最後の行のあとに `TOTAL <cents>` を出力してください。金額のないチケットは合計
+だけを出力し、空の入力は `TOTAL 0` を出力します。
+
+```
+input:  Charged HK$1,234.50 twice at SOGO; the second HK$1,234.50 is a duplicate.
+        Refund HK$80 and the HK$12.05 fee. The US$9.99 line is not ours.
+output: 1 HK$1,234.50 123450
+        1 HK$1,234.50 123450
+        2 HK$80 8000
+        2 HK$12.05 1205
+        TOTAL 256105
+```
+
+ドルとセントの名前付きグループを持つ `regex::Regex` をひとつ作り、ループの
+前に**一度だけ**コンパイルし(コンパイルが高価な部分です。ループ本体の中の
+`Regex` は古典的な間違いです)、各行を `captures_iter` で歩いてください。整数の
+セントで計算すること: `f64` のドルに 100 を掛けると、`HK$0.29` が 28 セントに
+なります。スターターは手でスキャンし、最初のカンマで止まり、浮動小数を掛けて
+います。
+'''
+hints = [
+  "`use regex::Regex;` と `let re = Regex::new(r\"...\").unwrap();` をループの上で一度だけ。`re.captures_iter(line)` はマッチごとに `Captures` をひとつ、左から右へ返します。",
+  "名前付きグループ: `(?P<dollars>...)` と `(?P<cents>...)`。パターンの中で `\\$` はリテラルのドル記号で、カンマ区切りの形は選択の先頭に、カンマグループには `+` を付けて置かなければなりません。さもないと `HK$1234.50` は `HK$123` としてマッチします — regex クレートは最長ではなく、最初にマッチした選択肢を取ります。",
+  "パターン: `HK\\$(?P<dollars>\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(?P<cents>\\d{2}))?`。`&caps[0]` がマッチ全体、`caps[\"dollars\"]` がグループのテキスト、`caps.name(\"cents\")` はそのグループが参加していないこともあるので `Option<Match>` です。",
+  "`let dollars: i64 = caps[\"dollars\"].replace(',', \"\").parse().unwrap();` 次に `let cents: i64 = caps.name(\"cents\").map_or(0, |m| m.as_str().parse().unwrap());` で、金額は `dollars * 100 + cents` です。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.frameworks.10.chrono-settlement"
+title = "次の営業日"
+story = "タイムズスクエアの端末からの金曜のカードバッチが、土曜の日付でグロスター・ロードの銀行へ行った。銀行は土曜日に開いていない。決済カレンダーは手書きの月表で、そこでは二月が毎年 28 日だ。"
+brief = '''
+標準入力の各行は `YYYY-MM-DD` 形式の取引日です。空行は無視します。各日付に
+ついて一行出力してください:
+
+```
+<value date> -> <settlement date> +<days>
+```
+
+ここで決済日とは取引日より**後**の最初の月曜から金曜の日(金曜は月曜に、土曜は
+月曜に、日曜は月曜に決済します)、`<days>` は二つの間の暦日数、そして両方の
+日付は `%d %b %Y %a` で出力します — `03 Oct 2026 Sat`。
+
+その形式の実在する日付でない行 — `2026-13-01`、`2026-02-29`、`2026-04-31`、
+`yesterday` — は、行のテキストをトリムして `ERROR: bad date <line>` を出力し、
+プログラムは次の行へ進みます。
+
+```
+input:  2026-10-02
+        2026-10-03
+        2026-10-07
+        2026-13-01
+output: 02 Oct 2026 Fri -> 05 Oct 2026 Mon +3
+        03 Oct 2026 Sat -> 05 Oct 2026 Mon +2
+        07 Oct 2026 Wed -> 08 Oct 2026 Thu +1
+        ERROR: bad date 2026-13-01
+```
+
+`chrono::NaiveDate` を使ってください: 読むのは `parse_from_str`、判定は
+`weekday()`、進めるのは `checked_add_days`、差は
+`signed_duration_since(...).num_days()`、出力は `format` です。決して時計を
+読まないこと。スターターは自前の月表と自前の曜日の式を持っていて、その
+どちらかが閏年で間違っています。
+'''
+hints = [
+  "`use chrono::{Datelike, Days, NaiveDate, Weekday};` — `weekday()` は `Datelike` トレイトから来るので、その import がないと存在しません。",
+  "`NaiveDate::parse_from_str(text, \"%Y-%m-%d\")` は `Result` です。`yesterday` と同じく `2026-02-29` や `2026-04-31` でも `Err` なので、`match` ひとつがすべての悪い行を扱います。",
+  "`!matches!(day.weekday(), Weekday::Sat | Weekday::Sun)` になるまで `date.checked_add_days(Days::new(1)).unwrap()` で進めます。差は `settles.signed_duration_since(value).num_days()` です。",
+  "`value.format(\"%d %b %Y %a\")` は `02 Oct 2026 Fri` をそのまま `println!` に出力します — `%a` は曜日の三文字名です。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.frameworks.11.itertools-chunk-by"
+title = "口座ごとに一行"
+story = "パーシバル・ストリートの端末からの終業明細は、レジが閉まった順にすべての送金を並べる。それを口座ごとに一行に畳むレポートは隣同士しかまとめないので、朝に払って昼食後にまた払った口座が二度現れる。"
+brief = '''
+標準入力は送金で、一行にひとつ、`<ACCOUNT> <CENTS>` です — 口座は空白を含まない
+トークンひとつ、セントは非負の整数です。空行は無視します。ひとつの口座の送金は
+入力のどこに現れてもかまいません。
+
+口座ごとに一行、口座を文字列の昇順で、`<ACCOUNT> <a>+<b>+...=<sum>` として
+出力してください — 金額は入力に現れた順に `+` で結び、次に `=` とその合計です
+(送金ひとつなら `C-031 80=80` と出力します)。その後にフッター一行、
+`<k> accounts, <total> cents` を、異なる口座の数とすべての合計で出力します。
+空の入力は `0 accounts, 0 cents` だけを出力します。
+
+```
+input:  B-204 500
+        A-117 1200
+        B-204 250
+        C-031 80
+        A-117 60
+output: A-117 1200+60=1260
+        B-204 500+250=750
+        C-031 80=80
+        3 accounts, 2090 cents
+```
+
+これは `itertools::Itertools` です: 各口座の送金を寄せ集めるのに `sorted_by_key`
+(安定ソートなので、金額は入力順を保ちます)、連を歩くのに `chunk_by`、出力に
+`join`、口座を数えるのに `unique`。`chunk_by` は*隣接する*等しいキーしか
+まとめません — それがソートを先にする理由のすべてです。スターターはソート
+していない入力に対して、隣接のまとめを手でやっています。
+'''
+hints = [
+  "`use itertools::Itertools;` が `sorted_by_key`、`chunk_by`、`join`、`unique` をすべてのイテレータに載せます。",
+  "`transfers.iter().sorted_by_key(|(account, _)| *account)` はソート済みの要素のイテレータを返し — 安定なので、ひとつの口座の二つの送金は順序を保ちます — その上の `.chunk_by(|(account, _)| *account)` が連をまとめます。",
+  "`ChunkBy` は参照でイテレートします: `let grouped = ...chunk_by(...); for (account, group) in &grouped { ... }`。`group` はその口座の送金のイテレータです。",
+  "ループの中: `let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();` 次に `println!(\"{account} {}={}\", amounts.iter().join(\"+\"), amounts.iter().sum::<i64>())`。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.frameworks.12.indexmap-first-seen"
+title = "来た順に"
+story = "怡和街の端末の店舗集計は HashMap で、朝のレポートは実行するたびに違う順で店を並べる。経理は最初にカードを受けた順で欲しがっているが、どの店がそれだったかは誰にも言えない。"
+brief = '''
+標準入力の各行は店の名前です(空白を含むことがあります。前後の空白はトリムし、
+空行は無視します)。各店が何回現れるかを数えてください。
+
+異なる店ごとに `<merchant> <count>` を、**最初に見た順**で出力し、その後に
+`DISTINCT <k>` を出力します。店が少なくとも一つあれば、`FIRST <merchant>`
+(最初に見た店)と `TOP <merchant> <count>`(最も多い数。同数なら最初に見た方)も
+出力してください。空の入力は `DISTINCT 0` だけを出力します。
+
+```
+input:  Lucky Mac
+        SOGO
+        Lucky Mac
+        Hysan Place
+        Times Square
+        SOGO
+        Jardine's Bazaar
+        Lucky Mac
+output: Lucky Mac 3
+        SOGO 2
+        Hysan Place 1
+        Times Square 1
+        Jardine's Bazaar 1
+        DISTINCT 5
+        FIRST Lucky Mac
+        TOP Lucky Mac 3
+```
+
+`indexmap::IndexMap` は挿入順を覚えているハッシュマップです: `entry` と
+`or_insert` は `HashMap` と同じ、イテレーションはキーが挿入された順、最初の
+ものには `get_index(0)`。スターターは `std::collections::HashMap` 上の同じ
+プログラムで、こちらはハッシャーが今日の気分で決めた順でイテレートします。
+'''
+hints = [
+  "`use indexmap::IndexMap;` — `IndexMap<&str, u64>` は `HashMap` と同じ `entry(key).or_insert(0)` を持ち、`&counts` をイテレートすると挿入順にキーを歩きます。",
+  "`counts.get_index(0)` は `Option<(&K, &V)>`: 最初に挿入された店です。覚えておくための二つ目の変数は要りません。",
+  "`TOP` には、`&counts` を順に歩いて `*count > best` のときだけ最良を置き換えます — 厳密に大きいとき、なので同数のうち最初のものが残ります。`max_by_key` は*最後*の最大値を返すので、ここでは間違った方です。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.frameworks.13.rand-seeded-shuffle"
+title = "同じ抽選をもう一度"
+story = "グロスター・ロード裏の不正対策デスクは、手作業の確認のためにその日の怡和街の店からランダムな標本を引く。監査人が昨日の標本にどの店がいたかを訊くが、それを引いたプログラムはもう一度引けない。"
+brief = '''
+標準入力は二行です。一行目はシード、符号なし 64 ビット整数。二行目は
+`<n> <k>` で、`1 <= n <= 99`、`0 <= k <= 20` です。
+
+デッキ `M01 M02 ... Mnn`(二桁、ゼロ埋め)を作り、シードから初期化した
+**ひとつ**の乱数生成器で:
+
+1. デッキを一度、その場でシャッフルし、`DECK <ids joined by one space>` を出力する;
+2. `k` 個の整数を、それぞれ `1..=100` の一様分布で `u32` として引き、順に
+   それぞれ `DRAW <x>` を出力する;
+3. `CHECK <first id of the shuffled deck>` を出力する。
+
+生成器は `SeedableRng::seed_from_u64` で作った `rand::rngs::StdRng` で、正確に
+その順に消費します — シャッフルが先、抽選が後 — ので、同じシードは常に同じ行を
+出力します。シードが `u64` でなければ、`ERROR: bad seed <text>`(トリム済み)を
+出力し、他には何も出力しません。
+
+```
+input:  20261006
+        6 3
+output: DECK M06 M02 M05 M01 M03 M04
+        DRAW 4
+        DRAW 26
+        DRAW 79
+        CHECK M06
+```
+
+シャッフルは `rand::seq::SliceRandom::shuffle`、抽選は
+`rand::RngExt::random_range` — どちらもトレイトで、どちらも import します。
+スターターは OS から初期化されたスレッドローカルの生成器 `rand::rng()` を使い、
+実行するたびに違う標本を出力します。
+'''
+hints = [
+  "`use rand::rngs::StdRng; use rand::{RngExt, SeedableRng}; use rand::seq::SliceRandom;` — rand 0.10 ではメソッドは `RngExt` と `SliceRandom` にあり、`seed_from_u64` は `SeedableRng` にあります。",
+  "`let mut rng = StdRng::seed_from_u64(seed);` が修正のすべてです: 生成器ひとつ、シードから作り、引くものすべてに `&mut rng` として渡します。",
+  "`deck.shuffle(&mut rng);` 次に `let draw: u32 = rng.random_range(1..=100);` — 型注釈がストリームからどの整数が出るかを決めるので、`u32` でなければなりません。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.frameworks.14.rayon-fee-run"
+title = "すべてのカードを一度に"
+story = "月末の手数料実行は、グロスター・ロード裏の十六コアのボックスの一コアで、怡和街の端末のカードを一枚ずつ歩く。終わってみると銀行の数字は、カードあたり一セントほど我々より高い。"
+brief = '''
+標準入力はゼロ行以上の `<CARD> <CENTS>` です: カード ID(空白なし、一意)と
+セント単位の金額、`0 <= CENTS <= 10_000_000_000`。
+
+一件の支払いの手数料は**金額の 1.5% を次の整数セントに切り上げ、さらに一律
+30 セント**です。整数で言えば `(cents * 15 + 999) / 1000 + 30` です。199 セント
+の支払いは料率分が 2.985 セントで、3 に切り上げ、30 を足して — 手数料は 33。
+ゼロセントの支払いでも一律の 30 は払います。
+
+カードごとに一行、`<CARD> <FEE>` を**カード ID でソートして**出力し、その後に
+`TOTAL <sum of the fees>` を出力してください。空の入力は `TOTAL 0` だけを
+出力します。
+
+```
+input:  C3 199
+        A1 10000
+        B2 3800
+output: A1 180
+        B2 87
+        C3 33
+        TOTAL 300
+```
+
+カードごとの処理を `rayon` で並列にしてください: `use rayon::prelude::*;`、
+そして逐次の `.iter()` があった所に `.par_iter()`。`Vec` への `.map(..).collect()`
+も `.map(..).sum()` も並列イテレータで動きます。`Vec` は入力順で返ってくるので、
+出力の前にソートすること — 並列部分の中から出力しては決していけません。
+スターターは逐次版で、その手数料は間違った方向に丸めています。
+'''
+hints = [
+  "`use rayon::prelude::*;` がすべての `Vec` とスライスに `par_iter()` を載せます。すでにあるクロージャは変わりません。`.map(...).collect()` と `.map(...).sum()` は並列イテレータにもあります。",
+  "整数での切り上げは `x / 1000` ではなく `(x + 999) / 1000` です。スターターは切り捨てていて、隠れたケースには 1.5% が整数セントにならない金額があります。",
+  "並列の `collect()` を `Vec` にすると入力順を保ちますが、課題文が望むのはカード順です: 出力ループ(こちらは逐次のまま)の前に `fees.par_sort_unstable()`(か素の `sort()`)。",
+  "`let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();` — 左側の型が `sum` に何に足し込むかを教えます。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.frameworks.15.parking-lot-ledger"
+title = "四台のレジ、ひとつの台帳"
+story = "ヒサン・プレイスの四台のレジは閉店時にひとつの台帳へ記帳する。各店の行には最後に終えたレジが見たものだけがあり、他の三台が足したものは何もない。"
+brief = '''
+一行目は `<TILLS>`、`1 <= TILLS <= 8` です。それ以降の各行は支払い、
+`<MERCHANT> <CENTS>` です(空白を含まない店のトークン、`CENTS > 0`)。支払いが
+まったくないこともあります。
+
+支払い `i`(0 始まり、支払い行だけを数える)はレジ `i % TILLS` に属します。
+各レジはスレッドひとつで、それぞれが自分の支払いを**ひとつの共有台帳**、
+店ごとの合計セントと件数を持つ `Mutex<HashMap<String, (i64, u32)>>` に
+足し込みます。すべてのレジが終わったら、店ごとに一行、
+`<MERCHANT> <TOTAL> <COUNT>` を店でソートして出力し、その後に支払い行の数で
+`PAYMENTS <n>` を出力してください。
+
+```
+input:  2
+        sogo 500
+        luckymac 3800
+        sogo 1200
+        tsuiwah 4500
+        luckymac 200
+output: luckymac 4000 2
+        sogo 1700 2
+        tsuiwah 4500 1
+        PAYMENTS 5
+```
+
+`parking_lot::Mutex` を使ってください。その `lock()` は失敗しえないので、ガード
+そのものを返します — `.unwrap()` はなく、ポイズニングもなく、`into_inner()` は
+`Result` ではなく値です。レジは `std::thread::scope` で spawn して、`Arc` なしに
+台帳を借用できるようにしてください。スターターは `std::sync` 版で、各レジの
+数字を、他のレジがすでに書いたものを落とすやり方で台帳にマージしています —
+ロックではなくマージを読んでください。
+'''
+hints = [
+  "`std::sync::Mutex` の代わりに `use parking_lot::Mutex;`。`ledger.lock()` がガードです — その後の `.unwrap()` はすべて削り、`into_inner()` はマップそのものです。",
+  "`HashMap::extend` はすでにあるキーを*置き換え*ます。レジ 0 のあとにレジ 1 が `luckymac` を書くと、レジ 0 の合計は消えます。それがスターターのバグで、二つのレジが両方見たどの店にも現れます。",
+  "`entry` でマージします: `let e = shared.entry(merchant).or_insert((0, 0)); e.0 += cents; e.1 += count;` — レジごとに `lock()` 一回、ローカルのマップが完成したあとに取るので、ロックはマージのためだけに保持され、他には何もしません。",
+  "`let mut shared = ledger.lock();` 次に `for (merchant, (cents, count)) in local` のループ。ガードはローカル変数で、スレッドのクロージャが終わるときにドロップされます。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.frameworks.16.crossbeam-hatch"
+title = "受け渡し口が閉まる"
+story = "怡和街の三台の端末がグロスター・ロードのオフィスのひとつの受け渡し口に記帳するが、端末が帰ったことを受け渡し口に告げるものは何もない。夜間バッチは朝六時になってもまだ待っている。"
+brief = '''
+一行目は `<PRODUCERS>`、`1 <= PRODUCERS <= 8` です。それ以降の各行は支払い伝票、
+`<CARD> <CENTS>` です。伝票 `i`(0 始まり、伝票だけ)はプロデューサー
+`i % PRODUCERS` に属します。ちょうど二つのフィールドでない伝票、またはセントが
+`i64` でない伝票は不良伝票です: プロデューサーはそれを飛ばし、何も送りません。
+
+各プロデューサーはスレッドで、自分の良い伝票を、一枚につきメッセージ一つで、
+**ひとつ**の `crossbeam::channel::bounded(4)` チャネルに送ります。ひとつの
+コンシューマー — メインスレッド — が `for msg in rx` ですべての送信者がいなく
+なるまでチャネルを読み、それから出力します:
+
+* `MESSAGES <n>` — 受け取ったメッセージ数
+* `TOTAL <sum of cents>`
+* `LARGEST <CARD> <CENTS>` — 最大の伝票一枚。同額なら小さい方のカード ID
+  (文字列順)。メッセージがなければ `LARGEST -`。
+
+```
+input:  3
+        K1 1200
+        K2 350
+        K3 oops
+        K4 1200
+        K5 90
+output: MESSAGES 4
+        TOTAL 2840
+        LARGEST K1 1200
+```
+
+`for msg in rx` は**最後**の `Sender` がドロップされたときにだけ終わります。各
+プロデューサーは `tx.clone()` を受け取り、それらはスレッドが終わるとドロップ
+されます — しかし元の `tx` はまだ `main` に座っているので、ループは決して
+終わらず、実行はタイムアウトになります。読み始める前にそれをドロップして
+ください。スターターはしていません。
+'''
+hints = [
+  "`use crossbeam::channel::bounded;` — `bounded(4)` は `(Sender, Receiver)` を返します。`Sender` は `Clone` で、`Receiver` はチャネルが閉じると終わるイテレータです。",
+  "チャネルは*すべて*の `Sender` がドロップされたときに閉じます。数えてください: プロデューサーごとにクローン一つ、それに `bounded` があなたに渡した一つ。それは `main` が `for slip in rx` に座っている間もまだ持っています。",
+  "コンシューマーはプロデューサーが spawn される前に走ってはいけません(クローンが要るからです)し、元のものはコンシューマーが始まる前に消えていなければなりません: spawn、次に `drop(tx);`、次にループです。",
+  "`for p in 0..producers` ループの直後、`thread::scope` のクロージャの中で `drop(tx);`。他は何も変わりません。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.frameworks.17.crossbeam-select-timeout"
+title = "三百ミリ秒"
+story = "グロスター・ロードのゲートウェイの向こうにいるあるカード発行会社が 11:52 に答えなくなった。SOGO の端末は二時まで PLEASE WAIT を表示していた。ゲートウェイも待っていたからだ。"
+brief = '''
+標準入力はゼロ行以上の `<CARD> <MS>` で、多くとも二十行です: カード ID と、
+そのカードの発行会社が答えるのにかかる時間、ミリ秒単位。`MS` は**3 以下**
+(生きている発行会社)か**3000 以上**(そうでないもの)のどちらかで、一回の実行で
+遅い種類は多くとも三行です。
+
+カードを順に取ります。それぞれについて、`MS` ミリ秒スリープしてからカード ID を
+チャネルで送り返すワーカースレッドを始めてください。答えを**多くとも 300 ms**
+待ちます: 来たら `<CARD> APPROVED`、来なかったら `<CARD> TIMEOUT` を出力し、
+すぐに次のカードへ進みます。最後のカードのあとに `APPROVED <a> TIMEOUT <t>` を
+出力してください。
+
+```
+input:  V1 0
+        V2 3000
+        V3 2
+output: V1 APPROVED
+        V2 TIMEOUT
+        V3 APPROVED
+        APPROVED 2 TIMEOUT 1
+```
+
+待つのは二つのレシーバーに対する `crossbeam::channel::select!` です: ワーカーの
+ものと、時間が来たときにメッセージを一つ届けるチャネル
+`after(Duration::from_millis(300))`。**各カードに自分の** `bounded(1)` チャネルを
+与えて、遅い発行会社の答えが三秒遅れて届いても次のカードのものと間違われない
+ようにしてください。ワーカーは `let _ = tx.send(..)` で送ります: その時点では
+誰も聞いていないかもしれず、それでかまいません。ワーカーは `std::thread::spawn`
+で spawn し、決して join しないこと — `main` が返ればプロセスは終わり、眠って
+いるワーカーも一緒です。スターターはタイムアウトなしの `rx.recv()` を呼んで
+三秒丸ごと待ち、それからカードを承認しています。
+'''
+hints = [
+  "`use crossbeam::channel::{after, bounded, select};` — `after(d)` は今から `d` 後にちょうど一つメッセージを受け取る `Receiver<Instant>` です。他と同じチャネルで、だから `select!` がそれを待てます。",
+  "`select!` は `recv(rx) -> msg => { .. }` のアームを取り、先に準備のできたレシーバーの方を実行します。ワーカーのレシーバーを一方のアームに、`after` のレシーバーをもう一方に置いてください。",
+  "`recv(rx) -> answer` は `Result` を与えます: ワーカーからの `Ok(card)` です。タイムアウトのアームのメッセージは要らない `Instant` です: `recv(after(Duration::from_millis(300))) -> _ => { .. }`。",
+  "`select! { recv(rx) -> answer => { approved += 1; println!(\"{} APPROVED\", answer.unwrap()); } recv(after(Duration::from_millis(300))) -> _ => { timed_out += 1; println!(\"{card} TIMEOUT\"); } }`",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.frameworks.18.tokio-spawn-join"
+title = "行ごとにひとつのタスク"
+story = "グロスター・ロード裏の決済チェッカーは、アクワイアラが答えた瞬間に各行を出力する。今朝のファイルは 40 行目が 1 行目の上にある状態で返ってきて、SOGO の照合デスクはそれをそのまま送り返した。"
+brief = '''
+標準入力は最大 50 行の `<MERCHANT> <CENTS>` です: 単語一つ、次に非負の整数。
+空行は飛ばします。
+
+各行は自分の `tokio::spawn` されたタスクで検査されます。検査とは `tokio::join!`
+で一緒に行う二つのこと: タグ(店名を大文字にしたもの)と手数料
+(`cents * 15 / 1000`、切り捨て)です。アクワイアラの往復は模擬です — 二つが
+走る前に `(cents % 5) * 50` ミリ秒の `tokio::time::sleep` — スターターにすでに
+あるので、そのまま残してください。これがタスクが始まった順に終わらない理由です。
+
+入力行ごとに一行、**入力順に**、`n` を 1 始まりとして `<n> <TAG> <cents> <fee>`
+を出力し、その後に `TOTAL <sum of cents> <sum of fees>` を出力してください。
+空の入力は `TOTAL 0 0` だけを出力します。
+
+```
+input:  lucky-mac 3804
+        sogo 12502
+        tsui-wah 700
+output: 1 LUCKY-MAC 3804 57
+        2 SOGO 12502 187
+        3 TSUI-WAH 700 10
+        TOTAL 17006 254
+```
+
+main 関数は `#[tokio::main] async fn main()` です。すべての `JoinHandle` を
+`Vec` に入れ、push した順に `.await` してください。タスクは結果を返すので
+あって、出力はしません。スターターはタスクの中から、それぞれが終わるごとに
+出力しています — それはスリープの順であって、ファイルの順ではありません。
+'''
+hints = [
+  "`tokio::spawn(fut)` は `JoinHandle<T>` を返し、`T` は future が返すものです。タスクに、自分の行のデータを出力するのではなく*返させて*ください。",
+  "`tokio::join!(a, b)` は二つの future を同じタスクで走らせ、`(a_result, b_result)` を返します — `check` の中で、タグと手数料です。",
+  "`Vec<JoinHandle<_>>` を前から後ろへ await すれば、タスクが実際にどの順で終わったかにかかわらず入力順です: `for (i, h) in handles.into_iter().enumerate() { let (tag, cents, fee) = h.await.unwrap(); println!(...); }`。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.frameworks.19.tokio-mpsc-drop-sender"
+title = "最後のレジが閉まる"
+story = "ヒサン・プレイスの四台のレジがチャネル越しにひとつの引き出し集計へ送る。集計は決して出力されない: 集計タスクは、閉店時に送るのをやめたレジをまだ待っている。"
+brief = '''
+一行目は `P`、レジの数(1 から 8)です。以降の各行は `<TILL> <CENTS>`: レジ番号と
+整数の金額です。レジが `1..=P` にない行は床に落とします — 送らず、数えません。
+
+各レジはプロデューサータスクです: レジごとに `tokio::spawn` を一つ、
+`tokio::sync::mpsc::channel(4)` の送信側のクローンを持ち、自分の各行について
+`(till, cents)` をファイル順に送ります。ひとつのコンシューマーは `main` にあり、
+`while let Some((till, cents)) = rx.recv().await` で受け取って集計します。
+
+チャネルが空になったら、レジ 1 から P のそれぞれについて
+`TILL <k> <count> <sum>` を、その後に全体の `TOTAL <count> <sum>` を出力して
+ください。
+
+```
+input:  3
+        1 1200
+        2 3000
+        1 800
+        3 50
+        2 1000
+output: TILL 1 2 2000
+        TILL 2 2 4000
+        TILL 3 1 50
+        TOTAL 5 6050
+```
+
+`recv()` が `None` を返すのは**すべて**の送信者がいなくなったときだけです。
+プロデューサーは return するときにクローンをドロップしますが、`main` の元の
+`tx` はまだ生きているので、ループは決して終わりません。スターターはその
+プログラムです。直せば、出力はどのレジが先に送ったかに依存しません —
+メッセージがどの順で届いても集計は同じです。
+'''
+hints = [
+  "`tokio::sync::mpsc::channel(4)` は `(Sender, Receiver)` を返します。`Receiver::recv().await` は `Sender` が一つでも存在する間は `Some(msg)`、最後の一つがドロップされると `None` です。",
+  "送信者を数えてください: レジごとにクローン一つ、そのタスクに move されてタスクが return するときにドロップされます — それに `main` の元の一つ、誰もドロップしません。",
+  "spawn ループの直後に `drop(tx);`。すると `while let Some(..) = rx.recv().await` は、最後のレジが送り終えたちょうどそのときに終わります。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.frameworks.20.tokio-timeout-select"
+title = "一秒、それで否"
+story = "タイムズスクエアのラッキー・マックの端末は、アクワイアラがかかるだけの時間、アクワイアラを待つ。遅い午後にはそれがタップ一回につき三秒で、行列はエスカレーターまで届いた。"
+brief = '''
+標準入力は最大 8 行の `<ID> <PRIMARY> <BACKUP>` です: 非負の整数と、それぞれ
+`fast` か `slow` の単語二つ。`slow slow` の行は多くとも二行です。
+
+すべてのタップは二つのアクワイアラで同時に承認されます。それぞれは遅延のあとに
+コード `id * 37 % 1000` を答えます — 遅延は `tokio::time::sleep` で模擬して
+ください:
+
+* プライマリ: `fast` は 10 ms、`slow` は 3 s
+* バックアップ: `fast` は 100 ms、`slow` は 3 s
+
+先に答えた方が勝ちです: 二つの future に対する `tokio::select!`。レース全体を
+**一秒**の `tokio::time::timeout` で包みます。行は一度に一つ、順に処理し、
+それぞれについて出力してください:
+
+* `DONE <id> primary <code>` か `DONE <id> backup <code>` — 誰が勝ったか
+* `TIMEOUT <id>` — どちらも時間内に答えなかった
+
+```
+input:  7 fast fast
+        8 slow fast
+        9 slow slow
+output: DONE 7 primary 259
+        DONE 8 backup 296
+        TIMEOUT 9
+```
+
+`timeout(dur, fut).await` は `Ok(value)` か `Err(Elapsed)` です。`Err` のときは
+中の future はドロップされています、スリープも含めて — 3 s を待ち切ることは
+決してありません。スターターはプライマリだけをタイムアウトなしで await し、
+バックアップには決して訊きません。
+'''
+hints = [
+  "`use tokio::time::{sleep, timeout};` — `timeout(Duration::from_secs(1), fut).await` は `Result<T, Elapsed>` を与え、中の future をドロップすることがキャンセルそのものです。",
+  "`tokio::select! { a = fut_a => ..., b = fut_b => ... }` は両方をポーリングし、先に終わった方のアームを実行します。もう一方の future はその場でドロップされます。",
+  "`select!` を `async fn authorise(...) -> (&'static str, u64)` に入れ、*それ*をタイムアウトで包んでください。そうすれば一つの締め切りが両方のアクワイアラを覆います。",
+  "`match timeout(..).await { Ok((who, code)) => println!(\"DONE {id} {who} {code}\"), Err(_) => println!(\"TIMEOUT {id}\") }`。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.frameworks.21.futures-join-all"
+title = "八十を一度に"
+story = "夜間のリスクスコアは怡和街の店を一軒ずつ、百ミリ秒ずつ歩く。八十軒になると決済の時間枠の中で終わらなくなり、通り全体が一日遅れで記帳される。"
+brief = '''
+標準入力は最大 100 行の `<ID> <CENTS>` です: 非負の整数二つ。それらに対する
+三つのパスがあり、それぞれ行ごとの `async fn` で、スターターにすでにあります:
+
+1. **スコア。** `score(id, cents)` は 100 ms(`sleep`)かかり、
+   `(id * 7 + cents) % 100` を返します。すべてのスコアを一度に
+   `futures::future::join_all` で走らせてください。これは future を与えた順で
+   結果を返します。行ごとに `<id> <score>` を入力順で出力します。
+2. **バケット。** `bucket(cents)` は 20 ms かかり、`cents / 10000` を返します。
+   バケットサービスは同時に四つまで許します: ストリームを
+   `futures::stream::iter(..).map(..).buffer_unordered(4)` で組み、`Vec` に
+   `collect` し、昇順にソートして、`BUCKETS <b1> <b2> ...` を一行で出力します
+   (行がなければ `BUCKETS` だけ)。
+3. **上限。** `check(id, cents)` は `cents > 500000` のとき `Err(id)`、それ以外は
+   `Ok(cents)` です。`futures::future::try_join_all` で走らせてください:
+   `OK <sum of cents>` か、入力順で最初の上限超過の行について `REJECTED <id>` を
+   出力します。
+
+```
+input:  1 3800
+        2 12500
+        3 250000
+output: 1 7
+        2 14
+        3 21
+        BUCKETS 0 1 25
+        OK 266300
+```
+
+百行は一秒をはるかに下回って終わらなければなりません。スターターは同じ三つの
+関数を一行ずつ await していて、店あたり百ミリ秒です。五十軒を超えるとジャッジ
+の五秒は尽きます。
+'''
+hints = [
+  "`use futures::future::{join_all, try_join_all}; use futures::stream::{self, StreamExt};` — `join_all(iter_of_futures).await` は入力と同じ順の結果の `Vec` です。",
+  "`stream::iter(&rows).map(|&(_, c)| bucket(c)).buffer_unordered(4).collect::<Vec<_>>().await` は四つの future を走らせ続け、終わるごとにそれぞれを返します。あとの `.sort_unstable()` が順序を再びあなたのものにします。",
+  "`try_join_all(..).await` はすべての future が `Ok` なら `Ok(Vec<T>)`、さもなければ最初の `Err` です — `check` は何も await しないので、入力順で最初のものが最初にポーリングされます。",
+  "`let scores = join_all(rows.iter().map(|&(id, c)| score(id, c))).await;` 次に出力には `rows.iter().zip(&scores)`。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.frameworks.22.log-trait"
+title = "フロアに聞こえるもの"
+story = "グロスター・ロードの決済サービスは、積み重なった if の裏で素の print でログを出す。誰かがパーシバル・ストリートの展開のために warn に設定し、エラーが出なくなった一方でデバッグ行は出続けた。"
+brief = '''
+一行目はレベルの単語で、大文字小文字は問いません: `off`、`error`、`warn`、
+`info`、`debug`、`trace` のいずれかです。それ以外の単語は `unknown level <word>`
+を出力し、他には何も出力しません。以降の各行は `<ACCOUNT> <AMOUNT>` です。
+
+行を 1 から番号を付けながら歩き、`log` クレートのマクロで、それぞれ明示的な
+target を付けてログを出してください:
+
+* `trace!(target: "io", "read {raw:?}")` — 生の行、`Debug` で引用符付き
+* `error!(target: "settle", "line {n}: not a number: {amount}")` — 金額が `i64`
+  でないとき。その行は飛ばします
+* `info!(target: "settle", "line {n}: {account} {cents}")`
+* `warn!(target: "settle", "line {n}: large amount {cents}")` — `cents > 100000`
+  のとき、`info!` のあとに
+* `debug!(target: "settle", "total so far {total}")` — 足したあとに
+
+それから、レベルが何であれ、`println!("TOTAL {total}")`。
+
+レコードは**標準出力**に `[LEVEL] target: message` として出力され、それはその
+レベルが選ばれたレベル以上のときだけです — `error` が最上位、`trace` が最下位、
+`off` は合計以外何も出力しません。
+
+```
+input:  info
+        A 100
+        B 250000
+        C 7x
+        D 1
+output: [INFO] settle: line 1: A 100
+        [INFO] settle: line 2: B 250000
+        [WARN] settle: line 2: large amount 250000
+        [ERROR] settle: line 3: not a number: 7x
+        [INFO] settle: line 4: D 1
+        TOTAL 250101
+```
+
+ユニット struct に `log::Log` を実装してください — `enabled` はレコードのレベル
+を `log::max_level()` と比較し、`log` は enabled のとき出力し、`flush` は stdout
+をフラッシュします — それを `static LOGGER` に置き、`log::set_logger(&LOGGER)`、
+そして単語を `LevelFilter` として解析して `log::set_max_level` です。スターター
+は自前のレベル表を持ち、それを逆向きに比較しています。
+'''
+hints = [
+  "`use log::{Log, Metadata, Record, LevelFilter};` — `impl Log for YourStruct` はメソッド三つです: `enabled`、`log`、`flush`。`\"warn\".parse::<LevelFilter>()` が単語を、大文字小文字を問わず読みます。",
+  "`static LOGGER: StdoutLogger = StdoutLogger; log::set_logger(&LOGGER).unwrap(); log::set_max_level(level);` — `set_logger` は `&'static dyn Log` を欲しがります。それが `let` ではなく `static` である理由です。",
+  "`Level` の順序は `Error < Warn < Info < Debug < Trace` なので、レコードが欲しいのは `record.level() <= log::max_level()` のときです。マクロはあなたを呼ぶ前にすでに `max_level()` を調べています。",
+  "`println!(\"[{}] {}: {}\", record.level(), record.target(), record.args())` — `Level` は `ERROR`、`WARN`、... と表示されます。各マクロで渡す `target:` が `record.target()` の返すものです。",
+]
+
+# ---------------------------------------------------------------- 23  BOSS
+
+[[quest]]
+id    = "rust.frameworks.23.the-settlement"
+title = "決済"
+story = "グロスター・ロード裏の決済パス、17:30。今日の送金は JSON ファイル一つで届き、銀行は 18:00 までに口座ごとに一行を欲しがっていて、今夜出ていくファイルは監査人が三月に読むものだ。"
+brief = '''
+標準入力は JSON オブジェクト一つです: `"date"`(文字列、`YYYY-MM-DD`)と
+`"transfers"`、`{"from", "to", "cents"}` の配列。
+
+決済を出力してください:
+
+```
+input:  {"date": "2026-10-06", "transfers": [
+          {"from": "LUCKYMAC", "to": "BANK", "cents": 3800},
+          {"from": "SOGO", "to": "BANK", "cents": 12500},
+          {"from": "BANK", "to": "LUCKYMAC", "cents": 300}]}
+output: SETTLEMENT Tue 06 Oct 2026
+        BANK 16000
+        LUCKYMAC -3500
+        SOGO -12500
+        MOVED 3
+```
+
+一行目は `%a %d %b %Y` で整形した日付です。次に、どこかに現れる口座ごとに
+一行、**名前でソートして**、その純額とともに: 受け取ったすべてから払った
+すべてを引いたもの。次に `MOVED <number of transfers>`。
+
+または `ERROR:` の一行だけで、他には何も出力しません。この順で調べます:
+
+* 入力がまったくその形をしていない — `ERROR: not a settlement`
+* 日付が解析できない — `ERROR: bad date 2026-13-01`
+* それから各送金を順に、1 始まりで — `cents` がゼロか負なら
+  `ERROR: transfer 2: nothing to move`、`from` が `to` と等しいなら
+  `ERROR: transfer 1: BANK pays itself`
+
+後ろの道から組み立ててください: 形には `serde`、日付には `chrono`、エラーには
+コンテキスト付きの `anyhow`、そして `tokio` — 送金ごとにタスク一つがそれを
+検証し、両側を `Arc<tokio::sync::Mutex<BTreeMap<String, i64>>>` に記帳し、最初の
+悪い送金が報告されるものになるよう**順に** join します。スターターは解析して
+spawn しますが、受け取る側にしか記帳せず、決して検証せず、日付を来たまま出力
+します。
+'''
+hints = [
+  "四つのクレート、一つのプログラム。形には `serde_json::from_str::<Settlement>`、日付には `NaiveDate::parse_from_str(&s, \"%Y-%m-%d\")`、出力には `date.format(\"%a %d %b %Y\")`。",
+  "エラーは `anyhow` です: クレート自身のメッセージを漏らしてはいけない所では `.map_err(|_| anyhow!(\"not a settlement\"))`、タスクの中では `bail!(...)`、join するときに `.with_context(|| format!(\"transfer {}\", i + 1))` — そして `{err:#}` が `context: cause` を出力します。",
+  "各タスクは `anyhow::Result<()>` を返す `tokio::spawn(post(Arc::clone(&book), transfer))` です。`handle.await` は `Result<Result<()>, JoinError>` を与えるので `?` は二つ — 最初の方には独自のコンテキストを付けて。",
+  "ハンドルを**spawn した順に** join し、最初の `Err` で止めてください: それが、送金 2 と 3 がどちらも悪いときに `transfer 2` が報告される理由です。マップは `BTreeMap` なので、口座はただでソートされて出てきます。",
+]

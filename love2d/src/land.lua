@@ -60,18 +60,21 @@ function Land.name(land)
   return Land.NAME[land] or tostring(land or "?"):upper()
 end
 
---- SPEC §0's four roads, in the order they are walked. `verybasic` is the
---- quiz road (PROTOCOL §5.3): the grammar asked before it is typed.
-Land.CATEGORIES = { "verybasic", "basic", "advanced", "hacker" }
+--- SPEC §0's roads, in the order they are walked. `verybasic` is the quiz
+--- road (PROTOCOL §5.3): the grammar asked before it is typed. `frameworks`
+--- is the crates road — the job after the interview — and RUST LAND's alone.
+Land.CATEGORIES = { "verybasic", "basic", "advanced", "hacker", "frameworks" }
 
---- The roads `land` has (SPEC §0): every language land has the four, and
---- REMIX LAND the two grammar roads only. What the map's switcher offers
---- and what Q cycles through, so no key leads to a map the server answers
---- `not_found` for.
+--- The roads `land` has (SPEC §0): every language land has the four, RUST
+--- has FRAMEWORKS as a fifth, and REMIX LAND the two grammar roads only.
+--- What the map's switcher offers and what Q cycles through, so no key
+--- leads to a map the server answers `not_found` for.
+Land.LANGUAGE_ROADS = { "verybasic", "basic", "advanced", "hacker" }
 Land.REMIX_ROADS = { "verybasic", "basic" }
 function Land.roads(land)
   if land == "remix" then return Land.REMIX_ROADS end
-  return Land.CATEGORIES
+  if land == "rust" then return Land.CATEGORIES end
+  return Land.LANGUAGE_ROADS
 end
 
 --- The English label a category is translated from. `verybasic` is two

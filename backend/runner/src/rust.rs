@@ -102,6 +102,9 @@ pub(crate) fn rendered_of(diagnostic: &serde_json::Value) -> Option<String> {
 
 pub fn run(sub: &Submission) -> Report {
     match sub.spec.harness {
+        // One file, judged on stdin and stdout — but built by cargo against
+        // the crate shelf, because the file says `use serde` (SPEC §5.1).
+        Harness::Stdio if !sub.spec.crates.is_empty() => return crate::cargo::run_bin(sub),
         Harness::Stdio => {}
         // `#[test]` and a generated manifest: a different job, in `cargo.rs`.
         Harness::Cargo => return crate::cargo::run(sub),

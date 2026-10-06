@@ -615,3 +615,33 @@ async fn the_formatter_tidies_and_never_records() {
     );
     server.handle.abort();
 }
+
+/// A Rust scratchpad takes the crate shelf when the machine has built it
+/// (PROTOCOL §4.9c): `use serde_json` works with nothing declared. Cold, the
+/// pad is plain `rustc` — which every other test in this file runs on, a
+/// fresh home having no shelf — so that path needs no test of its own.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "fetches and compiles the whole crate shelf; run it with --ignored"]
+async fn a_warm_shelf_reaches_the_playground() {
+    let server = start().await;
+    let build_dir = server.store.home().build_lang_dir("rust");
+    std::fs::create_dir_all(&build_dir).unwrap();
+    cwbhacker_runner::shelf::warm(&build_dir, &|_| {}).expect("the crate shelf warms");
+
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+    let before = table_counts(&server);
+    let run = client
+        .play(
+            "fn main() { let v = serde_json::json!({\"cents\": 42}); println!(\"{}\", v[\"cents\"]); }",
+            "",
+        )
+        .await;
+    assert_eq!(run["outcome"].as_str(), Some("ok"), "{run}");
+    assert_eq!(run["stdout"].as_str(), Some("42\n"));
+    assert_eq!(
+        table_counts(&server),
+        before,
+        "a playground run is still not recorded"
+    );
+}

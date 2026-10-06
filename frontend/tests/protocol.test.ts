@@ -19,13 +19,21 @@ describe("lands and languages", () => {
 });
 
 describe("roadsOf", () => {
-  it("gives every language land the four roads and remix the two grammar roads", () => {
-    for (const lang of LANGS) expect(roadsOf(lang)).toEqual(CATEGORIES);
+  it("gives every language land the four roads, rust a fifth, and remix the two grammar roads", () => {
+    const four = ["verybasic", "basic", "advanced", "hacker"];
+    for (const lang of LANGS) {
+      if (lang === "rust") continue;
+      expect(roadsOf(lang)).toEqual(four);
+    }
+    expect(roadsOf("rust")).toEqual([...four, "frameworks"]);
+    expect(roadsOf("rust")).toEqual(CATEGORIES);
     expect(roadsOf("remix")).toEqual(["verybasic", "basic"]);
-    expect(roadsOf("zig")).toEqual(CATEGORIES);
-    expect(roadsOf("lua")).toEqual(CATEGORIES);
+    expect(roadsOf("zig")).toEqual(four);
+    expect(roadsOf("lua")).toEqual(four);
     // A land nobody has opened is treated as a language land: four roads.
-    expect(roadsOf("cobol")).toEqual(CATEGORIES);
+    expect(roadsOf("cobol")).toEqual(four);
+    // FRAMEWORKS walks last: it is the job after the interview.
+    expect(CATEGORIES[CATEGORIES.length - 1]).toBe("frameworks");
   });
 });
 

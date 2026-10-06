@@ -269,6 +269,7 @@ return {
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",
   ["RIGHT — NOW TYPE IT"] = "SPRÁVNĚ — TEĎ HO NAPIŠ",
   ["ADVANCED"] = "POKROČILÉ",
+  ["FRAMEWORKS"] = "FRAMEWORKY",
   ["OPEN"] = "OTEVŘENO",
 
   -- PROTOCOL §4.11b — the answer, and what it costs.

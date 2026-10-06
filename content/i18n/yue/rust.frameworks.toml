@@ -1,0 +1,981 @@
+# RUST LAND — FRAMEWORKS, in Cantonese (colloquial written Cantonese, traditional
+# characters). A translation pack (SPEC §12.1): the prose of
+# `content/rust/frameworks.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers, sample input and output and the exact strings a program must
+# print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.frameworks"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.frameworks.01.anyhow-context"
+title = "一個問號"
+story = "返到付款通道嘅第一個朝早。告士打道側邊個結算讀檔程式喺一個四千行嘅檔案第 3 行死咗，淨係講句 'invalid digit found in string'。"
+brief = '''
+由標準輸入讀入一行行嘅 `<ACCOUNT> <CENTS>`，印出以仙為單位嘅總數，格式係
+`TOTAL <n>`。
+
+如果有一行唔係啱啱好兩個欄位，或者個仙數 parse 唔到做 `i64`，就改為印一行，
+然後正常退出：
+
+```
+ERROR: line 3: invalid digit found in string
+```
+
+呢個就係 `anyhow` 自己對一個帶一層 context 嘅錯誤嘅寫法：`format!("{:#}", err)`
+會印出個 context、一個冒號，再印個原因。個 context 係 `line <n>`（由 1 開始數）。
+出錯嘅情況下，其他嘢一樣都唔印。
+
+```
+input:  A 100
+        B 250
+        C 7
+output: TOTAL 357
+```
+
+做正事嘅 function 用 `anyhow::Result` 做返回型，用 `?` 傳遞錯誤，用
+`.with_context(|| ...)` 講明係邊一行。個 starter 係 unwrap 然後 panic，印一大段
+stack trace 再以 101 退出 —— 樓面冇人會睇得明嗰啲嘢。
+'''
+hints = [
+  "`use anyhow::{Context, Result};` —— `Result<T>` 即係 `Result<T, anyhow::Error>`，而 `?` 會將任何 `std::error::Error` 轉做佢。",
+  "`.with_context(|| format!(\"line {n}\"))` 對 `Result` *同埋* `Option` 都用得（個 `Option` 會變成一個帶住呢句訊息嘅錯誤）。喺 `?` 之前掛上去。",
+  "對 `anyhow::Error` 用 `{:#}` 會喺一行印出 `context: cause`；淨係用 `{}` 就只印最外層嘅 context。",
+  "少咗一個欄位係 `None`，唔係 parse 錯誤：用 `.ok_or_else(|| anyhow!(\"missing amount\"))` 將佢變做錯誤，再畀佢同一個 `line n` context。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.frameworks.02.thiserror-enum"
+title = "有名有姓嘅錯誤"
+story = "轉賬服務每一次拒絕都答同一句 'bad transfer'，而樓上兩層個客服部已經開始打電話問工程師到底係邊一種。"
+brief = '''
+兩個戶口 `A` 同 `B`，開頭嘅結餘喺第一行。然後第二行係 `n`，再然後係 `n` 筆
+轉賬 `<FROM> <TO> <CENTS>`。
+
+跟次序套用佢哋。每一筆印 `OK <FROM> <TO> <CENTS>`，或者印個錯誤 —— 而啲錯誤
+係一個有三個 variant 嘅 `thiserror` enum，佢嘅 `Display` 要啱啱好係：
+
+* `unknown account X` —— `FROM` 或者 `TO` 唔係 `A` 或 `B`（先 check `FROM`）
+* `insufficient funds in A: need 300, have 100`
+* `nothing to move` —— 金額係零或者負數
+
+轉賬做完之後印 `A <balance>` 同 `B <balance>`。
+
+```
+input:  100 100
+        3
+        A B 30
+        B C 5
+        A B 300
+output: OK A B 30
+        unknown account C
+        insufficient funds in A: need 300, have 70
+        A 70
+        B 130
+```
+
+用 `#[derive(Debug, thiserror::Error)]` 定義個 enum，每句訊息放入佢嘅
+`#[error("...")]` attribute，欄位用插值 —— tuple variant 用 `{0}`，有名欄位用
+`{need}`。`transfer` 返回 `Result<(), TransferError>`，而 `main` 用 `{}` 印。
+個 starter 已經有晒邏輯，不過乜都印 `bad transfer`。
+'''
+hints = [
+  "enum 上面 `#[derive(Debug, thiserror::Error)]`，每個 variant 上面 `#[error(\"...\")]`，呢個就係成個 `impl Display` 加 `impl std::error::Error`。",
+  "attribute 入面嘅 `{0}` 係 tuple variant 嘅第一個欄位；`{need}` 同 `{have}` 係 struct variant 嘅有名欄位。",
+  "先 check 兩個戶口名，再 check 金額，而 `FROM` 又要先過 `TO`：隱藏嘅例子會送 `C B 0` 入嚟，而個任務講明咗邊個錯誤贏。",
+  "個簽名改做 `Result<(), TransferError>`；`main` 入面 `println!(\"{e}\")` 就會印出 attribute 嘅文字。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.frameworks.03.serde-derive"
+title = "線上嘅形狀"
+story = "怡和街啲卡機用 JSON 送柯打過嚟。舊個讀檔程式係靠數逗號搵金額，所以一間名入面有逗號嘅商戶一直俾人入錯咗欄。"
+brief = '''
+標準輸入係一個 JSON array，入面係一個個柯打。每個柯打係一個 object，有
+`"id"`（數字）、`"merchant"`（字串）同 `"cents"`（數字）。
+
+每個柯打印一行，跟佢哋嚟嘅次序，`<id> <merchant> <cents>`，然後印
+`TOTAL <sum of cents>`。
+
+```
+input:  [{"id": 1, "merchant": "Lucky Mac", "cents": 3800},
+         {"id": 2, "merchant": "Tsui Wah, Causeway Bay", "cents": 12500}]
+output: 1 Lucky Mac 3800
+        2 Tsui Wah, Causeway Bay 12500
+        TOTAL 16300
+```
+
+定義一個有呢三個欄位嘅 `struct Order`，幫佢 `#[derive(Deserialize)]`，然後交畀
+`serde_json::from_str::<Vec<Order>>` 去讀。個 starter 係用逗號切。object 嘅
+key 可以係任何次序、任何數量嘅空白，而一個字串入面可以有逗號 —— 呢個正正
+係重點。
+'''
+hints = [
+  "`use serde::Deserialize;` 同埋 struct 上面 `#[derive(Deserialize)]` —— 欄位名就係 JSON 嘅 key，而型就講明每個必須係乜。",
+  "`let orders: Vec<Order> = serde_json::from_str(&input)?;` —— 左邊個型就係話畀 serde 知要砌乜嘢。",
+  "key 嘅次序同空白係 JSON 嘅事，唔係你嘅事；serde 讀得任何有呢三個 key 嘅 object。印嘢嗰個迴圈同之前一樣。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.frameworks.04.serde-attributes"
+title = "銀行讀嘅嘢"
+story = "銀行一個禮拜彈返怡和街個結算檔案兩次：每一張從未授權過嘅卡都以 `\"authCode\":null` 送出去，而唯一一部唔報手續費嘅卡機，仲未寫到個檔案就已經令個讀檔程式停低。"
+brief = '''
+標準輸入係一個 JSON array，入面係卡機送嚟嘅結算記錄。每一條記錄有
+`"terminalId"`（字串）、`"merchant"`（字串）、`"amountCents"`（數字），而
+`"feeCents"`（數字）同 `"authCode"`（字串）可能有、可能冇。key 可以係任何次序。
+
+每條記錄印一行，跟輸入次序：將條記錄寫成銀行想要嘅樣，用
+`serde_json::to_string` 出嚟嘅緊湊 JSON，key 跟呢個次序、串法要一模一樣 ——
+`terminalId`、`merchant`、`amountCents`、`feeCents`、`authCode`。冇 `feeCents`
+就寫做 `0`；冇 `authCode` 就**索性唔寫**，永遠唔准寫做 `null`。然後印
+`NET <sum of amountCents minus feeCents>`。
+
+```
+input:  [{"terminalId": "YW-07", "merchant": "Lucky Mac", "amountCents": 3800, "feeCents": 40, "authCode": "A1B2"},
+         {"terminalId": "PS-02", "merchant": "Tsui Wah", "amountCents": 12500}]
+output: {"terminalId":"YW-07","merchant":"Lucky Mac","amountCents":3800,"feeCents":40,"authCode":"A1B2"}
+        {"terminalId":"PS-02","merchant":"Tsui Wah","amountCents":12500,"feeCents":0}
+        NET 16260
+```
+
+一個 struct 做晒兩個方向：`#[derive(Serialize, Deserialize)]` 加 snake_case
+欄位，struct 上面 `#[serde(rename_all = "camelCase")]`，`fee_cents` 上面
+`#[serde(default)]`，而 `auth_code: Option<String>` 配
+`#[serde(skip_serializing_if = "Option::is_none")]`。`to_string` 會跟 struct
+聲明欄位嘅次序寫，所以輸出係準確嘅。個 starter 逐個欄位手動改名，讀唔到冇
+手續費嘅記錄，而且寫 `null`。
+'''
+hints = [
+  "`use serde::{Deserialize, Serialize};` —— 一個 struct，兩個 derive。struct 上面嘅 `#[serde(rename_all = \"camelCase\")]` 取代咗每個欄位各自嘅 `rename`。",
+  "`fee_cents: i64` 上面嘅 `#[serde(default)]` 會用 `i64::default()` 即係 `0` 填返冇咗嘅 key。冇呢句，一條冇手續費嘅記錄就係一個 deserialize 錯誤。",
+  "一個 `Option<String>` 本身已經會將冇咗嘅 key 讀做 `None`；需要 `#[serde(skip_serializing_if = \"Option::is_none\")]` 嘅係*寫*嗰邊，唔係佢就會 serialize 做 `null`。",
+  "`serde_json::to_string(record)` 畀你跟 struct 欄位次序嘅緊湊 JSON；`println!` 佢，一條記錄一行。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.frameworks.05.json-value-walk"
+title = "每塊葉一行"
+story = "波斯富街一間新嘅卡機供應商送嚟一個層層嵌套嘅 object，冇人幫佢寫過 struct，而客服部想今日就睇到入面有乜，唔係等 struct 寫完先。"
+brief = '''
+標準輸入係一個 JSON 文件，最頂層係一個 object 或者一個 array。將每一個葉值
+印做 `<path> = <value>`，一行一個。
+
+* object 嘅 key 以**排序後嘅次序**走訪（key 嘅 byte 次序 —— 即係
+  `serde_json::Value::Object` iterate 嘅次序）；array 嘅元素按索引次序。
+* 個 path 係啲 key 用 `.` 駁埋，array 索引就用 `[i]`：`terminal.id`、
+  `orders[0].cents`，root array 裏面嘅 array 就係 `[1][0]`。key 入面唔會有點
+  或者方括號。
+* 字串印出嚟唔帶引號。數字、`true`、`false` 同 `null` 就照 JSON 嘅寫法印
+  （`1.5` 保持 `1.5`，`null` 就係 `null` 呢個字）。
+* 空嘅 object 或者空嘅 array 冇葉，乜都唔印。
+
+```
+input:  {"batch": "2024-06-01", "terminal": {"id": "YW-07", "online": true},
+         "orders": [{"cents": 3800, "merchant": "Lucky Mac"}, {"cents": 250}], "note": null}
+output: batch = 2024-06-01
+        note = null
+        orders[0].cents = 3800
+        orders[0].merchant = Lucky Mac
+        orders[1].cents = 250
+        terminal.id = YW-07
+        terminal.online = true
+```
+
+用 `serde_json::from_str::<serde_json::Value>` 去 parse，然後寫一個遞歸嘅
+`walk(path: &str, value: &Value)`，match `Value::Object`、`Value::Array` 同
+其餘嘅。個 starter 淨係行最頂層，見到乜就印乜，所以一個嵌套嘅 object 會出成
+一行 JSON，而 root 係 array 就直接 panic。
+'''
+hints = [
+  "`use serde_json::Value;` 同 `let doc: Value = serde_json::from_str(&input)?;` —— `Value` 係一個 enum：`Null`、`Bool`、`Number`、`String`、`Array(Vec<Value>)`、`Object(Map<String, Value>)`。",
+  "遞歸帶住個 path：`fn walk(path: &str, value: &Value)`。object 嘅話，`for (key, child) in map` 已經係排好序嘅 key 次序；array 嘅話，`iter().enumerate()` 畀你個索引。",
+  "個 path 每層長一截：`format!(\"{path}.{key}\")`，除非 `path` 係空（嗰陣就淨係個 key），而索引就係 `format!(\"{path}[{i}]\")`。",
+  "`Value::String(s) => println!(\"{path} = {s}\")` 將字串淨色印出嚟；`other => println!(\"{path} = {other}\")` 用 `Value` 自己嘅 `Display`，即係緊湊 JSON —— `null`、`true`、`1.5`。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.frameworks.06.toml-config"
+title = "服務檔"
+story = "告士打道個結算服務係靠人手索引佢個 config table，而第二個 `[[upstream]]` 蓋咗第一個；由禮拜二開始每一筆結算都去咗 fallback。"
+brief = '''
+標準輸入係一個 TOML 格式嘅服務 config：
+
+* 最頂層：`name`（字串，必須有）、`port`（整數，預設 `8080`）
+* table `[limits]`（必須有）：`max_cents`（整數，必須有）、`retries`（整數，
+  預設 `3`）
+* array of tables `[[upstream]]`，零個或以上，每個有 `name` 同 `url`（字串，
+  必須有）同埋 `timeout_ms`（整數，預設 `1000`）
+
+印出摘要 —— 一行 `SERVICE`、一行 `LIMIT`，然後每個 table 一行 `UPSTREAM`，
+跟檔案次序：
+
+```
+input:  name = 'settlement'
+        port = 9000
+
+        [limits]
+        max_cents = 500000
+
+        [[upstream]]
+        name = 'clearing'
+        url = 'https://clearing.example/settle'
+        timeout_ms = 2000
+
+        [[upstream]]
+        name = 'fallback'
+        url = 'https://fallback.example/settle'
+output: SERVICE settlement on port 9000
+        LIMIT 500000 cents, 3 retries
+        UPSTREAM clearing https://clearing.example/settle 2000 ms
+        UPSTREAM fallback https://fallback.example/settle 1000 ms
+```
+
+如果輸入唔係合法嘅 TOML，或者唔係呢個形狀（少咗必須有嘅 key、值嘅型唔對），
+就淨係印一行 `ERROR: config rejected`，一個字都唔准多，然後正常退出。唔准印
+toml 自己嘅訊息。
+
+用 struct 描述個形狀 —— `Config`、`Limits`、`Upstream` —— 每個都
+`#[derive(Deserialize)]`，預設值用 `#[serde(default)]` 或者
+`#[serde(default = "fn_name")]`，然後用 `toml::from_str::<Config>(&input)` 讀，
+對個 `Result` 做 match。個 starter 係讀一個 `toml::Table` 然後索引入去，檔案
+齊全就得，其他一切情況都 panic。
+'''
+hints = [
+  "`use serde::Deserialize;` —— toml 同 serde_json 一樣係一種 serde 格式，所以 `toml::from_str::<Config>(&input)` 砌出嚟嘅係同一種 derive 出嚟嘅 struct。一個 `[table]` 係一個 struct 欄位；`[[array_of_tables]]` 係一個 `Vec<Struct>` 欄位。",
+  "唔係個型本身 `Default` 嘅預設值就係一個 function：`#[serde(default = \"default_port\")]` 配 `fn default_port() -> u16 { 8080 }`。`Vec` 上面淨係寫 `#[serde(default)]`，就令冇寫 `[[upstream]]` 變成一個空 list。",
+  "`toml::from_str` 返回 `Result<Config, toml::de::Error>`；少咗必須有嘅 key、型唔對、語法錯誤，全部都落入 `Err`。對佢 match 然後印你自己嗰行 —— 千萬唔要 `{}` 個錯誤。",
+  "`match toml::from_str::<Config>(&input) { Ok(cfg) => cfg, Err(_) => { println!(\"ERROR: config rejected\"); return; } }`。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.frameworks.07.clap-derive"
+title = "一行 flag"
+story = "結算機上面個 ops 工具食 `--limit`，而告士打道枱面有人打咗 `--limti 50`；個工具當咗佢係批次名，然後對全部批次行晒。"
+brief = '''
+`settle` 係一個命令行工具，有：
+
+* 一個必須有嘅位置參數 `BATCH`（字串）
+* `--limit <N>`，無符號整數，預設 `100`
+* `--dry-run`，一個 flag
+
+harness 唔會傳任何參數，所以命令行係由標準輸入嚟：每一個非空行係一條命令行，
+用空白切開（工具自己個名唔喺行上面）。每條印一行：
+
+* 成功嗰陣，`batch=<BATCH> limit=<N> dry-run=<true|false>`
+* 失敗嗰陣，`ERROR: ` 加 clap 嘅 `ErrorKind` 嘅 `Debug` 形式 ——
+  `ERROR: MissingRequiredArgument`、`ERROR: ValueValidation`、
+  `ERROR: UnknownArgument`、`ERROR: InvalidValue`（一個 option 後面冇值）
+
+```
+input:  2024-06-01 --limit 50
+        --dry-run 2024-06-02
+        2024-06-03 --limit ten
+output: batch=2024-06-01 limit=50 dry-run=false
+        batch=2024-06-02 limit=100 dry-run=true
+        ERROR: ValueValidation
+```
+
+用一個 `#[derive(clap::Parser)]` 嘅 struct 聲明個介面 ——
+`#[arg(long, default_value_t = 100)]`，同埋 `bool` 上面 `#[arg(long)]` ——
+然後每一行用 `Cli::try_parse_from(std::iter::once("settle").chain(words))`
+去 parse。`Err(e)` 帶住 `e.kind()`。option 可以喺位置參數之前或者之後，而
+`--limit=7` 同 `--limit 7` 係一樣嘅。唔要送 `--help`。個 starter 係一個手寫
+迴圈，乜都收。
+'''
+hints = [
+  "`use clap::Parser;` 同 struct 上面 `#[derive(Parser)]`：一個淨色嘅欄位係位置參數，`#[arg(long)]` 整出 `--field-name`，而欄位嘅型就係值嘅 parser —— `u32` 會幫你拒絕 `ten`。",
+  "`#[arg(long, default_value_t = 100)] limit: u32` 係以有型嘅值做預設；`#[arg(long)] dry_run: bool` 係一個 flag，有就有冇就冇，喺行上面串做 `--dry-run`。",
+  "`Cli::parse()` 讀真正嘅 argv，而呢度佢係空嘅。`Cli::try_parse_from(iter)` 食任何一個字串 iterator，第一項係程式名：`std::iter::once(\"settle\").chain(line.split_whitespace())`。",
+  "`Err(e) => println!(\"ERROR: {:?}\", e.kind())` —— `ErrorKind` 係一個普通 enum，佢嘅 `Debug` 就係 variant 個名。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.frameworks.08.clap-subcommands"
+title = "三個動詞，一個工具"
+story = "告士打道結算機上面個 ops 工具，`pay`、`refund` 同 `balance` 係由第一個字分出嚟嘅三個 if 分支；`refudn` 跌落最後嗰個分支，枱面應該見到拒絕嘅地方見到咗個結餘。"
+brief = '''
+`till` 係一個有三個子命令嘅命令行工具：
+
+* `pay <TO> <CENTS>` —— `TO` 係字串，`CENTS` 係無符號整數；印
+  `PAY <CENTS> to <TO>`
+* `refund <ID> [--reason <WORD>]` —— 印 `REFUND <ID>`，有畀原因就印
+  `REFUND <ID> because <WORD>`
+* `balance [ACCOUNT]` —— `ACCOUNT` 預設係 `main`；印 `BALANCE <ACCOUNT>`
+
+同之前一樣，harness 唔會傳參數：標準輸入每一個非空行係一條命令行，用空白
+切開，冇工具個名。每條命令行印一行輸出。失敗嗰陣印 `ERROR: ` 加 clap 嘅
+`ErrorKind` 嘅 `Debug` 形式：第一個字唔認得係 `ERROR: InvalidSubcommand`；
+子命令少咗位置參數係 `ERROR: MissingRequiredArgument`；`CENTS` 唔係整數係
+`ERROR: ValueValidation`；一個該子命令冇嘅 option 係 `ERROR: UnknownArgument`。
+
+```
+input:  pay yw-07 3800
+        refund r-1041 --reason duplicate
+        balance
+        topup yw-07 100
+output: PAY 3800 to yw-07
+        REFUND r-1041 because duplicate
+        BALANCE main
+        ERROR: InvalidSubcommand
+```
+
+struct 上面用 `#[derive(Parser)]`，有一個欄位標住 `#[command(subcommand)]`，
+佢嘅型係一個 `#[derive(Subcommand)]` 嘅 enum；每個 variant 嘅欄位就係嗰個
+子命令嘅參數，variant 個名變細楷就係行上面嗰個字。struct 上面要擺
+`#[command(disable_help_subcommand = true)]`，咁 `help` 就唔會變成第四個動詞。
+唔要送 `--help`。個 starter 係 match 第一個字，然後索引其餘嘅。
+'''
+hints = [
+  "`use clap::{Parser, Subcommand};` —— struct 得一個欄位 `#[command(subcommand)] command: Command`，而 `Command` 係一個 `#[derive(Subcommand)]` 嘅 enum。",
+  "一個 struct 形嘅 variant `Pay { to: String, cents: i64 }` 係一個有兩個位置參數嘅子命令；`#[arg(long)] reason: Option<String>` 係一個可選嘅 `--reason`；`#[arg(default_value = \"main\")] account: String` 係一個可選嘅位置參數。",
+  "struct 上面 `#[command(name = \"till\", disable_help_subcommand = true)]` —— 唔係嘅話 clap 會自己加一個 `help` 子命令，而 `help` 呢一行就會印 `DisplayHelp` 而唔係 `InvalidSubcommand`。",
+  "`try_parse_from` 之後對 `cli.command` 做 match：`Command::Refund { id, reason: Some(why) } => ...` 同 `Command::Refund { id, reason: None } => ...` 係同一個 match 嘅兩個 arm。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.frameworks.09.regex-captures"
+title = "文字入面嘅銀碼"
+story = "客服部將客人嘅電郵貼入退款 ticket，而銀碼就坐喺一大段文字中間。負責抽銀碼出嚟個掃描器見到第一個逗號就停，所以一個喺崇光俾人收咗 HK$1,234.50 嘅客，收到嘅退款提議係一蚊。"
+brief = '''
+標準輸入係自由文字，一行一個 ticket。搵出入面每一個港元金額。一個金額係
+`HK$` 後面直接跟住一個整蚊部分同一個可有可冇嘅仙部分：
+
+* 整蚊：要麼係淨色數字（`80`、`1234`），要麼係用逗號三位三位分組嘅數字
+  （`1,234`、`12,345,678` —— 一至三個數字，然後一組或以上嘅 `,ddd`）；
+* 仙：一個 `.` 加啱啱好兩個數字（`.50`）。一個 `.` 後面冇齊兩個數字就唔算
+  金額嘅一部分（`HK$38.` 係 38 蚊）。
+
+其他任何嘢 —— `US$9.99`、一個光禿禿嘅 `HK$` —— 都唔係金額。
+
+每一個金額，跟閱讀次序，印 `<line> <text> <cents>`：由 1 開始數嘅行號、個金額
+喺文字入面原本嘅樣，同埋佢以仙計嘅整數值。最後一行之後印 `TOTAL <cents>`。
+一個冇金額嘅 ticket 淨係印總數；空輸入印 `TOTAL 0`。
+
+```
+input:  Charged HK$1,234.50 twice at SOGO; the second HK$1,234.50 is a duplicate.
+        Refund HK$80 and the HK$12.05 fee. The US$9.99 line is not ours.
+output: 1 HK$1,234.50 123450
+        1 HK$1,234.50 123450
+        2 HK$80 8000
+        2 HK$12.05 1205
+        TOTAL 256105
+```
+
+砌一個 `regex::Regex`，用有名嘅 group 分別捕捉蚊同仙，喺迴圈**之前**編譯一次
+（編譯先係貴嘅部分；將 `Regex` 擺入迴圈嘅 body 係經典錯誤），然後用
+`captures_iter` 行每一行。用整數仙計：`f64` 嘅蚊數乘 100 就係 `HK$0.29` 變成
+28 仙嘅原因。個 starter 係手動掃，見到第一個逗號就停，而且用浮點數乘。
+'''
+hints = [
+  "`use regex::Regex;` 同 `let re = Regex::new(r\"...\").unwrap();` 一次，擺喺迴圈上面。`re.captures_iter(line)` 每個 match 產出一個 `Captures`，由左至右。",
+  "有名嘅 group：`(?P<dollars>...)` 同 `(?P<cents>...)`。pattern 入面 `\\$` 係一個字面嘅 dollar 符號，而分組嗰個寫法一定要擺喺 alternation 嘅前面，逗號組要用 `+`，唔係 `HK$1234.50` 就會 match 做 `HK$123` —— regex crate 攞第一個 match 到嘅 alternative，唔係最長嗰個。",
+  "個 pattern：`HK\\$(?P<dollars>\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(?P<cents>\\d{2}))?`。`&caps[0]` 係成個 match，`caps[\"dollars\"]` 係個 group 嘅文字，而 `caps.name(\"cents\")` 係一個 `Option<Match>`，因為個 group 可能冇參與。",
+  "`let dollars: i64 = caps[\"dollars\"].replace(',', \"\").parse().unwrap();` 然後 `let cents: i64 = caps.name(\"cents\").map_or(0, |m| m.as_str().parse().unwrap());`，個金額就係 `dollars * 100 + cents`。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.frameworks.10.chrono-settlement"
+title = "下一個營業日"
+story = "時代廣場啲卡機禮拜五嘅一批卡數，送去告士打道銀行嗰陣日期寫咗禮拜六，而銀行禮拜六唔開。個結算日曆係一張人手寫嘅月份表，入面嘅二月年年都係 28 日。"
+brief = '''
+標準輸入每一行係一個 `YYYY-MM-DD` 格式嘅起息日。空行唔理。每個日期印一行：
+
+```
+<value date> -> <settlement date> +<days>
+```
+
+當中結算日係起息日**之後**第一個星期一至星期五嘅日子（禮拜五結算喺禮拜一，
+禮拜六結算喺禮拜一，禮拜日結算喺禮拜一），`<days>` 係兩個日期之間嘅日曆日數，
+而兩個日期都以 `%d %b %Y %a` 印 —— `03 Oct 2026 Sat`。
+
+一行唔係該格式嘅真實日期 —— `2026-13-01`、`2026-02-29`、`2026-04-31`、
+`yesterday` —— 就印 `ERROR: bad date <line>`，用該行 trim 咗嘅文字，然後程式
+繼續去下一行。
+
+```
+input:  2026-10-02
+        2026-10-03
+        2026-10-07
+        2026-13-01
+output: 02 Oct 2026 Fri -> 05 Oct 2026 Mon +3
+        03 Oct 2026 Sat -> 05 Oct 2026 Mon +2
+        07 Oct 2026 Wed -> 08 Oct 2026 Thu +1
+        ERROR: bad date 2026-13-01
+```
+
+用 `chrono::NaiveDate`：`parse_from_str` 讀，`weekday()` 測試，
+`checked_add_days` 行一步，`signed_duration_since(...).num_days()` 計相隔，
+`format` 印。永遠唔准讀時鐘。個 starter 有自己嘅月份表同自己嘅星期幾公式，
+而其中一個喺閏年係錯嘅。
+'''
+hints = [
+  "`use chrono::{Datelike, Days, NaiveDate, Weekday};` —— `weekday()` 係由 `Datelike` trait 嚟嘅，所以冇咗嗰個 import 佢就唔存在。",
+  "`NaiveDate::parse_from_str(text, \"%Y-%m-%d\")` 係一個 `Result`；`2026-02-29` 同 `2026-04-31` 同 `yesterday` 一樣都係 `Err`，所以一個 `match` 就蓋晒所有壞行。",
+  "用 `date.checked_add_days(Days::new(1)).unwrap()` 一步步行，直到 `!matches!(day.weekday(), Weekday::Sat | Weekday::Sun)`；相隔係 `settles.signed_duration_since(value).num_days()`。",
+  "`value.format(\"%d %b %Y %a\")` 直接喺 `println!` 入面印出 `02 Oct 2026 Fri` —— `%a` 係星期幾嘅三個字母縮寫。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.frameworks.11.itertools-chunk-by"
+title = "一個戶口一行"
+story = "波斯富街啲卡機嘅日結報表，係跟各部收銀機收舖嘅次序列出每一筆轉賬。將佢哋摺成一個戶口一行嗰份報告淨係會合併相鄰嘅，所以一個朝早畀過錢、食完晏再畀嘅戶口會出現兩次。"
+brief = '''
+標準輸入係一筆筆轉賬，一行一筆，`<ACCOUNT> <CENTS>` —— 戶口係一個冇空格嘅
+token，仙數係非負整數。空行唔理。同一個戶口嘅轉賬可以出現喺輸入嘅任何位置。
+
+每個戶口印一行，戶口按字串升序，格式 `<ACCOUNT> <a>+<b>+...=<sum>` —— 金額跟
+佢哋喺輸入出現嘅次序，用 `+` 駁埋，然後 `=` 同佢哋嘅總和（單一筆轉賬印做
+`C-031 80=80`）。然後一行 footer，`<k> accounts, <total> cents`，即係唔同戶口
+嘅數量同埋全部嘢嘅總和。空輸入淨係印 `0 accounts, 0 cents`。
+
+```
+input:  B-204 500
+        A-117 1200
+        B-204 250
+        C-031 80
+        A-117 60
+output: A-117 1200+60=1260
+        B-204 500+250=750
+        C-031 80=80
+        3 accounts, 2090 cents
+```
+
+呢個就係 `itertools::Itertools`：`sorted_by_key` 將每個戶口嘅轉賬帶埋一齊
+（佢係穩定排序，所以金額保住輸入次序），`chunk_by` 行每一段，`join` 印佢哋，
+`unique` 數戶口。`chunk_by` 淨係會將*相鄰*嘅相同 key 分做一組 —— 呢個就係
+點解要先排序。個 starter 係對未排序嘅輸入手動做相鄰分組。
+'''
+hints = [
+  "`use itertools::Itertools;` 將 `sorted_by_key`、`chunk_by`、`join` 同 `unique` 放上每一個 iterator。",
+  "`transfers.iter().sorted_by_key(|(account, _)| *account)` 返回一個排好序嘅 item iterator —— 穩定，所以同一個戶口嘅兩筆轉賬保住次序 —— 而喺上面 `.chunk_by(|(account, _)| *account)` 就將一段段分組。",
+  "`ChunkBy` 係以 reference iterate 嘅：`let grouped = ...chunk_by(...); for (account, group) in &grouped { ... }`。`group` 係一個行該戶口轉賬嘅 iterator。",
+  "迴圈入面：`let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();` 然後 `println!(\"{account} {}={}\", amounts.iter().join(\"+\"), amounts.iter().sum::<i64>())`。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.frameworks.12.indexmap-first-seen"
+title = "佢哋嚟嘅次序"
+story = "怡和街啲卡機嘅商戶統計係一個 HashMap，而朝早份報告每次行都用唔同次序列出商戶。財務部想要佢哋第一次收卡嘅次序，而冇人講得出邊間商戶係第一。"
+brief = '''
+標準輸入每一行係一個商戶名（可以有空格；前後嘅空白會 trim 走；空行唔理）。
+數每個商戶出現幾多次。
+
+每個唔同嘅商戶印 `<merchant> <count>`，**跟佢哋第一次見到嘅次序**，然後印
+`DISTINCT <k>`。如果至少有一個商戶，再印 `FIRST <merchant>`（第一個見到嘅
+商戶）同 `TOP <merchant> <count>`（最高嘅計數；打和就攞先見到嗰個）。空輸入
+淨係印 `DISTINCT 0`。
+
+```
+input:  Lucky Mac
+        SOGO
+        Lucky Mac
+        Hysan Place
+        Times Square
+        SOGO
+        Jardine's Bazaar
+        Lucky Mac
+output: Lucky Mac 3
+        SOGO 2
+        Hysan Place 1
+        Times Square 1
+        Jardine's Bazaar 1
+        DISTINCT 5
+        FIRST Lucky Mac
+        TOP Lucky Mac 3
+```
+
+`indexmap::IndexMap` 係一個記得插入次序嘅 hash map：`entry` 同 `or_insert`
+同 `HashMap` 一樣，iterate 跟 key 插入嘅次序，`get_index(0)` 攞第一個。個
+starter 係同一個程式用 `std::collections::HashMap` 寫，而佢 iterate 嘅次序係
+個 hasher 今日心情點就點。
+'''
+hints = [
+  "`use indexmap::IndexMap;` —— `IndexMap<&str, u64>` 有同 `HashMap` 一樣嘅 `entry(key).or_insert(0)`，而 iterate `&counts` 就跟插入次序行啲 key。",
+  "`counts.get_index(0)` 係 `Option<(&K, &V)>`：史上第一個插入嘅商戶。唔使第二個變數去記住佢。",
+  "`TOP` 嘅話，跟次序行 `&counts`，淨係喺 `*count > best` 嘅時候先換走最佳 —— 嚴格大過，咁打和嗰陣最早嗰個就留得住。`max_by_key` 返回嘅係*最後*一個最大值，喺呢度係錯嗰個。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.frameworks.13.rand-seeded-shuffle"
+title = "同一鋪抽兩次"
+story = "告士打道側邊個反欺詐部門由當日怡和街嘅商戶抽一個隨機樣本做人手檢查。核數師問昨日個樣本有邊幾間商戶，而抽佢哋出嚟個程式冇辦法再抽一次。"
+brief = '''
+標準輸入係兩行。第一行係一個 seed，無符號 64 位整數；第二行係 `<n> <k>`，
+`1 <= n <= 99` 而 `0 <= k <= 20`。
+
+砌一副牌 `M01 M02 ... Mnn`（兩位數，前面補零），然後用**一個**由 seed 起嘅
+隨機生成器：
+
+1. 將副牌原地洗一次，印 `DECK <ids joined by one space>`；
+2. 抽 `k` 個整數，每個係 `1..=100` 入面均勻分佈嘅 `u32`，跟次序每個印
+   `DRAW <x>`；
+3. 印 `CHECK <first id of the shuffled deck>`。
+
+個生成器係用 `SeedableRng::seed_from_u64` 砌嘅 `rand::rngs::StdRng`，而且要
+啱啱好跟呢個次序消耗 —— 先洗牌，再抽 —— 咁同一個 seed 就永遠印同樣嘅行。
+如果個 seed 唔係 `u64`，印 `ERROR: bad seed <text>`（trim 咗），其他乜都唔印。
+
+```
+input:  20261006
+        6 3
+output: DECK M06 M02 M05 M01 M03 M04
+        DRAW 4
+        DRAW 26
+        DRAW 79
+        CHECK M06
+```
+
+洗牌係 `rand::seq::SliceRandom::shuffle`，抽數係 `rand::RngExt::random_range`
+—— 兩個都係 trait，兩個都要 import。個 starter 用 `rand::rng()`，即係由作業
+系統取 seed 嘅 thread-local 生成器，每次行都印一個唔同嘅樣本。
+'''
+hints = [
+  "`use rand::rngs::StdRng; use rand::{RngExt, SeedableRng}; use rand::seq::SliceRandom;` —— 喺 rand 0.10，啲 method 住喺 `RngExt` 同 `SliceRandom`，而 `seed_from_u64` 喺 `SeedableRng`。",
+  "`let mut rng = StdRng::seed_from_u64(seed);` 就係成個修正：一個生成器，由 seed 砌出嚟，以 `&mut rng` 交畀每一樣要抽數嘅嘢。",
+  "`deck.shuffle(&mut rng);` 然後 `let draw: u32 = rng.random_range(1..=100);` —— 個型註解決定由個流出嚟嘅係邊種整數，所以一定要係 `u32`。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.frameworks.14.rayon-fee-run"
+title = "每張卡一齊"
+story = "月結手續費嗰一輪，喺告士打道側邊一部十六核嘅機上面用一個核逐張行怡和街卡機嘅卡，行完之後銀行嘅數比我哋每張卡高大約一仙。"
+brief = '''
+標準輸入係零行或以上嘅 `<CARD> <CENTS>`：一個卡 id（冇空格，唯一）同一個以
+仙計嘅金額，`0 <= CENTS <= 10_000_000_000`。
+
+一筆付款嘅手續費係**金額嘅 1.5%，向上捨入到下一個整仙，再加 30 仙固定費**。
+用整數寫：`(cents * 15 + 999) / 1000 + 30`。一筆 199 仙嘅付款，費率部分係
+2.985 仙，向上捨入做 3，加 30 —— 手續費 33。零仙嘅付款一樣要畀固定嘅 30。
+
+每張卡印一行 `<CARD> <FEE>`，**按卡 id 排序**，然後印 `TOTAL <sum of the fees>`。
+空輸入淨係印 `TOTAL 0`。
+
+```
+input:  C3 199
+        A1 10000
+        B2 3800
+output: A1 180
+        B2 87
+        C3 33
+        TOTAL 300
+```
+
+用 `rayon` 將每張卡嘅工作平行做：`use rayon::prelude::*;`，然後本來順序
+`.iter()` 嘅地方改做 `.par_iter()`。`.map(..).collect()` 入一個 `Vec` 同
+`.map(..).sum()` 喺平行 iterator 上面都用得；個 `Vec` 返嚟係輸入次序，所以印
+之前要排序 —— 千萬唔要喺平行嘅部分入面印嘢。個 starter 係順序版，而且佢嘅
+手續費捨入方向錯咗。
+'''
+hints = [
+  "`use rayon::prelude::*;` 將 `par_iter()` 放上每一個 `Vec` 同 slice。你已經有嗰個 closure 唔使改；`.map(...).collect()` 同 `.map(...).sum()` 喺平行 iterator 上面都存在。",
+  "整數向上捨入係 `(x + 999) / 1000`，唔係 `x / 1000`。個 starter 係向下捨入，而隱藏嘅例子有啲金額嘅 1.5% 唔係整仙。",
+  "平行 `collect()` 入 `Vec` 會保住輸入次序，但係個任務要卡嘅次序：印嘢迴圈之前 `fees.par_sort_unstable()`（或者普通 `sort()`），而印嘢迴圈保持順序。",
+  "`let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();` —— 左邊個型話畀 `sum` 知要加入乜嘢型。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.frameworks.15.parking-lot-ledger"
+title = "四部收銀機，一本賬"
+story = "希慎廣場四部收銀機收舖嗰陣過數入同一本賬。每間商戶嗰一行揸住嘅係最後收工嗰部收銀機見到嘅數，其餘三部加過嘅一樣都冇。"
+brief = '''
+第一行係 `<TILLS>`，`1 <= TILLS <= 8`。之後每一行係一筆付款，
+`<MERCHANT> <CENTS>`（一個冇空格嘅商戶 token，`CENTS > 0`）。可能一筆付款
+都冇。
+
+第 `i` 筆付款（由 0 開始數，只數付款行）屬於第 `i % TILLS` 部收銀機。每部
+收銀機係一條 thread；每條將佢嘅付款加入**一本共享嘅賬**，一個
+`Mutex<HashMap<String, (i64, u32)>>`，記每間商戶嘅總仙數同筆數。等每部收銀機
+都做完，每間商戶印一行 `<MERCHANT> <TOTAL> <COUNT>`，按商戶排序，然後印
+`PAYMENTS <n>`，即係付款行嘅數量。
+
+```
+input:  2
+        sogo 500
+        luckymac 3800
+        sogo 1200
+        tsuiwah 4500
+        luckymac 200
+output: luckymac 4000 2
+        sogo 1700 2
+        tsuiwah 4500 1
+        PAYMENTS 5
+```
+
+用 `parking_lot::Mutex`。佢嘅 `lock()` 唔會失敗，所以直接交返個 guard 畀你
+—— 冇 `.unwrap()`，冇 poisoning，而 `into_inner()` 就係個值，唔係一個
+`Result`。用 `std::thread::scope` spawn 啲收銀機，咁佢哋唔使 `Arc` 都借得到
+本賬。個 starter 係 `std::sync` 版，而佢將每部收銀機嘅數合併入本賬嘅方式會
+掉咗其他收銀機已經寫咗嘅嘢 —— 睇個合併，唔係睇個鎖。
+'''
+hints = [
+  "用 `use parking_lot::Mutex;` 取代 `std::sync::Mutex`。`ledger.lock()` 就係個 guard —— 刪走佢後面每一個 `.unwrap()`，而 `into_inner()` 就係個 map 本身。",
+  "`HashMap::extend` 會*取代*已經存在嘅 key。當 1 號收銀機喺 0 號之後寫 `luckymac`，0 號嘅總數就冇咗。呢個就係個 starter 嘅 bug，任何兩部收銀機都見過嘅商戶都會現形。",
+  "用 `entry` 合併：`let e = shared.entry(merchant).or_insert((0, 0)); e.0 += cents; e.1 += count;` —— 每部收銀機 `lock()` 一次，喺本地個 map 砌完之後先攞，咁個鎖就淨係為咗合併揸住，其他嘢一樣都唔做。",
+  "`let mut shared = ledger.lock();` 然後 `for (merchant, (cents, count)) in local` 迴圈；個 guard 係一個 local，條 thread 嘅 closure 完結佢就 drop。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.frameworks.16.crossbeam-hatch"
+title = "窗口閂咗"
+story = "怡和街三部卡機過數入告士打道寫字樓同一個窗口，而冇嘢話畀個窗口知佢哋已經收工返屋企。夜批到朝早六點仲喺度等。"
+brief = '''
+第一行係 `<PRODUCERS>`，`1 <= PRODUCERS <= 8`。之後每一行係一張付款單，
+`<CARD> <CENTS>`。第 `i` 張單（由 0 開始數，只數單）屬於第 `i % PRODUCERS`
+個 producer。一張單唔係啱啱好兩個欄位，或者仙數唔係 `i64`，就係一張壞單：
+個 producer 跳過佢，乜都唔送。
+
+每個 producer 係一條 thread，將佢嘅好單逐張一個訊息，送落**一條**
+`crossbeam::channel::bounded(4)` channel。一個 consumer —— main thread —— 用
+`for msg in rx` 讀條 channel，直到每個 sender 都冇咗，然後印：
+
+* `MESSAGES <n>` —— 收到嘅訊息數
+* `TOTAL <sum of cents>`
+* `LARGEST <CARD> <CENTS>` —— 最大嗰一張單；打和就攞較細嘅卡 id（字串次序）。
+  冇訊息嘅話，`LARGEST -`。
+
+```
+input:  3
+        K1 1200
+        K2 350
+        K3 oops
+        K4 1200
+        K5 90
+output: MESSAGES 4
+        TOTAL 2840
+        LARGEST K1 1200
+```
+
+`for msg in rx` 淨係會喺**最後**一個 `Sender` drop 咗嗰陣先完。每個 producer
+攞一個 `tx.clone()`，啲 thread 做完佢哋就 drop —— 但係原裝嗰個 `tx` 仲坐喺
+`main` 度，所以個迴圈永遠唔完，成次行就係一個 timeout。開始讀之前 drop 佢。
+個 starter 冇。
+'''
+hints = [
+  "`use crossbeam::channel::bounded;` —— `bounded(4)` 畀你 `(Sender, Receiver)`；`Sender` 係 `Clone`，而 `Receiver` 係一個 iterator，條 channel 閂咗佢就完。",
+  "一條 channel 係喺*每一個* `Sender` 都 drop 咗嗰陣先閂。數一數：每個 producer 一個 clone，加上 `bounded` 交畀你嗰個，`main` 坐喺 `for slip in rx` 嗰陣仲擁有住佢。",
+  "consumer 唔可以喺 producer spawn 之前行（佢哋要啲 clone），而原裝嗰個一定要喺 consumer 開始之前冇咗：spawn，然後 `drop(tx);`，然後個迴圈。",
+  "`drop(tx);` 就擺喺 `for p in 0..producers` 迴圈之後，喺 `thread::scope` 嘅 closure 入面。其他乜都唔使改。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.frameworks.17.crossbeam-select-timeout"
+title = "三百毫秒"
+story = "告士打道 gateway 後面有一間發卡機構 11:52 開始冇反應。崇光啲卡機顯示 PLEASE WAIT 顯示到兩點，因為個 gateway 都一樣喺度等。"
+brief = '''
+標準輸入係零行或以上嘅 `<CARD> <MS>`，最多二十行：一個卡 id，同埋該卡嘅
+發卡機構要幾耐先答，以毫秒計。`MS` 要麼係**最多 3**（一間正常嘅發卡機構），
+要麼係**至少 3000**（一間唔正常嘅）；每次行最多三行係慢嗰種。
+
+跟次序處理啲卡。每張卡起一條 worker thread，瞓 `MS` 毫秒然後將卡 id 經一條
+channel 送返嚟。**最多等 300 ms** 攞答案：答案到咗就印 `<CARD> APPROVED`，
+冇到就印 `<CARD> TIMEOUT`，然後即刻去下一張卡。最後一張卡之後印
+`APPROVED <a> TIMEOUT <t>`。
+
+```
+input:  V1 0
+        V2 3000
+        V3 2
+output: V1 APPROVED
+        V2 TIMEOUT
+        V3 APPROVED
+        APPROVED 2 TIMEOUT 1
+```
+
+個等待係一個 `crossbeam::channel::select!`，對住兩個 receiver：worker 嗰個，
+同埋 `after(Duration::from_millis(300))`，一條時間到就送一個訊息嘅 channel。
+**每張卡畀佢自己一條** `bounded(1)` channel，咁一間慢嘅發卡機構遲三秒先到
+嘅答案就唔會俾人當係下一張卡嘅。worker 用 `let _ = tx.send(..)` 送：到嗰陣
+可能已經冇人聽，而咁係冇問題嘅。用 `std::thread::spawn` 開 worker，而且永遠
+唔要 join 佢哋 —— `main` 返回就結束成個 process，連瞓住嘅 worker 一齊。個
+starter 係用冇 timeout 嘅 `rx.recv()`，等足三秒，然後批准張卡。
+'''
+hints = [
+  "`use crossbeam::channel::{after, bounded, select};` —— `after(d)` 係一個 `Receiver<Instant>`，由而家起計 `d` 之後會收到啱啱好一個訊息。佢係一條同其他一樣嘅 channel，所以 `select!` 等得到佢。",
+  "`select!` 食 `recv(rx) -> msg => { .. }` 呢種 arm，邊個 receiver 先 ready 就行邊個。worker 嘅 receiver 放一個 arm，`after` 嘅 receiver 放另一個。",
+  "`recv(rx) -> answer` 畀你一個 `Result`：由 worker 嚟就係 `Ok(card)`。timeout 嗰個 arm 嘅訊息係一個你唔需要嘅 `Instant`：`recv(after(Duration::from_millis(300))) -> _ => { .. }`。",
+  "`select! { recv(rx) -> answer => { approved += 1; println!(\"{} APPROVED\", answer.unwrap()); } recv(after(Duration::from_millis(300))) -> _ => { timed_out += 1; println!(\"{card} TIMEOUT\"); } }`",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.frameworks.18.tokio-spawn-join"
+title = "一行一個 task"
+story = "告士打道側邊個結算核對程式，收單機構一答就即刻印該行。今朝嘅檔案返嚟，第 40 行喺第 1 行上面，崇光個對賬部門即刻退返轉頭。"
+brief = '''
+標準輸入最多 50 行 `<MERCHANT> <CENTS>`：一個字，然後一個非負整數。空行跳過。
+
+每一行由佢自己一個 `tokio::spawn` 出嚟嘅 task 檢查。一次檢查係兩樣嘢用
+`tokio::join!` 一齊做：個 tag（商戶轉大楷）同手續費（`cents * 15 / 1000`，
+向下捨入）。收單機構嘅來回係模擬嘅 —— 兩樣嘢行之前先 `tokio::time::sleep`
+`(cents % 5) * 50` 毫秒 —— 個 starter 已經有咗；保留佢。呢個就係啲 task 唔跟
+開始次序完成嘅原因。
+
+每一個輸入行印一行，**跟輸入次序**，`<n> <TAG> <cents> <fee>`，`n` 由 1 開始，
+然後印 `TOTAL <sum of cents> <sum of fees>`。空輸入淨係印 `TOTAL 0 0`。
+
+```
+input:  lucky-mac 3804
+        sogo 12502
+        tsui-wah 700
+output: 1 LUCKY-MAC 3804 57
+        2 SOGO 12502 187
+        3 TSUI-WAH 700 10
+        TOTAL 17006 254
+```
+
+main function 係 `#[tokio::main] async fn main()`。將每一個 `JoinHandle` 放入
+一個 `Vec`，跟 push 嘅次序 `.await` 佢哋；一個 task 返回佢嘅結果，唔係自己印。
+個 starter 係喺 task 入面印，邊個做完就印邊個 —— 即係 sleep 嘅次序，唔係
+檔案嘅次序。
+'''
+hints = [
+  "`tokio::spawn(fut)` 返回一個 `JoinHandle<T>`，`T` 就係個 future 返回嘅嘢。令個 task *返回*佢嗰行嘅資料，而唔係印佢。",
+  "`tokio::join!(a, b)` 喺同一個 task 上面行兩個 future，交返 `(a_result, b_result)` —— 即係 `check` 入面嘅 tag 同手續費。",
+  "一個 `Vec<JoinHandle<_>>` 由頭到尾 await 就係輸入次序，無論啲 task 實際上係幾時做完：`for (i, h) in handles.into_iter().enumerate() { let (tag, cents, fee) = h.await.unwrap(); println!(...); }`。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.frameworks.19.tokio-mpsc-drop-sender"
+title = "最後一部收銀機收舖"
+story = "希慎廣場四部收銀機經一條 channel 餵數入同一個錢櫃點算。個數永遠印唔出：負責點算嗰個 task 仲喺度等一部收舖嗰陣已經停咗送嘢嘅收銀機。"
+brief = '''
+第一行係 `P`，收銀機嘅數量（1 至 8）。之後每一行係 `<TILL> <CENTS>`：一個
+收銀機編號同一個整數金額。收銀機唔喺 `1..=P` 入面嗰行就直接掉落地 —— 唔送，
+唔計。
+
+每部收銀機係一個 producer task：每部 `tokio::spawn` 一個，揸住一條
+`tokio::sync::mpsc::channel(4)` 嘅 sender 嘅 clone，跟檔案次序將佢每一行送做
+`(till, cents)`。唯一一個 consumer，喺 `main` 入面，用
+`while let Some((till, cents)) = rx.recv().await` 接收同埋累計。
+
+條 channel 抽乾之後，每部收銀機 1 至 P 印 `TILL <k> <count> <sum>`，然後印
+全部加埋嘅 `TOTAL <count> <sum>`。
+
+```
+input:  3
+        1 1200
+        2 3000
+        1 800
+        3 50
+        2 1000
+output: TILL 1 2 2000
+        TILL 2 2 4000
+        TILL 3 1 50
+        TOTAL 5 6050
+```
+
+`recv()` 淨係會喺**每一個** sender 都冇咗嗰陣先返回 `None`。啲 producer 返回
+嗰陣就 drop 咗佢哋嘅 clone；`main` 入面原裝嗰個 `tx` 仲生勾勾，所以個迴圈
+永遠唔完。個 starter 就係呢個程式。修好佢之後，輸出唔會受邊部收銀機先送影響
+—— 無論訊息以邊個次序到，累計出嚟都一樣。
+'''
+hints = [
+  "`tokio::sync::mpsc::channel(4)` 畀你 `(Sender, Receiver)`。`Receiver::recv().await` 喺仲有任何 `Sender` 存在嗰陣係 `Some(msg)`，最後一個 drop 咗之後就係 `None`。",
+  "數一數啲 sender：每部收銀機一個 clone，move 入佢個 task，task 返回就 drop —— 仲有 `main` 入面原裝嗰個，冇人 drop 佢。",
+  "spawn 迴圈之後即刻 `drop(tx);`。然後 `while let Some(..) = rx.recv().await` 就會啱啱好喺最後一部收銀機送完嗰陣完結。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.frameworks.20.tokio-timeout-select"
+title = "一秒，然後話唔得"
+story = "時代廣場 Lucky Mac 部卡機等收單機構，收單機構用幾耐佢就等幾耐。一個慢嘅下晝變咗拍一下卡三秒，條隊排到去扶手電梯。"
+brief = '''
+標準輸入最多 8 行 `<ID> <PRIMARY> <BACKUP>`：一個非負整數同兩個字，每個係
+`fast` 或者 `slow`。最多兩行係 `slow slow`。
+
+每一下拍卡由兩間收單機構同時授權。每間延遲一段時間之後答返個 code
+`id * 37 % 1000` —— 用 `tokio::time::sleep` 模擬個延遲：
+
+* primary：`fast` 10 ms，`slow` 3 s
+* backup：`fast` 100 ms，`slow` 3 s
+
+邊個先答邊個贏：對兩個 future 做 `tokio::select!`。成場比賽包喺一個**一秒**
+嘅 `tokio::time::timeout` 入面。逐行跟次序處理，每行印：
+
+* `DONE <id> primary <code>` 或者 `DONE <id> backup <code>` —— 邊個贏
+* `TIMEOUT <id>` —— 兩個都冇準時答
+
+```
+input:  7 fast fast
+        8 slow fast
+        9 slow slow
+output: DONE 7 primary 259
+        DONE 8 backup 296
+        TIMEOUT 9
+```
+
+`timeout(dur, fut).await` 係 `Ok(value)` 或者 `Err(Elapsed)`；係 `Err` 嗰陣
+入面個 future 已經 drop 咗，連 sleep 一齊 —— 嗰 3 s 永遠唔會等足。個 starter
+淨係 await primary，冇 timeout，而且從來唔問 backup。
+'''
+hints = [
+  "`use tokio::time::{sleep, timeout};` —— `timeout(Duration::from_secs(1), fut).await` 畀你 `Result<T, Elapsed>`，而 drop 入面個 future 就係取消佢嘅方法。",
+  "`tokio::select! { a = fut_a => ..., b = fut_b => ... }` 兩個都 poll，邊個先完就行邊個 arm；另一個 future 當場就 drop。",
+  "將個 `select!` 放入一個 `async fn authorise(...) -> (&'static str, u64)`，然後將*佢*包入 timeout，咁一個死線就蓋住兩間收單機構。",
+  "`match timeout(..).await { Ok((who, code)) => println!(\"DONE {id} {who} {code}\"), Err(_) => println!(\"TIMEOUT {id}\") }`。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.frameworks.21.futures-join-all"
+title = "八十個一齊"
+story = "每晚嘅風險評分逐間行怡和街啲商戶，一間一百毫秒。到八十間商戶佢已經喺結算窗口入面做唔完，成條街遲一日先過數。"
+brief = '''
+標準輸入最多 100 行 `<ID> <CENTS>`：兩個非負整數。對佢哋做三次 pass，每次
+都係一個每行一次嘅 `async fn`，個 starter 已經有：
+
+1. **Score。** `score(id, cents)` 要 100 ms（一個 `sleep`），返回
+   `(id * 7 + cents) % 100`。用 `futures::future::join_all` 一次過行晒所有
+   score，佢會跟 future 交畀佢嘅次序返回結果。每行印 `<id> <score>`，跟輸入
+   次序。
+2. **Bucket。** `bucket(cents)` 要 20 ms，返回 `cents / 10000`。bucket 服務
+   一次最多容許四個在途：用
+   `futures::stream::iter(..).map(..).buffer_unordered(4)` 砌個 stream，
+   `collect` 做一個 `Vec`，升序排，然後一行印 `BUCKETS <b1> <b2> ...`
+   （冇行就淨係 `BUCKETS`）。
+3. **Limit。** `check(id, cents)` 喺 `cents > 500000` 嗰陣係 `Err(id)`，否則係
+   `Ok(cents)`。用 `futures::future::try_join_all` 行佢哋：印
+   `OK <sum of cents>`，或者為輸入次序第一條超額嘅行印 `REJECTED <id>`。
+
+```
+input:  1 3800
+        2 12500
+        3 250000
+output: 1 7
+        2 14
+        3 21
+        BUCKETS 0 1 25
+        OK 266300
+```
+
+一百行一定要喺遠少過一秒之內做完。個 starter 係逐行 await 同樣三個 function，
+即係每間商戶一百毫秒；超過五十間商戶，judge 嘅五秒就冇晒。
+'''
+hints = [
+  "`use futures::future::{join_all, try_join_all}; use futures::stream::{self, StreamExt};` —— `join_all(iter_of_futures).await` 係一個 `Vec`，結果次序同輸入一樣。",
+  "`stream::iter(&rows).map(|&(_, c)| bucket(c)).buffer_unordered(4).collect::<Vec<_>>().await` 保持四個 future 行住，邊個完就產出邊個；之後 `.sort_unstable()` 就將次序變返係你嘅。",
+  "`try_join_all(..).await` 喺每個 future 都 `Ok` 嗰陣係 `Ok(Vec<T>)`，否則係第一個 `Err` —— `check` 從來唔 await 任何嘢，所以輸入次序第一個就係第一個俾人 poll 嘅。",
+  "`let scores = join_all(rows.iter().map(|&(id, c)| score(id, c))).await;` 然後 `rows.iter().zip(&scores)` 去印。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.frameworks.22.log-trait"
+title = "樓面聽到乜"
+story = "告士打道個結算服務係用一堆 if 後面一個光禿禿嘅 print 去 log。有人為咗波斯富街嗰次上線將佢較做 warn，於是啲 error 唔再出現，而啲 debug 行照樣一直嚟。"
+brief = '''
+第一行係一個 level 字，大細楷都得：`off`、`error`、`warn`、`info`、`debug`
+或者 `trace`。其他任何字就印 `unknown level <word>`，其他乜都唔印。之後每一行
+係 `<ACCOUNT> <AMOUNT>`。
+
+行每一行，由 1 開始編號，經 `log` crate 嘅 macro 去 log，每個都帶明確嘅
+target：
+
+* `trace!(target: "io", "read {raw:?}")` —— 原始嗰行，`Debug` 引號
+* `error!(target: "settle", "line {n}: not a number: {amount}")` 當金額唔係
+  `i64`；該行跳過
+* `info!(target: "settle", "line {n}: {account} {cents}")`
+* `warn!(target: "settle", "line {n}: large amount {cents}")` 當
+  `cents > 100000`，喺 `info!` 之後
+* `debug!(target: "settle", "total so far {total}")` 加完之後
+
+然後，無論 level 係乜，`println!("TOTAL {total}")`。
+
+一條記錄印去**標準輸出**，格式係 `[LEVEL] target: message`，而且淨係喺佢嘅
+level 等於或高於所揀嘅 level 嗰陣先印 —— `error` 係最頂，`trace` 係最底，
+`off` 除咗總數乜都唔印。
+
+```
+input:  info
+        A 100
+        B 250000
+        C 7x
+        D 1
+output: [INFO] settle: line 1: A 100
+        [INFO] settle: line 2: B 250000
+        [WARN] settle: line 2: large amount 250000
+        [ERROR] settle: line 3: not a number: 7x
+        [INFO] settle: line 4: D 1
+        TOTAL 250101
+```
+
+為一個 unit struct 實現 `log::Log` —— `enabled` 將記錄嘅 level 同
+`log::max_level()` 比較，`log` 喺 enabled 嗰陣印，`flush` flush stdout —— 放
+一個入 `static LOGGER`，`log::set_logger(&LOGGER)`，然後 `log::set_max_level`，
+個字 parse 做 `LevelFilter`。個 starter 有自己嘅 level 表，而且比較嘅方向
+倒轉咗。
+'''
+hints = [
+  "`use log::{Log, Metadata, Record, LevelFilter};` —— `impl Log for YourStruct` 係三個 method：`enabled`、`log`、`flush`。`\"warn\".parse::<LevelFilter>()` 讀個字，大細楷都得。",
+  "`static LOGGER: StdoutLogger = StdoutLogger; log::set_logger(&LOGGER).unwrap(); log::set_max_level(level);` —— `set_logger` 想要一個 `&'static dyn Log`，呢個就係點解佢係一個 `static`，唔係 `let`。",
+  "`Level` 嘅排序係 `Error < Warn < Info < Debug < Trace`，所以一條記錄喺 `record.level() <= log::max_level()` 嗰陣先係要嘅。啲 macro 喺叫你之前已經 check 咗 `max_level()`。",
+  "`println!(\"[{}] {}: {}\", record.level(), record.target(), record.args())` —— `Level` 顯示做 `ERROR`、`WARN`……；你喺每個 macro 傳入嘅 `target:` 就係 `record.target()` 返回嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.frameworks.23.the-settlement"
+title = "結算"
+story = "17:30，告士打道側邊嘅付款通道。當日嘅轉賬以一個 JSON 檔案到達，銀行 18:00 之前要一個戶口一行，而今晚出去嗰份檔案，就係核數師三月會讀嗰份。"
+brief = '''
+標準輸入係一個 JSON object：`"date"`（字串，`YYYY-MM-DD`）同 `"transfers"`，
+一個 `{"from", "to", "cents"}` 嘅 array。
+
+印出結算：
+
+```
+input:  {"date": "2026-10-06", "transfers": [
+          {"from": "LUCKYMAC", "to": "BANK", "cents": 3800},
+          {"from": "SOGO", "to": "BANK", "cents": 12500},
+          {"from": "BANK", "to": "LUCKYMAC", "cents": 300}]}
+output: SETTLEMENT Tue 06 Oct 2026
+        BANK 16000
+        LUCKYMAC -3500
+        SOGO -12500
+        MOVED 3
+```
+
+第一行係日期，格式 `%a %d %b %Y`。然後每一個喺任何地方出現過嘅戶口印一行，
+**按名排序**，附上佢嘅淨額：收到嘅全部減去畀出嘅全部。然後印
+`MOVED <number of transfers>`。
+
+或者印一行 `ERROR:`，其他乜都唔印，按呢個次序 check：
+
+* 輸入根本唔係呢個形狀 —— `ERROR: not a settlement`
+* 日期 parse 唔到 —— `ERROR: bad date 2026-13-01`
+* 然後跟次序每一筆轉賬，由 1 開始數 —— `cents` 係零或者負數就
+  `ERROR: transfer 2: nothing to move`，`from` 等於 `to` 就
+  `ERROR: transfer 1: BANK pays itself`
+
+用你身後呢條路砌佢：`serde` 做形狀，`chrono` 做日期，帶 context 嘅 `anyhow`
+做錯誤，同埋 `tokio` —— 每筆轉賬一個 task，驗證佢然後將兩邊都過入一個
+`Arc<tokio::sync::Mutex<BTreeMap<String, i64>>>`，**跟次序** join，咁第一筆壞
+嘅轉賬就係報出嚟嗰筆。個 starter 有 parse 有 spawn，但係淨係計收嗰邊，從來
+唔驗證，而且日期點嚟就點印。
+'''
+hints = [
+  "四個 crate，一個程式。`serde_json::from_str::<Settlement>` 做形狀，`NaiveDate::parse_from_str(&s, \"%Y-%m-%d\")` 做日期，`date.format(\"%a %d %b %Y\")` 印佢。",
+  "啲錯誤係 `anyhow`：喺 crate 自己嘅訊息唔准漏出嚟嘅地方用 `.map_err(|_| anyhow!(\"not a settlement\"))`，task 入面用 `bail!(...)`，join 嗰陣用 `.with_context(|| format!(\"transfer {}\", i + 1))` —— 而 `{err:#}` 會印 `context: cause`。",
+  "每個 task 係 `tokio::spawn(post(Arc::clone(&book), transfer))`，返回 `anyhow::Result<()>`；`handle.await` 畀你一個 `Result<Result<()>, JoinError>`，所以係兩個 `?` —— 第一個要有佢自己嘅 context。",
+  "**跟你 spawn 嘅次序** join 啲 handle，見到第一個 `Err` 就停：呢個就係當第 2 同第 3 筆轉賬都壞嗰陣，令 `transfer 2` 係報出嚟嗰筆嘅原因。個 map 係一個 `BTreeMap`，所以啲戶口排好序出嚟係免費嘅。",
+]

@@ -13,7 +13,8 @@ yourself.
 
 Nine lands — **RUST LAND**, **GO LAND**, **C++ LAND**, **PYTHON LAND**,
 **PYTORCH LAND**, **TYPESCRIPT LAND**, **ZIG LAND**, **LUA LAND** and **REMIX
-LAND**. Four roads through each language land, and two through REMIX:
+LAND**. Four roads through each language land, a fifth through RUST, and two
+through REMIX:
 
 | | |
 | --- | --- |
@@ -21,6 +22,7 @@ LAND**. Four roads through each language land, and two through REMIX:
 | **BASIC** | grammar activation, not a quiz: each node shows one construct with the exact line to type, in the brief and again as an `ANSWER:` comment at the hole; you type it, it compiles, the idiom is back in the fingers; untimed. In Rust Land this is the language's own grammar, the half a live coding screen assumes — ownership and the move, `&` and `&mut`, `mem::swap`/`take`, slices, `String`/`&str`, chars and bytes, `Option`/`Result`/`?`, `match`, iterator chains, the entry API, comparators, a `Reverse` heap, a derived `Ord`, fast stdin, formatting, overflow, lifetimes on a function and a struct, a trait, a generic bound, `Box<dyn>`, `Rc<RefCell>`, closure kinds, threads, `Arc<Mutex>`, atomics and `RwLock`, a channel, many producers and one consumer, a worker pool at the boss. The other lands' BASIC roads are the plain grammar — integer widths, floats, strings, slices, loops, functions, structs, enums, containers, sorting, closures, a thread, a tree |
 | **ADVANCED** | the live coding test, untimed: a brief, a whole program, visible and hidden cases. Rust Land applies what BASIC drilled — ownership, slices, errors, traits, iterators, generics — and then the lunch rush: threads, channels, mutexes, lifetimes, a pipeline, DEADLOCK. The other lands keep the same shape with their own grammar: interfaces, pointers, goroutines, `select`, async, RAII, generators |
 | **HACKER** | the live interview: timed HackerRank-shaped quests, hidden tests, the same 34 problems in every land — TypeScript's, Zig's and Lua's included — except PyTorch Land, whose interview is the machine-learning one: write softmax so it does not overflow, write cross-entropy so it matches the library, write Adam so it matches the library, mask a padded batch, cache the keys and values, build a transformer block that agrees with a reference to 1e-5 |
+| **FRAMEWORKS** | Rust Land only: the job after the interview. ADVANCED's shape with a dependency in it — `anyhow` and `thiserror` for errors, `serde`/`serde_json`/`toml` for the wire, `clap` for a command line, `regex`, `chrono`, `itertools`, `indexmap`, a seeded `rand`, `rayon`, `parking_lot`, `crossbeam` channels and `select!`, `tokio` tasks, channels and timeouts, `futures`, a `log::Log` of your own, and at the boss the day's settlement in four crates at once. Built by cargo against a pinned **crate shelf**, offline, untimed; `cwbhacker warm` (or `make warm`) builds the shelf once per machine |
 
 **REMIX LAND** is the one land that is not a language. It is the same program
 three times: every concept is a *trio* of nodes — Go, then Rust, then Python,
@@ -40,7 +42,8 @@ toolchain; the land adds no toolchain of its own.
 Each road is a Super Mario World overworld. Clear a node, it is stamped
 `CLEARED`, for good.
 
-**The code is really compiled.** Rust goes through `rustc`/`cargo`, Go through
+**The code is really compiled.** Rust goes through `rustc`, or `cargo` against
+the pinned crate shelf on the FRAMEWORKS road, Go through
 `go build`/`go test`, C++ through the system `c++` (clang or gcc, `-std=c++20`),
 Python through `py_compile` and then `python3 -I`, TypeScript through a strict
 `tsc` and then `node`, Zig through `zig build-exe -O Debug` with every safety
@@ -94,6 +97,16 @@ Needs **Rust, Go, a C++ compiler, Python 3, Anaconda, Node** — one per land,
 and Node twice, because the browser client is built with it too. `make doctor`
 says which of them it cannot find, and the server prints the same list on the
 way up with the command that installs whatever is missing.
+
+Rust Land's FRAMEWORKS road needs one more thing: the **crate shelf** built
+once on this machine — `make warm` (or `cwbhacker warm`), which fetches and
+compiles the twenty-five pinned crates into `~/.causewaybayhacker/build/rust/`
+with the network on, and after which every quest on the road builds offline in
+a second or two. Until it has run, the road answers every submit with that
+command instead of a verdict; `make doctor` says whether it is warm. The
+playground gets the same shelf for free once it is warm: `use serde`,
+`#[tokio::main]`, `clap` and the rest work on a Rust scratchpad with nothing to
+declare.
 
 PyTorch Land is the odd one out, and worth a line of its own: its toolchain is
 not a program on PATH but a **package inside an interpreter**, so a machine can

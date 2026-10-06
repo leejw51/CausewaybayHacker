@@ -92,7 +92,7 @@ enum Command {
     Map {
         /// rust | go | cpp | python | pytorch | typescript | zig | lua | remix
         land: String,
-        /// basic | advanced | hacker
+        /// verybasic | basic | advanced | hacker | frameworks (rust only)
         category: String,
     },
     /// Read a quest's brief.

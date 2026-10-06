@@ -3,7 +3,7 @@
 //! One attempt, one directory under `~/.causewaybayhacker/build/<lang>/<id>/`.
 //! Nothing is written outside the home — no `/tmp`, no project directory.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -19,6 +19,7 @@ pub mod proc;
 pub mod python;
 pub mod reap;
 pub mod rust;
+pub mod shelf;
 pub mod spec;
 pub mod suite;
 pub mod typescript;
@@ -142,7 +143,24 @@ impl Report {
 /// the player is taught to fix something they never did — the whole curriculum
 /// is derived from that table (SPEC §7), so nothing may enter it that did not
 /// really happen.
-pub fn unsupported(lang: &str, spec: &TestSpec) -> Option<String> {
+///
+/// `build_dir` is the language's build directory (`build/<lang>/`, a
+/// submission's `cache_root`): a Rust quest that names crates is judged there
+/// against the shelf `cwbhacker warm` built, and is refused — with the
+/// command — while that shelf is cold or stale (`shelf.rs`). Cold, the first
+/// build would compile `tokio` inside the quest's compile budget and hand a
+/// correct answer a `timeout`, which is the worst verdict this game has.
+pub fn unsupported(lang: &str, spec: &TestSpec, build_dir: &Path) -> Option<String> {
+    if !spec.crates.is_empty() {
+        if lang != "rust" {
+            return Some(format!(
+                "crates is a rust key; a {lang} quest has no crate shelf (SPEC §5.1)"
+            ));
+        }
+        if let Some(why) = shelf::refusal(build_dir) {
+            return Some(why);
+        }
+    }
     match (lang, spec.harness) {
         // All three harnesses are built. What is still refused is a harness
         // asked of the wrong land, which is an authoring mistake rather than a

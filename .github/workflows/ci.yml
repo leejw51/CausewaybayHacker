@@ -591,6 +591,7 @@ jobs:
       - run: >
           python3 tests/content/verify_pack.py --complete
           content/rust/basic.toml content/rust/advanced.toml content/rust/hacker.toml
+          content/rust/frameworks.toml
           content/go/basic.toml content/go/advanced.toml content/go/hacker.toml
           content/cpp/basic.toml content/cpp/advanced.toml content/cpp/hacker.toml
           content/python/basic.toml content/python/advanced.toml content/python/hacker.toml

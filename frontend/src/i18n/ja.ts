@@ -154,6 +154,8 @@ export const ja: Partial<Catalogue> = {
   "lands.advancedBlurb":
     "ライブコーディングテスト、時間制限なし。問題文ひとつ、プログラムまるごと、見える例と隠れた例 — 文法を実際に使い、それから一度に起きる昼のラッシュ。",
   "lands.hackerBlurb": "面接。部屋がひとつ、時計がひとつ、行を代わりに書くものは何もない。",
+  "lands.frameworksBlurb":
+    "仕事。ここでは何もゼロから書かない。anyhow、serde、tokio、clap、街のあらゆるファイルが始まるクレート。",
   "lands.category": "{land} — カテゴリ",
   "lands.clearedOf": "{total} 中 {cleared} クリア",
   "lands.record": "{total} 中 {cleared} クリア   ★{stars}",
@@ -180,6 +182,7 @@ export const ja: Partial<Catalogue> = {
   "map.basic": "ベーシック",
   "map.advanced": "アドバンス",
   "map.hacker": "ハッカー",
+  "map.frameworks": "フレームワーク",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -534,6 +537,7 @@ export const ja: Partial<Catalogue> = {
   "search.basic": "ベーシック",
   "search.adv": "アドバンス",
   "search.hacker": "ハッカー",
+  "search.frameworks": "フレームワーク",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",

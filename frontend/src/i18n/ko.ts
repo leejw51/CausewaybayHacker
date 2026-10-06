@@ -155,6 +155,8 @@ export const ko: Partial<Catalogue> = {
   "lands.advancedBlurb":
     "라이브 코딩 테스트, 시간 제한 없음. 문제 하나, 프로그램 하나 통째로, 보이는 케이스와 숨은 케이스 — 문법을 실제로 쓰고, 그다음 한꺼번에 벌어지는 점심 러시.",
   "lands.hackerBlurb": "면접. 방 하나, 시계 하나, 당신의 줄을 대신 끝내 주는 것은 없다.",
+  "lands.frameworksBlurb":
+    "일터. 여기서는 아무것도 처음부터 쓰지 않는다. anyhow, serde, tokio, clap, 거리의 모든 파일이 시작하는 크레이트들.",
   "lands.category": "{land} — 분류",
   "lands.clearedOf": "{total} 중 {cleared} 클리어",
   "lands.record": "{total} 중 {cleared} 클리어   ★{stars}",
@@ -181,6 +183,7 @@ export const ko: Partial<Catalogue> = {
   "map.basic": "기초",
   "map.advanced": "심화",
   "map.hacker": "해커",
+  "map.frameworks": "프레임워크",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -537,6 +540,7 @@ export const ko: Partial<Catalogue> = {
   "search.basic": "기초",
   "search.adv": "심화",
   "search.hacker": "해커",
+  "search.frameworks": "프레임워크",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",

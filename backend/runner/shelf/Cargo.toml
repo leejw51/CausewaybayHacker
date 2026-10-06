@@ -1,0 +1,65 @@
+# The crate shelf (SPEC §5.1): every crate a Rust quest may `use`, at one
+# pinned version each, with one feature set.
+#
+# A quest that names `crates = [...]` in its test spec is built by cargo
+# against *this whole table* — not the subset it names — so every such quest
+# resolves the same dependency graph, the lockfile beside this file matches it
+# byte for byte, and the artifacts `cwbhacker warm` leaves in the shared
+# target directory are the artifacts every quest links against. The names a
+# quest lists are what the quest is about, checked against this table; they do
+# not change what is compiled. Cargo unifies features per build, so a subset
+# manifest could resolve `tokio` or `serde` with a different feature set and
+# miss the warm cache, and a cold `tokio` under the compile budget is a
+# `timeout` verdict on a correct answer.
+#
+# Adding a crate is: a line here, `cargo generate-lockfile` in this directory,
+# a `[[crate]]` row in `docs/decisions.md`, and `cwbhacker warm` wherever the
+# server runs. The runner embeds both files and refuses a crate quest until
+# the shelf on that machine was built from exactly these two.
+
+[package]
+name = "cwbhacker-shelf"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "The crates a Causewaybay Hacker Rust quest may depend on, pinned"
+
+[lib]
+path = "src/lib.rs"
+doctest = false
+
+[dependencies]
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+toml = "1.1.6"
+clap = { version = "4.6.7", features = ["derive"] }
+tokio = { version = "1.53.2", features = ["full"] }
+futures = "0.3.34"
+crossbeam = "0.8.5"
+rayon = "1.12.0"
+parking_lot = "0.12.5"
+rand = "0.10.3"
+regex = "1.13.1"
+chrono = "0.4.45"
+itertools = "0.15.0"
+log = "0.4.34"
+indexmap = "2.14.2"
+hex = "0.4.3"
+bytes = "1.12.1"
+uuid = { version = "1.27.0", features = ["v4", "v5", "serde"] }
+bincode = { version = "2", features = ["serde"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+# rustls rather than the platform TLS, so the shelf builds the same on a Mac
+# and on a Linux box with no OpenSSL headers. The runner opens no network of
+# its own and closes none (SPEC §5.3): this is for the scratchpad.
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "blocking", "rustls", "charset", "http2"] }
+# The bundled amalgamation, as the server's own rusqlite is (backend/Cargo.toml):
+# the build must not depend on whatever SQLite the host ships.
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+# A package of its own, not a member of the backend workspace above it. The
+# runner reads these two files as text; nothing in the workspace compiles it.
+[workspace]

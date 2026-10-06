@@ -7694,3 +7694,88 @@ job. The LÖVE client is covered headless by `tests/test_playground_sync.lua`
 (the real scene with a stand-in session) and live by
 `tests/drive/pgsync.lua`, where a second session inside the drive plays the
 other device; it runs in the `love2d-window` CI job.
+
+
+## 2026-10-06 — RUST LAND gets a fifth road, FRAMEWORKS, and the runner gets a crate shelf
+
+Every Rust quest was `rustc` on one file, offline, and that was the right
+rule for a road about the language's own grammar: ownership, borrows,
+lifetimes, threads need nothing from crates.io. But a cleared player who can
+write a worker pool from memory still meets `use serde::Deserialize` on the
+first morning of the job, and the game had nothing to say about it. Hence
+**FRAMEWORKS** — the road after the interview, in-world the payment path at
+the fintech off Gloucester Road (`docs/story.md` §4), and in content
+ADVANCED's shape with a dependency in it: 23 nodes, one or two crates each
+(anyhow, thiserror, serde, serde_json, toml, clap, regex, chrono, itertools,
+indexmap, rand, rayon, parking_lot, crossbeam, tokio, futures, log), untimed,
+the boss **THE SETTLEMENT** in four crates at once.
+
+**Rust's alone.** The road exists because of a cargo shelf, and no other land
+has one; the importer refuses `category = "frameworks"` for any other land,
+and the clients ask the roads of a land (`roadsOf` / `Land.roads`) rather than
+assuming four. The order is `verybasic`, `basic`, `advanced`, `hacker`,
+`frameworks` — the job comes after the interview. Migration `0024` widens the
+`quests.category` CHECK and nothing else; XP weight is ADVANCED's (×2).
+
+**The crate shelf** (`backend/runner/shelf/`, SPEC §5.1) is the closed list of
+crates a quest may `use`: one `Cargo.toml` with every crate pinned and one
+feature set, and its `Cargo.lock`. A stdio quest that names
+`crates = [...]` is built by `cargo build --release --offline` in a generated
+package whose dependency table is the **whole shelf**, with the lockfile
+copied in, and the binary is judged exactly as a `rustc` one is — the same
+`harness::judge`, cases and limits. The whole shelf rather than the named
+subset, because cargo unifies features per build: two quests naming different
+subsets could resolve `tokio` or `serde` with different features and miss the
+warm artifacts, and a cold `tokio` inside the compile budget is a `timeout`
+verdict on a correct answer, which is the verdict this game must never hand
+out. `crates` therefore says what a quest is *about* (checked against the
+shelf by `TestSpec::parse`, the importer and the content gate) and changes
+nothing about what is compiled.
+
+**Warm or refused.** `cwbhacker warm` (`make warm`) is the one step with the
+network on: `cargo fetch --locked` and `cargo build --release --locked` of the
+shelf package into `build/rust/`, then a marker `build/rust/shelf.ok` holding
+the sha256 of the two shelf files. `unsupported` grew a third argument, the
+language's build directory, and refuses a crate quest while the marker is
+missing or holds another digest — before an attempt row exists, with the
+command in the message, the same shape as PyTorch Land's missing `torch`.
+Refusing rather than building cold is deliberate: on this machine the whole
+shelf compiles in seven seconds and a quest in under one, but `prune
+--builds` makes the cache cold at any moment and a slower machine would spend
+the compile budget on `tokio`. The warm build runs in the quest build's own
+cleared environment, not the operator's shell: a `RUSTFLAGS` or a
+`~/.cargo/config.toml` there would change every artifact's hash and warm
+nothing. `doctor` prints the shelf's state; the content gate warms a cache of
+its own the same way, reading the same two files, so there is one shelf and
+no copy of it in Python.
+
+**Determinism, per crate.** `rand` is `StdRng::seed_from_u64` and nothing
+else; `chrono` parses and formats fixed dates and never reads the clock;
+`tokio`, `rayon` and `crossbeam` join in spawn order or sort what they
+collected; every timeout is at least ten times longer than the thing it
+waits for. The pack header says the same.
+
+**Eight crates are on the shelf for the playground's sake.** No quest uses
+`hex`, `bytes`, `uuid`, `bincode`, `tracing`, `tracing-subscriber`, `reqwest`
+or `rusqlite` (bundled, as the server's own is); they are there because a
+scratchpad wants them, and the
+playground's own starter shows `hex` beside `tokio`. `reqwest` is built on
+rustls so the shelf compiles the same on a Mac and on a Linux box without
+OpenSSL headers; a quest must not use it (the runner promises no network to a
+quest, SPEC §5.1's Go line says so and Rust's should mean the same), and `uuid`
+v4 is random and so is for the pad alone too.
+
+**The playground has the shelf too, warm only.** A Rust scratchpad run is a
+crate build against the whole shelf whenever the machine's shelf is warm, so
+`use serde` works there with nothing declared; cold, it stays plain `rustc`.
+That is the opposite of the road's refuse-when-cold rule, on purpose: a quest
+refused cold is a correct answer spared a `timeout`, but a pad refused cold is
+`fn main() { println!("hi") }` not running because `tokio` was never compiled.
+The pad's failure mode when cold is the compiler's own `E0432 unresolved
+import`, and the boot report and `doctor` say how to warm it.
+
+**Known gap: no art.** `art/emblem_rust_frameworks.png` and
+`art/mascot_rust_frameworks.png` do not exist yet. Both clients already fall
+back — the browser's category row draws the words alone, the LÖVE client
+draws nothing where the band would be — so the road is playable without them;
+the prompts belong in `art/prompts.toml` when the pipeline next runs.

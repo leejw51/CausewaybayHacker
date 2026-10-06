@@ -1,0 +1,1042 @@
+# RUST LAND — FRAMEWORKS, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/rust/frameworks.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers, sample input and output and the exact strings a program
+# must print are the English pack's and are copied verbatim, never translated.
+
+pack   = "rust.frameworks"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.frameworks.01.anyhow-context"
+title = "Jeden otazník"
+story = "První ráno zpátky na platební cestě. Čtečka zúčtování u Gloucester Road umře na řádku 3 souboru o 4 000 řádcích a řekne jen „invalid digit found in string“."
+brief = '''
+Čti ze standardního vstupu řádky `<ACCOUNT> <CENTS>` a vypiš součet v centech
+jako `TOTAL <n>`.
+
+Pokud řádek nemá dvě pole, nebo se centy nedají naparsovat jako `i64`, vypiš
+místo toho jediný řádek a skonči normálně:
+
+```
+ERROR: line 3: invalid digit found in string
+```
+
+To je vlastní podoba, v jaké `anyhow` vykreslí chybu s jednou vrstvou
+kontextu: `format!("{:#}", err)` vypíše kontext, dvojtečku a příčinu. Kontext
+je `line <n>` (číslováno od 1). V chybovém případě se nevypisuje nic jiného.
+
+```
+input:  A 100
+        B 250
+        C 7
+output: TOTAL 357
+```
+
+Použij `anyhow::Result` jako návratový typ funkce, která dělá práci, `?` na
+propagaci a `.with_context(|| ...)` k tomu, abys řekl, který řádek. Startovní
+kód unwrapuje a panikaří, což vypíše stack trace a skončí se 101 — ne
+hlášení, které by si někdo z provozu přečetl.
+'''
+hints = [
+  "`use anyhow::{Context, Result};` — `Result<T>` je `Result<T, anyhow::Error>` a `?` do něj převede libovolný `std::error::Error`.",
+  "`.with_context(|| format!(\"line {n}\"))` funguje na `Result` *i* na `Option` (z `Option` se stane chyba s tou zprávou). Připoj ho před `?`.",
+  "`{:#}` na `anyhow::Error` vypíše `context: cause` na jednom řádku; prosté `{}` vypíše jen nejvzdálenější kontext.",
+  "Chybějící pole je `None`, ne chyba parsování: udělej z něj chybu přes `.ok_or_else(|| anyhow!(\"missing amount\"))` a dej mu stejný kontext `line n`.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.frameworks.02.thiserror-enum"
+title = "Chyba se jménem"
+story = "Převodní služba odpovídá na každé odmítnutí stejným textem „bad transfer“ a podpora o dvě patra výš začala volat vývojářům s otázkou, které odmítnutí to vlastně je."
+brief = '''
+Dva účty, `A` a `B`, začínají se zůstatky na prvním řádku. Potom `n` na
+druhém řádku, potom `n` převodů `<FROM> <TO> <CENTS>`.
+
+Proveď je v pořadí. Pro každý vypiš `OK <FROM> <TO> <CENTS>`, nebo chybu — a
+chyby jsou `thiserror` enum se třemi variantami, jejichž `Display` je přesně:
+
+* `unknown account X` — `FROM` nebo `TO` není `A` ani `B` (nejdřív zkontroluj
+  `FROM`)
+* `insufficient funds in A: need 300, have 100`
+* `nothing to move` — částka je nula nebo záporná
+
+Po převodech vypiš `A <balance>` a `B <balance>`.
+
+```
+input:  100 100
+        3
+        A B 30
+        B C 5
+        A B 300
+output: OK A B 30
+        unknown account C
+        insufficient funds in A: need 300, have 70
+        A 70
+        B 130
+```
+
+Definuj enum s `#[derive(Debug, thiserror::Error)]` a každou zprávu dej do
+jeho atributu `#[error("...")]` s interpolovanými poli — `{0}` pro variantu
+s n-ticí, `{need}` pro pojmenované pole. `transfer` vrací
+`Result<(), TransferError>` a `main` vypisuje přes `{}`. Startovní kód má
+logiku a na všechno vypisuje `bad transfer`.
+'''
+hints = [
+  "`#[derive(Debug, thiserror::Error)]` na enumu a `#[error(\"...\")]` na každé variantě je celý `impl Display` i `impl std::error::Error`.",
+  "`{0}` v atributu je první pole varianty s n-ticí; `{need}` a `{have}` jsou pojmenovaná pole strukturové varianty.",
+  "Zkontroluj obě jména účtů před částkou a `FROM` před `TO`: skryté případy posílají `C B 0` a zadání říká, která chyba vyhrává.",
+  "Signatura se změní na `Result<(), TransferError>`; `println!(\"{e}\")` v `main` pak vypíše text z atributu.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.frameworks.03.serde-derive"
+title = "Tvar na drátě"
+story = "Platební terminály na Yee Wo Street posílají objednávky jako JSON. Stará čtečka hledala částky počítáním čárek a obchodník s čárkou ve jméně dostával peníze ve špatném sloupci."
+brief = '''
+Na standardním vstupu je jedno pole JSON s objednávkami. Každá objednávka je
+objekt s `"id"` (číslo), `"merchant"` (řetězec) a `"cents"` (číslo).
+
+Vypiš jeden řádek na objednávku, v pořadí, v jakém přišly,
+`<id> <merchant> <cents>`, potom `TOTAL <sum of cents>`.
+
+```
+input:  [{"id": 1, "merchant": "Lucky Mac", "cents": 3800},
+         {"id": 2, "merchant": "Tsui Wah, Causeway Bay", "cents": 12500}]
+output: 1 Lucky Mac 3800
+        2 Tsui Wah, Causeway Bay 12500
+        TOTAL 16300
+```
+
+Definuj `struct Order` s těmi třemi poli, dej jí `#[derive(Deserialize)]` a
+čtení nech na `serde_json::from_str::<Vec<Order>>`. Startovní kód dělí podle
+čárek. Objekty mohou mít klíče v libovolném pořadí a libovolné množství bílých
+znaků a řetězec může obsahovat čárku — o to tu jde.
+'''
+hints = [
+  "`use serde::Deserialize;` a `#[derive(Deserialize)]` na struktuře — názvy polí jsou klíče JSONu a typy říkají, čím každé musí být.",
+  "`let orders: Vec<Order> = serde_json::from_str(&input)?;` — typ nalevo je to, co serde řekne, co má postavit.",
+  "Pořadí klíčů a bílé znaky jsou věc JSONu, ne tvoje; serde přečte libovolný objekt s těmi třemi klíči. Výpis je stejná smyčka jako předtím.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.frameworks.04.serde-attributes"
+title = "Co čte banka"
+story = "Banka dvakrát týdně vrací zúčtovací soubor z Yee Wo Street: každá karta, která nikdy nebyla autorizovaná, odchází jako `\"authCode\":null`, a ten jeden terminál, který neposílá poplatek, zastaví čtečku dřív, než se soubor vůbec zapíše."
+brief = '''
+Na standardním vstupu je jedno pole JSON se zúčtovacími záznamy z terminálů.
+Každý záznam má `"terminalId"` (řetězec), `"merchant"` (řetězec),
+`"amountCents"` (číslo) a může, ale nemusí mít `"feeCents"` (číslo) a
+`"authCode"` (řetězec). Klíče mohou přijít v libovolném pořadí.
+
+Vypiš jeden řádek na záznam, v pořadí vstupu: záznam tak, jak ho chce banka,
+kompaktní JSON ze `serde_json::to_string`, klíče v tomto pořadí a napsané
+přesně takto — `terminalId`, `merchant`, `amountCents`, `feeCents`,
+`authCode`. Chybějící `feeCents` se zapíše jako `0`; chybějící `authCode` se
+**vynechá**, nikdy se nezapíše jako `null`. Potom
+`NET <sum of amountCents minus feeCents>`.
+
+```
+input:  [{"terminalId": "YW-07", "merchant": "Lucky Mac", "amountCents": 3800, "feeCents": 40, "authCode": "A1B2"},
+         {"terminalId": "PS-02", "merchant": "Tsui Wah", "amountCents": 12500}]
+output: {"terminalId":"YW-07","merchant":"Lucky Mac","amountCents":3800,"feeCents":40,"authCode":"A1B2"}
+        {"terminalId":"PS-02","merchant":"Tsui Wah","amountCents":12500,"feeCents":0}
+        NET 16260
+```
+
+Jedna struktura obslouží oba směry: `#[derive(Serialize, Deserialize)]`
+s poli ve snake_case, `#[serde(rename_all = "camelCase")]` na struktuře,
+`#[serde(default)]` na `fee_cents` a `auth_code: Option<String>`
+s `#[serde(skip_serializing_if = "Option::is_none")]`. `to_string` zapisuje
+pole v pořadí, v jakém je struktura deklaruje, takže výstup je přesný.
+Startovní kód přejmenovává každé pole ručně, nedokáže přečíst záznam bez
+poplatku a zapisuje `null`.
+'''
+hints = [
+  "`use serde::{Deserialize, Serialize};` — jedna struktura, oba derive. `#[serde(rename_all = \"camelCase\")]` na struktuře nahradí každý `rename` na jednotlivých polích.",
+  "`#[serde(default)]` na `fee_cents: i64` doplní chybějící klíč hodnotou `i64::default()`, což je `0`. Bez něj je záznam bez poplatku chyba deserializace.",
+  "`Option<String>` už chybějící klíč čte jako `None`; je to *zápis*, který potřebuje `#[serde(skip_serializing_if = \"Option::is_none\")]`, jinak se serializuje jako `null`.",
+  "`serde_json::to_string(record)` dá kompaktní JSON v pořadí polí struktury; `println!` ho, jeden záznam na řádek.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.frameworks.05.json-value-walk"
+title = "Každý list na řádek"
+story = "Nový dodavatel terminálů na Percival Street posílá vnořený objekt, pro který nikdo nenapsal strukturu, a podpora chce vidět, co v něm je, dnes — ne až po té struktuře."
+brief = '''
+Na standardním vstupu je jeden dokument JSON, jehož nejvyšší úroveň je objekt
+nebo pole. Vypiš každou listovou hodnotu jako `<path> = <value>`, jednu na
+řádek.
+
+* Klíče objektu se procházejí v **seřazeném pořadí** (bajtové pořadí klíče —
+  tak iteruje `serde_json::Value::Object`); prvky pole v pořadí indexů.
+* Cesta jsou klíče spojené `.` a `[i]` pro index v poli: `terminal.id`,
+  `orders[0].cents`, `[1][0]` pro pole uvnitř kořenového pole. Klíče
+  neobsahují tečky ani závorky.
+* Řetězec se vypíše bez uvozovek. Číslo, `true`, `false` a `null` se vypíší
+  tak, jak je zapisuje JSON (`1.5` zůstane `1.5`, `null` je slovo `null`).
+* Prázdný objekt nebo prázdné pole nemá žádné listy a nevypíše nic.
+
+```
+input:  {"batch": "2024-06-01", "terminal": {"id": "YW-07", "online": true},
+         "orders": [{"cents": 3800, "merchant": "Lucky Mac"}, {"cents": 250}], "note": null}
+output: batch = 2024-06-01
+        note = null
+        orders[0].cents = 3800
+        orders[0].merchant = Lucky Mac
+        orders[1].cents = 250
+        terminal.id = YW-07
+        terminal.online = true
+```
+
+Parsuj přes `serde_json::from_str::<serde_json::Value>` a napiš rekurzivní
+`walk(path: &str, value: &Value)`, která matchuje `Value::Object`,
+`Value::Array` a zbytek. Startovní kód projde jen nejvyšší úroveň a vypíše,
+co tam najde, takže vnořený objekt vyjde jako jeden řádek JSONu a kořenové
+pole je panika.
+'''
+hints = [
+  "`use serde_json::Value;` a `let doc: Value = serde_json::from_str(&input)?;` — `Value` je enum: `Null`, `Bool`, `Number`, `String`, `Array(Vec<Value>)`, `Object(Map<String, Value>)`.",
+  "Rekurze nese cestu: `fn walk(path: &str, value: &Value)`. U objektu je `for (key, child) in map` už v seřazeném pořadí klíčů; u pole dá `iter().enumerate()` index.",
+  "Cesta roste o jeden kus na úroveň: `format!(\"{path}.{key}\")`, pokud `path` není prázdná (pak jen klíč), a `format!(\"{path}[{i}]\")` pro index.",
+  "`Value::String(s) => println!(\"{path} = {s}\")` vypíše řetězec holý; `other => println!(\"{path} = {other}\")` použije vlastní `Display` typu `Value`, což je kompaktní JSON — `null`, `true`, `1.5`.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.frameworks.06.toml-config"
+title = "Soubor služby"
+story = "Zúčtovací služba na Gloucester Road indexuje svou konfigurační tabulku ručně a druhý `[[upstream]]` přepsal první; každé zúčtování od úterý šlo na záložní cestu."
+brief = '''
+Na standardním vstupu je konfigurace služby v TOML:
+
+* nejvyšší úroveň: `name` (řetězec, povinný), `port` (celé číslo, výchozí
+  `8080`)
+* tabulka `[limits]` (povinná): `max_cents` (celé číslo, povinné), `retries`
+  (celé číslo, výchozí `3`)
+* pole tabulek `[[upstream]]`, nula nebo více, každá s `name` a `url`
+  (řetězce, povinné) a `timeout_ms` (celé číslo, výchozí `1000`)
+
+Vypiš souhrn — jeden řádek `SERVICE`, jeden řádek `LIMIT`, potom jeden řádek
+`UPSTREAM` na tabulku v pořadí souboru:
+
+```
+input:  name = 'settlement'
+        port = 9000
+
+        [limits]
+        max_cents = 500000
+
+        [[upstream]]
+        name = 'clearing'
+        url = 'https://clearing.example/settle'
+        timeout_ms = 2000
+
+        [[upstream]]
+        name = 'fallback'
+        url = 'https://fallback.example/settle'
+output: SERVICE settlement on port 9000
+        LIMIT 500000 cents, 3 retries
+        UPSTREAM clearing https://clearing.example/settle 2000 ms
+        UPSTREAM fallback https://fallback.example/settle 1000 ms
+```
+
+Pokud vstup není platný TOML, nebo nemá ten tvar (chybí povinný klíč, hodnota
+má špatný typ), vypiš přesně `ERROR: config rejected` jako jediný řádek a
+skonči normálně. Vlastní hlášení toml nevypisuj.
+
+Popiš tvar strukturami — `Config`, `Limits`, `Upstream` — každá
+s `#[derive(Deserialize)]`, výchozí hodnoty přes `#[serde(default)]` nebo
+`#[serde(default = "fn_name")]`, a přečti ho přes
+`toml::from_str::<Config>(&input)` s `match` na vráceném `Result`. Startovní
+kód čte `toml::Table` a indexuje do ní, což funguje pro úplný soubor a na
+všem ostatním panikaří.
+'''
+hints = [
+  "`use serde::Deserialize;` — toml je formát serde stejně jako serde_json, takže `toml::from_str::<Config>(&input)` staví stejný druh odvozené struktury. `[table]` je pole typu struktura; `[[array_of_tables]]` je pole typu `Vec<Struct>`.",
+  "Výchozí hodnota, která není `Default` daného typu, je funkce: `#[serde(default = \"default_port\")]` s `fn default_port() -> u16 { 8080 }`. Prosté `#[serde(default)]` na `Vec` udělá z chybějícího `[[upstream]]` prázdný seznam.",
+  "`toml::from_str` vrací `Result<Config, toml::de::Error>`; chybějící povinný klíč, špatný typ i syntaktická chyba skončí všechny v `Err`. Matchni na něm a vypiš svůj vlastní řádek — chybu nikdy nevypisuj přes `{}`.",
+  "`match toml::from_str::<Config>(&input) { Ok(cfg) => cfg, Err(_) => { println!(\"ERROR: config rejected\"); return; } }`.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.frameworks.07.clap-derive"
+title = "Jeden řádek přepínačů"
+story = "Provozní nástroj na zúčtovacím stroji bere `--limit` a někdo u stolu na Gloucester Road napsal `--limti 50`; nástroj to vzal jako název dávky a pustil se do všech."
+brief = '''
+`settle` je nástroj příkazové řádky s:
+
+* jedním povinným pozičním argumentem `BATCH` (řetězec)
+* `--limit <N>`, celé číslo bez znaménka, výchozí `100`
+* `--dry-run`, přepínač
+
+Harness nepředává žádné argumenty, takže příkazové řádky přicházejí ze
+standardního vstupu: každý neprázdný řádek je jedna příkazová řádka, rozdělená
+podle bílých znaků (vlastní jméno nástroje na řádku není). Pro každou vypiš
+jeden řádek:
+
+* při úspěchu `batch=<BATCH> limit=<N> dry-run=<true|false>`
+* při neúspěchu `ERROR: ` a podobu `Debug` clapového `ErrorKind` —
+  `ERROR: MissingRequiredArgument`, `ERROR: ValueValidation`,
+  `ERROR: UnknownArgument`, `ERROR: InvalidValue` (volba, za kterou
+  nenásleduje hodnota)
+
+```
+input:  2024-06-01 --limit 50
+        --dry-run 2024-06-02
+        2024-06-03 --limit ten
+output: batch=2024-06-01 limit=50 dry-run=false
+        batch=2024-06-02 limit=100 dry-run=true
+        ERROR: ValueValidation
+```
+
+Deklaruj rozhraní jako strukturu s `#[derive(clap::Parser)]` —
+`#[arg(long, default_value_t = 100)]` a `#[arg(long)]` na `bool` — a každý
+řádek parsuj přes
+`Cli::try_parse_from(std::iter::once("settle").chain(words))`. `Err(e)` nese
+`e.kind()`. Volby mohou přijít před pozičním argumentem i za ním a
+`--limit=7` je totéž jako `--limit 7`. Neposílej `--help`. Startovní kód je
+ručně psaná smyčka, která přijme cokoli.
+'''
+hints = [
+  "`use clap::Parser;` a `#[derive(Parser)]` na struktuře: holé pole je poziční argument, `#[arg(long)]` udělá `--field-name` a typ pole je parser hodnoty — `u32` ti `ten` odmítne samo.",
+  "`#[arg(long, default_value_t = 100)] limit: u32` je výchozí hodnota jako typovaná hodnota; `#[arg(long)] dry_run: bool` je přepínač, přítomný nebo ne, na řádku psaný `--dry-run`.",
+  "`Cli::parse()` čte skutečné argv, které je tu prázdné. `Cli::try_parse_from(iter)` bere libovolný iterátor řetězců, jehož první položka je jméno programu: `std::iter::once(\"settle\").chain(line.split_whitespace())`.",
+  "`Err(e) => println!(\"ERROR: {:?}\", e.kind())` — `ErrorKind` je prostý enum a jeho `Debug` je název varianty.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.frameworks.08.clap-subcommands"
+title = "Tři slovesa, jeden nástroj"
+story = "Provoznímu nástroji na zúčtovacím stroji na Gloucester Road přirostly `pay`, `refund` a `balance` jako tři větve if podle prvního slova; `refudn` propadlo do poslední větve a stůl si přečetl zůstatek tam, kde čekal odmítnutí."
+brief = '''
+`till` je nástroj příkazové řádky se třemi podpříkazy:
+
+* `pay <TO> <CENTS>` — `TO` řetězec, `CENTS` celé číslo bez znaménka; vypíše
+  `PAY <CENTS> to <TO>`
+* `refund <ID> [--reason <WORD>]` — vypíše `REFUND <ID>`, nebo
+  `REFUND <ID> because <WORD>`, když je uveden důvod
+* `balance [ACCOUNT]` — `ACCOUNT` má výchozí hodnotu `main`; vypíše
+  `BALANCE <ACCOUNT>`
+
+Jako předtím, harness nepředává žádné argumenty: každý neprázdný řádek
+standardního vstupu je jedna příkazová řádka, rozdělená podle bílých znaků,
+bez jména nástroje. Jeden výstupní řádek na příkazovou řádku. Při neúspěchu
+vypiš `ERROR: ` a podobu `Debug` clapového `ErrorKind`: neznámé první slovo
+je `ERROR: InvalidSubcommand`; podpříkaz, kterému chybí poziční argument, je
+`ERROR: MissingRequiredArgument`; `CENTS`, které není celé číslo, je
+`ERROR: ValueValidation`; volba, kterou podpříkaz nemá, je
+`ERROR: UnknownArgument`.
+
+```
+input:  pay yw-07 3800
+        refund r-1041 --reason duplicate
+        balance
+        topup yw-07 100
+output: PAY 3800 to yw-07
+        REFUND r-1041 because duplicate
+        BALANCE main
+        ERROR: InvalidSubcommand
+```
+
+Použij `#[derive(Parser)]` na struktuře s jedním polem označeným
+`#[command(subcommand)]`, jehož typ je enum s `#[derive(Subcommand)]`; pole
+každé varianty jsou argumenty toho podpříkazu a název varianty malými písmeny
+je slovo na řádku. Dej na strukturu `#[command(disable_help_subcommand = true)]`,
+aby `help` nebylo čtvrté sloveso. Neposílej `--help`. Startovní kód matchuje
+první slovo a indexuje zbytek.
+'''
+hints = [
+  "`use clap::{Parser, Subcommand};` — struktura dostane jedno pole `#[command(subcommand)] command: Command` a `Command` je enum s `#[derive(Subcommand)]`.",
+  "Strukturová varianta `Pay { to: String, cents: i64 }` je podpříkaz se dvěma pozičními argumenty; `#[arg(long)] reason: Option<String>` je nepovinný `--reason`; `#[arg(default_value = \"main\")] account: String` je nepovinný poziční argument.",
+  "`#[command(name = \"till\", disable_help_subcommand = true)]` na struktuře — jinak clap přidá vlastní podpříkaz `help` a řádek `help` vypíše `DisplayHelp` místo `InvalidSubcommand`.",
+  "Po `try_parse_from` matchni na `cli.command`: `Command::Refund { id, reason: Some(why) } => ...` a `Command::Refund { id, reason: None } => ...` jsou dvě větve jednoho match.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.frameworks.09.regex-captures"
+title = "Dolary uprostřed textu"
+story = "Podpora vkládá e-maily zákazníků do refundačních tiketů a částky sedí uprostřed textu. Skener, který je vytahuje, se zastaví na první čárce, takže zákazníkovi, kterému v SOGO naúčtovali HK$1,234.50, nabídli zpátky jeden dolar."
+brief = '''
+Na standardním vstupu je volný text, jeden řádek tiketu na řádek. Najdi v něm
+každou částku v hongkongských dolarech. Částka je `HK$` následované přímo
+celodolarovou částí a nepovinnou centovou částí:
+
+* celé dolary: buď prosté číslice (`80`, `1234`), nebo číslice seskupené po
+  třech s čárkami (`1,234`, `12,345,678` — jedna až tři číslice, potom jedna
+  nebo více skupin `,ddd`);
+* centy: `.` a přesně dvě číslice (`.50`). `.`, za kterou nejsou dvě číslice,
+  není součástí částky (`HK$38.` je 38 dolarů).
+
+Cokoli jiného — `US$9.99`, holé `HK$` — částka není.
+
+Pro každou částku, v pořadí čtení, vypiš `<line> <text> <cents>`: číslo řádku
+od 1, částku přesně tak, jak se objevila v textu, a její hodnotu v centech
+jako celé číslo. Po posledním řádku vypiš `TOTAL <cents>`. Tiket bez částek
+vypíše jen součet; prázdný vstup vypíše `TOTAL 0`.
+
+```
+input:  Charged HK$1,234.50 twice at SOGO; the second HK$1,234.50 is a duplicate.
+        Refund HK$80 and the HK$12.05 fee. The US$9.99 line is not ours.
+output: 1 HK$1,234.50 123450
+        1 HK$1,234.50 123450
+        2 HK$80 8000
+        2 HK$12.05 1205
+        TOTAL 256105
+```
+
+Postav jeden `regex::Regex` s pojmenovanými skupinami pro dolary a centy,
+zkompiluj ho **jednou** před smyčkou (kompilace je ta drahá část; `Regex`
+v těle smyčky je klasická chyba) a každý řádek projdi přes `captures_iter`.
+Počítej v celých centech: `f64` dolary krát 100 je způsob, jak se z `HK$0.29`
+stane 28 centů. Startovní kód skenuje ručně, zastaví se na první čárce a
+násobí floaty.
+'''
+hints = [
+  "`use regex::Regex;` a `let re = Regex::new(r\"...\").unwrap();` jednou, nad smyčkou. `re.captures_iter(line)` dává jeden `Captures` na shodu, zleva doprava.",
+  "Pojmenované skupiny: `(?P<dollars>...)` a `(?P<cents>...)`. Ve vzoru je `\\$` doslovný znak dolaru a seskupená podoba musí být v alternaci první, s `+` na skupinách s čárkou, jinak se `HK$1234.50` shodne jako `HK$123` — crate regex bere první alternativu, která se shodne, ne nejdelší.",
+  "Vzor: `HK\\$(?P<dollars>\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(?P<cents>\\d{2}))?`. `&caps[0]` je celá shoda, `caps[\"dollars\"]` text skupiny a `caps.name(\"cents\")` je `Option<Match>`, protože skupina se nemusela zúčastnit.",
+  "`let dollars: i64 = caps[\"dollars\"].replace(',', \"\").parse().unwrap();`, potom `let cents: i64 = caps.name(\"cents\").map_or(0, |m| m.as_str().parse().unwrap());` a částka je `dollars * 100 + cents`.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.frameworks.10.chrono-settlement"
+title = "Příští pracovní den"
+story = "Páteční dávka karet z terminálů v Times Square šla do banky na Gloucester Road s datem soboty a banka v sobotu nemá otevřeno. Zúčtovací kalendář je ručně psaná tabulka měsíců a únor v ní má každý rok 28 dní."
+brief = '''
+Každý řádek standardního vstupu je datum valuty jako `YYYY-MM-DD`. Prázdné
+řádky se ignorují. Pro každé datum vypiš jeden řádek:
+
+```
+<value date> -> <settlement date> +<days>
+```
+
+kde datum zúčtování je první den **po** datu valuty, který je pondělí až
+pátek (pátek se zúčtuje v pondělí, sobota v pondělí, neděle v pondělí),
+`<days>` je počet kalendářních dnů mezi nimi a obě data se vypisují jako
+`%d %b %Y %a` — `03 Oct 2026 Sat`.
+
+Řádek, který není skutečné datum v tomto formátu — `2026-13-01`,
+`2026-02-29`, `2026-04-31`, `yesterday` — vypíše `ERROR: bad date <line>`
+s oříznutým textem řádku a program pokračuje dalším řádkem.
+
+```
+input:  2026-10-02
+        2026-10-03
+        2026-10-07
+        2026-13-01
+output: 02 Oct 2026 Fri -> 05 Oct 2026 Mon +3
+        03 Oct 2026 Sat -> 05 Oct 2026 Mon +2
+        07 Oct 2026 Wed -> 08 Oct 2026 Thu +1
+        ERROR: bad date 2026-13-01
+```
+
+Použij `chrono::NaiveDate`: `parse_from_str` na čtení, `weekday()` na test,
+`checked_add_days` na krok, `signed_duration_since(...).num_days()` na rozdíl
+a `format` na výpis. Nikdy nečti hodiny. Startovní kód má vlastní tabulku
+měsíců a vlastní vzorec na den v týdnu a jedno z toho je v přestupných letech
+špatně.
+'''
+hints = [
+  "`use chrono::{Datelike, Days, NaiveDate, Weekday};` — `weekday()` pochází z traitu `Datelike`, takže bez toho importu neexistuje.",
+  "`NaiveDate::parse_from_str(text, \"%Y-%m-%d\")` je `Result`; je `Err` pro `2026-02-29` i `2026-04-31` stejně jako pro `yesterday`, takže jeden `match` pokryje každý špatný řádek.",
+  "Krokuj přes `date.checked_add_days(Days::new(1)).unwrap()`, dokud `!matches!(day.weekday(), Weekday::Sat | Weekday::Sun)`; rozdíl je `settles.signed_duration_since(value).num_days()`.",
+  "`value.format(\"%d %b %Y %a\")` vypíše `02 Oct 2026 Fri` rovnou do `println!` — `%a` je třípísmenný název dne v týdnu.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.frameworks.11.itertools-chunk-by"
+title = "Jeden řádek na účet"
+story = "Výpis na konci dne z terminálů na Percival Street uvádí každý převod v pořadí, v jakém pokladny zavíraly. Report, který je skládá na jeden řádek na účet, slučuje jen sousedy, takže účet, který platil ráno a znovu po obědě, je v něm dvakrát."
+brief = '''
+Na standardním vstupu jsou převody, jeden na řádek, `<ACCOUNT> <CENTS>` —
+účet je jeden token bez mezer, centy nezáporné celé číslo. Prázdné řádky se
+ignorují. Převody jednoho účtu se mohou ve vstupu objevit kdekoli.
+
+Vypiš jeden řádek na účet, účty ve vzestupném řetězcovém pořadí, jako
+`<ACCOUNT> <a>+<b>+...=<sum>` — částky v pořadí, v jakém se objevily ve
+vstupu, spojené `+`, potom `=` a jejich součet (jediný převod se vypíše jako
+`C-031 80=80`). Potom jeden závěrečný řádek, `<k> accounts, <total> cents`,
+s počtem různých účtů a součtem všeho. Prázdný vstup vypíše jen
+`0 accounts, 0 cents`.
+
+```
+input:  B-204 500
+        A-117 1200
+        B-204 250
+        C-031 80
+        A-117 60
+output: A-117 1200+60=1260
+        B-204 500+250=750
+        C-031 80=80
+        3 accounts, 2090 cents
+```
+
+Tohle je `itertools::Itertools`: `sorted_by_key`, aby se převody každého účtu
+dostaly k sobě (je to stabilní řazení, takže částky si zachovají pořadí ze
+vstupu), `chunk_by` na průchod po úsecích, `join` na jejich výpis, `unique`
+na spočítání účtů. `chunk_by` seskupuje jen *sousedící* stejné klíče — to je
+celý důvod, proč je řazení první. Startovní kód dělá seskupování sousedů
+ručně na neseřazeném vstupu.
+'''
+hints = [
+  "`use itertools::Itertools;` dá `sorted_by_key`, `chunk_by`, `join` a `unique` na každý iterátor.",
+  "`transfers.iter().sorted_by_key(|(account, _)| *account)` vrací iterátor přes seřazené položky — stabilně, takže dva převody jednoho účtu si zachovají pořadí — a `.chunk_by(|(account, _)| *account)` na něm seskupí úseky.",
+  "`ChunkBy` se iteruje přes referenci: `let grouped = ...chunk_by(...); for (account, group) in &grouped { ... }`. `group` je iterátor přes převody toho účtu.",
+  "Uvnitř smyčky: `let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();`, potom `println!(\"{account} {}={}\", amounts.iter().join(\"+\"), amounts.iter().sum::<i64>())`.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.frameworks.12.indexmap-first-seen"
+title = "V pořadí, v jakém přišli"
+story = "Součet po obchodnících pro terminály na Yee Wo Street je HashMap a ranní report vypisuje obchodníky při každém běhu v jiném pořadí. Finance je chtějí v pořadí, v jakém poprvé přijali kartu, a nikdo neumí říct, který obchodník to byl."
+brief = '''
+Každý řádek standardního vstupu je jméno obchodníka (může obsahovat mezery;
+bílé znaky kolem se oříznou; prázdné řádky se ignorují). Spočítej, kolikrát
+se každý obchodník objeví.
+
+Vypiš `<merchant> <count>` pro každého různého obchodníka **v pořadí, v jakém
+byli poprvé viděni**, potom `DISTINCT <k>`. Pokud byl aspoň jeden obchodník,
+vypiš také `FIRST <merchant>` (první viděný obchodník) a
+`TOP <merchant> <count>` (nejvyšší počet; při shodě ten, který byl viděn
+první). Prázdný vstup vypíše jen `DISTINCT 0`.
+
+```
+input:  Lucky Mac
+        SOGO
+        Lucky Mac
+        Hysan Place
+        Times Square
+        SOGO
+        Jardine's Bazaar
+        Lucky Mac
+output: Lucky Mac 3
+        SOGO 2
+        Hysan Place 1
+        Times Square 1
+        Jardine's Bazaar 1
+        DISTINCT 5
+        FIRST Lucky Mac
+        TOP Lucky Mac 3
+```
+
+`indexmap::IndexMap` je hašovací mapa, která si pamatuje pořadí vkládání:
+`entry` a `or_insert` jako na `HashMap`, iterace v pořadí, v jakém byly klíče
+vloženy, `get_index(0)` pro ten první. Startovní kód je stejný program nad
+`std::collections::HashMap`, která iteruje v pořadí, na jaké má hašovací
+funkce dnes náladu.
+'''
+hints = [
+  "`use indexmap::IndexMap;` — `IndexMap<&str, u64>` má stejné `entry(key).or_insert(0)` jako `HashMap` a iterace přes `&counts` prochází klíče v pořadí vložení.",
+  "`counts.get_index(0)` je `Option<(&K, &V)>`: první obchodník, který byl kdy vložen. Žádná druhá proměnná na zapamatování není potřeba.",
+  "Pro `TOP` projdi `&counts` v pořadí a nejlepšího nahraď jen tehdy, když `*count > best` — ostře větší, aby ze shody zůstal ten nejdřívější. `max_by_key` vrací *poslední* maximum, což je tady to špatné.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.frameworks.13.rand-seeded-shuffle"
+title = "Stejné losování dvakrát"
+story = "Fraud tým u Gloucester Road vybírá k ruční kontrole náhodný vzorek obchodníků z Yee Wo Street za ten den. Auditor se ptá, kteří obchodníci byli ve včerejším vzorku, a program, který je vylosoval, je nedokáže vylosovat znovu."
+brief = '''
+Na standardním vstupu jsou dva řádky. První je seed, 64-bitové celé číslo bez
+znaménka; druhý je `<n> <k>`, s `1 <= n <= 99` a `0 <= k <= 20`.
+
+Postav balíček `M01 M02 ... Mnn` (dvě číslice, doplněné nulou), potom
+s **jedním** generátorem náhodných čísel nasazeným ze seedu:
+
+1. balíček jednou zamíchej, na místě, a vypiš `DECK <ids joined by one space>`;
+2. vylosuj `k` celých čísel, každé rovnoměrně z `1..=100` jako `u32`, a pro
+   každé v pořadí vypiš `DRAW <x>`;
+3. vypiš `CHECK <first id of the shuffled deck>`.
+
+Generátor je `rand::rngs::StdRng` postavený přes `SeedableRng::seed_from_u64`,
+spotřebovaný přesně v tomto pořadí — nejdřív míchání, potom losování — takže
+stejný seed vždy vypíše stejné řádky. Pokud seed není `u64`, vypiš
+`ERROR: bad seed <text>` (oříznuté) a nic jiného.
+
+```
+input:  20261006
+        6 3
+output: DECK M06 M02 M05 M01 M03 M04
+        DRAW 4
+        DRAW 26
+        DRAW 79
+        CHECK M06
+```
+
+Míchání je `rand::seq::SliceRandom::shuffle`, losování
+`rand::RngExt::random_range` — oboje traity, oboje importované. Startovní kód
+používá `rand::rng()`, generátor lokální pro vlákno nasazený z operačního
+systému, a při každém běhu vypíše jiný vzorek.
+'''
+hints = [
+  "`use rand::rngs::StdRng; use rand::{RngExt, SeedableRng}; use rand::seq::SliceRandom;` — v rand 0.10 žijí metody na `RngExt` a `SliceRandom` a `seed_from_u64` na `SeedableRng`.",
+  "`let mut rng = StdRng::seed_from_u64(seed);` je celá oprava: jeden generátor, postavený ze seedu, předaný jako `&mut rng` všemu, co losuje.",
+  "`deck.shuffle(&mut rng);`, potom `let draw: u32 = rng.random_range(1..=100);` — typová anotace rozhoduje, která celá čísla z proudu vyjdou, takže to musí být `u32`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.frameworks.14.rayon-fee-run"
+title = "Všechny karty naráz"
+story = "Měsíční výpočet poplatků prochází karty terminálů z Yee Wo Street jednu po druhé na jednom jádru šestnáctijádrového stroje u Gloucester Road, a když doběhne, číslo banky je asi o cent na kartu vyšší než naše."
+brief = '''
+Na standardním vstupu je nula nebo více řádků `<CARD> <CENTS>`: id karty (bez
+mezer, jedinečné) a částka v centech, `0 <= CENTS <= 10_000_000_000`.
+
+Poplatek z jedné platby je **1,5 % částky, zaokrouhlených nahoru na nejbližší
+celý cent, plus 30 centů paušálně**. V celých číslech:
+`(cents * 15 + 999) / 1000 + 30`. Platba 199 centů je 2,985 centu sazby,
+zaokrouhleno nahoru na 3, plus 30 — poplatek 33. Platba nula centů stále
+platí paušálních 30.
+
+Vypiš jeden řádek na kartu, `<CARD> <FEE>`, **seřazené podle id karty**,
+potom `TOTAL <sum of the fees>`. Prázdný vstup vypíše jen `TOTAL 0`.
+
+```
+input:  C3 199
+        A1 10000
+        B2 3800
+output: A1 180
+        B2 87
+        C3 33
+        TOTAL 300
+```
+
+Práci na kartu udělej paralelně přes `rayon`: `use rayon::prelude::*;`, potom
+`.par_iter()` tam, kde bylo sekvenční `.iter()`. `.map(..).collect()` do
+`Vec` i `.map(..).sum()` fungují na paralelním iterátoru také; `Vec` se vrátí
+v pořadí vstupu, takže ho před výpisem seřaď — nikdy nevypisuj zevnitř
+paralelní části. Startovní kód je sekvenční verze a jeho poplatek zaokrouhluje
+na špatnou stranu.
+'''
+hints = [
+  "`use rayon::prelude::*;` dá `par_iter()` na každý `Vec` a řez. Uzávěra, kterou už máš, se nemění; `.map(...).collect()` a `.map(...).sum()` existují i na paralelním iterátoru.",
+  "Zaokrouhlení nahoru v celých číslech je `(x + 999) / 1000`, ne `x / 1000`. Startovní kód zaokrouhluje dolů a skryté případy mají částky, jejichž 1,5 % není celý cent.",
+  "Paralelní `collect()` do `Vec` zachová pořadí vstupu, ale zadání chce pořadí karet: `fees.par_sort_unstable()` (nebo prosté `sort()`) před výpisovou smyčkou, která zůstává sekvenční.",
+  "`let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();` — typ nalevo říká `sum`, do čeho má sčítat.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.frameworks.15.parking-lot-ledger"
+title = "Čtyři pokladny, jedna kniha"
+story = "Čtyři pokladny v Hysan Place zapisují při zavírce do jedné knihy. Řádek každého obchodníka drží to, co viděla pokladna, která skončila poslední, a nic z toho, co přidaly ostatní tři."
+brief = '''
+První řádek je `<TILLS>`, `1 <= TILLS <= 8`. Každý další řádek je platba,
+`<MERCHANT> <CENTS>` (token obchodníka bez mezer, `CENTS > 0`). Plateb nemusí
+být vůbec žádná.
+
+Platba `i` (od 0, počítají se jen řádky s platbami) patří pokladně
+`i % TILLS`. Každá pokladna je vlákno; každá přičítá své platby do **jedné
+sdílené knihy**, `Mutex<HashMap<String, (i64, u32)>>` s celkovými centy a
+počtem na obchodníka. Až každá pokladna skončí, vypiš jeden řádek na
+obchodníka, `<MERCHANT> <TOTAL> <COUNT>`, seřazené podle obchodníka, potom
+`PAYMENTS <n>` s počtem řádků s platbami.
+
+```
+input:  2
+        sogo 500
+        luckymac 3800
+        sogo 1200
+        tsuiwah 4500
+        luckymac 200
+output: luckymac 4000 2
+        sogo 1700 2
+        tsuiwah 4500 1
+        PAYMENTS 5
+```
+
+Použij `parking_lot::Mutex`. Jeho `lock()` nemůže selhat, takže vrací rovnou
+strážce — žádný `.unwrap()`, žádné otravování (poisoning) a `into_inner()` je
+hodnota, ne `Result`. Pokladny spusť přes `std::thread::scope`, aby si knihu
+mohly půjčit bez `Arc`. Startovní kód je verze se `std::sync` a slučuje čísla
+každé pokladny do knihy způsobem, který zahodí to, co ostatní pokladny už
+zapsaly — čti to slučování, ne zámek.
+'''
+hints = [
+  "`use parking_lot::Mutex;` místo `std::sync::Mutex`. `ledger.lock()` je strážce — smaž každý `.unwrap()` za ním, a `into_inner()` je mapa samotná.",
+  "`HashMap::extend` klíč, který už tam je, *nahrazuje*. Když pokladna 1 zapíše `luckymac` po pokladně 0, součet pokladny 0 je pryč. To je chyba startovního kódu a projeví se na každém obchodníkovi, kterého viděly dvě pokladny.",
+  "Slučuj přes `entry`: `let e = shared.entry(merchant).or_insert((0, 0)); e.0 += cents; e.1 += count;` — jeden `lock()` na pokladnu, vzatý až po dokončení lokální mapy, takže zámek se drží na slučování a na nic jiného.",
+  "`let mut shared = ledger.lock();`, potom smyčka `for (merchant, (cents, count)) in local`; strážce je lokální proměnná a zahodí se, když uzávěra vlákna skončí.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.frameworks.16.crossbeam-hatch"
+title = "Okénko se zavírá"
+story = "Tři terminály z Yee Wo Street posílají do jednoho okénka v kanceláři na Gloucester Road a nic okénku neřekne, že už šly domů. Noční dávka v šest ráno pořád čeká."
+brief = '''
+První řádek je `<PRODUCERS>`, `1 <= PRODUCERS <= 8`. Každý další řádek je
+platební lístek, `<CARD> <CENTS>`. Lístek `i` (od 0, jen lístky) patří
+producentovi `i % PRODUCERS`. Lístek, který nemá přesně dvě pole, nebo jehož
+centy nejsou `i64`, je špatný lístek: producent ho přeskočí a nepošle nic.
+
+Každý producent je vlákno, které posílá své dobré lístky, jednu zprávu na
+každý, **jedním** kanálem `crossbeam::channel::bounded(4)`. Jeden konzument —
+hlavní vlákno — čte kanál přes `for msg in rx`, dokud není každý odesílatel
+pryč, a potom vypíše:
+
+* `MESSAGES <n>` — přijaté zprávy
+* `TOTAL <sum of cents>`
+* `LARGEST <CARD> <CENTS>` — jediný největší lístek; při shodě menší id karty
+  (řetězcové pořadí). Bez zpráv `LARGEST -`.
+
+```
+input:  3
+        K1 1200
+        K2 350
+        K3 oops
+        K4 1200
+        K5 90
+output: MESSAGES 4
+        TOTAL 2840
+        LARGEST K1 1200
+```
+
+`for msg in rx` skončí jen tehdy, když je zahozen **poslední** `Sender`. Každý
+producent dostane `tx.clone()` a ty se zahodí, když vlákna skončí — ale
+původní `tx` pořád sedí v `main`, takže smyčka nikdy neskončí a běh je
+timeout. Zahoď ho, než začneš číst. Startovní kód to nedělá.
+'''
+hints = [
+  "`use crossbeam::channel::bounded;` — `bounded(4)` dá `(Sender, Receiver)`; `Sender` je `Clone` a `Receiver` je iterátor, který skončí, když se kanál zavře.",
+  "Kanál se zavře, když byl zahozen *každý* `Sender`. Spočítej je: jeden klon na producenta, plus ten, který ti `bounded` dal a který `main` pořád vlastní, zatímco sedí ve `for slip in rx`.",
+  "Konzument nesmí běžet dřív, než jsou producenti spuštěni (potřebují klony), a originál musí být pryč, než konzument začne: spusť, potom `drop(tx);`, potom smyčka.",
+  "`drop(tx);` hned za smyčkou `for p in 0..producers`, uvnitř uzávěry `thread::scope`. Nic jiného se nemění.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.frameworks.17.crossbeam-select-timeout"
+title = "Tři sta milisekund"
+story = "Jeden vydavatel karet za bránou na Gloucester Road přestal v 11:52 odpovídat. Terminály v SOGO ukazovaly PLEASE WAIT až do dvou, protože brána čekala taky."
+brief = '''
+Na standardním vstupu je nula nebo více řádků `<CARD> <MS>`, nejvýše dvacet:
+id karty a jak dlouho vydavateli té karty trvá odpověď, v milisekundách. `MS`
+je buď **nejvýše 3** (vydavatel, který běží), nebo **aspoň 3000** (který
+neběží); nejvýše tři řádky za běh jsou ty pomalé.
+
+Ber karty v pořadí. Pro každou spusť pracovní vlákno, které spí `MS`
+milisekund a potom pošle id karty zpátky kanálem. Čekej na odpověď **nejvýše
+300 ms**: vypiš `<CARD> APPROVED`, pokud přišla, `<CARD> TIMEOUT`, pokud ne,
+a hned přejdi na další kartu. Po poslední kartě vypiš
+`APPROVED <a> TIMEOUT <t>`.
+
+```
+input:  V1 0
+        V2 3000
+        V3 2
+output: V1 APPROVED
+        V2 TIMEOUT
+        V3 APPROVED
+        APPROVED 2 TIMEOUT 1
+```
+
+Čekání je `crossbeam::channel::select!` přes dva přijímače: ten pracovního
+vlákna a `after(Duration::from_millis(300))`, kanál, který doručí jednu
+zprávu, až vyprší čas. Dej **každé kartě vlastní** kanál `bounded(1)`, aby se
+odpověď pomalého vydavatele, která dorazí o tři sekundy později, nemohla
+splést s další kartou. Pracovní vlákno posílá přes `let _ = tx.send(..)`: tou
+dobou už možná nikdo neposlouchá, a to je v pořádku. Pracovní vlákna spouštěj
+přes `std::thread::spawn` a nikdy je nepřipojuj — návrat z `main` ukončí
+proces, spící vlákna a všechno. Startovní kód volá `rx.recv()` bez timeoutu,
+počká celé tři sekundy a kartu pak schválí.
+'''
+hints = [
+  "`use crossbeam::channel::{after, bounded, select};` — `after(d)` je `Receiver<Instant>`, který dostane přesně jednu zprávu, `d` od teď. Je to kanál jako každý jiný, a právě to dovolí `select!` na něj čekat.",
+  "`select!` bere větve `recv(rx) -> msg => { .. }` a spustí tu, jejíž přijímač je připravený první. Dej přijímač pracovního vlákna do jedné větve a přijímač `after` do druhé.",
+  "`recv(rx) -> answer` dává `Result`: `Ok(card)` od pracovního vlákna. Zpráva větve s timeoutem je `Instant`, který nepotřebuješ: `recv(after(Duration::from_millis(300))) -> _ => { .. }`.",
+  "`select! { recv(rx) -> answer => { approved += 1; println!(\"{} APPROVED\", answer.unwrap()); } recv(after(Duration::from_millis(300))) -> _ => { timed_out += 1; println!(\"{card} TIMEOUT\"); } }`",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.frameworks.18.tokio-spawn-join"
+title = "Jedna úloha na řádek"
+story = "Kontrola zúčtování u Gloucester Road vypíše každý řádek ve chvíli, kdy ho acquirer odpoví. Dnešní ranní soubor přišel zpátky s řádkem 40 nad řádkem 1 a rekonciliace v SOGO ho poslala rovnou nazpátek."
+brief = '''
+Na standardním vstupu je až 50 řádků `<MERCHANT> <CENTS>`: jedno slovo, potom
+nezáporné celé číslo. Prázdné řádky se přeskakují.
+
+Každý řádek kontroluje vlastní úloha spuštěná přes `tokio::spawn`. Kontrola
+jsou dvě věci udělané společně přes `tokio::join!`: značka (obchodník velkými
+písmeny) a poplatek (`cents * 15 / 1000`, zaokrouhleno dolů). Cesta
+k acquirerovi a zpět je simulovaná — `tokio::time::sleep` na
+`(cents % 5) * 50` milisekund, než ty dvě proběhnou — a startovní kód ji už
+má; nech ji tam. Právě ona je důvod, proč úlohy nekončí v pořadí, v jakém
+začaly.
+
+Vypiš jeden řádek na vstupní řádek, **v pořadí vstupu**,
+`<n> <TAG> <cents> <fee>` s `n` od 1, potom
+`TOTAL <sum of cents> <sum of fees>`. Prázdný vstup vypíše jen `TOTAL 0 0`.
+
+```
+input:  lucky-mac 3804
+        sogo 12502
+        tsui-wah 700
+output: 1 LUCKY-MAC 3804 57
+        2 SOGO 12502 187
+        3 TSUI-WAH 700 10
+        TOTAL 17006 254
+```
+
+Hlavní funkce je `#[tokio::main] async fn main()`. Drž každý `JoinHandle` ve
+`Vec` a awaitni je v pořadí, v jakém jsi je přidal; úloha svůj výsledek
+vrací, nevypisuje ho. Startovní kód vypisuje zevnitř úlohy, jak každá
+doběhne — což je pořadí spánků, ne pořadí souboru.
+'''
+hints = [
+  "`tokio::spawn(fut)` vrací `JoinHandle<T>`, kde `T` je to, co future vrací. Nech úlohu data svého řádku *vracet*, místo aby je vypisovala.",
+  "`tokio::join!(a, b)` spustí dvě future na stejné úloze a vrátí `(a_result, b_result)` — značku a poplatek, uvnitř `check`.",
+  "`Vec<JoinHandle<_>>` awaitnutý odpředu dozadu je pořadí vstupu, ať úlohy doběhly v jakémkoli pořadí: `for (i, h) in handles.into_iter().enumerate() { let (tag, cents, fee) = h.await.unwrap(); println!(...); }`.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.frameworks.19.tokio-mpsc-drop-sender"
+title = "Poslední pokladna zavírá"
+story = "Čtyři pokladny v Hysan Place sypou přes kanál do jednoho počítání zásuvky. Výsledek se nikdy nevypíše: počítající úloha pořád čeká na pokladnu, která při zavírce přestala posílat."
+brief = '''
+První řádek je `P`, počet pokladen (1 až 8). Každý další řádek je
+`<TILL> <CENTS>`: číslo pokladny a celočíselná částka. Řádek, jehož pokladna
+není v `1..=P`, padá na zem — neposílá se, nepočítá se.
+
+Každá pokladna je úloha-producent: `tokio::spawn` jednu na pokladnu, s klonem
+odesílatele kanálu `tokio::sync::mpsc::channel(4)`, posílající `(till, cents)`
+pro každý svůj řádek, v pořadí souboru. Jediný konzument, v `main`, přijímá
+přes `while let Some((till, cents)) = rx.recv().await` a sčítá.
+
+Až je kanál vyprázdněný, vypiš pro každou pokladnu 1 až P
+`TILL <k> <count> <sum>`, potom `TOTAL <count> <sum>` přes všechny.
+
+```
+input:  3
+        1 1200
+        2 3000
+        1 800
+        3 50
+        2 1000
+output: TILL 1 2 2000
+        TILL 2 2 4000
+        TILL 3 1 50
+        TOTAL 5 6050
+```
+
+`recv()` vrátí `None` jen tehdy, když je **každý** odesílatel pryč. Producenti
+své klony zahodí, když se vrátí; původní `tx` v `main` je pořád naživu, takže
+smyčka nikdy neskončí. Startovní kód je ten program. Oprav ho a výstup
+nezávisí na tom, která pokladna poslala první — součet je stejný, ať zprávy
+dorazí v jakémkoli pořadí.
+'''
+hints = [
+  "`tokio::sync::mpsc::channel(4)` dá `(Sender, Receiver)`. `Receiver::recv().await` je `Some(msg)`, dokud existuje nějaký `Sender`, a `None`, jakmile je poslední zahozen.",
+  "Spočítej odesílatele: jeden klon na pokladnu, přesunutý do její úlohy a zahozený, když úloha skončí — a originál v `main`, který nikdo nezahodí.",
+  "`drop(tx);` hned za smyčkou se spawn. Pak `while let Some(..) = rx.recv().await` skončí přesně tehdy, když poslední pokladna doposílá.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.frameworks.20.tokio-timeout-select"
+title = "Jedna sekunda, a pak ne"
+story = "Terminál v Lucky Mac v Times Square čeká na acquirera tak dlouho, jak to acquirerovi trvá. Jedno pomalé odpoledne to byly tři sekundy na přiložení a fronta došla až k eskalátoru."
+brief = '''
+Na standardním vstupu je až 8 řádků `<ID> <PRIMARY> <BACKUP>`: nezáporné celé
+číslo a dvě slova, každé `fast` nebo `slow`. Nejvýše dva řádky jsou
+`slow slow`.
+
+Každé přiložení autorizují dva acquireři naráz. Každý odpoví kódem
+`id * 37 % 1000` po prodlevě — prodlevu simuluj přes `tokio::time::sleep`:
+
+* primární: `fast` 10 ms, `slow` 3 s
+* záložní: `fast` 100 ms, `slow` 3 s
+
+Vyhrává první, kdo odpoví: `tokio::select!` přes ty dvě future. Celý závod je
+zabalený do `tokio::time::timeout` na **jednu sekundu**. Řádky zpracovávej
+po jednom, v pořadí, a pro každý vypiš:
+
+* `DONE <id> primary <code>` nebo `DONE <id> backup <code>` — kdo vyhrál
+* `TIMEOUT <id>` — ani jeden neodpověděl včas
+
+```
+input:  7 fast fast
+        8 slow fast
+        9 slow slow
+output: DONE 7 primary 259
+        DONE 8 backup 296
+        TIMEOUT 9
+```
+
+`timeout(dur, fut).await` je `Ok(value)` nebo `Err(Elapsed)`; když je `Err`,
+future uvnitř byla zahozena, i se spánkem — ty 3 s se nikdy nečekají celé.
+Startovní kód awaitne jen primárního, bez timeoutu, a záložního se nikdy
+nezeptá.
+'''
+hints = [
+  "`use tokio::time::{sleep, timeout};` — `timeout(Duration::from_secs(1), fut).await` dá `Result<T, Elapsed>` a zahození vnitřní future je to, co ji zruší.",
+  "`tokio::select! { a = fut_a => ..., b = fut_b => ... }` polluje obě a spustí větev té, která skončí první; druhá future se tam na místě zahodí.",
+  "Dej `select!` do `async fn authorise(...) -> (&'static str, u64)` a *tu* zabal do timeoutu, aby jedna lhůta pokryla oba acquirery.",
+  "`match timeout(..).await { Ok((who, code)) => println!(\"DONE {id} {who} {code}\"), Err(_) => println!(\"TIMEOUT {id}\") }`.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.frameworks.21.futures-join-all"
+title = "Osmdesát naráz"
+story = "Noční rizikové skóre prochází obchodníky z Yee Wo Street jednoho po druhém, sto milisekund na každého. Při osmdesáti obchodnících už se nevejde do zúčtovacího okna a celá ulice zaúčtuje o den později."
+brief = '''
+Na standardním vstupu je až 100 řádků `<ID> <CENTS>`: dvě nezáporná celá
+čísla. Tři průchody přes ně, každý jedna `async fn` na řádek, která už ve
+startovním kódu existuje:
+
+1. **Skóre.** `score(id, cents)` trvá 100 ms (`sleep`) a vrací
+   `(id * 7 + cents) % 100`. Spusť všechna skóre naráz přes
+   `futures::future::join_all`, které vrací výsledky v pořadí, v jakém
+   dostalo future. Vypiš `<id> <score>` na řádek, v pořadí vstupu.
+2. **Koš.** `bucket(cents)` trvá 20 ms a vrací `cents / 10000`. Služba košů
+   dovolí čtyři rozpracované naráz: postav stream přes
+   `futures::stream::iter(..).map(..).buffer_unordered(4)`, `collect` ho do
+   `Vec`, seřaď vzestupně a vypiš `BUCKETS <b1> <b2> ...` na jeden řádek
+   (samotné `BUCKETS`, když nejsou žádné řádky).
+3. **Limit.** `check(id, cents)` je `Err(id)`, když `cents > 500000`, jinak
+   `Ok(cents)`. Spusť je přes `futures::future::try_join_all`: vypiš
+   `OK <sum of cents>`, nebo `REJECTED <id>` pro první řádek nad limitem
+   v pořadí vstupu.
+
+```
+input:  1 3800
+        2 12500
+        3 250000
+output: 1 7
+        2 14
+        3 21
+        BUCKETS 0 1 25
+        OK 266300
+```
+
+Sto řádků musí doběhnout hluboko pod jednu sekundu. Startovní kód awaitne
+tytéž tři funkce po jednom řádku, což je sto milisekund na obchodníka; nad
+padesát obchodníků je pět sekund rozhodčího pryč.
+'''
+hints = [
+  "`use futures::future::{join_all, try_join_all}; use futures::stream::{self, StreamExt};` — `join_all(iter_of_futures).await` je `Vec` výsledků ve stejném pořadí jako vstup.",
+  "`stream::iter(&rows).map(|&(_, c)| bucket(c)).buffer_unordered(4).collect::<Vec<_>>().await` drží čtyři future v běhu a vydává každou, jak doběhne; `.sort_unstable()` potom udělá pořadí znovu tvoje.",
+  "`try_join_all(..).await` je `Ok(Vec<T>)`, když je každá future `Ok`, nebo první `Err` — `check` nikdy nic neawaitne, takže první v pořadí vstupu je první pollnutá.",
+  "`let scores = join_all(rows.iter().map(|&(id, c)| score(id, c))).await;`, potom `rows.iter().zip(&scores)` na výpis.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.frameworks.22.log-trait"
+title = "Co slyší provoz"
+story = "Zúčtovací služba na Gloucester Road loguje holým printem za hromadou ifů. Někdo ji pro nasazení na Percival Street přepnul na warn a chyby přestaly chodit, zatímco debugovací řádky chodily dál."
+brief = '''
+První řádek je slovo úrovně, v libovolné velikosti písmen: `off`, `error`,
+`warn`, `info`, `debug` nebo `trace`. Jakékoli jiné slovo vypíše
+`unknown level <word>` a nic jiného. Každý další řádek je
+`<ACCOUNT> <AMOUNT>`.
+
+Projdi řádky, číslované od 1, a loguj makry crate `log`, každé s explicitním
+cílem (target):
+
+* `trace!(target: "io", "read {raw:?}")` — surový řádek, v uvozovkách přes
+  `Debug`
+* `error!(target: "settle", "line {n}: not a number: {amount}")`, když částka
+  není `i64`; řádek se přeskočí
+* `info!(target: "settle", "line {n}: {account} {cents}")`
+* `warn!(target: "settle", "line {n}: large amount {cents}")`, když
+  `cents > 100000`, po tom `info!`
+* `debug!(target: "settle", "total so far {total}")` po přičtení
+
+Potom, ať je úroveň jakákoli, `println!("TOTAL {total}")`.
+
+Záznam se vypíše na **standardní výstup** jako `[LEVEL] target: message`, a
+jen když je jeho úroveň na zvolené úrovni nebo nad ní — `error` je vršek,
+`trace` spodek, `off` nevypíše nic než součet.
+
+```
+input:  info
+        A 100
+        B 250000
+        C 7x
+        D 1
+output: [INFO] settle: line 1: A 100
+        [INFO] settle: line 2: B 250000
+        [WARN] settle: line 2: large amount 250000
+        [ERROR] settle: line 3: not a number: 7x
+        [INFO] settle: line 4: D 1
+        TOTAL 250101
+```
+
+Implementuj `log::Log` pro jednotkovou strukturu — `enabled` porovná úroveň
+záznamu s `log::max_level()`, `log` vypíše, když je povoleno, `flush`
+vyprázdní stdout — dej jednu do `static LOGGER`, `log::set_logger(&LOGGER)` a
+`log::set_max_level` se slovem naparsovaným jako `LevelFilter`. Startovní kód
+má vlastní tabulku úrovní a porovnává ji obráceně.
+'''
+hints = [
+  "`use log::{Log, Metadata, Record, LevelFilter};` — `impl Log for YourStruct` jsou tři metody: `enabled`, `log`, `flush`. `\"warn\".parse::<LevelFilter>()` přečte slovo v libovolné velikosti písmen.",
+  "`static LOGGER: StdoutLogger = StdoutLogger; log::set_logger(&LOGGER).unwrap(); log::set_max_level(level);` — `set_logger` chce `&'static dyn Log`, a proto je to `static`, ne `let`.",
+  "`Level` se řadí `Error < Warn < Info < Debug < Trace`, takže záznam je chtěný, když `record.level() <= log::max_level()`. Makra kontrolují `max_level()` už předtím, než tě zavolají.",
+  "`println!(\"[{}] {}: {}\", record.level(), record.target(), record.args())` — `Level` se zobrazí jako `ERROR`, `WARN`, ...; `target:`, který předáš v každém makru, je to, co vrací `record.target()`.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.frameworks.23.the-settlement"
+title = "Zúčtování"
+story = "17:30 na platební cestě u Gloucester Road. Převody dne přicházejí jako jeden soubor JSON, banka chce do 18:00 jeden řádek na účet a soubor, který dnes večer odejde, je ten, který v březnu čtou auditoři."
+brief = '''
+Na standardním vstupu je jeden objekt JSON: `"date"` (řetězec, `YYYY-MM-DD`)
+a `"transfers"`, pole `{"from", "to", "cents"}`.
+
+Vypiš zúčtování:
+
+```
+input:  {"date": "2026-10-06", "transfers": [
+          {"from": "LUCKYMAC", "to": "BANK", "cents": 3800},
+          {"from": "SOGO", "to": "BANK", "cents": 12500},
+          {"from": "BANK", "to": "LUCKYMAC", "cents": 300}]}
+output: SETTLEMENT Tue 06 Oct 2026
+        BANK 16000
+        LUCKYMAC -3500
+        SOGO -12500
+        MOVED 3
+```
+
+První řádek je datum formátované `%a %d %b %Y`. Potom jeden řádek na každý
+účet, který se kdekoli objeví, **seřazené podle jména**, s jeho čistou
+bilancí: všechno, co přijal, minus všechno, co zaplatil. Potom
+`MOVED <number of transfers>`.
+
+Nebo jeden řádek `ERROR:` a nic jiného, kontrolováno v tomto pořadí:
+
+* vstup vůbec nemá ten tvar — `ERROR: not a settlement`
+* datum se nedá naparsovat — `ERROR: bad date 2026-13-01`
+* potom každý převod v pořadí, od 1 — `ERROR: transfer 2: nothing to move`
+  pro `cents`, které je nula nebo záporné, `ERROR: transfer 1: BANK pays itself`,
+  když se `from` rovná `to`
+
+Postav to z cesty za sebou: `serde` na tvar, `chrono` na datum, `anyhow`
+s kontextem na chyby a `tokio` — jedna úloha na převod, která ho zvaliduje a
+zapíše obě strany do `Arc<tokio::sync::Mutex<BTreeMap<String, i64>>>`,
+připojené **v pořadí**, aby byl nahlášen první špatný převod. Startovní kód
+parsuje a spouští, ale připisuje jen přijímající stranu, nikdy nevaliduje a
+datum vypisuje tak, jak přišlo.
+'''
+hints = [
+  "Čtyři crate, jeden program. `serde_json::from_str::<Settlement>` na tvar, `NaiveDate::parse_from_str(&s, \"%Y-%m-%d\")` na datum, `date.format(\"%a %d %b %Y\")` na jeho výpis.",
+  "Chyby jsou `anyhow`: `.map_err(|_| anyhow!(\"not a settlement\"))` tam, kde nesmí prosáknout vlastní hlášení crate, `bail!(...)` uvnitř úlohy, `.with_context(|| format!(\"transfer {}\", i + 1))` při připojování — a `{err:#}` vypíše `context: cause`.",
+  "Každá úloha je `tokio::spawn(post(Arc::clone(&book), transfer))` vracející `anyhow::Result<()>`; `handle.await` ti dá `Result<Result<()>, JoinError>`, takže jsou to dva `?` — ten první s vlastním kontextem.",
+  "Připojuj handly **v pořadí, v jakém jsi je spustil**, a zastav se na prvním `Err`: právě to dělá z `transfer 2` ten nahlášený, když jsou špatné převody 2 i 3. Mapa je `BTreeMap`, takže účty vyjdou seřazené zadarmo.",
+]

@@ -400,7 +400,8 @@ fn too_much_output_is_an_output_limit() {
 /// Asserted against the probe, so it holds on both kinds of machine.
 #[test]
 fn the_gate_agrees_with_the_probe() {
-    let refusal = cwbhacker_runner::unsupported("typescript", &one_case());
+    let refusal =
+        cwbhacker_runner::unsupported("typescript", &one_case(), std::path::Path::new(""));
     assert_eq!(refusal.is_none(), installed(), "{refusal:?}");
     if let Some(reason) = refusal {
         assert!(
@@ -413,7 +414,7 @@ fn the_gate_agrees_with_the_probe() {
             "harness": harness,
             "cases": [ { "name": "t", "visible": true } ]
         }));
-        let reason = cwbhacker_runner::unsupported("typescript", &wrong)
+        let reason = cwbhacker_runner::unsupported("typescript", &wrong, std::path::Path::new(""))
             .unwrap_or_else(|| panic!("the {harness} harness must be refused for typescript"));
         assert!(reason.contains("typescript"), "{reason}");
     }

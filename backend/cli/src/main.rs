@@ -1,4 +1,4 @@
-//! `cwbhacker` — the binary. serve, import, doctor, prune.
+//! `cwbhacker` — the binary. serve, import, warm, doctor, prune.
 //!
 //! Everything the terminal needs lives here: argument parsing, logging, exit
 //! statuses. The core crate does none of it, so the same operations are
@@ -58,6 +58,11 @@ enum Command {
         #[arg(long, value_name = "DIR")]
         content: Option<PathBuf>,
     },
+    /// Build the crate shelf every FRAMEWORKS quest links against (SPEC
+    /// §5.1): the pinned crates, fetched and compiled once into
+    /// `build/rust/`. Needs the network. Run it again after `prune --builds`
+    /// or when the server was rebuilt from a newer shelf; `doctor` says when.
+    Warm,
     /// Check the toolchains, the home and the database.
     Doctor,
     /// Remove things the server never removes on its own.
@@ -105,6 +110,7 @@ fn real_main() -> Result<()> {
             strict_content,
         ),
         Command::Import { content } => import(&home_path, content),
+        Command::Warm => warm(&home_path),
         Command::Doctor => doctor(&home_path),
         Command::Prune {
             builds,
@@ -202,6 +208,7 @@ fn serve(
     // drawn. Both are worth saying at boot, with the one line that fixes it,
     // rather than at the moment a player presses something.
     report_toolchains();
+    report_shelf(store.home());
 
     if no_import {
         tracing::info!("skipping the content import (--no-import)");
@@ -325,6 +332,23 @@ fn import(home: &Path, content_dir: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+/// `cwbhacker warm` — the one step with the network on. Everything a quest
+/// build will need is downloaded and compiled into the Rust build directory,
+/// and the marker `unsupported` reads is written last.
+fn warm(home: &Path) -> Result<()> {
+    let home = paths::Home::open(home).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let build_dir = home.build_lang_dir("rust");
+    println!(
+        "shelf       {} crates → {}",
+        cwbhacker_runner::shelf::names().len(),
+        build_dir.display()
+    );
+    cwbhacker_runner::shelf::warm(&build_dir, &|line| println!("            {line}"))
+        .context("building the crate shelf")?;
+    println!("shelf       warm ({})", cwbhacker_runner::shelf::digest());
+    Ok(())
+}
+
 fn doctor(home: &Path) -> Result<()> {
     let mut bad = 0;
     println!("home        {}", home.display());
@@ -357,6 +381,25 @@ fn doctor(home: &Path) -> Result<()> {
                     bad += 1;
                 }
             }
+        }
+    }
+
+    // The crate shelf: warm or not is a fact about this home, not about PATH,
+    // and a cold one takes the FRAMEWORKS road away with a message that names
+    // this same command.
+    {
+        let build_dir = home.join("build").join("rust");
+        if cwbhacker_runner::shelf::is_warm(&build_dir) {
+            println!(
+                "shelf       warm — {} crates built under {}",
+                cwbhacker_runner::shelf::names().len(),
+                build_dir.display()
+            );
+        } else {
+            println!(
+                "shelf       COLD — the FRAMEWORKS road is refused until: {}",
+                cwbhacker_runner::shelf::WARM_HINT
+            );
         }
     }
 
@@ -497,6 +540,25 @@ fn prune(
 
 fn chrono_days(days: i64) -> std::time::Duration {
     std::time::Duration::from_secs((days.max(0) * 86_400) as u64)
+}
+
+/// The crate shelf's state, on the way up (SPEC §5.1): cold, the FRAMEWORKS
+/// road refuses every submit with the command below, and that is worth one
+/// line here rather than a surprise at the first one.
+fn report_shelf(home: &paths::Home) {
+    let build_dir = home.build_lang_dir("rust");
+    if cwbhacker_runner::shelf::is_warm(&build_dir) {
+        tracing::info!(
+            crates = cwbhacker_runner::shelf::names().len(),
+            dir = %build_dir.display(),
+            "crate shelf warm"
+        );
+    } else {
+        tracing::warn!(
+            fix = cwbhacker_runner::shelf::WARM_HINT,
+            "crate shelf COLD — the FRAMEWORKS road is refused until it is built"
+        );
+    }
 }
 
 /// The compilers and formatters this machine has, on the way up.

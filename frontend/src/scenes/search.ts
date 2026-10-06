@@ -83,6 +83,7 @@ const CATS = (): ReadonlyArray<{ id: string; label: string; value: Category | nu
   { id: "cat:basic", label: t("search.basic"), value: "basic" },
   { id: "cat:advanced", label: t("search.adv"), value: "advanced" },
   { id: "cat:hacker", label: t("search.hacker"), value: "hacker" },
+  { id: "cat:frameworks", label: t("search.frameworks"), value: "frameworks" },
 ];
 
 /** §4.12: default 20, max 100. Twenty is plenty for a screen you scroll. */

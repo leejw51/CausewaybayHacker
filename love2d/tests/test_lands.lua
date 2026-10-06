@@ -156,12 +156,16 @@ return function()
     T.eq(External.EXT.remix, nil, "remix is not a language")
   end)
 
-  T.case("every language land has four roads and remix the two grammar roads", function()
+  T.case("every language land has four roads, rust a fifth, and remix the two grammar roads", function()
     for _, land in ipairs(Land.LANGS) do
-      T.same(Land.roads(land), { "verybasic", "basic", "advanced", "hacker" }, land)
+      if land == "rust" then
+        T.same(Land.roads(land), { "verybasic", "basic", "advanced", "hacker", "frameworks" }, land)
+      else
+        T.same(Land.roads(land), { "verybasic", "basic", "advanced", "hacker" }, land)
+      end
     end
     T.same(Land.roads("remix"), { "verybasic", "basic" })
-    T.same(Land.roads("cobol"), Land.CATEGORIES, "an unknown land is offered every road")
+    T.same(Land.roads("cobol"), Land.LANGUAGE_ROADS, "an unknown land is offered a language's roads")
   end)
 
   T.case("a quest's language is its own lang, else its land, and never remix", function()
@@ -264,11 +268,12 @@ return function()
 
   T.section("lands — the fourth road, and the quiz's pure parts")
 
-  T.case("VERY BASIC walks first, and every road has a label", function()
-    T.same(Land.CATEGORIES, { "verybasic", "basic", "advanced", "hacker" })
+  T.case("VERY BASIC walks first, FRAMEWORKS last, and every road has a label", function()
+    T.same(Land.CATEGORIES, { "verybasic", "basic", "advanced", "hacker", "frameworks" })
     T.eq(Land.category_label("verybasic"), "VERY BASIC", "two words on screen, not the id")
     T.eq(Land.category_label("basic"), "BASIC")
     T.eq(Land.category_label("hacker"), "HACKER")
+    T.eq(Land.category_label("frameworks"), "FRAMEWORKS")
     T.eq(Land.category_label("cobol"), "COBOL", "an unknown road keeps its id, upper-cased")
   end)
 

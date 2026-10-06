@@ -254,6 +254,7 @@ return {
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "揀啱嗰一行，然後打出嚟  (1–4)",
   ["RIGHT — NOW TYPE IT"] = "啱 — 而家打出嚟",
   ["ADVANCED"] = "進階",
+  ["FRAMEWORKS"] = "框架",
   ["OPEN"] = "開咗",
 
   -- PROTOCOL §4.11b — the answer, and what it costs.

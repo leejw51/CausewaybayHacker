@@ -186,16 +186,31 @@ export function nextLand(lands: readonly Land[], current: Land): Land {
   if (lands.length === 0) return current;
   return lands[(lands.indexOf(current) + 1) % lands.length];
 }
-export type Category = "verybasic" | "basic" | "advanced" | "hacker";
-/** SPEC §0's four roads, in the order they are walked. */
-export const CATEGORIES: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
+export type Category = "verybasic" | "basic" | "advanced" | "hacker" | "frameworks";
 /**
- * The roads a land has (SPEC §0). Every language land has the four; REMIX
- * LAND has the two grammar roads only, and a switcher that offered it an
- * ADVANCED or a HACKER would be offering a map with nothing on it.
+ * SPEC §0's roads, in the order they are walked. The first four are every
+ * language land's; FRAMEWORKS — the crates road, the job after the
+ * interview — is Rust Land's alone, and comes last.
+ */
+export const CATEGORIES: readonly Category[] = [
+  "verybasic",
+  "basic",
+  "advanced",
+  "hacker",
+  "frameworks",
+];
+/** The four roads every language land has. */
+export const LANGUAGE_ROADS: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
+/**
+ * The roads a land has (SPEC §0). Every language land has the four; RUST has
+ * FRAMEWORKS as a fifth; REMIX LAND has the two grammar roads only, and a
+ * switcher that offered it an ADVANCED or a HACKER would be offering a map
+ * with nothing on it.
  */
 export function roadsOf(land: Land | string): readonly Category[] {
-  return land === "remix" ? ["verybasic", "basic"] : CATEGORIES;
+  if (land === "remix") return ["verybasic", "basic"];
+  if (land === "rust") return CATEGORIES;
+  return LANGUAGE_ROADS;
 }
 
 /**

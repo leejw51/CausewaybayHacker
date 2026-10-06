@@ -251,6 +251,7 @@ return {
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "选出对的那一行，然后敲出来  (1–4)",
   ["RIGHT — NOW TYPE IT"] = "答对了 — 现在把它敲出来",
   ["ADVANCED"] = "进阶",
+  ["FRAMEWORKS"] = "框架",
   ["OPEN"] = "开放",
 
   -- PROTOCOL §4.11b — the answer, and what it costs.

@@ -17,9 +17,12 @@ HACKER road asks the same 34 questions as the other language lands, REMIX
 LAND with 114 on its two grammar roads: nineteen trios, each the same program
 in Go, Rust and Python, judged by those three toolchains, and ZIG LAND and
 LUA LAND with 122 each — Zig a port of C++'s roads and Lua of Python's, node
-for node, the same 34 interview questions on both HACKER roads. The
-paragraph below is the audit's own snapshot and is kept as it was written;
-§5's residual list is what this document is for.
+for node, the same 34 interview questions on both HACKER roads. RUST LAND has
+since gained a fifth road, FRAMEWORKS — 23 quests on the crates a job is
+built from, judged by cargo against the pinned crate shelf (`docs/story.md`
+§4, `docs/decisions.md` 2026-10-06). The paragraph below is the audit's own
+snapshot and is kept as it was written; §5's residual list is what this
+document is for.
 
 At the time of the audit: **278 quests** across four lands. `basic` is 18 in Rust
 and Go and 19 in C++ and Python, `advanced` is 17 everywhere, `hacker` is 34

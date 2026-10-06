@@ -169,6 +169,8 @@ export const cs: Partial<Catalogue> = {
   "lands.advancedBlurb":
     "Živé kódování bez časomíry. Zadání, celý program, viditelné i skryté případy — gramatika v praxi, a pak polední špička, kdy se všechno děje naráz.",
   "lands.hackerBlurb": "Pohovor. Jedna místnost, jedny hodiny a nikdo, kdo by dopsal tvůj řádek.",
+  "lands.frameworksBlurb":
+    "Práce. Nic tu nevzniká od nuly: anyhow, serde, tokio, clap, crates, kterými začíná každý soubor na ulici.",
   "lands.category": "{land} — KATEGORIE",
   "lands.clearedOf": "{cleared} Z {total} SPLNĚNO",
   "lands.record": "{cleared}/{total} SPLNĚNO   ★{stars}",
@@ -195,6 +197,7 @@ export const cs: Partial<Catalogue> = {
   "map.basic": "ZÁKLAD",
   "map.advanced": "POKROČILÉ",
   "map.hacker": "HACKER",
+  "map.frameworks": "FRAMEWORKY",
   "map.rust": "RUST",
   "map.go": "GO",
   "map.cpp": "C++",
@@ -555,6 +558,7 @@ export const cs: Partial<Catalogue> = {
   "search.basic": "ZÁKLAD",
   "search.adv": "POKR.",
   "search.hacker": "HACKER",
+  "search.frameworks": "FRAMEWORKY",
   "search.rust": "RUST",
   "search.go": "GO",
   "search.cpp": "C++",
