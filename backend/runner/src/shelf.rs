@@ -134,6 +134,48 @@ pub fn refusal(build_dir: &Path) -> Option<String> {
     })
 }
 
+/// The shelf crates a compiler's rendered stderr names as missing — the
+/// `` `serde_json` `` of an E0432 "unresolved import" or an E0433 "unlinked
+/// crate" — in shelf order, by their shelf name (`tracing-subscriber`, not
+/// the `tracing_subscriber` the source wrote).
+///
+/// For the playground on a cold shelf (PROTOCOL §4.9c): the pad there is
+/// plain `rustc`, so the default scratch text, which uses every crate on
+/// the shelf, fails with twenty-five unresolved imports and no word about
+/// why. This is how the server tells a `use rayon` that failed for want of
+/// `cwbhacker warm` from one that failed for a typo, and says so.
+pub fn missing_from(rendered_stderr: &str) -> Vec<&'static str> {
+    // rustc puts the name on the diagnostic's own line — "error[E0432]:
+    // unresolved import `anyhow`", "error[E0433]: … unlinked crate `rayon`"
+    // — so only those lines are read. A `log` in an unused-variable warning
+    // further down is not a missing crate.
+    let crate_lines: Vec<&str> = rendered_stderr
+        .lines()
+        .filter(|line| line.contains("E0432") || line.contains("E0433"))
+        .collect();
+    names()
+        .into_iter()
+        .filter(|name| {
+            let as_written = format!("`{}`", name.replace('-', "_"));
+            crate_lines.iter().any(|line| line.contains(&as_written))
+        })
+        .collect()
+}
+
+/// The line a cold pad's compile error opens with when [`missing_from`] is
+/// not empty: which shelf crates the player reached for, and the command.
+pub fn cold_pad_note(missing: &[&str]) -> String {
+    format!(
+        "the crate shelf is cold on this machine, so this pad is plain rustc and \
+         {} cannot be linked: {WARM_HINT}",
+        missing
+            .iter()
+            .map(|name| format!("`{name}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 /// Build the shelf under `build_dir`: `cargo fetch --locked` and then
 /// `cargo build --release --locked` of the shelf package, with `CARGO_HOME`
 /// and `CARGO_TARGET_DIR` exactly where a submission's are (§5.1), so what
@@ -293,6 +335,48 @@ mod tests {
         std::fs::write(marker_path(tmp.path()), format!("{}\n", digest())).unwrap();
         assert!(is_warm(tmp.path()));
         assert_eq!(refusal(tmp.path()), None);
+    }
+
+    #[test]
+    fn a_cold_pads_compile_error_names_the_shelf_crates_it_reached_for() {
+        // What rustc renders for the playground's default scratch text on a
+        // machine that never ran `cwbhacker warm`.
+        let stderr = "error[E0432]: unresolved import `anyhow`\n \
+             --> main.rs:4:5\n\
+             error[E0433]: failed to resolve: use of unresolved module or \
+             unlinked crate `rayon`\n\
+             error[E0433]: cannot find module or crate `tracing_subscriber` \
+             in this scope\n\
+             error[E0432]: unresolved import `std::nope`\n";
+        assert_eq!(
+            missing_from(stderr),
+            vec!["anyhow", "rayon", "tracing-subscriber"],
+            "shelf order, shelf spelling, and nothing for std"
+        );
+        let note = cold_pad_note(&missing_from(stderr));
+        assert!(
+            note.contains("`anyhow`, `rayon`, `tracing-subscriber`"),
+            "{note}"
+        );
+        assert!(note.contains("cwbhacker warm"), "{note}");
+
+        // A compile error that is not about a crate — a type mismatch, a
+        // move — mentions no shelf crate and gets no note, and a crate name
+        // in some other diagnostic is not a missing crate either.
+        assert!(missing_from("error[E0308]: mismatched types\n").is_empty());
+        assert!(missing_from("warning: unused variable: `serde`\n").is_empty());
+        assert!(missing_from("").is_empty());
+        // Nor is a shelf crate named by some other line of a stderr that
+        // does have a real unresolved import in it: the short names on the
+        // shelf (`log`, `hex`, `rand`) are ordinary words in a program.
+        assert_eq!(
+            missing_from(
+                "error[E0432]: unresolved import `std::nope`\n\
+                 warning: unused variable: `log`\n\
+                 error[E0599]: no method named `hex` found\n"
+            ),
+            Vec::<&str>::new()
+        );
     }
 
     #[test]

@@ -7749,6 +7749,20 @@ nothing. `doctor` prints the shelf's state; the content gate warms a cache of
 its own the same way, reading the same two files, so there is one shelf and
 no copy of it in Python.
 
+**The cold pad says why.** The marker lives under the machine's own
+`~/.causewaybayhacker/build/rust`, not in the repository, so the FRAMEWORKS
+commit shipped from a machine that had run `warm` to machines that had not —
+and on those the scratchpad's default text, which uses every crate on the
+shelf, was twenty-five unresolved imports with no word about why. The pad
+stays plain `rustc` when cold (a pad that will not run `fn main` is worse
+than one that cannot `use tokio`), but a compile error there is now led by
+one line the compiler cannot write: `shelf::missing_from` reads the shelf
+crates out of the rendered E0432/E0433 text and `cold_pad_note` names them
+with the command, ahead of the compiler so the stderr cap never drops it. A
+crate that was never on the shelf gets no line, since warming would not
+help; a type mismatch gets none either. `playground.rs` tests both, cold,
+and the ignored warm test checks the line is gone.
+
 **Determinism, per crate.** `rand` is `StdRng::seed_from_u64` and nothing
 else; `chrono` parses and formats fixed dates and never reads the clock;
 `tokio`, `rayon` and `crossbeam` join in spawn order or sort what they

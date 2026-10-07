@@ -64,7 +64,9 @@ pub fn run(
     // `rustc` rather than refusing — a scratchpad that will not run `fn
     // main` because `tokio` was never compiled is worse than one that cannot
     // `use tokio`; the boot report and `doctor` say how to warm it.
-    if lang == "rust" && cwbhacker_runner::shelf::is_warm(&home.build_lang_dir("rust")) {
+    let shelf_warm =
+        lang == "rust" && cwbhacker_runner::shelf::is_warm(&home.build_lang_dir("rust"));
+    if shelf_warm {
         spec.crates = cwbhacker_runner::shelf::names()
             .iter()
             .map(|s| s.to_string())
@@ -126,7 +128,7 @@ pub fn run(
     let mut diagnostics = mistakes::classify_compile(&lang, &report.compiler_stderr);
     diagnostics.extend(mistakes::classify_runtime(&lang, &report.runtime_stderr));
 
-    let human_stderr = if report.compiler_stderr.trim().is_empty() {
+    let mut human_stderr = if report.compiler_stderr.trim().is_empty() {
         report.runtime_stderr.clone()
     } else {
         let rendered = if lang == "rust" {
@@ -136,6 +138,18 @@ pub fn run(
         };
         format!("{rendered}{}", report.runtime_stderr)
     };
+    // The one thing plain `rustc` cannot say for itself: that `use rayon`
+    // failed because this machine never ran `cwbhacker warm`, not because
+    // the player misspelt it. The default scratch text uses every crate on
+    // the shelf, so a fresh install's first RUN is exactly this. The note
+    // goes first, ahead of the compiler, so the cap on stderr never drops it.
+    if lang == "rust" && !shelf_warm && report.verdict == Verdict::CompileError {
+        let missing = cwbhacker_runner::shelf::missing_from(&human_stderr);
+        if !missing.is_empty() {
+            let note = cwbhacker_runner::shelf::cold_pad_note(&missing);
+            human_stderr = format!("{note}\n\n{human_stderr}");
+        }
+    }
 
     let outcome = match report.verdict {
         Verdict::CompileError => "compile_error",

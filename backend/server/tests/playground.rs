@@ -223,7 +223,12 @@ async fn a_broken_playground_run_is_diagnosed_but_never_recorded() {
         kinds.contains(&"borrow-after-move"),
         "the player should still be told what is wrong: {run}"
     );
-    assert!(run["stderr"].as_str().unwrap().contains("borrow of moved"));
+    let stderr = run["stderr"].as_str().unwrap();
+    assert!(stderr.contains("borrow of moved"));
+    assert!(
+        !stderr.contains("cwbhacker warm"),
+        "a move error has nothing to do with the crate shelf: {stderr}"
+    );
 
     assert_eq!(
         table_counts(&server),
@@ -616,10 +621,70 @@ async fn the_formatter_tidies_and_never_records() {
     server.handle.abort();
 }
 
+/// Every other test in this file runs on a cold shelf — a fresh home has
+/// none — and so does a fresh install's first RUN of the default scratch
+/// text, which uses every crate on the shelf (PROTOCOL §4.9c). The pad is
+/// plain `rustc` there, and it must say why `use rayon` failed: the
+/// compiler's own errors, led by one line that names the crates and
+/// `cwbhacker warm`. The machine it was written on had run that once and
+/// never showed the problem; the next machine did.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_cold_shelf_pad_names_the_command_that_warms_it() {
+    let server = start().await;
+    assert!(
+        !cwbhacker_runner::shelf::is_warm(&server.store.home().build_lang_dir("rust")),
+        "a fresh home has no shelf"
+    );
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+    let before = table_counts(&server);
+
+    let run = client
+        .play(
+            "use anyhow::Result;\nuse rayon::prelude::*;\nuse tracing_subscriber::fmt;\n\
+             fn main() -> Result<()> { let n: i32 = (1..4).into_par_iter().sum(); \
+             println!(\"{n}\"); Ok(()) }",
+            "",
+        )
+        .await;
+    assert_eq!(run["outcome"].as_str(), Some("compile_error"), "{run}");
+    let stderr = run["stderr"].as_str().unwrap();
+    let (note, compiler) = stderr
+        .split_once("\n\n")
+        .expect("the note, then the compiler");
+    assert!(note.starts_with("the crate shelf is cold"), "{note}");
+    assert!(
+        note.contains("`anyhow`, `rayon`, `tracing-subscriber`"),
+        "the crates reached for, by their shelf names: {note}"
+    );
+    assert!(note.contains("cwbhacker warm"), "{note}");
+    assert!(
+        compiler.contains("E0432") || compiler.contains("E0433"),
+        "the compiler's own words still follow: {compiler}"
+    );
+    // The note is for the player, not the curriculum: the diagnostics are
+    // what rustc said, and nothing is recorded, as for any pad.
+    assert!(!run["diagnostics"].as_array().unwrap().is_empty(), "{run}");
+    assert_eq!(table_counts(&server), before);
+
+    // `std` is still a pad, and a `use` of something that was never on the
+    // shelf is the player's own typo — no note for either.
+    let run = client.play(HELLO, "").await;
+    assert_eq!(run["outcome"].as_str(), Some("ok"), "{run}");
+    let run = client
+        .play("use diesel::prelude::*;\nfn main() {}", "")
+        .await;
+    assert_eq!(run["outcome"].as_str(), Some("compile_error"), "{run}");
+    assert!(
+        !run["stderr"].as_str().unwrap().contains("cwbhacker warm"),
+        "diesel is not on the shelf; warming would not help: {run}"
+    );
+    server.handle.abort();
+}
+
 /// A Rust scratchpad takes the crate shelf when the machine has built it
-/// (PROTOCOL §4.9c): `use serde_json` works with nothing declared. Cold, the
-/// pad is plain `rustc` — which every other test in this file runs on, a
-/// fresh home having no shelf — so that path needs no test of its own.
+/// (PROTOCOL §4.9c): `use serde_json` works with nothing declared, and the
+/// cold note above is gone.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "fetches and compiles the whole crate shelf; run it with --ignored"]
 async fn a_warm_shelf_reaches_the_playground() {
@@ -639,6 +704,7 @@ async fn a_warm_shelf_reaches_the_playground() {
         .await;
     assert_eq!(run["outcome"].as_str(), Some("ok"), "{run}");
     assert_eq!(run["stdout"].as_str(), Some("42\n"));
+    assert!(!run["stderr"].as_str().unwrap().contains("cwbhacker warm"));
     assert_eq!(
         table_counts(&server),
         before,

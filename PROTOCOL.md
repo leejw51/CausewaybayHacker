@@ -645,8 +645,14 @@ on the shelf — `use serde::Deserialize`, `#[tokio::main]`, `clap`, `regex`,
 `chrono` and the rest work with nothing to declare, exactly as on the
 FRAMEWORKS road. On a machine whose shelf is cold the pad is plain `rustc`, as
 before, rather than refused: `std` still runs, and a `use serde` there fails
-with the compiler's own unresolved-import error while the boot report and
-`doctor` name the command that fixes it.
+with the compiler's own unresolved-import error. That error is led by one line
+the compiler cannot write — *the crate shelf is cold on this machine, so this
+pad is plain rustc and serde cannot be linked: cwbhacker warm …* — naming the
+shelf crates the source reached for, because the default scratch text uses
+every one of them and a fresh install's first RUN is otherwise twenty-five
+unresolved imports with no word about why. A crate that was never on the
+shelf gets no such line: warming would not help. The boot report and `doctor`
+say the same.
 
 **Snippets** are saved per user, server-side, so the same scratchpad opens in
 the browser and in the LÖVE client.
