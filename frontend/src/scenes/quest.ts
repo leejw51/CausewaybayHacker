@@ -352,6 +352,9 @@ const STREET: Record<string, string> = {
   "rust/basic": "bg_street",
   "rust/advanced": "bg_room732",
   "rust/hacker": "bg_datacentre",
+  // FRAMEWORKS is the job: the payment path off Gloucester Road, where the
+  // settlement runs on the machines in the back room.
+  "rust/frameworks": "bg_datacentre",
   "go/basic": "bg_mtr",
   "go/advanced": "bg_times",
   "go/hacker": "bg_till",

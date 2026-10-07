@@ -277,6 +277,15 @@ return function()
     T.eq(Land.category_label("cobol"), "COBOL", "an unknown road keeps its id, upper-cased")
   end)
 
+  T.case("FRAMEWORKS is named and described in every language", function()
+    local en = "the job. anyhow, serde, tokio, clap: the crates every file starts with."
+    for _, loc in ipairs({ "ko", "ja", "zh", "yue", "cs" }) do
+      local cat = require("src.lang." .. loc)
+      T.ok(type(cat[en]) == "string" and cat[en] ~= en, loc .. " translates the FRAMEWORKS blurb")
+      T.ok(type(cat["FRAMEWORKS"]) == "string", loc .. " names the road")
+    end
+  end)
+
   T.case("a pick is right only at the wire's 0-based answer", function()
     local Quest = require("src.scenes.quest")
     local quiz = { choices = { "a", "b", "c", "d" }, answer = 2 }

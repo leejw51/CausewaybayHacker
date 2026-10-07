@@ -131,6 +131,7 @@ return {
   ["grammar. one construct, one to four lines, untimed."] = "文法。一個文法，一至四行，唔計時。",
   ["the live coding test, untimed. whole programs, hidden cases."] = "即場寫程式測試，唔計時。成個程式，隱藏例子。",
   ["timed. the whiteboard is watching."] = "計時嘅。塊白板望住你。",
+  ["the job. anyhow, serde, tokio, clap: the crates every file starts with."] = "返工。anyhow、serde、tokio、clap：每個檔案開頭都用嘅 crate。",
   ["ownership, borrows, lifetimes"] = "ownership、borrows、lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
   ["threads, mutexes, the STL"] = "threads、mutexes、仲有 STL",

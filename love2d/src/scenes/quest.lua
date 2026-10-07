@@ -123,6 +123,12 @@ function Quest.backdrop(land, category)
   if category == "hacker" then
     return Assets.pick("bg_room732", "bg_flat", "bg_night")
   end
+  if category == "frameworks" then
+    -- FRAMEWORKS (Rust Land only) is the job: the payment path off
+    -- Gloucester Road, the settlement on the machines in the back room. The
+    -- browser draws the same plate (`STREET` in frontend/src/scenes/quest.ts).
+    return Assets.pick("bg_datacentre", "bg_street", "bg_flat")
+  end
   local advanced = category == "advanced"
   if land == "go" then
     return Assets.pick(advanced and "bg_mtr" or "bg_till", "bg_mtr", "bg_flat")

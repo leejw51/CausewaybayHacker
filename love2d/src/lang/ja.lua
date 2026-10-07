@@ -128,6 +128,7 @@ return {
   ["grammar. one construct, one to four lines, untimed."] = "文法。構文ひとつ、一行から四行、時間制限なし。",
   ["the live coding test, untimed. whole programs, hidden cases."] = "ライブコーディングテスト、時間制限なし。プログラムまるごと、隠れたケース。",
   ["timed. the whiteboard is watching."] = "時間制限あり。ホワイトボードが見ています。",
+  ["the job. anyhow, serde, tokio, clap: the crates every file starts with."] = "仕事。anyhow、serde、tokio、clap。あらゆるファイルが始まるクレート。",
   ["ownership, borrows, lifetimes"] = "ownership、borrows、lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines、channels、interfaces",
   ["threads, mutexes, the STL"] = "threads、mutexes、そして STL",

@@ -140,6 +140,7 @@ return {
   ["grammar. one construct, one to four lines, untimed."] = "gramatika. jedna konstrukce, jeden až čtyři řádky, bez časomíry.",
   ["the live coding test, untimed. whole programs, hidden cases."] = "živé kódování bez časomíry. celé programy, skryté případy.",
   ["timed. the whiteboard is watching."] = "na čas. tabule se dívá.",
+  ["the job. anyhow, serde, tokio, clap: the crates every file starts with."] = "práce. anyhow, serde, tokio, clap: crates, kterými začíná každý soubor.",
   ["ownership, borrows, lifetimes"] = "ownership, borrows, lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
   ["threads, mutexes, the STL"] = "vlákna, mutexy, STL",

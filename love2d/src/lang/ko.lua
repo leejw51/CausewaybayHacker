@@ -126,6 +126,7 @@ return {
   ["grammar. one construct, one to four lines, untimed."] = "문법. 구문 하나, 한 줄에서 네 줄, 시간 제한 없음.",
   ["the live coding test, untimed. whole programs, hidden cases."] = "라이브 코딩 테스트, 시간 제한 없음. 프로그램 통째로, 숨은 케이스.",
   ["timed. the whiteboard is watching."] = "시간 제한. 화이트보드가 보고 있습니다.",
+  ["the job. anyhow, serde, tokio, clap: the crates every file starts with."] = "일터. anyhow, serde, tokio, clap: 모든 파일이 시작하는 크레이트들.",
   ["ownership, borrows, lifetimes"] = "ownership, borrows, lifetimes",
   ["goroutines, channels, interfaces"] = "goroutines, channels, interfaces",
   ["threads, mutexes, the STL"] = "threads, mutexes, 그리고 STL",
