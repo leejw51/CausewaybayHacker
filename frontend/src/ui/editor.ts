@@ -1309,6 +1309,12 @@ export class Editor {
    * screen that runs the drill.
    */
   onMiss: ((text: string) => void) | null = null;
+  /**
+   * A plain ENTER in the field, heard after the newline is in. Set by a
+   * screen with AUTO-RUN: the app keeps a key typed here from ever reaching
+   * the scene unless Ctrl or Cmd is held, so the editor has to say it.
+   */
+  onEnter: (() => void) | null = null;
   /** Whether the editor had focus when it was locked, to hand back after. */
   private refocus = false;
 
@@ -1502,6 +1508,28 @@ export class Editor {
           // Not from inside the filter: whoever hears it may want to dispatch.
           if (miss) queueMicrotask(() => miss(text));
           return [];
+        }),
+        // An observer, not a handler: the keymap takes ENTER first and a
+        // handler after it never hears the key at all.
+        EditorView.domEventObservers({
+          keydown: (ev) => {
+            // The ENTER that ends a Hangul or kana composition is the IME's,
+            // not a new line; and a held key is not a fresh press.
+            if (
+              ev.key === "Enter" &&
+              !ev.ctrlKey &&
+              !ev.metaKey &&
+              !ev.shiftKey &&
+              !ev.altKey &&
+              !ev.isComposing &&
+              !ev.repeat &&
+              this.onEnter
+            ) {
+              // Next task, not now: the keymap has not put the newline in yet.
+              const enter = this.onEnter;
+              setTimeout(enter, 0);
+            }
+          },
         }),
         ghost,
         suggestField,

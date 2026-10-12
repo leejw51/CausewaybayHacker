@@ -380,6 +380,8 @@ export const en = {
   "pg.rename": "RENAME",
   "pg.delete": "DELETE",
   "pg.run": "RUN",
+  "code.autoOn": "AUTO-RUN ON",
+  "code.autoOff": "AUTO-RUN OFF",
   "pg.format": "FORMAT",
   "pg.save": "SAVE",
   "pg.updatedElsewhere": "updated on another device",
