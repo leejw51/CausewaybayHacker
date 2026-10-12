@@ -72,7 +72,7 @@ import {
   TEXT_SCALE_MAX,
   TEXT_SCALE_MIN,
 } from "../engine/text";
-import { readNumberPref, writePref } from "../ui/prefs";
+import { AUTO_RUN_KEY, readNumberPref, readPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
@@ -457,6 +457,13 @@ export class PlaygroundScene implements Scene {
   private focus = false;
 
   private stage: RunStage | "idle" = "idle";
+  /** See `AUTO_RUN_KEY`. */
+  private autoRun = readPref(AUTO_RUN_KEY) !== "off";
+  /**
+   * An ENTER landed while a run was out: run once more when it is back, so
+   * the answer on screen is for the code on screen and not for a line ago.
+   */
+  private runAgain = false;
   private attemptId: string | null = null;
   private log = new LogBuffer("");
   private result: PlaygroundRun | null = null;
@@ -973,6 +980,25 @@ export class PlaygroundScene implements Scene {
     }
   }
 
+  /**
+   * ENTER in the editor, with AUTO-RUN on. A run already out is not
+   * interrupted; one more follows it, for the code as it is by then.
+   */
+  private autoEnter(): void {
+    if (!this.autoRun || this.conflict) return;
+    if (this.stage === "idle") void this.run();
+    else this.runAgain = true;
+  }
+
+  /** AUTO-RUN, saying the state it is in, beside RUN on the bench and in CODE. */
+  private autoItem(): { id: string; label: string; strong?: boolean } {
+    return {
+      id: "autorun",
+      label: this.autoRun ? t("code.autoOn") : t("code.autoOff"),
+      strong: this.autoRun,
+    };
+  }
+
   /** The two size buttons, for the bench and for CODE alike. */
   private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
     return [
@@ -1085,6 +1111,7 @@ export class PlaygroundScene implements Scene {
   private mount(): void {
     this.land = this.held.lang;
     this.editor = new Editor(this.held.lang, this.held.source, () => this.touched());
+    this.editor.onEnter = () => this.autoEnter();
     this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
     // After the editor, so it is painted over it; before the other overlays,
     // which are fields a person clicks into and must stay on top of it.
@@ -1428,6 +1455,10 @@ export class PlaygroundScene implements Scene {
       this.app.chip.fail();
     } finally {
       this.stage = "idle";
+    }
+    if (this.runAgain) {
+      this.runAgain = false;
+      void this.run();
     }
     return this.result;
   }
@@ -1796,6 +1827,12 @@ export class PlaygroundScene implements Scene {
     }
     if (hit.id === "rename") {
       this.startRename();
+      return;
+    }
+    if (hit.id === "autorun") {
+      this.autoRun = !this.autoRun;
+      writePref(AUTO_RUN_KEY, this.autoRun ? "on" : "off");
+      this.app.chip.blip();
       return;
     }
     if (hit.id === "run") void this.run();
@@ -2278,6 +2315,7 @@ export class PlaygroundScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
+      this.autoItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
@@ -2584,6 +2622,7 @@ export class PlaygroundScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
+      this.autoItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),

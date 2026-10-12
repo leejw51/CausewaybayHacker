@@ -12,6 +12,13 @@
  * business, which keeps its own slot and does its own reading (SPEC §3.1).
  */
 
+/**
+ * AUTO-RUN on the two code screens: ENTER in the editor runs the code. One
+ * preference for both, like the code face — a fact about the person, not
+ * about which screen they are on. On unless somebody turned it off.
+ */
+export const AUTO_RUN_KEY = "code.autoRun";
+
 /** One namespace, so a stray key in devtools is obviously ours. */
 const NS = "cwbhacker.";
 

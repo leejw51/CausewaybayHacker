@@ -349,6 +349,8 @@ export const zh: Partial<Catalogue> = {
   "pg.rename": "重命名",
   "pg.delete": "删除",
   "pg.run": "运行",
+  "code.autoOn": "自动运行 开",
+  "code.autoOff": "自动运行 关",
   "pg.format": "格式化",
   "pg.save": "保存",
   "pg.updatedElsewhere": "已在另一台设备上更新",

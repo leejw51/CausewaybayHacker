@@ -99,7 +99,7 @@ import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
 import { clipMessage, copyText, readText } from "../ui/clip";
-import { readEnumPref, writePref } from "../ui/prefs";
+import { AUTO_RUN_KEY, readEnumPref, readPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
 import { locale, t, tn, type Locale } from "../i18n";
 import { MapScene } from "./map";
@@ -398,6 +398,13 @@ export class QuestScene implements Scene {
   private overlay: Overlay | null = null;
   private readonly buttons = new Buttons();
   private stage: Stage = "idle";
+  /** ENTER in the editor runs the code. See `AUTO_RUN_KEY`. */
+  private autoRun = readPref(AUTO_RUN_KEY) !== "off";
+  /**
+   * An ENTER landed while a run was out: one more when it is back, so the
+   * drawer answers for the code on screen and not for a line ago.
+   */
+  private runAgain = false;
   private attemptId: string | null = null;
   /**
    * `run.log` chunks may split mid-line and carry a per-stream `seq`
@@ -712,6 +719,7 @@ export class QuestScene implements Scene {
       // starts the idle timer that eventually takes a copy.
       this.editor = new Editor(this.lang, this.opened, () => this.touched());
       this.editor.onMiss = (text) => this.missed(text);
+      this.editor.onEnter = () => this.autoEnter();
       // The quiz comes first on VERY BASIC: the editor opens locked and the
       // right choice is the key. A cleared quest is past its quiz.
       this.quizRight = !startsLocked(res.quest.quiz, res.quest.state);
@@ -811,11 +819,34 @@ export class QuestScene implements Scene {
   }
 
   private submit(): Promise<void> {
+    // A submit ends the matter; a run queued behind it would be news about
+    // code that has already been judged.
+    this.runAgain = false;
     return this.execute("quest.submit");
   }
 
-  private run(): Promise<void> {
-    return this.execute("quest.run");
+  private async run(): Promise<void> {
+    await this.execute("quest.run");
+    if (this.runAgain && this.stage === "idle") {
+      this.runAgain = false;
+      void this.run();
+    }
+  }
+
+  /** ENTER in the editor, with AUTO-RUN on. */
+  private autoEnter(): void {
+    if (!this.autoRun) return;
+    if (this.stage === "idle") void this.run();
+    else this.runAgain = true;
+  }
+
+  /** AUTO-RUN, saying the state it is in, beside RUN on both pages. */
+  private autoItem(): { id: string; label: string; strong?: boolean } {
+    return {
+      id: "autorun",
+      label: this.autoRun ? t("code.autoOn") : t("code.autoOff"),
+      strong: this.autoRun,
+    };
   }
 
   /**
@@ -2259,6 +2290,11 @@ export class QuestScene implements Scene {
       case "run":
         void this.run();
         break;
+      case "autorun":
+        this.autoRun = !this.autoRun;
+        writePref(AUTO_RUN_KEY, this.autoRun ? "on" : "off");
+        this.app.chip.blip();
+        break;
       case "submit":
         void this.submit();
         break;
@@ -2666,6 +2702,7 @@ export class QuestScene implements Scene {
         primary: this.stage === "idle",
         strong: false,
       },
+      this.autoItem(),
       ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
@@ -2741,6 +2778,7 @@ export class QuestScene implements Scene {
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
+      this.autoItem(),
       ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),

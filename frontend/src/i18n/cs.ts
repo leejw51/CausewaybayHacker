@@ -379,6 +379,8 @@ export const cs: Partial<Catalogue> = {
   "pg.rename": "PŘEJMENOVAT",
   "pg.delete": "SMAZAT",
   "pg.run": "SPUSTIT",
+  "code.autoOn": "AUTOSPUŠTĚNÍ ZAP",
+  "code.autoOff": "AUTOSPUŠTĚNÍ VYP",
   "pg.format": "FORMÁT",
   "pg.save": "ULOŽIT",
   "pg.updatedElsewhere": "aktualizováno na jiném zařízení",
