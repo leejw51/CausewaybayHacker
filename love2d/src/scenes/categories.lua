@@ -117,7 +117,7 @@ end
 local TITLE_SIZE, NAME_SIZE, COUNT_SIZE, BLURB_SIZE = 16, 13, 10, 7
 local TITLE_FLOOR, SIZE_FLOOR = 8, 5
 
-local function measure(vw, vh, rows, title_step, step, blurb)
+local function measure(vw, vh, rows, title_step, step, blurb, tight)
   local title_size = math.max(TITLE_FLOOR, TITLE_SIZE - title_step)
   local name_size = math.max(SIZE_FLOOR, NAME_SIZE - step)
   local count_size = math.max(SIZE_FLOOR, COUNT_SIZE - step)
@@ -152,13 +152,20 @@ local function measure(vw, vh, rows, title_step, step, blurb)
   local stacked = widest + 28 > w - right
   if stacked then gutter = w - 12 end
   local label_w = math.max(40, gutter - 24)
-  local count_y = stacked and (12 + name_h + 8) or 8
+  local count_y = stacked and (12 + name_h + 8) or (tight and 4 or 8)
 
   -- Rows: what the type needs, stretched to what the screen has.
   local n = math.max(1, #rows)
   local bottom = Categories.band_top(vh) - 10
   local need = 12 + name_h + 4 + (blurb and blurb_h or 0) + 14
   need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
+  -- Tight, the last resort: the name and the counts plate with a few pixels
+  -- round them and no strip at the bottom — the badge moves beside the
+  -- plate instead. Five roads (RUST's FRAMEWORKS) at the largest type in a
+  -- 720-tall window did not fit any other way.
+  if tight then
+    need = math.max(12 + name_h + 14, 4 + math.max(plate_h, count_h) + 4)
+  end
   if stacked then need = math.max(need, count_y + count_h + 10) end
   local avail = math.floor((bottom - y0) / n) - 12
   local rh = math.max(need, math.min(math.max(84, avail), math.max(128, need)))
@@ -178,7 +185,7 @@ local function measure(vw, vh, rows, title_step, step, blurb)
     label_w = label_w, plate_h = plate_h,
     blurb_y = blurb_y, blurb_lh = blurb_lh, blurb_lines = math.min(blurb_lines, 3),
     count_w = count_w, count_h = count_h, count_y = count_y,
-    stacked = stacked, widest = widest,
+    stacked = stacked, tight = tight or false, widest = widest,
     title_size = title_size, name_size = name_size, count_size = count_size,
     blurb_size = BLURB_SIZE, bottom = bottom,
     fits = y0 + n * (rh + 12) - 12 <= bottom,
@@ -199,6 +206,15 @@ function Categories.metrics(vw, vh, rows)
   while not m.fits and step < NAME_SIZE - SIZE_FLOOR do
     step = step + 1
     m = measure(vw, vh, rows, title_step, step, false)
+  end
+  if m.fits then return m end
+  -- Still over the band at the smallest type: give back the padding first,
+  -- and only then the size, so the names stay as large as they can.
+  step = 0
+  m = measure(vw, vh, rows, title_step, step, false, true)
+  while not m.fits and step < NAME_SIZE - SIZE_FLOOR do
+    step = step + 1
+    m = measure(vw, vh, rows, title_step, step, false, true)
   end
   return m
 end
@@ -342,7 +358,8 @@ function Categories:draw()
 
     -- The badge keeps clear of the counts plate, which sits at the bottom
     -- right when the row is stacked.
-    local bx = m.stacked and (pad + w - 14 - pw - 36) or (pad + w - 40)
+    -- Tight, there is no strip under the plate either: beside it, then.
+    local bx = (m.stacked or m.tight) and (pad + w - 14 - pw - 36) or (pad + w - 40)
     if cat.total > 0 and cat.cleared >= cat.total then
       Assets.marker("badge_cleared", bx, ry + rh - 22, 30)
     elseif not cat.open then
