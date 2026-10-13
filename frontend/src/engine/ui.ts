@@ -114,9 +114,11 @@ export function btnBox(
  * button over whatever is underneath, so anything that puts something *below*
  * a button row has to ask this first.
  */
-export function rowsIn(font: Font, labels: string[], w: number, minH = 0): number {
+export function rowsIn(font: Font, labels: string[], w: number, minH = 0, lead = 0): number {
   const gap = Math.round(font.size * 0.5);
-  let x = 0;
+  // `lead`: the first line starts this far in — the toolbars' filter box sits
+  // at the head of it — and the lines after it start at the left edge.
+  let x = lead;
   let rows = 1;
   for (const label of labels) {
     const [bw] = btnBox(font, [label], 0, btnPad(font), minH);

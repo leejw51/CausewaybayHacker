@@ -72,6 +72,7 @@ import {
 } from "../ui/editor";
 import { burstPlan, coinPlan, fillPlan } from "../engine/burst";
 import { Overlay } from "../ui/overlay";
+import { ToolFilter } from "../ui/toolfilter";
 import { CodeFx } from "../ui/codefx";
 import {
   CODE_THEME_KEY,
@@ -537,6 +538,8 @@ export class QuestScene implements Scene {
    * automated run see every control on the screen regardless.
    */
   private readonly bar = new Buttons();
+  /** The box at the head of the toolbar; it narrows the bench's row too. */
+  private readonly tools = new ToolFilter();
   /**
    * The quiz's four choices. Their own set: `this.buttons` is painted as
    * pixel plates by `Buttons.draw`, and a choice painted as a blank plate
@@ -768,6 +771,7 @@ export class QuestScene implements Scene {
         fx: () => this.fx,
       });
       this.coder.mount(this.editor);
+      this.tools.mount(this.app.overlay, this.app.layout);
       queueMicrotask(() => this.editor?.focus());
       // Deliberately *not* inside this try. The stack is an addition to the
       // bench and a server without it must not make the quest itself look
@@ -792,6 +796,7 @@ export class QuestScene implements Scene {
     this.inTurn = false;
     this.overlay?.destroy();
     this.fx?.destroy();
+    this.tools.destroy();
     this.coder?.leave();
     this.coder = null;
     this.editor?.destroy();
@@ -2489,15 +2494,22 @@ export class QuestScene implements Scene {
     // not have, and the last thing in them lands outside it.
     const pad = Math.round(10 * s);
     const toolW = layout.vw - pad * 2;
+    // The toolbar and the bench are set in `tool`, the code's own size, and
+    // the filter box heads the toolbar's first row.
+    const tf = fonts.tool;
+    const lead = this.tools.width(tf) + Math.round(tf.size * 0.5);
+    // The register is decided on the whole bar, not on what a filter left
+    // of it — typing must not flip the screen between layouts mid-word.
     const fullRows = rowsIn(
-      fonts.stationSm,
-      this.toolLabels(false, true),
+      tf,
+      this.toolLabels(false, true, false),
       toolW,
       layout.minTouchH(),
+      lead,
     );
     const bareRows =
       fullRows > 1
-        ? rowsIn(fonts.stationSm, this.toolLabels(false, false), toolW, layout.minTouchH())
+        ? rowsIn(tf, this.toolLabels(false, false, false), toolW, layout.minTouchH(), lead)
         : fullRows;
     // **A phone is compact in both orientations.** Held sideways the toolbar
     // fits on one row, so "compact when it wraps" left the phone's landscape
@@ -2509,13 +2521,11 @@ export class QuestScene implements Scene {
     // size goes to the code and the brief; the controls keep the chrome face.
     this.compactMode = layout.isPhone() || (layout.touch && bareRows > 1) || getTextScale() > 1.001;
     this.tightMode = !this.compactMode && layout.touch && fullRows > 1;
-    const toolRows = this.compactMode
-      ? rowsIn(fonts.stationSm, this.toolLabels(), toolW, layout.minTouchH())
-      : this.tightMode
-        ? bareRows
-        : fullRows;
-    const toolRowH = Math.max(layout.minTouchH(), fonts.stationSm.height + 20);
-    const toolGap = Math.round(fonts.stationSm.size * 0.5);
+    // What is drawn, in the register just chosen and through the filter —
+    // the same list `drawToolbar` lays out.
+    const toolRows = rowsIn(tf, this.toolLabels(), toolW, layout.minTouchH(), lead);
+    const toolRowH = Math.max(layout.minTouchH(), tf.height + 20);
+    const toolGap = Math.round(tf.size * 0.5);
     this.barH = toolRows * toolRowH + (toolRows - 1) * toolGap;
 
     // Beside, or above. The player's choice if they have made one, the
@@ -2588,8 +2598,8 @@ export class QuestScene implements Scene {
       this.overlay?.hide();
     }
 
-    this.buttons.draw(g, this.compactMode ? fonts.stationSm : fonts.button);
-    this.bar.draw(g, fonts.stationSm);
+    this.buttons.draw(g, fonts.tool);
+    this.bar.draw(g, fonts.tool);
     if (this.error) {
       // A bar rather than a loose line: the message crosses both panels, and
       // bare text laid over a panel border is unreadable at the seam.
@@ -2625,13 +2635,18 @@ export class QuestScene implements Scene {
   private toolItems(
     compact = this.compactMode,
     toggles = !this.tightMode,
+    filtered = true,
   ): Array<{ id: string; label: string; dim?: boolean; strong?: boolean }> {
+    // While a filter is typed every button is a candidate, whatever the
+    // register: one the register dropped is one the box could never find.
+    const filtering = filtered && this.tools.query.trim() !== "";
     const noOutput = !this.runResult && this.log.lines.length === 0;
     // In the compact register the clipboard chips and LOBBY go: on a phone
     // the keyboard has its own paste, the map is one tap away, and three
     // rows of toolbar were the editor's rows.
     const keep = (id: string) =>
       !compact ||
+      filtering ||
       id === "back" ||
       id === "stack" ||
       id === "fontdown" ||
@@ -2671,11 +2686,15 @@ export class QuestScene implements Scene {
       // The paper under the code — the playground's preference too.
       { id: "theme", label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark") },
       { id: "focus", label: t("quest.code") },
-    ].filter((i) => keep(i.id));
+    ].filter((i) => keep(i.id) && (!filtered || this.tools.keeps(i)));
   }
 
-  private toolLabels(compact = this.compactMode, toggles = !this.tightMode): string[] {
-    return this.toolItems(compact, toggles).map((i) => i.label);
+  private toolLabels(
+    compact = this.compactMode,
+    toggles = !this.tightMode,
+    filtered = true,
+  ): string[] {
+    return this.toolItems(compact, toggles, filtered).map((i) => i.label);
   }
 
   /**
@@ -2710,7 +2729,7 @@ export class QuestScene implements Scene {
       : 0;
     const hintLabel = hintsLeft === 0 ? t("quest.noHints") : tn("quest.hintsLeft", hintsLeft);
     const steps = editControls(this.edit, this.editBusy || this.inTurn);
-    return [
+    return this.tools.filter([
       {
         id: "run",
         label: this.stage === "idle" ? t("quest.run") : "…",
@@ -2753,7 +2772,7 @@ export class QuestScene implements Scene {
       ...(this.compactMode
         ? [{ id: "solve", label: t("quest.solve"), dim: !this.quest || this.solving }]
         : []),
-    ];
+    ]);
   }
 
   /**
@@ -2777,7 +2796,7 @@ export class QuestScene implements Scene {
     this.app.logoutRect = null;
     this.app.logoutHover = false;
     const pad = Math.round(6 * s);
-    const f = fonts.stationSm;
+    const f = fonts.tool;
     const done = t("quest.codeDone");
     const [dw, dh] = btnBox(f, [done], 0, btnPad(f), layout.minTouchH());
     const bx = layout.vw - pad - dw;
@@ -2788,7 +2807,7 @@ export class QuestScene implements Scene {
     // writing, and a row that carried all twelve would be the crowding this
     // mode exists to escape.
     const steps = editControls(this.edit, this.editBusy || this.inTurn);
-    const items = [
+    const items = this.tools.filter([
       {
         id: "run",
         label: this.stage === "idle" ? t("quest.run") : "…",
@@ -2830,13 +2849,17 @@ export class QuestScene implements Scene {
       // ASK AI on the code page too, where the question is asked: it opens
       // the room beside the code.
       ...(this.coder ? [{ id: "agent", label: t("agent.ask"), strong: this.coder.open }] : []),
-    ];
-    const rowW = Math.max(f.size * 4, bx - pad * 2);
+    ]);
+    // The filter box heads the first row and the buttons flow on after it.
+    const filterW = this.tools.width(f);
+    const lead = filterW + Math.round(f.size * 0.5);
+    const rowW = Math.max(lead + f.size * 4, bx - pad * 2);
     const rows = rowsIn(
       f,
       items.map((i) => i.label),
       rowW,
       layout.minTouchH(),
+      lead,
     );
     const rowGap = Math.round(f.size * 0.5);
     const bandH = rows * dh + (rows - 1) * rowGap;
@@ -2847,9 +2870,10 @@ export class QuestScene implements Scene {
     const strip = pad + Math.max(bandH, dh) + Math.round(3 * s) + f.height + Math.round(4 * s);
     fill(g, Theme.ink, 0, 0, layout.vw, strip, 0.82);
     fill(g, Theme.dim, 0, strip, layout.vw, 1, 0.5);
-    this.bar.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH());
+    this.bar.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH(), lead);
     this.bar.add({ id: "unfocus", rect: [bx, pad, dw, dh], label: done });
     this.bar.draw(g, f);
+    this.tools.draw(g, [pad, pad, filterW, dh], f);
 
     // The file — and, in ANSWER mode, how much of it is already yours. The
     // count is the whole scoreboard: characters you have typed that *are*
@@ -2932,7 +2956,11 @@ export class QuestScene implements Scene {
     const [x, y, w, h] = rect;
     fill(g, Theme.ink, x - 4, y - 3, w + 8, h + 6, 0.82);
     fill(g, Theme.dim, x - 4, y + h + 3, w + 8, 1, 0.5);
-    this.bar.row(fonts.stationSm, [x, y, w, h], this.toolItems(), layout.minTouchH());
+    const f = fonts.tool;
+    const filterW = this.tools.width(f);
+    const lead = filterW + Math.round(f.size * 0.5);
+    this.bar.row(f, [x, y, w, h], this.toolItems(), layout.minTouchH(), lead);
+    this.tools.draw(g, [x, y, filterW, Math.max(layout.minTouchH(), f.height + 20)], f);
   }
 
   /** One of the four, chosen. */
@@ -3203,9 +3231,10 @@ export class QuestScene implements Scene {
     const { layout } = this.app;
     const s = layout.uiScale();
     const fonts = ensureFonts(s);
-    // The bench's face: the button face, or the smaller chrome face in the
-    // compact register, where eight labels a finger tall each took a row.
-    const bench = this.compactMode ? fonts.stationSm : fonts.button;
+    // The bench's face: `tool`, the code's own size, in every register. The
+    // button face at the CJK floor made each label twice the height of the
+    // code it acts on, and the rows of them were the editor's rows.
+    const bench = fonts.tool;
     const label = MAIN_FILE[this.lang];
     const inner = titledPanel(g, rect, `${label}   ${this.stageLabel()}`, accent);
 
@@ -3275,12 +3304,12 @@ export class QuestScene implements Scene {
     // Twice the gap between the bench's own wrapped rows, measured rather than
     // guessed: at 1280 the rows sit 12 virtual pixels apart, and a control that
     // wipes the editor must not be one slip below HINT either.
-    const solveGap = this.compactMode ? 0 : Math.round(fonts.button.size);
+    const solveGap = this.compactMode ? 0 : Math.round(bench.size);
     const [solveW, solveBtnH] = btnBox(
-      fonts.stationSm,
+      bench,
       [t("quest.solve")],
       0,
-      btnPad(fonts.stationSm),
+      btnPad(bench),
       layout.minTouchH(),
     );
     const noteX = inner[0] + solveW + Math.round(10 * s);
@@ -3289,10 +3318,8 @@ export class QuestScene implements Scene {
     // lines are a tenth of the screen spent on a sentence that the press
     // itself puts up anyway, so there the button stands alone and the
     // sentence arrives when it is relevant.
-    const noteLines = this.compactMode ? [] : wrap(fonts.stationSm, t("quest.solveNote"), noteW);
-    const noteH = this.compactMode
-      ? 0
-      : Math.max(solveBtnH, noteLines.length * fonts.stationSm.height);
+    const noteLines = this.compactMode ? [] : wrap(bench, t("quest.solveNote"), noteW);
+    const noteH = this.compactMode ? 0 : Math.max(solveBtnH, noteLines.length * bench.height);
 
     const editorH = Math.max(
       40,
@@ -3335,10 +3362,10 @@ export class QuestScene implements Scene {
     // screen and on the map are already that colour. Dim would read as small
     // print, which is exactly the wrong register for a price.
     g.fillStyle = css(Theme.coin, 0.72);
-    let ny = solveY + Math.round((noteH - noteLines.length * fonts.stationSm.height) / 2);
+    let ny = solveY + Math.round((noteH - noteLines.length * bench.height) / 2);
     for (const line of noteLines) {
-      printf(g, fonts.stationSm, line, noteX, ny, noteW, "left");
-      ny += fonts.stationSm.height;
+      printf(g, bench, line, noteX, ny, noteW, "left");
+      ny += bench.height;
     }
 
     if (consoleH > 0) {

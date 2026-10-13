@@ -355,6 +355,7 @@ export const ko: Partial<Catalogue> = {
   "pg.scratchpads": "메모장 목록",
   "pg.notScored": "여기는 기록에 남지 않습니다. 무엇이든 쓰고, 무엇이든 망가뜨리세요.",
   "pg.search": "검색",
+  "tools.filter": "필터",
   "pg.noMatch": "그런 이름의 메모장이 없습니다",
   "pg.nothingSaved": "아직 저장된 것이 없습니다",
   "pg.new": "새로",

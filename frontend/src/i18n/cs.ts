@@ -373,6 +373,7 @@ export const cs: Partial<Catalogue> = {
   "pg.scratchpads": "ŠPALÍČKY",
   "pg.notScored": "Nic tady se nepočítá do tvého záznamu. Piš cokoli, rozbij cokoli.",
   "pg.search": "HLEDAT",
+  "tools.filter": "FILTR",
   "pg.noMatch": "žádný zápisník toho jména",
   "pg.nothingSaved": "zatím nic uloženého",
   "pg.new": "NOVÝ",

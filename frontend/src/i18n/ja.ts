@@ -354,6 +354,7 @@ export const ja: Partial<Catalogue> = {
   "pg.scratchpads": "スクラッチパッド",
   "pg.notScored": "ここは記録に残りません。何でも書いて、何でも壊してください。",
   "pg.search": "検索",
+  "tools.filter": "絞り込み",
   "pg.noMatch": "その名前のメモはありません",
   "pg.nothingSaved": "まだ何も保存されていません",
   "pg.new": "新規",

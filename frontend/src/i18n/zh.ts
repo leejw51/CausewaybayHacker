@@ -343,6 +343,7 @@ export const zh: Partial<Catalogue> = {
   "pg.scratchpads": "草稿本",
   "pg.notScored": "这里的东西不计入你的记录。随便写，随便弄坏。",
   "pg.search": "搜索",
+  "tools.filter": "筛选",
   "pg.noMatch": "没有这个名字的草稿",
   "pg.nothingSaved": "还没有保存过什么",
   "pg.new": "新建",

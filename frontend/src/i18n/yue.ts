@@ -358,6 +358,7 @@ export const yue: Partial<Catalogue> = {
   "pg.scratchpads": "草稿簿",
   "pg.notScored": "呢度啲嘢唔計入你嘅記錄。想寫乜就寫乜，想搞爛乜就搞爛乜。",
   "pg.search": "搜尋",
+  "tools.filter": "篩選",
   "pg.noMatch": "冇呢個名嘅草稿",
   "pg.nothingSaved": "仲未儲過嘢",
   "pg.new": "新",

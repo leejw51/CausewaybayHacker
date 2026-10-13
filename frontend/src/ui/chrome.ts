@@ -335,12 +335,16 @@ export class Buttons {
       strong?: boolean;
     }>,
     minH = 0,
+    lead = 0,
   ): void {
     const [x, y, w] = rect;
     const gap = Math.round(f.size * 0.5);
-    let cx = x;
+    // The same first-line offset `rowsIn` is told about, or the two disagree.
+    let cx = x + lead;
     let cy = y;
-    let lineH = 0;
+    // With a lead the first line is already one button tall even if nothing
+    // fits on it, or a first button that wraps lands on the filter box.
+    let lineH = lead > 0 ? btnBox(f, [], 0, 0, minH)[1] : 0;
     for (const item of labels) {
       const [bw, bh] = btnBox(f, [item.label], 0, btnPad(f), minH);
       if (cx > x && cx + bw > x + w) {

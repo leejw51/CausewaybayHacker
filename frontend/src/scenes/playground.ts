@@ -74,6 +74,7 @@ import {
 } from "../engine/text";
 import { AUTO_RUN_KEY, STDERR_KEY, readNumberPref, readPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
+import { ToolFilter } from "../ui/toolfilter";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
 import { WireError } from "../net/client";
@@ -512,6 +513,8 @@ export class PlaygroundScene implements Scene {
   private readonly listIn = new Tween(seconds("panel"), seconds("stagger"));
   private readonly buttons = new Buttons();
   private readonly rows = new Buttons();
+  /** The box at the head of the button band, on the bench and in CODE. */
+  private readonly tools = new ToolFilter();
   private offs: Array<() => void> = [];
   private offLocale?: () => void;
   private readonly onBlur = () => void this.save();
@@ -1113,6 +1116,7 @@ export class PlaygroundScene implements Scene {
     this.stdinOverlay?.destroy();
     this.nameOverlay?.destroy();
     this.searchOverlay?.destroy();
+    this.tools.destroy();
     this.editor?.destroy();
     this.app.chip.music("stop");
   }
@@ -1178,6 +1182,7 @@ export class PlaygroundScene implements Scene {
     this.searchOverlay.hide();
     this.keyOverlay = new Overlay(this.app.overlay, this.app.layout, this.keyEl);
     this.keyOverlay.hide();
+    this.tools.mount(this.app.overlay, this.app.layout);
     queueMicrotask(() => this.editor?.focus());
   }
 
@@ -1911,7 +1916,7 @@ export class PlaygroundScene implements Scene {
       this.buttons.reset();
       this.rows.reset();
       this.drawFocus(g, layout.uiScale());
-      this.buttons.draw(g, ensureFonts(layout.uiScale()).stationSm);
+      this.buttons.draw(g, ensureFonts(layout.uiScale()).tool);
       this.coder?.draw();
       if (this.conflict) this.drawConflict(g);
       return;
@@ -1931,7 +1936,7 @@ export class PlaygroundScene implements Scene {
     this.rows.reset();
     this.drawList(g, f.left, s, f.portrait);
     this.drawBench(g, f.right, s);
-    this.buttons.draw(g, ensureFonts(s).button);
+    this.buttons.draw(g, ensureFonts(s).tool);
     footer(g, layout, t("pg.footer"));
     this.coder?.draw();
     if (this.conflict) this.drawConflict(g);
@@ -1958,6 +1963,7 @@ export class PlaygroundScene implements Scene {
     ]) {
       o?.hide();
     }
+    this.tools.hide();
     this.coder?.panel.hideFields();
     this.buttons.reset();
     this.rows.reset();
@@ -2039,26 +2045,18 @@ export class PlaygroundScene implements Scene {
   /**
    * The saved snippets, and the one line that says what this screen is.
    *
-   * `stacked` is the frame's own decision rather than the window's, and it
-   * picks the face the panel reads in. Side by side this is a full-height
-   * column and the body face is right. **Stacked it is a quarter of the
-   * window** — and `small` there (30·s, so 40 virtual px at the scale a
-   * 1080x1750 window asks for) drew the rule *larger than the panel's own
-   * title bar*, which is `stationSm`. Two lines of rule and a row and a half
-   * of pads were the whole panel.
-   *
-   * So the stacked panel drops to `stationSm`: the small chrome face the title
-   * bar and the language tag on every row already use. That is one step, not
-   * an arbitrary shrink — in a CJK language the floor arithmetic in `text.ts`
-   * pins `small` to 30·s and `stationSm` to max(20·s, 24·s) = 24·s, so this is
-   * the smallest size Korean is allowed to be drawn at and no smaller.
-   * Everything measured off the face follows it down — the row height, the
-   * search well, the centring — so the panel holds four pads where it held
-   * one and a half.
+   * `stacked` is the frame's own decision rather than the window's: side by
+   * side this is a full-height column, stacked it is a quarter of the window
+   * and splits into two panes. Either way the panel reads in `tool`, the
+   * code's own size: `small` there drew the rule larger than the panel's
+   * title bar, and even `stationSm` at the CJK floor left a Korean rule
+   * taking half the column above four names.
    */
   private drawList(g: Ctx, rect: Rect, s: number, stacked: boolean): void {
     const fonts = ensureFonts(s);
-    const body = stacked ? fonts.stationSm : fonts.small;
+    // The code's size, like the bench's buttons: the list holds names, and
+    // at the chrome's CJK floor the rule above it took half the panel.
+    const body = fonts.tool;
     const inner = titledPanel(g, rect, t("pg.scratchpads"), Theme.coin);
     const pad = Math.round(8 * s);
     const minH = this.app.layout.minTouchH();
@@ -2073,15 +2071,15 @@ export class PlaygroundScene implements Scene {
     const listGap = Math.round(6 * s);
     // What the NEW / RENAME / DELETE rows take in a column `w` wide.
     const buttonsH = (w: number): number => {
-      const [, bh] = btnBox(fonts.button, labels, 0, btnPad(fonts.button), minH);
-      const n = rowsIn(fonts.button, labels, w, minH);
+      const [, bh] = btnBox(fonts.tool, labels, 0, btnPad(fonts.tool), minH);
+      const n = rowsIn(fonts.tool, labels, w, minH);
       return n * bh + (n - 1) * listGap;
     };
     // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
     // three of them wrap in a narrow column instead of the third being
     // painted over the second's last letter.
     const placeButtons = (x: number, y: number, w: number, h: number): void =>
-      this.buttons.row(fonts.button, [x, y, w, h], listItems, minH);
+      this.buttons.row(fonts.tool, [x, y, w, h], listItems, minH);
     const placeSearch = (x: number, y: number, w: number): void => {
       well(g, x, y, w, findH, [0.06, 0.05, 0.14, 0.98]);
       this.searchOverlay?.place([x + 4, y + 3, w - 8, findH - 6], body.size);
@@ -2209,10 +2207,10 @@ export class PlaygroundScene implements Scene {
         g.fillStyle = css(Theme.dim);
         printf(
           g,
-          fonts.stationSm,
+          fonts.tool,
           landName(snip.lang),
           x,
-          ry + Math.round((rowH - fonts.stationSm.height) / 2),
+          ry + Math.round((rowH - fonts.tool.height) / 2),
           w - Math.round(8 * s),
           "right",
         );
@@ -2319,13 +2317,13 @@ export class PlaygroundScene implements Scene {
     // rectangle it had in the framed layout.
     this.searchOverlay?.hide();
     const fonts = ensureFonts(s);
-    const f = fonts.stationSm;
+    const f = fonts.tool;
     const pad = Math.round(6 * s);
     const done = t("pg.codeDone");
     const [dw, dh] = btnBox(f, [done], 0, btnPad(f), layout.minTouchH());
     const bx = layout.vw - pad - dw;
 
-    const items = [
+    const items = this.tools.filter([
       {
         id: "run",
         label: this.stage === "idle" ? t("pg.run") : "…",
@@ -2364,21 +2362,26 @@ export class PlaygroundScene implements Scene {
       { id: "reader", label: t("pg.reader") },
       ...this.fontItems(),
       ...this.displayItems(),
-    ];
-    const rowW = Math.max(f.size * 4, bx - pad * 2);
+    ]);
+    // The filter box heads the first row and the buttons flow on after it.
+    const filterW = this.tools.width(f);
+    const lead = filterW + Math.round(f.size * 0.5);
+    const rowW = Math.max(lead + f.size * 4, bx - pad * 2);
     const rows = rowsIn(
       f,
       items.map((i) => i.label),
       rowW,
       layout.minTouchH(),
+      lead,
     );
     const rowGap = Math.round(f.size * 0.5);
     const bandH = rows * dh + (rows - 1) * rowGap;
     const strip = pad + Math.max(bandH, dh) + Math.round(3 * s) + f.height + Math.round(4 * s);
     fill(g, Theme.ink, 0, 0, layout.vw, strip, 0.82);
     fill(g, Theme.dim, 0, strip, layout.vw, 1, 0.5);
-    this.buttons.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH());
+    this.buttons.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH(), lead);
     this.buttons.add({ id: "unfocus", rect: [bx, pad, dw, dh], label: done });
+    this.tools.draw(g, [pad, pad, filterW, dh], f);
 
     // Which pad, in which language, and whether it is safe on the server —
     // the three things the framed screen says in its title that a person
@@ -2612,13 +2615,21 @@ export class PlaygroundScene implements Scene {
     );
     // One box per land, each as wide as its own label. They are a *state*,
     // not an action, and the chosen one is painted lit in its land's colour.
+    // The band is set in `tool`, the code's own size: at the chrome's CJK
+    // floor its labels were twice the height of the code they act on, and
+    // four rows of them were the editor's rows.
+    const bf = fonts.tool;
     const langBoxes = LANGS.map((land) => {
       const label = t(`pg.${land}` as "pg.rust");
-      const [bw, bh] = btnBox(fonts.button, [label], 0, btnPad(fonts.button), layout.minTouchH());
+      const [bw, bh] = btnBox(bf, [label], 0, btnPad(bf), layout.minTouchH());
       return { land, label, bw, bh };
     });
     const langH = langBoxes[0].bh;
-    const flowGap = Math.round(fonts.button.size * 0.5);
+    const shownLangs = langBoxes.filter((b) => this.tools.keeps({ id: b.land, label: b.label }));
+    const flowGap = Math.round(bf.size * 0.5);
+    // The filter box heads the band's first row; the buttons flow after it.
+    const filterW = this.tools.width(bf);
+    const lead = filterW + flowGap;
     const minOut = fonts.codeSm.height * 3 + Math.round(10 * s);
     // Its label and one whole line of what you typed. Anything less is a box
     // that says STDIN over a sliver of a character, which is how it looked
@@ -2671,19 +2682,24 @@ export class PlaygroundScene implements Scene {
     // between the stdin box and the output. Actions first, so RUN is where
     // the band starts; the lands follow in the same wrap.
     const flowLabels = (items: typeof actions) => [
-      ...items.map((a) => a.label),
-      ...langBoxes.map((b) => b.label),
+      ...this.tools.filter(items).map((a) => a.label),
+      ...shownLangs.map((b) => b.label),
     ];
     const bandFor = (items: typeof actions) => {
-      const r = rowsIn(fonts.button, flowLabels(items), inner[2], layout.minTouchH());
+      const r = rowsIn(bf, flowLabels(items), inner[2], layout.minTouchH(), lead);
       return r * langH + (r - 1) * flowGap;
     };
-    for (let drop = 0; drop < optional.length; drop++) {
+    // While a filter is typed every button is a candidate — a dropped one
+    // would be the one thing the box could not find — and the few it leaves
+    // are no crowd.
+    const filtering = this.tools.query.trim() !== "";
+    for (let drop = 0; drop < optional.length && !filtering; drop++) {
       const room = inner[3] - bandFor(actions) - minStdin - (wide ? gap * 2 : minOut + gap * 3);
       if (room >= editorFloor) break;
       actions = [...core, ...optional.slice(0, optional.length - 1 - drop)];
     }
     const bandH = bandFor(actions);
+    actions = this.tools.filter(actions);
 
     // **The editor is served first.** It used to be served last — whatever a
     // fixed stdin box, a percentage-of-panel output panel and however many
@@ -2740,8 +2756,10 @@ export class PlaygroundScene implements Scene {
     else this.stdinOverlay?.hide();
 
     const rowY = stdinY + stdinRoom + gap;
+    if (this.benchIn.finished) this.tools.draw(g, [inner[0], rowY, filterW, langH], bf);
+    else this.tools.hide();
     {
-      let cx = inner[0];
+      let cx = inner[0] + lead;
       let cy = rowY;
       const place = (bw: number): [number, number] => {
         if (cx > inner[0] && cx + bw > inner[0] + inner[2]) {
@@ -2753,17 +2771,11 @@ export class PlaygroundScene implements Scene {
         return at;
       };
       for (const item of actions) {
-        const [bw, bh] = btnBox(
-          fonts.button,
-          [item.label],
-          0,
-          btnPad(fonts.button),
-          layout.minTouchH(),
-        );
+        const [bw, bh] = btnBox(bf, [item.label], 0, btnPad(bf), layout.minTouchH());
         const [bx, by] = place(bw);
         this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
       }
-      for (const { land: id, label, bw } of langBoxes) {
+      for (const { land: id, label, bw } of shownLangs) {
         const [bx, langY] = place(bw);
         const on = this.held.lang === id;
         const hover = this.buttons.hovered === id;
@@ -2772,15 +2784,15 @@ export class PlaygroundScene implements Scene {
           g.fillStyle = css(Theme.ink);
           printf(
             g,
-            fonts.button,
+            bf,
             label,
             bx,
-            inkCentreY(fonts.button, label, langY + 8, langH - BTN_FRAME),
+            inkCentreY(bf, label, langY + 8, langH - BTN_FRAME),
             bw,
             "center",
           );
         } else {
-          pixBtn(g, fonts.button, bx, langY, bw, langH, label, { hover, quiet: true });
+          pixBtn(g, bf, bx, langY, bw, langH, label, { hover, quiet: true });
         }
         // Painted here, in the land's own colour when it is the live one, so
         // the row says which compiler will run this file. `painted` keeps

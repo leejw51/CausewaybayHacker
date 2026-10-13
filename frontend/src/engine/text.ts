@@ -394,7 +394,8 @@ export type FontName =
   | "stationSm"
   | "button"
   | "stamp"
-  | "help";
+  | "help"
+  | "tool";
 
 export interface Font {
   css: string;
@@ -558,6 +559,12 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     button: make(P(20 * s), pixel),
     stamp: make(P(24 * s), pixel),
     help: make(B(32 * s), body),
+    // The toolbars over the two code screens, at the code's own size and in
+    // the interface's body face. **Not through the CJK floor**: the floor is
+    // what put a Korean label at twice the height of the code under it, and
+    // a band of twenty such labels was eating the screen it is the tools for.
+    // Hangul at 22 is what the code pane already shows in its comments.
+    tool: make(22 * s * (spec.family ? spec.body : 1), body),
   };
   return fonts;
 }

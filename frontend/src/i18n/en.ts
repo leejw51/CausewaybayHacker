@@ -374,6 +374,7 @@ export const en = {
   "pg.scratchpads": "SCRATCHPADS",
   "pg.notScored": "Nothing here is part of your record. Write anything, break anything.",
   "pg.search": "SEARCH",
+  "tools.filter": "FILTER",
   "pg.noMatch": "no pad by that name",
   "pg.nothingSaved": "nothing saved yet",
   "pg.new": "NEW",

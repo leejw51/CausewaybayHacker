@@ -284,12 +284,19 @@ export class Panel {
     this.provider = ctx.provider;
     const { layout } = this.app;
     const fonts = ensureFonts(s);
-    const f = fonts.stationSm;
+    const f = fonts.tool;
     const title = t("agent.provider", {
       name: `${t("agent.title")} · ${PROVIDER_NAME[ctx.provider]}`,
       model: readModel(ctx.provider),
     });
-    const inner = titledPanel(g, rect, elide(f, title, rect[2] - 24), Theme.coin, Theme.navy);
+    // Elided in the face `titledPanel` draws its title in, not the body's.
+    const inner = titledPanel(
+      g,
+      rect,
+      elide(fonts.stationSm, title, rect[2] - 24),
+      Theme.coin,
+      Theme.navy,
+    );
     this.buttons.reset();
     const gap = Math.round(5 * s);
     let y = inner[1];
@@ -340,8 +347,8 @@ export class Panel {
   private drawSetup(g: Ctx, rect: Rect, s: number): void {
     const { layout } = this.app;
     const fonts = ensureFonts(s);
-    const f = fonts.stationSm;
-    const body = fonts.small;
+    const f = fonts.tool;
+    const body = fonts.tool;
     const gap = Math.round(6 * s);
     const provider = this.provider;
     let y = rect[1];
@@ -464,8 +471,8 @@ export class Panel {
   ): void {
     const { layout } = this.app;
     const fonts = ensureFonts(s);
-    const f = fonts.stationSm;
-    const body = fonts.small;
+    const f = fonts.tool;
+    const body = fonts.tool;
     const gap = Math.round(5 * s);
     const fieldH = Math.max(layout.minTouchH(), body.height + Math.round(12 * s));
 
