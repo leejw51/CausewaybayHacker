@@ -19,6 +19,14 @@
  */
 export const AUTO_RUN_KEY = "code.autoRun";
 
+/**
+ * STDERR on the two code screens. Off unless somebody turned it on: the
+ * output is then what the program printed, and the compiler only when the
+ * build failed — warnings, panics and the compiler's progress chatter stay
+ * out of the way of the answer. One preference for both, like AUTO-RUN.
+ */
+export const STDERR_KEY = "code.stderr";
+
 /** One namespace, so a stray key in devtools is obviously ours. */
 const NS = "cwbhacker.";
 

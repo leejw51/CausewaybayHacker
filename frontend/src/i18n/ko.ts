@@ -363,6 +363,8 @@ export const ko: Partial<Catalogue> = {
   "pg.run": "실행",
   "code.autoOn": "자동 실행 켬",
   "code.autoOff": "자동 실행 끔",
+  "code.stderrOn": "STDERR 켬",
+  "code.stderrOff": "STDERR 끔",
   "pg.format": "정렬",
   "pg.save": "저장",
   "pg.updatedElsewhere": "다른 기기에서 업데이트됨",

@@ -99,7 +99,7 @@ import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
 import { clipMessage, copyText, readText } from "../ui/clip";
-import { AUTO_RUN_KEY, readEnumPref, readPref, writePref } from "../ui/prefs";
+import { AUTO_RUN_KEY, STDERR_KEY, readEnumPref, readPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
 import { locale, t, tn, type Locale } from "../i18n";
 import { MapScene } from "./map";
@@ -400,6 +400,8 @@ export class QuestScene implements Scene {
   private stage: Stage = "idle";
   /** ENTER in the editor runs the code. See `AUTO_RUN_KEY`. */
   private autoRun = readPref(AUTO_RUN_KEY) !== "off";
+  /** See `STDERR_KEY`. */
+  private showStderr = readPref(STDERR_KEY) === "on";
   /**
    * An ENTER landed while a run was out: one more when it is back, so the
    * drawer answers for the code on screen and not for a line ago.
@@ -838,6 +840,15 @@ export class QuestScene implements Scene {
     if (!this.autoRun) return;
     if (this.stage === "idle") void this.run();
     else this.runAgain = true;
+  }
+
+  /** STDERR, saying the state it is in, beside AUTO-RUN on both pages. */
+  private stderrItem(): { id: string; label: string; strong?: boolean } {
+    return {
+      id: "stderr",
+      label: this.showStderr ? t("code.stderrOn") : t("code.stderrOff"),
+      strong: this.showStderr,
+    };
   }
 
   /** AUTO-RUN, saying the state it is in, beside RUN on both pages. */
@@ -2295,6 +2306,11 @@ export class QuestScene implements Scene {
         writePref(AUTO_RUN_KEY, this.autoRun ? "on" : "off");
         this.app.chip.blip();
         break;
+      case "stderr":
+        this.showStderr = !this.showStderr;
+        writePref(STDERR_KEY, this.showStderr ? "on" : "off");
+        this.app.chip.blip();
+        break;
       case "submit":
         void this.submit();
         break;
@@ -2703,6 +2719,7 @@ export class QuestScene implements Scene {
         strong: false,
       },
       this.autoItem(),
+      this.stderrItem(),
       ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
@@ -2779,6 +2796,7 @@ export class QuestScene implements Scene {
         primary: this.stage === "idle",
       },
       this.autoItem(),
+      this.stderrItem(),
       ...(this.app.client.canFormat(this.lang)
         ? [{ id: "format", label: t("quest.format"), dim: this.formatting }]
         : []),
@@ -3555,7 +3573,11 @@ export class QuestScene implements Scene {
     const lineH = fonts.codeSm.height;
     const rows = Math.max(1, Math.floor((h - pad * 2) / lineH));
     const flat: Array<{ stream: string; text: string }> = [];
+    // With STDERR off, what the program printed — and the compiler only when
+    // the build failed, since then its error is the whole answer.
+    const loud = this.showStderr || this.runResult?.verdict === "compile_error";
     for (const line of this.log.lines) {
+      if (!loud && line.stream !== "stdout") continue;
       for (const piece of wrap(fonts.codeSm, line.text, w - pad * 2)) {
         flat.push({ stream: line.stream, text: piece });
       }
@@ -3590,7 +3612,10 @@ export class QuestScene implements Scene {
       }
       if (flat.length === 0) {
         g.fillStyle = css(Theme.dim);
-        printf(g, fonts.codeSm, t("quest.silentCompiler"), x + pad, y + pad, w - pad * 2, "left");
+        // With STDERR off the compiler was never going to be heard from, so
+        // a finished run with nothing printed says that instead.
+        const quiet = !loud && this.runResult ? t("pg.noOutput") : t("quest.silentCompiler");
+        printf(g, fonts.codeSm, quiet, x + pad, y + pad, w - pad * 2, "left");
       }
     });
     if (this.logOverflow > 0) {

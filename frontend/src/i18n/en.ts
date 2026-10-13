@@ -382,6 +382,8 @@ export const en = {
   "pg.run": "RUN",
   "code.autoOn": "AUTO-RUN ON",
   "code.autoOff": "AUTO-RUN OFF",
+  "code.stderrOn": "STDERR ON",
+  "code.stderrOff": "STDERR OFF",
   "pg.format": "FORMAT",
   "pg.save": "SAVE",
   "pg.updatedElsewhere": "updated on another device",

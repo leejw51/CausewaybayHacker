@@ -351,6 +351,8 @@ export const zh: Partial<Catalogue> = {
   "pg.run": "运行",
   "code.autoOn": "自动运行 开",
   "code.autoOff": "自动运行 关",
+  "code.stderrOn": "STDERR 开",
+  "code.stderrOff": "STDERR 关",
   "pg.format": "格式化",
   "pg.save": "保存",
   "pg.updatedElsewhere": "已在另一台设备上更新",

@@ -366,6 +366,8 @@ export const yue: Partial<Catalogue> = {
   "pg.run": "執行",
   "code.autoOn": "自動執行 開",
   "code.autoOff": "自動執行 關",
+  "code.stderrOn": "STDERR 開",
+  "code.stderrOff": "STDERR 關",
   "pg.format": "格式化",
   "pg.save": "儲存",
   "pg.updatedElsewhere": "喺另一部裝置更新咗",

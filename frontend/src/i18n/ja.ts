@@ -362,6 +362,8 @@ export const ja: Partial<Catalogue> = {
   "pg.run": "実行",
   "code.autoOn": "自動実行 オン",
   "code.autoOff": "自動実行 オフ",
+  "code.stderrOn": "STDERR オン",
+  "code.stderrOff": "STDERR オフ",
   "pg.format": "整形",
   "pg.save": "保存",
   "pg.updatedElsewhere": "別の端末で更新されました",

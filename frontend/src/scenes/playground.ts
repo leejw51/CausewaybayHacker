@@ -72,7 +72,7 @@ import {
   TEXT_SCALE_MAX,
   TEXT_SCALE_MIN,
 } from "../engine/text";
-import { AUTO_RUN_KEY, readNumberPref, readPref, writePref } from "../ui/prefs";
+import { AUTO_RUN_KEY, STDERR_KEY, readNumberPref, readPref, writePref } from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { LogBuffer } from "../net/logbuf";
@@ -459,6 +459,8 @@ export class PlaygroundScene implements Scene {
   private stage: RunStage | "idle" = "idle";
   /** See `AUTO_RUN_KEY`. */
   private autoRun = readPref(AUTO_RUN_KEY) !== "off";
+  /** See `STDERR_KEY`. */
+  private showStderr = readPref(STDERR_KEY) === "on";
   /**
    * An ENTER landed while a run was out: run once more when it is back, so
    * the answer on screen is for the code on screen and not for a line ago.
@@ -996,6 +998,15 @@ export class PlaygroundScene implements Scene {
       id: "autorun",
       label: this.autoRun ? t("code.autoOn") : t("code.autoOff"),
       strong: this.autoRun,
+    };
+  }
+
+  /** STDERR, saying the state it is in, beside AUTO-RUN. */
+  private stderrItem(): { id: string; label: string; strong?: boolean } {
+    return {
+      id: "stderr",
+      label: this.showStderr ? t("code.stderrOn") : t("code.stderrOff"),
+      strong: this.showStderr,
     };
   }
 
@@ -1835,6 +1846,12 @@ export class PlaygroundScene implements Scene {
       this.app.chip.blip();
       return;
     }
+    if (hit.id === "stderr") {
+      this.showStderr = !this.showStderr;
+      writePref(STDERR_KEY, this.showStderr ? "on" : "off");
+      this.app.chip.blip();
+      return;
+    }
     if (hit.id === "run") void this.run();
     else if (hit.id === "format") void this.format();
     else if (hit.id === "save") void this.save();
@@ -2316,6 +2333,7 @@ export class PlaygroundScene implements Scene {
         primary: this.stage === "idle",
       },
       this.autoItem(),
+      this.stderrItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
@@ -2623,6 +2641,7 @@ export class PlaygroundScene implements Scene {
         primary: this.stage === "idle",
       },
       this.autoItem(),
+      this.stderrItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
@@ -2871,22 +2890,30 @@ export class PlaygroundScene implements Scene {
       out.push([label, Theme.dim]);
       for (const line of lines) push(line, col);
     };
+    // With STDERR off, the program's output and nothing else — unless the
+    // build failed, when there is no output and the compiler's error (which
+    // the server puts in `stderr`) is the whole answer.
+    const loud = this.showStderr || r?.outcome === "compile_error";
     if (r) {
       const nonEmpty = (s: string) => s.split("\n").filter((l) => l !== "");
       block(t("pg.outStdout"), nonEmpty(r.stdout), Theme.cream);
-      block(t("pg.outStderr"), nonEmpty(r.stderr), Theme.red);
-      block(
-        t("pg.outCompiler"),
-        r.diagnostics.map((d) => {
-          const where = d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`;
-          return `${d.kind}${d.code ? " " + d.code : ""}${where}  ${d.message}`;
-        }),
-        Theme.pink,
-      );
+      if (loud) block(t("pg.outStderr"), nonEmpty(r.stderr), Theme.red);
+      if (loud)
+        block(
+          t("pg.outCompiler"),
+          r.diagnostics.map((d) => {
+            const where = d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`;
+            return `${d.kind}${d.code ? " " + d.code : ""}${where}  ${d.message}`;
+          }),
+          Theme.pink,
+        );
     }
     // While it is still running, the compiler's own chatter is the progress bar.
+    // With STDERR off, only what the program prints shows while it runs.
     if (!r)
-      for (const l of this.log.lines) push(l.text, l.stream === "stderr" ? Theme.red : Theme.dim);
+      for (const l of this.log.lines)
+        if (loud || l.stream === "stdout")
+          push(l.text, l.stream === "stderr" ? Theme.red : Theme.dim);
     if (out.length === 0) {
       this.outputOverflow = 0;
       g.fillStyle = css(Theme.dim);

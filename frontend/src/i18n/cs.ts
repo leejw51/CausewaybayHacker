@@ -381,6 +381,8 @@ export const cs: Partial<Catalogue> = {
   "pg.run": "SPUSTIT",
   "code.autoOn": "AUTOSPUŠTĚNÍ ZAP",
   "code.autoOff": "AUTOSPUŠTĚNÍ VYP",
+  "code.stderrOn": "STDERR ZAP",
+  "code.stderrOff": "STDERR VYP",
   "pg.format": "FORMÁT",
   "pg.save": "ULOŽIT",
   "pg.updatedElsewhere": "aktualizováno na jiném zařízení",
