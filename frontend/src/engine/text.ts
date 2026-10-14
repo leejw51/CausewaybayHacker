@@ -248,6 +248,7 @@ export const CODE_FACES = [
   "dunggeunmo",
   "galmuri",
   "comic",
+  "courier",
 ] as const;
 export type CodeFace = (typeof CODE_FACES)[number];
 
@@ -274,6 +275,8 @@ export const CODE_FACE_SCALE: Record<CodeFace, number> = {
   dunggeunmo: 0.85,
   galmuri: 0.62,
   comic: 0.78,
+  // Courier New: cap 0.571 em, advance 0.6 em.
+  courier: 0.98,
 };
 
 /** What to call each on the button. Its own name, not a description. */
@@ -285,6 +288,7 @@ export const CODE_FACE_NAME: Record<CodeFace, string> = {
   dunggeunmo: "DUNGGEUNMO",
   galmuri: "GALMURI",
   comic: "COMIC",
+  courier: "COURIER NEW",
 };
 
 /** The family each code face is fetched as, for the ones `style.css` lacks. */
@@ -296,6 +300,8 @@ const CODE_FACE_FAMILY: Record<CodeFace, string | null> = {
   dunggeunmo: "NeoDunggeunmoCode",
   galmuri: "GalmuriMono11",
   comic: "ComicMono",
+  // A system face, never fetched: Courier behind it for a machine without it.
+  courier: null,
 };
 
 let codeFace: CodeFace = "game";
@@ -306,6 +312,9 @@ const CODE_STACK = (): string => {
   }
   if (codeFace === "jetbrains") {
     return `"JetBrainsMonoCode","VT323",ui-monospace,monospace,${back()}`;
+  }
+  if (codeFace === "courier") {
+    return `"Courier New",Courier,"VT323",ui-monospace,monospace,${back()}`;
   }
   const fam = CODE_FACE_FAMILY[codeFace];
   if (fam) return `"${fam}","VT323",ui-monospace,monospace,${back()}`;
