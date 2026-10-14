@@ -3,8 +3,8 @@
  *
  * Twenty touch-sized buttons were most of the screen they are the tools for,
  * so each band carries a text box: type part of a label (or an id) and only
- * the buttons that match stay drawn — and stay clickable. Empty, every button
- * is back. This walks the three bands a player meets: the practice page's
+ * the buttons that match stay drawn — and stay clickable. Several words keep
+ * a button that matches any of them. Empty, every button is back. This walks the three bands a player meets: the practice page's
  * toolbar, the playground's split page and the playground's code page.
  *
  * A fixture account rather than a fresh one: nothing here records progress,
@@ -57,6 +57,12 @@ test("the filter narrows the menu buttons on the practice page and the playgroun
   expect(copies).toEqual(expect.arrayContaining(["copybrief", "copycode", "copyout"]));
   expect(copies, "a button that does not match is gone").not.toContain("fontup");
   expect(copies.length).toBeLessThan(quest.length);
+  // Several words keep every button that matches any one of them.
+  const several = await narrow(page, "copy paste font");
+  expect(several).toEqual(
+    expect.arrayContaining(["copybrief", "copycode", "copyout", "paste", "fontup", "fontdown"]),
+  );
+  expect(several, "a button that matches none of the words is gone").not.toContain("lobby");
   // Empty puts every button back.
   expect(await narrow(page, "")).toEqual(quest);
 
@@ -76,6 +82,10 @@ test("the filter narrows the menu buttons on the practice page and the playgroun
   expect(pythons).toContain("python");
   expect(pythons).not.toContain("rust");
   expect(pythons).not.toContain("run");
+  // Symbolic: a concept, Korean initials and an abbreviation, together.
+  const sym = await narrow(page, "font ㅈㅈ cpcd");
+  expect(sym).toEqual(expect.arrayContaining(["fontup", "fontdown", "face"]));
+  expect(sym).not.toContain("rust");
   await narrow(page, "");
 
   // The playground, code page.
