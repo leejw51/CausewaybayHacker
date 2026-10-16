@@ -288,7 +288,23 @@ export const CODE_FACE_NAME: Record<CodeFace, string> = {
   dunggeunmo: "DUNGGEUNMO",
   galmuri: "GALMURI",
   comic: "COMIC",
-  courier: "COURIER NEW",
+  courier: "COURIER NEW BOLD",
+};
+
+/**
+ * The weight each code face is drawn at, as a CSS `font-weight`. Courier New
+ * at its regular weight is a hairline beside the pixel faces round it; the
+ * bold cut is the one that holds up on the dark pane.
+ */
+const CODE_FACE_WEIGHT: Record<CodeFace, string> = {
+  game: "normal",
+  iosevka: "normal",
+  jetbrains: "normal",
+  dos: "normal",
+  dunggeunmo: "normal",
+  galmuri: "normal",
+  comic: "normal",
+  courier: "bold",
 };
 
 /** The family each code face is fetched as, for the ones `style.css` lacks. */
@@ -346,6 +362,7 @@ export function setCodeFace(face: CodeFace): void {
   try {
     const root = document.documentElement.style;
     root.setProperty("--cwb-code", CODE_STACK());
+    root.setProperty("--cwb-code-weight", CODE_FACE_WEIGHT[codeFace]);
   } catch {
     /* no document in a unit test; the canvas half is what those measure */
   }
@@ -472,9 +489,9 @@ function ctx2d(): CanvasRenderingContext2D {
   return measurer;
 }
 
-function make(size: number, family: string): Font {
+function make(size: number, family: string, weight = "normal"): Font {
   const px = Math.max(8, Math.round(size));
-  const css = `${px}px ${family}`;
+  const css = `${weight === "normal" ? "" : `${weight} `}${px}px ${family}`;
   const g = ctx2d();
   g.font = css;
   const m = g.measureText("Hg");
@@ -528,6 +545,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   const body = BODY();
   const code = CODE_STACK();
   const faceScale = CODE_FACE_SCALE[codeFace];
+  const faceWeight = CODE_FACE_WEIGHT[codeFace];
   /**
    * No smaller than the floor, whatever the role asked for — except for the
    * two code faces. What is in the editor and in a sample well is Rust or Go,
@@ -548,8 +566,8 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     subtitle: make(B(40 * s), body),
     ui: make(P(20 * s), pixel),
     small: make(B(30 * s), body),
-    code: make(28 * s * faceScale, code),
-    codeSm: make(22 * s * faceScale, code),
+    code: make(28 * s * faceScale, code, faceWeight),
+    codeSm: make(22 * s * faceScale, code, faceWeight),
     bubble: make(B(30 * s), body),
     station: make(P(20 * s), pixel),
     // The small chrome face — panel titles, the footer key bar, captions, the
