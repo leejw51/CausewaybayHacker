@@ -396,6 +396,8 @@ export class PlaygroundScene implements Scene {
    * unsaved pads both have `id: null` and are otherwise indistinguishable.
    */
   private padSerial = 0;
+  /** The save on the wire, if any, so NEW can wait for it to land. */
+  private inflight: Promise<void> = Promise.resolve();
   private savedSource = "";
   private savedLang: Lang = "rust";
   /**
@@ -951,7 +953,7 @@ export class PlaygroundScene implements Scene {
         return;
       }
       // A new pad, so nothing of the open one is lost under the disk.
-      this.fresh();
+      if (!(await this.fresh())) return;
       // The poster's own title when the file kept one; else the file's name
       // with what `posterFileName` added taken off again, so a JPEG of
       // `scratch` comes back as `scratch`, not `cwbhacker-scratch-20260916-1055`.
@@ -1400,6 +1402,13 @@ export class PlaygroundScene implements Scene {
       return;
     }
     this.saving = true;
+    // The pad this save is for. NEW swaps `held` for a fresh object, and an
+    // answer landing after that belongs to the old pad, not the new one:
+    // written into the new one it took the old id, and the next autosave
+    // overwrote the saved program with the starter.
+    const pad = this.held;
+    let landed!: () => void;
+    this.inflight = new Promise((r) => (landed = r));
     try {
       const res = await this.app.client.request("playground.save", {
         ...(this.held.id ? { id: this.held.id } : {}),
@@ -1411,6 +1420,10 @@ export class PlaygroundScene implements Scene {
         source,
         stdin: this.held.stdin,
       });
+      if (this.held !== pad) {
+        void this.refreshList();
+        return;
+      }
       this.held.id = res.snippet.id;
       this.held.name = res.snippet.name;
       this.savedSource = source;
@@ -1432,6 +1445,7 @@ export class PlaygroundScene implements Scene {
           : t("pg.saveFailed");
     } finally {
       this.saving = false;
+      landed();
     }
   }
 
@@ -1613,8 +1627,18 @@ export class PlaygroundScene implements Scene {
     this.app.chip.select();
   }
 
-  private fresh(): void {
-    void this.save();
+  /** NEW: save the pad on screen, then open a fresh one. False if it would not. */
+  private async fresh(): Promise<boolean> {
+    // Another device's save waiting on a choice: NEW would throw away
+    // whichever side lost, without asking.
+    if (this.conflict) {
+      this.app.chip.fail();
+      return false;
+    }
+    // A save already on the wire carries the text as it was; wait for it,
+    // then save whatever was typed since, before the pad is let go.
+    await this.inflight;
+    await this.save();
     this.padSerial++;
     this.held = {
       id: null,
@@ -1633,6 +1657,7 @@ export class PlaygroundScene implements Scene {
     this.editor?.load(this.held.lang, this.held.source);
     this.writeLocal();
     this.app.chip.select();
+    return true;
   }
 
   private setLang(lang: Lang): void {
@@ -1860,7 +1885,7 @@ export class PlaygroundScene implements Scene {
     if (hit.id === "run") void this.run();
     else if (hit.id === "format") void this.format();
     else if (hit.id === "save") void this.save();
-    else if (hit.id === "new") this.fresh();
+    else if (hit.id === "new") void this.fresh();
     else if (hit.id === "delete") void this.remove();
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
     else if (isLang(hit.id)) this.setLang(hit.id);
@@ -2341,6 +2366,7 @@ export class PlaygroundScene implements Scene {
       { id: "undo", label: t("quest.undo"), dim: !this.editor?.canUndo },
       { id: "redo", label: t("quest.redo"), dim: !this.editor?.canRedo },
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      { id: "new", label: t("pg.new"), dim: this.conflict !== null },
       { id: "rename", label: t("pg.rename") },
       // In and out of the screen. Nothing on a canvas can be selected with a
       // mouse, so without these the code and the compiler's answer cannot

@@ -140,8 +140,8 @@ describe("the key field", () => {
 describe("DISK READER", () => {
   it("opens the program as a new pad and never over the open one", () => {
     const read = method("readDisk");
-    expect(read.indexOf("this.fresh();")).toBeGreaterThan(0);
-    expect(read.indexOf("this.fresh();")).toBeLessThan(
+    expect(read.indexOf("await this.fresh()")).toBeGreaterThan(0);
+    expect(read.indexOf("await this.fresh()")).toBeLessThan(
       read.indexOf("this.held.source = disk.source;"),
     );
   });
@@ -158,7 +158,7 @@ describe("DISK READER", () => {
       expect(read).toContain(k);
     }
     const hashed = read.slice(read.indexOf('disk.verdict === "hashed"'));
-    expect(hashed.indexOf("return;")).toBeLessThan(hashed.indexOf("this.fresh();"));
+    expect(hashed.indexOf("return;")).toBeLessThan(hashed.indexOf("await this.fresh()"));
   });
 
   it("is a button on both the bench and CODE, beside POSTER", () => {
