@@ -1,0 +1,958 @@
+# REMIX LAND — CHEATSHEET. The grammar off the page, asked: one question per
+# row of the Go · Rust · Python live-coding cheatsheet (~/vivid/Cheatsheet,
+# go_rust_python_cheatsheet.html), four lines, one right. Nothing is typed and
+# nothing is compiled — the pick is the submission, and the server judges it
+# against the quiz (SPEC §0). Each quest names its language in the brief and
+# in `lang`; the wrong lines are mostly the other two languages' spellings of
+# the same idea, plus the near-miss in the right language.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "remix.cheatsheet"
+land = "remix"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "remix.cheatsheet.01.flush"
+node        = 1
+title       = "THE FLUSH"
+difficulty  = 1
+lang        = "go"
+story       = "06:30, Jardine's Bazaar. The kiosk printed every answer into a buffer, and the screen stayed blank."
+concepts    = ["io", "functions"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+In **Go**, `main` starts with
+
+```
+in := bufio.NewReader(os.Stdin)
+out := bufio.NewWriter(os.Stdout)
+// ____
+```
+
+Which line, right there, makes sure everything written to `out` reaches the
+screen when `main` returns?
+'''
+solution    = 'defer out.Flush()'
+hints = [
+  "A buffered writer only writes when flushed. Schedule the flush for the moment main returns.",
+]
+
+[quest.quiz]
+choices = [
+  'out.Close()',
+  'defer out.Flush()',
+  'drop(out);',
+  'sys.stdout.flush()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "remix.cheatsheet.02.char-count"
+node        = 2
+title       = "CHARACTERS, NOT BYTES"
+difficulty  = 1
+lang        = "rust"
+story       = "The café sign on Paterson Street says \"héllo\". The till counted six letters."
+concepts    = ["strings", "types"]
+requires    = ["remix.cheatsheet.01.flush"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+In **Rust**, `s` is the `String` `"héllo"`. Which expression gives 5, the
+number of characters, rather than the number of bytes?
+'''
+solution    = 's.chars().count()'
+hints = [
+  "A Rust String is UTF-8 bytes; `é` takes two. Walk the chars and count them.",
+]
+
+[quest.quiz]
+choices = [
+  's.len()',
+  'len(s)',
+  's.chars().count()',
+  'utf8.RuneCountInString(s)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "remix.cheatsheet.03.grid"
+node        = 3
+title       = "ROWS OF THEIR OWN"
+difficulty  = 1
+lang        = "python"
+story       = "The seating chart at the Lee Garden banquet: change one table and every table changed."
+concepts    = ["collections", "comprehensions"]
+requires    = ["remix.cheatsheet.02.char-count"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+In **Python**, build `g`, an `n` × `m` grid of zeros whose rows are
+**independent** lists — writing `g[0][0] = 1` must change only row 0.
+'''
+solution    = 'g = [[0] * m for _ in range(n)]'
+hints = [
+  "Multiplying a list of lists copies the reference, not the row. Build each row fresh.",
+]
+
+[quest.quiz]
+choices = [
+  'g = [[0] * m] * n',
+  'g = vec![vec![0; m]; n]',
+  'g := make([][]int, n)',
+  'g = [[0] * m for _ in range(n)]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "remix.cheatsheet.04.count"
+node        = 4
+title       = "THE TALLY"
+difficulty  = 1
+lang        = "go"
+story       = "The dai pai dong on Haven Street counts orders by dish, and a new dish starts at zero."
+concepts    = ["hashing", "collections"]
+requires    = ["remix.cheatsheet.03.grid"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+In **Go**, `m := map[string]int{}`. Add one to the count for the word `w`;
+a word not seen before starts at 0.
+'''
+solution    = 'm[w]++'
+hints = [
+  "Reading a missing key from a Go map gives the zero value, so there is nothing to check first.",
+]
+
+[quest.quiz]
+choices = [
+  'm[w]++',
+  '*m.entry(w).or_insert(0) += 1;',
+  'm[w] = m.get(w, 0) + 1',
+  'if _, ok := m[w]; ok { m[w]++ }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "remix.cheatsheet.05.float-sort"
+node        = 5
+title       = "FLOATS IN A ROW"
+difficulty  = 1
+lang        = "rust"
+story       = "The gold shop on Percival Street sorts the day's prices, and every price has cents."
+concepts    = ["sorting", "traits"]
+requires    = ["remix.cheatsheet.04.count"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+In **Rust**, `a` is a `Vec<f64>`. Sort it ascending, in place.
+'''
+solution    = 'a.sort_by(|x, y| x.total_cmp(y));'
+hints = [
+  "`sort()` needs `Ord`, and `f64` is not `Ord` because of NaN. Give it a comparator that orders every float.",
+]
+
+[quest.quiz]
+choices = [
+  'a.sort();',
+  'sort.Float64s(a)',
+  'a.sort_by(|x, y| x.total_cmp(y));',
+  'a.sort(key=float)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "remix.cheatsheet.06.max-heap"
+node        = 6
+title       = "BIGGEST OUT FIRST"
+difficulty  = 2
+lang        = "python"
+story       = "The auction at the Causeway Bay stamp shop takes the highest bid first. heapq only knows the lowest."
+concepts    = ["heaps", "collections"]
+requires    = ["remix.cheatsheet.05.float-sort"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+In **Python**, `h` is a list used with `heapq`, which is a min-heap. Push
+the number `x` so that `heapq.heappop(h)` gives the **largest** value first
+(you flip its sign back on the way out).
+'''
+solution    = 'heapq.heappush(h, -x)'
+hints = [
+  "There is no max-heap in heapq. Store the values so their order is reversed.",
+]
+
+[quest.quiz]
+choices = [
+  'heapq.heappush(h, -x)',
+  'h.push(Reverse(x));',
+  'heapq.heappush(h, x)',
+  'heap.Push(h, -x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "remix.cheatsheet.07.recursive-closure"
+node        = 7
+title       = "CALLING ITSELF"
+difficulty  = 2
+lang        = "go"
+story       = "The lifts in Hysan Place: to search every floor, the search has to call itself."
+concepts    = ["closures", "recursion"]
+requires    = ["remix.cheatsheet.06.max-heap"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+In **Go**, a closure walks a graph by calling itself:
+
+```
+// ____
+dfs = func(u int) {
+    for _, v := range g[u] { dfs(v) }
+}
+```
+
+Which line must come first so that the body can refer to `dfs`?
+'''
+solution    = 'var dfs func(u int)'
+hints = [
+  "With `:=` the name does not exist yet inside its own literal. Declare the variable with its function type first, then assign.",
+]
+
+[quest.quiz]
+choices = [
+  'dfs := nil',
+  'nonlocal dfs',
+  'let mut dfs = |u: usize| {};',
+  'var dfs func(u int)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "remix.cheatsheet.08.concat"
+node        = 8
+title       = "KEEP BOTH"
+difficulty  = 2
+lang        = "rust"
+story       = "Two queues outside the Times Square cinema join into one, and both ushers keep their lists."
+concepts    = ["collections", "ownership", "slices"]
+requires    = ["remix.cheatsheet.07.recursive-closure"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+In **Rust**, `a` and `b` are `Vec<i32>`. Make a new `Vec` `c` holding `a`
+followed by `b`, and keep using `a` and `b` afterwards.
+'''
+solution    = 'let c = [&a[..], &b[..]].concat();'
+hints = [
+  "Putting the Vecs themselves in the array moves them. Put slices of them in instead.",
+]
+
+[quest.quiz]
+choices = [
+  'let c = [a, b].concat();',
+  'let c = [&a[..], &b[..]].concat();',
+  'c := slices.Concat(a, b)',
+  'let c = a + b;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "remix.cheatsheet.09.multi-key"
+node        = 9
+title       = "TWO KEYS"
+difficulty  = 2
+lang        = "python"
+story       = "The karaoke scoreboard on Lockhart Road: highest score on top, ties in alphabetical order."
+concepts    = ["sorting", "closures"]
+requires    = ["remix.cheatsheet.08.concat"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+In **Python**, `pairs` is a list of `(name, score)` tuples with integer
+scores. Sort it in place: score **descending**, and equal scores by name
+**ascending**.
+'''
+solution    = 'pairs.sort(key=lambda p: (-p[1], p[0]))'
+hints = [
+  "One key, two parts. Negate the number to flip only its order; `reverse=True` would flip the names too.",
+]
+
+[quest.quiz]
+choices = [
+  'pairs.sort(key=lambda p: (p[1], p[0]), reverse=True)',
+  'pairs.sort_by_key(|p| (Reverse(p.1), p.0.clone()));',
+  'pairs.sort(key=lambda p: (-p[1], p[0]))',
+  'sort.Slice(pairs, func(i, j int) bool { return pairs[i].s > pairs[j].s })',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "remix.cheatsheet.10.close-results"
+node        = 10
+title       = "CLOSE AFTER ALL"
+difficulty  = 3
+lang        = "go"
+story       = "Four couriers bring parcels to the Sugar Street depot. The door shuts after the last one, not the first."
+concepts    = ["concurrency", "channels"]
+requires    = ["remix.cheatsheet.09.multi-key"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+In **Go**, four worker goroutines each send on the **unbuffered** channel
+`results` and call `wg.Done()` when they finish. Then `main` collects:
+
+```
+// ____
+for r := range results { all = append(all, r) }
+```
+
+Which line, right before the loop, closes `results` at the right moment so
+the loop ends without a panic or a deadlock?
+'''
+solution    = 'go func() { wg.Wait(); close(results) }()'
+hints = [
+  "Close only after every sender is done, and wait for that somewhere other than the goroutine that is about to read.",
+]
+
+[quest.quiz]
+choices = [
+  'go func() { wg.Wait(); close(results) }()',
+  'close(results)',
+  'defer close(results)',
+  'drop(rtx);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "remix.cheatsheet.11.shared-rx"
+node        = 11
+title       = "ONE INBOX, FOUR HANDS"
+difficulty  = 3
+lang        = "rust"
+story       = "One order slot at the Yee Wo Street kitchen, four cooks reaching into it — one hand at a time."
+concepts    = ["concurrency", "shared-state", "smart-pointers"]
+requires    = ["remix.cheatsheet.10.close-results"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+In **Rust**, `let (tx, rx) = mpsc::channel::<i32>();` — four spawned threads
+must all take jobs from this one receiver. Which line makes `rx` something
+each thread can get its own handle to?
+'''
+solution    = 'let rx = Arc::new(Mutex::new(rx));'
+hints = [
+  "A Receiver cannot be cloned. Share one: a thread-safe counted pointer around a lock.",
+]
+
+[quest.quiz]
+choices = [
+  'let rx = rx.clone();',
+  'let rx = Rc::new(RefCell::new(rx));',
+  'jobs := make(chan int, 100)',
+  'let rx = Arc::new(Mutex::new(rx));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "remix.cheatsheet.12.sentinels"
+node        = 12
+title       = "ONE SENTINEL EACH"
+difficulty  = 3
+lang        = "python"
+story       = "Closing time in Room 7-32. Every worker on the night shift has to be told to go home, one by one."
+concepts    = ["concurrency", "cancellation", "stacks-queues"]
+requires    = ["remix.cheatsheet.11.shared-rx"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+In **Python**, `ts` is a list of worker threads, each running
+
+```
+while True:
+    j = q.get()
+    if j is None: break
+    ...
+```
+
+The producer has put every job on `q`. Which line makes **every** worker
+stop, so that `for t in ts: t.join()` returns?
+'''
+solution    = 'for _ in ts: q.put(None)'
+hints = [
+  "Each worker that reads the stop signal is gone, and it takes the signal with it. Count the workers.",
+]
+
+[quest.quiz]
+choices = [
+  'q.put(None)',
+  'for _ in ts: q.put(None)',
+  'drop(tx);',
+  'close(jobs)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "remix.cheatsheet.13.index-cast"
+node        = 13
+title       = "THE INDEX IS USIZE"
+difficulty  = 2
+lang        = "rust"
+story       = "The shelves at the Central Library in Causeway Bay are numbered, and the ticket in your hand says 7 in a different hand."
+concepts    = ["types", "slices"]
+requires    = ["remix.cheatsheet.12.sentinels"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+In **Rust**, `x` is an `i32` that is known to be non-negative, and `a` is
+a `Vec<i64>`. Bind `n` so that `a[n]` compiles.
+'''
+solution    = 'let n = x as usize;'
+hints = [
+  "An index is `usize`, and Rust never converts a number silently — not even into a `let` with the type written on it. Say the cast.",
+]
+
+[quest.quiz]
+choices = [
+  'n := int(x)',
+  'let n = x as usize;',
+  'let n: usize = x;',
+  'n = int(x)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "remix.cheatsheet.14.comma-ok"
+node        = 14
+title       = "COMMA OK"
+difficulty  = 2
+lang        = "go"
+story       = "The lost-and-found at Victoria Park: a purse with no coins in it is still a purse."
+concepts    = ["collections", "control-flow", "zero-values"]
+requires    = ["remix.cheatsheet.13.index-cast"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+In **Go**, `m` is a `map[string]int`. Open a block that runs only when the
+key `k` is **present**, with its value bound to `v` — and a key stored with
+the value 0 counts as present.
+'''
+solution    = 'if v, ok := m[k]; ok {'
+hints = [
+  "A missing key reads as the zero value, so the value alone cannot tell you. Ask the map for the second result in the if's init statement.",
+]
+
+[quest.quiz]
+choices = [
+  'if let Some(v) = m.get(&k) {',
+  'if v := m[k]; v != 0 {',
+  'if (v := m.get(k)) is not None:',
+  'if v, ok := m[k]; ok {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "remix.cheatsheet.15.enumerate"
+node        = 15
+title       = "NUMBERED STALLS"
+difficulty  = 2
+lang        = "python"
+story       = "The stalls along Jardine's Crescent are numbered, and the inspector reads the number and the stall together."
+concepts    = ["iteration", "control-flow"]
+requires    = ["remix.cheatsheet.14.comma-ok"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+In **Python**, `a` is a list of strings. Open a loop over `a` that gives
+you both `i`, the position starting at 0, and `x`, the element at that
+position.
+'''
+solution    = 'for i, x in enumerate(a):'
+hints = [
+  "There is a builtin that pairs each element with its position — and it hands you the position first.",
+]
+
+[quest.quiz]
+choices = [
+  'for i, x in enumerate(a):',
+  'for i, x := range a {',
+  'for x, i in enumerate(a):',
+  'for (i, x) in a.iter().enumerate() {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "remix.cheatsheet.16.pointer-receiver"
+node        = 16
+title       = "MOVE THE REAL ONE"
+difficulty  = 2
+lang        = "go"
+story       = "The tram on Hennessy Road moved three stops. The photo of the tram did not."
+concepts    = ["structs", "functions"]
+requires    = ["remix.cheatsheet.15.enumerate"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+type P struct{ X, Y int }
+
+// ____
+    p.X += d
+}
+```
+
+`p := P{1, 2}; p.Shift(3)` must leave `p.X` equal to 4. Which line opens
+the method?
+'''
+solution    = 'func (p *P) Shift(d int) {'
+hints = [
+  "A value receiver gets a copy, and the copy is what moves. Receive the address instead.",
+]
+
+[quest.quiz]
+choices = [
+  'fn shift(&mut self, d: i32) {',
+  'func (p P) Shift(d int) {',
+  'func (p *P) Shift(d int) {',
+  'def shift(self, d):',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "remix.cheatsheet.17.derive-ord"
+node        = 17
+title       = "BORN SORTABLE"
+difficulty  = 3
+lang        = "rust"
+story       = "The egg-waffle queue on Tang Lung Street lines up by ticket number, then by name — and nobody wrote a rule for it."
+concepts    = ["traits", "structs", "sorting"]
+requires    = ["remix.cheatsheet.16.pointer-receiver"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+In **Rust**, `struct P { x: i32, y: i32 }` and `v` is a `Vec<P>`. Which
+attribute, placed on the struct, makes `v.sort()` compile — ordering by
+`x` first and then `y` — with no `impl` written by hand?
+'''
+solution    = '#[derive(PartialEq, Eq, PartialOrd, Ord)]'
+hints = [
+  "sort wants Ord, and Ord stands on Eq and PartialOrd, which stand on PartialEq. Derive the whole ladder.",
+]
+
+[quest.quiz]
+choices = [
+  'slices.SortFunc(v, func(a, b P) int { return a.X - b.X })',
+  '#[derive(PartialOrd, Ord)]',
+  '#[derive(PartialEq, Eq, PartialOrd, Ord)]',
+  '@dataclass(order=True)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "remix.cheatsheet.18.not-a-number"
+node        = 18
+title       = "NOT A NUMBER"
+difficulty  = 2
+lang        = "python"
+story       = "The ticket machine at Causeway Bay station was handed a word where it wanted a number, and it must not go dark."
+concepts    = ["error-handling", "types"]
+requires    = ["remix.cheatsheet.17.derive-ord"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+In **Python**, `s` is a string read from input:
+
+```
+try:
+    n = int(s)
+# ____
+    print("bad")
+```
+
+Which line opens the handler so that `s = "abc"` prints `bad` instead of
+crashing?
+'''
+solution    = 'except ValueError:'
+hints = [
+  "The argument is the right type — a string — it is the value that cannot be read as a number. Catch the exception named after that.",
+]
+
+[quest.quiz]
+choices = [
+  'if err != nil {',
+  'except ValueError:',
+  'except TypeError:',
+  'Err(_) => {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "remix.cheatsheet.19.wrap-error"
+node        = 19
+title       = "KEEP THE CHAIN"
+difficulty  = 3
+lang        = "go"
+story       = "A complaint climbs from the Sogo counter to the floor manager, and the original slip stays stapled to it."
+concepts    = ["error-handling", "strings"]
+requires    = ["remix.cheatsheet.18.not-a-number"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+In **Go**, inside `func load(s string) (int, error)`:
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+
+Return an error that adds the context `load:` **and** keeps the original
+one inside it, so that the caller's `errors.Is(err, strconv.ErrSyntax)`
+is still true.
+'''
+solution    = 'return 0, fmt.Errorf("load: %w", err)'
+hints = [
+  "Formatting the error into the message turns it into text and the chain is gone. One verb wraps instead of prints.",
+]
+
+[quest.quiz]
+choices = [
+  'return 0, fmt.Errorf("load: %w", err)',
+  'return Err(format!("load: {e}").into());',
+  'return 0, fmt.Errorf("load: %v", err)',
+  'raise ValueError(f"load: {e}") from e',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "remix.cheatsheet.20.below-zero"
+node        = 20
+title       = "MINUS BELOW ZERO"
+difficulty  = 4
+lang        = "rust"
+story       = "Two tram stops on Yee Wo Street. Counting the gap backwards from the nearer one went below zero, and the whole tram stopped."
+concepts    = ["types", "panics"]
+requires    = ["remix.cheatsheet.19.wrap-error"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+In **Rust**, `i` and `j` are both `usize`, and either may be the larger.
+Bind `d` to the distance between them — a line that compiles and never
+panics, in a debug build too.
+'''
+solution    = 'let d = i.abs_diff(j);'
+hints = [
+  "An unsigned subtraction that would go negative overflows, and in debug that is a panic. There is a method that asks for the gap, not the difference.",
+]
+
+[quest.quiz]
+choices = [
+  'd := max(i, j) - min(i, j)',
+  'let d = (i - j).abs();',
+  'd = abs(i - j)',
+  'let d = i.abs_diff(j);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "remix.cheatsheet.21.append"
+node        = 21
+title       = "KEEP THE RETURN"
+difficulty  = 1
+lang        = "go"
+story       = "Alex adds a parcel to the Percival Street courier list, and the list on the wall stays the same length."
+concepts    = ["slices", "bindings"]
+requires    = ["remix.cheatsheet.20.below-zero"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+In **Go**, `a` is a `[]int` and `x` is an `int`. Add `x` to the end of `a`
+so that `len(a)` is one more than before.
+'''
+solution    = 'a = append(a, x)'
+hints = [
+  "append hands back a slice that may live somewhere new. The line is not finished until that result is kept.",
+]
+
+[quest.quiz]
+choices = [
+  'append(a, x)',
+  'a.push(x);',
+  'a = append(a, x)',
+  'a.append(x)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "remix.cheatsheet.22.larger"
+node        = 22
+title       = "THE LARGER ONE"
+difficulty  = 1
+lang        = "rust"
+story       = "Two bids on the same stamp at the Causeway Bay auction, and Mei writes down the higher one with nothing imported above fn main."
+concepts    = ["types", "functions"]
+requires    = ["remix.cheatsheet.21.append"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+In **Rust**, `x` and `y` are both `i32`, and the file has no `use` lines.
+Bind `m` to the larger of the two.
+'''
+solution    = 'let m = x.max(y);'
+hints = [
+  "Nothing called max is in scope on its own. An integer carries its own comparison, as a method that takes the other value.",
+]
+
+[quest.quiz]
+choices = [
+  'let m = max(x, y);',
+  'let m = x.max(y);',
+  'm := max(x, y)',
+  'let m = x.max(&y);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "remix.cheatsheet.23.sorted-copy"
+node        = 23
+title       = "SORT A COPY"
+difficulty  = 1
+lang        = "python"
+story       = "The stall list along Jardine's Crescent must stay in walking order; the inspector wants an alphabetical one as well."
+concepts    = ["sorting", "slices"]
+requires    = ["remix.cheatsheet.22.larger"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+In **Python**, `a` is a list of strings. Bind `b` to a **new** list holding
+the same strings in ascending order, leaving `a` exactly as it was.
+'''
+solution    = 'b = sorted(a)'
+hints = [
+  "The list's own sort method works in place and hands back None. The builtin that takes any iterable hands back a new list.",
+]
+
+[quest.quiz]
+choices = [
+  'b = a.sort()',
+  'b = sorted(a)',
+  'b = a.sorted()',
+  'b := slices.Sorted(slices.Values(a))',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "remix.cheatsheet.24.empty-not-nil"
+node        = 24
+title       = "EMPTY, NOT NIL"
+difficulty  = 1
+lang        = "go"
+story       = "The courier bag at the Sugar Street depot was sewn with room for eight parcels. Tonight it holds none."
+concepts    = ["slices", "zero-values"]
+requires    = ["remix.cheatsheet.23.sorted-copy"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+In **Go**, `a` was made with `a := make([]int, 0, 8)` and may have had
+elements appended and popped since. Which expression is `true` exactly
+when `a` holds no elements?
+'''
+solution    = 'len(a) == 0'
+hints = [
+  "A slice can be empty without being nil, and its capacity says how much room it has, not how much of it is used.",
+]
+
+[quest.quiz]
+choices = [
+  'len(a) == 0',
+  'a == nil',
+  'cap(a) == 0',
+  'not a',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "remix.cheatsheet.25.inclusive-range"
+node        = 25
+title       = "THROUGH THE LAST STOP"
+difficulty  = 2
+lang        = "rust"
+story       = "The tram on Hennessy Road is counted stop by stop, 1 up to n, and the last stop counts too."
+concepts    = ["control-flow", "iteration"]
+requires    = ["remix.cheatsheet.24.empty-not-nil"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+In **Rust**, `n` is a `usize`. Open a loop that runs `i` over
+`1, 2, …, n`, with `n` **included**.
+'''
+solution    = 'for i in 1..=n {'
+hints = [
+  "Two dots stop one short of the end. There is a spelling of the range that keeps the end in.",
+]
+
+[quest.quiz]
+choices = [
+  'for i in 1..n {',
+  'for i in 1..=n {',
+  'for i := 1; i <= n; i++ {',
+  'for i in range(1, n + 1):',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "remix.cheatsheet.26.own-list"
+node        = 26
+title       = "ITS OWN LIST"
+difficulty  = 2
+lang        = "python"
+story       = "The python on the wet-market price board: one board for the morning prices, one for the afternoon, not the same board twice."
+concepts    = ["slices", "bindings"]
+requires    = ["remix.cheatsheet.25.inclusive-range"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+In **Python**, `a` is a list of ints and nothing is imported. Bind `b` to a
+list holding the same ints, such that `b.append(9)` afterwards leaves `a`
+unchanged.
+'''
+solution    = 'b = a.copy()'
+hints = [
+  "Assignment only binds a second name to the same list, and there is no builtin by that name. Ask the list itself for a fresh one.",
+]
+
+[quest.quiz]
+choices = [
+  'b = a',
+  'b := slices.Clone(a)',
+  'b = copy(a)',
+  'b = a.copy()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "remix.cheatsheet.27.int-abs"
+node        = 27
+title       = "NO ABS FOR INT"
+difficulty  = 2
+lang        = "go"
+story       = "Gogo counts the floors between two lifts at Hysan Place; going down comes out negative, and math is not imported."
+concepts    = ["types", "functions"]
+requires    = ["remix.cheatsheet.26.own-list"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+In **Go** 1.22, `x` is an `int` well inside the range of `int`, and the
+file imports only `fmt`. Bind `a` to the absolute value of `x`.
+'''
+solution    = 'a := max(x, -x)'
+hints = [
+  "math.Abs wants a float64 and needs its import. Since 1.21 two builtins compare values of any ordered type, and one of them, given x and its negation, is enough.",
+]
+
+[quest.quiz]
+choices = [
+  'a := abs(x)',
+  'a := math.Abs(x)',
+  'a := x.abs()',
+  'a := max(x, -x)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "remix.cheatsheet.28.parse"
+node        = 28
+title       = "SAY THE TYPE"
+difficulty  = 2
+lang        = "rust"
+story       = "A ticket number read off a paper slip at Causeway Bay station, and the till wants the number, not the paper."
+concepts    = ["strings", "types", "error-handling"]
+requires    = ["remix.cheatsheet.27.int-abs"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+In **Rust**, `s` is a `&str` holding a decimal integer such as `"42"`.
+Bind `n` as an `i32` holding that number, panicking if `s` is not one.
+'''
+solution    = 'let n: i32 = s.parse().unwrap();'
+hints = [
+  "parse gives back a Result, and it cannot pick the number type on its own. Take the value out of it — a panic on failure is allowed — and write the type somewhere it can be seen.",
+]
+
+[quest.quiz]
+choices = [
+  'let n: i32 = s.parse();',
+  'n, _ := strconv.Atoi(s)',
+  'let n: i32 = s.parse().unwrap();',
+  'n = int(s)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "remix.cheatsheet.29.two-decimals"
+node        = 29
+title       = "TWO DECIMALS"
+difficulty  = 2
+lang        = "python"
+story       = "The gold shop on Percival Street prints the price per gram, and 3.1 has to read 3.10 on the slip."
+concepts    = ["io", "strings"]
+requires    = ["remix.cheatsheet.28.parse"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+In **Python**, `x` is a float. Print it with exactly two digits after the
+decimal point, so that `3.1` prints as `3.10`.
+'''
+solution    = 'print(f"{x:.2f}")'
+hints = [
+  "round drops a trailing zero on the way to the screen. An f-string can carry a format spec that fixes both the precision and the notation.",
+]
+
+[quest.quiz]
+choices = [
+  'print(f"{x:.2f}")',
+  'print(round(x, 2))',
+  'println!("{x:.2}")',
+  'print(f"{x:2f}")',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "remix.cheatsheet.30.whole-quotient"
+node        = 30
+title       = "THE WHOLE QUOTIENT"
+difficulty  = 3
+lang        = "python"
+story       = "Closing the books in Room 7-32: a sum of eighteen digits split three ways, and the python wants every digit right."
+concepts    = ["types", "math"]
+requires    = ["remix.cheatsheet.29.two-decimals"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+In **Python**, `a` and `b` are ints: `a` may be negative and as large as
+`10**18`, and `b` is positive. Bind `q` to `a` divided by `b`, rounded
+**down**, as an `int` that is exact in every digit.
+'''
+solution    = 'q = a // b'
+hints = [
+  "Anything that passes through a float loses digits past 2**53, and int() cuts toward zero, not down. One operator does the whole thing in integers.",
+]
+
+[quest.quiz]
+choices = [
+  'q = a / b',
+  'q = int(a / b)',
+  'q = a // b',
+  'q = math.floor(a / b)',
+]
+answer  = 2

@@ -1,0 +1,964 @@
+# C++ LAND — CHEATSHEET ADVANCED. The second page of the cheatsheet, asked:
+# one question per thing an interviewer uses to tell a fluent C++20 hand from
+# one who only knows the grammar — abbreviated templates, concepts, what a
+# lambda captures, a lambda that calls itself, moving a unique_ptr, locking a
+# weak_ptr, a move constructor that leaves the source safe, try_emplace,
+# optional and string_view, visit, span, a views pipeline, a hash for a pair,
+# a heap with its own order, erasing one copy, splitting on a delimiter,
+# erase_if, popcount, a stopwatch, jthread, async, scoped_lock, atomics and a
+# condition variable. Four lines, one right. Nothing is typed and nothing is
+# compiled — the pick is the submission, and the server judges it against the
+# quiz (SPEC §0). The three wrong lines are near-misses: a missing `mutable`,
+# a `static_cast` where a `dynamic_cast` was meant, a lock that deadlocks, a
+# comparator that builds the other heap.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+# Every line was compiled with clang (C++20, libc++) before it was written down.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "cpp.cheatsheet_advanced"
+land     = "cpp"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "cpp.cheatsheet_advanced.01.auto-params"
+node        = 1
+title       = "ANY TWO WILL DO"
+difficulty  = 3
+story       = "The money changer on Hennessy Road adds a fare in dollars to a tip in cents and does not want a separate function for every pair of types."
+concepts    = ["generics", "functions", "types"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+Define `add` in **one** definition so that `add(1, 2.5)` compiles and
+returns `3.5`, and `add(std::string("a"), "b")` compiles too. C++20.
+'''
+solution    = 'auto add(auto a, auto b) { return a + b; }'
+hints = [
+  "Since C++20 a placeholder in a parameter list makes the function a template by itself — and each placeholder is its own type.",
+]
+
+[quest.quiz]
+choices = [
+  'template <typename T> T add(T a, T b) { return a + b; }',
+  'auto add(auto a, auto b) { return a + b; }',
+  'template <auto T> T add(T a, T b) { return a + b; }',
+  'auto add(a, b) { return a + b; }',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "cpp.cheatsheet_advanced.02.constrained-member"
+node        = 2
+title       = "OUT OF THE BOX"
+difficulty  = 4
+story       = "The Sogo stocktake keeps a running total of whole items only — and the member that reports it is defined in the .cpp, outside the class."
+concepts    = ["generics", "structs", "functions"]
+requires    = ["cpp.cheatsheet_advanced.01.auto-params"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+```cpp
+template <std::integral T>
+struct Stat {
+  T s = 0;
+  void add(T x) { s += x; }
+  T sum() const;
+};
+```
+
+Define `sum` **outside** the struct. `<concepts>` is included.
+'''
+solution    = 'template <std::integral T> T Stat<T>::sum() const { return s; }'
+hints = [
+  "An out-of-line member of a class template repeats the template header — and it has to be the same header, constraint included.",
+]
+
+[quest.quiz]
+choices = [
+  'template <typename T> T Stat<T>::sum() const { return s; }',
+  'T Stat<T>::sum() const { return s; }',
+  'template <std::integral T> T Stat::sum() const { return s; }',
+  'template <std::integral T> T Stat<T>::sum() const { return s; }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "cpp.cheatsheet_advanced.03.mutable-capture"
+node        = 3
+title       = "THE TICKET MACHINE"
+difficulty  = 3
+story       = "The queue-ticket dispenser at the Lucky Mac counter hands out 0, 1, 2 — and keeps its own count, with no counter variable anywhere outside it."
+concepts    = ["closures", "mutability", "bindings"]
+requires    = ["cpp.cheatsheet_advanced.02.constrained-member"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+Make `next` a callable that returns `0`, then `1`, then `2` on successive
+calls. **No variable named `n` exists outside the lambda.**
+'''
+solution    = 'auto next = [n = 0]() mutable { return n++; };'
+hints = [
+  "A capture can be initialised right in the brackets. A lambda's call operator is `const` unless you say otherwise — and mind post- versus pre-increment.",
+]
+
+[quest.quiz]
+choices = [
+  'auto next = [n = 0]() mutable { return n++; };',
+  'auto next = [n = 0]() { return n++; };',
+  'auto next = [&n]() { return n++; };',
+  'auto next = [n = 0]() mutable { return ++n; };',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "cpp.cheatsheet_advanced.04.this-capture"
+node        = 4
+title       = "COUNT ME IN"
+difficulty  = 3
+story       = "The turnstile at Causeway Bay station hands out a clicker; every click must land on the turnstile's own tally, not on a copy of it."
+concepts    = ["closures", "structs", "pointers"]
+requires    = ["cpp.cheatsheet_advanced.03.mutable-capture"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+```cpp
+struct Counter {
+  int count = 0;
+  std::function<void()> ticker();
+};
+```
+
+Inside `ticker`, return a lambda. Calling it twice must leave **this
+object's** `count` at `2`.
+'''
+solution    = 'return [this] { ++count; };'
+hints = [
+  "A data member is not a variable, so it cannot sit in a capture list by name. Capture the object — by pointer, so the real one is changed.",
+]
+
+[quest.quiz]
+choices = [
+  'return [count] { ++count; };',
+  'return [&count] { ++count; };',
+  'return [this] { ++count; };',
+  'return [*this]() mutable { ++count; };',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "cpp.cheatsheet_advanced.05.recursive-lambda"
+node        = 5
+title       = "CALLS ITSELF"
+difficulty  = 4
+story       = "The pastry chef at the Jardine's Bazaar bakery writes the egg-tart tally as a function that calls itself — inside main, with no named function in sight."
+concepts    = ["closures", "recursion", "functions"]
+requires    = ["cpp.cheatsheet_advanced.04.this-capture"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+Define `fib` as a local lambda that **calls itself**, so that `fib(10)`
+returns `55`. `<functional>` is included.
+'''
+solution    = 'std::function<int(int)> fib = [&](int n) { return n < 2 ? n : fib(n-1) + fib(n-2); };'
+hints = [
+  "An `auto` variable cannot appear in its own initializer; a variable with a declared callable type can — and the lambda must capture it.",
+]
+
+[quest.quiz]
+choices = [
+  'auto fib = [&](int n) -> int { return n < 2 ? n : fib(n-1) + fib(n-2); };',
+  'std::function<int(int)> fib = [&](int n) { return n < 2 ? n : fib(n-1) + fib(n-2); };',
+  'std::function<int(int)> fib = [](int n) { return n < 2 ? n : fib(n-1) + fib(n-2); };',
+  'auto fib = [](auto self, int n) -> int { return n < 2 ? n : self(n-1) + self(n-2); };',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "cpp.cheatsheet_advanced.06.if-constexpr"
+node        = 6
+title       = "ONE BRANCH ONLY"
+difficulty  = 4
+story       = "The weighbridge at the typhoon shelter pier takes a crate count or a label — and refuses to compile the branch that makes no sense for what it was given."
+concepts    = ["generics", "control-flow", "types"]
+requires    = ["cpp.cheatsheet_advanced.05.recursive-lambda"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+```cpp
+template <typename T>
+auto weigh(const T& x) {
+  // one line here
+}
+```
+
+Return `x * 2` when `T` is an integer type, otherwise `x.size()`. Both
+`weigh(21)` and `weigh(std::string("abc"))` must compile. `<type_traits>`
+is included.
+'''
+solution    = 'if constexpr (std::is_integral_v<T>) return x * 2; else return x.size();'
+hints = [
+  "A plain `if` still compiles both branches for every `T`. The condition has to be a value, not a trait type — and the `else` is what keeps the other branch out.",
+]
+
+[quest.quiz]
+choices = [
+  'if constexpr (std::is_integral_v<T>) return x * 2; else return x.size();',
+  'if (std::is_integral_v<T>) return x * 2; else return x.size();',
+  'if constexpr (std::is_integral<T>) return x * 2; else return x.size();',
+  'if constexpr (std::is_integral_v<T>) return x * 2; return x.size();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "cpp.cheatsheet_advanced.07.static-assert"
+node        = 7
+title       = "FAIL THE BUILD, NOT THE RUN"
+difficulty  = 3
+story       = "The Noon Day Gun crew checks the square of the charge before the gun is even loaded — if the arithmetic is off, nothing ships."
+concepts    = ["testing", "bindings", "functions"]
+requires    = ["cpp.cheatsheet_advanced.06.if-constexpr"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`constexpr int sq(int x) { return x * x; }` is declared. At **namespace
+scope**, make the **compilation** fail if `sq(12)` is not `144` — nothing
+may be checked at run time.
+'''
+solution    = 'static_assert(sq(12) == 144);'
+hints = [
+  "A `constexpr` call can be evaluated by the compiler, and there is an assertion that lives at compile time; since C++17 its message is optional, but when given it must be a string.",
+]
+
+[quest.quiz]
+choices = [
+  'assert(sq(12) == 144);',
+  'static_assert(sq(12) = 144);',
+  'static_assert(sq(12) == 144, 144);',
+  'static_assert(sq(12) == 144);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "cpp.cheatsheet_advanced.08.enum-class"
+node        = 8
+title       = "A NUMBER BECOMES A LINE"
+difficulty  = 3
+story       = "The MTR signboard at Causeway Bay reads a line number off the wire and must turn it into a proper, scoped, one-byte line code."
+concepts    = ["enums", "types"]
+requires    = ["cpp.cheatsheet_advanced.07.static-assert"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+```cpp
+enum class Line : std::uint8_t { Island, TsuenWan, KwunTong };
+```
+
+`int n` was read from input and is `0`, `1` or `2`. Declare `Line l`
+holding the matching enumerator.
+'''
+solution    = 'Line l = static_cast<Line>(n);'
+hints = [
+  "A scoped enum never converts implicitly, in either direction; brace-init refuses to narrow a run-time `int`. One of the named casts does the job.",
+]
+
+[quest.quiz]
+choices = [
+  'Line l = n;',
+  'Line l = Line{n};',
+  'Line l = static_cast<Line>(n);',
+  'Line l = std::to_underlying<Line>(n);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "cpp.cheatsheet_advanced.09.spaceship"
+node        = 9
+title       = "SIX FOR THE PRICE OF ONE"
+difficulty  = 4
+story       = "The harbour office now wants every berth comparable every which way — less, equal, at-least — and refuses to write six operators by hand."
+concepts    = ["structs", "sorting", "generics"]
+requires    = ["cpp.cheatsheet_advanced.08.enum-class"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`struct Pt { int r, c; };` — add **one member** so that `a < b`, `a == b`
+and `a >= b` all compile, ordering by `r` then `c`. C++20, `<compare>` is
+included.
+'''
+solution    = 'auto operator<=>(const Pt&) const = default;'
+hints = [
+  "One defaulted three-way operator gives you `==` as well. Its return type is an ordering category — let the compiler deduce it — and a defaulted comparison must be `const`.",
+]
+
+[quest.quiz]
+choices = [
+  'auto operator<=>(const Pt&) const = default;',
+  'bool operator<=>(const Pt&) const = default;',
+  'auto operator<=>(const Pt&) = default;',
+  'bool operator<(const Pt&) const = default;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "cpp.cheatsheet_advanced.10.dynamic-cast"
+node        = 10
+title       = "IS IT REALLY A CIRCLE"
+difficulty  = 3
+story       = "The sign shop on Jaffe Road holds every order through a base pointer, and the round-sign machine must only get the ones that really are circles."
+concepts    = ["dispatch", "pointers", "structs"]
+requires    = ["cpp.cheatsheet_advanced.09.spaceship"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+```cpp
+struct Shape { virtual double area() const = 0; virtual ~Shape() = default; };
+struct Circle : Shape { double r; double area() const override { return 3.14 * r * r; } };
+struct Square : Shape { double s; double area() const override { return s * s; } };
+```
+
+`Shape* s` points at some shape. Set `c` to point at it **as a `Circle`**
+when it really is one, and to `nullptr` otherwise.
+'''
+solution    = 'Circle* c = dynamic_cast<Circle*>(s);'
+hints = [
+  "Only one cast asks the object what it is at run time; the others just reinterpret the pointer and never produce null.",
+]
+
+[quest.quiz]
+choices = [
+  'Circle* c = static_cast<Circle*>(s);',
+  'Circle* c = dynamic_cast<Circle*>(s);',
+  'Circle* c = dynamic_cast<Circle>(s);',
+  'Circle* c = reinterpret_cast<Circle*>(s);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "cpp.cheatsheet_advanced.11.move-unique"
+node        = 11
+title       = "HANDED OVER"
+difficulty  = 3
+story       = "A parcel at the Percival Street depot has exactly one owner; putting it on the van means the courier no longer holds it."
+concepts    = ["ownership", "smart-pointers", "move-semantics"]
+requires    = ["cpp.cheatsheet_advanced.10.dynamic-cast"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`auto p = std::make_unique<Node>(5);` and
+`std::vector<std::unique_ptr<Node>> v;` — put the node `p` owns into `v`.
+Afterwards `p` must be **empty**, and no `Node` may be copied.
+'''
+solution    = 'v.push_back(std::move(p));'
+hints = [
+  "A unique pointer cannot be copied, and a raw pointer will not silently become one; hand over the ownership itself.",
+]
+
+[quest.quiz]
+choices = [
+  'v.push_back(p);',
+  'v.push_back(p.release());',
+  'v.push_back(std::make_unique<Node>(*p));',
+  'v.push_back(std::move(p));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "cpp.cheatsheet_advanced.12.weak-lock"
+node        = 12
+title       = "STILL THERE?"
+difficulty  = 4
+story       = "The concierge above Jardine's Bazaar keeps a non-owning note of flat 7's tenant and must check they still live there — and keep them in the lobby while talking."
+concepts    = ["smart-pointers", "ownership", "zero-values"]
+requires    = ["cpp.cheatsheet_advanced.11.move-unique"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`std::weak_ptr<Room> wp;` — print the room's `n` **only if the room still
+exists**, and hold it alive while you do.
+'''
+solution    = 'if (auto sp = wp.lock()) std::cout << sp->n;'
+hints = [
+  "A weak pointer cannot be dereferenced or tested directly; it hands you back a strong one, which is empty when the object is gone.",
+]
+
+[quest.quiz]
+choices = [
+  'if (wp) std::cout << wp->n;',
+  'if (!wp.expired()) std::cout << wp->n;',
+  'if (auto sp = wp.lock()) std::cout << sp->n;',
+  'if (auto sp = wp.get()) std::cout << sp->n;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "cpp.cheatsheet_advanced.13.move-ctor"
+node        = 13
+title       = "TAKE THE KEYS, LEAVE NOTHING"
+difficulty  = 4
+story       = "The pawn shop on Yee Wo Street takes over a locker's contents; the old ticket must be left pointing at nothing, or the locker gets emptied twice."
+concepts    = ["move-semantics", "ownership", "raii"]
+requires    = ["cpp.cheatsheet_advanced.12.weak-lock"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+```cpp
+struct Buf {
+  int* data; int n;
+  explicit Buf(int n) : data(new int[n]), n(n) {}
+  ~Buf() { delete[] data; }
+  Buf(const Buf&) = delete;
+  Buf& operator=(const Buf&) = delete;
+  // the move constructor goes here
+};
+```
+
+Add the move constructor: `Buf b(std::move(a));` must take over `a`'s
+array, and the moved-from `a` must be **safe to destroy**. `<utility>` is
+included.
+'''
+solution    = 'Buf(Buf&& o) noexcept : data(std::exchange(o.data, nullptr)), n(o.n) {}'
+hints = [
+  "The parameter is an rvalue reference, and it cannot be `const` if you are going to empty it. One utility stores a new value and hands back the old one in a single expression.",
+]
+
+[quest.quiz]
+choices = [
+  'Buf(Buf&& o) noexcept : data(std::exchange(o.data, nullptr)), n(o.n) {}',
+  'Buf(Buf&& o) noexcept : data(o.data), n(o.n) {}',
+  'Buf(Buf& o) noexcept : data(std::exchange(o.data, nullptr)), n(o.n) {}',
+  'Buf(const Buf&& o) noexcept : data(std::exchange(o.data, nullptr)), n(o.n) {}',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "cpp.cheatsheet_advanced.14.try-emplace"
+node        = 14
+title       = "ONLY IF NEW"
+difficulty  = 3
+story       = "The tram depot register takes a new car number only once; a repeat must leave the old entry untouched and say so."
+concepts    = ["collections", "pattern-matching", "zero-values"]
+requires    = ["cpp.cheatsheet_advanced.13.move-ctor"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`std::map<std::string, int> m;` with `std::string k; int v;` — insert
+`k → v` **only if `k` is absent**, and in the same line bind `ok` to
+whether it went in.
+'''
+solution    = 'auto [it, ok] = m.try_emplace(k, v);'
+hints = [
+  "The insert that never overwrites returns a pair; structured bindings use square brackets. Its overwriting cousin also returns a pair, which is the trap.",
+]
+
+[quest.quiz]
+choices = [
+  'auto [it, ok] = m.insert_or_assign(k, v);',
+  'auto [it, ok] = m.try_emplace(k, v);',
+  'bool ok = m.try_emplace(k, v);',
+  'auto (it, ok) = m.try_emplace(k, v);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "cpp.cheatsheet_advanced.15.optional-view"
+node        = 15
+title       = "A NUMBER, OR NOT, FROM ANY TEXT"
+difficulty  = 3
+story       = "The tunnel toll booth parses whatever text arrives — a std::string from the reader, a literal from the test — and answers with a fare or with nothing."
+concepts    = ["error-handling", "strings", "functions"]
+requires    = ["cpp.cheatsheet_advanced.14.try-emplace"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+Declare `parse`: it returns an `int` **or nothing** (no exceptions, no
+pointers), and it must be callable with a `std::string` **and** with the
+literal `"7"` without copying the text.
+'''
+solution    = 'std::optional<int> parse(std::string_view s);'
+hints = [
+  "The non-owning string type takes both a `std::string` and a literal by value; a reference to it will not bind to either. The return type needs its template argument.",
+]
+
+[quest.quiz]
+choices = [
+  'std::optional<int> parse(std::string& s);',
+  'std::optional parse(std::string_view s);',
+  'std::optional<int> parse(std::string_view s);',
+  'std::optional<int> parse(std::string_view& s);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "cpp.cheatsheet_advanced.16.visit"
+node        = 16
+title       = "WHICHEVER IT IS"
+difficulty  = 4
+story       = "A ticket at the Times Square cinema is either a seat number or a name on the guest list; the usher prints whichever it holds."
+concepts    = ["enums", "pattern-matching", "dispatch"]
+requires    = ["cpp.cheatsheet_advanced.15.optional-view"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+```cpp
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+std::variant<int, std::string> v = ...;
+auto pr = overloaded{ [](int i) { std::cout << i; },
+                      [](const std::string& s) { std::cout << s; } };
+```
+
+Print whichever alternative `v` holds, using `pr`.
+'''
+solution    = 'std::visit(pr, v);'
+hints = [
+  "The dispatcher is a free function, not a member: the callable comes first, then the variant.",
+]
+
+[quest.quiz]
+choices = [
+  'v.visit(pr);',
+  'std::visit(v, pr);',
+  'pr(v);',
+  'std::visit(pr, v);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "cpp.cheatsheet_advanced.17.span"
+node        = 17
+title       = "ANY ROW OF NUMBERS"
+difficulty  = 4
+story       = "The Victoria Park sensor hub sums readings that arrive as a const vector, a std::array, or a plain C array — one function, nothing copied."
+concepts    = ["slices", "functions", "pointers"]
+requires    = ["cpp.cheatsheet_advanced.16.visit"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+Declare `total` so that **all three** calls compile without copying any
+elements: `total(v)` where `v` is a `const std::vector<int>`, `total(a)`
+where `a` is a `std::array<int, 3>`, and `total(c)` where `c` is
+`int c[3]`. C++20.
+'''
+solution    = 'int total(std::span<const int> xs)'
+hints = [
+  "One non-owning view covers every contiguous sequence — but a view of mutable elements will not accept a `const` vector.",
+]
+
+[quest.quiz]
+choices = [
+  'int total(const std::vector<int>& xs)',
+  'int total(std::span<const int> xs)',
+  'int total(std::span<int> xs)',
+  'int total(std::vector<int> xs)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "cpp.cheatsheet_advanced.18.views-pipeline"
+node        = 18
+title       = "THE LAZY PIPELINE"
+difficulty  = 4
+story       = "The Sogo arcade scoreboard wants the squares of the first three even scores, computed only as the board scrolls to them."
+concepts    = ["iteration", "closures", "slices"]
+requires    = ["cpp.cheatsheet_advanced.17.span"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+```cpp
+namespace views = std::views;
+std::vector<int> v = {9, 2, 7, 4, 6, 1, 8, 10};
+std::ranges::sort(v);
+auto even = [](int x) { return x % 2 == 0; };
+auto sq   = [](int x) { return x * x; };
+```
+
+Build the lazy range `r` whose elements are `4 16 36` — the squares of the
+**first three even** numbers. `<ranges>` is included.
+'''
+solution    = 'auto r = v | views::filter(even) | views::transform(sq) | views::take(3);'
+hints = [
+  "Adaptors compose with `|` and apply left to right: taking three before filtering takes the wrong three, and reversing first takes them from the far end.",
+]
+
+[quest.quiz]
+choices = [
+  'auto r = v | views::filter(even) | views::transform(sq) | views::take(3);',
+  'auto r = v | views::take(3) | views::filter(even) | views::transform(sq);',
+  'auto r = v | views::filter(even) | views::transform(sq) | views::reverse | views::take(3);',
+  'auto r = v.filter(even).transform(sq).take(3);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "cpp.cheatsheet_advanced.19.multiset-erase-one"
+node        = 19
+title       = "JUST ONE OF THEM"
+difficulty  = 3
+story       = "Three sampans in the typhoon shelter share the same draft reading; when one leaves, the sorted log must drop exactly one entry, not all three."
+concepts    = ["collections", "sorting"]
+requires    = ["cpp.cheatsheet_advanced.18.views-pipeline"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`std::multiset<int> ms = {3, 5, 5, 5, 8};` and `int x = 5;` — remove
+**exactly one** `5`, leaving `3 5 5 8`, in O(log n).
+'''
+solution    = 'ms.erase(ms.find(x));'
+hints = [
+  "Erasing by value removes every copy; erasing by iterator removes one. The member lookup is logarithmic — the free algorithm walks.",
+]
+
+[quest.quiz]
+choices = [
+  'ms.erase(x);',
+  'ms.remove(x);',
+  'ms.erase(std::find(ms.begin(), ms.end(), x), ms.end());',
+  'ms.erase(ms.find(x));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "cpp.cheatsheet_advanced.20.pair-hash"
+node        = 20
+title       = "A KEY WITH TWO HALVES"
+difficulty  = 4
+story       = "The Causeway Bay grid is visited by (row, column), and the hashed set of visited cells needs a hasher the standard did not ship."
+concepts    = ["collections", "hashing", "structs"]
+requires    = ["cpp.cheatsheet_advanced.19.multiset-erase-one"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+```cpp
+struct PairHash {
+  // one line here
+    return std::hash<long long>()(((long long)p.first << 32) ^ (unsigned)p.second);
+  }
+};
+std::unordered_map<std::pair<int,int>, int, PairHash> seen;
+```
+
+Write the opening line of the hasher so that `seen` compiles.
+'''
+solution    = 'std::size_t operator()(const std::pair<int,int>& p) const {'
+hints = [
+  "A hasher is a call operator taking one key and returning a `size_t` — and the container calls it on a `const` object. Two keys and a `bool` is a comparator, not a hash.",
+]
+
+[quest.quiz]
+choices = [
+  'std::size_t operator()(const std::pair<int,int>& p) {',
+  'std::size_t hash(const std::pair<int,int>& p) const {',
+  'std::size_t operator()(const std::pair<int,int>& p) const {',
+  'bool operator()(const std::pair<int,int>& a, const std::pair<int,int>& b) const {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "cpp.cheatsheet_advanced.21.heap-comparator"
+node        = 21
+title       = "THE SOONEST JOB ON TOP"
+difficulty  = 4
+story       = "Chef Bo's ticket rail at the Lucky Mac night kitchen keeps the order with the earliest deadline on top — and the rail does not know what 'less' means for a ticket."
+concepts    = ["heaps", "closures", "sorting"]
+requires    = ["cpp.cheatsheet_advanced.20.pair-hash"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+```cpp
+struct Job { int d; std::string name; };   // no comparison operators
+std::priority_queue<Job, std::vector<Job>, decltype(cmp)> pq(cmp);
+```
+
+Define `cmp` (before the queue) so that `pq.top()` is always the job with
+the **smallest** `d`.
+'''
+solution    = 'auto cmp = [](auto& a, auto& b) { return a.d > b.d; };'
+hints = [
+  "The comparator says who sinks: the queue puts on top the element that is not 'less' than any other. For the smallest on top, 'less' has to mean larger — and it must return a real bool.",
+]
+
+[quest.quiz]
+choices = [
+  'auto cmp = [](auto& a, auto& b) { return a.d > b.d; };',
+  'auto cmp = [](auto& a, auto& b) { return a.d < b.d; };',
+  'auto cmp = [](auto& a, auto& b) { return a > b; };',
+  'auto cmp = [](auto& a, auto& b) { return a.d - b.d; };',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "cpp.cheatsheet_advanced.22.getline-delim"
+node        = 22
+title       = "SPLIT ON THE COMMA"
+difficulty  = 3
+story       = "The delivery manifest reads 'Jaffe Road,7,Sogo' — three fields, one of them with a space inside, split on commas only."
+concepts    = ["strings", "io", "iteration"]
+requires    = ["cpp.cheatsheet_advanced.21.heap-comparator"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`std::istringstream ss(line); std::string tok; std::vector<std::string> parts;`
+— with `line` being `Jaffe Road,7,Sogo`, fill `parts` with **three** fields,
+the first one `Jaffe Road`.
+'''
+solution    = "while (std::getline(ss, tok, ',')) parts.push_back(tok);"
+hints = [
+  "`>>` splits on whitespace, which cuts the road name in two. The line reader takes an optional delimiter — a single character, as its third argument.",
+]
+
+[quest.quiz]
+choices = [
+  'while (ss >> tok) parts.push_back(tok);',
+  "while (std::getline(ss, tok, ',')) parts.push_back(tok);",
+  'while (std::getline(ss, tok, ",")) parts.push_back(tok);',
+  "while (std::getline(ss, ',', tok)) parts.push_back(tok);",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "cpp.cheatsheet_advanced.23.erase-if"
+node        = 23
+title       = "DROP THE ODD ONES"
+difficulty  = 4
+story       = "The Sogo arcade purges every odd-numbered token from the jar — in one line, without an iterator going stale halfway through."
+concepts    = ["slices", "iteration", "undefined-behaviour"]
+requires    = ["cpp.cheatsheet_advanced.22.getline-delim"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`std::vector<int> v = {1, 3, 5, 2, 4, 7, 9};` — remove every **odd**
+element so that `v` is `{2, 4}` with `v.size() == 2`. C++20, `<algorithm>`
+and `<vector>` are included.
+'''
+solution    = 'std::erase_if(v, [](int x) { return x % 2 != 0; });'
+hints = [
+  "The classic algorithm only shuffles and never shrinks; erasing inside a `++it` loop uses an iterator the erase just invalidated. C++20 added a free function that does the whole dance for you.",
+]
+
+[quest.quiz]
+choices = [
+  'std::remove_if(v.begin(), v.end(), [](int x) { return x % 2 != 0; });',
+  'for (auto it = v.begin(); it != v.end(); ++it) if (*it % 2 != 0) v.erase(it);',
+  'v.erase_if([](int x) { return x % 2 != 0; });',
+  'std::erase_if(v, [](int x) { return x % 2 != 0; });',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "cpp.cheatsheet_advanced.24.popcount"
+node        = 24
+title       = "COUNT THE LIT WINDOWS"
+difficulty  = 4
+story       = "Sixty-four flats in the Hennessy Road tower, one bit each; the night watchman counts the lit ones — all sixty-four, not just the low half."
+concepts    = ["bit-manipulation", "types"]
+requires    = ["cpp.cheatsheet_advanced.23.erase-if"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`std::uint64_t x = 0xF0000000F0000001;` — set `int c` to the number of
+**set bits** in `x`, which is `9`. `<bit>` and `<bitset>` are included.
+'''
+solution    = 'int c = std::popcount(x);'
+hints = [
+  "Two of these only look at 32 bits of a 64-bit value, and one counts the trailing ones rather than all of them. The C++20 one takes any unsigned type as it is.",
+]
+
+[quest.quiz]
+choices = [
+  'int c = __builtin_popcount(x);',
+  'int c = std::bitset<32>(x).count();',
+  'int c = std::popcount(x);',
+  'int c = std::countr_one(x);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "cpp.cheatsheet_advanced.25.stopwatch"
+node        = 25
+title       = "HOW LONG DID THAT TAKE"
+difficulty  = 3
+story       = "Mei times the solve from the gun to the last keystroke, and wants the answer in whole milliseconds — not nanoseconds, not a compile error."
+concepts    = ["types", "testing"]
+requires    = ["cpp.cheatsheet_advanced.24.popcount"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+```cpp
+using namespace std::chrono;
+auto t0 = steady_clock::now();
+solve();
+auto t1 = steady_clock::now();
+```
+
+Set `ms` to the elapsed time as an integer number of **milliseconds**.
+'''
+solution    = 'auto ms = duration_cast<milliseconds>(t1 - t0).count();'
+hints = [
+  "The difference of two time points is a duration in the clock's own unit. Converting to a coarser unit loses precision, so it has to be asked for explicitly.",
+]
+
+[quest.quiz]
+choices = [
+  'auto ms = (t1 - t0).count();',
+  'auto ms = duration_cast<milliseconds>(t1 - t0).count();',
+  'auto ms = milliseconds(t1 - t0).count();',
+  'auto ms = (t1 - t0).milliseconds();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "cpp.cheatsheet_advanced.26.jthread"
+node        = 26
+title       = "JOINS ITSELF ON THE WAY OUT"
+difficulty  = 3
+story       = "Alex on Percival Street starts the night batch on a second thread and wants it waited for when the scope ends — without a line he might forget."
+concepts    = ["concurrency", "raii"]
+requires    = ["cpp.cheatsheet_advanced.25.stopwatch"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`void work();` — start `work` on a new thread `t` that is **joined
+automatically** when `t` goes out of scope. C++20, `<thread>` is included.
+'''
+solution    = 'std::jthread t(work);'
+hints = [
+  "A plain thread that is still joinable at destruction terminates the program; detaching never joins. C++20 added a thread whose destructor joins — its constructor is explicit, so no `=`.",
+]
+
+[quest.quiz]
+choices = [
+  'std::jthread t(work);',
+  'std::thread t(work);',
+  'std::jthread t = work;',
+  'std::thread t(work); t.detach();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "cpp.cheatsheet_advanced.27.async"
+node        = 27
+title       = "START NOW, COLLECT LATER"
+difficulty  = 4
+story       = "The exchange booth sends the rate lookup off to another clerk the moment the customer arrives, and collects the number when it is needed."
+concepts    = ["concurrency", "functions", "error-handling"]
+requires    = ["cpp.cheatsheet_advanced.26.jthread"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`int work(int x);` — start `work(5)` **immediately on another thread** and
+get a handle `f` such that `int r = f.get();` later yields the result.
+`<future>` is included.
+'''
+solution    = 'auto f = std::async(std::launch::async, work, 5);'
+hints = [
+  "Pass the callable and its arguments separately — calling it yourself runs it right here. The deferred policy does not start anything until `get`.",
+]
+
+[quest.quiz]
+choices = [
+  'auto f = std::async(std::launch::async, work(5));',
+  'std::future<int> f = std::thread(work, 5);',
+  'auto f = std::async(std::launch::deferred, work, 5);',
+  'auto f = std::async(std::launch::async, work, 5);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "cpp.cheatsheet_advanced.28.scoped-lock"
+node        = 28
+title       = "TWO LOCKS, NO DEADLOCK"
+difficulty  = 4
+story       = "Two tellers at the fintech off Gloucester Road move money between the same two accounts in opposite directions, and the branch must never freeze."
+concepts    = ["shared-state", "deadlock", "raii"]
+requires    = ["cpp.cheatsheet_advanced.27.async"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+```cpp
+struct Acct { std::mutex m; int bal; };
+void transfer(Acct& from, Acct& to, int amt) {
+  // one line here
+  from.bal -= amt; to.bal += amt;
+}
+```
+
+Lock **both** accounts for the rest of the function. One thread runs
+`transfer(a, b, 1)` in a loop while another runs `transfer(b, a, 1)`; the
+program must never deadlock.
+'''
+solution    = 'std::scoped_lock lk(from.m, to.m);'
+hints = [
+  "Taking the two locks one after the other, in whatever order the arguments came, is exactly how two threads wait on each other forever. One C++17 guard takes any number of mutexes and acquires them deadlock-free.",
+]
+
+[quest.quiz]
+choices = [
+  'std::lock_guard lk(from.m, to.m);',
+  'std::lock_guard<std::mutex> l1(from.m); std::lock_guard<std::mutex> l2(to.m);',
+  'std::scoped_lock lk(from.m, to.m);',
+  'std::scoped_lock lk(from.m); std::scoped_lock lk2(to.m);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "cpp.cheatsheet_advanced.29.fetch-add"
+node        = 29
+title       = "THE NUMBER BEFORE MINE"
+difficulty  = 5
+story       = "Eight turnstiles at Causeway Bay station share one counter; each gate needs the count as it was just before its own click, and no click may be lost."
+concepts    = ["shared-state", "data-races", "concurrency"]
+requires    = ["cpp.cheatsheet_advanced.28.scoped-lock"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`std::atomic<int> hits{0};` is incremented by eight threads at once. In
+each thread, add `1` and set `int before` to the value **just before this
+thread's increment**. No increment may be lost.
+'''
+solution    = 'int before = hits.fetch_add(1);'
+hints = [
+  "Reading the value and then storing a new one are two separate atomic steps, and another thread fits between them. The pre-increment is atomic but hands back the value after.",
+]
+
+[quest.quiz]
+choices = [
+  'int before = hits.fetch_add(1);',
+  'int before = ++hits;',
+  'int before = hits.exchange(hits + 1);',
+  'int before = hits.add(1);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "cpp.cheatsheet_advanced.30.condition-variable"
+node        = 30
+title       = "WAIT UNTIL THERE IS SOMETHING"
+difficulty  = 5
+story       = "Noon, the gun fires, and the Lucky Mac pass-through window: the runner sleeps until a plate is actually there, wakes for nothing else, and never misses one that was put down early."
+concepts    = ["channels", "shared-state", "concurrency"]
+requires    = ["cpp.cheatsheet_advanced.29.fetch-add"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`std::mutex m; std::condition_variable cv; std::queue<int> q;` — at the
+start of the consumer, take the lock and **block until `q` is not empty**,
+correct even if the producer already pushed and notified before we got
+here, and robust to spurious wake-ups. Afterwards the lock is still held.
+'''
+solution    = 'std::unique_lock<std::mutex> lk(m); cv.wait(lk, [&] { return !q.empty(); });'
+hints = [
+  "The wait needs a lock it can release and reacquire, so not the simple guard, and not the bare mutex. The overload that takes a predicate re-checks it on every wake and returns at once if it already holds.",
+]
+
+[quest.quiz]
+choices = [
+  'std::unique_lock<std::mutex> lk(m); cv.wait(lk);',
+  'std::unique_lock<std::mutex> lk(m); cv.wait(lk, [&] { return !q.empty(); });',
+  'std::lock_guard<std::mutex> lk(m); cv.wait(lk, [&] { return !q.empty(); });',
+  'std::unique_lock<std::mutex> lk(m); cv.wait(m, [&] { return !q.empty(); });',
+]
+answer  = 1

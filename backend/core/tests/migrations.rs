@@ -1020,14 +1020,13 @@ fn migration_0023_opens_the_eighth_and_ninth_lands() {
 }
 
 #[test]
-fn the_newest_migration_opens_the_fifth_road() {
-    // The "newest migration" pin: fails loudly if a 0025 is added without a
-    // test of its own here. 0024 is one name in one CHECK constraint,
-    // `quests.category`, for Rust Land's FRAMEWORKS road — with everything
-    // 0023 built (the `lang` fill-in trigger, the `OF`-narrowed FTS update
-    // trigger, the rowids the index keys on) carried across the rebuild.
-    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
-    assert_eq!(previous, 23);
+fn migration_0025_opens_the_cheatsheet_road() {
+    // 0025 is one name in one CHECK constraint, `quests.category`, for every
+    // land's CHEATSHEET road — with everything 0024 carried (the `lang`
+    // fill-in trigger, the `OF`-narrowed FTS update trigger, the rowids the
+    // index keys on) across the rebuild. Run to 0025 only: 0026 has a pin of
+    // its own below.
+    let previous = 24;
     let conn = database_at_version(previous);
     conn.execute(
         "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
@@ -1041,27 +1040,28 @@ fn the_newest_migration_opens_the_fifth_road() {
         conn.execute(
             "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
                                  starter, solution, tests, checksum)
-             VALUES ('rust.frameworks.01.a', 'p', 'rust', 'frameworks', 1, 't', 'b', 's', 1, 's',
+             VALUES ('rust.cheatsheet.01.a', 'p', 'rust', 'cheatsheet', 1, 't', 'b', 's', 1, 's',
                      's', '{}', 'c')",
             [],
         )
         .is_err(),
-        "0023 has no frameworks in its CHECK"
+        "0024 has no cheatsheet in its CHECK"
     );
 
-    db::prepare(&conn).unwrap();
+    let (_, _, sql) = db::MIGRATIONS.iter().find(|m| m.0 == 25).unwrap();
+    conn.execute_batch(sql).unwrap();
 
     conn.execute(
         "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
                              starter, solution, tests, checksum)
-         VALUES ('rust.frameworks.01.a', 'p', 'rust', 'frameworks', 1, 'serde', 'b', 's', 2, 's',
-                 's', '{\"crates\":[\"serde\"]}', 'c')",
+         VALUES ('rust.cheatsheet.01.a', 'p', 'rust', 'cheatsheet', 1, 'serde', 'b', 's', 2, 's',
+                 's', '{}', 'c')",
         [],
     )
-    .expect("quests takes frameworks");
+    .expect("quests takes cheatsheet");
     let lang: String = conn
         .query_row(
-            "SELECT lang FROM quests WHERE id = 'rust.frameworks.01.a'",
+            "SELECT lang FROM quests WHERE id = 'rust.cheatsheet.01.a'",
             [],
             |r| r.get(0),
         )
@@ -1098,18 +1098,115 @@ fn the_newest_migration_opens_the_fifth_road() {
         .unwrap();
     assert_eq!(hits, 1, "the FTS insert trigger came back with the table");
     conn.execute(
-        "UPDATE quests SET lang = 'rust' WHERE id = 'rust.frameworks.01.a'",
+        "UPDATE quests SET lang = 'rust' WHERE id = 'rust.cheatsheet.01.a'",
         [],
     )
     .expect("a lang update does not go near the FTS index");
     conn.execute(
-        "UPDATE quests SET title = 'tokio' WHERE id = 'rust.frameworks.01.a'",
+        "UPDATE quests SET title = 'tokio' WHERE id = 'rust.cheatsheet.01.a'",
         [],
     )
     .unwrap();
     let hits: i64 = conn
         .query_row(
             "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'tokio'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS update trigger came back with the table");
+    let total: i64 = conn
+        .query_row("SELECT count(*) FROM quest_fts", [], |r| r.get(0))
+        .unwrap();
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM quests", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(total, rows, "one FTS row per quest, no more and no fewer");
+}
+
+#[test]
+fn the_newest_migration_opens_the_second_sheet_road() {
+    // The "newest migration" pin: fails loudly if a 0027 is added without a
+    // test of its own here. 0026 is one more name in `quests.category`'s
+    // CHECK — `cheatsheet_advanced`, CHEATSHEET ADVANCED on screen — with
+    // everything 0025 carried (the `lang` fill-in trigger, the FTS triggers,
+    // the rowids the index keys on) across the rebuild.
+    let previous = db::MIGRATIONS[db::MIGRATIONS.len() - 2].0;
+    assert_eq!(previous, 25);
+    let conn = database_at_version(previous);
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('rust.cheatsheet.01.a', 'p', 'rust', 'cheatsheet', 1, 'tram', 'b', 's', 1, 's',
+                 's', '{}', 'c')",
+        [],
+    )
+    .unwrap();
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('rust.cheatsheet_advanced.01.a', 'p', 'rust', 'cheatsheet_advanced', 1,
+                     't', 'b', 's', 1, 's', 's', '{}', 'c')",
+            [],
+        )
+        .is_err(),
+        "0025 has no cheatsheet_advanced in its CHECK"
+    );
+
+    db::prepare(&conn).unwrap();
+
+    conn.execute(
+        "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                             starter, solution, tests, checksum)
+         VALUES ('go.cheatsheet_advanced.01.a', 'p', 'go', 'cheatsheet_advanced', 1, 'errgroup',
+                 'b', 's', 3, 's', 's', '{}', 'c')",
+        [],
+    )
+    .expect("quests takes cheatsheet_advanced");
+    let lang: String = conn
+        .query_row(
+            "SELECT lang FROM quests WHERE id = 'go.cheatsheet_advanced.01.a'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(lang, "go", "the fill-in trigger survived the rebuild");
+    assert!(
+        conn.execute(
+            "INSERT INTO quests (id, pack, land, category, node, title, brief, story, difficulty,
+                                 starter, solution, tests, checksum)
+             VALUES ('rust.expert.01.a', 'p', 'rust', 'expert', 1, 't', 'b', 's', 1, 's', 's', '{}',
+                     'c')",
+            [],
+        )
+        .is_err(),
+        "the CHECK is widened, not removed"
+    );
+    let kept: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quests WHERE id = 'rust.cheatsheet.01.a' AND lang = 'rust'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, 1, "the rebuild carried the quests across");
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'errgroup'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(hits, 1, "the FTS insert trigger came back with the table");
+    conn.execute(
+        "UPDATE quests SET title = 'select' WHERE id = 'go.cheatsheet_advanced.01.a'",
+        [],
+    )
+    .unwrap();
+    let hits: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM quest_fts WHERE quest_fts MATCH 'select'",
             [],
             |r| r.get(0),
         )

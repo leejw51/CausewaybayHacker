@@ -1,0 +1,417 @@
+# LUA LAND — CHEATSHEET, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/lua/cheatsheet.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code, live in the English
+# pack, and are never translated. Code blocks and identifiers are copied
+# verbatim.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "lua.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.cheatsheet.01.read-line"
+title = "第一行"
+story = "21:00，浣紗街。隊員名單一行一行咁入嚟。"
+brief = '''
+由標準輸入讀一行入 `line`，做字串，唔要個換行。
+'''
+hints = [
+  "io.read 收一個格式：讀一行一種，讀數字一種，讀晒一種。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.cheatsheet.02.not-equal"
+title = "唔一樣"
+story = "兩個人都話自己孭火龍同一節。糾察睇吓兩個號碼係咪唔同。"
+brief = '''
+開一個 `if`，`a` 同 `b` **唔相等**先係 true。
+'''
+hints = [
+  "Lua 寫唔等於用波浪號，唔係感嘆號。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.cheatsheet.03.last"
+title = "龍尾"
+story = "龍頭係第 1 節。糾察要龍尾，唔理今晚條龍有幾長。"
+brief = '''
+`t` 係一個好似 `{10, 20, 30}` 咁嘅 list。整 `last` 做佢最後一個元素，幾長都得。
+'''
+hints = [
+  "list 由 1 開始，所以長度就係最後一個元素嘅 index。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.cheatsheet.04.local"
+title = "留喺度"
+story = "每一節自己數自己啲香，成條街其他人都唔應該睇到。"
+brief = '''
+整 `count` 做一個由 0 開始、淨係喺而家呢個 block 入面先見到嘅變數——唔係
+global。
+'''
+hints = [
+  "直接 assign 一個新名會變 global。收窄個 scope 只要一個 keyword。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.cheatsheet.05.concat"
+title = "名牌"
+story = "每個孭龍嘅人都攞一張紙牌：一個字、一條橫、一個號碼。"
+brief = '''
+`n` 係數字 7。整 `s` 做字串 `"id-7"`。
+'''
+hints = [
+  "Lua 嘅 `+` 淨係計數。字串用兩點駁埋。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.cheatsheet.06.ipairs"
+title = "由頭到尾"
+story = "點名由龍頭開始，一節一節順住嚟。"
+brief = '''
+順住 1、2、3…… 行一次 list `t`，index 叫 `i`，元素叫 `v`。
+'''
+hints = [
+  "table 本身唔係 iterator。有一個內建 function 會順住次序行 list 部分，俾你 index 同值。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.cheatsheet.07.format"
+title = "兩個位"
+story = "印好嘅場刊將每人分到嘅香寫到小數點後兩個位。"
+brief = '''
+`x` 係 `3.14159`。印佢出嚟，小數點後啱啱好兩個位：`3.14`。
+'''
+hints = [
+  "string.format 用 C 嘅 printf code；精度寫喺點後面。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.cheatsheet.08.sort-desc"
+title = "高嘅排頭"
+story = "孭杆嘅人按高矮排隊，最高嗰個企最前。"
+brief = '''
+`t` 係一個數字 list。就地排做**由大到細**。
+'''
+hints = [
+  "table.sort 收一個 function，講 `a` 係咪排喺 `b` 前面。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.cheatsheet.09.closure"
+title = "計數器"
+story = "蓮花宮門口嘅糾察用一個識記數嘅計數器數燈籠。"
+brief = '''
+`counter()` 返一個 function，每 call 一次就加一：
+
+```
+local function counter()
+  local n = 0
+  -- ____
+end
+local c = counter()
+print(c(), c())  -- 1  2
+```
+'''
+hints = [
+  "入面個 function 改外面嗰個 `n` 本身，再返佢出嚟。Lua 冇 `+=`。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.cheatsheet.10.setmetatable"
+title = "新嘅 stack"
+story = "啲香疊喺棚入面張枱度，每一節都想要自己一疊。"
+brief = '''
+整 `s` 做一個新嘅空 table，搵 method 搵唔到就去 `Stack` 搵。
+
+```
+local Stack = {}
+Stack.__index = Stack
+function Stack:push(x) self[#self + 1] = x end
+-- ____
+s:push(5)
+```
+'''
+hints = [
+  "搵唔到嘅 key 會經 metatable 嘅 `__index` 去搵。setmetatable 設定佢，再返返個 table。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.cheatsheet.11.colon"
+title = "冒號"
+story = "再擺多支香上去。個 call 要知係邊個嘅嗰疊。"
+brief = '''
+`Stack.push` 係用 `function Stack:push(x)` 定義嘅，`s` 係一個 stack。將 5
+push 落 `s`。
+'''
+hints = [
+  "用 `:` 定義嘅 method 有個收埋咗嘅第一個參數 `self`。call 嗰陣要將個 table 當佢傳入去。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.cheatsheet.12.pcall"
+title = "龍頭"
+story = "半夜十二點。龍頭行上廟前嘅石級，一支壞香唔可以搞到佢跌落嚟。"
+brief = '''
+`f(x)` 可能會出 error。call 佢嗰陣要捉住個 error：fail 嘅話 `ok` 係 `false`，
+`err` 就係個訊息。
+'''
+hints = [
+  "將 function 同參數分開俾 pcall；佢自己 call，狀態排先。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.cheatsheet.13.pop"
+title = "由頂攞走"
+story = "啲香一支一支咁放上堆；點火嗰個再由頂攞一支落嚟。"
+brief = '''
+`t` 係一個當 stack 用嘅 list；啲香用 `table.insert(t, x)` 放上去。將**頂**（最後）
+嗰個元素由 `t` 攞走放入 `top`，令 `#t` 縮一個。
+'''
+hints = [
+  "負責加嘅嗰個 library 都負責移走，冇俾位置嘅話佢攞嘅係尾。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.cheatsheet.14.gmatch-numbers"
+title = "嗰行啲數字"
+story = "各節嘅人數以一行數字嘅形式嚟到，中間用空格隔開：`3 14 15`。"
+brief = '''
+`line` 係 `"3 14 15"`，`t` 係一個空 table。將三個**數字** 3、14、15 填入 `t` —— 令
+`t[1] == 3` 係 true，而 `#t` 係 3。
+'''
+hints = [
+  "Pattern iterator 將每一段數字當字串交出嚟；一段係一個或以上，而字串仲未係數字。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.cheatsheet.15.sub"
+title = "頭三個"
+story = "銅鑼灣塊路線牌每條街淨係顯示頭三個字母。"
+brief = '''
+`s` 係 `"CausewayBay"`。整 `head` 做佢頭三個字元 `"Cau"`。
+'''
+hints = [
+  "Lua 字串由 1 數起，而個子字串 method 收一個開始同一個包括在內嘅結尾。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.cheatsheet.16.pairs"
+title = "每一個 key"
+story = "本香簿係按孭嘅人嘅名記嘅，唔係按號碼，而糾察要每一筆都讀出嚟。"
+brief = '''
+`t` 係 `{ann = 3, bo = 5, cy = 2}` —— 字串 key，冇 list 部分。開一個 loop，行勻
+**每一筆**，key 叫 `k`，值叫 `v`。
+'''
+hints = [
+  "ipairs 行 1、2、3…… 去到第一個冇嘅 index 就停；呢個 table 根本冇 `t[1]`。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.cheatsheet.17.select"
+title = "嚟咗幾多個"
+story = "孭龍嘅人點名嗰陣嗌自己個名應到；有啲乜都冇嗌，糾察照數佢哋。"
+brief = '''
+`count` 收任意數量嘅參數。整 `n` 做傳入咗幾多個，**包括** `nil`：
+
+```
+local function count(...)
+  -- ____
+  return n
+end
+print(count(1, nil, 3))  -- 3
+```
+'''
+hints = [
+  "將 vararg 打包做 table 會唔見咗啲窿；嗰個按位置揀參數嘅內建 function，仲有個特別嘅第一個參數係淨係數佢哋有幾多個嘅。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.cheatsheet.18.concat"
+title = "一行名"
+story = "場刊將孭杆嘅人列喺一行，每個名之間一個空格。"
+brief = '''
+`parts` 係 `{"Tai", "Hang", "Road"}`。整 `s` 做單一字串 `"Tai Hang Road"` —— 唔用
+`..` loop。
+'''
+hints = [
+  "table library 一個 call 就駁埋一個字串 list；分隔符係第二個參數。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.cheatsheet.19.floor-div"
+title = "分份同餘數"
+story = "啲香三支三支咁分出去；個棚借咗啲俾蓮花宮之後，個數變咗負。"
+brief = '''
+`a` 係 `-7`，`b` 係 `3`。整 `q` 做**向下**取整嘅商（`-3`），`r` 做**非負**嘅餘數
+（`2`），令 `q * b + r == a`。
+'''
+hints = [
+  "LuaJIT 冇整數除法運算子，而 `/` 永遠係浮點數。`%` 本身已經係向負無限取整；fmod 唔係。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.cheatsheet.20.shift-letter"
+title = "龍轉彎"
+story = "大坑道嘅午夜。龍頭繞住個街口轉，而喺 `z` 嗰個孭龍嘅人踏前一步，又變返做 `a`。"
+brief = '''
+`c` 係一個細楷字母，`k` 係一個非負數。整 `out` 做字母表入面 `k` 個位之後嗰個字母，
+去到尾就兜返轉頭 —— `"z"` 配 `k = 1` 得出 `"a"`。細楷 `a` 係 byte 97。
+'''
+hints = [
+  "字串冇算術；攞佢個 byte，喺 0..25 之內移位，再將個 byte 變返做一個單字元字串。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.cheatsheet.21.insert"
+title = "多一個名"
+story = "一個遲到嘅孭龍人去到浣紗街個棚，佢個名就寫落名冊嘅尾。"
+brief = '''
+`t` 係一個名嘅 list。用 table library 將 `x` 放喺 `t` 嘅**尾** —— 唔計 index —— 令 `#t`
+大一而 `t[#t]` 係 `x`。
+'''
+hints = [
+  "個 library 入面令 list 增長嗰個 call 係先收個 table 嘅；冇俾位置嘅話，佢會將個值放喺最後一個後面。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.cheatsheet.22.countdown"
+title = "十數到一"
+story = "點龍頭嘅倒數由十數到一，喺大坑道上面大聲嗌出嚟。"
+brief = '''
+開一個數值 loop，俾 `i` 攞 10, 9, 8, …, 1 —— 按呢個次序，十個全部要有。
+'''
+hints = [
+  "數值 for 冇第三個值講明嘅話係每次加一嘅 —— 而冇第三個值而起點高過終點嘅話，佢一次都唔會行。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.cheatsheet.23.tally"
+title = "計數"
+story = "糾察逐個名咁數每個孭龍人攞咗幾多支香，由一本空嘅簿開始。"
+brief = '''
+`seen` 係一個一開始係空嘅 table，而 `k` 係一個孭龍人嘅名。幫 `seen[k]` 加一，仲未喺
+table 入面嘅名當 0 —— 第一次佢會變做 1，唔係一個 error。
+'''
+hints = [
+  "對 nil 做算術會 raise，而 `+` 綁得比 `or` 緊。個預設值要喺加法之前俾，唔係之後。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.cheatsheet.24.function"
+title = "兩個數嘅和"
+story = "兩個棚夾埋啲香，而個總數要一個成條街都 call 得到嘅有名 function。"
+brief = '''
+將 `add` 定義做一個收兩個數、回傳佢哋嘅和嘅 **local** function，寫喺一行。
+'''
+hints = [
+  "Lua 嘅 body 自己唔會交任何嘢返嚟，而以 `function` 開頭嘅嘢係用一個字嚟閂嘅，唔係一個大括號。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.cheatsheet.25.two-returns"
+title = "一次過兩個"
+story = "個棚三支三支咁派香，而糾察想一次過攞到有幾多紮同幾多支散嘅。"
+brief = '''
+`divmod` 回傳兩個值。兩個都要接住：
+
+```
+local function divmod(a, b)
+  return math.floor(a / b), a % b
+end
+-- ____
+print(q, r)  -- 2  1
+```
+'''
+hints = [
+  "一個 call 可以交返幾個值，而一個用逗號分開嘅名嘅 list 會按次序接住佢哋 —— 唔使包住，唔使括號。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.cheatsheet.26.empty"
+title = "仲未有人"
+story = "第一下鼓之前，糾察先睇吓有冇人簽過名冊。"
+brief = '''
+`t` 係一個冇窿嘅 list，可能係空嘅。開一個 `if`，啱啱好喺 `t` **冇**任何元素嗰陣先係 true。
+'''
+hints = [
+  "空嘅 table 仍然係一個 table，而每一個 table 都係 truthy；兩個唔同嘅 table 永遠唔會相等。問個數目。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.cheatsheet.27.swap"
+title = "換位"
+story = "兩個孭龍人中途交換龍身段數，而名冊要將佢哋嘅號碼對調，一張紙仔都唔用。"
+brief = '''
+`a` 同 `b` 係兩個已經存在嘅變數。用一個 statement 交換佢哋嘅值，唔用臨時變數。
+'''
+hints = [
+  "Lua 係將一個值嘅 list assign 俾一個名嘅 list 嘅，而且存任何一個之前會先計晒每一個右邊。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.cheatsheet.28.error"
+title = "停鼓"
+story = "一支冇香嘅棍係一個錯誤，而點火嗰個一定要帶住個訊息停咗條線，唔係繼續行。"
+brief = '''
+用一個訊息係 `"bad"` 嘅 error 停咗當前嘅 function，令包住佢嘅 `pcall` 回傳 `false` 同
+一個包含 `bad` 嘅訊息。
+'''
+hints = [
+  "assert 淨係喺第一個參數係 nil 或者 false 嗰陣先會投訴，而字串兩樣都唔係。嗰個負責 raise 嘅內建 function 係直接收個訊息嘅。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.cheatsheet.29.and-or"
+title = "一個或者另一個"
+story = "多過十支香嘅孭龍人喺個棚要畀 5 蚊附加費；其他人畀 8 蚊。"
+brief = '''
+`n` 係一個數。`n > 10` 嗰陣整 `fee` 做 5，否則做 8 —— 一個表達式，唔用 `if` statement。
+'''
+hints = [
+  "一個關鍵字係左邊係 true 嗰陣交出佢右邊嘅；另一個就係唔係嗰陣補上。睇清楚邊個值會落喺邊度。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.cheatsheet.30.copy"
+title = "第二份名冊"
+story = "午夜。糾察抄多一份今晚嘅名冊，等聽日嘅修改唔會掂到舞火龍夜嘅紀錄。"
+brief = '''
+`src` 係一個數嘅 list。整 `cp` 做一個元素一樣嘅**新** list，令 `cp[1] = 99` 之後 `src[1]`
+保持原狀。呢個 land 行嘅係 LuaJIT（Lua 5.1）。
+'''
+hints = [
+  "Assign 一個 table 係 copy 一個 reference，唔係個 table。將個 list 嘅值攤開落一個全新嘅 constructor 入面 —— 而喺 5.1 入面嗰個攤開嘅嘢係一個 global，唔係 `table` 嘅 field。",
+]

@@ -1,0 +1,556 @@
+# PYTHON LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/python/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "python.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.cheatsheet_advanced.01.yield-from"
+title = "KRABICE V KRABICÍCH"
+story = "Zásilka do bytu nad Jardine's Bazaar: kartony v kartonech, a python chce každou položku na podlaze, jednu po druhé."
+brief = '''
+`flatten` musí být generátor, který vydá každý list libovolně vnořeného
+seznamu, v pořadí: `list(flatten([1, [2, [3, 4]], 5]))` je
+`[1, 2, 3, 4, 5]`. Který řádek patří do mezery?
+
+```
+def flatten(xs):
+    for x in xs:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+'''
+hints = [
+  "Rekurzivní volání vrací generátor; vy chcete jeho položky, podané nahoru jednu po druhé — a na to existuje dvouslovný tvar.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.cheatsheet_advanced.02.first-or-default"
+title = "PRVNÍ SUDÝ, NEBO NIKDO"
+story = "Fronta na tramvaj na Yee Wo Street: nastoupí první cestující se sudým lístkem, a když žádný není, průvodčí zapíše -1."
+brief = '''
+`xs` je dlouhý seznam intů. Udělejte z `first` první sudé číslo v něm, nebo
+`-1`, pokud žádné není — zastavte se u prvního nálezu a nestavějte
+druhý seznam.
+'''
+hints = [
+  "Generátorový výraz, který není jediným argumentem, potřebuje vlastní závorky, a vestavěná funkce, která vytáhne jednu položku, bere výchozí hodnotu.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.cheatsheet_advanced.03.read-until-empty"
+title = "DOKUD KOHOUTEK NEVYSCHNE"
+story = "Skener nočního trhu na Jardine's Crescent čte roli účtenek po soustech o 4 KB a zastaví se, když se sousto vrátí prázdné."
+brief = '''
+`f` je soubor otevřený v binárním režimu. Nechte `chunk` procházet po sobě
+jdoucí výsledky `f.read(4096)` a zastavte se, když čtení vrátí `b""`, pomocí
+dvouargumentové podoby jedné vestavěné funkce.
+'''
+hints = [
+  "Ta vestavěná funkce chce něco, co může volat znovu a znovu, plus hodnotu, která znamená stop — hotový výsledek čtení není ani jedno.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.cheatsheet_advanced.04.keep-the-name"
+title = "POŘÁD SE JMENUJE GREET"
+story = "Jmenovka na recepci na Percival Street musí přežít, že se přes ni navlékne uniforma."
+brief = '''
+`import functools` je provedeno. Po aplikaci `@logged` na `greet` musí
+`greet.__name__` stále být `"greet"` a `greet.__doc__` musí být
+vlastní docstring funkce greet. Který řádek patří do mezery?
+
+```
+def logged(fn):
+    # ____
+    def inner(*a, **kw):
+        print(fn.__name__)
+        return fn(*a, **kw)
+    return inner
+```
+'''
+hints = [
+  "Ten pomocník je továrna na dekorátory: volá se s obalovanou funkcí a to, co vrátí, dekoruje wrapper.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.cheatsheet_advanced.05.three-layers"
+title = "DO TŘETICE VŠEHO DOBRÉHO"
+story = "Kurýr na Lockhart Road zazvoní třikrát, než to vzdá, a dispečer to pravidlo zapojí dál bez cukru v podobě @."
+brief = '''
+`retry` je dekorátor, který bere argument: `@retry(3)` nad `def`
+způsobí, že se ta funkce pokusí až třikrát.
+
+```
+def retry(times):
+    def deco(fn):
+        def inner(*a, **kw):
+            ...
+        return inner
+    return deco
+```
+
+`fetch` je už definována bez jakéhokoli dekorátoru. Převažte `fetch` ručně
+tak, aby se opakovala třikrát — totéž, co by udělalo `@retry(3)`.
+'''
+hints = [
+  "Jsou tu tři vrstvy. Vnější volání bere číslo a vrací skutečný dekorátor; funkce jde do něj.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.cheatsheet_advanced.06.memo"
+title = "JEDNOU ZEPTÁNO, NAVŽDY ZODPOVĚZENO"
+story = "Počítadlo na mokré tržnici na Bowrington Road si pamatuje každý mezisoučet, který kdy udělalo, takže stánek nikdy nesčítá tentýž sloupec dvakrát."
+brief = '''
+`import functools` a `import sys` jsou jediné importy a
+`sys.setrecursionlimit(10_000)` bylo zvýšeno. `fib(300)` se musí vrátit
+v milisekundách: každé `fib(n)` se spočítá jednou a zapamatuje, bez
+omezení velikosti. Který řádek patří nad `def`?
+
+```
+# ____
+def fib(n):
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+```
+'''
+hints = [
+  "Neomezený memoizátor (3.9+) se používá holý — není to továrna, takže žádné závorky — a importováno bylo jen jméno modulu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.cheatsheet_advanced.07.old-style-compare"
+title = "STARÝ KOMPARÁTOR"
+story = "Rozhodčí ze starých céčkových časů sedí v herně v Times Square s dvouargumentovým pravidlem — menší, rovno, větší — a žebříček ho musí použít tak, jak je."
+brief = '''
+`from functools import cmp_to_key` je provedeno. `cmp(a, b)` je
+dvouargumentový komparátor vracející `-1`, `0` nebo `1`. Udělejte z `ys` seznam
+`xs` seřazený podle toho komparátoru.
+'''
+hints = [
+  "Python 3 řadí jen podle jednoargumentového klíče; adaptér udělá z dvouargumentového komparátoru jednoargumentový, a předáváte výsledek toho adaptéru.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.cheatsheet_advanced.08.own-list"
+title = "KAŽDÉMU ČERSTVÝ SÁČEK"
+story = "Každá objednávka v nudlárně na Jaffe Road dostane vlastní prázdný sáček na přílohy; sdílený sáček by dal chilli jednoho stolu na stůl druhý."
+brief = '''
+`from dataclasses import dataclass, field` je provedeno. Každá `Order` musí
+začínat s **vlastním** prázdným seznamem `tags` — `Order("a").tags.append("hot")`
+musí nechat `Order("b").tags` prázdné — a třída se musí stále definovat
+bez chyby. Který řádek patří do mezery?
+
+```
+@dataclass
+class Order:
+    id: str
+    # ____
+```
+'''
+hints = [
+  "Měnitelná výchozí hodnota je při vytváření třídy odmítnuta. Pomocník field chce něco, co může zavolat jednou na instanci — třídu samotnou, ne instanci.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.cheatsheet_advanced.09.alt-constructor"
+title = "PODTŘÍDA DOSTANE SVOU VLASTNÍ"
+story = "Dárkový pult v Sogo parsuje \"1,2\" na souřadnici a prémiový pult hned vedle čeká zpátky prémiovou souřadnici, ne obyčejnou."
+brief = '''
+`Point3(Point)` je podtřída, která nic nepřidává. `Point3.parse("1,2")`
+musí vrátit `Point3`, ne `Point`. Který řádek patří do mezery?
+
+```
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @property
+    def norm(self):
+        return abs(self.x) + abs(self.y)
+
+    @classmethod
+    def parse(cls, s):
+        a, b = s.split(",")
+        # ____
+```
+'''
+hints = [
+  "První parametr classmethod je ta třída, přes kterou volání přišlo. Pojmenovat základní třídu ručně ji přibije k základní třídě.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.cheatsheet_advanced.10.hash-with-eq"
+title = "STEJNÁ KARTIČKA, STEJNÝ ČLOVĚK"
+story = "Dva příchody do posilovny na Hennessy Road se stejným členským číslem jsou jeden člen a množina docházky s tím musí souhlasit."
+brief = '''
+`uid` je `str`. Definice `__eq__` udělala `User` nehashovatelným, takže
+instance nemohou do `set`. Který řádek obnoví hashování tak, aby
+`len({User("a"), User("a"), User("b")})` bylo `2`?
+
+```
+class User:
+    def __init__(self, uid):
+        self.uid = uid
+
+    def __eq__(self, o):
+        return isinstance(o, User) and self.uid == o.uid
+
+    # ____
+```
+'''
+hints = [
+  "Rovné objekty musí mít rovný hash, takže hashujte totéž, co porovnává `__eq__` — a metoda musí vracet int, ne str.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.cheatsheet_advanced.11.deck-iter"
+title = "ROZDEJTE MI TO"
+story = "Mahjongový stůl v bytě na Causeway Bay Road chce projít balíček kamenů obyčejným cyklem for, ne sahat do jeho šuplíku."
+brief = '''
+`for card in Deck()` musí navštívit `"A"`, `"K"`, `"Q"` po jednom a
+`len(deck)` už funguje. Který řádek patří do mezery?
+
+```
+class Deck:
+    def __init__(self):
+        self._cards = ["A", "K", "Q"]
+
+    def __len__(self):
+        return len(self._cards)
+
+    # ____
+```
+'''
+hints = [
+  "Ten dunder musí vrátit iterátor, ne seznam samotný; yield seznamu podá jednu položku, a tou je celý seznam.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.cheatsheet_advanced.12.exit-protocol"
+title = "ZAVŘÍT, ALE NEUMLČET"
+story = "Roleta stánku na Jardine's Bazaar jde dolů, ať se uvnitř stalo cokoli, ale požární poplach musí být slyšet i venku."
+brief = '''
+`Res` se používá jako `with Res() as r:`. Při opuštění bloku musí proběhnout
+`self.close()` — a výjimka vyvolaná uvnitř bloku se musí stále
+**šířit** k volajícímu. Který řádek patří do mezery?
+
+```
+class Res:
+    def __enter__(self):
+        return self
+
+    def close(self):
+        ...
+
+    # ____
+```
+'''
+hints = [
+  "Dunder pro exit se volá se třemi argumenty navíc, a vrátit z něj pravdivou hodnotu výjimku spolkne.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.cheatsheet_advanced.13.chain-the-cause"
+title = "A DŮVOD BYL"
+story = "Úřednice konfigurace ve fintechu na Gloucester Road odmítne špatný port vlastním razítkem, ale původní stížnost nechá připíchnutou pod ním."
+brief = '''
+`class ConfigError(Exception): pass` existuje. Uvnitř
+`except ValueError as e:` vyvolejte `ConfigError("bad port")` tak, aby
+volající chytil `ConfigError`, jehož `__cause__` je původní
+`ValueError`.
+'''
+hints = [
+  "Nová výjimka se vyvolá; ta stará se za ní pojmenuje jako příčina. Pojmenovat tam `None` příčinu naopak skryje.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.cheatsheet_advanced.14.two-faults-one-net"
+title = "DVĚ CHYBY, JEDNA SÍŤ"
+story = "Objednávkovému lístku v Lucky Mac může chybět port nebo v něm může být slovo, a tak či tak pokladní řekne \"bad\" a jde dál."
+brief = '''
+`parse({})` musí vrátit `"bad"` (`KeyError`), `parse({"port": "x"})`
+musí vrátit `"bad"` (`ValueError`) a `parse({"port": "80"})` musí
+vrátit `80`. Který řádek patří do mezery?
+
+```
+def parse(d):
+    try:
+        v = int(d["port"])
+    # ____
+        return "bad"
+    else:
+        return v
+```
+'''
+hints = [
+  "Několik typů v jedné klauzuli cestuje jako n-tice; holá čárka je tu syntaktická chyba a `or` se jen vyhodnotí na první třídu.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.cheatsheet_advanced.15.sort-then-group"
+title = "NEJDŘÍV SEŘADIT, PAK SESKUPIT"
+story = "Rybář na Bowrington Road třídí úlovek do kádí podle velikosti, ale až poté, co ryby podle velikosti seřadí — jinak se stejná káď objeví pětkrát."
+brief = '''
+`from itertools import groupby` je provedeno a `words` je neseřazený seznam
+řetězců. Procházejte `k, g` tak, aby se každá odlišná délka objevila **přesně
+jednou** a `g` obsahovalo každé slovo té délky.
+'''
+hints = [
+  "Seskupovač slučuje jen sousedy. Nejdřív slova seřaďte podle téhož klíče — a `list.sort` vrací None.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.cheatsheet_advanced.16.every-pair-once"
+title = "KAŽDÁ DVOJICE, JEDNOU"
+story = "Tři čajovny na Lee Garden Road chtějí vyzkoušet společné menu a každá dvojice z nich se sejde přesně jednou."
+brief = '''
+`import itertools` je provedeno a `xs = ["a", "b", "c"]`. Udělejte z `pairs`
+seznam `[("a", "b"), ("a", "c"), ("b", "c")]` — každou neuspořádanou dvojici jednou,
+žádný prvek spárovaný sám se sebou, žádné `("b", "a")`.
+'''
+hints = [
+  "Na pořadí nezáleží a nic se neopakuje; ti dva sousedé v itertools dávají uspořádané dvojice, respektive dvojice prvku se sebou samým.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.cheatsheet_advanced.17.ten-off-the-stream"
+title = "DESET Z PROUDU"
+story = "Molo trajektu ve Wan Chai chrlí řady cestujících bez konce; úředník chce prvních deset lidí, ne prvních deset řad."
+brief = '''
+`from itertools import chain, islice` je provedeno. `rows` je **nekonečný**
+generátor seznamů. Udělejte z `first` seznam prvních 10 jednotlivých
+prvků napříč řadami, aniž byste `rows` kdy vyčerpali.
+'''
+hints = [
+  "Rozbalení nekonečného generátoru hvězdičkou nikdy neskončí a chain nejde řezat hranatými závorkami — použijte řezací adaptér na zplošťující classmethod.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.cheatsheet_advanced.18.neighbour-gaps"
+title = "MEZERA DO DALŠÍ TRAMVAJE"
+story = "Časy příjezdů tramvají na konečnou Causeway Bay chodí po drátě, jeden po druhém; inspektor chce čekání mezi každou tramvají a tou další."
+brief = '''
+`from itertools import pairwise, zip_longest` je provedeno a `xs` je
+**iterátor** intů (žádné `len`, žádné řezy). Udělejte z `gaps` seznam
+rozdílů mezi každým prvkem a tím dalším, např. `1, 4, 9, 16` dá
+`[3, 5, 7]`.
+'''
+hints = [
+  "Iterátor nejde řezat a zipování se sebou samým sní dvě položky na krok. Adaptér z 3.10 vydává překrývající se sousedy.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.cheatsheet_advanced.19.top-two"
+title = "DVA NEJVĚTŠÍ ÚTRATY"
+story = "VIP přepážka v klubu v Causeway Bay chce dva největší účty večera podle částky, aniž by řadila každou účtenku."
+brief = '''
+`import heapq` je provedeno a `xs` je seznam n-tic `(name, amount)`.
+Udělejte z `top` dvě n-tice s **největší** `amount`, největší první.
+'''
+hints = [
+  "Počet jde před iterovatelný objekt, a bez klíče se n-tice porovnávají podle jména.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.cheatsheet_advanced.20.slot-it-in"
+title = "ZASUŇTE TO PODLE SKÓRE"
+story = "Žebříček herny pod Sogo zůstává seřazený podle skóre; nové jméno musí dopadnout do správného místa, a to místo určuje číslo, ne jméno."
+brief = '''
+`from bisect import insort, bisect_left` je provedeno. `xs` je seznam
+n-tic `(name, score)` udržovaný seřazený podle `score` vzestupně. Vložte
+`(name, s)` tak, aby `xs` zůstalo seřazené podle skóre (Python 3.10+).
+'''
+hints = [
+  "Klíč se aplikuje na prvky i na vkládanou věc, takže vkládejte celý záznam, ne holé skóre.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.cheatsheet_advanced.21.port-in-both"
+title = "PORT V OBOU KAPSÁCH"
+story = "Fintech na Gloucester Road má výchozí port a port z příkazové řádky, a `connect` nevezme stejné klíčové slovo dvakrát."
+brief = '''
+`def connect(host="x", port=0)` bere jen klíčové argumenty.
+`defaults = {"host": "db", "port": 5432}` a `opts = {"port": 6543}`.
+Zavolejte `connect` s výchozími hodnotami přepsanými podle `opts`, aby dostal
+`host="db", port=6543`.
+'''
+hints = [
+  "Dvě rozbalení `**`, která sdílejí klíč, vyvolají výjimku. Nejdřív dicty slučte, s přepisem vpravo, a rozbalte ten sloučený.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.cheatsheet_advanced.22.name-it-in-passing"
+title = "POJMENUJTE TO CESTOU"
+story = "Odhadce ve zlatnictví na Hennessy Road je pomalý a drahý, takže se každý kus váží jednou a nechávají se jen ty výnosné."
+brief = '''
+`f` je drahá a musí se zavolat **přesně jednou** na prvek. Udělejte z
+`ys` seznam hodnot `f(x)`, které jsou větší než 0, v jedné
+comprehension.
+'''
+hints = [
+  "Přiřazovací výraz potřebuje uvnitř podmínky vlastní závorky a váže výsledek — ne porovnání.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.cheatsheet_advanced.23.far-click"
+title = "DALEKÝ KLIK NEBO DALEKÉ TAŽENÍ"
+story = "Dotykový panel kiosku v Times Square bere klik i tažení stejně, ale jen když dopadnou daleko vpravo."
+brief = '''
+`Click` a `Drag` jsou obyčejné třídy s atributy `x` a `y` a
+**bez** `__match_args__`. `far(ev)` musí vrátit `"far"` pro `Click` nebo
+`Drag`, jejichž `x` je nad 100, a `"near"` pro cokoli jiného. Který řádek
+patří do mezery?
+
+```
+def far(ev):
+    match ev:
+        # ____
+            return "far"
+        case _:
+            return "near"
+```
+'''
+hints = [
+  "Bez match args musí být podvzory klíčové; alternativy se spojují svislítkem a stráž (guard) přijde až za všemi.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.cheatsheet_advanced.24.pool-with-a-timeout"
+title = "ČTYŘI STAHOVAČI, JEDEN TIMEOUT"
+story = "Čtyři běžci vyrazí z kanceláře na Percival Street najednou, každý s pokynem vzdát to po dvou sekundách, a dispečer chce výsledky zpátky v pořadí."
+brief = '''
+`ex` je `ThreadPoolExecutor` a `fetch(url, timeout=10)` je funkce; importy
+nejsou zobrazeny. Udělejte z `results` seznam `fetch(u, timeout=2)` pro každé
+`u` v `urls`, v pořadí, spuštěný napříč poolem.
+'''
+hints = [
+  "Map toho poolu má vlastní `timeout`, který se k `fetch` nikdy nedostane. Nejdřív to klíčové slovo navažte do funkce.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.cheatsheet_advanced.25.tick-it-off"
+title = "ODŠKRTNOUT"
+story = "Noční kuchyně v Lucky Mac: manažer čeká u výdeje, dokud není každý lístek uvařený, ne jen převzatý, a každý kuchař musí říct, kdy je talíř hotový."
+brief = '''
+`q` je `queue.Queue`. Hlavní vlákno zavolá `q.join()` po vložení
+každé úlohy a musí blokovat, dokud není každá úloha **zpracována**. Který
+řádek uzavírá tělo cyklu workera tak, aby se `q.join()` vrátilo?
+
+```
+def worker():
+    while True:
+        job = q.get()
+        with lock:
+            done.append(process(job))
+        # ____
+
+for _ in range(4):
+    threading.Thread(target=worker, daemon=True).start()
+```
+'''
+hints = [
+  "`get` úlohu jen vezme. Fronta počítá nedokončené úlohy a worker jí musí říct, že jedna skončila — bez argumentu.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.cheatsheet_advanced.26.all-the-cores"
+title = "VŠECHNA JÁDRA"
+story = "Vykreslení mapy ohňostroje ve Victoria Parku je čistá práce pro CPU; GIL pustí dovnitř jedno vlákno naráz, takže úloha jde do samostatných procesů."
+brief = '''
+`cpu_heavy(x)` je funkce na nejvyšší úrovni modulu a
+`p` je `multiprocessing.Pool` (pod strážcem `__main__`). Udělejte z
+`out` seznam `cpu_heavy(x)` pro každé `x` v `xs`, v pořadí, rozprostřený
+napříč procesy.
+'''
+hints = [
+  "Práce se do jiného procesu posílá pickleováním volatelného objektu; lambda se picklovat nedá. Map toho poolu bere funkci a iterovatelný objekt zvlášť.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.cheatsheet_advanced.27.all-at-once"
+title = "TŘI NARÁZ, NE JEDNA PO DRUHÉ"
+story = "Tři rozvozy objednané z bytu na Lockhart Road, každý jízda na jednu sekundu; objednat je jeden po druhém znamená, že python čeká tři."
+brief = '''
+`fetch(u)` je `async def`, která awaitne `asyncio.sleep(1)` a vrátí
+`u`. Uvnitř `async def main()`, spouštěné přes `asyncio.run(main())`, udělejte z
+`results` seznam výsledků pro `urls` v pořadí — všechna tři stažení
+**souběžně**, aby `main` trvalo zhruba jednu sekundu, ne tři.
+'''
+hints = [
+  "Awaitnout každou korutinu po řadě je serializuje. Kombinátor bere awaitovatelné objekty jako samostatné argumenty, ne jako jeden seznam, a sám musí být awaitnut.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.cheatsheet_advanced.28.generic-first"
+title = "PRVNÍ Z ČEHOKOLI"
+story = "Lékárna na Hennessy Road chce jedno `first`, které funguje na polici s pilulkami i na polici s náplastmi, a štítek musí říct, co dostalo."
+brief = '''
+Python 3.12. `from collections.abc import Sequence` je provedeno a **žádný**
+`TypeVar` nebyl nikde deklarován. Napište řádek `def` generické
+funkce `first`, která bere `Sequence[T]` a vrací `T`, s `T` deklarovaným
+na funkci samotné.
+'''
+hints = [
+  "3.12 dovoluje funkci deklarovat vlastní typový parametr, v hranatých závorkách hned za jejím jménem.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.cheatsheet_advanced.29.shared-bag"
+title = "SÁČEK, KTERÝ SE NIKDY NEVYPRÁZDNÍ"
+story = "Výchozí \"nový sáček\" v dai pai dongu je jeden sáček, vyrobený jednou, když se tiskl jídelní lístek — a každá objednávka, která mu věří, v něm najde hůlky od minulého stolu."
+brief = '''
+`add(x, xs)` připojí `x` k `xs` a vrátí `xs`. Zavoláno dvakrát bez
+druhého argumentu, `add(1)` a pak `add(2)` musí dát `[1]` a pak
+`[2]` — pokaždé čerstvý seznam. Tělo před připojením nahradí **vynechané**
+`xs` novým prázdným seznamem. Který řádek `def` je správný?
+'''
+hints = [
+  "Výchozí hodnota se vyhodnotí jednou, v čase `def`, a sdílí ji každé volání. Použijte sentinel a seznam postavte uvnitř.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.cheatsheet_advanced.30.late-binding"
+title = "TŘI VRÁTNÍ, JEDNO ČÍSLO"
+story = "Třem vrátným na Jaffe Road bylo řečeno \"pamatuj si své číslo\" — ale všichni si pamatují jméno toho čísla, a do zavíračky je to pro všechny 2."
+brief = '''
+Postavte `fs`, seznam tří funkcí bez argumentů, tak, aby
+`[f() for f in fs]` bylo `[0, 2, 4]` — každá zdvojnásobí to `i`, se kterým
+byla vyrobena.
+'''
+hints = [
+  "Uzávěr (closure) hledá `i` až při zavolání, a to už je cyklus u konce. Výchozí argument se vyhodnotí v okamžiku, kdy lambda vzniká.",
+]

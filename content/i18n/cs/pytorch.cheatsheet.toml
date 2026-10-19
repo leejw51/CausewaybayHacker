@@ -1,0 +1,439 @@
+# PYTORCH LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/pytorch/cheatsheet.toml`, quest by quest, and nothing else. Code
+# blocks, identifiers and the quiz's four choices are the English pack's and are
+# never translated.
+
+pack   = "pytorch.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.cheatsheet.01.zeros"
+title = "ČISTÝ STŮL"
+story = "23:00 ve strojovně pod budovou Chow Yei Ching. První tenzor noci je samé nuly."
+brief = '''
+Po `import torch` vytvoř `x`, **torchový** tenzor nul tvaru `(2, 3)`.
+'''
+hints = [
+  "Velikost patří do argumentů volání; funkce z NumPy by ti dala ndarray, ne tenzor.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.cheatsheet.02.to-device"
+title = "FLOAT, NA KARTĚ"
+story = "Štítky přišly jako celá čísla na CPU. GPU v racku 3 chce floaty."
+brief = '''
+`x = torch.tensor([1, 2, 3])` je `int64` na CPU a
+`device = "cuda" if torch.cuda.is_available() else "cpu"`. Který řádek udělá
+z `x` tenzor `float32` na `device`?
+'''
+hints = [
+  "`.to` vrací nový tenzor a starý nechá být, takže si nech, co vrátí.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.cheatsheet.03.eval-mode"
+title = "ZHASNOUT SVĚTLA"
+story = "Zkouškový večer u terminálů Ústřední knihovny. Dropout přestane hádat, když jde o skutečný test."
+brief = '''
+`model` má vrstvy `Dropout` a `BatchNorm`. Který řádek je před vyhodnocením
+testovací sady přepne do chování pro inferenci?
+'''
+hints = [
+  "Každý nn.Module nese příznak trénování; jedno volání metody ho vypne pro modul i všechny jeho potomky.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.cheatsheet.04.view"
+title = "TŘI ŘADY PO ČTYŘECH"
+story = "Dvanáct balíků v řadě v depu na Sugar Street a regál má tři police."
+brief = '''
+`x = torch.arange(12)` má tvar `(12,)`. Vytvoř `y` se stejnými čísly ve
+**3 řádcích a 4 sloupcích**.
+'''
+hints = [
+  "Nové rozměry se píšou řádky napřed a jejich součin musí dát počet prvků.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.cheatsheet.05.argmax"
+title = "VÍTĚZNÁ TŘÍDA"
+story = "Čtečka číslic na tramvajové zastávce Tin Hau boduje deset tříd na řádek. V každém řádku musí jedno číslo vyhrát."
+brief = '''
+`logits` má tvar `(batch, classes)`. Který řádek dá `pred`, index nejlepší
+třídy pro každý řádek, tvaru `(batch,)`?
+'''
+hints = [
+  "`dim` určuje osu, která se zredukuje pryč. Třídy vedou podél dim 1.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.cheatsheet.06.unsqueeze"
+title = "SLOUPEC, NE ŘÁDEK"
+story = "Tři nájmy obchodů na Russell Street, čtyři měsíce poplatků. Každá dvojice se musí potkat."
+brief = '''
+`x` má tvar `(3,)` a `y` má tvar `(4,)`. Který řádek přetvaruje `x` tak, aby
+se `x + y` broadcastovalo na tvar `(3, 4)`?
+'''
+hints = [
+  "Broadcasting zarovnává tvary zprava. `x` potřebuje novou osu velikosti 1 za tou svou.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.cheatsheet.07.backward"
+title = "SKLON"
+story = "Eskalátor nahoru do Lee Theatre má sklon. Graf ho zná; někdo se musí zeptat."
+brief = '''
+```
+w = torch.tensor(2.0, requires_grad=True)
+y = w * w
+```
+
+Který řádek naplní `w.grad` hodnotou dy/dw, tedy 4?
+'''
+hints = [
+  "Gradienty tečou zpětně od výstupu, takže se volá na výsledku, ne na listu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.cheatsheet.08.no-grad"
+title = "DNES BEZ GRAFU"
+story = "Noční směna jen odečítá měřáky. Nikdo nepotřebuje záznam o tom, jak čísla vznikla."
+brief = '''
+Spusť model na validační dávce **bez zaznamenávání grafu** pro autograd.
+Který řádek otevře blok?
+
+```
+# ____
+    out = model(xb)
+```
+'''
+hints = [
+  "Je to správce kontextu: odsazený blok pod ním běží s vypnutým sledováním gradientů.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.cheatsheet.09.step-order"
+title = "POŘADÍ VĚCÍ"
+story = "Uklidit pult, zvážit zboží, pak vrátit drobné. Pořadí na tržnici se nikdy nemění."
+brief = '''
+`loss` byla právě spočítána z této dávky a `opt` je optimalizátor. Které
+pořadí tří volání je jeden správný trénovací krok?
+'''
+hints = [
+  "Gradienty se sčítají, takže smaž ty staré; pak spočítej nové; pak je použij.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.cheatsheet.10.super-init"
+title = "NEJDŘÍV RODIČ"
+story = "Nový stánek v Causeway Bay potřebuje papíry od majitele, než může pověsit ceduli."
+brief = '''
+```
+class Net(nn.Module):
+    def __init__(self):
+        # ____
+        self.fc = nn.Linear(4, 2)
+
+    def forward(self, x):
+        return self.fc(x)
+```
+
+Který řádek musí být v `__init__` první, jinak přiřazení `self.fc` selže?
+'''
+hints = [
+  "nn.Module si registr vrstev zakládá ve vlastním konstruktoru; spusť ho dřív, než nějakou přidáš.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.cheatsheet.11.cross-entropy"
+title = "SUROVÉ SKÓRE"
+story = "Klasifikátor ve sklepě dává surová skóre, ne pravděpodobnosti. Soudce musí vědět, co to je."
+brief = '''
+`logits` má tvar `(B, C)` — surová, nenormalizovaná skóre — a `target` má
+tvar `(B,)` s indexy tříd. Který řádek je správná klasifikační ztráta?
+'''
+hints = [
+  "Jedna z těchto ztrát si log-softmax aplikuje sama. Dej jí surová skóre, nezměkčená.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.cheatsheet.12.dataloader"
+title = "ZAMÍCHANÝ BALÍČEK"
+story = "Mahjongová herna na Leighton Road míchá kameny před každou hrou. Trenér by měl taky."
+brief = '''
+`ds` je `TensorDataset` a `DataLoader` je importovaný z `torch.utils.data`.
+Který řádek zařídí, aby `loader` vydával dávky po 32 v **novém náhodném
+pořadí každou epochu**?
+'''
+hints = [
+  "Míchání je vypnuté, dokud o ně nepožádáš, a klíčové slovo pro velikost dávky se píše celé.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.cheatsheet.13.stack"
+title = "NOVÉ PATRO"
+story = "Dvě patra Times Square, každé stejná mřížka obchodů, jedno položené na druhém."
+brief = '''
+`a` i `b` mají tvar `(3, 4)`. Který řádek vytvoří `z` s tvarem
+`(2, 3, 4)`, kde `z[0]` je `a` a `z[1]` je `b`?
+'''
+hints = [
+  "Jedna funkce spojuje podél osy, která už existuje; druhá klade kusy podél zbrusu nové osy, ve výchozím stavu vpředu. Spočítej rozměry výsledku.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.cheatsheet.14.matmul"
+title = "ŘÁDKY POTKÁVAJÍ SLOUPCE"
+story = "Dva stánky krát tři druhy zboží, tři druhy zboží krát čtyři dny: tabulka tržeb na Jardine's Bazaar."
+brief = '''
+`a` má tvar `(2, 3)` a `b` má tvar `(3, 4)`. Který řádek dá `c`,
+**maticový součin**, s tvarem `(2, 4)`?
+'''
+hints = [
+  "`*` násobí prvek po prvku a oba tvary by se musely broadcastovat; maticový součin má vlastní infixový operátor, tentýž, který používá NumPy.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.cheatsheet.15.long"
+title = "CELÁ ČÍSLA, PROSÍM"
+story = "Pokladna na Hong Kong Stadium počítá sedadla, nikdy zlomky sedadla."
+brief = '''
+`target = torch.tensor([0., 2., 1.])` přišel jako `float32` a
+`nn.CrossEntropyLoss` ho odmítá: indexy tříd musí být **`int64`**. Který
+řádek `target` opraví?
+'''
+hints = [
+  "Přetypování vrací nový tenzor, místo aby měnilo tenhle, a `int()` na tenzoru je ta 32bitová varianta — ne ta, kterou ztráta chce.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.cheatsheet.16.manual-seed"
+title = "STEJNÉ KOSTKY"
+story = "Každá zkouška v Lee Theatre začíná od stejné narážky, jinak nikdo nepozná, co se změnilo."
+brief = '''
+Tazatel chce, aby běh byl reprodukovatelný: `nn.Linear(4, 2)` musí
+vyjít se **stejnými náhodnými vahami** při každém spuštění skriptu.
+Který řádek patří nahoru, ještě před sestavením modelu?
+'''
+hints = [
+  "Torch má vlastní generátor náhodných čísel; nastavení seedu v NumPy nebo v pythonském `random` k němu nedosáhne a setter bere seed jako argument.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.cheatsheet.17.item"
+title = "JEN TO ČÍSLO"
+story = "Výsledková tabule ve Victoria Parku ukazuje jedno číslo, ne celou historii toho, jak k němu došlo."
+brief = '''
+`loss` je 0-rozměrný tenzor, stále připojený ke grafu autogradu. Pro celé
+pole bys napsal `.detach().cpu().numpy()`; pro jedno číslo existuje
+kratší cesta. Který řádek dá `v`, obyčejný pythonský `float`, pro řádek logu?
+'''
+hints = [
+  "Jednoprvkový tenzor má metodu, která vydá číslo uvnitř a graf nechá za sebou; indexování 0-rozměrného tenzoru je chyba.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.cheatsheet.18.load-state-dict"
+title = "VÁHY SE VRACEJÍ DOMŮ"
+story = "Checkpoint strávil noc na USB flashce ve skříňce ve Wan Chai. Ráno: zpátky do sítě stejného tvaru."
+brief = '''
+Váhy byly uloženy přes `torch.save(model.state_dict(), p)`. Teď byl sestaven
+čerstvý `model = Net()`. Který řádek ty váhy vrátí
+zpátky do něj a nechá `model` jako `nn.Module`?
+'''
+hints = [
+  "Dva kroky na jednom řádku: načti slovník z disku a pak ten slovník předej zavaděči modulu. Samotné čtení souboru ti dá dict, ne model.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.cheatsheet.19.keepdim"
+title = "KAŽDÝ ŘÁDEK NA JEDNA"
+story = "Pět stánků na Bowrington Road, tři směny tržeb: podíly každého stánku po směnách musí dát dohromady jedna."
+brief = '''
+`x` má tvar `(5, 3)`. Broadcasting zarovnává tvary zprava, takže
+`(5, 1)` dělí `(5, 3)` řádek po řádku. Který řádek vytvoří `s`, řádkové součty,
+s tvarem `(5, 1)`, aby `x / s` normalizovalo každý řádek?
+'''
+hints = [
+  "Redukce normálně osu, přes kterou sčítá, zahodí; řekni jí, ať ji místo toho ponechá s velikostí 1. Holé `(5,)` proti `(5, 3)` se nezarovná.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.cheatsheet.20.clip-grad"
+title = "JISTIČ"
+story = "Když na Yee Wo Street zakolísá proud, jistič vypadne dřív, než se udělá krok — nikdy potom."
+brief = '''
+Gradienty explodují. Doplň mezeru tak, aby **celková norma gradientu**
+modelu `model` byla před aktualizací omezena na `1.0`:
+
+```
+opt.zero_grad()
+loss.backward()
+# ____
+opt.step()
+```
+'''
+hints = [
+  "Ořezávač chce iterovatelnou kolekci parametrů, ne samotný modul, a omezuje se norma — sesterská funkce omezuje místo toho každou hodnotu.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.cheatsheet.21.randn"
+title = "GAUSSOVA KŘIVKA"
+story = "Čerstvé váhy pro prediktor jízdného u turniketu MTR Causeway Bay: střed nula, rozptyl jedna, než se cokoli naučí."
+brief = '''
+Vytvoř `w`, tenzor tvaru `(3, 4)` tažený ze **standardního normálního**
+rozdělení — střední hodnota 0, směrodatná odchylka 1 — generátorem samotného torche.
+'''
+hints = [
+  "Dvě funkce torche berou velikosti jako obyčejné argumenty a plní náhodnými čísly; ta s kratším jménem je rovnoměrná na [0, 1) a ta z NumPy dá ndarray.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.cheatsheet.22.shape"
+title = "SPOČÍTEJ SLOUPCE"
+story = "Dávka výsledkových archů ze čtečky číslic v Tin Hau. Nikdo neřekl, kolik je tříd, tak se zeptej tenzoru."
+brief = '''
+`logits` má dva rozměry: řádek na vzorek, sloupec na třídu. Který řádek
+dá `c`, **počet tříd**, jako obyčejný `int`?
+'''
+hints = [
+  "Tvar je hodnota jako n-tice, kterou indexuješ, ne metoda, kterou voláš; jedna z možností místo toho počítá vzorky a jedna je metoda, která se nikdy nezavolala.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.cheatsheet.23.column"
+title = "JEDEN SLOUPEC, VŠECHNY ŘÁDKY"
+story = "Tabulka nájmů pro Russell Street: obchody po straně, měsíce napříč. Pronajímatel chce jen únor."
+brief = '''
+`x` má tvar `(5, 4)`: pět obchodů, čtyři měsíce. Který řádek dá `feb`,
+**druhý sloupec** pro každý obchod, s tvarem `(5,)`?
+'''
+hints = [
+  "Jeden index na osu, oddělené čárkou, a holá dvojtečka znamená každý prvek podél té osy. Tři z nich vybírají řádek.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.cheatsheet.24.mask"
+title = "JEN VÍTĚZOVÉ"
+story = "Noc tržeb na Jardine's Bazaar, některé stánky v mínusu. Účetní chce ty kladné v seznamu, nic jiného."
+brief = '''
+`x = torch.tensor([-1., 2., -3., 4.])`. Který řádek dá `p`, **1-d
+tenzor kladných hodnot** — tady `tensor([2., 4.])`?
+'''
+hints = [
+  "Porovnání udělá tenzor booleanů stejného tvaru jako `x`; dej ten tenzor mezi hranaté závorky. Jedna možnost se zastaví u booleanů, jedna dá pozice.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.cheatsheet.25.clamp"
+title = "NIC POD NULOU"
+story = "Termostat v serverovně pod Hysan Place nejde nastavit pod nulu, ale číselník jde až do čtyřiceti."
+brief = '''
+`x` obsahuje hodnoty kdekoli mezi `-40.` a `40.`. Který řádek udělá `y`,
+kde se každá **záporná** položka stane `0.` a každá jiná položka zůstane
+**přesně, jak je**?
+'''
+hints = [
+  "Existuje metoda tenzoru, která přišpendlí hodnoty do rozsahu; dej jí jen podlahu. Jedna možnost jí dá i strop, jedna podá pythonovský int funkci, která chce tenzor, a jedna metodu nikdy nezavolá.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.cheatsheet.26.max-values"
+title = "NEJLEPŠÍ SKÓRE, NE JEHO MÍSTO"
+story = "Rozhodčí u šachových stolů ve Victoria Parku vyvěšují nejvyšší skóre každého hráče. Ze které desky přišlo, je jiný sloupec."
+brief = '''
+`logits` má tvar `(B, C)`. Který řádek dá `best`, **největší skóre
+v každém řádku**, jako tenzor tvaru `(B,)` — skóre samotná, ne to,
+ve kterém sloupci seděla?
+'''
+hints = [
+  "S `dim` vrací metoda max dvojici — hodnoty a kde byly — takže si vyber polovinu, kterou chceš, jménem. Bez `dim` dostaneš jedno číslo za celý tenzor.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.cheatsheet.27.sequential"
+title = "PROSTŘEDNÍ PATRO"
+story = "Tři patra eskalátorů v Times Square: nahoru, podesta, zase nahoru. Podesta je věc, na které se stojí, ne její výkres."
+brief = '''
+Doplň mezeru tak, aby `model` byla dvouvrstvá síť s ReLU mezi
+vrstvami, postavená přes `nn.Sequential`:
+
+```
+model = nn.Sequential(
+    nn.Linear(4, 8),
+    # ____
+    nn.Linear(8, 2),
+)
+```
+'''
+hints = [
+  "Sequential přijímá jen moduly — instance, ne třídy a ne holé funkce. Dvě z možností aktivaci pojmenují, aniž by ji vytvořily; jedna je funkce bez svého vstupu.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.cheatsheet.28.linear"
+title = "VSTUP PŘED VÝSTUPEM"
+story = "Každý útržek lístku 28 na 28 z Hong Kong Stadium se zploští na 784 čísel a brána má deset turniketů."
+brief = '''
+`xb` má tvar `(B, 784)` a tříd je 10. Který řádek udělá
+`fc`, plně propojenou vrstvu, aby `fc(xb)` mělo tvar `(B, 10)`?
+'''
+hints = [
+  "Konstruktor bere dvě obyčejná celá čísla: velikost toho, co vchází, pak velikost toho, co vychází. Jedna možnost je má obráceně, jedna je balí do n-tice a jedna je napsaná po kerasovsku.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.cheatsheet.29.optimizer"
+title = "PŘEDEJ KLÍČE"
+story = "Kurýrka v depu na Sugar Street může přenášet jen balíky, které jí někdo podá — ne celou budovu."
+brief = '''
+`model` je `nn.Module`. Který řádek postaví `opt`, optimalizátor **Adam**
+nad trénovatelnými tenzory modelu s rychlostí učení `1e-3`?
+'''
+hints = [
+  "Optimalizátor chce iterovatelnou kolekci tenzorů, ne modul a ne objekt metody — takže přístupovou metodu zavolej. A bez jakýchkoli parametrů se postavit nedá.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.cheatsheet.30.accuracy"
+title = "SKÓRE NA TABULI"
+story = "Zkoušková noc v Central Library skončila. Mei chce do logovacího řádku jeden zlomek: kolik jich síť trefila z celé dávky."
+brief = '''
+`pred` i `yb` jsou tenzory `int64` tvaru `(B,)` — předpovězená
+a skutečná třída na vzorek. Který řádek dá `acc`, **podíl**
+správně předpovězených vzorků, jako 0-d floatový tenzor?
+'''
+hints = [
+  "Porovnání dá booleany a přes booleany se průměr brát nedá — nejdřív změň jejich typ. Součet je počet, ne podíl, a hlídej, kde se zavírají závorky.",
+]

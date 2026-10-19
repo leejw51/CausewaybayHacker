@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::{bad_request, internal, Result};
-use crate::ids::parse_quest_id;
+use crate::ids::{is_sheet, parse_quest_id};
 use crate::paths::{write_private, Home};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -49,14 +49,20 @@ pub struct QuestDef {
     #[serde(default)]
     pub map: MapDef,
     pub brief: String,
+    /// The code the editor opens on. CHEATSHEET quests may leave it out: the
+    /// question there is the brief, and there is nothing to type.
+    #[serde(default)]
     pub starter: String,
     pub solution: String,
     #[serde(default)]
     pub hints: Vec<String>,
+    /// Absent only on CHEATSHEET, where nothing runs: the pick is the answer.
+    #[serde(default = "no_tests")]
     pub tests: toml::Value,
     #[serde(default)]
     pub time_limit_s: Option<i64>,
-    /// VERY BASIC only: the four choices and the index of the right one.
+    /// VERY BASIC and CHEATSHEET: the four choices and the index of the right
+    /// one. On CHEATSHEET it is the whole quest.
     #[serde(default)]
     pub quiz: Option<QuizDef>,
     /// REMIX LAND only: which toolchain judges this quest — `go`, `rust` or
@@ -108,6 +114,10 @@ pub struct MapDef {
     pub y: f64,
     #[serde(default = "quest_kind")]
     pub kind: String,
+}
+
+fn no_tests() -> toml::Value {
+    toml::Value::Table(toml::map::Map::new())
 }
 
 fn half() -> f64 {
@@ -391,7 +401,13 @@ pub fn validate(pack: &Pack) -> Result<()> {
     }
     if !matches!(
         pack.category.as_str(),
-        "verybasic" | "basic" | "advanced" | "hacker" | "frameworks"
+        "cheatsheet"
+            | "cheatsheet_advanced"
+            | "verybasic"
+            | "basic"
+            | "advanced"
+            | "hacker"
+            | "frameworks"
     ) {
         return Err(bad_request(format!("unknown category '{}'", pack.category)));
     }
@@ -476,6 +492,12 @@ pub fn validate(pack: &Pack) -> Result<()> {
             // §12: a quest without a working reference answer does not get
             // imported. CI runs it; the importer at least insists it exists.
             return Err(bad_request(format!("quest '{}' has no solution", quest.id)));
+        }
+        if is_sheet(&pack.category) {
+            // The sheet roads are four lines and one of them right; nothing
+            // is compiled, so the quiz is the whole of what is checked.
+            validate_cheatsheet(quest)?;
+            continue;
         }
         let tests = tests_json(quest)?;
         let cases = tests
@@ -621,6 +643,60 @@ pub fn validate(pack: &Pack) -> Result<()> {
                 i + 1
             )));
         }
+    }
+    Ok(())
+}
+
+/// A CHEATSHEET quest: four distinct choices, the answer one of them, the
+/// solution that answer, and no tests or clock — the submit judges the pick
+/// against the choice, so a case here would be a promise nothing keeps.
+fn validate_cheatsheet(quest: &QuestDef) -> Result<()> {
+    let quiz = quest.quiz.as_ref().ok_or_else(|| {
+        bad_request(format!(
+            "quest '{}' is a cheatsheet quest with no quiz",
+            quest.id
+        ))
+    })?;
+    if quiz.choices.len() != 4 {
+        return Err(bad_request(format!(
+            "quest '{}' has {} choices; a cheatsheet quest has four",
+            quest.id,
+            quiz.choices.len()
+        )));
+    }
+    let distinct: BTreeSet<&str> = quiz.choices.iter().map(|c| c.trim()).collect();
+    if distinct.len() != 4 || distinct.contains("") {
+        return Err(bad_request(format!(
+            "quest '{}' has an empty or repeated choice",
+            quest.id
+        )));
+    }
+    let right = usize::try_from(quiz.answer)
+        .ok()
+        .and_then(|i| quiz.choices.get(i))
+        .ok_or_else(|| {
+            bad_request(format!(
+                "quest '{}' has answer {} outside its four choices",
+                quest.id, quiz.answer
+            ))
+        })?;
+    if quest.solution.trim() != right.trim() {
+        return Err(bad_request(format!(
+            "quest '{}' has a solution that is not its right choice",
+            quest.id
+        )));
+    }
+    if quest.time_limit_s.is_some() {
+        return Err(bad_request(format!(
+            "quest '{}' is a cheatsheet quest and must not carry time_limit_s",
+            quest.id
+        )));
+    }
+    if quest.tests.as_table().is_none_or(|t| !t.is_empty()) {
+        return Err(bad_request(format!(
+            "quest '{}' is a cheatsheet quest with tests; nothing runs on that road",
+            quest.id
+        )));
     }
     Ok(())
 }

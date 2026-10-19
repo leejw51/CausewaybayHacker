@@ -1,0 +1,585 @@
+# ZIG LAND — CHEATSHEET ADVANCED, in Japanese. A translation pack (SPEC §12.1): the
+# prose of `content/zig/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code, live in the English
+# pack, and are never translated. Code blocks and identifiers are copied
+# verbatim.
+
+pack   = "zig.cheatsheet_advanced"
+locale = "ja"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.cheatsheet_advanced.01.generic-fn"
+title = "どの二つでも大きいほう"
+story = "22:00、ポータルにて。管制室は二つの運賃、二つの重量、二つのタイムスタンプを比較し、比較は一度だけ書きたい。"
+brief = '''
+`max` は一つの型の二つの値のうち大きいほうを返し、型を明示して呼ばれます:
+`max(i64, 3, 7)`、`max(f64, 2.5, 1.0)`。それを開く行はどれでしょう?
+
+```
+// ____
+    return if (a > b) a else b;
+}
+```
+'''
+hints = [
+  "型は最初の引数で、コンパイル時に既知です。残り二つのパラメータと戻り値はそれを使って書きます。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.cheatsheet_advanced.02.this"
+title = "まだ名前のない型"
+story = "コンテナのスタックはどんな積荷でも受ける。その中で、メソッドには自分が書かれている構造体の名前が要る。"
+brief = '''
+`Stack` が返す構造体の中で、`push` が `self: *Self` を取れるように、`Self` を
+その構造体自身の型に束縛してください。
+
+```
+fn Stack(comptime T: type) type {
+    return struct {
+        // ____
+        items: std.ArrayList(T) = .empty,
+        pub fn push(self: *Self, gpa: std.mem.Allocator, v: T) !void {
+            try self.items.append(gpa, v);
+        }
+    };
+}
+```
+'''
+hints = [
+  "無名構造体には自分を指す名前がありません。ある組み込み関数が、定義中の最も内側の struct、enum、union を返します。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.cheatsheet_advanced.03.fn-pointer"
+title = "今夜はどのルール"
+story = "ブース 2 の運賃ルールは真夜中に入れ替わる: 前は二倍、後は符号反転。ブースはルールを変数に持って呼ぶ。"
+brief = '''
+`double` と `negate` はどちらも `fn (i32) i32` です。`double` で始まり、後で
+`negate` に再代入でき、`f(3)` として呼ばれる **実行時変数** `f` を宣言してください。
+'''
+hints = [
+  "裸の `fn` 型は comptime 専用で `var` には住めません。実行時の関数値はそれへのポインタで、関数は `const` です。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.cheatsheet_advanced.04.inline-for-fields"
+title = "すべてのフィールドを、名前で"
+story = "夜間監査は渡されたすべてのレコードのすべてのフィールドを印字する。構造体が何であれ、フィールド名を教えられずに。"
+brief = '''
+`dump` は与えられたどんな構造体についても各フィールドの名前と値を印字します。
+`f.name` が `@field` で使えるように、フィールドに対するループを開いてください
+（Zig 0.16: 型情報のタグは小文字で綴ります）。
+
+```
+fn dump(v: anytype) void {
+    const T = @TypeOf(v);
+    if (@typeInfo(T) != .@"struct") @compileError("not a struct: " ++ @typeName(T));
+    // ____
+        std.debug.print("{s}: {any}\n", .{ f.name, @field(v, f.name) });
+    }
+}
+```
+'''
+hints = [
+  "フィールドリストはコンパイル時のデータなので、素のループでは添字付けできません。ループは展開されなければならず、`struct` はフィールド名としては引用が必要なキーワードです。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.cheatsheet_advanced.05.has-field"
+title = "ナンバープレートはあるか"
+story = "車にはナンバープレートがあり、自転車にはない。一つのラベル関数が両方を渡され、どちらを持っているかコンパイル時に知らなければならない。"
+brief = '''
+`label` は `Car`（フィールド `plate` を持つ）と `Bike`（フィールド `plate` も、その
+名前の宣言も持たない）で呼ばれます。`Car` では分岐が取られ `Bike` では刈り取られる
+`if` を開き、`v.plate` がそれが存在するところでだけコンパイルされるようにしてください。
+
+```
+fn label(v: anytype) []const u8 {
+    const T = @TypeOf(v);
+    // ____
+        return v.plate;
+    } else return "no plate";
+}
+```
+'''
+hints = [
+  "ある組み込み関数は型に、文字列で与えた名前のフィールドがあるかを尋ねます。宣言について尋ねるほうは、フィールドには no と答えます。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.cheatsheet_advanced.06.comptime-var"
+title = "ビルドの前に数えた"
+story = "五つのレーン二乗テーブルはプログラムが走る前に埋められる。埋めるループはコンパイラが展開する。"
+brief = '''
+**実行時** 関数の中で、下の `inline while` が展開され、どの反復でも `i` が
+コンパイル時に既知であるように、ループカウンタ `i` を宣言してください。
+
+```
+fn squares() [5]u32 {
+    var out: [5]u32 = undefined;
+    // ____
+    inline while (i < 5) : (i += 1) {
+        out[i] = @intCast(i * i);
+    }
+    return out;
+}
+```
+'''
+hints = [
+  "実行時の `var` は inline ループを駆動できず、`const` は進められません。可変なコンパイル時の値を強制するキーワードが `var` の前に付きます。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.cheatsheet_advanced.07.error-merge"
+title = "失敗の仕方の二つのリスト"
+story = "チケットのパースは二通りに失敗しうる。課金は三つ目。課金関数は三つすべてを一つの集合で名指しする。"
+brief = '''
+`ParseError` は `error{ Empty, BadDigit }` です。`TollError` をその二つのエラー
+**と** `Overdrawn` を持つ集合として定義し、`fn charge(s: []const u8) TollError!i64`
+が三つのどれでも返せるようにしてください。
+'''
+hints = [
+  "エラー集合は二文字の演算子でマージします。縦棒一つはビット単位の or で、型は取りません。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.cheatsheet_advanced.08.switch-on-error"
+title = "どう失敗したか"
+story = "にじんだチケットは無価値。桁が多すぎるチケットは最大値の価値。ブースは捕まえたエラーで決める。"
+brief = '''
+`std.fmt.parseInt(i64, tok, 10)` は `InvalidCharacter` か `Overflow` で失敗します。
+エラーは catch されて switch されます。不正な文字に 0 を与える prong はどれでしょう?
+
+```
+return std.fmt.parseInt(i64, tok, 10) catch |e| switch (e) {
+    // ____
+    error.Overflow => std.math.maxInt(i64),
+};
+```
+'''
+hints = [
+  "エラー集合に対する switch は各 case を `error.` プレフィックスで名指しします。enum リテラルのドット形式は別の型です。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.cheatsheet_advanced.09.walk-optional"
+title = "鎖をたどって"
+story = "その夜のレシートはリンクされた鎖で、各ノードは次か、何もないところを指す。監査は末尾まで歩いて合計する。"
+brief = '''
+`Node` は `struct { v: i64, next: ?*Node }` で、`cur` は型 `?*Node` の `var` です。
+`node` を各ノードに順に束縛して本体を走らせ、`null` で止まるループを、次のノードへの
+ステップを本体ではなくループヘッダに書いて開いてください。
+
+```
+var total: i64 = 0;
+var cur = head;
+// ____
+    total += node.v;
+}
+```
+'''
+hints = [
+  "条件は optional そのもの、キャプチャはアンラップされたポインタ、そしてコロンの後の continue 式が進めるのはキャプチャではなく optional です。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.cheatsheet_advanced.10.union-payload"
+title = "どう払ったか"
+story = "車は硬貨で払うか、オクトパスカードで払うか、手を振って通される。集計は硬貨を額面で、カードを二倍で足す。"
+brief = '''
+`Pay` は `union(enum) { coin: i64, octopus: i64, waved: void }` で、`p` は `Pay` です。
+coin のペイロードを `t` に足す prong はどれでしょう?
+
+```
+switch (p) {
+    // ____
+    .octopus => |amount| t += amount * 2,
+    .waved => {},
+}
+```
+'''
+hints = [
+  "ペイロードは矢印の後のキャプチャで束縛します。optional に対する `if` と同じ縦棒です。素のキャプチャは値で、`|*x|` はそれへのポインタです。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.cheatsheet_advanced.11.enum-from-int"
+title = "配線から来た数字"
+story = "車軸センサーはレーン区分をバイトで送る。料金表は enum をキーにしていて、enum は自分の料金を知っている。"
+brief = '''
+`n` は有効なタグ値を持つ実行時の `u8` です。`lane.fee()` がコンパイルできるように、
+`lane` を対応する `Lane` にしてください。
+
+```
+const Lane = enum(u8) {
+    car, van, truck, bus,
+    pub fn fee(self: Lane) i64 {
+        return switch (self) { .car, .van => 10, .truck => 20, .bus => 15 };
+    }
+};
+// ____
+return lane.fee();
+```
+'''
+hints = [
+  "その組み込み関数は整数だけを取ります。なる先の enum は結果型なので、束縛がそれを名指ししなければなりません。逆方向は `@intFromEnum` です。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.cheatsheet_advanced.12.labeled-block"
+title = "最初の重いやつ"
+story = "計量台のログを、百トンを超える最初の読みを求めて走査する。答えは値であって、関数からの脱出ではない。"
+brief = '''
+`xs` には 100 を超える値があることが保証されています。`found` はそのような最初の `x`
+にならなければならず、関数はその後 `found` を使い続けます。ブロックから `x` を
+渡す行はどれでしょう?
+
+```
+const found = blk: {
+    for (xs) |x| {
+        if (x > 100) // ____
+    }
+    unreachable;
+};
+return found * 2;
+```
+'''
+hints = [
+  "ラベル付きブロックは、ラベルを前にコロンを付けて名指しし値を運ぶ break で値を生みます。`return` なら間違った数で関数を抜け、ラベルは未使用になります。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.cheatsheet_advanced.13.span"
+title = "C 側からの文字列"
+story = "ナンバープレートカメラのドライバは C だ。名前をゼロバイトで終わるポインタとして渡し、Zig 側は長さ付きのスライスが欲しい。"
+brief = '''
+`c_name` は `[*:0]const u8` — 長さのない many-item ポインタで、0 で終端 — です。
+`s` を、終端子の手前まで（終端子は含まず）のバイトに対する `[]const u8` に、
+コピーせずにしてください。
+'''
+hints = [
+  "many ポインタはスライスに型強制されません。何かが番兵まで歩いて長さを見つけなければなりません。std.mem のある関数がまさにそれをやり、ポインタだけを取ります。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.cheatsheet_advanced.14.to-owned-slice"
+title = "リストを引き渡せ"
+story = "偶数番のレーンがリストに集められ、呼び出し側は素のスライスが欲しい。終わったら gpa.free で解放するために。"
+brief = '''
+`list` は `gpa` で埋められた `std.ArrayList(i64)` です。その中身を、呼び出し側が
+`gpa.free` で解放する `[]i64` として返し、`list` が解放するものは何も残さず、何も
+コピーしないようにしてください（Zig 0.16: リストはアロケータを持ちません）。
+
+```
+fn evens(gpa: std.mem.Allocator, xs: []const i64) ![]i64 {
+    var list: std.ArrayList(i64) = .empty;
+    errdefer list.deinit(gpa);
+    for (xs) |x| if (@rem(x, 2) == 0) try list.append(gpa, x);
+    // ____
+}
+```
+'''
+hints = [
+  "`.items` はまだリストが所有していて、二度解放されるか決して解放されません。所有権を移す呼び出しはサイズをぴったりに縮めるので、失敗しうるしアロケータを取ります。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.cheatsheet_advanced.15.get-or-put"
+title = "検索は一回、二回ではなく"
+story = "管制室のナンバープレート集計は車一台につき一つ増える。夜勤は同じプレートを二度ハッシュするのを拒む。"
+brief = '''
+`counts` は `std.AutoHashMap(i64, i64)` です。一回の検索で `x` を数えてください:
+初めて見るキーはインクリメントの前に 0 から始まり、すでにあるキーはカウントを保ちます。
+
+```
+const gop = try counts.getOrPut(x);
+// ____
+gop.value_ptr.* += 1;
+```
+'''
+hints = [
+  "結果はキーがすでにあったかを言うフラグと、スロットへのポインタを持ちます。新しいスロットは書き込むまで undefined です。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.cheatsheet_advanced.16.dupe-key"
+title = "行より長生きするキー"
+story = "プレートは一行に一つ、同じバッファに届く。今夜見たプレートの集合は、まさに上書きされようとしているバッファを指していてはならない。"
+brief = '''
+`seen` は `gpa` で作った `std.StringHashMap(void)` で、`word` は次の読み取りで
+上書きされる行バッファへの `[]const u8` スライスです。`word` を、バッファが変わった
+後も有効なままのキーとして挿入してください。キーは最後に一つずつ解放されます。
+'''
+hints = [
+  "文字列マップは渡されたスライスを格納するのであって、バイトではありません。先にアロケータでコピーしましょう。コピーも失敗しえます。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.cheatsheet_advanced.17.debug-allocator"
+title = "告げ口するアロケータ"
+story = "夜間ビルドは返されなかったすべてのバイトを報告するアロケータで走る。その名前は 0.16 で変わり、古いものはコンパイルできない。"
+brief = '''
+Zig 0.16。リーク検査付きの汎用アロケータ `dbg` を、下の二行がコンパイルできるように
+宣言してください — `deinit` はそれを変更し、リークを報告します。
+
+```
+// ____
+defer _ = dbg.deinit();
+const gpa = dbg.allocator();
+```
+'''
+hints = [
+  "`GeneralPurposeAllocator` は 0.16 の std.heap からなくなりました。その型は設定タプルを取り、呼び出しではなく decl リテラルから初期化します。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.cheatsheet_advanced.18.arena"
+title = "払うのは一度、最後に"
+story = "一つのリクエストの一時ノードと文字列は、リクエストが死ぬときに全部一緒に死ぬ。誰も一つずつ解放しない。"
+brief = '''
+`page` は `std.heap.page_allocator` です。`arena` をその上のアリーナにして、下の
+`a.create(Node)` と `std.fmt.allocPrint(a, ...)` がすべて一つの `deinit` で解放される
+ようにしてください。
+
+```
+// ____
+defer arena.deinit();
+const a = arena.allocator();
+```
+'''
+hints = [
+  "アリーナは唯一の引数として取る子アロケータの上に作られます。ジェネリック型ではなく、設定タプルもありません。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.cheatsheet_advanced.19.defer-order"
+title = "後入れ先出し"
+story = "ブースを出る途中の三つのスタンプ、そのうち二つは defer。台帳はそれらが押された順を示す。"
+brief = '''
+この関数は全体で何を印字するでしょう?
+
+```
+fn stamp() void {
+    defer std.debug.print("1", .{});
+    defer std.debug.print("2", .{});
+    std.debug.print("3", .{});
+}
+```
+'''
+hints = [
+  "defer された文はスコープ終了時に、defer された順と逆に走ります: 最後に登録されたものが最初です。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.cheatsheet_advanced.20.split-keeps-empties"
+title = "空の列も数える"
+story = "料金エクスポートはコンマ区切りで、欠けた列は空のフィールドであって、最初からなかったフィールドではない。`a,,b` は三列だ。"
+brief = '''
+`line` は `[]const u8` です。`it` を `line` のコンマ区切りフィールドに対するイテレータ
+にして、`while (it.next()) |f| n += 1;` が `"a,,b"` を **3** フィールド、`"a"` を 1
+と数えるようにしてください。
+'''
+hints = [
+  "std.mem の二つのイテレータが単一バイトの区切りを取ります。tokenizer は区切りの連続を飲み込んで二つと数え、splitter はその間の空フィールドを生みます。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.cheatsheet_advanced.21.sort-context"
+title = "他人の数字で並べ替える"
+story = "レーンの添字は別のテーブルの重みで並べ替えられる。Zig にはテーブルをキャプチャするクロージャがないので、ソートにそれを渡す。"
+brief = '''
+`idx` は `[]usize`、`keys` は `[]const i64` です。この比較関数を使って `idx` を
+`keys[i]` の昇順に並べ替えてください:
+
+```
+fn byKey(keys: []const i64, a: usize, b: usize) bool {
+    return keys[a] < keys[b];
+}
+```
+'''
+hints = [
+  "第三引数は比較関数が最初のパラメータとして受け取るコンテキストです。比較関数の型はそれに正確に一致しなければならないので、`{}` は `void` コンテキストにしか合いません。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.cheatsheet_advanced.22.truncate"
+title = "下位バイトだけ"
+story = "車軸センサーは四つの読みを u32 に詰める。ブースは最下位バイトが欲しく、残りがゼロでなくてもパニックしてはならない。"
+brief = '''
+`x` は `0x1234` を持つ実行時の `u32` です。`lo` を `0x34` — 下位 8 ビット — を持つ
+`u8` に、Debug モードで安全性パニックを起こさずにしてください。
+'''
+hints = [
+  "値が収まるか検査するキャストは 0x1234 でパニックします。上位ビットを落とすものは引数を一つ取り、幅は束縛から得ます。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.cheatsheet_advanced.23.wrapping"
+title = "回り込め、止まるな"
+story = "プレートのハッシュは一晩に何千回もオーバーフローするように作られている。Debug モードでは頼んでいないオーバーフローはパニックで、閉じたバリアだ。"
+brief = '''
+`h` は `std.math.maxInt(u32)` の近くから始まる `u32` で、`c` は `u8` です。ハッシュの
+一歩 `h = h * 31 + c` を、2^32 を法として **回り込む** ように書いてください —
+パニックでもなく、最大値での飽和でもなく。
+'''
+hints = [
+  "素の演算子は Debug でオーバーフロー時にパニックし、後からマスクをかけても手遅れです — 掛け算はすでにオーバーフローしています。Zig には接尾辞付き演算子の族が二つあります: 一方は最大値で飽和し、他方は回り込みます。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.cheatsheet_advanced.24.expect-equal"
+title = "運賃を証明せよ"
+story = "面接官が走らせる前に、候補者は料金表と平均に `zig test` を走らせ、テストは何を期待するかを言う。"
+brief = '''
+`fare(3)` は 7 であるべき `i64` を返します。テストブロックの中でそれをアサート
+してください — 値が間違っていればテストは失敗しなければならず、コンパイルできなければ
+なりません。
+
+```
+fn avg(sum: i64, n: i64) f64 {
+    return @as(f64, @floatFromInt(sum)) / @as(f64, @floatFromInt(n));
+}
+
+test "fare" {
+    // ____
+    try std.testing.expect(avg(5, 2) == 2.5);
+}
+```
+'''
+hints = [
+  "比較はエラーユニオンを返すので `try` しなければならず、さもないとコンパイラは無視を拒みます。一引数の `expect` は bool を取ります。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.cheatsheet_advanced.25.main-init"
+title = "ランタイムが入ってくるところ"
+story = "Zig 0.16 は main に I/O ランタイムとアロケータを一つの構造体で渡す。古いシグネチャはどちらも使わない限りまだコンパイルできる。"
+brief = '''
+Zig 0.16。下の本体がコンパイルできるように `main` を開いてください: パラメータから
+`io` と `gpa` を読み、`try` を使います。
+
+```
+// ____
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+}
+```
+'''
+hints = [
+  "エントリポイントは `pub` でなければならず、`try` のためにエラーを返せなければならず、本体がフィールドを読む std.process の型のパラメータを一つ取ります。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.cheatsheet_advanced.26.stdin-lines"
+title = "一度に一行"
+story = "プレートのフィードは果てしなく、管制室はフィードが閉じるまで 0.16 のリーダーを通して一行ずつ読む。"
+brief = '''
+Zig 0.16。`r` は `&stdin.interface`、バッファ付き stdin に対する `*std.Io.Reader`
+です。各行を（改行なしで）`line` に束縛し、読み取りの失敗を呼び出し側へ渡し、入力の
+終わりできれいに終わるループを開いてください。
+'''
+hints = [
+  "0.16 のリーダーには区切りまで取る呼び出しがあり、optional スライスを包むエラーユニオンを返します: ストリームの終わりで null なので、`try` してからキャプチャ。その Exclusive の兄弟は optional ではなく、終わりでエラーになります。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.cheatsheet_advanced.27.spawn"
+title = "自分のスレッドを持つブース"
+story = "ブース 5 は自分のスレッドでカウントを二乗し、答えを管制室のスロットに書く。管制室は読む前に join する。"
+brief = '''
+`fn worker(out: *i64, n: i64) void` で、`total` は `var i64` です。`worker` を
+`&total` と `5` で新しいスレッドで始め、次の行で `t.join();` がコンパイルできるように
+ハンドルを `t` として保持してください。
+'''
+hints = [
+  "spawn は設定、関数、そしてその引数を一つのタプルとして取ります。失敗しうるので、ハンドルはエラーを外して初めて存在します。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.cheatsheet_advanced.28.io-mutex"
+title = "一つのトレイ、二つの手"
+story = "二つのブースが一つの現金合計に足す。その周りのロックは 0.16 では I/O ランタイムのもので、std.Thread.Mutex はなくなった。"
+brief = '''
+Zig 0.16。`m` は `*std.Io.Mutex`、`io` は `std.Io` です。加算の前にロックを取って
+ください。下の `defer` がそれを返します。`add` は `void` を返し、エラーを伝播
+できません。
+
+```
+fn add(io: std.Io, m: *std.Io.Mutex, total: *i64, value: i64) void {
+    // ____
+    defer m.unlock(io);
+    total.* += value;
+}
+```
+'''
+hints = [
+  "0.16 のミューテックスの素の `lock` は `io` を取り `error.Canceled` を返しうるので、`void` 関数では `try` できません。キャンセルできない兄弟は何も返しません。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.cheatsheet_advanced.29.atomic"
+title = "一ワード、ロックなし"
+story = "高架下のヒットカウンタはマシンワード一つで、すべてのレーンから同時に増やされる。一回の加算の周りにミューテックスなど誰も欲しくない。"
+brief = '''
+`hits` は複数のスレッドで共有される `*std.atomic.Value(u32)` です。古い値を必要と
+しない `void` 関数の中で、relaxed（monotonic）順序でアトミックに 1 を足してください。
+'''
+hints = [
+  "read-modify-write は以前の値を返し、Zig は void でない結果を黙って捨てさせません。順序は 0.16 では小文字の enum リテラルです。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.cheatsheet_advanced.30.packed-bitcast"
+title = "一バイトに八つのフラグ"
+story = "バリア制御装置は車一台につき一バイトを取る: 支払済み、フラグ付き、3 ビットのレーン、予備 3 ビット。構造体はビット単位で配置され、そのバイトとして送られる。"
+brief = '''
+`Flags` は `packed struct(u8)` です — C と同じ配置になる `extern struct` と違い、
+`@sizeOf(Flags)` は 1 です。`f` は `Flags` です。`bits` を、ビットパターンが `f` の
+ものである `u8` にして、配線に送り出せるようにしてください。
+
+```
+const Flags = packed struct(u8) {
+    paid: bool,
+    flagged: bool,
+    lane: u3,
+    _pad: u3 = 0,
+};
+```
+'''
+hints = [
+  "整数キャストは入力に整数を欲しがります。packed struct は、引数を一つ取り目標を束縛から得るキャストでビット単位に再解釈されます。",
+]

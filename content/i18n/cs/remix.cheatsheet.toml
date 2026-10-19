@@ -1,0 +1,467 @@
+# REMIX LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/remix/cheatsheet.toml`, quest by quest, and nothing else. Code blocks,
+# identifiers and the quiz's four choices are the English pack's and are never
+# translated.
+
+pack   = "remix.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet.01.flush"
+title = "VYPRÁZDNIT BUFFER"
+story = "06:30, Jardine's Bazaar. Kiosek zapsal každou odpověď do bufferu a obrazovka zůstala prázdná."
+brief = '''
+V **Go** začíná `main` takto:
+
+```
+in := bufio.NewReader(os.Stdin)
+out := bufio.NewWriter(os.Stdout)
+// ____
+```
+
+Který řádek, přesně na tom místě, zajistí, že všechno zapsané do `out`
+se dostane na obrazovku, až `main` skončí?
+'''
+hints = [
+  "Bufferovaný zapisovač zapisuje jen při vyprázdnění. Naplánuj vyprázdnění na chvíli, kdy main skončí.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet.02.char-count"
+title = "ZNAKY, NE BAJTY"
+story = "Cedule kavárny na Paterson Street říká \"héllo\". Pokladna napočítala šest písmen."
+brief = '''
+V **Rustu** je `s` hodnota typu `String` `"héllo"`. Který výraz dá 5, tedy
+počet znaků, a ne počet bajtů?
+'''
+hints = [
+  "Rustový String jsou bajty UTF-8; `é` zabere dva. Projdi chars a spočítej je.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet.03.grid"
+title = "KAŽDÝ ŘÁDEK SVŮJ"
+story = "Zasedací pořádek na banketu v Lee Garden: změníš jeden stůl a změnily se všechny."
+brief = '''
+V **Pythonu** vytvoř `g`, mřížku nul `n` × `m`, jejíž řádky jsou
+**nezávislé** seznamy — zápis `g[0][0] = 1` smí změnit jen řádek 0.
+'''
+hints = [
+  "Násobení seznamu seznamů kopíruje odkaz, ne řádek. Každý řádek vytvoř znovu.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet.04.count"
+title = "ČÁRKOVÁNÍ"
+story = "Dai pai dong na Haven Street počítá objednávky podle jídla a nové jídlo začíná na nule."
+brief = '''
+V **Go** platí `m := map[string]int{}`. Přičti jedničku k počtu pro slovo `w`;
+slovo, které tu ještě nebylo, začíná na 0.
+'''
+hints = [
+  "Čtení chybějícího klíče z mapy v Go vrátí nulovou hodnotu, takže není co kontrolovat předem.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet.05.float-sort"
+title = "DESETINNÁ ČÍSLA ZA SEBOU"
+story = "Zlatnictví na Percival Street řadí denní ceny a každá cena má haléře."
+brief = '''
+V **Rustu** je `a` typu `Vec<f64>`. Seřaď ho vzestupně, na místě.
+'''
+hints = [
+  "`sort()` potřebuje `Ord` a `f64` kvůli NaN `Ord` není. Dej mu komparátor, který seřadí každé desetinné číslo.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet.06.max-heap"
+title = "NEJVĚTŠÍ VEN PRVNÍ"
+story = "Aukce v obchodě se známkami v Causeway Bay bere nejvyšší nabídku první. heapq zná jen tu nejnižší."
+brief = '''
+V **Pythonu** je `h` seznam používaný s `heapq`, což je min-halda. Vlož
+číslo `x` tak, aby `heapq.heappop(h)` dal jako první **největší** hodnotu
+(znaménko při vyndání otočíš zpátky).
+'''
+hints = [
+  "V heapq žádná max-halda není. Ulož hodnoty tak, aby jejich pořadí bylo obrácené.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet.07.recursive-closure"
+title = "VOLÁ SAMA SEBE"
+story = "Výtahy v Hysan Place: aby hledání prošlo každé patro, musí volat samo sebe."
+brief = '''
+V **Go** prochází uzávěr graf tím, že volá sám sebe:
+
+```
+// ____
+dfs = func(u int) {
+    for _, v := range g[u] { dfs(v) }
+}
+```
+
+Který řádek musí přijít první, aby tělo mohlo odkazovat na `dfs`?
+'''
+hints = [
+  "S `:=` jméno uvnitř vlastního literálu ještě neexistuje. Nejdřív deklaruj proměnnou s jejím funkčním typem, pak přiřaď.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet.08.concat"
+title = "NECH SI OBA"
+story = "Dvě fronty před kinem na Times Square se spojí v jednu a oba uvaděči si nechají své seznamy."
+brief = '''
+V **Rustu** jsou `a` a `b` typu `Vec<i32>`. Vytvoř nový `Vec` `c`, který
+obsahuje `a` a za ním `b`, a `a` i `b` používej i potom.
+'''
+hints = [
+  "Když do pole dáš samotné Vecy, přesunou se. Dej tam místo nich jejich řezy.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet.09.multi-key"
+title = "DVA KLÍČE"
+story = "Tabulka skóre v karaoke na Lockhart Road: nejvyšší skóre nahoře, shody podle abecedy."
+brief = '''
+V **Pythonu** je `pairs` seznam n-tic `(name, score)` s celočíselným
+skóre. Seřaď ho na místě: skóre **sestupně** a stejná skóre podle jména
+**vzestupně**.
+'''
+hints = [
+  "Jeden klíč, dvě části. Zneguj číslo, abys otočil jen jeho pořadí; `reverse=True` by otočilo i jména.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet.10.close-results"
+title = "ZAVŘÍT AŽ PO VŠECH"
+story = "Čtyři kurýři nosí balíky do depa na Sugar Street. Dveře se zavřou po posledním, ne po prvním."
+brief = '''
+V **Go** posílají čtyři pracovní gorutiny na **nebufferovaný** kanál
+`results` a po skončení volají `wg.Done()`. Pak `main` sbírá:
+
+```
+// ____
+for r := range results { all = append(all, r) }
+```
+
+Který řádek, těsně před smyčkou, zavře `results` ve správnou chvíli, aby
+smyčka skončila bez paniky i bez deadlocku?
+'''
+hints = [
+  "Zavři až poté, co skončí každý odesílatel, a čekej na to jinde než v gorutině, která se chystá číst.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet.11.shared-rx"
+title = "JEDNA SCHRÁNKA, ČTYŘI RUCE"
+story = "Jedno okénko na objednávky v kuchyni na Yee Wo Street, čtyři kuchaři do něj sahají — vždy jedna ruka."
+brief = '''
+V **Rustu** platí `let (tx, rx) = mpsc::channel::<i32>();` — čtyři spuštěná
+vlákna musí brát úlohy z tohoto jediného příjemce. Který řádek udělá z `rx`
+něco, k čemu může každé vlákno dostat vlastní handle?
+'''
+hints = [
+  "Receiver se nedá klonovat. Sdílej jeden: vláknově bezpečný počítaný ukazatel kolem zámku.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet.12.sentinels"
+title = "KAŽDÉMU JEDEN SIGNÁL"
+story = "Zavírací hodina v místnosti 7-32. Každému pracovníkovi noční směny se musí říct, ať jde domů, jednomu po druhém."
+brief = '''
+V **Pythonu** je `ts` seznam pracovních vláken a každé z nich běží
+
+```
+while True:
+    j = q.get()
+    if j is None: break
+    ...
+```
+
+Producent už dal všechny úlohy do `q`. Který řádek zastaví **každého**
+pracovníka, aby `for t in ts: t.join()` skončilo?
+'''
+hints = [
+  "Každý pracovník, který přečte signál ke stopce, odejde a signál si vezme s sebou. Spočítej pracovníky.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet.13.index-cast"
+title = "INDEX JE USIZE"
+story = "Regály v Ústřední knihovně v Causeway Bay jsou očíslované a na lístku v tvé ruce stojí 7 cizím rukopisem."
+brief = '''
+V **Rustu** je `x` typu `i32`, o kterém se ví, že je nezáporné, a `a` je
+`Vec<i64>`. Navaž `n` tak, aby se `a[n]` přeložilo.
+'''
+hints = [
+  "Index je `usize` a Rust nikdy nepřevádí číslo potichu — ani do `let` s vypsaným typem. Přetypování vyslov.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet.14.comma-ok"
+title = "COMMA OK"
+story = "Ztráty a nálezy ve Victoria Parku: peněženka bez jediné mince je pořád peněženka."
+brief = '''
+V **Go** je `m` typu `map[string]int`. Otevři blok, který proběhne jen tehdy, když
+klíč `k` **existuje**, s jeho hodnotou navázanou na `v` — a klíč uložený s
+hodnotou 0 se počítá jako existující.
+'''
+hints = [
+  "Chybějící klíč se přečte jako nulová hodnota, takže samotná hodnota ti nic neřekne. Zeptej se mapy na druhý výsledek v inicializačním příkazu ifu.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet.15.enumerate"
+title = "OČÍSLOVANÉ STÁNKY"
+story = "Stánky podél Jardine's Crescent jsou očíslované a inspektor čte číslo i stánek zároveň."
+brief = '''
+V **Pythonu** je `a` seznam řetězců. Otevři smyčku přes `a`, která ti dá
+jak `i`, pozici od 0, tak `x`, prvek na té
+pozici.
+'''
+hints = [
+  "Existuje vestavěná funkce, která každý prvek spáruje s jeho pozicí — a pozici ti dává jako první.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet.16.pointer-receiver"
+title = "POSUŇ TEN SKUTEČNÝ"
+story = "Tramvaj na Hennessy Road popojela o tři zastávky. Fotka tramvaje ne."
+brief = '''
+V **Go**,
+
+```
+type P struct{ X, Y int }
+
+// ____
+    p.X += d
+}
+```
+
+`p := P{1, 2}; p.Shift(3)` musí nechat `p.X` rovno 4. Který řádek otevírá
+metodu?
+'''
+hints = [
+  "Hodnotový příjemce dostane kopii a je to kopie, co se posune. Přijmi místo toho adresu.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet.17.derive-ord"
+title = "ZROZEN K ŘAZENÍ"
+story = "Fronta na vaječné vafle na Tang Lung Street se řadí podle čísla lístku, pak podle jména — a nikdo pro to nenapsal pravidlo."
+brief = '''
+V **Rustu** platí `struct P { x: i32, y: i32 }` a `v` je `Vec<P>`. Který
+atribut, umístěný na struct, způsobí, že se `v.sort()` přeloží — s řazením podle
+`x` a pak podle `y` — bez jediného ručně napsaného `impl`?
+'''
+hints = [
+  "sort chce Ord a Ord stojí na Eq a PartialOrd, které stojí na PartialEq. Odvoď celý žebřík.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet.18.not-a-number"
+title = "NENÍ TO ČÍSLO"
+story = "Automatu na lístky na stanici Causeway Bay podstrčili slovo tam, kde chtěl číslo, a nesmí zhasnout."
+brief = '''
+V **Pythonu** je `s` řetězec načtený ze vstupu:
+
+```
+try:
+    n = int(s)
+# ____
+    print("bad")
+```
+
+Který řádek otevírá obsluhu tak, aby `s = "abc"` vypsalo `bad` místo
+pádu?
+'''
+hints = [
+  "Argument má správný typ — řetězec — je to hodnota, která se nedá přečíst jako číslo. Chyť výjimku, která se podle toho jmenuje.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet.19.wrap-error"
+title = "ZACHOVEJ ŘETĚZ"
+story = "Stížnost stoupá od pultu v Sogu k vedoucímu patra a původní lístek zůstává přišitý k ní."
+brief = '''
+V **Go**, uvnitř `func load(s string) (int, error)`:
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+
+Vrať chybu, která přidá kontext `load:` **a** zachová v sobě tu původní,
+aby volajícímu `errors.Is(err, strconv.ErrSyntax)`
+stále platilo.
+'''
+hints = [
+  "Naformátování chyby do zprávy ji promění v text a řetěz je pryč. Jedno sloveso balí místo toho, aby tisklo.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet.20.below-zero"
+title = "MÍNUS POD NULOU"
+story = "Dvě tramvajové zastávky na Yee Wo Street. Počítání rozestupu pozpátku od té bližší šlo pod nulu a celá tramvaj stála."
+brief = '''
+V **Rustu** jsou `i` a `j` obě `usize` a větší může být kterékoli z nich.
+Navaž `d` na vzdálenost mezi nimi — řádek, který se přeloží a nikdy
+nepanikaří, ani v ladicím sestavení.
+'''
+hints = [
+  "Odčítání bez znaménka, které by šlo do záporu, přeteče, a v ladicím sestavení je to panika. Existuje metoda, která se ptá na rozestup, ne na rozdíl.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet.21.append"
+title = "NECH SI NÁVRAT"
+story = "Alex přidává balík do seznamu kurýrů na Percival Street a seznam na zdi zůstává stejně dlouhý."
+brief = '''
+V **Go** je `a` `[]int` a `x` je `int`. Přidej `x` na konec `a`
+tak, aby `len(a)` bylo o jedna víc než předtím.
+'''
+hints = [
+  "append vrací slice, který může bydlet někde jinde. Řádek není hotový, dokud si ten výsledek nenecháš.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet.22.larger"
+title = "TEN VĚTŠÍ"
+story = "Dvě nabídky na tutéž známku na aukci v Causeway Bay a Mei zapisuje tu vyšší, aniž by nad fn main cokoli importovala."
+brief = '''
+V **Rustu** jsou `x` i `y` `i32` a soubor nemá žádné řádky `use`.
+Navaž `m` na větší z obou.
+'''
+hints = [
+  "Nic jménem max samo o sobě v dosahu není. Celé číslo nese své vlastní porovnání, jako metodu, která bere tu druhou hodnotu.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet.23.sorted-copy"
+title = "SEŘAĎ KOPII"
+story = "Seznam stánků podél Jardine's Crescent musí zůstat v pořadí chůze; inspektor chce k tomu i abecední."
+brief = '''
+V **Pythonu** je `a` seznam řetězců. Navaž `b` na **nový** seznam se
+stejnými řetězci ve vzestupném pořadí a `a` nech přesně, jak bylo.
+'''
+hints = [
+  "Vlastní metoda sort seznamu pracuje na místě a vrací None. Vestavěná funkce, která bere libovolný iterovatelný objekt, vrací nový seznam.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet.24.empty-not-nil"
+title = "PRÁZDNÝ, NE NIL"
+story = "Kurýrský vak v depu na Sugar Street byl ušitý s místem na osm balíků. Dnes v noci nedrží žádný."
+brief = '''
+V **Go** byl `a` vytvořen přes `a := make([]int, 0, 8)` a od té doby do něj
+mohly být prvky přidány i odebrány. Který výraz je `true` přesně
+tehdy, když `a` nedrží žádné prvky?
+'''
+hints = [
+  "Slice může být prázdný, aniž by byl nil, a jeho kapacita říká, kolik má místa, ne kolik z něj je využito.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet.25.inclusive-range"
+title = "AŽ PO POSLEDNÍ ZASTÁVKU"
+story = "Tramvaj na Hennessy Road se počítá zastávku po zastávce, od 1 do n, a poslední zastávka se počítá taky."
+brief = '''
+V **Rustu** je `n` `usize`. Otevři smyčku, která nechá `i` proběhnout
+`1, 2, …, n`, s `n` **včetně**.
+'''
+hints = [
+  "Dvě tečky se zastaví o jedna před koncem. Existuje zápis rozsahu, který konec nechá uvnitř.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet.26.own-list"
+title = "VLASTNÍ SEZNAM"
+story = "Krajta na cenové tabuli mokrého trhu: jedna tabule na ranní ceny, jedna na odpolední, ne tatáž tabule dvakrát."
+brief = '''
+V **Pythonu** je `a` seznam intů a nic není importované. Navaž `b` na
+seznam se stejnými inty tak, aby `b.append(9)` potom nechalo `a` beze změny.
+'''
+hints = [
+  "Přiřazení jen naváže druhé jméno na tentýž seznam a vestavěná funkce toho jména neexistuje. Požádej o čerstvý seznam ten seznam sám.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet.27.int-abs"
+title = "ŽÁDNÝ ABS PRO INT"
+story = "Gogo počítá patra mezi dvěma výtahy v Hysan Place; cesta dolů vychází záporně a math není importované."
+brief = '''
+V **Go** 1.22 je `x` `int` bezpečně uvnitř rozsahu `int` a soubor
+importuje jen `fmt`. Navaž `a` na absolutní hodnotu `x`.
+'''
+hints = [
+  "math.Abs chce float64 a potřebuje svůj import. Od 1.21 porovnávají dvě vestavěné funkce hodnoty libovolného uspořádaného typu a jedna z nich, když dostane x a jeho zápornou hodnotu, stačí.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet.28.parse"
+title = "ŘEKNI TYP"
+story = "Číslo lístku přečtené z papírového útržku na stanici Causeway Bay a pokladna chce číslo, ne papír."
+brief = '''
+V **Rustu** je `s` `&str` obsahující desítkové celé číslo jako `"42"`.
+Navaž `n` jako `i32` s tímto číslem, s panikou, pokud `s` žádné není.
+'''
+hints = [
+  "parse vrací Result a typ čísla si sám vybrat neumí. Vyndej z něj hodnotu — panika při neúspěchu je dovolená — a typ napiš někam, kde je vidět.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet.29.two-decimals"
+title = "DVĚ DESETINNÁ MÍSTA"
+story = "Zlatnictví na Percival Street tiskne cenu za gram a 3.1 se na lístku musí číst jako 3.10."
+brief = '''
+V **Pythonu** je `x` float. Vypiš ho s přesně dvěma číslicemi za
+desetinnou tečkou, aby se `3.1` vypsalo jako `3.10`.
+'''
+hints = [
+  "round cestou na obrazovku zahodí koncovou nulu. F-string může nést formátovací specifikaci, která zafixuje přesnost i zápis.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet.30.whole-quotient"
+title = "CELÝ PODÍL"
+story = "Uzavírání knih v místnosti 7-32: částka o osmnácti číslicích dělená na tři díly a krajta chce každou číslici správně."
+brief = '''
+V **Pythonu** jsou `a` a `b` inty: `a` může být záporné a velké až
+`10**18` a `b` je kladné. Navaž `q` na `a` dělené `b`, zaokrouhlené
+**dolů**, jako `int` přesný v každé číslici.
+'''
+hints = [
+  "Cokoli, co projde floatem, ztratí číslice nad 2**53, a int() usekává k nule, ne dolů. Jeden operátor udělá celou věc v celých číslech.",
+]

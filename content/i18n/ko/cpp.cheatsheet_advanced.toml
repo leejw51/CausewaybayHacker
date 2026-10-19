@@ -1,0 +1,496 @@
+# C++ LAND — CHEATSHEET ADVANCED, in Korean. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "cpp.cheatsheet_advanced"
+locale = "ko"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet_advanced.01.auto-params"
+title = "어떤 둘이든"
+story = "헤네시 로드의 환전소는 달러 요금에 센트 팁을 더하는데, 타입 쌍마다 함수를 따로 두고 싶지는 않다."
+brief = '''
+`add(1, 2.5)`가 컴파일되어 `3.5`를 돌려주고 `add(std::string("a"), "b")`도
+컴파일되도록 `add`를 **하나의** 정의로 정의하세요. C++20.
+'''
+hints = [
+  "C++20부터 매개변수 목록의 자리표시자는 그 자체로 함수를 템플릿으로 만듭니다 — 그리고 자리표시자 하나하나가 각자의 타입입니다.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet_advanced.02.constrained-member"
+title = "상자 밖에서"
+story = "소고의 재고 조사는 온전한 품목만 누계를 내고 — 그것을 보고하는 멤버는 클래스 밖, .cpp에 정의되어 있다."
+brief = '''
+```cpp
+template <std::integral T>
+struct Stat {
+  T s = 0;
+  void add(T x) { s += x; }
+  T sum() const;
+};
+```
+
+`sum`을 struct **밖에서** 정의하세요. `<concepts>`는 포함되어 있습니다.
+'''
+hints = [
+  "클래스 템플릿의 out-of-line 멤버는 템플릿 헤더를 되풀이합니다 — 그리고 제약까지 포함해 같은 헤더여야 합니다.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet_advanced.03.mutable-capture"
+title = "번호표 기계"
+story = "럭키맥 카운터의 번호표 기계는 0, 1, 2를 내주고 — 바깥 어디에도 카운터 변수 없이 자기 개수를 스스로 센다."
+brief = '''
+연속 호출에서 `0`, 그다음 `1`, 그다음 `2`를 돌려주는 호출 가능 객체 `next`를
+만드세요. **람다 밖에는 `n`이라는 변수가 없습니다.**
+'''
+hints = [
+  "캡처는 대괄호 안에서 바로 초기화할 수 있습니다. 람다의 호출 연산자는 따로 말하지 않으면 `const`입니다 — 그리고 후위 증가와 전위 증가에 주의하세요.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet_advanced.04.this-capture"
+title = "나도 세어 줘"
+story = "코즈웨이베이역의 개찰구가 계수기를 내준다. 클릭 하나하나가 사본이 아니라 개찰구 자신의 집계에 떨어져야 한다."
+brief = '''
+```cpp
+struct Counter {
+  int count = 0;
+  std::function<void()> ticker();
+};
+```
+
+`ticker` 안에서 람다를 돌려주세요. 그것을 두 번 호출하면 **이 객체의**
+`count`가 `2`가 되어야 합니다.
+'''
+hints = [
+  "데이터 멤버는 변수가 아니므로 캡처 목록에 이름으로 들어갈 수 없습니다. 객체를 캡처하세요 — 진짜가 바뀌도록 포인터로.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet_advanced.05.recursive-lambda"
+title = "자기 자신을 부른다"
+story = "자딘스 바자 빵집의 파티시에는 에그타르트 집계를 자기 자신을 부르는 함수로 쓴다 — main 안에서, 이름 붙은 함수 하나 없이."
+brief = '''
+`fib(10)`이 `55`를 돌려주도록 `fib`를 **자기 자신을 호출하는** 지역 람다로
+정의하세요. `<functional>`은 포함되어 있습니다.
+'''
+hints = [
+  "`auto` 변수는 자기 초기화식에 나타날 수 없습니다. 호출 가능 타입을 선언한 변수는 됩니다 — 그리고 람다는 그것을 캡처해야 합니다.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet_advanced.06.if-constexpr"
+title = "분기 하나만"
+story = "태풍 대피항 부두의 계량대는 상자 개수나 라벨을 받고 — 받은 것에 말이 안 되는 분기는 컴파일을 거부한다."
+brief = '''
+```cpp
+template <typename T>
+auto weigh(const T& x) {
+  // one line here
+}
+```
+
+`T`가 정수 타입이면 `x * 2`를, 아니면 `x.size()`를 돌려주세요. `weigh(21)`과
+`weigh(std::string("abc"))`가 둘 다 컴파일되어야 합니다. `<type_traits>`는
+포함되어 있습니다.
+'''
+hints = [
+  "평범한 `if`는 모든 `T`에 대해 두 분기를 다 컴파일합니다. 조건은 트레이트 타입이 아니라 값이어야 하고 — 다른 분기를 막아 주는 것은 `else`입니다.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet_advanced.07.static-assert"
+title = "실행이 아니라 빌드를 실패시켜라"
+story = "눈데이 건 포수들은 장전하기도 전에 장약의 제곱을 확인한다 — 산술이 틀리면 아무것도 나가지 않는다."
+brief = '''
+`constexpr int sq(int x) { return x * x; }`가 선언되어 있습니다.
+**네임스페이스 스코프**에서, `sq(12)`가 `144`가 아니면 **컴파일**이
+실패하게 하세요 — 런타임에 검사되는 것이 있어서는 안 됩니다.
+'''
+hints = [
+  "`constexpr` 호출은 컴파일러가 평가할 수 있고, 컴파일 시간에 사는 단언문이 있습니다. C++17부터 메시지는 선택이지만, 주려면 문자열이어야 합니다.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet_advanced.08.enum-class"
+title = "숫자가 노선이 된다"
+story = "코즈웨이베이의 MTR 안내판은 선로에서 노선 번호를 읽어 제대로 된, 스코프가 있는, 1바이트짜리 노선 코드로 바꿔야 한다."
+brief = '''
+```cpp
+enum class Line : std::uint8_t { Island, TsuenWan, KwunTong };
+```
+
+`int n`은 입력에서 읽었고 `0`, `1`, `2` 중 하나입니다. 해당 열거자를 담은
+`Line l`을 선언하세요.
+'''
+hints = [
+  "스코프 enum은 어느 방향으로도 암시적으로 변환되지 않습니다. 중괄호 초기화는 런타임 `int`의 좁히기를 거부합니다. 이름 붙은 캐스트 중 하나가 할 일입니다.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet_advanced.09.spaceship"
+title = "하나 값에 여섯"
+story = "항만 사무소는 이제 모든 정박지를 온갖 방법으로 — 작다, 같다, 이상이다 — 비교할 수 있길 원하고, 연산자 여섯을 손으로 쓰기는 거부한다."
+brief = '''
+`struct Pt { int r, c; };` — `a < b`, `a == b`, `a >= b`가 모두 컴파일되고
+`r` 다음 `c`로 순서가 매겨지도록 **멤버 하나**를 추가하세요. C++20,
+`<compare>`는 포함되어 있습니다.
+'''
+hints = [
+  "default로 둔 삼방 연산자 하나가 `==`까지 줍니다. 반환 타입은 순서 범주입니다 — 컴파일러가 추론하게 두세요 — 그리고 default로 둔 비교는 `const`여야 합니다.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet_advanced.10.dynamic-cast"
+title = "정말 원인가"
+story = "자페 로드의 간판 가게는 모든 주문을 기반 포인터로 들고 있고, 둥근 간판 기계는 정말 원인 것만 받아야 한다."
+brief = '''
+```cpp
+struct Shape { virtual double area() const = 0; virtual ~Shape() = default; };
+struct Circle : Shape { double r; double area() const override { return 3.14 * r * r; } };
+struct Square : Shape { double s; double area() const override { return s * s; } };
+```
+
+`Shape* s`는 어떤 도형을 가리킵니다. 정말 `Circle`일 때 `c`가 그것을
+**`Circle`로서** 가리키고, 아니면 `nullptr`이 되게 하세요.
+'''
+hints = [
+  "런타임에 객체에게 무엇이냐고 묻는 캐스트는 하나뿐입니다. 나머지는 포인터를 재해석할 뿐이고 절대 null을 내지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet_advanced.11.move-unique"
+title = "넘겨주기"
+story = "퍼시벌 스트리트 창고의 소포에는 주인이 정확히 하나다. 밴에 실으면 배달원은 더는 그것을 들고 있지 않다."
+brief = '''
+`auto p = std::make_unique<Node>(5);`와
+`std::vector<std::unique_ptr<Node>> v;` — `p`가 소유한 노드를 `v`에 넣으세요.
+그 뒤 `p`는 **비어** 있어야 하고, 어떤 `Node`도 복사되어서는 안 됩니다.
+'''
+hints = [
+  "unique 포인터는 복사할 수 없고, 생 포인터가 조용히 그것이 되지도 않습니다. 소유권 자체를 넘기세요.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet_advanced.12.weak-lock"
+title = "아직 거기 있나?"
+story = "자딘스 바자 위층의 관리인은 7호 세입자를 소유하지 않는 메모로 적어 두고, 아직 사는지 확인해야 한다 — 그리고 말하는 동안은 로비에 붙잡아 둬야 한다."
+brief = '''
+`std::weak_ptr<Room> wp;` — **방이 아직 존재할 때만** 방의 `n`을 출력하고,
+그동안 살아 있게 붙들어 두세요.
+'''
+hints = [
+  "weak 포인터는 직접 역참조하거나 검사할 수 없습니다. strong 포인터를 되돌려 주는데, 객체가 사라졌으면 그것은 비어 있습니다.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet_advanced.13.move-ctor"
+title = "열쇠를 받고, 아무것도 남기지 마라"
+story = "이워 스트리트의 전당포가 사물함의 내용물을 넘겨받는다. 옛 표는 아무것도 가리키지 않게 두어야지, 아니면 사물함이 두 번 비워진다."
+brief = '''
+```cpp
+struct Buf {
+  int* data; int n;
+  explicit Buf(int n) : data(new int[n]), n(n) {}
+  ~Buf() { delete[] data; }
+  Buf(const Buf&) = delete;
+  Buf& operator=(const Buf&) = delete;
+  // the move constructor goes here
+};
+```
+
+이동 생성자를 추가하세요: `Buf b(std::move(a));`가 `a`의 배열을 넘겨받고,
+이동된 뒤의 `a`는 **파괴해도 안전**해야 합니다. `<utility>`는 포함되어
+있습니다.
+'''
+hints = [
+  "매개변수는 rvalue 참조이고, 비울 거라면 `const`일 수 없습니다. 유틸리티 하나가 새 값을 저장하고 옛 값을 돌려주는 것을 식 하나로 합니다.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet_advanced.14.try-emplace"
+title = "새것일 때만"
+story = "트램 차고 대장은 새 차량 번호를 한 번만 받는다. 반복은 옛 항목을 건드리지 않고 그렇다고 말해야 한다."
+brief = '''
+`std::map<std::string, int> m;`과 `std::string k; int v;` — **`k`가 없을
+때만** `k → v`를 삽입하고, 같은 줄에서 들어갔는지 여부를 `ok`에 묶으세요.
+'''
+hints = [
+  "절대 덮어쓰지 않는 삽입은 pair를 돌려줍니다. 구조적 바인딩은 대괄호를 씁니다. 덮어쓰는 사촌도 pair를 돌려주고, 그것이 함정입니다.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet_advanced.15.optional-view"
+title = "어떤 텍스트에서든 숫자, 아니면 없음"
+story = "터널 요금소는 도착하는 텍스트가 무엇이든 — 리더기의 std::string이든, 테스트의 리터럴이든 — 파싱해서 요금 아니면 없음으로 답한다."
+brief = '''
+`parse`를 선언하세요: `int` **아니면 없음**을 돌려주고(예외도 포인터도
+없이), `std::string`**과** 리터럴 `"7"`로 모두, 텍스트 복사 없이 호출할 수
+있어야 합니다.
+'''
+hints = [
+  "소유하지 않는 문자열 타입은 값으로 `std::string`과 리터럴을 모두 받습니다. 그것의 참조는 어느 쪽에도 묶이지 않습니다. 반환 타입에는 템플릿 인자가 필요합니다.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet_advanced.16.visit"
+title = "무엇이든 그것"
+story = "타임스 스퀘어 영화관의 표는 좌석 번호이거나 게스트 명단의 이름이다. 안내원은 들어 있는 쪽을 출력한다."
+brief = '''
+```cpp
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+std::variant<int, std::string> v = ...;
+auto pr = overloaded{ [](int i) { std::cout << i; },
+                      [](const std::string& s) { std::cout << s; } };
+```
+
+`pr`을 써서 `v`가 담고 있는 대안이 무엇이든 출력하세요.
+'''
+hints = [
+  "디스패처는 멤버가 아니라 자유 함수입니다: 호출 가능 객체가 먼저, 그다음 variant.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet_advanced.17.span"
+title = "어떤 숫자 행이든"
+story = "빅토리아 파크의 센서 허브는 const vector, std::array, 평범한 C 배열로 도착하는 측정값을 합산한다 — 함수 하나로, 복사 없이."
+brief = '''
+원소를 하나도 복사하지 않고 **세 호출 모두** 컴파일되도록 `total`을
+선언하세요: `v`가 `const std::vector<int>`인 `total(v)`, `a`가
+`std::array<int, 3>`인 `total(a)`, `c`가 `int c[3]`인 `total(c)`. C++20.
+'''
+hints = [
+  "소유하지 않는 뷰 하나가 모든 연속 시퀀스를 덮습니다 — 하지만 가변 원소의 뷰는 `const` vector를 받지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet_advanced.18.views-pipeline"
+title = "게으른 파이프라인"
+story = "소고 오락실 점수판은 처음 세 짝수 점수의 제곱을 원하고, 보드가 거기까지 스크롤될 때만 계산한다."
+brief = '''
+```cpp
+namespace views = std::views;
+std::vector<int> v = {9, 2, 7, 4, 6, 1, 8, 10};
+std::ranges::sort(v);
+auto even = [](int x) { return x % 2 == 0; };
+auto sq   = [](int x) { return x * x; };
+```
+
+원소가 `4 16 36` — **처음 세 짝수**의 제곱 — 인 게으른 range `r`을
+만드세요. `<ranges>`는 포함되어 있습니다.
+'''
+hints = [
+  "어댑터는 `|`로 합성되고 왼쪽에서 오른쪽으로 적용됩니다: 필터 전에 셋을 취하면 엉뚱한 셋을 취하고, 먼저 뒤집으면 반대쪽 끝에서 취합니다.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet_advanced.19.multiset-erase-one"
+title = "그중 하나만"
+story = "태풍 대피항의 삼판 셋이 같은 흘수 측정값을 공유한다. 하나가 떠나면 정렬된 로그는 셋 다가 아니라 정확히 항목 하나를 지워야 한다."
+brief = '''
+`std::multiset<int> ms = {3, 5, 5, 5, 8};`과 `int x = 5;` — `5`를 **정확히
+하나** 제거해 `3 5 5 8`을 남기세요. O(log n)에.
+'''
+hints = [
+  "값으로 지우면 모든 사본이 지워지고, 이터레이터로 지우면 하나가 지워집니다. 멤버 조회는 로그 시간이고 — 자유 알고리즘은 걷습니다.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet_advanced.20.pair-hash"
+title = "두 반쪽으로 된 키"
+story = "코즈웨이베이 격자는 (행, 열)로 방문되고, 방문한 칸의 해시 집합에는 표준이 내놓지 않은 해셔가 필요하다."
+brief = '''
+```cpp
+struct PairHash {
+  // one line here
+    return std::hash<long long>()(((long long)p.first << 32) ^ (unsigned)p.second);
+  }
+};
+std::unordered_map<std::pair<int,int>, int, PairHash> seen;
+```
+
+`seen`이 컴파일되도록 해셔의 첫 줄을 쓰세요.
+'''
+hints = [
+  "해셔는 키 하나를 받아 `size_t`를 돌려주는 호출 연산자입니다 — 그리고 컨테이너는 `const` 객체에서 그것을 부릅니다. 키 둘과 `bool`은 해시가 아니라 비교자입니다.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet_advanced.21.heap-comparator"
+title = "가장 급한 일을 맨 위에"
+story = "럭키맥 야간 주방의 보 셰프 주문표 레일은 마감이 가장 이른 주문을 맨 위에 두는데 — 레일은 주문표에게 '작다'가 무슨 뜻인지 모른다."
+brief = '''
+```cpp
+struct Job { int d; std::string name; };   // no comparison operators
+std::priority_queue<Job, std::vector<Job>, decltype(cmp)> pq(cmp);
+```
+
+`pq.top()`이 언제나 `d`가 **가장 작은** 일이 되도록 (큐 앞에서) `cmp`를
+정의하세요.
+'''
+hints = [
+  "비교자는 누가 가라앉는지 말합니다: 큐는 다른 어느 것보다도 '작지' 않은 원소를 맨 위에 둡니다. 가장 작은 것이 위에 오려면 '작다'가 더 크다는 뜻이어야 하고 — 진짜 bool을 돌려줘야 합니다.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet_advanced.22.getline-delim"
+title = "쉼표로 나누기"
+story = "배송 명세서는 'Jaffe Road,7,Sogo'를 읽는다 — 필드 셋, 그중 하나는 안에 공백이 있고, 쉼표로만 나눈다."
+brief = '''
+`std::istringstream ss(line); std::string tok; std::vector<std::string> parts;`
+— `line`이 `Jaffe Road,7,Sogo`일 때 `parts`를 **세** 필드로 채우되, 첫째는
+`Jaffe Road`여야 합니다.
+'''
+hints = [
+  "`>>`는 공백으로 나누어 도로 이름을 둘로 자릅니다. 줄 읽기는 선택적 구분자를 받습니다 — 셋째 인자로, 문자 하나.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet_advanced.23.erase-if"
+title = "홀수는 버리기"
+story = "소고 오락실은 단지에서 홀수 번호 토큰을 모두 걷어 낸다 — 한 줄로, 중간에 이터레이터가 상하는 일 없이."
+brief = '''
+`std::vector<int> v = {1, 3, 5, 2, 4, 7, 9};` — **홀수** 원소를 모두 제거해
+`v`가 `{2, 4}`이고 `v.size() == 2`가 되게 하세요. C++20, `<algorithm>`과
+`<vector>`는 포함되어 있습니다.
+'''
+hints = [
+  "고전 알고리즘은 뒤섞기만 하고 절대 줄이지 않습니다. `++it` 루프 안에서 지우면 방금 erase가 무효화한 이터레이터를 씁니다. C++20은 이 춤 전체를 대신 춰 주는 자유 함수를 추가했습니다.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet_advanced.24.popcount"
+title = "불 켜진 창 세기"
+story = "헤네시 로드 타워의 예순네 가구, 한 비트씩. 야간 경비원은 불 켜진 창을 센다 — 아래 절반만이 아니라 예순네 개 전부."
+brief = '''
+`std::uint64_t x = 0xF0000000F0000001;` — `int c`를 `x`의 **켜진 비트** 수인
+`9`로 설정하세요. `<bit>`과 `<bitset>`은 포함되어 있습니다.
+'''
+hints = [
+  "이 중 둘은 64비트 값의 32비트만 보고, 하나는 전부가 아니라 끝의 1들만 셉니다. C++20의 것은 어떤 unsigned 타입이든 그대로 받습니다.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet_advanced.25.stopwatch"
+title = "얼마나 걸렸나"
+story = "메이는 대포부터 마지막 키 입력까지 풀이 시간을 재고, 답을 정수 밀리초로 원한다 — 나노초도, 컴파일 오류도 아니고."
+brief = '''
+```cpp
+using namespace std::chrono;
+auto t0 = steady_clock::now();
+solve();
+auto t1 = steady_clock::now();
+```
+
+`ms`를 경과 시간의 정수 **밀리초** 수로 설정하세요.
+'''
+hints = [
+  "시점 둘의 차는 시계 자신의 단위로 된 duration입니다. 더 거친 단위로 변환하면 정밀도를 잃으므로 명시적으로 요청해야 합니다.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet_advanced.26.jthread"
+title = "나가는 길에 스스로 join"
+story = "퍼시벌 스트리트의 알렉스는 둘째 스레드에서 야간 배치를 시작하고, 스코프가 끝나면 기다려지길 원한다 — 잊어버릴 수도 있는 줄 없이."
+brief = '''
+`void work();` — `t`가 스코프를 벗어날 때 **자동으로 join되는** 새 스레드
+`t`에서 `work`를 시작하세요. C++20, `<thread>`는 포함되어 있습니다.
+'''
+hints = [
+  "파괴 시점에 아직 joinable한 평범한 스레드는 프로그램을 종료시킵니다. detach는 절대 join하지 않습니다. C++20은 소멸자가 join하는 스레드를 추가했습니다 — 생성자가 explicit이니 `=`는 없습니다.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet_advanced.27.async"
+title = "지금 시작, 나중에 수거"
+story = "환전 부스는 손님이 오는 순간 환율 조회를 다른 직원에게 보내고, 필요할 때 숫자를 받아 온다."
+brief = '''
+`int work(int x);` — `work(5)`를 **다른 스레드에서 즉시** 시작하고, 나중에
+`int r = f.get();`이 결과를 내는 핸들 `f`를 얻으세요. `<future>`는
+포함되어 있습니다.
+'''
+hints = [
+  "호출 가능 객체와 인자를 따로 넘기세요 — 직접 호출하면 바로 여기서 실행됩니다. deferred 정책은 `get` 전까지 아무것도 시작하지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet_advanced.28.scoped-lock"
+title = "잠금 둘, 교착 없이"
+story = "글로스터 로드 옆 핀테크의 텔러 둘이 같은 두 계좌 사이에서 반대 방향으로 돈을 옮기고, 지점은 절대 얼어붙어서는 안 된다."
+brief = '''
+```cpp
+struct Acct { std::mutex m; int bal; };
+void transfer(Acct& from, Acct& to, int amt) {
+  // one line here
+  from.bal -= amt; to.bal += amt;
+}
+```
+
+함수의 나머지 동안 **두** 계좌를 모두 잠그세요. 한 스레드가
+`transfer(a, b, 1)`을 루프로 돌리는 동안 다른 스레드는 `transfer(b, a, 1)`을
+돌립니다. 프로그램은 절대 교착해서는 안 됩니다.
+'''
+hints = [
+  "인자가 온 순서대로 잠금 둘을 차례로 잡는 것이 바로 두 스레드가 서로를 영원히 기다리는 방법입니다. C++17의 가드 하나가 뮤텍스를 몇 개든 받아 교착 없이 획득합니다.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet_advanced.29.fetch-add"
+title = "내 것 직전의 숫자"
+story = "코즈웨이베이역의 개찰구 여덟 개가 카운터 하나를 공유한다. 게이트마다 자기 클릭 직전의 카운트가 필요하고, 어떤 클릭도 잃어서는 안 된다."
+brief = '''
+`std::atomic<int> hits{0};`가 스레드 여덟 개에서 동시에 증가합니다. 각
+스레드에서 `1`을 더하고 `int before`를 **이 스레드의 증가 직전** 값으로
+설정하세요. 어떤 증가도 잃어서는 안 됩니다.
+'''
+hints = [
+  "값을 읽고 새 값을 저장하는 것은 별개의 원자적 두 단계이고, 그 사이에 다른 스레드가 끼어듭니다. 전위 증가는 원자적이지만 이후의 값을 돌려줍니다.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet_advanced.30.condition-variable"
+title = "무언가 있을 때까지 기다려라"
+story = "정오, 대포가 울리고, 럭키맥의 패스 창구: 러너는 접시가 정말 거기 있을 때까지 자고, 다른 것에는 깨지 않으며, 일찍 내려놓은 접시를 절대 놓치지 않는다."
+brief = '''
+`std::mutex m; std::condition_variable cv; std::queue<int> q;` — 소비자의
+시작에서 잠금을 잡고 **`q`가 비어 있지 않을 때까지 막으세요**. 우리가 오기
+전에 생산자가 이미 push하고 notify했어도 올바르고, 가짜 깨어남에도
+견고하게. 그 뒤에도 잠금은 여전히 잡혀 있습니다.
+'''
+hints = [
+  "wait에는 풀었다가 다시 잡을 수 있는 잠금이 필요하므로 단순한 가드도, 맨 뮤텍스도 안 됩니다. 술어를 받는 오버로드는 깰 때마다 다시 검사하고, 이미 참이면 즉시 돌아옵니다.",
+]

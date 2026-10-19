@@ -1399,7 +1399,7 @@ type MapNode = {
 type Quest = {
   id: string; land: "rust"|"go"|"cpp"|"python"|"pytorch"|"typescript"|"zig"|"lua"|"remix";
   /** SPEC §0. `frameworks` — the crates road — is reported for `rust` only. */
-  category: "verybasic"|"basic"|"advanced"|"hacker"|"frameworks";
+  category: "cheatsheet"|"cheatsheet_advanced"|"verybasic"|"basic"|"advanced"|"hacker"|"frameworks";
   /** The language the quest is judged in (SPEC §12): the runner, the file
    *  name, the editor's grammar and the formatter all key on it, and a
    *  submit's `lang` must equal it (§4.9). The land's own name everywhere

@@ -1,0 +1,498 @@
+# C++ LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "cpp.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet_advanced.01.auto-params"
+title = "LIBOVOLNÉ DVA"
+story = "Směnárna na Hennessy Road sčítá jízdné v dolarech se spropitným v centech a nechce zvláštní funkci pro každou dvojici typů."
+brief = '''
+Definuj `add` **jednou** definicí tak, aby se `add(1, 2.5)` zkompilovalo a
+vrátilo `3.5` a aby se zkompilovalo i `add(std::string("a"), "b")`. C++20.
+'''
+hints = [
+  "Od C++20 dělá zástupný typ v seznamu parametrů z funkce šablonu sám o sobě — a každý zástupný typ je svůj vlastní typ.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet_advanced.02.constrained-member"
+title = "MIMO TŘÍDU"
+story = "Inventura v Sogu drží průběžný součet jen celých kusů — a člen, který ho hlásí, je definovaný v .cpp, mimo třídu."
+brief = '''
+```cpp
+template <std::integral T>
+struct Stat {
+  T s = 0;
+  void add(T x) { s += x; }
+  T sum() const;
+};
+```
+
+Definuj `sum` **mimo** struct. `<concepts>` je vložen.
+'''
+hints = [
+  "Člen šablony třídy definovaný mimo tělo opakuje hlavičku šablony — a musí to být tatáž hlavička, včetně omezení.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet_advanced.03.mutable-capture"
+title = "LÍSTKOVÝ AUTOMAT"
+story = "Automat na pořadové lístky u pultu Lucky Mac vydává 0, 1, 2 — a počítá si sám, bez jediné proměnné s počtem kdekoli mimo něj."
+brief = '''
+Udělej z `next` volatelný objekt, který při po sobě jdoucích voláních vrací
+`0`, pak `1`, pak `2`. **Mimo lambdu neexistuje žádná proměnná jménem `n`.**
+'''
+hints = [
+  "Zachycenou hodnotu lze inicializovat přímo v hranatých závorkách. Volací operátor lambdy je `const`, pokud neřekneš jinak — a pozor na post- versus pre-inkrement.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet_advanced.04.this-capture"
+title = "POČÍTEJ SE MNOU"
+story = "Turniket na stanici Causeway Bay vydává klikátko; každé kliknutí musí dopadnout do vlastního počítadla turniketu, ne do jeho kopie."
+brief = '''
+```cpp
+struct Counter {
+  int count = 0;
+  std::function<void()> ticker();
+};
+```
+
+Uvnitř `ticker` vrať lambdu. Dvojí zavolání musí nechat `count` **tohoto
+objektu** na hodnotě `2`.
+'''
+hints = [
+  "Datový člen není proměnná, takže se v seznamu zachycení nemůže objevit jménem. Zachyť objekt — ukazatelem, aby se změnil ten skutečný.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet_advanced.05.recursive-lambda"
+title = "VOLÁ SAMA SEBE"
+story = "Cukrář v pekárně na Jardine's Bazaar píše počet vaječných tartaletek jako funkci, která volá sama sebe — uvnitř main, bez jediné pojmenované funkce v dohledu."
+brief = '''
+Definuj `fib` jako lokální lambdu, která **volá sama sebe**, takže `fib(10)`
+vrátí `55`. `<functional>` je vložen.
+'''
+hints = [
+  "Proměnná `auto` se nemůže objevit ve vlastním inicializátoru; proměnná s deklarovaným volatelným typem může — a lambda ji musí zachytit.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet_advanced.06.if-constexpr"
+title = "JEN JEDNA VĚTEV"
+story = "Mostní váha na molu tajfunového přístaviště bere počet beden nebo štítek — a odmítá zkompilovat větev, která pro to, co dostala, nedává smysl."
+brief = '''
+```cpp
+template <typename T>
+auto weigh(const T& x) {
+  // one line here
+}
+```
+
+Vrať `x * 2`, když je `T` celočíselný typ, jinak `x.size()`. Zkompilovat se
+musí jak `weigh(21)`, tak `weigh(std::string("abc"))`. `<type_traits>` je
+vložen.
+'''
+hints = [
+  "Obyčejný `if` pořád kompiluje obě větve pro každé `T`. Podmínka musí být hodnota, ne typ traitu — a právě `else` drží druhou větev stranou.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet_advanced.07.static-assert"
+title = "SHOĎ PŘEKLAD, NE BĚH"
+story = "Obsluha Polední salvy kontroluje druhou mocninu nálože ještě před nabitím děla — když aritmetika nesedí, nic nejde ven."
+brief = '''
+`constexpr int sq(int x) { return x * x; }` je deklarováno. Na úrovni
+**jmenného prostoru** zařiď, aby **překlad** selhal, pokud `sq(12)` není
+`144` — za běhu se nesmí kontrolovat nic.
+'''
+hints = [
+  "Volání `constexpr` může vyhodnotit překladač a existuje aserce, která žije v době překladu; od C++17 je její zpráva nepovinná, ale když je uvedena, musí to být řetězec.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet_advanced.08.enum-class"
+title = "Z ČÍSLA JE LINKA"
+story = "Informační tabule MTR v Causeway Bay čte číslo linky z drátu a musí z něj udělat řádný, scoped, jednobajtový kód linky."
+brief = '''
+```cpp
+enum class Line : std::uint8_t { Island, TsuenWan, KwunTong };
+```
+
+`int n` byl načten ze vstupu a je `0`, `1` nebo `2`. Deklaruj `Line l`
+s odpovídajícím enumerátorem.
+'''
+hints = [
+  "Scoped enum se nikdy nepřevádí implicitně, ani jedním směrem; inicializace složenými závorkami odmítne zúžit `int` známý až za běhu. Jedno z pojmenovaných přetypování to zvládne.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet_advanced.09.spaceship"
+title = "ŠEST ZA CENU JEDNOHO"
+story = "Přístavní kancelář teď chce každé kotviště porovnatelné všemi směry — menší, rovno, aspoň — a odmítá psát šest operátorů ručně."
+brief = '''
+`struct Pt { int r, c; };` — přidej **jeden člen** tak, aby se `a < b`,
+`a == b` i `a >= b` zkompilovaly, s řazením podle `r` a pak podle `c`.
+C++20, `<compare>` je vložen.
+'''
+hints = [
+  "Jeden defaultovaný trojcestný operátor ti dá i `==`. Jeho návratový typ je kategorie uspořádání — nech ji odvodit překladač — a defaultované porovnání musí být `const`.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet_advanced.10.dynamic-cast"
+title = "JE TO OPRAVDU KRUH"
+story = "Výroba cedulí na Jaffe Road drží každou zakázku přes ukazatel na základní třídu a stroj na kulaté cedule smí dostat jen ty, které jsou opravdu kruhy."
+brief = '''
+```cpp
+struct Shape { virtual double area() const = 0; virtual ~Shape() = default; };
+struct Circle : Shape { double r; double area() const override { return 3.14 * r * r; } };
+struct Square : Shape { double s; double area() const override { return s * s; } };
+```
+
+`Shape* s` ukazuje na nějaký tvar. Nastav `c` tak, aby na něj ukazoval
+**jako na `Circle`**, když jím opravdu je, a jinak byl `nullptr`.
+'''
+hints = [
+  "Jen jedno přetypování se objektu za běhu ptá, čím je; ostatní jen přeinterpretují ukazatel a nikdy nevrátí null.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet_advanced.11.move-unique"
+title = "PŘEDÁNO"
+story = "Balík v depu na Percival Street má přesně jednoho vlastníka; naložit ho do dodávky znamená, že kurýr už ho nedrží."
+brief = '''
+`auto p = std::make_unique<Node>(5);` a
+`std::vector<std::unique_ptr<Node>> v;` — vlož uzel, který `p` vlastní, do `v`.
+Poté musí být `p` **prázdný** a žádný `Node` se nesmí kopírovat.
+'''
+hints = [
+  "Unique pointer nelze kopírovat a surový ukazatel se v něj potichu nepromění; předej samotné vlastnictví.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet_advanced.12.weak-lock"
+title = "JEŠTĚ TAM JE?"
+story = "Recepční nad Jardine's Bazaar si vede nevlastnící poznámku o nájemníkovi z bytu 7 a musí ověřit, že tam pořád bydlí — a po dobu hovoru ho zdržet v hale."
+brief = '''
+`std::weak_ptr<Room> wp;` — vypiš `n` místnosti **jen pokud místnost ještě
+existuje**, a po tu dobu ji drž naživu.
+'''
+hints = [
+  "Weak pointer nelze dereferencovat ani přímo testovat; vrátí ti silný ukazatel, který je prázdný, když je objekt pryč.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet_advanced.13.move-ctor"
+title = "VEZMI KLÍČE, NIC NENECH"
+story = "Zastavárna na Yee Wo Street přebírá obsah skříňky; starý lístek musí zůstat ukazovat na nic, jinak se skříňka vyprázdní dvakrát."
+brief = '''
+```cpp
+struct Buf {
+  int* data; int n;
+  explicit Buf(int n) : data(new int[n]), n(n) {}
+  ~Buf() { delete[] data; }
+  Buf(const Buf&) = delete;
+  Buf& operator=(const Buf&) = delete;
+  // the move constructor goes here
+};
+```
+
+Přidej přesouvací konstruktor: `Buf b(std::move(a));` musí převzít pole
+z `a` a vyprázdněné `a` musí být **bezpečné ke zničení**. `<utility>` je
+vložen.
+'''
+hints = [
+  "Parametr je rvalue reference a nemůže být `const`, když ho hodláš vyprázdnit. Jedna utilita uloží novou hodnotu a vrátí tu starou v jediném výrazu.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet_advanced.14.try-emplace"
+title = "JEN KDYŽ JE NOVÝ"
+story = "Registr tramvajové vozovny bere nové číslo vozu jen jednou; opakování musí nechat starý záznam nedotčený a dát to najevo."
+brief = '''
+`std::map<std::string, int> m;` s `std::string k; int v;` — vlož
+`k → v` **jen pokud `k` chybí**, a na témže řádku navaž `ok` na to, zda
+se vložení povedlo.
+'''
+hints = [
+  "Vkládání, které nikdy nepřepisuje, vrací pair; strukturované vazby používají hranaté závorky. Jeho přepisující příbuzný vrací pair také, a v tom je past.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet_advanced.15.optional-view"
+title = "ČÍSLO, NEBO NIC, Z JAKÉHOKOLI TEXTU"
+story = "Mýtná budka v tunelu parsuje jakýkoli text, který přijde — std::string ze čtečky, literál z testu — a odpoví jízdným, nebo ničím."
+brief = '''
+Deklaruj `parse`: vrací `int` **nebo nic** (žádné výjimky, žádné
+ukazatele) a musí jít zavolat se `std::string` **i** s literálem `"7"`,
+aniž by se text kopíroval.
+'''
+hints = [
+  "Nevlastnící řetězcový typ přijme hodnotou jak `std::string`, tak literál; reference na něj se nenaváže ani na jedno. Návratový typ potřebuje svůj šablonový argument.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet_advanced.16.visit"
+title = "AŤ JE TO COKOLI"
+story = "Lístek v kině v Times Square je buď číslo sedadla, nebo jméno na seznamu hostů; uvaděč vypíše to, co lístek zrovna nese."
+brief = '''
+```cpp
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+std::variant<int, std::string> v = ...;
+auto pr = overloaded{ [](int i) { std::cout << i; },
+                      [](const std::string& s) { std::cout << s; } };
+```
+
+Vypiš tu alternativu, kterou `v` drží, pomocí `pr`.
+'''
+hints = [
+  "Rozcestník je volná funkce, ne člen: nejdřív přijde volatelný objekt, pak variant.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet_advanced.17.span"
+title = "JAKÁKOLI ŘADA ČÍSEL"
+story = "Senzorový uzel ve Victoria Parku sčítá údaje, které přicházejí jako const vector, std::array nebo obyčejné céčkové pole — jedna funkce, nic se nekopíruje."
+brief = '''
+Deklaruj `total` tak, aby se **všechna tři** volání zkompilovala bez
+kopírování jediného prvku: `total(v)`, kde `v` je `const std::vector<int>`,
+`total(a)`, kde `a` je `std::array<int, 3>`, a `total(c)`, kde `c` je
+`int c[3]`. C++20.
+'''
+hints = [
+  "Jeden nevlastnící pohled pokryje každou souvislou posloupnost — ale pohled na měnitelné prvky nepřijme `const` vector.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet_advanced.18.views-pipeline"
+title = "LÍNÁ ROURA"
+story = "Tabule herny v Sogu chce druhé mocniny prvních tří sudých skóre, spočítané teprve ve chvíli, kdy se k nim tabule odroluje."
+brief = '''
+```cpp
+namespace views = std::views;
+std::vector<int> v = {9, 2, 7, 4, 6, 1, 8, 10};
+std::ranges::sort(v);
+auto even = [](int x) { return x % 2 == 0; };
+auto sq   = [](int x) { return x * x; };
+```
+
+Sestav líný rozsah `r`, jehož prvky jsou `4 16 36` — druhé mocniny
+**prvních tří sudých** čísel. `<ranges>` je vložen.
+'''
+hints = [
+  "Adaptéry se skládají pomocí `|` a uplatňují se zleva doprava: vzít tři před filtrováním vezme špatné tři a obrácení napřed je vezme z opačného konce.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet_advanced.19.multiset-erase-one"
+title = "JEN JEDEN Z NICH"
+story = "Tři sampany v tajfunovém přístavišti mají stejný údaj o ponoru; když jeden odpluje, seřazený deník musí vypustit přesně jeden záznam, ne všechny tři."
+brief = '''
+`std::multiset<int> ms = {3, 5, 5, 5, 8};` a `int x = 5;` — odstraň
+**přesně jednu** `5`, aby zůstalo `3 5 5 8`, v O(log n).
+'''
+hints = [
+  "Mazání podle hodnoty odstraní každou kopii; mazání podle iterátoru odstraní jednu. Členské hledání je logaritmické — volný algoritmus prochází.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet_advanced.20.pair-hash"
+title = "KLÍČ O DVOU PŮLKÁCH"
+story = "Mřížkou Causeway Bay se chodí po (řádek, sloupec) a hashovaná množina navštívených políček potřebuje hasher, který standard nedodal."
+brief = '''
+```cpp
+struct PairHash {
+  // one line here
+    return std::hash<long long>()(((long long)p.first << 32) ^ (unsigned)p.second);
+  }
+};
+std::unordered_map<std::pair<int,int>, int, PairHash> seen;
+```
+
+Napiš úvodní řádek hasheru tak, aby se `seen` zkompilovalo.
+'''
+hints = [
+  "Hasher je volací operátor, který bere jeden klíč a vrací `size_t` — a kontejner ho volá na `const` objektu. Dva klíče a `bool` jsou komparátor, ne hash.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet_advanced.21.heap-comparator"
+title = "NEJBLIŽŠÍ ÚKOL NAHOŘE"
+story = "Lišta objednávek šéfkuchaře Bo v noční kuchyni Lucky Mac drží nahoře objednávku s nejbližším termínem — a lišta neví, co pro objednávku znamená 'menší'."
+brief = '''
+```cpp
+struct Job { int d; std::string name; };   // no comparison operators
+std::priority_queue<Job, std::vector<Job>, decltype(cmp)> pq(cmp);
+```
+
+Definuj `cmp` (před frontou) tak, aby `pq.top()` byla vždy práce s
+**nejmenším** `d`.
+'''
+hints = [
+  "Komparátor říká, kdo klesá: fronta dává nahoru prvek, který není 'menší' než žádný jiný. Aby bylo nahoře nejmenší, musí 'menší' znamenat větší — a musí vracet skutečný bool.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet_advanced.22.getline-delim"
+title = "ROZDĚL NA ČÁRCE"
+story = "Dodací manifest zní 'Jaffe Road,7,Sogo' — tři pole, v jednom z nich mezera, dělené jen podle čárek."
+brief = '''
+`std::istringstream ss(line); std::string tok; std::vector<std::string> parts;`
+— když `line` je `Jaffe Road,7,Sogo`, naplň `parts` **třemi** poli,
+prvním z nich `Jaffe Road`.
+'''
+hints = [
+  "`>>` dělí podle bílých znaků, což rozsekne název ulice vedví. Čtečka řádků bere nepovinný oddělovač — jeden znak, jako třetí argument.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet_advanced.23.erase-if"
+title = "VYHOĎ LICHÉ"
+story = "Herna v Sogu čistí sklenici od každého žetonu s lichým číslem — na jeden řádek, bez iterátoru, který by v půlce zvětral."
+brief = '''
+`std::vector<int> v = {1, 3, 5, 2, 4, 7, 9};` — odstraň každý **lichý**
+prvek tak, aby `v` bylo `{2, 4}` a `v.size() == 2`. C++20, `<algorithm>`
+a `<vector>` jsou vloženy.
+'''
+hints = [
+  "Klasický algoritmus jen přesouvá a nikdy nezkracuje; mazání uvnitř smyčky s `++it` používá iterátor, který právě to mazání zneplatnilo. C++20 přidalo volnou funkci, která celý ten tanec odvede za tebe.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet_advanced.24.popcount"
+title = "SPOČÍTEJ ROZSVÍCENÁ OKNA"
+story = "Šedesát čtyři bytů ve věži na Hennessy Road, jeden bit na každý; noční hlídač počítá rozsvícené — všech šedesát čtyři, ne jen dolní půlku."
+brief = '''
+`std::uint64_t x = 0xF0000000F0000001;` — nastav `int c` na počet
+**nastavených bitů** v `x`, což je `9`. `<bit>` a `<bitset>` jsou vloženy.
+'''
+hints = [
+  "Dvě z těchto možností se dívají jen na 32 bitů 64bitové hodnoty a jedna počítá koncové jedničky místo všech. Ta z C++20 bere jakýkoli bezznaménkový typ tak, jak je.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet_advanced.25.stopwatch"
+title = "JAK DLOUHO TO TRVALO"
+story = "Mei měří řešení od výstřelu po poslední úhoz a chce výsledek v celých milisekundách — ne v nanosekundách, ne jako chybu překladu."
+brief = '''
+```cpp
+using namespace std::chrono;
+auto t0 = steady_clock::now();
+solve();
+auto t1 = steady_clock::now();
+```
+
+Nastav `ms` na uplynulý čas jako celočíselný počet **milisekund**.
+'''
+hints = [
+  "Rozdíl dvou časových bodů je doba trvání ve vlastní jednotce hodin. Převod na hrubší jednotku ztrácí přesnost, takže se o něj musí požádat výslovně.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet_advanced.26.jthread"
+title = "PŘI ODCHODU SE PŘIPOJÍ SAMO"
+story = "Alex na Percival Street spouští noční dávku na druhém vlákně a chce, aby se na ni počkalo na konci bloku — bez řádku, který by mohl zapomenout."
+brief = '''
+`void work();` — spusť `work` na novém vlákně `t`, které se **připojí
+automaticky**, když `t` opustí rozsah platnosti. C++20, `<thread>` je vložen.
+'''
+hints = [
+  "Obyčejné vlákno, které je při destrukci stále joinable, ukončí program; odpojení nikdy nepřipojí. C++20 přidalo vlákno, jehož destruktor připojuje — jeho konstruktor je explicitní, takže žádné `=`.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet_advanced.27.async"
+title = "SPUSŤ TEĎ, VYZVEDNI POZDĚJI"
+story = "Směnárenský stánek pošle dohledání kurzu jinému úředníkovi ve chvíli, kdy zákazník dorazí, a číslo si vyzvedne, až ho potřebuje."
+brief = '''
+`int work(int x);` — spusť `work(5)` **okamžitě na jiném vlákně** a získej
+handle `f` takový, že `int r = f.get();` později vydá výsledek.
+`<future>` je vložen.
+'''
+hints = [
+  "Předej volatelný objekt a jeho argumenty zvlášť — když ho zavoláš sám, proběhne rovnou tady. Odložená politika nespustí nic, dokud nepřijde `get`.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet_advanced.28.scoped-lock"
+title = "DVA ZÁMKY, ŽÁDNÝ DEADLOCK"
+story = "Dva pokladní ve fintechu kousek od Gloucester Road přesouvají peníze mezi týmiž dvěma účty opačnými směry a pobočka nesmí nikdy zamrznout."
+brief = '''
+```cpp
+struct Acct { std::mutex m; int bal; };
+void transfer(Acct& from, Acct& to, int amt) {
+  // one line here
+  from.bal -= amt; to.bal += amt;
+}
+```
+
+Zamkni **oba** účty po zbytek funkce. Jedno vlákno volá ve smyčce
+`transfer(a, b, 1)`, zatímco druhé volá `transfer(b, a, 1)`; program se
+nikdy nesmí zaseknout v deadlocku.
+'''
+hints = [
+  "Vzít oba zámky po sobě, v tom pořadí, v jakém přišly argumenty, je přesně způsob, jak na sebe dvě vlákna čekají navěky. Jeden strážce z C++17 bere libovolný počet mutexů a získá je bez deadlocku.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet_advanced.29.fetch-add"
+title = "ČÍSLO PŘED MÝM"
+story = "Osm turniketů na stanici Causeway Bay sdílí jedno počítadlo; každá branka potřebuje stav těsně před svým vlastním kliknutím a žádné kliknutí se nesmí ztratit."
+brief = '''
+`std::atomic<int> hits{0};` zvyšuje osm vláken najednou. V každém vlákně
+přičti `1` a nastav `int before` na hodnotu **těsně před inkrementem
+tohoto vlákna**. Žádný inkrement se nesmí ztratit.
+'''
+hints = [
+  "Přečíst hodnotu a pak uložit novou jsou dva oddělené atomické kroky a mezi ně se vejde jiné vlákno. Pre-inkrement je atomický, ale vrací hodnotu až po něm.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet_advanced.30.condition-variable"
+title = "ČEKEJ, DOKUD NĚCO NENÍ"
+story = "Poledne, salva vystřelí, a výdejní okénko Lucky Mac: běžec spí, dokud tam opravdu není talíř, na nic jiného se nebudí a nikdy nepropásne ten, který byl položen dřív."
+brief = '''
+`std::mutex m; std::condition_variable cv; std::queue<int> q;` — na začátku
+konzumenta vezmi zámek a **blokuj, dokud `q` není neprázdná**, správně i
+v případě, že producent už vložil a notifikoval dřív, než jsme sem došli,
+a odolně vůči falešným probuzením. Poté je zámek stále držen.
+'''
+hints = [
+  "Čekání potřebuje zámek, který umí uvolnit a znovu získat, takže ne jednoduchý guard a ne holý mutex. Přetížení, které bere predikát, ho při každém probuzení znovu ověří a vrátí se hned, pokud už platí.",
+]

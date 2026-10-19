@@ -1,0 +1,1020 @@
+# PYTHON LAND — CHEATSHEET ADVANCED. The second road off the page: the
+# patterns a live-coding interviewer uses to tell a fluent candidate from
+# one who only knows the grammar. Generators and their adaptors, decorators
+# and what they wrap, dunders, the sharper half of itertools / heapq /
+# bisect, pattern matching with guards, threads, pools and asyncio, and the
+# traps that bite under time pressure (late binding, the mutable default,
+# `**a, **b` with a key in both). Four lines, one right. Nothing is typed
+# and nothing is run — the pick is the submission, and the server judges it
+# against the quiz (SPEC §0). Every line was checked on CPython 3.12; the
+# three wrong ones raise, fail to parse, or run and give a different answer.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+# The BASIC road (cheatsheet.toml) is not repeated here.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "python.cheatsheet_advanced"
+land     = "python"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "python.cheatsheet_advanced.01.yield-from"
+node        = 1
+title       = "BOXES IN BOXES"
+difficulty  = 3
+story       = "A delivery to the walk-up above Jardine's Bazaar: cartons inside cartons, and the python wants every item on the floor, one at a time."
+concepts    = ["generators", "recursion", "iteration"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`flatten` must be a generator that produces every leaf of an arbitrarily
+nested list, in order: `list(flatten([1, [2, [3, 4]], 5]))` is
+`[1, 2, 3, 4, 5]`. Which line goes in the gap?
+
+```
+def flatten(xs):
+    for x in xs:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+'''
+solution    = 'yield from flatten(x)'
+hints = [
+  "The recursive call returns a generator; what you want is its items, handed up one by one — there is a two-word form for that.",
+]
+
+[quest.quiz]
+choices = [
+  'yield flatten(x)',
+  'return flatten(x)',
+  'yield from flatten(x)',
+  'for y in x: yield y',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "python.cheatsheet_advanced.02.first-or-default"
+node        = 2
+title       = "FIRST EVEN, OR NOBODY"
+difficulty  = 3
+story       = "The tram queue on Yee Wo Street: the first passenger with an even ticket boards, and if there is none the conductor writes -1."
+concepts    = ["generators", "comprehensions", "zero-values"]
+requires    = ["python.cheatsheet_advanced.01.yield-from"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`xs` is a long list of ints. Make `first` the first even number in it, or
+`-1` if there is none — stopping at the first hit, without building a
+second list.
+'''
+solution    = 'first = next((x for x in xs if x % 2 == 0), -1)'
+hints = [
+  "A generator expression that is not the only argument needs its own parentheses, and the builtin that pulls one item takes a default.",
+]
+
+[quest.quiz]
+choices = [
+  'first = next(x for x in xs if x % 2 == 0, -1)',
+  'first = next((x for x in xs if x % 2 == 0), -1)',
+  'first = next([x for x in xs if x % 2 == 0], -1)',
+  'first = (x for x in xs if x % 2 == 0).next()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "python.cheatsheet_advanced.03.read-until-empty"
+node        = 3
+title       = "UNTIL THE TAP RUNS DRY"
+difficulty  = 4
+story       = "The night-market scanner on Jardine's Crescent reads a receipt roll in 4 KB bites and stops when a bite comes back empty."
+concepts    = ["generators", "io", "iteration"]
+requires    = ["python.cheatsheet_advanced.02.first-or-default"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`f` is a file opened in binary mode. Loop `chunk` over successive
+`f.read(4096)` results and stop when the read returns `b""`, using the
+two-argument form of one builtin.
+'''
+solution    = 'for chunk in iter(lambda: f.read(4096), b""):'
+hints = [
+  "The builtin wants something it can call again and again, plus the value that means stop — a finished read result is neither.",
+]
+
+[quest.quiz]
+choices = [
+  'for chunk in iter(f.read(4096), b""):',
+  'for chunk in iter(f.read, 4096):',
+  'for chunk in iter(lambda: f.read(4096), b""):',
+  'for chunk in iter(lambda: f.read(4096)):',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "python.cheatsheet_advanced.04.keep-the-name"
+node        = 4
+title       = "STILL CALLED GREET"
+difficulty  = 3
+story       = "The name badge at the Percival Street reception must survive the uniform being put on over it."
+concepts    = ["decorators", "functions", "closures"]
+requires    = ["python.cheatsheet_advanced.03.read-until-empty"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`import functools` is done. After `@logged` is applied to `greet`,
+`greet.__name__` must still be `"greet"` and `greet.__doc__` must be
+greet's own. Which line goes in the gap?
+
+```
+def logged(fn):
+    # ____
+    def inner(*a, **kw):
+        print(fn.__name__)
+        return fn(*a, **kw)
+    return inner
+```
+'''
+solution    = '@functools.wraps(fn)'
+hints = [
+  "The helper is a decorator factory: it is called with the function being wrapped, and what it returns decorates the wrapper.",
+]
+
+[quest.quiz]
+choices = [
+  '@functools.wraps(fn)',
+  '@functools.wraps',
+  '@functools.wraps(inner)',
+  '@functools.update_wrapper(fn)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "python.cheatsheet_advanced.05.three-layers"
+node        = 5
+title       = "THIRD TIME LUCKY"
+difficulty  = 4
+story       = "The courier on Lockhart Road rings three times before giving up, and the dispatcher wires that rule on without the @ sugar."
+concepts    = ["decorators", "closures", "functions"]
+requires    = ["python.cheatsheet_advanced.04.keep-the-name"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`retry` is a decorator that takes an argument: `@retry(3)` above a `def`
+makes that function try up to three times.
+
+```
+def retry(times):
+    def deco(fn):
+        def inner(*a, **kw):
+            ...
+        return inner
+    return deco
+```
+
+`fetch` is already defined without any decorator. Rebind `fetch` by hand
+so it is retried three times — the same thing `@retry(3)` would do.
+'''
+solution    = 'fetch = retry(3)(fetch)'
+hints = [
+  "There are three layers. The outer call takes the number and gives back the real decorator; the function goes into that.",
+]
+
+[quest.quiz]
+choices = [
+  'fetch = retry(fetch, 3)',
+  'fetch = retry(3)(fetch)',
+  'fetch = retry(3, fetch)',
+  'fetch = retry(fetch)(3)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "python.cheatsheet_advanced.06.memo"
+node        = 6
+title       = "ASKED ONCE, ANSWERED FOREVER"
+difficulty  = 3
+story       = "The abacus at the Bowrington Road wet market remembers every subtotal it has ever done, so the stall never adds the same column twice."
+concepts    = ["decorators", "recursion", "dynamic-programming"]
+requires    = ["python.cheatsheet_advanced.05.three-layers"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`import functools` and `import sys` are the only imports, and
+`sys.setrecursionlimit(10_000)` has been raised. `fib(300)` must return
+in milliseconds: every `fib(n)` is computed once and remembered, with no
+size limit. Which line goes above the `def`?
+
+```
+# ____
+def fib(n):
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+```
+'''
+solution    = '@functools.cache'
+hints = [
+  "The unbounded memoiser (3.9+) is used bare — it is not a factory, so no parentheses — and only the module name was imported.",
+]
+
+[quest.quiz]
+choices = [
+  '@functools.cache()',
+  '@functools.memoize',
+  '@cache',
+  '@functools.cache',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "python.cheatsheet_advanced.07.old-style-compare"
+node        = 7
+title       = "THE OLD COMPARATOR"
+difficulty  = 4
+story       = "A judge from the old C days sits at the Times Square arcade with a two-argument rule — less, equal, more — and the leaderboard has to use it as is."
+concepts    = ["sorting", "functions", "closures"]
+requires    = ["python.cheatsheet_advanced.06.memo"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`from functools import cmp_to_key` is done. `cmp(a, b)` is a
+two-argument comparator returning `-1`, `0` or `1`. Make `ys` the list
+`xs` sorted by that comparator.
+'''
+solution    = 'ys = sorted(xs, key=cmp_to_key(cmp))'
+hints = [
+  "Python 3 sorts by a one-argument key only; the adaptor turns a two-argument comparator into one, and it is the adaptor's result you hand over.",
+]
+
+[quest.quiz]
+choices = [
+  'ys = sorted(xs, key=cmp_to_key(cmp))',
+  'ys = sorted(xs, cmp=cmp)',
+  'ys = sorted(xs, key=cmp)',
+  'ys = sorted(xs, key=cmp_to_key(cmp()))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "python.cheatsheet_advanced.08.own-list"
+node        = 8
+title       = "A FRESH BAG EACH"
+difficulty  = 3
+story       = "Every order at the Jaffe Road noodle shop gets its own empty bag of toppings; a shared bag would put one table's chili on another's."
+concepts    = ["structs", "decorators", "zero-values"]
+requires    = ["python.cheatsheet_advanced.07.old-style-compare"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`from dataclasses import dataclass, field` is done. Each `Order` must
+start with its **own** empty `tags` list — `Order("a").tags.append("hot")`
+must leave `Order("b").tags` empty — and the class must still define
+without error. Which line goes in the gap?
+
+```
+@dataclass
+class Order:
+    id: str
+    # ____
+```
+'''
+solution    = 'tags: list[str] = field(default_factory=list)'
+hints = [
+  "A mutable default is refused at class creation. The field helper wants something it can call once per instance — the class itself, not an instance.",
+]
+
+[quest.quiz]
+choices = [
+  'tags: list[str] = []',
+  'tags: list[str] = field(default=[])',
+  'tags: list[str] = field(default_factory=[])',
+  'tags: list[str] = field(default_factory=list)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "python.cheatsheet_advanced.09.alt-constructor"
+node        = 9
+title       = "THE SUBCLASS GETS ITS OWN"
+difficulty  = 3
+story       = "The Sogo gift counter parses \"1,2\" into a coordinate, and the premium counter next door expects a premium coordinate back, not a plain one."
+concepts    = ["structs", "decorators", "dispatch"]
+requires    = ["python.cheatsheet_advanced.08.own-list"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`Point3(Point)` is a subclass that adds nothing. `Point3.parse("1,2")`
+must return a `Point3`, not a `Point`. Which line goes in the gap?
+
+```
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @property
+    def norm(self):
+        return abs(self.x) + abs(self.y)
+
+    @classmethod
+    def parse(cls, s):
+        a, b = s.split(",")
+        # ____
+```
+'''
+solution    = 'return cls(int(a), int(b))'
+hints = [
+  "The first parameter of a classmethod is whichever class the call went through. Naming the base class by hand pins it to the base.",
+]
+
+[quest.quiz]
+choices = [
+  'return cls(int(a), int(b))',
+  'return Point(int(a), int(b))',
+  'return self(int(a), int(b))',
+  'return cls.__init__(int(a), int(b))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "python.cheatsheet_advanced.10.hash-with-eq"
+node        = 10
+title       = "SAME BADGE, SAME PERSON"
+difficulty  = 4
+story       = "Two sign-ins at the Hennessy Road gym with the same member number are one member, and the attendance set has to agree."
+concepts    = ["duck-typing", "hashing", "structs"]
+requires    = ["python.cheatsheet_advanced.09.alt-constructor"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`uid` is a `str`. Defining `__eq__` made `User` unhashable, so instances
+cannot go in a `set`. Which line restores hashing so that
+`len({User("a"), User("a"), User("b")})` is `2`?
+
+```
+class User:
+    def __init__(self, uid):
+        self.uid = uid
+
+    def __eq__(self, o):
+        return isinstance(o, User) and self.uid == o.uid
+
+    # ____
+```
+'''
+solution    = 'def __hash__(self): return hash(self.uid)'
+hints = [
+  "Equal objects must hash equal, so hash the same thing `__eq__` compares — and the method must return an int, not a str.",
+]
+
+[quest.quiz]
+choices = [
+  'def __hash__(self): return id(self)',
+  'def __hash__(self): return hash(self.uid)',
+  'def __hash__(self): return self.uid',
+  '__hash__ = object.__hash__',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "python.cheatsheet_advanced.11.deck-iter"
+node        = 11
+title       = "DEAL ME THROUGH"
+difficulty  = 3
+story       = "The mahjong table in the Causeway Bay Road walk-up wants to walk a deck of tiles with a plain for-loop, not reach into its drawer."
+concepts    = ["duck-typing", "iteration", "generators"]
+requires    = ["python.cheatsheet_advanced.10.hash-with-eq"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`for card in Deck()` must visit `"A"`, `"K"`, `"Q"` one at a time, and
+`len(deck)` already works. Which line goes in the gap?
+
+```
+class Deck:
+    def __init__(self):
+        self._cards = ["A", "K", "Q"]
+
+    def __len__(self):
+        return len(self._cards)
+
+    # ____
+```
+'''
+solution    = 'def __iter__(self): return iter(self._cards)'
+hints = [
+  "The dunder must return an iterator, not the list itself; yielding the list hands back one item, which is the whole list.",
+]
+
+[quest.quiz]
+choices = [
+  'def __iter__(self): return iter(self._cards)',
+  'def __iter__(self): return self._cards',
+  'def __iter__(self): yield self._cards',
+  'def __next__(self): return next(self._cards)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "python.cheatsheet_advanced.12.exit-protocol"
+node        = 12
+title       = "CLOSE, BUT DO NOT HUSH"
+difficulty  = 4
+story       = "The shutter on the Jardine's Bazaar stall comes down whatever happened inside, but a fire alarm still has to be heard outside."
+concepts    = ["duck-typing", "error-handling", "functions"]
+requires    = ["python.cheatsheet_advanced.11.deck-iter"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`Res` is used as `with Res() as r:`. On leaving the block, `self.close()`
+must run — and an exception raised inside the block must still
+**propagate** to the caller. Which line goes in the gap?
+
+```
+class Res:
+    def __enter__(self):
+        return self
+
+    def close(self):
+        ...
+
+    # ____
+```
+'''
+solution    = 'def __exit__(self, exc_type, exc, tb): self.close()'
+hints = [
+  "The exit dunder is called with three extra arguments, and returning a truthy value from it swallows the exception.",
+]
+
+[quest.quiz]
+choices = [
+  'def __exit__(self): self.close()',
+  'def __close__(self, exc_type, exc, tb): self.close()',
+  'def __exit__(self, *a): self.close(); return True',
+  'def __exit__(self, exc_type, exc, tb): self.close()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "python.cheatsheet_advanced.13.chain-the-cause"
+node        = 13
+title       = "AND THE REASON WAS"
+difficulty  = 3
+story       = "The config clerk at the Gloucester Road fintech rejects a bad port with her own stamp, but keeps the original complaint pinned underneath."
+concepts    = ["error-handling", "structs", "panics"]
+requires    = ["python.cheatsheet_advanced.12.exit-protocol"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`class ConfigError(Exception): pass` exists. Inside
+`except ValueError as e:`, raise a `ConfigError("bad port")` so that the
+caller catches a `ConfigError` whose `__cause__` is the original
+`ValueError`.
+'''
+solution    = 'raise ConfigError("bad port") from e'
+hints = [
+  "The new exception is raised; the old one is named after it as the cause. Naming `None` there hides the cause instead.",
+]
+
+[quest.quiz]
+choices = [
+  'raise ConfigError("bad port") from None',
+  'raise ConfigError("bad port"), e',
+  'raise ConfigError("bad port") from e',
+  'raise e from ConfigError("bad port")',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "python.cheatsheet_advanced.14.two-faults-one-net"
+node        = 14
+title       = "TWO FAULTS, ONE NET"
+difficulty  = 3
+story       = "The order form at the Lucky Mac may be missing the port or have a word in it, and either way the cashier says \"bad\" and moves on."
+concepts    = ["error-handling", "control-flow", "pattern-matching"]
+requires    = ["python.cheatsheet_advanced.13.chain-the-cause"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`parse({})` must return `"bad"` (a `KeyError`), `parse({"port": "x"})`
+must return `"bad"` (a `ValueError`), and `parse({"port": "80"})` must
+return `80`. Which line goes in the gap?
+
+```
+def parse(d):
+    try:
+        v = int(d["port"])
+    # ____
+        return "bad"
+    else:
+        return v
+```
+'''
+solution    = 'except (ValueError, KeyError) as e:'
+hints = [
+  "Several types in one clause travel as a tuple; a bare comma is a syntax error here, and `or` just evaluates to the first class.",
+]
+
+[quest.quiz]
+choices = [
+  'except (ValueError, KeyError) as e:',
+  'except ValueError, KeyError as e:',
+  'except ValueError or KeyError as e:',
+  'except [ValueError, KeyError] as e:',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "python.cheatsheet_advanced.15.sort-then-group"
+node        = 15
+title       = "SORT BEFORE YOU GROUP"
+difficulty  = 4
+story       = "The Bowrington Road fishmonger bins his catch by size, but only after lining the fish up by size — otherwise the same bin appears five times."
+concepts    = ["generators", "sorting", "iteration"]
+requires    = ["python.cheatsheet_advanced.14.two-faults-one-net"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`from itertools import groupby` is done and `words` is an unsorted list
+of strings. Loop `k, g` so that each distinct length appears **exactly
+once** and `g` holds every word of that length.
+'''
+solution    = 'for k, g in groupby(sorted(words, key=len), key=len):'
+hints = [
+  "The grouper only merges neighbours. Line the words up by the same key first — and `list.sort` returns None.",
+]
+
+[quest.quiz]
+choices = [
+  'for k, g in groupby(words, key=len):',
+  'for k, g in groupby(sorted(words, key=len), key=len):',
+  'for k, g in groupby(sorted(words), key=len):',
+  'for k, g in groupby(words.sort(key=len), key=len):',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "python.cheatsheet_advanced.16.every-pair-once"
+node        = 16
+title       = "EVERY PAIR, ONCE"
+difficulty  = 3
+story       = "Three teahouses on Lee Garden Road want to trial a shared menu, and each pair of them meets exactly once."
+concepts    = ["generators", "iteration", "backtracking"]
+requires    = ["python.cheatsheet_advanced.15.sort-then-group"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`import itertools` is done and `xs = ["a", "b", "c"]`. Make `pairs` the
+list `[("a", "b"), ("a", "c"), ("b", "c")]` — each unordered pair once,
+no element paired with itself, no `("b", "a")`.
+'''
+solution    = 'pairs = list(itertools.combinations(xs, 2))'
+hints = [
+  "Order does not matter and nothing repeats; the two neighbours in itertools give ordered pairs and self-pairs respectively.",
+]
+
+[quest.quiz]
+choices = [
+  'pairs = list(itertools.permutations(xs, 2))',
+  'pairs = list(itertools.product(xs, repeat=2))',
+  'pairs = list(itertools.combinations(xs, 2))',
+  'pairs = list(itertools.combinations(2, xs))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "python.cheatsheet_advanced.17.ten-off-the-stream"
+node        = 17
+title       = "TEN OFF THE STREAM"
+difficulty  = 4
+story       = "The Wan Chai ferry pier feeds rows of passengers without end; the clerk wants the first ten people, not the first ten rows."
+concepts    = ["generators", "iteration", "complexity"]
+requires    = ["python.cheatsheet_advanced.16.every-pair-once"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`from itertools import chain, islice` is done. `rows` is an **infinite**
+generator of lists. Make `first` a list of the first 10 individual
+elements across the rows, without ever exhausting `rows`.
+'''
+solution    = 'first = list(islice(chain.from_iterable(rows), 10))'
+hints = [
+  "Star-unpacking an endless generator never finishes, and a chain cannot be sliced with brackets — use the slicing adaptor on the flattening classmethod.",
+]
+
+[quest.quiz]
+choices = [
+  'first = list(chain(*rows))[:10]',
+  'first = list(islice(chain.from_iterable(rows), 10))',
+  'first = list(chain.from_iterable(rows)[:10])',
+  'first = list(islice(chain(rows), 10))',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "python.cheatsheet_advanced.18.neighbour-gaps"
+node        = 18
+title       = "GAP TO THE NEXT TRAM"
+difficulty  = 4
+story       = "Tram arrival times at Causeway Bay terminus come in off a wire, one by one; the inspector wants the wait between each tram and the next."
+concepts    = ["generators", "iteration", "two-pointers"]
+requires    = ["python.cheatsheet_advanced.17.ten-off-the-stream"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`from itertools import pairwise, zip_longest` is done and `xs` is an
+**iterator** of ints (no `len`, no slicing). Make `gaps` the list of
+differences between each element and the next, e.g. `1, 4, 9, 16` gives
+`[3, 5, 7]`.
+'''
+solution    = 'gaps = [b - a for a, b in pairwise(xs)]'
+hints = [
+  "An iterator cannot be sliced, and zipping it with itself eats two items per step. The 3.10 adaptor yields overlapping neighbours.",
+]
+
+[quest.quiz]
+choices = [
+  'gaps = [b - a for a, b in zip(xs, xs[1:])]',
+  'gaps = [b - a for a, b in zip_longest(xs, xs)]',
+  'gaps = [xs[i + 1] - xs[i] for i in range(len(xs) - 1)]',
+  'gaps = [b - a for a, b in pairwise(xs)]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "python.cheatsheet_advanced.19.top-two"
+node        = 19
+title       = "THE TOP TWO SPENDERS"
+difficulty  = 3
+story       = "The VIP desk at the Causeway Bay club wants the two biggest tabs of the night by amount, without sorting every receipt."
+concepts    = ["heaps", "sorting", "closures"]
+requires    = ["python.cheatsheet_advanced.18.neighbour-gaps"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`import heapq` is done and `xs` is a list of `(name, amount)` tuples.
+Make `top` the two tuples with the **largest** `amount`, largest first.
+'''
+solution    = 'top = heapq.nlargest(2, xs, key=lambda p: p[1])'
+hints = [
+  "The count comes before the iterable, and without a key the tuples compare by name.",
+]
+
+[quest.quiz]
+choices = [
+  'top = heapq.nlargest(2, xs, key=lambda p: p[1])',
+  'top = heapq.nlargest(xs, 2, key=lambda p: p[1])',
+  'top = heapq.nsmallest(2, xs, key=lambda p: p[1])',
+  'top = heapq.nlargest(2, xs, key=p[1])',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "python.cheatsheet_advanced.20.slot-it-in"
+node        = 20
+title       = "SLOT IT IN BY SCORE"
+difficulty  = 4
+story       = "The arcade leaderboard under Sogo stays sorted by score; a new name has to land in the right slot, and the slot is decided by the number, not the name."
+concepts    = ["binary-search", "sorting", "slices"]
+requires    = ["python.cheatsheet_advanced.19.top-two"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`from bisect import insort, bisect_left` is done. `xs` is a list of
+`(name, score)` tuples kept sorted by `score` ascending. Insert
+`(name, s)` so that `xs` stays sorted by score (Python 3.10+).
+'''
+solution    = 'insort(xs, (name, s), key=lambda p: p[1])'
+hints = [
+  "The key is applied to the elements and to the thing being inserted, so insert the whole record, not the bare score.",
+]
+
+[quest.quiz]
+choices = [
+  'insort(xs, s, key=lambda p: p[1])',
+  'xs.insert(bisect_left(xs, s), (name, s))',
+  'insort(xs, (name, s), key=lambda p: p[1])',
+  'insort(xs, (name, s))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "python.cheatsheet_advanced.21.port-in-both"
+node        = 21
+title       = "PORT IN BOTH POCKETS"
+difficulty  = 4
+story       = "The fintech on Gloucester Road has a default port and a command-line port, and `connect` will not take the same keyword twice."
+concepts    = ["functions", "collections", "error-handling"]
+requires    = ["python.cheatsheet_advanced.20.slot-it-in"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`def connect(host="x", port=0)` takes keywords only.
+`defaults = {"host": "db", "port": 5432}` and `opts = {"port": 6543}`.
+Call `connect` with the defaults overridden by `opts`, so it receives
+`host="db", port=6543`.
+'''
+solution    = 'connect(**(defaults | opts))'
+hints = [
+  "Two `**` unpackings that share a key raise. Merge the dicts first, with the override on the right, and unpack the merged one.",
+]
+
+[quest.quiz]
+choices = [
+  'connect(**defaults, **opts)',
+  'connect(**opts | defaults)',
+  'connect(defaults | opts)',
+  'connect(**(defaults | opts))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "python.cheatsheet_advanced.22.name-it-in-passing"
+node        = 22
+title       = "NAME IT IN PASSING"
+difficulty  = 4
+story       = "The gold shop's appraiser on Hennessy Road is slow and expensive, so each piece is weighed once, and only the profitable ones are kept."
+concepts    = ["comprehensions", "bindings", "complexity"]
+requires    = ["python.cheatsheet_advanced.21.port-in-both"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`f` is expensive and must be called **exactly once** per element. Make
+`ys` the list of `f(x)` values that are greater than 0, in one
+comprehension.
+'''
+solution    = 'ys = [y for x in xs if (y := f(x)) > 0]'
+hints = [
+  "The assignment expression needs its own parentheses inside the condition, and it binds the result — not the comparison.",
+]
+
+[quest.quiz]
+choices = [
+  'ys = [y for x in xs if y := f(x) > 0]',
+  'ys = [y for x in xs if (y := f(x)) > 0]',
+  'ys = [f(x) for x in xs if f(x) > 0]',
+  'ys = [y for x in xs if (y := f(x) > 0)]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "python.cheatsheet_advanced.23.far-click"
+node        = 23
+title       = "FAR CLICK OR FAR DRAG"
+difficulty  = 4
+story       = "The touch panel at the Times Square kiosk treats a click and a drag the same way, but only when they land far off to the right."
+concepts    = ["pattern-matching", "control-flow", "structs"]
+requires    = ["python.cheatsheet_advanced.22.name-it-in-passing"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`Click` and `Drag` are plain classes with attributes `x` and `y` and
+**no** `__match_args__`. `far(ev)` must return `"far"` for a `Click` or a
+`Drag` whose `x` is above 100, and `"near"` for anything else. Which line
+goes in the gap?
+
+```
+def far(ev):
+    match ev:
+        # ____
+            return "far"
+        case _:
+            return "near"
+```
+'''
+solution    = 'case Click(x=x) | Drag(x=x) if x > 100:'
+hints = [
+  "Without match args the sub-patterns must be keyword ones; alternatives are joined by a bar, and the guard comes after all of them.",
+]
+
+[quest.quiz]
+choices = [
+  'case Click(x=x) | Drag(x=x) if x > 100:',
+  'case Click(x) | Drag(x) if x > 100:',
+  'case Click(x=x) or Drag(x=x) if x > 100:',
+  'case Click(x=x) if x > 100 | Drag(x=x):',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "python.cheatsheet_advanced.24.pool-with-a-timeout"
+node        = 24
+title       = "FOUR FETCHERS, ONE TIMEOUT"
+difficulty  = 4
+story       = "Four runners leave the Percival Street office at once, each told to give up after two seconds, and the dispatcher wants the results back in order."
+concepts    = ["concurrency", "functions", "closures"]
+requires    = ["python.cheatsheet_advanced.23.far-click"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`ex` is a `ThreadPoolExecutor` and `fetch(url, timeout=10)` is a
+function; imports are not shown. Make `results` a list of
+`fetch(u, timeout=2)` for every `u` in `urls`, in order, run across the
+pool.
+'''
+solution    = 'results = list(ex.map(partial(fetch, timeout=2), urls))'
+hints = [
+  "The pool's map has a `timeout` of its own that never reaches `fetch`. Bind the keyword into the function first.",
+]
+
+[quest.quiz]
+choices = [
+  'results = list(ex.map(fetch, urls, timeout=2))',
+  'results = list(ex.map(fetch(timeout=2), urls))',
+  'results = ex.submit(fetch, urls, timeout=2).result()',
+  'results = list(ex.map(partial(fetch, timeout=2), urls))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "python.cheatsheet_advanced.25.tick-it-off"
+node        = 25
+title       = "TICK IT OFF"
+difficulty  = 4
+story       = "The Lucky Mac night kitchen: the manager waits by the pass until every ticket is cooked, not merely picked up, and each cook has to say when a plate is done."
+concepts    = ["channels", "concurrency", "stacks-queues"]
+requires    = ["python.cheatsheet_advanced.24.pool-with-a-timeout"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`q` is a `queue.Queue`. The main thread calls `q.join()` after putting
+every job and must block until every job has been **processed**. Which
+line ends the worker's loop body so that `q.join()` returns?
+
+```
+def worker():
+    while True:
+        job = q.get()
+        with lock:
+            done.append(process(job))
+        # ____
+
+for _ in range(4):
+    threading.Thread(target=worker, daemon=True).start()
+```
+'''
+solution    = 'q.task_done()'
+hints = [
+  "`get` only takes the job. The queue counts unfinished tasks, and the worker has to tell it one finished — no argument.",
+]
+
+[quest.quiz]
+choices = [
+  'q.done()',
+  'q.join()',
+  'q.task_done()',
+  'q.task_done(job)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "python.cheatsheet_advanced.26.all-the-cores"
+node        = 26
+title       = "ALL THE CORES"
+difficulty  = 4
+story       = "Rendering the Victoria Park fireworks map is pure CPU work; the GIL lets one thread in at a time, so the job goes to separate processes."
+concepts    = ["concurrency", "thread-safety", "functions"]
+requires    = ["python.cheatsheet_advanced.25.tick-it-off"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`cpu_heavy(x)` is a top-level function in the module and
+`p` is a `multiprocessing.Pool` (under the `__main__` guard). Make
+`out` the list of `cpu_heavy(x)` for every `x` in `xs`, in order, spread
+across the processes.
+'''
+solution    = 'out = p.map(cpu_heavy, xs)'
+hints = [
+  "Work is sent to another process by pickling the callable; a lambda cannot be pickled. The pool's map takes the function and the iterable, separately.",
+]
+
+[quest.quiz]
+choices = [
+  'out = p.map(lambda x: cpu_heavy(x), xs)',
+  'out = p.map(cpu_heavy, xs)',
+  'out = p.map(cpu_heavy(x) for x in xs)',
+  'out = p.map(cpu_heavy, *xs)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "python.cheatsheet_advanced.27.all-at-once"
+node        = 27
+title       = "THREE AT ONCE, NOT ONE BY ONE"
+difficulty  = 5
+story       = "Three deliveries ordered from the Lockhart Road flat, each a one-second ride; ordering them one after another makes the python wait three."
+concepts    = ["async", "concurrency", "generators"]
+requires    = ["python.cheatsheet_advanced.26.all-the-cores"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`fetch(u)` is an `async def` that awaits `asyncio.sleep(1)` and returns
+`u`. Inside `async def main()`, run by `asyncio.run(main())`, make
+`results` the list of results for `urls` in order — all three fetches
+**concurrently**, so `main` takes about one second, not three.
+'''
+solution    = 'results = await asyncio.gather(*[fetch(u) for u in urls])'
+hints = [
+  "Awaiting each coroutine in turn serialises them. The combinator takes the awaitables as separate arguments, not as one list, and it must itself be awaited.",
+]
+
+[quest.quiz]
+choices = [
+  'results = await asyncio.gather(*[fetch(u) for u in urls])',
+  'results = await asyncio.gather([fetch(u) for u in urls])',
+  'results = [await fetch(u) for u in urls]',
+  'results = asyncio.gather(*[fetch(u) for u in urls])',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "python.cheatsheet_advanced.28.generic-first"
+node        = 28
+title       = "FIRST OF ANYTHING"
+difficulty  = 5
+story       = "The Hennessy Road pharmacy wants one `first` that works on a shelf of pills and a shelf of plasters, and the label has to say which it got."
+concepts    = ["generics", "types", "functions"]
+requires    = ["python.cheatsheet_advanced.27.all-at-once"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+Python 3.12. `from collections.abc import Sequence` is done and **no**
+`TypeVar` has been declared anywhere. Write the `def` line of a generic
+`first` that takes a `Sequence[T]` and returns a `T`, with `T` declared
+on the function itself.
+'''
+solution    = 'def first[T](xs: Sequence[T]) -> T:'
+hints = [
+  "3.12 lets a function declare its own type parameter, in square brackets right after its name.",
+]
+
+[quest.quiz]
+choices = [
+  'def first<T>(xs: Sequence[T]) -> T:',
+  'def first(xs: Sequence[T]) -> T:',
+  'def first[T](xs: Sequence[T]) -> T:',
+  'def first(xs: Sequence[T]) -> T where T:',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "python.cheatsheet_advanced.29.shared-bag"
+node        = 29
+title       = "THE BAG THAT NEVER EMPTIES"
+difficulty  = 5
+story       = "The dai pai dong's \"new bag\" default is one bag, made once when the menu was printed — and every order that trusts it finds last table's chopsticks inside."
+concepts    = ["functions", "zero-values", "bindings"]
+requires    = ["python.cheatsheet_advanced.28.generic-first"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`add(x, xs)` appends `x` to `xs` and returns `xs`. Called twice without
+a second argument, `add(1)` then `add(2)` must give `[1]` and then
+`[2]` — a fresh list each time. The body replaces an **omitted** `xs`
+with a new empty list before appending. Which `def` line is right?
+'''
+solution    = 'def add(x, xs=None):'
+hints = [
+  "A default is evaluated once, at `def` time, and shared by every call. Use a sentinel and build the list inside.",
+]
+
+[quest.quiz]
+choices = [
+  'def add(x, xs=[]):',
+  'def add(x, xs=list()):',
+  'def add(x, xs: list = []):',
+  'def add(x, xs=None):',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "python.cheatsheet_advanced.30.late-binding"
+node        = 30
+title       = "THREE DOORMEN, ONE NUMBER"
+difficulty  = 5
+story       = "Three doormen on Jaffe Road were each told \"remember your number\" — but they all remember the name of the number, and by closing time it is 2 for everyone."
+concepts    = ["closures", "bindings", "comprehensions"]
+requires    = ["python.cheatsheet_advanced.29.shared-bag"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+Build `fs`, a list of three zero-argument functions, so that
+`[f() for f in fs]` is `[0, 2, 4]` — each one doubling the `i` it was
+made with.
+'''
+solution    = 'fs = [lambda i=i: i * 2 for i in range(3)]'
+hints = [
+  "A closure looks `i` up when it is called, by which time the loop is over. A default argument is evaluated when the lambda is made.",
+]
+
+[quest.quiz]
+choices = [
+  'fs = [lambda: i * 2 for i in range(3)]',
+  'fs = [lambda i=i: i * 2 for i in range(3)]',
+  'fs = [lambda i: i * 2 for i in range(3)]',
+  'fs = [(lambda: i * 2) for i in range(3)]',
+]
+answer  = 1

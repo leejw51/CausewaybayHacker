@@ -1,0 +1,472 @@
+# ZIG LAND — CHEATSHEET, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/zig/cheatsheet.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code, live in the English
+# pack, and are never translated. Code blocks and identifiers are copied
+# verbatim.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "zig.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.cheatsheet.01.print"
+title = "收費牌"
+story = "06:00，紅隧銅鑼灣出口。1 號亭頂塊牌要有人寫落去，先會出收費。"
+brief = '''
+`w` 係 stdout 上面一個有 buffer 嘅 writer。用十進制印 `n`，跟住換行。
+
+```
+const w = &stdout.interface;
+defer w.flush() catch {};
+const n: i64 = 42;
+// ____
+```
+
+係邊一行？
+'''
+hints = [
+  "參數要擺入 tuple `.{ ... }` 度；print 可能會 fail，所以要 `try`。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.cheatsheet.02.parse-int"
+title = "銀仔變數字"
+story = "2 號亭個銀仔盤用文字數，錢箱要嘅係整數。"
+brief = '''
+`tok` 係一個裝住 `"42"` 嘅 `[]const u8`。將 `n` 變做十進制嘅 `i64`，壞 token
+嘅 error 就交返俾 caller。
+'''
+hints = [
+  "type 行先，跟住係文字，最後係進制。佢返一個 error union，所以要 `try`。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.cheatsheet.03.for-index"
+title = "行車線號碼"
+story = "車軸計數器記低每架車行邊條線，由零開始數。"
+brief = '''
+`xs` 係 `[]const i64`。逐個行一次，每個元素叫 `x`，佢嘅 index 叫 `i`。
+'''
+hints = [
+  "for loop 可以一齊行兩樣嘢：個 slice 同一個由 0 開始嘅開放 range。一樣一個 capture。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.cheatsheet.04.div-trunc"
+title = "分數"
+story = "成晚收到嘅錢要喺幾個亭之間分，盤數可以係負數。"
+brief = '''
+`a` 同 `b` 係 runtime 嘅 `i64`，兩個都可能係負數。整 `q` 做佢哋嘅商，好似 C
+咁**向零**取整。
+'''
+hints = [
+  "有符號嘅 runtime 整數直接用 `/` 係 compile 唔到嘅：Zig 要你講明點樣取整。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.cheatsheet.05.eql"
+title = "同一塊車牌"
+story = "天橋上面部車牌機逐架車同通緝名單上嗰塊對。"
+brief = '''
+`a` 同 `b` 都係 `[]const u8`。開一個 `if`，兩個嘅 byte 一樣先係 true。
+'''
+hints = [
+  "slice 冇 `==` 用。std.mem 嗰個比較 function 第一個參數係元素 type。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.cheatsheet.06.orelse"
+title = "冇紀錄"
+story = "張數表從來未見過嘅車牌都有個數，個數係零。"
+brief = '''
+`counts` 係 `std.StringHashMap(i64)`，`get` 返 `?i64`。整 `c` 做 key `k` 嘅
+數，冇 `k` 嘅話就係 0。
+'''
+hints = [
+  "optional 用 `orelse` 加個預設值拆開；`catch` 係俾 error union 用嘅。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.cheatsheet.07.append"
+title = "多一架車"
+story = "3 號亭條龍長咗一架車，每一個 byte 都係俾過錢嘅。"
+brief = '''
+將 `x` 加落 list 最尾。
+
+```
+var xs: std.ArrayList(i64) = .empty;
+defer xs.deinit(gpa);
+// ____
+```
+'''
+hints = [
+  "個 list 唔會記住 allocator：每個可能變大嘅 call 都要俾 `gpa`，個結果要 `try`。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.cheatsheet.08.sort-desc"
+title = "最重排頭"
+story = "堅拿道底嘅地磅將最重嗰架貨車排喺最頂。"
+brief = '''
+`xs` 係 `std.ArrayList(i64)`。將佢啲 items 就地排做**由大到細**。
+'''
+hints = [
+  "std.mem.sort 要 type、slice、context 同 comparator；std.sort 每個方向都有一個。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.cheatsheet.09.catch-default"
+title = "糊咗張飛"
+story = "出票機出嚟張飛糊咗。個亭當佢係零，揮手放車。"
+brief = '''
+`tok` 未必係數字。用十進制 `i64` parse 落 `n`，parse 唔到就用 0，唔好將個
+error 返出去。
+'''
+hints = [
+  "error union 用 `catch` 俾預設值；`orelse` 係俾 optional 用嘅。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.cheatsheet.10.comptime-type"
+title = "乜貨都得"
+story = "出口嗰堆貨櫃乜都收，只要 compile 嗰陣話佢知係乜。"
+brief = '''
+`Stack` 係一個 function：收一個元素 type，返一個用佢砌出嚟嘅 struct type。
+邊一行開頭？
+
+```
+// ____
+    return struct {
+        items: []T,
+    };
+}
+```
+'''
+hints = [
+  "type 係 compile 時已經知嘅值，所以個參數要咁樣標明；function 返 `type`。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.cheatsheet.11.self-ptr"
+title = "計數盒"
+story = "鑲死喺 4 號亭嗰個計數器每過一架車就㩒一下。佢個副本淨係會自己㩒。"
+brief = '''
+一個 method `inc`，將 call 佢嗰個 counter 加一：
+
+```
+const Counter = struct {
+    n: i64 = 0,
+    // ____
+        self.n += 1;
+    }
+};
+```
+'''
+hints = [
+  "參數係一個 const 副本。要改 caller 嗰個 struct，就要收一個指住佢嘅 pointer。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.cheatsheet.12.errdefer"
+title = "失敗先做"
+story = "隧道口支閘，過到數就放車，過唔到就收返張飛。"
+brief = '''
+`fill` fail 嘅話就 free 咗 `buf`，成功就原封不動交俾 caller。
+
+```
+fn load(gpa: std.mem.Allocator, n: usize) ![]u8 {
+    const buf = try gpa.alloc(u8, n);
+    // ____
+    try fill(buf);
+    return buf;
+}
+```
+'''
+hints = [
+  "普通 `defer` 喺每一個出口都會行，成功都包埋。有一種寫法淨係返 error 嗰陣先行。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.cheatsheet.13.slice"
+title = "中間嗰兩條線"
+story = "入口五條行車線入面，今晚喺鏡頭底下嘅係中間嗰兩條。"
+brief = '''
+`xs` 係一個有五個元素嘅 `[]const i64`。整 `mid` 做 index 1 同 2 嗰兩個元素嘅 view
+—— 啱啱好兩個，唔複製。
+'''
+hints = [
+  "子 slice 係 `[start..end]`，end 唔計在內；完全唔寫 end 嘅話就去到 `xs.len`。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.cheatsheet.14.while-step"
+title = "數吓有幾多個亭"
+story = "巡查員由零號亭行到最後一個，每查完一個就行一步。"
+brief = '''
+`i` 同 `n` 係 `usize`，`i` 由 0 開始。開一個 loop，為 `i = 0, 1, …, n-1` 行 body，
+而個步進寫喺 loop 頭，唔係 body 最底。
+'''
+hints = [
+  "Zig 冇 C 式嘅 `for`：佢係一個 `while`，continue 表達式寫喺冒號後面，而且冇 `++`。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.cheatsheet.15.switch-range"
+title = "重量級別"
+story = "地磅按讀到嘅噸數將每架車分級，而最重嗰級係冇上限嘅。"
+brief = '''
+`t` 係 `i64`。邊一個 prong 令 0 去到 9（包括 9）嘅每個值都俾出 `"light"`？
+
+```
+const class = switch (t) {
+    // ____
+    10...99 => "medium",
+    else => "heavy",
+};
+```
+'''
+hints = [
+  "switch 嘅 range 兩頭都包括在內，而且比 slice 嘅 range 多一粒點。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.cheatsheet.16.error-union"
+title = "可能會 fail，寫明咗"
+story = "5 號亭部讀票機要麼交返一個數，要麼承認讀唔到張飛，而佢個標籤兩樣都寫明。"
+brief = '''
+`parse` 將一個 token 變做 `i64`，parse fail 就交上去俾 caller。邊一行開頭？
+
+```
+// ____
+    return try std.fmt.parseInt(i64, s, 10);
+}
+```
+'''
+hints = [
+  "function 入面嘅 `try` 淨係喺 return type 載得到 error 嗰陣先 compile 到；推斷嘅 error set 係喺個 type 前面寫一個字元。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.cheatsheet.17.if-capture"
+title = "如果有車牌"
+story = "3 號線上面個鏡頭可能讀到車牌，可能讀唔到；讀到先會郁個數。"
+brief = '''
+`maybe` 係 `?i64`。開一個 `if`，個 body 淨係喺 `maybe` 有值嗰陣先行，而個值喺 body
+入面綁做 `v`。
+'''
+hints = [
+  "個條件係個 optional 本身，唔係一個比較，而後面嘅 capture 就係拆開咗嘅值。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.cheatsheet.18.hashmap-count"
+title = "嗰啲再多一個"
+story = "控制室嘅車牌數表每過一架車就加一，從來未見過嘅車牌就由零開始。"
+brief = '''
+將 key `x` 底下存住嘅數加一，未有嘅 key 當 0。
+
+```
+var counts: std.AutoHashMap(i64, i64) = .init(gpa);
+defer counts.deinit();
+// ____
+```
+'''
+hints = [
+  "`get` 返 optional，所以計數之前要俾個預設值；呢個 map 記住咗佢個 allocator，所以存入嗰個 call 唔收 allocator。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.cheatsheet.19.intcast"
+title = "有符號嘅線號"
+story = "個線號由線路傳嚟嗰陣係有符號整數；線路表淨係收 size。"
+brief = '''
+`k` 係 runtime 嘅 `i64`，已知非負而且喺範圍內。整 `idx` 做裝住同一個值嘅 `usize`，
+令 `xs[idx]` compile 到。
+'''
+hints = [
+  "個 cast 收一個參數，目標闊度係由佢落去嗰個綁定嚟嘅，所以個綁定一定要寫明 type。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.cheatsheet.20.labeled-break"
+title = "跳出兩個 loop"
+story = "搵嗰塊被偷嘅車牌，逐條線逐架車咁搵，一搵到成個掃描就即刻停。"
+brief = '''
+`grid` 係一個 row 嘅 slice。搵到目標嗰陣，**兩個** loop 要一齊離開 —— 外層 loop
+唔可以繼續去下一個 row。
+
+```
+outer: for (grid) |row| {
+    for (row) |c| {
+        if (c == target) {
+            found = c;
+            // ____
+        }
+    }
+}
+```
+'''
+hints = [
+  "有 label 嘅 loop 係喺 keyword 後面寫佢個 label 嚟離開嘅，個名前面要有個冒號；另一個有 label 嘅跳法淨係會跳去下一個 row。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.cheatsheet.21.var-typed"
+title = "累計總數"
+story = "1 號亭嘅夜更數簿由零開始，個 loop 交俾佢嘅每一個車費佢都要收。"
+brief = '''
+`xs` 係一個 `[]const i64`。將 `total` 宣告做由 0 開始嘅 `i64`，令下面個 loop 可以加落去。
+
+```
+// ____
+for (xs) |x| total += x;
+```
+'''
+hints = [
+  "一個俾 loop 寫入嘅綁定要用可變嗰個關鍵字，而一個淨係整數 literal 本身冇 runtime type —— 個宣告一定要講明一個。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.cheatsheet.22.range-for"
+title = "行十轉"
+story = "稽查員巡一輪，十個亭每個試一次，10 號亭都包括在內。"
+brief = '''
+開一個 `for`，佢個 body 行**十**次，`i` 依次攞 1, 2, …, 10 —— 最後一轉一定要見到
+`i == 10`。
+'''
+hints = [
+  "行 range 嘅 for 唔包括上限，同 slice `[a..b]` 一模一樣，所以上限係你想要嘅最後一個值再加一。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.cheatsheet.23.bool-and"
+title = "兩盞燈都綠"
+story = "2 號線個閘淨係喺張飛讀咗而且車費過咗數先會升起。"
+brief = '''
+`ready` 同 `valid` 係 runtime 嘅 `bool`。開一個 `if`，佢個 body 淨係兩個都係 true 嗰陣
+先行。
+'''
+hints = [
+  "Zig 嘅邏輯運算子係用關鍵字寫嘅，唔係兩個符號疊埋 —— C 嗰種寫法喺呢度係 compile error —— 而且個條件仍然要有括號。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.cheatsheet.24.float-from-int"
+title = "半價車費"
+story = "夜間半價車費：塊牌上面個收費係整數，個折扣就唔係。"
+brief = '''
+`n` 係 runtime 嘅 `i64`。整 `f` 做裝住同一個值嘅 `f64`，令 `f / 2.0` compile 到。
+'''
+hints = [
+  "冇隱式嘅整數轉浮點數，而做呢件事嘅內建 function 淨係收個值 —— 佢嘅目標 type 係由個綁定嚟嘅，所以個綁定一定要寫明一個。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.cheatsheet.25.abs"
+title = "差幾遠"
+story = "4 號亭個車軸計數器隔夜飄咗；控制室想知飄咗幾多，唔係飄向邊邊。"
+brief = '''
+`x` 係 runtime 嘅 `i64`，可能係負數。整 `a` 做佢嘅絕對值 —— 而且記住結果係**無符號**嘅
+（`u64`）。
+'''
+hints = [
+  "由 0.12 開始呢個係內建 function，唔係 std.math 嘅 function，而佢交返嘅係輸入 type 嘅無符號孖生兄弟 —— 有符號嘅綁定係收唔到佢嘅。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.cheatsheet.26.reverse"
+title = "照原路退返出去"
+story = "拖車將條隊按入嚟嘅相反次序由隧道口退返出去。"
+brief = '''
+`xs` 係一個 `std.ArrayList(i64)`。就地倒轉佢啲元素。
+'''
+hints = [
+  "slice 冇 method；std.mem 嗰個 helper 係先收元素 type 嘅，同 sort 同 eql 一樣。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.cheatsheet.27.dupe"
+title = "一份副本做紀錄"
+story = "呢更嘅車牌名單要送上銅鑼灣嘅檔案室，而檔案室會自己留一份。"
+brief = '''
+`xs` 係一個 `[]const i64`。整 `c` 做佢一個獨立嘅 heap 副本，由 `gpa` 擁有 —— caller 之後
+會用 `gpa.free(c)` 釋放佢。
+'''
+hints = [
+  "個 copy 係 allocator 上面嘅 method，唔係 std.mem 嘅，而且佢係先俾佢個元素 type 再俾個 slice。分配係可以 fail 嘅。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.cheatsheet.28.items-len"
+title = "條隊有幾長"
+story = "隧道口塊牌顯示 3 號亭有幾多架車等緊。"
+brief = '''
+`xs` 係一個 `std.ArrayList(i64)`。整 `n` 做佢裝住嘅元素數目。
+'''
+hints = [
+  "個 list 自己冇長度；啲元素住喺一個 slice field 入面，而 slice 嘅長度係一個 field，唔係一個 call。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.cheatsheet.29.return-error"
+title = "講出邊度出錯"
+story = "5 號亭問一條空隊要第一架車，而個讀取器要講明呢件事。"
+brief = '''
+個 slice 入面乜都冇嗰陣，交一個叫 `Empty` 嘅 error 俾 caller。
+
+```
+fn first(xs: []const i64) !i64 {
+    if (xs.len == 0) {
+        // ____
+    }
+    return xs[0];
+}
+```
+'''
+hints = [
+  "error 係一個值，同其他值一樣咁 return；新嘅一個係由細楷嘅 namespace 加一粒點串出嚟嘅 —— 唔係好似 function 咁 call —— 唔使宣告。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.cheatsheet.30.mod"
+title = "剩低啲乜"
+story = "今晚嘅收入分三份，剩低嘅散銀落貼士罐 —— 永遠唔會係負一手。"
+brief = '''
+`a` 同 `b` 係 runtime 嘅 `i64`；`b` 係正數，而 `a` 可能係負數。整 `r` 做**永遠唔會係負數**
+嘅餘數：`a = -7` 同 `b = 3` 嗰陣，`r` 一定要係 `2`。
+'''
+hints = [
+  "同 `/` 一樣，`%` 符號唔肯收有符號嘅 runtime 運算元，逼你揀一個內建 function：一個跟被除數嘅符號，另一個跟除數嘅符號。",
+]

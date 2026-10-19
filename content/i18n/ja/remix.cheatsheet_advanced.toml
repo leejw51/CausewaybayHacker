@@ -1,0 +1,659 @@
+# REMIX LAND — CHEATSHEET ADVANCED, in Japanese. A translation pack (SPEC §12.1): the
+# prose of `content/remix/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and live in the
+# English pack only. Code blocks and identifiers are copied verbatim, never
+# translated.
+
+pack   = "remix.cheatsheet_advanced"
+locale = "ja"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet_advanced.01.handoff-go"
+title = "引き渡せ"
+story = "06:50、ジャーディンズ・バザール。メイはキオスクに数を一つ頼み、キオスクはまだ作ってもいないのに彼女が受け取るのを待つ。"
+brief = '''
+**Go** で、`main` には `ch := make(chan int)` — **バッファなし** — があり、後で
+`x := <-ch` をします。`compute()` は `int` を返します。その二つの間に置いて、
+`main` をデッドロックさせずに `compute()` の結果を `x` に届ける行はどれでしょう?
+'''
+hints = [
+  "バッファなしの送信は誰かが受信するまでブロックします。送信側は受信側とは別のゴルーチンでなければなりません。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet_advanced.02.handoff-rust"
+title = "引き渡せ、フェリス"
+story = "フェリスは同じ数をラッキー・マックのカウンター越しに運び、カウンターはトレイを借りさせてくれない。"
+brief = '''
+**Rust** で、`let (tx, rx) = mpsc::channel::<i32>();` があり、`main` は
+`let v = rx.recv().unwrap();` で終わります。`compute()` は `i32` を返します。
+その二つの間で、`compute()` の結果を `v` に届けるスレッドを始める — そして
+コンパイルできる — 行はどれでしょう?
+'''
+hints = [
+  "spawn されたクロージャは main のスタックフレームより長生きするかもしれないので、送信側を借用できません。所有しなければなりません。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet_advanced.03.handoff-python"
+title = "引き渡せ、ゆっくりと"
+story = "街市の価格板のニシキヘビは同じ数を三度目に、スレッドで受け取る。今度は本当に始めなければならない。"
+brief = '''
+**Python** で、`q = queue.Queue()` があり、`main` は `v = q.get()` で終わります。
+`compute()` は `int` を返します。その二つの間で、`compute()` を **新しいスレッド** で
+走らせてその結果を `v` に届ける — `q.get()` が永遠に待たずに返るようにする — 行は
+どれでしょう?
+'''
+hints = [
+  "`target` は引数なしで呼べるものを欲しがります。作られただけで start されない Thread は何もしません。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet_advanced.04.counter-go"
+title = "一度に一つ"
+story = "ラッキー・マックのシェフ・ボーの注文カウンタ: コック二人、それぞれ千回の刻み、板はちょうど二千と言わなければならない。"
+brief = '''
+**Go** で、
+
+```
+type C struct {
+    mu sync.Mutex
+    n  int
+}
+
+func (c *C) Inc() {
+    // ____
+    c.n++
+}
+```
+
+二つのゴルーチンがそれぞれ `Inc` を 1000 回呼びます。どの実行でも `c.n` が
+ちょうど 2000 になり、`go test -race` でもクリーンで、ミューテックスを保持したままに
+決してしない行はどれでしょう?
+'''
+hints = [
+  "インクリメント自体はロックを保持している間に起きなければならず、アンロックはメソッドが戻るときに予約されなければなりません。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet_advanced.05.counter-rust"
+title = "一度に一つ、フェリス"
+story = "四匹のカニ、一つの集計、怡和街。フェリスはハサミにガードを持っていて、それでも足せない。"
+brief = '''
+**Rust** で、`let counter = Arc::new(Mutex::new(0));` があり、spawn された各スレッドは
+`let c = Arc::clone(&counter);` を持ちます。スレッドのループの中で、共有された数に
+1 を足す — そしてコンパイルできる — 行はどれでしょう?
+'''
+hints = [
+  "ロックは Result を返します。その中にガードがあり、算術の前にガードを参照外ししなければなりません。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet_advanced.06.counter-python"
+title = "一度に一つ、と GIL は言った"
+story = "7-32 号室は夜勤のチケットを四つのスレッドで数える。GIL は `+=` について何も約束しない。"
+brief = '''
+**Python** で、`lock = threading.Lock()` はすべてのスレッドが共有する唯一のロックで、
+`n = 0` はグローバルです:
+
+```
+def work():
+    global n
+    for _ in range(100_000):
+        # ____
+            n += 1
+```
+
+四つのスレッドが `work` を走らせます。どの実行でも `n` がちょうど 400000 になる —
+すべてのスレッドが **同じ** ロックで順番を待つ — 行はどれでしょう?
+'''
+hints = [
+  "ロックオブジェクトはそれ自体がコンテキストマネージャです。acquire() が返すものはそうではありません。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet_advanced.07.wait-go"
+title = "四人とも戻った"
+story = "四人の配達員が糖街の集配所を出る。ドアは全員がサインインし直して初めて施錠される。"
+brief = '''
+**Go**（1.22 なので `i` は反復ごとに新しい）で:
+
+```
+var wg sync.WaitGroup
+for i := 0; i < 4; i++ {
+    wg.Add(1)
+    // ____
+}
+wg.Wait()
+```
+
+`work(i)` を自分のゴルーチンで始め、四つの `work` 呼び出しがすべて **終わった**
+ちょうどそのときに `wg.Wait()` が戻る — デッドロックなし、早すぎる return なし —
+行はどれでしょう?
+'''
+hints = [
+  "work が戻った後に、その仕事をしたゴルーチンの上で何かが Done を呼ばなければなりません。そして go 文には呼び出しが要ります。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet_advanced.08.wait-rust"
+title = "四人とも戻った、フェリス"
+story = "フェリスは屋台自身の価格表を三人のヘルパーに同時に貸し出し、シャッターが下りる前に、箱に入れずに返してほしい。"
+brief = '''
+**Rust** で、`let v = vec![1, 2, 3];` と `fn work(x: &i32) -> i32`:
+
+```
+thread::scope(|s| {
+    for x in &v {
+        // ____
+    }
+});
+```
+
+要素ごとに一つ、`v` を直接借用する — `Arc` なし、`'static` なし — スレッドを始め、
+スコープが終わるときに join される行はどれでしょう?
+'''
+hints = [
+  "フリー関数ではなくスコープのハンドルを通して spawn し、値ではなくクロージャを渡しましょう。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet_advanced.09.wait-python"
+title = "四人とも戻った、順番どおりに"
+story = "ニシキヘビは市場の運搬人に四つの仕事を渡し、仕事が出ていった順でレシートを返してほしい。"
+brief = '''
+**Python** で、`jobs` はリストで `work(j)` は `int` を返します:
+
+```
+with ThreadPoolExecutor(4) as ex:
+    # ____
+print(out[0], len(out))
+```
+
+プールのスレッドで `jobs` に対して `work` を走らせ、`out` を仕事の順の **結果の
+リスト** にして `print` が動くようにする行はどれでしょう?
+'''
+hints = [
+  "executor 自身の map は順序を保ちますが、遅延イテレータを返します。submit は future を返します。どちらも添字で引けません。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet_advanced.10.shape-go"
+title = "誰が Shape か"
+story = "パーシヴァル・ストリートのアレックスはタイムズスクエアの平面図から正方形を切り出し、コンパイラはそれは shape ではないと言う。"
+brief = '''
+**Go** で、
+
+```
+type Shape interface{ Area() float64 }
+
+type Sq struct{ s float64 }
+
+func (q *Sq) Area() float64    { return q.s * q.s }
+func (q *Sq) Scale(k float64)  { q.s *= k }
+```
+
+2×2 の正方形を `s` に入れる — そしてコンパイルできる — 行はどれでしょう?
+'''
+hints = [
+  "レシーバを見ましょう。メソッド集合はそれが宣言された型のもので、Sq の値はその型ではありません。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet_advanced.11.shape-rust"
+title = "誰が Shape か、フェリス"
+story = "フェリスはラッキー・マックのナプキンにトレイトを書いた。正方形はそれに署名すればいいだけだ。"
+brief = '''
+**Rust** で、
+
+```
+trait Shape {
+    fn area(&self) -> f64;
+    fn describe(&self) -> String { format!("{:.1}", self.area()) }
+}
+
+struct Sq { s: f64 }
+// ____
+```
+
+`Sq { s: 2.0 }.describe()` が `"4.0"` を返すようにする行はどれでしょう?
+'''
+hints = [
+  "トレイトは型に対して実装します。逆向きは決してありません。そしてメソッドのレシーバはトレイトのものと正確に一致しなければなりません。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet_advanced.12.shape-python"
+title = "誰が Shape か、アヒルの鳴き声"
+story = "ニシキヘビは正方形が何を継承しているかは気にせず、`area` に応えるかだけを気にする — そして `isinstance` はそれを書面で欲しがる。"
+brief = '''
+**Python** 3.12 で、`Sq` は `area(self) -> float` メソッドを持ち基底クラスのない
+素のクラスです:
+
+```
+# ____
+class Shape(Protocol):
+    def area(self) -> float: ...
+```
+
+import は示していません。`isinstance(Sq(2), Shape)` が `TypeError` を出す代わりに
+`True` と答えるように、穴に入る行はどれでしょう?
+'''
+hints = [
+  "Protocol は、インタプリタが実行時に検査してよいものだと印を付けない限り静的な約束です。その印は `typing` にあります。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet_advanced.13.generic-go"
+title = "どの二つでも大きいほう"
+story = "パーシヴァル・ストリートの金行は価格、重さ、そして二人の客の名前を一つの関数で比較する。"
+brief = '''
+**Go** 1.22 で、`Max(3, 7)`、`Max(1.5, 0.5)`、`Max("a", "b")` がすべてコンパイル
+できなければなりません:
+
+```
+// ____
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+それを成り立たせるシグネチャの行はどれでしょう?
+'''
+hints = [
+  "`>` には順序を約束する制約が要ります。等価性だけでは足りず、`any` は何も約束しません。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet_advanced.14.generic-rust"
+title = "どの二つでも大きいほう、フェリス"
+story = "フェリス版は二つの浮動小数点の価格も比較しなければならず、浮動小数点は全順序であることを拒む。"
+brief = '''
+**Rust** で、`max(1.5, 2.5)` と `max("a", "b")` の両方がコンパイルできなければ
+なりません:
+
+```
+// ____
+    if a > b { a } else { b }
+}
+```
+
+それを成り立たせるシグネチャの行はどれでしょう?
+'''
+hints = [
+  "`f64` は半順序のトレイトしか実装していません。全順序を要求する境界はそれを拒みます。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet_advanced.15.generic-python"
+title = "どの二つでも大きいほう、境界付きで"
+story = "ニシキヘビの型チェッカは、二つの価格を通す前に `<` が何を意味するか知りたがる。"
+brief = '''
+**Python** 3.12 で、`Comparable` は `__lt__` を持つ `Protocol` です:
+
+```
+from typing import TypeVar
+
+# ____
+
+def smallest(a: T, b: T) -> T:
+    return a if a < b else b
+```
+
+`Comparable` である型だけが使えるように `T` を宣言し — そしてモジュールの import 時に
+例外を出さない行はどれでしょう?
+'''
+hints = [
+  "TypeVar は名前を最初に取ります。その後、上限の型一つはキーワードに入り、裸の位置引数の型は制約で、少なくとも二つ必要です。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet_advanced.16.closure-go"
+title = "整理券の機械"
+story = "ヘネシー・ロードの銀行の整理券機: 押すたびに前より一つ多く、他の誰にもカウントは見えない。"
+brief = '''
+**Go** で、
+
+```
+func counter() func() int {
+    c := 0
+    // ____
+}
+```
+
+`next := counter(); next(); next()` は 1、次に 2 を返さなければなりません。穴に入る
+行はどれでしょう?
+'''
+hints = [
+  "クロージャは自分のスコープに新しい `c` を宣言するのではなく、外側の `c` を変えなければなりません。そして Go の `++` は文であって値ではありません。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet_advanced.17.closure-rust"
+title = "整理券の機械、フェリス"
+story = "フェリスは同じ機械を作り、借用チェッカは `counter` が戻った後にカウントを誰が所有するのか尋ねる。"
+brief = '''
+**Rust** で、
+
+```
+fn counter() -> impl FnMut() -> i32 {
+    let mut c = 0;
+    // ____
+}
+```
+
+`let mut next = counter(); next(); next()` は 1、次に 2 を返さなければなりません。
+穴に入る — そしてコンパイルできる — 行はどれでしょう?
+'''
+hints = [
+  "クロージャが取らない限り `c` は関数のフレームと一緒に死にます。そして読むだけでなく、変えなければなりません。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet_advanced.18.closure-python"
+title = "整理券の機械、入れ子"
+story = "ニシキヘビの機械はずっと整理券 1 番を印字し続ける。内側の関数がこっそり自分の `c` を作ってしまったからだ。"
+brief = '''
+**Python** で、
+
+```
+def counter():
+    c = 0
+    def nxt():
+        # ____
+        c += 1
+        return c
+    return nxt
+```
+
+`n = counter(); n(); n()` は 1、次に 2 を返さなければならず、モジュールレベルの `c` は
+ありません。穴に入る行はどれでしょう?
+'''
+hints = [
+  "代入は、どの外側のスコープのものか言わない限り、名前を最も内側の関数のローカルにします — そしてモジュールはそのスコープではありません。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet_advanced.19.error-go"
+title = "どのキーがなかったか"
+story = "アレックスに届くエラーはパーシヴァル・ストリートのキャッシュから上がってくる途中で二度包まれた。それでも彼はキーが欲しい。"
+brief = '''
+**Go** で、
+
+```
+type NotFound struct{ Key string }
+
+func (e *NotFound) Error() string { return e.Key + " not found" }
+
+func load(k string) error {
+    return fmt.Errorf("load: %w", &NotFound{Key: k})
+}
+```
+
+`err := load("tea")`。`err` の中の `*NotFound` に届いて `nf.Key` を出力できるように
+する — panic なしで — 行はどれでしょう?
+'''
+hints = [
+  "素の型アサーションは外側の包みしか見ません。*型*のためのアンラップヘルパーはその型の変数へのポインタが要ります。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet_advanced.20.error-rust"
+title = "どのキーがなかったか、フェリス"
+story = "フェリスはラッキー・マックのナプキンにエラーの Display を手で書いた。`?` はまだそれを Box に入れてくれない。"
+brief = '''
+**Rust** で、std のみ — クレートなし:
+
+```
+#[derive(Debug)]
+struct NotFound(String);
+
+impl fmt::Display for NotFound { /* "<key> not found" */ }
+
+// ____
+
+fn load(k: &str) -> Result<i32, Box<dyn Error>> {
+    Err(Box::new(NotFound(k.into())))
+}
+```
+
+穴に入れて `load` をコンパイルさせ、呼び出し側が `?` を使えるようにする行は
+どれでしょう?
+'''
+hints = [
+  "Debug と Display がそろっていれば、エラートレイトにはもう求めるものがありません — しかし、それでも空の本体で実装しなければなりません。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet_advanced.21.error-python"
+title = "どのキーがなかったか、そしてなぜ"
+story = "ニシキヘビは市場の KeyError を自分のものとして送出し直す。トレースバックはそれでも、どこで始まったかを示さなければならない。"
+brief = '''
+**Python** で、`class NotFound(KeyError): pass` と
+
+```
+def load(k):
+    try:
+        return d[k]
+    except KeyError as e:
+        # ____
+```
+
+呼び出し側は `__cause__` が元の `KeyError` **そのもの** である `NotFound` を捕まえ
+なければなりません。穴に入る行はどれでしょう?
+'''
+hints = [
+  "except ブロックの中で送出すると context は自動的に記録されます。cause は明示的に名指ししなければならず、cause に `None` を指定すると黙らせます。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet_advanced.22.iter-go"
+title = "キーを、順番に"
+story = "アレックスはシェフ・ボーの集計から料理名をアルファベット順に、一行で欲しい。Go 1.23 がちょうどその道具をくれた。"
+brief = '''
+**Go 1.23** で、`m` は `map[string]int` で、`maps` と `slices` は import 済みです。
+`keys` にマップのキーを昇順の `[]string` として与える — 一つの式で、コンパイル
+できる — 行はどれでしょう?
+'''
+hints = [
+  "1.23 から maps パッケージはスライスではなくイテレータを渡します。slices パッケージにはイテレータを消費してソート済みスライスを返す関数があります。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet_advanced.23.iter-rust"
+title = "一番大きいものはどこか"
+story = "フェリスはパーシヴァル・ストリートの板で最高価格の位置が欲しい。価格ではなく — そしてタプルのトリックにもう少しで騙される。"
+brief = '''
+**Rust** で、`a` は相異なる値を持つ空でない `Vec<i32>`、たとえば `[3, 9, 4, 1]` です。
+`let i = ____;` の後、`a[i]` は最大値でなければなりません — ここでは `i` は `1` です。
+穴に入る式はどれでしょう?
+'''
+hints = [
+  "要素に番号を付け、それから (添字, 値) のペア全体ではなく、*値によって*最大を取りましょう — ペアは添字で先に比較されます。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet_advanced.24.iter-python"
+title = "木箱を平らに"
+story = "宝霊頓道の市場で木箱の中に木箱。ニシキヘビはライチを一つずつ、怠惰に全部取り出したい。"
+brief = '''
+**Python** で、
+
+```
+def walk(t):
+    for x in t:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+
+`list(walk([1, [2, [3]], 4]))` が `[1, 2, 3, 4]` を返すようにする行はどれでしょう?
+'''
+hints = [
+  "再帰呼び出しはジェネレータを返します。それを一つの要素として yield するのは、制御を渡すのと同じではありません。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet_advanced.25.json-go"
+title = "フィールドのタグ"
+story = "銅鑼湾スポーツセンターの会員フォーム: 配線上は小文字のキー、空欄にした人には age の行なし。"
+brief = '''
+**Go** で、
+
+```
+type P struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+
+`json.Marshal(P{Name: "Mei", Age: 35})` は `{"name":"Mei","age":35}` を、
+`json.Marshal(P{Name: "Mei"})` は `{"name":"Mei"}` を返さなければなりません。穴に
+入るフィールドの行はどれでしょう?
+'''
+hints = [
+  "キー名とオプションは同じ引用符の中にコンマで区切って入ります。キーは現れるべきとおり正確に綴ります。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet_advanced.26.json-rust"
+title = "波括弧を二重に"
+story = "ラッキー・マックのノート PC にクレートはない。だからフェリスは JSON を手で書き、フォーマット文字列が彼の波括弧を食う。"
+brief = '''
+**Rust** で、std のみ — serde なし。`p.name` は `String` の `"Mei"` で、`p.age` は
+`u32` の `35` です。`String` `{"name":"Mei","age":35}` — 引用符付きの数ではなく、
+数 — を組み立て、コンパイルできる式はどれでしょう?
+'''
+hints = [
+  "フォーマット文字列のリテラルの波括弧は二つ重ねて書きます。一つだけだとプレースホルダが開きます。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet_advanced.27.json-python"
+title = "入れ子の dataclass"
+story = "メイの住所は dataclass の中の dataclass で、`json` は助けなしにはどちらの中も見ようとしない。"
+brief = '''
+**Python** で、
+
+```
+@dataclass
+class Addr:
+    street: str
+    floor: int
+
+@dataclass
+class P:
+    name: str
+    addr: Addr
+```
+
+`p = P("Mei", Addr("Jardine's Bazaar", 5))`。`s` に JSON テキスト
+`{"name": "Mei", "addr": {"street": "Jardine's Bazaar", "floor": 5}}` — 二重引用符、
+入れ子のオブジェクト、すべて込み — を与える行はどれでしょう?
+'''
+hints = [
+  "`json` は dict とリストしか知りません。dataclasses モジュールには入れ子の dataclass に再帰する変換器があり、`vars` は最初の一段で止まります。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet_advanced.28.match-go"
+title = "case ごとに一つの型"
+story = "アレックスは一行節約しようと一つの case に二つの整数型を列挙し、`v` は彼の手元でインタフェースに戻ってしまう。"
+brief = '''
+**Go** で、
+
+```
+func describe(x any) string {
+    switch v := x.(type) {
+    // ____
+        return strconv.Itoa(v * 2)
+    case string:
+        return v
+    }
+    return "?"
+}
+```
+
+`describe(21)` が `"42"` を返す — そしてコンパイルできる — case の行はどれでしょう?
+'''
+hints = [
+  "`v` は case がちょうど一つの型を名指しするときだけその case の型になります。二つ名指しすると `v` はまだ `any` で、掛け算できません。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet_advanced.29.match-rust"
+title = "小さくて奇数、フェリス"
+story = "フェリスは湾仔の寺でラッキーナンバーを選り分ける: 一桁で、奇数で、検査する間その桁を手元に置いておきたい。"
+brief = '''
+**Rust** で、`x` は `Option<i32>` です:
+
+```
+match x {
+    // ____ "small odd",
+    Some(_) => "other",
+    None => "none",
+}
+```
+
+1 から 9 まで（両端含む）の **奇数** の値に一致し、検査のために値を `n` に束縛する
+アームの頭はどれでしょう?
+'''
+hints = [
+  "範囲のサブパターンにアットマークで名前を束縛し、算術はガードに置きましょう。Rust のパターンに `in` も `as` もありません。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet_advanced.30.match-python"
+title = "ボス: 位置パターン"
+story = "最後のノード、タイムズスクエア。ニシキヘビの素のクラスは、どの属性がどの順で数えられるかを言うまで、位置では一致しない。"
+brief = '''
+**Python** 3.12 で、`Pt` は素のクラスです — dataclass では **ありません**:
+
+```
+class Pt:
+    # ____
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+穴がないと、`case Pt(a, b):` は `TypeError: Pt() accepts 0 positional sub-patterns`
+を出します。`case Pt(a, b):` が `a` を `x` に、`b` を `y` に束縛するようにする、
+クラス本体の行はどれでしょう?
+'''
+hints = [
+  "まさにこのためのダンダーがあり、インタプリタはそれが属性名のタプルであることを要求します — dataclass はそれを代わりに書いてくれます。",
+]

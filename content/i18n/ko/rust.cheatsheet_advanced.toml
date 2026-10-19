@@ -1,0 +1,572 @@
+# RUST LAND — CHEATSHEET ADVANCED, in Korean. A translation pack (SPEC §12.1):
+# the prose of `content/rust/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "rust.cheatsheet_advanced"
+locale = "ko"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet_advanced.01.default-method"
+title = "덤으로 한 줄"
+story = "06:50, 자딘스 바자 위층. 메이의 목록에 있는 가게는 모두 자기 이름을 말할 수 있다. 메이는 가게마다 인사말을 따로 쓰지 않고도 모두가 인사하길 원한다."
+brief = '''
+`Greet`는 이미 `name`을 요구합니다. `impl Greet for Shop`이 **오직** `name`만
+쓰고도 `Shop.hello()`가 여전히 컴파일되고 `name`이 돌려주는 것을 그대로
+돌려주도록, 트레이트에 `hello`를 추가하세요.
+
+```
+trait Greet {
+    fn name(&self) -> String;
+    // ____
+}
+impl Greet for Shop { fn name(&self) -> String { "Sogo".into() } }
+```
+'''
+hints = [
+  "본문이 있는 트레이트 메서드는 구현하는 쪽에서 선택 사항이고, 시그니처만 있는 것은 그렇지 않습니다. 그것을 위한 키워드는 없습니다 — 본문이 있다는 것 자체가 신호의 전부입니다.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet_advanced.02.trait-objects"
+title = "어떤 모양이든"
+story = "자페 로드의 간판 가게는 사각형과 원을 같은 주문서에 받고, 하나하나가 자기 넓이를 안다."
+brief = '''
+`Shape`는 `fn area(&self) -> f64`를 가진 트레이트이고, `Sq`와 `Ci`가 둘 다
+구현합니다. `Sq`**와** `Ci`를 동시에, 각각 힙에 담을 수 있는 늘어나는
+리스트로 `shapes`를 선언해서 `shapes.iter().map(|s| s.area()).sum::<f64>()`가
+동작하게 하세요.
+'''
+hints = [
+  "Vec 하나에 서로 다른 구체 타입 둘을 담으려면 트레이트 객체를 가리키는 포인터가 필요합니다. 제네릭 매개변수는 타입을 둘 중 하나로 고정해 버리고, 트레이트 이름만 쓴 것은 타입이 아예 아닙니다.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet_advanced.03.where-bound"
+title = "무엇이든 가장 큰 것"
+story = "소고의 가격판은 가격을 f64로, 재고 수를 i32로 들고 있고, 페리스는 함수 둘을 쓰지 않고 어느 쪽에서든 가장 큰 것을 원한다."
+brief = '''
+`largest`는 `&[f64]`**와** `&[i32]`에 대해 호출됩니다. `>`로 비교하고 승자의
+참조를 돌려줍니다. 바운드는 `where` 절에 둡니다.
+
+```
+// ____
+    let mut m = &v[0];
+    for x in v { if x > m { m = x; } }
+    m
+}
+```
+'''
+hints = [
+  "`>`에는 부분 순서만 있으면 되고 그 이상은 필요 없습니다 — 전순서나 완전한 동등성을 요구하는 바운드는 float의 문을 닫아 버립니다. 그리고 본문은 `T`가 아니라 `&T`를 돌려줍니다.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet_advanced.04.next-signature"
+title = "FIB가 건네는 것"
+story = "헤네시 로드의 트램 번호는 한 번에 하나씩 나오고, 하나하나가 앞의 둘에서 만들어진다."
+brief = '''
+`Fib { a: u64, b: u64 }`가 `u64`를 내는 이터레이터가 됩니다:
+
+```
+impl Iterator for Fib {
+    type Item = u64;
+    // ____
+        let r = self.a;
+        self.a = self.b;
+        self.b += r;
+        Some(r)
+    }
+}
+```
+
+빈칸의 메서드에 트레이트가 요구하는 시그니처는 어느 것일까요?
+'''
+hints = [
+  "이 메서드는 상태를 전진시키므로 `self`의 배타적 빌림이 필요합니다. 그리고 더 이상 없다고 말할 수 있어야 하므로, 항목을 맨몸이 아니라 감싸서 돌려줍니다.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet_advanced.05.box-dyn-error"
+title = "두 종류의 말썽"
+story = "글로스터 로드 옆 결제 경로는 파서에서도 장부에서도 실패할 수 있고, `main`은 `?` 하나로 둘 다 삼켜야 한다."
+brief = '''
+`AppError`는 커스텀 에러입니다:
+
+```
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "app: {}", self.0) }
+}
+impl std::error::Error for AppError {}
+```
+
+이것이 impl의 전부입니다 — `AppError`에는 `From` 변환이 **없습니다**.
+`main` 안에서 `?`가 `ParseIntError`**와** `AppError`에 모두 쓰입니다.
+둘 다 컴파일되게 하는 `main`의 시그니처는 어느 것일까요?
+'''
+hints = [
+  "서로 다른 에러 타입 둘이 `?` 하나를 지나가려면 둘 다 변환될 수 있는 반환 타입이 필요합니다: 트레이트 객체, 그것도 크기가 정해진 것 — 그래서 포인터 뒤에 둡니다.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet_advanced.06.from-for-question-mark"
+title = "변환기"
+story = "자딘스 바자의 계산대는 파싱 실패를 자기 말로 보고한다. 장부는 그것을 줄마다 `map_err`를 쓰지 않고 자기 enum으로 받고 싶다."
+brief = '''
+`enum AppError { Parse(ParseIntError), Neg }`. 아래 함수는 적힌 그대로
+컴파일되어야 합니다 — 변환은 `?`가 합니다:
+
+```
+fn read(s: &str) -> Result<i32, AppError> {
+    let n: i32 = s.trim().parse()?;
+    if n < 0 { return Err(AppError::Neg); }
+    Ok(n)
+}
+```
+
+안에 `fn from(e: ParseIntError) -> Self { AppError::Parse(e) }`를 둔
+어느 impl 헤더가 그렇게 해 줄까요?
+'''
+hints = [
+  "`?`는 에러를 변환할 때 특정 트레이트 하나를 호출하고, 그것은 대상 타입 위에 원본 타입에 대해 구현됩니다 — 반대 방향도 아니고, 거울상 사촌도 아닙니다.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet_advanced.07.map-err-chain"
+title = "그녀의 말로"
+story = "7-32호실의 장부는 실패를 평문으로 기록하므로, 파서의 에러는 함수를 떠나기 전에 String이 되어야 한다."
+brief = '''
+함수는 `Result<i32, String>`을 돌려줍니다. `n`은 `s`를 파싱한 `i32`이고,
+잘못된 `s`는 파서의 메시지를 `Err`로 돌려줍니다. 한 줄로.
+
+```
+fn read(s: &str) -> Result<i32, String> {
+    // ____
+    Ok(n * 2)
+}
+```
+'''
+hints = [
+  "파서의 에러를 String으로 바꾸는 내장 변환은 없으므로 `?`만으로는 안 됩니다. 에러를 먼저 변형한 다음 전파하세요.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet_advanced.08.option-chain"
+title = "어쩌면 인덱스"
+story = "코즈웨이베이역의 `o`번 사물함은 None일 수도, 마지막 사물함을 지난 번호일 수도 있다. 메이는 내용물 아니면 -1을 원하고, 패닉은 원하지 않는다."
+brief = '''
+`v: Vec<i32>`, `o: Option<usize>`. `x`는 `i32`입니다: 그 인덱스에 있는 `v`의
+원소, 또는 `o`가 `None`이**거나** 인덱스가 범위를 벗어나면 `-1`. 어떤 `o`에
+대해서도 패닉해서는 안 됩니다.
+'''
+hints = [
+  "자기도 Option을 돌려주는 조회는 map이 아니라 chain해야 합니다. 아니면 Option 안의 Option이 됩니다. 그리고 조회는 참조를 돌려주니, 기본값을 쓰기 전에 복사해 내세요.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet_advanced.09.let-else"
+title = "첫 단어 아니면 퇴장"
+story = "다이파이동의 주문서는 비어 있을 수 있다. 첫 단어가 없으면 메이는 0을 들고 돌아선다."
+brief = '''
+`w`는 `s`의 공백으로 나뉜 첫 단어여야 합니다 — 다음 줄에서 쓰이는 `&str`.
+없으면 함수는 그 자리에서 `0`을 돌려줍니다.
+
+```
+fn first_num(s: &str) -> i32 {
+    // ____
+    w.parse().unwrap_or(0)
+}
+```
+'''
+hints = [
+  "`let`의 반박 가능한 패턴에는 else 분기가 필요하고, 그 분기는 떠나야 합니다 — return, break, continue, 아니면 panic. 값을 돌려주는 것은 떠나는 것이 아닙니다.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet_advanced.10.binding-and-guard"
+title = "짧고 홀수인 걸음"
+story = "퍼시벌 스트리트에서 알렉스의 걷기 지시: 1에서 5블록까지는 짧은 걸음이고, 메이는 그중 홀수만 신경 쓴다."
+brief = '''
+`enum Cmd { Walk(i32), Wait }`. `Cmd::label(&self)` 안에, 거리가 1에서 5
+사이 — **5 포함** — 이고 홀수인 `Walk`에 대한 arm을 추가해 거리를
+출력하세요:
+
+```
+match self {
+    Cmd::Wait => "wait".into(),
+    // ____
+    Cmd::Walk(_) => "walk".into(),
+}
+```
+'''
+hints = [
+  "범위 패턴에 `@`로 이름을 묶으면 가드가 그 이름을 검사할 수 있습니다. 어느 범위 형태가 위쪽 끝을 포함하는지 주의하세요.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet_advanced.11.struct-lifetime"
+title = "한 줄의 한 조각"
+story = "이워 스트리트 키오스크의 표는 한 줄이다. 메이가 간직하는 토큰은 그 조각이라 그 줄보다 오래 살 수 없다."
+brief = '''
+`Token`은 호출자의 문자열을 가리키는 빌린 `&str`을 가집니다. 다음이
+컴파일되도록 선언하세요:
+
+```
+fn first_word<'a>(s: &'a str) -> Token<'a> {
+    Token { text: s.split_whitespace().next().unwrap_or("") }
+}
+```
+'''
+hints = [
+  "참조를 가진 struct는 수명 매개변수를 지니고, 필드는 바로 그 매개변수를 써야 합니다 — 선언해 놓고 쓰지 않는 것이 흔한 실수입니다.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet_advanced.12.counter-closure"
+title = "도어맨의 계수기"
+story = "록하트 로드의 도어맨은 행사마다 새 계수기를 만든다. 누를 때마다 안의 숫자가 바뀐다."
+brief = '''
+`counter`의 본문은 `let mut c = 0; move || { c += 1; c }`입니다 — 박싱하지
+않습니다. 호출자는 `let mut next = counter(); next(); next();`를 합니다.
+컴파일되는 `counter`의 시그니처는 어느 것일까요?
+
+```
+// ____
+    let mut c = 0;
+    move || { c += 1; c }
+}
+```
+'''
+hints = [
+  "클로저가 캡처한 것을 변경하므로 어느 한 종류의 클로저이고, 두 번 호출되므로 한 번만 쓰는 종류는 아니며, 본문의 어느 것도 Box로 감싸지 않습니다.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet_advanced.13.longest"
+title = "더 긴 이름"
+story = "거리 이름 둘, 하나는 트램 정류장에서 빌려 왔고 하나는 곧 내려질 간판에서 빌려 왔다. 메이는 더 긴 쪽을 돌려준다."
+brief = '''
+`longest`는 `a`와 `b` 중 더 긴 쪽을 돌려줍니다. 컴파일되는 시그니처는 어느
+것일까요?
+
+```
+// ____
+    if a.len() >= b.len() { a } else { b }
+}
+```
+'''
+hints = [
+  "참조 입력이 둘이면 컴파일러는 출력이 어느 쪽을 빌리는지 추측할 수 없습니다. 수명 하나를 이름 붙여 두 입력과 출력에 모두 묶으세요.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet_advanced.14.letter-from-index"
+title = "I번째 글자"
+story = "빅토리아 파크의 사물함에는 a부터 z까지 글자가 붙어 있고, 예약은 숫자로 들어왔다."
+brief = '''
+`i: usize`, `0 <= i < 26`. `c`는 `char`입니다: `i`번째 소문자 ASCII 글자,
+그러니까 `0 → 'a'`, `7 → 'h'`, `25 → 'z'`.
+'''
+hints = [
+  "char로 곧장 캐스팅되는 정수 너비는 하나뿐이고, 그것은 바이트입니다. 바이트 리터럴에 더한 다음 캐스팅하세요 — 그리고 std의 digit 헬퍼는 글자에 닿기 전에 0부터 9를 먼저 셉니다.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet_advanced.15.filter-map-parse"
+title = "파싱되는 것만 남기기"
+story = "세븐일레븐의 영수증 두루마리는 절반이 숫자, 절반이 얼룩이다. 메이는 숫자만 순서대로 원하고, 나머지에는 호들갑 떨지 않는다."
+brief = '''
+`ws: [&str; 4]`에는 숫자와 쓰레기가 섞여 있습니다. 예: `["12", "x", "7", "3.5"]`.
+`v`는 `i32`로 파싱되는 것들을 순서대로 담고, 쓰레기는 조용히 건너뜁니다.
+
+```
+let v: Vec<i32> = ____;
+```
+
+빈칸을 채우는 식은 어느 것일까요?
+'''
+hints = [
+  "클로저가 Option을 돌려주면 어댑터 하나가 필터와 맵을 동시에 합니다 — 그리고 파싱 결과는 당신이 만들기 전까지는 Option이 아닙니다.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet_advanced.16.collect-result"
+title = "전부 아니면 전무"
+story = "자딘스 바자의 계산대는 토큰 하나라도 나쁘면 줄 전체를 거부한다. 부분 합계는 없다."
+brief = '''
+`main`(`()`를 돌려줌) 안에서 `ws: [&str; 3]`. `r`은 숫자 **전부**를 담은
+`Ok`이거나, 토큰 중 하나라도 나쁘면 첫 파싱 에러입니다.
+
+```
+let r: Result<Vec<i32>, ParseIntError> = ____;
+```
+
+빈칸을 채우는 식은 어느 것일까요?
+'''
+hints = [
+  "Result의 이터레이터를 Vec의 Result로 모으는 것은 올바른 대상 타입과 함께 호출 하나로 됩니다 — `r`의 어노테이션이 이미 그것을 이름 붙였습니다. `?`는 필요 없고, 여기의 `main`은 어차피 받을 수도 없습니다.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet_advanced.17.zip-into-map"
+title = "두 열, 맵 하나"
+story = "재래시장의 가격판은 목록 둘이다 — 왼쪽은 이름, 오른쪽은 가격 — 그리고 메이는 이름으로 가격을 찾고 싶다."
+brief = '''
+`keys: Vec<String>`과 `vals: Vec<u32>`, 길이는 같고, 둘 다 이후에 쓰이지
+않습니다. `m`은 그 둘에서 식 하나로 만들어집니다:
+
+```
+let m: HashMap<String, u32> = ____;
+```
+
+빈칸을 채우는 식은 어느 것일까요?
+'''
+hints = [
+  "두 수열을 짝지은 다음 그 쌍들을 모으세요. 맵은 소유된 String과 평범한 u32를 원하므로, Vec을 참조가 아니라 값으로 걸으세요.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet_advanced.18.sort-floats-desc"
+title = "비싼 것부터"
+story = "코즈웨이베이 워크업 건물들의 월세는 float이고, 집주인은 가장 비싼 것을 맨 위에 원한다."
+brief = '''
+`v: Vec<f64>`, NaN은 없습니다. 제자리에서 **내림차순**으로 정렬하세요.
+'''
+hints = [
+  "float에는 전순서가 없으므로 평범한 sort도 키 기반 sort도 거부합니다. 부분 비교를 쓰고 피연산자를 뒤집는 비교자를 주세요.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet_advanced.19.lazy-cache"
+title = "없을 때만 계산"
+story = "럭키맥의 주방은 요리의 원가를 한 번 계산해 판에 꽂아 둔다. 보 셰프는 이미 판에 있는 요리의 합계를 다시 하지 않는다."
+brief = '''
+`cache: HashMap<u64, u64>`이고 `fn slow(n: u64) -> u64`는 실행될 때마다
+`computing n`을 출력합니다. `for n in [3, 3, 4]`를 도는 동안 `v`는 `n`의
+캐시된 값이고, `slow`는 **정확히 두 번** 출력해야 합니다.
+'''
+hints = [
+  "entry API에는 빈자리를 채우는 방법이 둘 있습니다: 하나는 값을 받고(매번 이미 계산된), 다른 하나는 키가 없을 때만 실행되는 클로저를 받습니다.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet_advanced.20.btree-range"
+title = "10부터 20까지"
+story = "정렬된 장부의 트램 정류장에는 번호가 붙어 있다. 메이는 책 전체를 읽지 않고 10번부터 20번 정류장까지를 순서대로 원한다."
+brief = '''
+`m: BTreeMap<u32, &str>`. 키가 10에서 20까지 — **양 끝 포함** — 인 항목을
+오름차순으로, 맵 전체를 걷지 않고 도세요.
+
+```
+// ____
+    print!("{k}{v} ");
+}
+```
+'''
+hints = [
+  "정렬된 맵은 키로 부분 범위를 건네줄 수 있습니다. 범위 인자 하나를 받고, 어느 범위 문법이 위쪽 끝을 포함하는지가 문제입니다.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet_advanced.21.checked-digits"
+title = "조용한 오버플로는 없다"
+story = "글로스터 로드의 정산은 금액을 손으로 파싱한다. 오버플로는 None으로 돌아와야지, 그럴듯해 보이기만 하는 숫자로 돌아와서는 안 된다."
+brief = '''
+`parse_u64`는 `Option<u64>`를 돌려줍니다: 오버플로면 (감긴 숫자가 아니라)
+`None`, 그리고 절대 패닉하지 않습니다. `d: u32`는 자릿수의 값입니다.
+
+```
+fn parse_u64(s: &str) -> Option<u64> {
+    let mut acc: u64 = 0;
+    for c in s.chars() {
+        let d = c.to_digit(10)?;
+        // ____
+    }
+    Some(acc)
+}
+```
+'''
+hints = [
+  "Option을 돌려주는 산술 메서드는 이 함수 안에서 각각 `?`를 뒤에 붙일 수 있습니다. 평범한 연산자는 디버그에서 패닉하고, wrapping 계열은 조용히 틀린 숫자를 돌려줍니다.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet_advanced.22.derive-ord-fields"
+title = "우선순위, 그다음 이름"
+story = "야간 주방의 주문표는 우선순위로 먼저, 같은 우선순위 안에서는 요리 이름으로 정렬되고, derive는 필드가 말하는 그대로 한다."
+brief = '''
+struct 위에 `#[derive(PartialEq, Eq, PartialOrd, Ord)]` 줄이 있습니다.
+`tasks.sort()`는 `pri`로 먼저(1이 2보다 앞), 그리고 **`pri`가 같으면**
+`name`으로 정렬해야 합니다. 필드는 `pri: u32`와 `name: String`입니다.
+어느 선언이 그렇게 할까요?
+'''
+hints = [
+  "derive된 순서는 필드를 선언된 순서대로, 위에서 아래로 비교합니다. 처음으로 다른 필드가 결정합니다.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet_advanced.23.struct-update"
+title = "포트만"
+story = "핀테크의 설정에는 필드가 열두 개이고 메이는 하나만 바꾸고 싶다. 나머지는 빈 설정이 말하는 대로면 된다."
+brief = '''
+`Config`에는 `host: String`, `port: u16`, `retries: u8`, `verbose: bool`
+필드가 있고 `Default`를 derive합니다. `port`를 `8080`으로 두고 **다른 모든
+필드는 기본값**으로 하되, 다른 필드는 하나도 이름 붙이지 않고 `c`를
+만드세요.
+'''
+hints = [
+  "struct update 문법은 이름 붙이지 않은 필드를 다른 인스턴스에서 채웁니다 — 점 두 개, 그다음 트레이트 이름이 아니라 `Config`를 내는 식.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet_advanced.24.rc-refcell"
+title = "핸들 둘, 로그 하나"
+story = "페리스와 메이는 같은 단일 스레드 로그의 핸들을 하나씩 들고 있다. 페리스가 쓰고, 메이가 되읽는다."
+brief = '''
+`log`는 `Rc<RefCell<Vec<&str>>>`이고 `let b = Rc::clone(&log);`.
+`log.borrow()`에 보이도록 `b`를 통해 `"tram"`을 push하세요.
+'''
+hints = [
+  "`Rc`는 언제나 공유 접근만 내줍니다. 안의 셀이 런타임에 가변 빌림을 가능하게 하는 것입니다 — 공유 빌림이 아니라 가변 빌림을 그 셀에 요청하세요.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet_advanced.25.arc-mutex"
+title = "문 넷, 집계 하나"
+story = "소고 지하 오락실의 문 넷이 입장을 하나의 집계로 센다. 합계는 정확해야 한다."
+brief = '''
+`hits`는 `Arc<Mutex<u32>>`입니다. spawn된 스레드 넷 각각에서 `c`는
+`Arc::clone(&hits)`이고, 각 스레드는 카운트에 1을 1000번 더합니다.
+스레드 안에서 1을 더하는 줄은 어느 것일까요?
+
+```
+hs.push(thread::spawn(move || {
+    for _ in 0..1000 { /* ____ */ }
+}));
+for h in hs { h.join().unwrap(); }
+```
+'''
+hints = [
+  "잠그면 Result가 돌아옵니다. unwrap해서 가드를 얻고, 가드를 역참조해 숫자에 닿으세요. 세 단계 — 그리고 오답들은 각각 하나씩 빠뜨립니다.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet_advanced.26.scoped-thread"
+title = "잠깐 빌려주기"
+story = "타임스 스퀘어 에스컬레이터 카운트를 조수에게 잠시 빌려준다. 복사도 없고 공유 소유자도 없으며, 조수가 끝나면 다시 필요하다."
+brief = '''
+`v: Vec<i32>`. 다른 스레드에서 그것을 **빌려서** 출력하세요 — `Arc`도,
+clone도, `move`도 없이 — 그리고 `v`는 바로 다음 줄에서 다시 쓰입니다.
+'''
+hints = [
+  "평범하게 spawn한 스레드는 함수보다 오래 살 수 있으므로 빌릴 수 없습니다. scoped 종류는 스코프가 돌아오기 전에 끝나는 것이 보장되고, 그 spawn은 스코프 핸들을 통해 갑니다.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet_advanced.27.take-n-messages"
+title = "정확히 넷, 멈추지 않기"
+story = "록하트 로드의 배달원 넷이 각자 숫자 하나를 무전으로 보낸다. 배차원은 자기 무전기를 켜 둔 채로도 넷을 받으면 듣기를 멈춰야 한다."
+brief = '''
+`n: usize = 4`. 스레드 넷이 각각 `tx.clone()`을 받았고, 각각 약간의 일을
+한 뒤 `u64` **하나**를 보냅니다. 원래 `tx`는 drop되지 **않고** `main`이
+계속 들고 있습니다. `r`은 메시지 넷을 모두 담고, `main`은 멈춰 있어서는
+안 됩니다.
+
+```
+let (tx, rx) = mpsc::channel::<u64>();
+for id in 0..n as u64 {
+    let tx = tx.clone();
+    thread::spawn(move || { work(); tx.send(id * id).unwrap() });
+}
+// ____
+```
+'''
+hints = [
+  "receiver의 블로킹 이터레이터는 모든 sender가 사라져야만 끝납니다. 하나가 `main`에 남아 있으니 개수로 멈추세요. 논블로킹 이터레이터는 지금까지 도착한 것만 돌려줍니다 — 아무것도 없을 수도 있습니다.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet_advanced.28.global-counter"
+title = "건물에 숫자 하나"
+story = "타임스 스퀘어 전체의 입장 카운터 하나. 모든 문에서 동시에 올리고, 손마다 새 사본이어서는 곤란하다."
+brief = '''
+모든 스레드가 공유하는 프로그램 전역 카운터, 어디에도 `unsafe`는 없습니다.
+`fn hit() { HITS.fetch_add(1, Ordering::Relaxed); }`가 스레드 넷 각각에서
+1000번 호출되고, join한 뒤 `HITS.load(Ordering::Relaxed)`는 `4000`이어야
+합니다.
+
+모듈 수준에서 `HITS`를 어떻게 선언해야 할까요?
+'''
+hints = [
+  "오답 중 하나는 컴파일되고 0을 출력합니다: `const`는 쓰일 때마다 새 값으로 인라인되므로 모든 `fetch_add`가 사본을 올립니다. 메모리의 한 자리에는 다른 아이템 키워드가 필요하고 — 그것의 가변 형태는 건드리는 것이 `unsafe`입니다.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet_advanced.29.take-the-batch"
+title = "통째로 넘기기"
+story = "보 셰프는 주문표 레일 전체를 러너에게 넘기고 빈 레일을 갖는다 — 주문표 복사도 없고, 레일은 여전히 그의 것이다."
+brief = '''
+`Batch { items: Vec<String> }`. `flush(&mut self) -> Vec<String>`은 `items`의
+모든 것을 돌려주고 `self.items`를 **비워** 둡니다. clone 없이.
+
+```
+fn flush(&mut self) -> Vec<String> {
+    // ____
+}
+```
+'''
+hints = [
+  "`&mut self` 뒤에서 필드를 이동해 낼 수는 없지만, `std::mem`은 필드를 기본값과 바꿔치기하고 옛것을 줄 수 있습니다 — 필드의 가변 참조를 통해서.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet_advanced.30.dijkstra-pop"
+title = "가장 짧은 거리부터"
+story = "코즈웨이베이 격자 위의 다익스트라: 힙은 (거리, 노드)를 가장 가까운 것이 먼저 나오도록 감싸서 들고 있고, 루프는 둘 다 벗겨 내야 한다."
+brief = '''
+`heap: BinaryHeap<Reverse<(u64, usize)>>`는 `(distance, node)` 쌍을 **가장
+짧은 거리**가 먼저 pop되도록 들고 있습니다. 힙이 빌 때까지 pop하면서 `d`와
+`u`를 묶는 루프 헤더를 쓰세요:
+
+```
+heap.push(Reverse((0u64, 0usize)));
+// ____
+    if d > dist[u] { continue; }
+    for &(v, w) in &adj[u] { /* relax */ }
+}
+```
+'''
+hints = [
+  "pop은 Option을 줍니다. 그 안에 래퍼가 있고, 래퍼 안에 튜플이 있습니다 — 세 겹, 그리고 래퍼에는 필드가 정확히 하나 있습니다.",
+]

@@ -163,6 +163,10 @@ export const en = {
     "Tables, closures, metatables, coroutines. One structure for everything, and it is numbered from 1.",
   "lands.remixBlurb":
     "Go, Rust, Python: the same program three times. One idea, three grammars, side by side in the fingers.",
+  "lands.cheatsheetBlurb":
+    "The cheatsheet, basic. The core grammar off the page, asked: four lines, one right. Pick it and the node is cleared.",
+  "lands.cheatsheetAdvancedBlurb":
+    "The cheatsheet, advanced. Traits, channels, generics, closures — the patterns a live coding test turns on. Four lines, one right.",
   "lands.verybasicBlurb": "The quiz. Which line is the grammar? Pick one of four, then type it.",
   "lands.basicBlurb":
     "The morning walk. One construct at a time, explained, and one to four lines to type — the grammar a live coding screen assumes you have in your fingers.",
@@ -194,6 +198,8 @@ export const en = {
   "map.playground": "PLAYGROUND",
   "map.allMapsShort": "MAPS",
   "map.playgroundShort": "PLAY",
+  "map.cheatsheet": "CHEATSHEET BASIC",
+  "map.cheatsheet_advanced": "CHEATSHEET ADVANCED",
   "map.verybasic": "VERY BASIC",
   "map.basic": "BASIC",
   "map.advanced": "ADVANCED",
@@ -236,6 +242,10 @@ export const en = {
   // -- the quest screen ----------------------------------------------------
   "quest.loading": "LOADING",
   "quest.job": "THE JOB",
+  "quest.sheetPick": "PICK THE RIGHT LINE  (1–4)",
+  "quest.sheetRight": "RIGHT",
+  "quest.sheetStreak": "STREAK ×{n}",
+  "quest.sheetCombo": "×{n} COMBO",
   "quest.quizPick": "PICK THE LINE, THEN TYPE IT  (1–4)",
   "quest.quizRight": "RIGHT — NOW TYPE IT",
   "quest.sample": "SAMPLE · {name}",
@@ -312,6 +322,7 @@ export const en = {
   "quest.noFormat": "this server does not have FORMAT yet",
   "quest.formatSilent": "the formatter did not answer",
   "quest.briefEnglish": "the brief is in English — the quests are not translated yet",
+  "quest.sheetFooter": "1–4  PICK   ESC  MAP",
   "quest.footer":
     "CTRL+ENTER  RUN   CTRL+SHIFT+ENTER  SUBMIT   CTRL+SHIFT+F  FORMAT   PGUP/PGDN  LOG   ESC  MAP",
   // What a run found. Never a verdict — see `scenes/quest.ts`.

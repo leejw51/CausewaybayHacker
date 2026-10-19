@@ -227,7 +227,7 @@ return function()
       "and not from `refresh`, which re-fires on every language change")
     -- RUN and SUBMIT are the two moments the buffer already leaves the
     -- machine, so they are the two moments a stack step is unambiguous.
-    local execute = code:match("function Quest:execute%(mode%).-\nend")
+    local execute = code:match("function Quest:execute%(mode[^)]*%).-\nend")
     T.ok(execute ~= nil and execute:find("self:edit_push()", 1, true) ~= nil,
       "a run and a submit each put the buffer on the stack")
   end)

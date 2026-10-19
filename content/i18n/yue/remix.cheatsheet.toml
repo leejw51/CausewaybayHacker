@@ -1,0 +1,429 @@
+# REMIX LAND — CHEATSHEET, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/remix/cheatsheet.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack,
+# and are never translated. Code blocks and identifiers are copied verbatim.
+
+pack   = "remix.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet.01.flush"
+title = "沖出去"
+story = "06:30，渣甸坊。個報攤將所有答案寫晒入緩衝區，但係個螢幕一片空白。"
+brief = '''
+喺 **Go** 入面，`main` 係咁開頭：
+
+```
+in := bufio.NewReader(os.Stdin)
+out := bufio.NewWriter(os.Stdout)
+// ____
+```
+
+喺嗰個位寫邊一行，先可以確保 `main` return 嗰陣，寫入 `out` 嘅嘢全部都去到螢幕？
+'''
+hints = [
+  "有緩衝嘅 writer 要 flush 先會真係寫出去。將 flush 排喺 main return 嗰一刻做。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet.02.char-count"
+title = "數字元，唔係數 byte"
+story = "百德新街間咖啡店個招牌寫住「héllo」。收銀機數咗六個字母。"
+brief = '''
+喺 **Rust** 入面，`s` 係 `String` `"héllo"`。邊個表達式會俾到 5，即係字元嘅數目，而唔係 byte 嘅數目？
+'''
+hints = [
+  "Rust 嘅 String 係 UTF-8 bytes；`é` 佔兩個。逐個 char 行一次再數。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet.03.grid"
+title = "每行各自獨立"
+story = "利園宴會嘅座位表：改一張枱，張張枱都跟住改埋。"
+brief = '''
+喺 **Python** 入面，整一個 `g`，係 `n` × `m` 全部係零嘅格仔，而且每一行都係**獨立**嘅 list —— 寫 `g[0][0] = 1` 淨係可以改到第 0 行。
+'''
+hints = [
+  "將一個 list of lists 乘落去，複製嘅係個 reference，唔係嗰行。每一行都要重新整過。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet.04.count"
+title = "點數"
+story = "希雲街嘅大排檔逐味餸數單，新嘅餸由零開始。"
+brief = '''
+喺 **Go** 入面，`m := map[string]int{}`。將字 `w` 嘅計數加一；未見過嘅字由 0 開始。
+'''
+hints = [
+  "喺 Go map 讀一個唔存在嘅 key 會得到零值，所以唔使事先檢查。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet.05.float-sort"
+title = "排好啲浮點數"
+story = "波斯富街間金舖將成日嘅價錢排好，每個價錢都有毫子。"
+brief = '''
+喺 **Rust** 入面，`a` 係一個 `Vec<f64>`。原地由細到大排好佢。
+'''
+hints = [
+  "`sort()` 要 `Ord`，而 `f64` 因為 NaN 唔係 `Ord`。俾佢一個可以排到所有浮點數嘅比較函數。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet.06.max-heap"
+title = "最大嘅行先"
+story = "銅鑼灣郵票舖嘅拍賣，出價最高嗰個行先。heapq 淨係識得最低嗰個。"
+brief = '''
+喺 **Python** 入面，`h` 係一個配 `heapq` 用嘅 list，而 `heapq` 係 min-heap。將數字 `x` push 入去，令 `heapq.heappop(h)` 最先俾返**最大**嘅值（攞出嚟嗰陣你再將個正負號反返轉）。
+'''
+hints = [
+  "heapq 冇 max-heap。將啲值咁樣存，令佢哋嘅次序反轉。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet.07.recursive-closure"
+title = "自己叫自己"
+story = "希慎廣場啲𨋢：要搜晒每一層，個搜尋就要自己叫自己。"
+brief = '''
+喺 **Go** 入面，有個 closure 靠自己叫自己嚟行一個 graph：
+
+```
+// ____
+dfs = func(u int) {
+    for _, v := range g[u] { dfs(v) }
+}
+```
+
+邊一行一定要寫喺前面，個 body 先可以用到 `dfs`？
+'''
+hints = [
+  "用 `:=` 嘅話，個名喺佢自己個 literal 入面仲未存在。先用佢嘅 function type 宣告個變數，之後先 assign。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet.08.concat"
+title = "兩樣都留低"
+story = "時代廣場戲院外面兩條隊併埋做一條，兩個帶位都仲keep住自己張名單。"
+brief = '''
+喺 **Rust** 入面，`a` 同 `b` 係 `Vec<i32>`。整一個新嘅 `Vec` `c`，入面係 `a` 跟住 `b`，而且之後仲要繼續用到 `a` 同 `b`。
+'''
+hints = [
+  "將啲 Vec 本身放入個 array 會 move 咗佢哋。改為放佢哋嘅 slice 入去。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet.09.multi-key"
+title = "兩個 key"
+story = "駱克道卡拉OK嘅計分板：最高分喺頂，同分就跟字母排。"
+brief = '''
+喺 **Python** 入面，`pairs` 係一個 `(name, score)` tuple 嘅 list，分數係整數。原地排好佢：分數**由大到細**，同分就跟名**由細到大**。
+'''
+hints = [
+  "一個 key，兩部分。將個數變負，淨係反轉佢嘅次序；`reverse=True` 會連啲名都反埋。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet.10.close-results"
+title = "全部做完先關"
+story = "四個速遞員將包裹送去糖街個倉。道門係最後一個走咗先關，唔係第一個。"
+brief = '''
+喺 **Go** 入面，四個 worker goroutine 各自喺**冇緩衝**嘅 channel `results` 度 send，做完就叫 `wg.Done()`。之後 `main` 會收集：
+
+```
+// ____
+for r := range results { all = append(all, r) }
+```
+
+喺個 loop 前面寫邊一行，先可以喺啱嘅時候關 `results`，令個 loop 完結得到，又唔會 panic 或者 deadlock？
+'''
+hints = [
+  "要等所有 sender 做完先好關，而且要喺準備讀嗰個 goroutine 以外嘅地方等。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet.11.shared-rx"
+title = "一個收件箱，四隻手"
+story = "怡和街廚房得一個落單位，四個廚師伸手入去攞 —— 一次一隻手。"
+brief = '''
+喺 **Rust** 入面，`let (tx, rx) = mpsc::channel::<i32>();` —— 四條 spawn 出嚟嘅 thread 全部都要由呢一個 receiver 攞工作。邊一行會將 `rx` 變成每條 thread 都可以攞到自己一個 handle 嘅嘢？
+'''
+hints = [
+  "Receiver 唔可以 clone。共用一個：用一個 thread-safe 嘅計數指標包住一把鎖。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet.12.sentinels"
+title = "每人一個哨兵"
+story = "7-32 號房收工。夜更每個工人都要逐個逐個通知佢返屋企。"
+brief = '''
+喺 **Python** 入面，`ts` 係一個 worker thread 嘅 list，每條都行緊
+
+```
+while True:
+    j = q.get()
+    if j is None: break
+    ...
+```
+
+生產者已經將所有工作放晒入 `q`。邊一行會令**每一個** worker 都停低，等 `for t in ts: t.join()` 可以 return？
+'''
+hints = [
+  "每個讀到停止訊號嘅 worker 都會走，而且會帶埋個訊號走。數吓有幾多個 worker。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet.13.index-cast"
+title = "index 係 usize"
+story = "銅鑼灣中央圖書館啲書架有編號，而你手上張飛用另一種筆跡寫住 7。"
+brief = '''
+喺 **Rust** 入面，`x` 係一個已知非負嘅 `i32`，而 `a` 係 `Vec<i64>`。綁定 `n`，令 `a[n]` compile 到。
+'''
+hints = [
+  "Index 係 `usize`，而 Rust 從來唔會靜靜雞轉數 —— 就算係寫明咗 type 嘅 `let` 都唔會。要講明個 cast。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet.14.comma-ok"
+title = "逗號後面個 ok"
+story = "維園嘅失物認領處：一個冇銀仔嘅銀包都仲係一個銀包。"
+brief = '''
+喺 **Go** 入面，`m` 係 `map[string]int`。開一個 block，淨係 key `k` **存在**嗰陣先行，佢個值綁做 `v` —— 而存住值 0 嘅 key 都當係存在。
+'''
+hints = [
+  "冇嘅 key 讀出嚟係零值，所以淨係靠個值係分唔到嘅。喺 if 嘅 init 句度問個 map 攞第二個結果。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet.15.enumerate"
+title = "有編號嘅檔口"
+story = "渣甸街沿路啲檔口有編號，而巡查員係將號碼同檔口一齊讀嘅。"
+brief = '''
+喺 **Python** 入面，`a` 係一個字串 list。開一個行 `a` 嘅 loop，一齊俾你 `i`，即係由 0 開始嘅位置，同 `x`，即係嗰個位置嘅元素。
+'''
+hints = [
+  "有一個內建 function 會將每個元素同佢嘅位置配對 —— 而佢交俾你嘅係位置先。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet.16.pointer-receiver"
+title = "郁真嗰個"
+story = "軒尼詩道架電車行咗三個站。架電車張相就冇郁。"
+brief = '''
+喺 **Go** 入面，
+
+```
+type P struct{ X, Y int }
+
+// ____
+    p.X += d
+}
+```
+
+`p := P{1, 2}; p.Shift(3)` 之後 `p.X` 一定要等於 4。邊一行開個 method？
+'''
+hints = [
+  "Value receiver 攞到嘅係副本，而郁嘅就係個副本。改為收個地址。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet.17.derive-ord"
+title = "天生識排"
+story = "登龍街雞蛋仔條隊按飛號排，再按名排 —— 而冇人寫過條規則。"
+brief = '''
+喺 **Rust** 入面，`struct P { x: i32, y: i32 }`，`v` 係 `Vec<P>`。邊個 attribute 放喺個 struct 上面，可以令 `v.sort()` compile 到 —— 先按 `x` 再按 `y` 排 —— 而唔使人手寫任何 `impl`？
+'''
+hints = [
+  "sort 要 Ord，而 Ord 企喺 Eq 同 PartialOrd 上面，佢哋又企喺 PartialEq 上面。成條梯都 derive 埋。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet.18.not-a-number"
+title = "唔係數字"
+story = "銅鑼灣站部售票機想要個數，卻俾人塞咗個字入去，而佢唔可以熄機。"
+brief = '''
+喺 **Python** 入面，`s` 係由輸入讀入嘅字串：
+
+```
+try:
+    n = int(s)
+# ____
+    print("bad")
+```
+
+邊一行開個 handler，令 `s = "abc"` 會印 `bad` 而唔係死機？
+'''
+hints = [
+  "個參數類型係啱嘅 —— 係字串 —— 係個值讀唔成數字。捉嗰個以此命名嘅 exception。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet.19.wrap-error"
+title = "留住條鏈"
+story = "一單投訴由崇光櫃台一路升上去樓面經理，而原本張單仲釘住喺上面。"
+brief = '''
+喺 **Go** 入面，`func load(s string) (int, error)` 之內：
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+
+Return 一個加咗 `load:` 說明**而且**將原本嗰個 error 留喺入面嘅 error，令 caller 嘅 `errors.Is(err, strconv.ErrSyntax)` 仍然係 true。
+'''
+hints = [
+  "將個 error 格式化入個訊息會將佢變做文字，條鏈就斷咗。有一個動詞係包住而唔係印出。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet.20.below-zero"
+title = "零以下嘅減"
+story = "怡和街兩個電車站。由近嗰個倒數個距離，數到零以下，成架電車就停咗。"
+brief = '''
+喺 **Rust** 入面，`i` 同 `j` 都係 `usize`，邊個大啲都有可能。將 `d` 綁做佢哋之間嘅距離 —— 一行 compile 到而且永遠唔 panic 嘅，debug build 都係。
+'''
+hints = [
+  "無符號減法變負就係溢出，而喺 debug 入面嗰個就係 panic。有個 method 係問差距、唔係問差嘅。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet.21.append"
+title = "留住個 return"
+story = "Alex 喺波斯富街嘅速遞名單度加多一個包裹，而牆上面張名單長度一樣冇變。"
+brief = '''
+喺 **Go** 入面，`a` 係一個 `[]int`，`x` 係一個 `int`。將 `x` 加到 `a` 嘅尾，令 `len(a)` 比之前多一。
+'''
+hints = [
+  "append 交返嘅係一個可能住咗喺新地方嘅 slice。嗰個結果冇留住之前，呢一行係未寫完嘅。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet.22.larger"
+title = "大嗰個"
+story = "銅鑼灣拍賣會上面同一枚郵票有兩個出價，而 Mei 喺 fn main 上面乜都冇 import 嘅情況下寫低高嗰個。"
+brief = '''
+喺 **Rust** 入面，`x` 同 `y` 都係 `i32`，而個檔案冇任何 `use` 行。將 `m` 綁做兩個入面大嗰個。
+'''
+hints = [
+  "冇任何叫 max 嘅嘢自己喺 scope 入面。整數本身就帶住自己嘅比較，係一個收另一個值嘅 method。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet.23.sorted-copy"
+title = "排一份副本"
+story = "渣甸街沿路張檔口名單一定要保持行路嘅次序；巡查員仲想要一份按字母排嘅。"
+brief = '''
+喺 **Python** 入面，`a` 係一個字串 list。將 `b` 綁做一個**新**嘅 list，裝住同樣嘅字串，升序排好，而 `a` 保持原封不動。
+'''
+hints = [
+  "個 list 自己嗰個 sort method 係就地做嘅，交返嘅係 None。嗰個收任何 iterable 嘅內建 function 交返嘅係一個新 list。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet.24.empty-not-nil"
+title = "空，唔係 nil"
+story = "糖街貨倉個速遞袋縫嘅時候留咗八個包裹嘅位。今晚佢一個都冇。"
+brief = '''
+喺 **Go** 入面，`a` 係用 `a := make([]int, 0, 8)` 整嘅，之後可能 append 過又 pop 過元素。邊個表達式啱啱好喺 `a` 冇任何元素嗰陣係 `true`？
+'''
+hints = [
+  "一個 slice 可以係空而唔係 nil，而佢嘅 capacity 講嘅係佢有幾多位，唔係用咗幾多。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet.25.inclusive-range"
+title = "去到尾站"
+story = "軒尼詩道架電車逐個站數，由 1 數到 n，而尾站都要計。"
+brief = '''
+喺 **Rust** 入面，`n` 係一個 `usize`。開一個 loop，令 `i` 行 `1, 2, …, n`，`n` **包括在內**。
+'''
+hints = [
+  "兩粒點會喺結尾之前一格停。有一種 range 嘅寫法係會將結尾留喺入面嘅。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet.26.own-list"
+title = "自己嗰張"
+story = "街市價錢板上面嗰條蟒蛇：一塊板寫朝早嘅價錢，一塊寫下晝嘅，唔係同一塊板用兩次。"
+brief = '''
+喺 **Python** 入面，`a` 係一個 int 嘅 list，而且乜都冇 import。將 `b` 綁做一個裝住同樣啲 int 嘅 list，令之後 `b.append(9)` 唔會改變 `a`。
+'''
+hints = [
+  "Assign 淨係幫同一個 list 綁多一個名，而且冇一個叫呢個名嘅內建 function。問個 list 自己攞一個新鮮嘅。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet.27.int-abs"
+title = "int 冇 abs"
+story = "Gogo 數希慎廣場兩部𨋢之間隔咗幾多層；落樓嗰陣個數係負嘅，而 math 冇 import。"
+brief = '''
+喺 **Go** 1.22 入面，`x` 係一個遠離 `int` 範圍邊界嘅 `int`，而個檔案淨係 import 咗 `fmt`。將 `a` 綁做 `x` 嘅絕對值。
+'''
+hints = [
+  "math.Abs 要 float64，而且要佢個 import。由 1.21 開始有兩個內建 function 可以比較任何可排序 type 嘅值，而其中一個，俾佢 x 同 x 嘅負數，已經夠。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet.28.parse"
+title = "講明個 type"
+story = "喺銅鑼灣站由一張紙條讀落嚟嘅飛號，而部收銀機要嘅係個數，唔係張紙。"
+brief = '''
+喺 **Rust** 入面，`s` 係一個裝住十進整數（例如 `"42"`）嘅 `&str`。將 `n` 綁做一個裝住嗰個數嘅 `i32`，`s` 唔係整數嘅話就 panic。
+'''
+hints = [
+  "parse 交返嘅係 Result，而且佢自己揀唔到數字 type。將個值由入面攞出嚟 —— 失敗就 panic 係容許嘅 —— 然後將個 type 寫喺佢睇得到嘅地方。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet.29.two-decimals"
+title = "兩個小數位"
+story = "波斯富街間金舖印每克嘅價錢，而 3.1 喺張單上面一定要讀做 3.10。"
+brief = '''
+喺 **Python** 入面，`x` 係一個 float。將佢印出嚟，小數點後面啱啱好兩個位，令 `3.1` 印做 `3.10`。
+'''
+hints = [
+  "round 去到畫面嘅路上會掉走尾嘅零。f-string 可以帶一個 format spec，一次過釘死精度同寫法。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet.30.whole-quotient"
+title = "整個商"
+story = "7-32 室埋數：一個十八位數嘅總和分三份，而條蟒蛇要每一個位都啱。"
+brief = '''
+喺 **Python** 入面，`a` 同 `b` 係 int：`a` 可能係負數而且可以大到 `10**18`，`b` 係正數。將 `q` 綁做 `a` 除以 `b`、**向下**取整嘅結果，一個每一位都準確嘅 `int`。
+'''
+hints = [
+  "任何經過 float 嘅嘢都會喺 2**53 之後掉位，而 int() 係向零斬嘅，唔係向下。有一個運算子可以全程用整數做晒成件事。",
+]

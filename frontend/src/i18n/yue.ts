@@ -153,6 +153,9 @@ export const yue: Partial<Catalogue> = {
     "optional、error 當值、comptime。乜都冇得匿：每次分配都要俾錢，每次失敗都有個名。",
   "lands.luaBlurb": "table、closure、metatable、coroutine。一個結構包晒所有嘢，而且由 1 開始數。",
   "lands.remixBlurb": "Go、Rust、Python：同一個程式寫三次。一個概念，三種語法，並排記入手指。",
+  "lands.cheatsheetBlurb": "貼士紙基礎。紙上面嘅核心文法，問你：四行入面得一行啱。揀中就過關。",
+  "lands.cheatsheetAdvancedBlurb":
+    "貼士紙進階。Trait、channel、泛型、閉包——live coding 見真章嘅 pattern。四行入面得一行啱。",
   "lands.verybasicBlurb": "小測驗。邊一行先係啱嘅文法？四選一，然後打返出嚟。",
   "lands.basicBlurb":
     "朝早行街。一次一個文法，先解釋，再填一至四行 — 即場寫程式嘅畫面當你已經熟到手嘅嗰啲文法。",
@@ -183,6 +186,8 @@ export const yue: Partial<Catalogue> = {
   "map.playground": "練習場",
   "map.allMapsShort": "地圖",
   "map.playgroundShort": "練習",
+  "map.cheatsheet": "貼士紙基礎",
+  "map.cheatsheet_advanced": "貼士紙進階",
   "map.verybasic": "入門",
   "map.basic": "基礎",
   "map.advanced": "進階",
@@ -223,6 +228,10 @@ export const yue: Partial<Catalogue> = {
   "map.footer": "←→  街   ENTER  入去   TAB  領地   Q/E  分類   F1  畫面方向",
 
   "quest.loading": "載緊",
+  "quest.sheetPick": "揀啱嗰一行  (1–4)",
+  "quest.sheetRight": "啱",
+  "quest.sheetStreak": "連勝 ×{n}",
+  "quest.sheetCombo": "×{n} COMBO",
   "quest.quizPick": "揀啱嗰一行，然後打出嚟  (1–4)",
   "quest.quizRight": "啱 — 而家打出嚟",
   "quest.job": "今次嘅任務",
@@ -299,6 +308,7 @@ export const yue: Partial<Catalogue> = {
   "quest.noFormat": "呢部伺服器仲未有格式化",
   "quest.formatSilent": "格式化工具冇覆",
   "quest.briefEnglish": "任務正文係英文 — 啲題目仲未翻譯",
+  "quest.sheetFooter": "1–4  揀   ESC  地圖",
   "quest.footer":
     "CTRL+ENTER  執行   CTRL+SHIFT+ENTER  提交   CTRL+SHIFT+F  格式化   PGUP/PGDN  日誌   ESC  地圖",
   "verdict.accepted": "示例過到",

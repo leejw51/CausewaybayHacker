@@ -24,6 +24,8 @@ ORDER = [
     "map_zig", "map_zig_p", "map_lua", "map_lua_p",
     "bg_street", "bg_times", "bg_till", "bg_mtr",
     "bg_room732", "bg_room732_p", "bg_datacentre",
+    "bg_cheatsheet", "bg_cheatsheet_p",
+    "bg_cheatsheet_pro", "bg_cheatsheet_pro_p",
     "sprite_mei", "sprite_alex", "sprite_ferris", "sprite_gogo",
     "sprite_cpp", "sprite_python", "sprite_pytorch",
     "sprite_typescript", "sprite_remix", "sprite_zig", "sprite_lua",

@@ -1,0 +1,520 @@
+# TYPESCRIPT LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "typescript.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet_advanced.01.generic-bound"
+title = "COKOLI S ID"
+story = "19:10, velín ve třicátém patře. Každá obrazovka na ostrově má id; vyhledávací tabulka má brát jakýkoli jejich seznam a nesmí ho smět měnit."
+brief = '''
+`xs` je `readonly Screen[]` (tedy `ReadonlyArray<Screen>`) a `Screen` má
+`id: string`. Otevři generickou funkci `byId`, jejíž tělo je
+
+```ts
+return new Map(xs.map(x => [x.id, x] as const));
+```
+
+Musí přijmout `xs` — a jakékoli jiné pole jen pro čtení s věcmi, které
+nesou řetězcové `id` — a nechat to tělo zkompilovat. `strict` je zapnuto.
+'''
+hints = [
+  "Holé `T` žádné `id` nemá; dej parametru omezení (bound). A pole jen pro čtení neprojde tam, kde se žádá měnitelné.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet_advanced.02.mapped-draft"
+title = "KAŽDÝ KLÍČ, MOŽNÁ"
+story = "Koncept konfigurace obrazovky v Hysan Place může být vyplněný napůl a pořád se dá upravovat. Tvar kopíruje ten skutečný, klíč po klíči."
+brief = '''
+Napiš `Draft<T>` ručně — ne vestavěným utility typem, který to dělá:
+stejné klíče jako `T`, každý nepovinný, každý si nechá svůj vlastní typ, a
+pořád zapisovatelné. S `type Screen = { id: string; w: number }` se
+zkompiluje jak `const d: Draft<Screen> = { w: 3 };`, tak `d.w = 5;`.
+'''
+hints = [
+  "Mapped type prochází `keyof T`; `?` za hranatou závorkou dělá každý klíč nepovinným (to je `Partial<T>` ručně), `-?` ho dělá povinným (`Required<T>`) a `readonly` před ní ho zmrazí (`Readonly<T>`).",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet_advanced.03.as-const-union"
+title = "TŘI SLOVA, ŽÁDNÝ ENUM"
+story = "Příjezdové tabule na Yee Wo Street ukazují tři druhy panelů a nikdo nechce čtvrtý soubor, ve kterém by se ten seznam držel."
+brief = '''
+```ts
+const KINDS = ["ad", "news", "tram"] as const;
+```
+
+Odvoď `Kind` z `KINDS` tak, aby to byl přesně union těch tří řetězců —
+`const k: Kind = "ad";` se zkompiluje a `const b: Kind = "bus";` ne.
+Union literálů, ne enum.
+'''
+hints = [
+  "Hodnota není typ: nejdřív si vyžádej typ *té* hodnoty a pak n-tici indexuj pomocí `number`, abys dostal, čím mohou být její prvky.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet_advanced.04.pick-card"
+title = "JEN PŘEDNÍ STRANA"
+story = "Aplikace Lee Garden ukazuje kartu za každou obrazovku: id a titulek. Pole s feedem zůstává ve velínu."
+brief = '''
+`Screen` má `id`, `title`, `feed` a `w`. Deklaruj `Card` jako objektový
+typ **jen** s `id` a `title`, postavený ze `Screen` utility typem, aby
+sledoval `Screen`, když se `Screen` změní.
+'''
+hints = [
+  "Jedna utilita si pojmenované klíče nechá, její dvojče je zahodí. Obě berou klíče jako jeden union, ne jako oddělené argumenty.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet_advanced.05.awaited-return"
+title = "CO LOAD VRACÍ"
+story = "Loader feedu ve třicátém patře mění tvar každý sprint. Typ, který pojmenovává jeho výsledek, se má měnit s ním, ne se znovu vypisovat."
+brief = '''
+```ts
+async function load() { return { items: [1, 2], at: Date.now() }; }
+```
+
+Deklaruj `Feed` jako **rozbalený** objektový typ, na který se `load`
+resolvuje — `{ items: number[]; at: number }` — odvozený z `load`
+samotného, takže `const f: Feed = { items: [1], at: 0 };` se zkompiluje.
+'''
+hints = [
+  "`load` je hodnota, takže nejdřív potřebuješ její typ. Co z ní vychází, je `Promise`; ještě jedna utilita ten promise sundá.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet_advanced.06.infer-elem"
+title = "CO JE V BEDNĚ"
+story = "Bedna panelů pro obrazovku na Times Square: štítek má říct, co je jeden panel, a neříct nic, pokud to bedna není."
+brief = '''
+Napiš `Elem<T>`: pro typ pole jeho typ prvku (`Elem<string[]>` je
+`string`); pro cokoli, co pole **není**, `never`.
+'''
+hints = [
+  "Podmíněný typ umí pojmenovat kus, který se mu shodl, ale jen s klíčovým slovem před ním — a přípona pole potřebuje závorky.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet_advanced.07.template-id"
+title = "SCREEN POMLČKA ČÍSLO"
+story = "Každá tabule na ostrově se jmenuje screen-něco a to něco je číslo. Kompilátor tu hranici udrží."
+brief = '''
+Deklaruj `ScreenId` tak, aby se `"screen-12"` do něj dalo přiřadit a ani
+`"screen-x"`, ani `"led-12"` ne.
+'''
+hints = [
+  "Typ může být template literál: zpětné apostrofy se zástupným místem, jehož typ je primitivum. Obyčejné uvozovky dělají prostý řetězcový literál.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet_advanced.08.satisfies-palette"
+title = "ZKONTROLOVÁNO, NEROZŠÍŘENO"
+story = "Paleta LED stěny se kontroluje proti kontraktu — ale červená zůstává trojicí, protože ji shader indexuje."
+brief = '''
+`type Palette = Record<string, [number, number, number] | string>`.
+Deklaruj `p` s `r: [255, 0, 0]` a `s: "#8cf"`, zkontrolované proti
+`Palette` — hodnota špatného tvaru, třeba `r: [255, 0]`, je chyba
+kompilace — a přesto se potom musí zkompilovat `p.r.map(x => x / 255)` i
+`p.s.toUpperCase()`: `p` si nechá užší typy literálu samotného.
+TypeScript 5.
+'''
+hints = [
+  "Anotace nebo přetypování nahradí typ literálu typem `Palette`, a pak je každá hodnota `tuple | string`. Existuje operátor (4.9+), který jen kontroluje.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet_advanced.09.labeled-rest-tuple"
+title = "PŘÍKAZ A JEHO ČÍSLA"
+story = "Konzole ve velínu bere sloveso a pak tolik čísel, kolik to sloveso potřebuje. `show 1 2 3`, `clear`, nikdy `1 2`."
+brief = '''
+Otevři `run`, funkci s **jedním** rest parametrem `args`, typovaným jako
+pojmenovaná n-tice: nejdřív `cmd: string`, pak libovolný počet
+`nums: number`. `run("show", 1, 2, 3)` a `run("clear")` se zkompilují;
+`run(1, 2)` ne.
+'''
+hints = [
+  "Popisky patří dovnitř n-tice a otevřený ocas je sám rest prvkem — tři tečky a typ pole.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet_advanced.10.declaration-merging"
+title = "O POLE VÍC, STEJNÉ JMÉNO"
+story = "Dodavatelův typ obrazovky nemá jas a dodavatelův soubor je jen pro čtení. Velín potřebuje jas na každé obrazovce ještě dnes večer."
+brief = '''
+`interface Screen { id: string }` je deklarováno v souboru, který upravovat
+nesmíš. Ve svém vlastním souboru dej témuž `Screen` ještě jedno pole,
+`brightness: number`, takže `{ id: "a", brightness: 3 }` je `Screen`
+všude — ne nové jméno (`interface Big extends Screen { … }` i
+`type Big = Screen & { … }` by nějaké vytvořily) a žádná chyba
+duplicitního identifikátoru.
+'''
+hints = [
+  "Dvě deklarace jednoho interface se sloučí. Alias přes `type` se neslučuje a interface nemůže rozšiřovat sám sebe.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet_advanced.11.hash-private"
+title = "SKRYTÉ I ZA BĚHU"
+story = "Do počtu na čítači tramvajové zastávky nikomu nic není: ani podtřídě, ani serializéru, ani `Object.keys`."
+brief = '''
+```ts
+abstract class Panel { abstract draw(): string; }
+interface Tally { bump(): void }
+
+class Counter extends Panel implements Tally {
+  // the field goes here
+  protected label = "c";
+  get value(): number { /* returns the field */ }
+  set value(v: number) { /* stores v in the field */ }
+  bump() { /* adds one to the field */ }
+  draw() { return `${this.label}=${this.value}`; }
+}
+```
+
+Přidej pole `count`, začínající na `0`, skryté i za **běhu**, nejen při
+kompilaci: po `new Counter()` ho nesmí ukázat ani `Object.keys(c)`, ani
+`JSON.stringify(c)`. `strict` je zapnuto.
+'''
+hints = [
+  "Klíčové slovo `private` se vymaže spolu s typy; v JavaScriptu to pole pořád je. Jméno s `#` je privátní v samotném enginu — a nebere žádný modifikátor přístupu a potřebuje svůj inicializátor.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet_advanced.12.overload-impl"
+title = "ŘÁDEK POD PŘETÍŽENÍMI"
+story = "`parse` na příjezdové tabuli jde oběma směry: řetězec dovnitř dá číslo, číslo dovnitř dá řetězec. Dva sliby, jedno tělo."
+brief = '''
+```ts
+function parse(x: string): number;
+function parse(x: number): string;
+```
+
+Napiš implementační řádek, který následuje po těch dvou přetíženích, s
+tělem `return typeof x === "string" ? Number(x) : String(x);` — tak, aby
+`parse("42")` bylo `number` a `parse(7)` `string`, pod `strict`.
+'''
+hints = [
+  "Implementační signatura musí být dost široká, aby pokryla každé přetížení, musí mít tělo a pod `strict` její parametr nemůže zůstat bez typu.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet_advanced.13.nullish-assign"
+title = "PRÁZDNÉ JE POŘÁD V CACHE"
+story = "Cache titulků na stěně Hysan: některé obrazovky mají prázdný titulek schválně a jejich načítání znovu každý snímek je to, co stěnu minulé úterý zmrazilo."
+brief = '''
+`cache: Record<string, string>`; `load(k)` je drahé. Naplň `cache[k]`
+hodnotou `load(k)` jen tehdy, když klíč **nikdy** nebyl nastaven — uložené
+`""` je skutečná, platná hodnota a nesmí spustit nové načtení. Jeden
+příkaz.
+'''
+hints = [
+  "`\"\"` je falsy. Cokoli, co se ptá \"je to truthy?\", to načte znovu; přiřazovací operátor, který se ptá \"je to null nebo undefined?\", ne.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet_advanced.14.find-last-chain"
+title = "POSLEDNÍ REKLAMA, POKUD NĚJAKÁ"
+story = "Nejnovější reklama v rotaci na Times Square je poslední v seznamu a dnes večer je jedna z nich schválně nula pixelů široká."
+brief = '''
+`xs: S[]` je `feeds.flatMap(f => f.panels)`, kde `S` má `kind: string`
+a `width: number`. Udělej z `w` šířku **posledního** prvku, jehož kind je
+`"ad"`, nebo `-1`, když žádný není. Šířka `0` musí projít jako `0`. Žádný non-null assertion;
+`strict` je zapnuto. Node 22.
+'''
+hints = [
+  "Existuje hledání, které začíná od konce (Node 18+); `xs.at(-1)` je jen poslední *prvek*, ne poslední shoda. Jeho výsledek může být `undefined`, takže čtení vlastnosti potřebuje optional chain — a výchozí hodnota nesmí spolknout nulu.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet_advanced.15.destructure-rename"
+title = "ŠÍŘKA, ZVANÁ W"
+story = "Dílna na cedule na Jaffe Road čte specifikaci obrazovky z feedu: druh tak, jak je, šířku pod krátkým jménem a sto, když ji nikdo nevyplnil."
+brief = '''
+`screen: { kind: string; width?: number }`. V jedné destrukturační
+deklaraci navaž `kind` a navaž `width` na **nové jméno** `w` s `100`
+jako výchozí hodnotou, když `width` chybí.
+'''
+hints = [
+  "V objektovém vzoru je nejdřív jméno vlastnosti a nová vazba až za dvojtečkou — opačně, než to vypadá — a výchozí hodnota následuje za vazbou s `=`.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet_advanced.16.range-from-length"
+title = "OD NULY DO N MINUS JEDNA"
+story = "Pět panelů na stěně Hysan, číslovaných od nuly. Seznam jejich čísel je potřeba dřív, než se kterýkoli z nich rozsvítí."
+brief = '''
+`n: number`. Udělej z `ix: number[]` seznam `[0, 1, …, n - 1]` jedním
+výrazem, s každým prvkem skutečně na místě — iterace přes `ix` musí
+navštívit `n` čísel.
+'''
+hints = [
+  "`Array(n)` je `n` děr a `map` díry přeskakuje. Stav z objektu podobného poli s `length` a **druhý** argument mapovací funkce je index.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet_advanced.17.sorted-two-keys"
+title = "NEJVÍC NAPŘED, PAK PODLE JMÉNA"
+story = "Žebříček na obrazovce Times Square: nejvíc zásahů napřed, shody podle jména — a vlastní seznam feedu se nesmí pod ostatními obrazovkami přeuspořádat."
+brief = '''
+`rs: { id: string; n: number }[]` bylo postaveno ze součtu
+`Record<string, number>` jako `Object.entries(tally).map(([id, n]) => ({ id, n }))` —
+položky jsou `[string, number][]`. Výraz
+pro `top`: řádky seřazené podle `n` **sestupně**, shody rozhodnuté podle
+`id` vzestupně v řetězcovém pořadí locale — a `rs` samo musí zůstat
+přesně tak, jak bylo. Node 22, `strict` zapnuto.
+'''
+hints = [
+  "Node 20+ má řazení, které vrací kopii. Komparátor musí vrátit číslo, takže rozhodnutí shody na řetězcích nemůže být `<` — řetězce mají metodu, která porovná a vrátí číslo.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet_advanced.18.map-group-push"
+title = "DO SPRÁVNÉHO KOŠE"
+story = "Půlnoc na Yee Wo Street: každý panel roztříděný do koše podle druhu. Klasická chyba pushuje do koše, který si nikdo nenechá."
+brief = '''
+`m: Map<string, string[]>`, nejprve prázdná. Uvnitř
+`for (const [k, v] of pairs)` přidej `v` do seznamu uloženého pod `k`,
+a ten seznam vytvoř, když je `k` vidět poprvé — v **jednom** příkazu,
+tak aby `m` potom skutečně držela každou hodnotu. `strict` je zapnuto.
+'''
+hints = [
+  "`get` vrací seznam nebo `undefined`; `?? []` ti dá něco, kam pushovat, ale čerstvé `[]` v mapě není, dokud ho tam nedáš (`has` a pak `set` by byly dva příkazy). Map nemá žádné `[k]` a `get` nebere výchozí hodnotu — a když odchází jako JSON, cesta ven je `Object.fromEntries(m)`.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet_advanced.19.deep-copy"
+title = "KOPIE, KTERÁ JE KOPIÍ"
+story = "Zkušební feed pro stěnu Hysan musí být skutečná kopie toho dnešního — Set idček, řádky čísel — aby si do něj zkouška mohla čmárat."
+brief = '''
+`feed` je `{ ids: Set<string>; rows: number[][] }`. Udělej z `copy`
+**hlubokou** kopii: `copy.ids.add("c")` a `copy.rows[0].push(9)` musí
+nechat `feed` nedotčený — a `copy.ids` musí pořád být `Set` s `add` na
+sobě. Node 22.
+'''
+hints = [
+  "Spread i `Object.assign` kopírují jednu úroveň. Cesta tam a zpět přes JSON ztratí Set (stane se z něj `{}`). Node 17+ má vlastní hlubokou kopii platformy.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet_advanced.20.bigint-sum"
+title = "U PŘEPÁŽKY SE NEMÍCHÁ"
+story = "Počet vln v tajfunovém přístavišti je přes 2 na 63.; dnešních sedm dalších vln je obyčejné number a součet musí být přesný."
+brief = '''
+`big` je `bigint` nad 2 na 63. a `n` je `number` —
+`today.reduce<number>((s, w) => s + w, 0)` — držící malé celé číslo
+(`Number.isInteger(n)` je true). Udělej z `total` jejich **přesný** součet. `number` zaokrouhluje nad 2 na 53. a
+`|0` by přeteklo na 32 bitech.
+'''
+hints = [
+  "Operandy musí být stejného druhu a přetypování není převod. Převeď ten malý nahoru — funkcí, ne příponou `n`, ta funguje jen na literálech.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet_advanced.21.named-groups"
+title = "KAŽDÝ ROK V ŘÁDKU"
+story = "Feed plakety pod Noon Day Gun: postaveno, přestavěno, termín. Každý čtyřmístný rok v něm jde na tabuli."
+brief = '''
+`s` je `"built 1998, refit 2015, due 2031"` a `ys: string[]` je prázdné
+(každý rok se později ukáže jako `y.slice(-2).padStart(2, "0")`). Otevři
+smyčku přes **každou** shodu pojmenované skupiny `y` o čtyřech číslicích,
+tak aby tohle tělo posbíralo každý rok:
+
+```ts
+  ys.push(m.groups?.y ?? "");
+```
+
+Node 22, TypeScript 5.
+'''
+hints = [
+  "Jedna metoda vrací každou shodu i s jejími skupinami — a za běhu vyhodí chybu, pokud vzor nenese globální příznak. Pojmenovaná skupina je `(?<name>…)`; pythonovské `P` je tady syntaktická chyba.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet_advanced.22.loop-closure"
+title = "KAŽDÝ SVOJE VLASTNÍ ČÍSLO"
+story = "Tři panely na stěně Hysan jsou nastavené, aby se rozsvítily později, každý se svým vlastním číslem. Chyba, kde všechny tři říkají 3, byla první věc, kterou kdy Skynet navrhl."
+brief = '''
+```ts
+class Board {
+  q: (() => void)[] = [];
+  show(i: number) { /* lights panel i */ }
+  arm(n: number) {
+    // the loop goes here
+  }
+}
+```
+
+Uvnitř `arm(n)` pushni na `this.q` `n` closures. Ta k-tá musí, když se
+zavolá **později**, zavolat `this.show(k)` se svým vlastním `k` — spuštění
+všech po `arm(3)` rozsvítí `0, 1, 2`, ne `3, 3, 3`. `strict` je zapnuto.
+'''
+hints = [
+  "`var` je jedna proměnná pro celou smyčku; blokově vázaná vazba je v každém kole čerstvá. A `function () {}` má svoje vlastní `this`, které strict mode odmítá hádat.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet_advanced.23.type-only-import"
+title = "IMPORT, KTERÝ NENECHÁ STOPU"
+story = "Modul obrazovky loguje do velínu ve chvíli, kdy se načte. Aplikace chce jen jeho typ a nikdo nechce ten log při buildu."
+brief = '''
+`screen.ts` má `export interface Screen { … }` — **pojmenovaný** export,
+žádný default — a `console.log` na nejvyšší úrovni, který běží, kdykoli
+se modul načte. `verbatimModuleSyntax` je zapnuto. Importuj `Screen` pro
+použití v typové anotaci tak, aby v emitovaném JavaScriptu nepřežilo
+**nic** z toho importu: log nesmí vystřelit.
+'''
+hints = [
+  "Pod `verbatimModuleSyntax` je prostý import typu chyba a modifikátor `type` *uvnitř* složených závorek pořád nechá `import {}`, který modul načte. Dej modifikátor na celý příkaz.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet_advanced.24.error-cause"
+title = "NECH SI ORIGINÁL"
+story = "Stažení feedu selhalo s TypeError o tři patra níž. Velín chce navrch svou vlastní chybu a tu skutečnou pořád připojenou pod ní."
+brief = '''
+Uvnitř `catch (e: unknown)` vyhoď **novou** `Error`, jejíž zpráva je
+`"feed failed"` a která si nechá `e` připojené jako svou původní příčinu
+(ES2022), aby volající pořád mohl na tom, co je připojené, spustit
+`instanceof TypeError`. `strict` je zapnuto.
+'''
+hints = [
+  "`Error` bere druhý argument — objekt s volbami, ne tu chybu samotnou. A `e` je `unknown`: bez zúžení z něj `.message` nepřečteš.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet_advanced.25.all-settled"
+title = "SPOČÍTEJ TY, CO DORAZILY"
+story = "Šest kurýrů vyjelo ze Sugar Street; jednoho smetl déšť. Kuchyně sečte, co dorazilo, a nezahodí celou noc kvůli tomu jednomu, co nedorazil."
+brief = '''
+`ps: Promise<number>[]` a `rs = await Promise.allSettled(ps)`. Uvnitř
+`for (const r of rs)` přičti k `total` hodnotu každého promise, který
+**uspěl**, a ty neúspěšné přeskoč — na jednom řádku, který se zkompiluje
+pod `strict`.
+'''
+hints = [
+  "Každý výsledek je discriminated union podle `status`; jen úspěšná větev má `value`. Ty dva stavové řetězce jsou ty, které používá spec, ne \"resolved\" a ne `ok`. (`Promise.all` by při prvním selhání vyhodil chybu a `Promise.race` vrací jen jeden.)",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet_advanced.26.for-await"
+title = "JAK KAŽDÝ DORAZÍ"
+story = "Feed tiků z tabulí na Yee Wo Street chodí po jednom, každý po čekání. Součet roste, jak přicházejí, ne až když jsou všechny uvnitř."
+brief = '''
+`ticks()` vrací `AsyncGenerator<number>`. Uvnitř `async` funkce otevři
+smyčku, která přijímá každé `t`, jak dorazí, tak aby se tělo `sum += t;`
+zkompilovalo pod `strict`.
+'''
+hints = [
+  "Asynchronní iterable nemá `[Symbol.iterator]`, takže prosté `for…of` je odmítnuto — a await na objektu generátoru nepomůže. To `await` patří k `for`.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet_advanced.27.iterable-stack"
+title = "ROZLOŽ ZÁSOBNÍK"
+story = "Zásobník undo ve velínu se má rozložit do pole a projít ve `for…of` jako cokoli jiného na patře."
+brief = '''
+```ts
+class Stack<T> {
+  #items: T[] = [];
+  push(x: T) { this.#items.push(x); }
+  pop(): T | undefined { return this.#items.pop(); }
+  // one more method goes here
+}
+```
+
+Přidej tu jednu metodu, díky které `[...s]` dá `[1, 2]` po
+`s.push(1); s.push(2)` a `for (const x of s)` se zkompiluje. `strict`
+je zapnuto.
+'''
+hints = [
+  "Jméno metody je well-known symbol v hranatých závorkách, musí to být generátor (hvězdička) a delegování na pole přes `yield*` vydává položky po jedné — prosté `yield` vydá celé pole jako jednu položku.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet_advanced.28.exhaustive-never"
+title = "ČTVRTÝ DRUH ROZBIJE BUILD"
+story = "Dnes dva druhy panelů. Až někdo příští sprint přidá třetí, musí build spadnout na tomhle switchi — ne obrazovka na Times Square v 19:00."
+brief = '''
+`Shape` je `{ kind: "ad"; w: number } | { kind: "news"; len: number }`
+a `area(s: Shape): number` dělá switch na `s.kind`. Poté, co `case "ad"` a
+`case "news"` každý dělají `return`, napiš `default` tak, aby se funkce
+zkompilovala dnes **a** přestala kompilovat v den, kdy se do `Shape` přidá
+třetí druh. `strict` je zapnuto.
+'''
+hints = [
+  "Poté, co každý case vrátil, má `s` spodní typ (bottom). Přiřadit ho do proměnné toho typu je dnes zadarmo a typová chyba ve chvíli, kdy jeden druh zbude. Přetypování nebo `any` nekontrolují nic; `throw` se to dozví až v 19:00.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet_advanced.29.type-guard"
+title = "CO PŘIŠLO PO DRÁTĚ"
+story = "JSON dorazil do třicátého patra a typy jsou pryč. Jedna funkce se na něj musí za běhu podívat a říct kompilátoru, co viděla."
+brief = '''
+`data: unknown` přišlo z `JSON.parse` a `Screen` je
+`{ id: string; w: number }`. Otevři funkci `isScreen` s tělem
+
+```ts
+return typeof x === "object" && x !== null && "id" in x && "w" in x;
+```
+
+tak, aby se `if (isScreen(data)) console.log(data.id.toUpperCase());`
+zkompilovalo — uvnitř toho `if` je `data` `Screen`. `strict` je zapnuto.
+'''
+hints = [
+  "Vrácení `boolean` kompilátoru o `x` neřekne nic. Typový predikát na místě návratového typu ano — jméno parametru, to slovo, typ. Parametr musí přijmout `unknown` a assertion signatura nemůže sedět v `if`.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet_advanced.30.asserts-defined"
+title = "ASERCE"
+story = "Půlnoc. Poslední vyhledání, než obrazovky ostrova zhasnou: hodnota tam je, nebo noc skončí vyhozenou Error, a po tom řádku jí kompilátor musí věřit na slovo."
+brief = '''
+Tělo je `if (x === undefined || x === null) throw new Error("missing");`.
+Otevři generickou funkci `must` tak, aby po
+
+```ts
+const v = m.get("a");   // m: Map<string, number>, so v: number | undefined
+must(v);
+```
+
+řádek `v + 1` zkompiloval — `must` kompilátoru slibuje, že `v` od té
+chvíle není ani `null`, ani `undefined`. `strict` je zapnuto.
+'''
+hints = [
+  "Funkce, která nic nevrací, nemůže být typový predikát; může být assertion signatura. A asertovat `x is T` nezúží nic — asertovat se má ta utilita, která z typu odstraní `null` a `undefined`.",
+]

@@ -1,0 +1,443 @@
+# GO LAND — CHEATSHEET, in Cantonese (colloquial written). A translation pack
+# (SPEC §12.1): the prose of `content/go/cheatsheet.toml`, quest by quest, and
+# nothing else. The four choices are code, live in the English pack, and are
+# never translated. Code blocks, identifiers and printed strings are copied
+# verbatim.
+
+pack   = "go.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.cheatsheet.01.flush"
+title = "唔 flush 就乜都冇"
+story = "06:30，渣甸坊。部 kiosk 成晚都印落 buffer 度，但係冇人見過一行。"
+brief = '''
+輸出經過一個有 buffer 嘅 writer。邊一行可以確保 `main` 返回嗰陣，寫咗落 `out`
+嘅嘢全部真係出到上畫面？
+
+```
+out := bufio.NewWriter(os.Stdout)
+// ____
+fmt.Fprintln(out, ans)
+```
+'''
+hints = [
+  "`bufio.Writer` 會一直揸住啲 byte，直到佢俾人 flush；而 `defer` 要一個連埋括號嘅 call。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.cheatsheet.02.fields"
+title = "鬆散嘅空格"
+story = "茶餐廳張落單紙寫住 3   5，係個伙記趕住打出嚟嘅。"
+brief = '''
+`sc.Scan()` 啱啱讀咗一行 `"3   5"`（中間有幾個空格）。邊一行可以將佢變成兩個
+token `["3", "5"]`？
+'''
+hints = [
+  "淨係用一個空格嚟拆，連續空格之間會剩低啲空字串。有個 function 係用任何一段空白嚟拆嘅。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.cheatsheet.03.zero-pad"
+title = "五個位"
+story = "希慎廣場櫃位啲籌號永遠係五個位，前面補零。"
+brief = '''
+`n` 係 `42`。將佢印成 `00042`，跟住轉行。
+'''
+hints = [
+  "喺闊度前面加個 `0`，就用零而唔係空格嚟補。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.cheatsheet.04.inclusive"
+title = "一至十"
+story = "電車站由 1 號排到 10 號，大家成日唔記得嘅就係最尾嗰個。"
+brief = '''
+Loop 1, 2, … 10 —— 連 10 都要。
+'''
+hints = [
+  "Go 得一個 loop 關鍵字，啲子句外面唔使加括號。`range 10` 係由 0 數起。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.cheatsheet.05.float-div"
+title = "半碗"
+story = "七碗雲吞麵兩個人分。部收銀機硬係話每人三碗。"
+brief = '''
+`n := 7` 同 `m := 2` 都係 `int`。整 `f` 做 `float64` 值 `3.5`。
+'''
+hints = [
+  "`int / int` 未轉之前已經截咗。先將兩邊都轉咗佢。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.cheatsheet.06.append"
+title = "次次都要再 assign"
+story = "崇光部 lift 門口條隊多咗一個人。夾板上面張名單都要咁寫。"
+brief = '''
+`s` 係一個 `[]int`。喺佢尾加 `x`。
+'''
+hints = [
+  "`append` 淨係會交返個 slice 出嚟 —— 可能連埋個新 array —— 佢自己唔會改 `s`。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.cheatsheet.07.comma-ok"
+title = "零都係有"
+story = "百德新街個檔口今日賣咗零個蛋撻。咁同冇呢個檔口唔係一回事。"
+brief = '''
+`m` 係 `map[string]int`。淨係 key `k` 存在嗰陣先入個 block —— 存咗 `0` 都當係有。
+'''
+hints = [
+  "冇嘅 key 讀出嚟係零值。問個 map 攞佢第二個結果。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.cheatsheet.08.rune"
+title = "兩個 byte，一個字"
+story = "利園山道間咖啡店個招牌有個重音符號，部數 byte 嘅機搞錯咗第二個字。"
+brief = '''
+`s := "héllo"`。整 `r` 做第二個字元 `'é'`，type 係 `rune`。
+'''
+hints = [
+  "String 攞 index 出嚟係 byte，而 `é` 喺 UTF-8 係兩個 byte。先轉做 rune。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.cheatsheet.09.rec-closure"
+title = "先改個名"
+story = "耀華街後面啲後巷會兜返轉頭。行嘅人要知道自己個名，先可以繼續行落去。"
+brief = '''
+喺 `main` 入面，一個會 call 自己嘅 closure `dfs`。邊一個第一行 compile 得到？
+
+```
+// ____
+    vis[u] = true
+    for _, v := range adj[u] { if !vis[v] { dfs(v) } }
+}
+```
+'''
+hints = [
+  "一個變數喺自己嘅初始化式入面仲未入 scope。先宣告，再 assign。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.cheatsheet.10.ptr-receiver"
+title = "郁真嗰個"
+story = "時代廣場張地圖上面嘅釘應該向東移一個街口。郁張影印本係冇用嘅。"
+brief = '''
+`type P struct{ X, Y int }`。寫個 method `Shift`，等 `p.Shift(1)` 之後，call 嗰邊
+嘅 `p.X` 真係加咗一。
+'''
+hints = [
+  "Value receiver 係喺副本上面做嘢。經 pointer 攞 field 係自動嘅。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.cheatsheet.11.wrap"
+title = "留住個原因"
+story = "銅鑼灣郵局張投訴表有格寫備註，原本封信用釘書釘釘咗喺後面。"
+brief = '''
+喺 `func parse(s string) (int, error)` 入面。交返個加咗說明嘅 error，但係 call 嗰邊
+嘅 `errors.Is(err, strconv.ErrSyntax)` 仍然要對得上。
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+'''
+hints = [
+  "得一個格式動詞會將個 error 包住，等 `errors.Is` 睇得穿。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.cheatsheet.12.close-results"
+title = "最後一個走"
+story = "四個速遞員喺波斯富街一間後房做夜更。最後一個返嚟之後要有人鎖門 —— 唔可以早過佢。"
+brief = '''
+一個 worker pool。每個 worker 喺 `jobs` 冇嘢之後 call `wg.Done()`，`jobs` 由
+producer 閂。邊一行可以令最後個 `range` 喺所有 worker 做完之後完結 —— 唔 deadlock，
+亦唔 panic？
+
+```
+results := make(chan int) // unbuffered
+for w := 0; w < 4; w++ { wg.Add(1); go worker(jobs, results, &wg) }
+// ____
+for r := range results { fmt.Println(r) }
+```
+'''
+hints = [
+  "等要喺讀嗰邊隔籬做，唔係喺讀之前：啲 worker 會卡喺冇 buffer 嘅 send 度，等到 `main` 去讀為止。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.cheatsheet.13.concat"
+title = "全新嘅底"
+story = "崇光十字路口兩條隊併埋一條，糾察要一張全新嘅名單 —— 唔係喺第一條隊張夾板上面塗改嗰張。"
+brief = '''
+`a` 同 `b` 係 `[]int`。整 `c` 做一個 slice，入面係 `a` 嘅元素跟住 `b` 嘅，而且之後
+`c[0] = 9` 唔會掂到 `a` —— 就算 `a` 有剩餘 capacity 都係。
+'''
+hints = [
+  "`append` 喺第一個參數嘅底層 array 有位嗰陣會重用佢。Go 1.22 加咗一個一定會開新 array 嘅 function。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.cheatsheet.14.sort-desc"
+title = "最好喺頂"
+story = "蛋撻聯賽積分榜今晚貼上大坑間餅店幅牆，最高分喺最頂。"
+brief = '''
+`type P struct{ N string; S int }`，`ps` 係 `[]P`。就地排 `ps`，等最高嘅 `S` 排最先。
+'''
+hints = [
+  "用 index 嘅比較器答嘅係「`i` 應唔應該排喺 `j` 前面？」—— 要最高排先，就係大嗰個排前面。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.cheatsheet.15.nil-map"
+title = "仲未有頁"
+story = "渣甸街個檔口本新數簿一頁都未有；第一筆落去就直接穿咗個封面。"
+brief = '''
+三行全部喺 `main` 入面，同一個 block。空位填邊一行，個加一先唔會 panic？
+
+```
+var m map[string]int
+// ____
+m["a"]++
+```
+'''
+hints = [
+  "宣告咗但從來冇 make 過嘅 map 係 nil：讀會得到零值，寫就 panic。而 `:=` 喺同一個 block 入面唔可以再宣告 `m`。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.cheatsheet.16.recv-ok"
+title = "零都係一個包裹數"
+story = "開平道個速遞員用對講機報包裹數，零個包裹都係真嘅報告。淨係閘落咗先代表今日完咗。"
+brief = '''
+`ch` 係 `chan int`。Sender 好可能會 send `0` 做真正嘅值，而佢做完就會閂 `ch`。
+收入 `v`，而 `ok` 淨係喺 `ch` 閂咗兼且清空咗之後先係 false。
+'''
+hints = [
+  "接收表達式有兩個值嘅寫法，好似 map 查 key 咁。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.cheatsheet.17.cancel-send"
+title = "收工時間"
+story = "勿地臣街嘅夜更廚房將碟餸一個傳一個咁傳落去。經理嗌收工嗰陣，廚師就放低碟餸 —— 就算冇人接都係。"
+brief = '''
+喺一個 pipeline stage 入面，
+`func send(ctx context.Context, out chan<- int, v int) error`。
+喺 `out` 度 send `v`，但 `ctx` 一取消就即刻放棄，return 個 context 嘅 error ——
+就算冇人讀 `out` 都係。
+'''
+hints = [
+  "淨係 `select` 可以同時等兩樣嘢，而佢每個 case 都一定要係 send 或者 receive —— `Done()` 會俾你一個 channel。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.cheatsheet.18.unmarshal"
+title = "填真嗰張表"
+story = "一個訂房以 JSON 嘅形式去到利園酒店個櫃台。要填嘅係櫃台上面嗰張表 —— 唔係佢嘅影印本。"
+brief = '''
+`s` 係一個裝住 JSON 嘅 `string`，而 `var u User` 係一個普通值。由 `s` 填 `u`，
+個 error 留喺 `err`。
+'''
+hints = [
+  "Decoder 收嘅係 byte，而且佢要寫得入 `u` 本身，唔係佢嘅副本。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.cheatsheet.19.bfs-queue"
+title = "最舊嘅先"
+story = "雨水喺時代廣場地底停車場一格一格咁由去水位向外散開。"
+brief = '''
+格仔 BFS。邊一行由隊列攞出下一個點，令搜尋保持廣度優先 —— 而且個 loop 真係會完？
+
+```
+q := []pt{{sr, sc}}
+for len(q) > 0 {
+    // ____
+    for _, d := range dirs {
+        nr, nc := cur.r+d.r, cur.c+d.c
+        if !okCell(nr, nc) { continue }
+        q = append(q, pt{nr, nc})
+    }
+}
+```
+'''
+hints = [
+  "廣度優先即係最舊嗰個先行。喺 loop body 入面，`:=` 會整一個新嘅 `q`，而出面嗰個永遠唔會縮。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.cheatsheet.20.itoa"
+title = "要數字，唔該"
+story = "銅鑼灣地鐵站部售票機顯示 65 號閘。對面嗰部打印機卻派出一個字母。"
+brief = '''
+`n := 65` 係 `int`。整 `s` 做字串 `65` —— 兩個字元，即係啲數字。
+'''
+hints = [
+  "將整數轉做 `string` 會得到嗰個碼位嘅字元，唔係佢啲數字。去 `strconv` 度搵，留意參數類型。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.cheatsheet.21.both"
+title = "兩盞燈都綠"
+story = "怡和街個過路處淨係喺綠公仔同嘟嘟聲一致嗰陣先放行，而嘟嘟聲有佢自己嘅意見。"
+brief = '''
+`ready` 同 `valid` 都係 `bool`。寫一個淨係兩個都係 true 嗰陣先係 true 嘅條件。
+'''
+hints = [
+  "Go 嘅邏輯運算子係跟 C 嘅寫法，而單一字元嗰個對 `bool` 根本冇定義。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.cheatsheet.22.last"
+title = "尾站"
+story = "稽查員喺銅鑼灣總站上咗尾班電車，而車廠啲電車係由零開始編號嘅。"
+brief = '''
+`a` 係一個非空嘅 `[]int`。整 `x` 做佢最後一個元素。
+'''
+hints = [
+  "Go 冇由尾數起嘅 index —— 負數常量 index 連 compile 都唔到 —— 而個長度係最後一個 index 加一。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.cheatsheet.23.empty"
+title = "仍然係個盤"
+story = "有啲下晝駱克道間酒樓架點心車推出嚟乜都冇，但佢仍然係一架有十二個格嘅車。"
+brief = '''
+`s` 係一個 `[]int`，好可能唔係 nil 而且仲有位 —— 譬如用 `make([]int, 0, 16)` 整嘅，
+或者切返做 `s[:0]`。淨係佢冇任何元素嗰陣先入個 block。
+'''
+hints = [
+  "空嘅 slice 唔一定係 nil，而 capacity 係空位，唔係內容。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.cheatsheet.24.func-add"
+title = "先名後 type"
+story = "波斯富街嘅 Alex 用 Go 嘅寫法寫部收銀機個加數程序；新嚟嗰個就一直用 C 嘅寫法，仲唔明點解個 build 係紅色。"
+brief = '''
+宣告 `add`，收兩個 `int` 然後將佢哋嘅和以 `int` 回傳，令 `fmt.Println(add(1, 2))`
+印出 `3`。
+'''
+hints = [
+  "先寫名，後寫 type，而結果 type 係放喺參數列後面 —— 冇宣告結果 type 嘅 function 乜都 return 唔到。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.cheatsheet.25.sort-asc"
+title = "最細排先"
+story = "糖街電車站啲飛尾亂咁掉落文員張枱，而文員想最細嗰個號碼放最頂。"
+brief = '''
+`a` 係一個 `[]int`，而 `slices` 已經 import 咗（Go 1.21+）。就地將 `a` 升序排好，一個
+call。
+'''
+hints = [
+  "泛型嗰個 package 收一個參數 —— 個 slice 本身，唔係佢嘅地址。舊嘅 `sort` package 要一個 `Interface` 或者一個比較器。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.cheatsheet.26.reverse"
+title = "由尾到頭"
+story = "午炮響完之後，人群按入嚟嘅次序啱啱倒轉咁由海傍個閘魚貫行出去。"
+brief = '''
+`a` 係一個 `[]int`，而 `slices` 已經 import 咗（Go 1.21+）。就地將 `a` 倒轉，一行搞掂，
+之後繼續用 `a`。
+'''
+hints = [
+  "佢係喺交俾佢嗰個 slice 上面做嘢而且乜都唔 return，所以冇嘢可以 assign —— 而 `sort` 入面同名嗰個 function 係俾 `Interface` 用嘅。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.cheatsheet.27.clone"
+title = "你自己嗰份"
+story = "名店坊張報名表影印咗一份俾第二間舖，喺影印本上面剔一剔，絕對唔可以出現喺正本度。"
+brief = '''
+`s` 係一個 `[]int`，而 `slices` 已經 import 咗（Go 1.21+）。整 `c` 做 `s` 嘅一個副本，
+令之後 `c[0] = 9` 唔會掂到 `s`。
+'''
+hints = [
+  "Assign 同重新切片派出嚟嘅係同一個底層 array，而嗰個做 copy 嘅內建 function 要一個你已經整好嘅目的地。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.cheatsheet.28.switch"
+title = "一或者二"
+story = "羅素街間 Lucky Mac 將一至兩個人嘅枱叫做「細枱」，而個知客已經厭咗將條規則寫兩次。"
+brief = '''
+`x` 係一個 `int`。填個空位，令 `x` 係 1 或者 2 嗰陣 `s` 變做 `"small"` —— 而其他 case
+照做佢哋原本做嘅嘢。
+
+```
+switch x {
+case 0:
+    s = "zero"
+// ____
+default:
+    s = "big"
+}
+```
+'''
+hints = [
+  "Go 嘅 case 去到下一個 case 開始就完 —— 唔會自己 fall through —— 而一個 case 可以寫多過一個值。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.cheatsheet.29.abs"
+title = "差三塊磚"
+story = "堅拿道天橋底下，一隻拖鞋掉短咗三塊磚，同掉長咗三塊磚係同一個分數。"
+brief = '''
+`x` 係一個可能係負數嘅 `int`（而且細到 `-x` 唔會溢出）。整 `a` 做佢嘅絕對值 —— Go
+1.21+，唔加 import。
+'''
+hints = [
+  "標準庫冇整數絕對值，而 `math` 嗰個收嘅係 `float64`。1.21 嚟咗兩個做比較嘅內建 function。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.cheatsheet.30.mod"
+title = "兜返個鐘"
+story = "喺一條三站嘅環線上面由維園總站倒退七個站，而塊板仍然要顯示一個站號，唔係一個負號。"
+brief = '''
+`x` 同 `m` 係 `int`，`m > 0`，而 `x` 可能係負數 —— 仲可以低過 `-m`，好似 `x = -7`、
+`m = 3` 咁。整 `r` 做 `0 .. m-1` 範圍內嘅餘數，令嗰對數得出 `2`。
+'''
+hints = [
+  "喺 Go 入面 `%` 嘅符號係跟被除數嘅，而淨係加一次 `m` 只能夠救返去到 `-m` 嘅值。",
+]

@@ -1,0 +1,861 @@
+# TYPESCRIPT LAND — CHEATSHEET. The grammar off the page, asked: one question
+# per section of a TypeScript live-coding cheatsheet (tsc strict, then node) —
+# stdin, lines, numbers, decimals, integer division, a loop, a sort, a tally,
+# a grid, a heap, a char code, a caught error — then a Map walked in pairs,
+# head and tail, `??` against a zero, awaiting every promise, a parameter
+# property, a typeof narrowing, a bigint, and a quotient toward zero — then
+# the sheet's drills, in TypeScript: a push, an inclusive loop, a typed
+# function, a join, an empty check, a max over an array, a copy, a reversed
+# string, a queue's front, and a remainder that never goes negative (the
+# boss). Four lines, one right. Nothing is typed and nothing is compiled —
+# the pick is the submission, and the server judges it against the quiz
+# (SPEC §0). The three wrong lines are near-misses: Python's spelling, a
+# call that compiles and answers wrong, a line strict mode refuses.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "typescript.cheatsheet"
+land = "typescript"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "typescript.cheatsheet.01.read-all"
+node        = 1
+title       = "THE WHOLE FEED"
+difficulty  = 1
+story       = "19:00 over Times Square. The big screen's feed arrives all at once, and it wants all of it."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+In Node, read **all** of standard input into `input`, as one `string`.
+'''
+solution    = 'const input = require("fs").readFileSync(0, "utf8");'
+hints = [
+  "File descriptor 0 is stdin. Without an encoding you get a Buffer, not a string.",
+]
+
+[quest.quiz]
+choices = [
+  'const input = require("fs").readFileSync(0);',
+  'const input = process.stdin.read();',
+  'const input = require("fs").readFileSync(0, "utf8");',
+  'const input = prompt();',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "typescript.cheatsheet.02.lines"
+node        = 2
+title       = "NO GHOST LINE"
+difficulty  = 1
+story       = "The ticker on Yee Wo Street ends every message with a line break, and the last line is always blank."
+concepts    = ["io", "strings"]
+requires    = ["typescript.cheatsheet.01.read-all"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`input` ends with a newline. Split it into `lines` with **no** empty string at
+the end.
+'''
+solution    = 'const lines = input.trim().split("\n");'
+hints = [
+  "Splitting `\"a\\nb\\n\"` on the newline gives three parts, the last one empty. Trim first.",
+]
+
+[quest.quiz]
+choices = [
+  'const lines = input.split("\n");',
+  'const lines = input.trim().split("\n");',
+  'const lines = input.splitlines();',
+  'const lines = input.lines();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "typescript.cheatsheet.03.numbers"
+node        = 3
+title       = "WORDS TO NUMBERS"
+difficulty  = 1
+story       = "The lottery stand on Lockhart Road reads its winning numbers off a strip of text."
+concepts    = ["strings", "types"]
+requires    = ["typescript.cheatsheet.02.lines"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`lines[1]` is `"3 1 2"`. Which line gives `nums` as the `number[]`
+`[3, 1, 2]`?
+'''
+solution    = 'const nums = lines[1].split(" ").map(Number);'
+hints = [
+  "`map` passes the index as a second argument, and `parseInt` takes that as the radix. `Number` takes one argument.",
+]
+
+[quest.quiz]
+choices = [
+  'const nums = lines[1].split(" ").map(Number);',
+  'const nums = lines[1].split(" ").map(parseInt);',
+  'const nums = lines[1].split(" ").map(int);',
+  'const nums = lines[1].split(" ") as number[];',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "typescript.cheatsheet.04.to-fixed"
+node        = 4
+title       = "TWO PLACES"
+difficulty  = 1
+story       = "The exchange booth on Hennessy Road shows every rate to exactly two decimal places."
+concepts    = ["io", "strings"]
+requires    = ["typescript.cheatsheet.03.numbers"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`const x = 3.14159;` Print `3.14` — exactly two digits **after the decimal
+point**.
+'''
+solution    = 'console.log(x.toFixed(2));'
+hints = [
+  "`toPrecision` counts significant digits; the method that counts decimals is the other one.",
+]
+
+[quest.quiz]
+choices = [
+  'console.log(x.toPrecision(2));',
+  'console.log(Math.round(x, 2));',
+  'console.log(x.format("%.2f"));',
+  'console.log(x.toFixed(2));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "typescript.cheatsheet.05.floor-div"
+node        = 5
+title       = "NO HALF TICKETS"
+difficulty  = 1
+story       = "Seven tram tokens shared between two riders. Nobody gets half a token."
+concepts    = ["types", "math"]
+requires    = ["typescript.cheatsheet.04.to-fixed"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`a = 7`, `b = 2`, both non-negative integers. `q` must be `3` — integer
+division.
+'''
+solution    = 'const q = Math.floor(a / b);'
+hints = [
+  "Every number is a float: `/` gives 3.5. Round it down.",
+]
+
+[quest.quiz]
+choices = [
+  'const q = a / b;',
+  'const q = Math.floor(a / b);',
+  'const q = a // b;',
+  'const q = Math.round(a / b);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "typescript.cheatsheet.06.for-of"
+node        = 6
+title       = "VALUES, NOT KEYS"
+difficulty  = 2
+story       = "The shop signs along Great George Street, read one by one — the names, not the house numbers."
+concepts    = ["iteration", "control-flow"]
+requires    = ["typescript.cheatsheet.05.floor-div"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Start a loop over the **values** (not the indexes) of `arr: number[]`.
+'''
+solution    = 'for (const x of arr) {'
+hints = [
+  "`in` walks the keys — the indexes, as strings. `of` walks the values.",
+]
+
+[quest.quiz]
+choices = [
+  'for (const x of arr) {',
+  'for (const x in arr) {',
+  'for x in arr {',
+  'for (const x : arr) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "typescript.cheatsheet.07.sort"
+node        = 7
+title       = "TEN AFTER NINE"
+difficulty  = 2
+story       = "The queue tickets at the Sogo counter: 10 comes after 9, whatever the alphabet says."
+concepts    = ["sorting", "closures"]
+requires    = ["typescript.cheatsheet.06.for-of"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`arr: number[]` holds `[10, 9, 1]`. Sort it **ascending by value**, in place.
+'''
+solution    = 'arr.sort((a, b) => a - b);'
+hints = [
+  "With no comparator, `sort` compares strings, so \"10\" < \"9\". The comparator returns a number: negative keeps `a` first.",
+]
+
+[quest.quiz]
+choices = [
+  'arr.sort();',
+  'arr.sort((a, b) => a > b);',
+  'arr.sort((a, b) => b - a);',
+  'arr.sort((a, b) => a - b);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "typescript.cheatsheet.08.count"
+node        = 8
+title       = "THE TALLY"
+difficulty  = 2
+story       = "The dai pai dong counts orders by dish, and a new dish starts at zero."
+concepts    = ["hashing", "collections"]
+requires    = ["typescript.cheatsheet.07.sort"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`m: Map<string, number>`. Add one to the count for key `w`, starting at 0 if
+it is not there yet. `strict` is on.
+'''
+solution    = 'm.set(w, (m.get(w) ?? 0) + 1);'
+hints = [
+  "`get` returns `number | undefined`. Give the missing case a default with `??`.",
+]
+
+[quest.quiz]
+choices = [
+  'm[w]++;',
+  'm.set(w, m.get(w) + 1);',
+  'm.set(w, (m.get(w) ?? 0) + 1);',
+  'm.get(w)++;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "typescript.cheatsheet.09.grid"
+node        = 9
+title       = "THE FLOOR PLAN"
+difficulty  = 2
+story       = "Windsor House, floor by floor, shop by shop: an n-by-m plan with every unit empty — and each floor its own."
+concepts    = ["collections", "matrix"]
+requires    = ["typescript.cheatsheet.08.count"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+Make `g`, an `n`-by-`m` grid of zeros, where writing `g[0][0] = 1` changes
+**only** that one cell.
+'''
+solution    = 'const g = Array.from({ length: n }, () => new Array(m).fill(0));'
+hints = [
+  "`fill` with an array puts the same array in every slot. Build a fresh row per index.",
+]
+
+[quest.quiz]
+choices = [
+  'const g = Array.from({ length: n }, () => new Array(m).fill(0));',
+  'const g = new Array(n).fill(new Array(m).fill(0));',
+  'const g = new Array(n, m).fill(0);',
+  'const g = [[0] * m] * n;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "typescript.cheatsheet.10.heap-parent"
+node        = 10
+title       = "WHO IS ABOVE"
+difficulty  = 3
+story       = "There is no heap in the standard library, so the minibus queue keeps its own — in a plain array."
+concepts    = ["heaps", "bit-manipulation"]
+requires    = ["typescript.cheatsheet.09.grid"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+A binary heap lives in a 0-based array `h`: the children of index `p` are
+`2*p + 1` and `2*p + 2`. For `i > 0`, which line gives the parent of `i`?
+'''
+solution    = 'const p = (i - 1) >> 1;'
+hints = [
+  "Undo the child formula: subtract one, then halve, rounding down. Try `i = 2`.",
+]
+
+[quest.quiz]
+choices = [
+  'const p = i >> 1;',
+  'const p = (i - 1) >> 1;',
+  'const p = (i - 1) / 2;',
+  'const p = Math.floor(i / 2);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "typescript.cheatsheet.11.char-code"
+node        = 11
+title       = "A IS ZERO"
+difficulty  = 3
+story       = "The letterboxes in the Causeway Bay Plaza lobby are numbered by letter, a to z, starting from zero."
+concepts    = ["strings", "math"]
+requires    = ["typescript.cheatsheet.10.heap-parent"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`s` is all lowercase. Turn the letter at index `i` into `k` in 0..25, where
+`'a'` is 0.
+'''
+solution    = 'const k = s.charCodeAt(i) - 97;'
+hints = [
+  "Strings do not subtract. Get the character's code as a number first; 'a' is 97.",
+]
+
+[quest.quiz]
+choices = [
+  'const k = s[i] - "a";',
+  'const k = s.charCodeAt(i) - "a";',
+  'const k = ord(s[i]) - 97;',
+  'const k = s.charCodeAt(i) - 97;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "typescript.cheatsheet.12.unknown-catch"
+node        = 12
+title       = "THE UNKNOWN THROW"
+difficulty  = 3
+story       = "The feed that arrives before midnight throws something. Nobody promised it was an Error."
+concepts    = ["error-handling", "types"]
+requires    = ["typescript.cheatsheet.11.char-code"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+Under `strict`, the `e` in `catch (e) { … }` has type `unknown`. Print its
+`message` in a way that compiles and cannot crash.
+'''
+solution    = 'if (e instanceof Error) console.log(e.message);'
+hints = [
+  "You cannot read a property off `unknown`. Narrow it with a runtime check first.",
+]
+
+[quest.quiz]
+choices = [
+  'console.log(e.message);',
+  'console.log(e!.message);',
+  'if (e instanceof Error) console.log(e.message);',
+  'console.log((e as string).message);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "typescript.cheatsheet.13.map-entries"
+node        = 13
+title       = "KEY AND COUNT"
+difficulty  = 2
+story       = "The dai pai dong tally is done; now the owner reads it back, dish by dish, with its count beside it."
+concepts    = ["collections", "iteration"]
+requires    = ["typescript.cheatsheet.12.unknown-catch"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`m: Map<string, number>`. Start a loop that visits **every** pair in `m`,
+with the key in `k` and the value in `v`.
+'''
+solution    = 'for (const [k, v] of m) {'
+hints = [
+  "A Map iterates as pairs — destructure each one. `Object.entries` only sees own properties, and a Map has none.",
+]
+
+[quest.quiz]
+choices = [
+  'for (const [k, v] in m) {',
+  'for (const [k, v] of Object.entries(m)) {',
+  'for (const k, v of m.items()) {',
+  'for (const [k, v] of m) {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "typescript.cheatsheet.14.head-tail"
+node        = 14
+title       = "HEAD AND TAIL"
+difficulty  = 2
+story       = "The first bus in the Jardine's Bazaar queue goes now; everyone behind it waits together."
+concepts    = ["pattern-matching", "slices"]
+requires    = ["typescript.cheatsheet.13.map-entries"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`a: number[]` is `[5, 6, 7]`. In one declaration, make `first` the number
+`5` and `rest` the `number[]` `[6, 7]`.
+'''
+solution    = 'const [first, ...rest] = a;'
+hints = [
+  "Destructure with brackets. The tail is collected by three dots, not two, and not a star.",
+]
+
+[quest.quiz]
+choices = [
+  'const [first, ...rest] = a;',
+  'const [first, rest] = a;',
+  'const first, *rest = a;',
+  'const [first, ..rest] = a;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "typescript.cheatsheet.15.zero-is-a-value"
+node        = 15
+title       = "ZERO IS A VALUE"
+difficulty  = 2
+story       = "Floor 0 of Hysan Place is a real floor. The lift panel must not send you to the default."
+concepts    = ["zero-values", "error-handling"]
+requires    = ["typescript.cheatsheet.14.head-tail"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`x: number | undefined`. Make `d` equal to `x` when `x` is defined — **even
+when `x` is `0`** — and `10` only when `x` is `undefined`.
+'''
+solution    = 'const d = x ?? 10;'
+hints = [
+  "`0` is falsy, so anything that asks \"is it truthy?\" throws the zero away. Ask \"is it null or undefined?\" instead.",
+]
+
+[quest.quiz]
+choices = [
+  'const d = x || 10;',
+  'const d = x ?? 10;',
+  'const d = x ? x : 10;',
+  'const d = x or 10;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "typescript.cheatsheet.16.await-all"
+node        = 16
+title       = "ALL AT ONCE"
+difficulty  = 3
+story       = "Six delivery riders left Sugar Street together. The kitchen waits for all six, not one after another."
+concepts    = ["async", "concurrency"]
+requires    = ["typescript.cheatsheet.15.zero-is-a-value"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+Inside an `async` function, `ps: Promise<number>[]`. Make `rs` the
+`number[]` of every result, waiting for all of them together.
+'''
+solution    = 'const rs = await Promise.all(ps);'
+hints = [
+  "Awaiting an array gives you the same array of promises. Combine them into one promise first, then await that.",
+]
+
+[quest.quiz]
+choices = [
+  'const rs = await ps;',
+  'const rs = await Promise.all(...ps);',
+  'const rs = await Promise.all(ps);',
+  'const rs = Promise.all(ps);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "typescript.cheatsheet.17.param-property"
+node        = 17
+title       = "ONE-LINE CLASS"
+difficulty  = 3
+story       = "The Noon Day Gun is built once, with its calibre fixed, and nobody outside the battery reads the setting."
+concepts    = ["structs", "types"]
+requires    = ["typescript.cheatsheet.16.await-all"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`class P { … }` has nothing in its body but one constructor line. It takes
+`x: number` and stores it as a field `x` that is **private** (reading
+`p.x` outside the class is a compile error) and **read-only** (assigning
+`this.x` later is a compile error). `strict` is on.
+'''
+solution    = 'constructor(private readonly x: number) {}'
+hints = [
+  "A modifier on a constructor parameter declares the field and assigns it. The access modifier comes before the read-only one.",
+]
+
+[quest.quiz]
+choices = [
+  'constructor(x: number) { this.x = x; }',
+  'constructor(private readonly x: number) {}',
+  'constructor(readonly private x: number) {}',
+  'constructor(this.x: number) {}',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "typescript.cheatsheet.18.typeof-narrow"
+node        = 18
+title       = "IS IT A STRING"
+difficulty  = 3
+story       = "The Paterson Street sign is sometimes a name and sometimes a number. Only the name gets shouted in capitals."
+concepts    = ["types", "pattern-matching"]
+requires    = ["typescript.cheatsheet.17.param-property"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`v: string | number`, `strict` on. Open an `if` inside which
+`v.toUpperCase()` compiles.
+'''
+solution    = 'if (typeof v === "string") {'
+hints = [
+  "A primitive is not an instance of anything. The runtime check that narrows a primitive compares against a lowercase string.",
+]
+
+[quest.quiz]
+choices = [
+  'if (typeof v === "string") {',
+  'if (v instanceof String) {',
+  'if (typeof v === String) {',
+  'if (isinstance(v, str)) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "typescript.cheatsheet.19.bigint"
+node        = 19
+title       = "PAST THE SAFE LINE"
+difficulty  = 3
+story       = "The Causeway Bay Typhoon Shelter counts every wave since 1883. A float lost count long ago."
+concepts    = ["types", "math"]
+requires    = ["typescript.cheatsheet.18.typeof-narrow"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`target` is ES2022. Make `big` a `bigint` holding exactly
+`9223372036854775807` — that is 2 to the 63rd power, minus one.
+'''
+solution    = 'const big = 2n ** 63n - 1n;'
+hints = [
+  "A `number` is a 64-bit float: above 2^53 it rounds, and converting afterwards keeps the rounding. Every operand needs the `n`.",
+]
+
+[quest.quiz]
+choices = [
+  'const big = 2 ** 63 - 1;',
+  'const big = 2n ** 63 - 1;',
+  'const big = BigInt(2 ** 63 - 1);',
+  'const big = 2n ** 63n - 1n;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "typescript.cheatsheet.20.toward-zero"
+node        = 20
+title       = "TOWARD ZERO"
+difficulty  = 4
+story       = "Midnight at the Cross-Harbour Tunnel toll: a refund of eight dollars split three ways, and the C programmer in the booth rounds toward zero."
+concepts    = ["math", "types"]
+requires    = ["typescript.cheatsheet.19.bigint"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`a = -8`, `b = 3`, both integers. `q` must be `-2` — the quotient rounded
+**toward zero**, the way `/` works on integers in C, Go and Rust.
+'''
+solution    = 'const q = Math.trunc(a / b);'
+hints = [
+  "Rounding down and rounding to nearest both land on -3 here. You want the fraction cut off, whatever the sign.",
+]
+
+[quest.quiz]
+choices = [
+  'const q = Math.floor(a / b);',
+  'const q = Math.round(a / b);',
+  'const q = Math.trunc(a / b);',
+  'const q = parseInt(a / b);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "typescript.cheatsheet.21.push"
+node        = 21
+title       = "THE BACK OF THE LINE"
+difficulty  = 1
+story       = "One more rider joins the minibus queue on Tang Lung Street — at the back, where riders join."
+concepts    = ["slices", "collections"]
+requires    = ["typescript.cheatsheet.20.toward-zero"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`a: number[]`, `x: number`. Add `x` at the **end** of `a`, in place, so `a`
+is one element longer afterwards. `strict` is on.
+'''
+solution    = 'a.push(x);'
+hints = [
+  "`concat` builds a new array and leaves `a` alone. The in-place method returns the new length, not the array — do not assign it back.",
+]
+
+[quest.quiz]
+choices = [
+  'a.append(x);',
+  'a.push(x);',
+  'a.concat(x);',
+  'a = a.push(x);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "typescript.cheatsheet.22.inclusive-loop"
+node        = 22
+title       = "ONE THROUGH TEN"
+difficulty  = 1
+story       = "The Lee Garden lift stops at every floor from 1 to 10, and the tenth is not optional."
+concepts    = ["control-flow", "iteration"]
+requires    = ["typescript.cheatsheet.21.push"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+Open a loop whose body runs for `i = 1, 2, … 10` — **ten** times, with `10`
+included. `i` is declared nowhere else. `strict` is on.
+'''
+solution    = 'for (let i = 1; i <= 10; i++) {'
+hints = [
+  "Declare the counter with something that is allowed to change, and compare so that the last value still passes.",
+]
+
+[quest.quiz]
+choices = [
+  'for (let i = 1; i < 10; i++) {',
+  'for (i = 1; i <= 10; i++) {',
+  'for (const i = 1; i <= 10; i++) {',
+  'for (let i = 1; i <= 10; i++) {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "typescript.cheatsheet.23.add-function"
+node        = 23
+title       = "TWO NUMBERS IN"
+difficulty  = 1
+story       = "The Hennessy Road exchange booth adds two amounts; under strict it also wants to know what kind of amounts."
+concepts    = ["functions", "types"]
+requires    = ["typescript.cheatsheet.22.inclusive-loop"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+Define `add` so that `add(2, 3)` is `5` and the file compiles under `strict`
+(`noImplicitAny` is on).
+'''
+solution    = 'function add(a: number, b: number) { return a + b; }'
+hints = [
+  "An untyped parameter is an implicit `any`, which strict refuses. A body without a `return` yields `undefined`.",
+]
+
+[quest.quiz]
+choices = [
+  'function add(a: number, b: number) { return a + b; }',
+  'function add(a, b) { return a + b; }',
+  'function add(a: number, b: number) { a + b; }',
+  'function add(a: number, b: number) => a + b;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "typescript.cheatsheet.24.join"
+node        = 24
+title       = "GLUE"
+difficulty  = 2
+story       = "The Sogo announcer reads the winning stalls out loud: one space between each name, and no commas."
+concepts    = ["strings", "iteration"]
+requires    = ["typescript.cheatsheet.23.add-function"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`xs: string[]` is `["a", "b", "c"]`. Print `a b c` — the elements separated
+by **one space**.
+'''
+solution    = 'console.log(xs.join(" "));'
+hints = [
+  "The method is on the array, not on the separator — and called with no argument, the separator is a comma.",
+]
+
+[quest.quiz]
+choices = [
+  'console.log(" ".join(xs));',
+  'console.log(xs.join());',
+  'console.log(xs.join(" "));',
+  'console.log(xs.toString(" "));',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "typescript.cheatsheet.25.empty-check"
+node        = 25
+title       = "NOBODY IN LINE"
+difficulty  = 2
+story       = "The Jardine's Bazaar bus stop at 03:00. Is anyone waiting? An empty queue is still a queue."
+concepts    = ["zero-values", "slices"]
+requires    = ["typescript.cheatsheet.24.join"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`a: number[]`. Open an `if` that is entered **only** when `a` has no
+elements. `strict` is on.
+'''
+solution    = 'if (a.length === 0) {'
+hints = [
+  "An empty array is truthy, and two arrays are never `===` to each other. Compare the one number that says how many.",
+]
+
+[quest.quiz]
+choices = [
+  'if (a === []) {',
+  'if (a.length === 0) {',
+  'if (!a) {',
+  'if (a.isEmpty()) {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "typescript.cheatsheet.26.max-of-array"
+node        = 26
+title       = "THE TALLEST"
+difficulty  = 2
+story       = "Of the towers along Gloucester Road the clerk wants the tallest — out of a list, not a pair."
+concepts    = ["math", "slices"]
+requires    = ["typescript.cheatsheet.25.empty-check"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`arr: number[]` is `[3, 9, 2]` (a short array). Make `m` the number `9`.
+'''
+solution    = 'const m = Math.max(...arr);'
+hints = [
+  "`Math.max` takes numbers one by one, not an array — handing it the array is a compile error. Unpack the array into separate arguments.",
+]
+
+[quest.quiz]
+choices = [
+  'const m = Math.max(arr);',
+  'const m = max(arr);',
+  'const m = arr.max();',
+  'const m = Math.max(...arr);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "typescript.cheatsheet.27.copy"
+node        = 27
+title       = "ITS OWN COPY"
+difficulty  = 2
+story       = "The Times Square ticket list is copied for the night shift; a change on one list must not show up on the other."
+concepts    = ["slices", "bindings"]
+requires    = ["typescript.cheatsheet.26.max-of-array"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`a: number[]`. Make `b` a **separate** array with the same elements, so that
+`b[0] = 9` afterwards leaves `a` unchanged.
+'''
+solution    = 'const b = [...a];'
+hints = [
+  "Assigning an array copies the reference, not the elements. `Array(a)` makes a new array with `a` as its one element.",
+]
+
+[quest.quiz]
+choices = [
+  'const b = [...a];',
+  'const b = a;',
+  'const b = a.copy();',
+  'const b = Array(a);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "typescript.cheatsheet.28.reverse-string"
+node        = 28
+title       = "BACKWARDS"
+difficulty  = 2
+story       = "The neon sign on Percival Street, read back to front from the upper deck of the tram."
+concepts    = ["strings", "slices"]
+requires    = ["typescript.cheatsheet.27.copy"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`s` is `"abc"`. Make `r` the **string** `"cba"`.
+'''
+solution    = 'const r = s.split("").reverse().join("");'
+hints = [
+  "Strings have no `reverse`; arrays do. Go to an array and back — and mind what `join` puts between the pieces when you give it nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'const r = s.reverse();',
+  'const r = s.split("").reverse();',
+  'const r = s.split("").reverse().join("");',
+  'const r = s.split("").reverse().join();',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "typescript.cheatsheet.29.queue-front"
+node        = 29
+title       = "FRONT OF THE QUEUE"
+difficulty  = 2
+story       = "A BFS out from Victoria Park: the first stop that went in is the first one out, and it leaves the queue."
+concepts    = ["stacks-queues", "slices"]
+requires    = ["typescript.cheatsheet.28.reverse-string"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`q: number[]` is `[1, 2, 3]`, used as a FIFO queue. **Remove** the front item
+and put it in `x` — so `x` is `1` and `q` is left as `[2, 3]`.
+'''
+solution    = 'const x = q.shift();'
+hints = [
+  "`pop` takes from the end, and indexing reads without removing. The method that takes from the front moves everything else down one place.",
+]
+
+[quest.quiz]
+choices = [
+  'const x = q.pop();',
+  'const x = q.shift();',
+  'const x = q.popleft();',
+  'const x = q[0];',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "typescript.cheatsheet.30.wrap-modulo"
+node        = 30
+title       = "THE WRAP"
+difficulty  = 3
+story       = "Midnight at the Cross-Harbour Tunnel toll again: seven dollars short, three lanes, and the lane index must still be 0, 1 or 2."
+concepts    = ["math", "types"]
+requires    = ["typescript.cheatsheet.29.queue-front"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`b = 3`. `a` is an integer that may be `-7`, `0` or `4`. Make `r` the
+mathematical remainder — always in `0..b-1`, so `-7` gives `2`, `0` gives
+`0` and `4` gives `1`.
+'''
+solution    = 'const r = ((a % b) + b) % b;'
+hints = [
+  "`%` keeps the sign of the left operand, so one `%` gives -1 for -7. Adding `b` fixes the negatives and breaks `0` and the positives; do something about that.",
+]
+
+[quest.quiz]
+choices = [
+  'const r = ((a % b) + b) % b;',
+  'const r = a % b;',
+  'const r = Math.abs(a % b);',
+  'const r = (a % b) + b;',
+]
+answer  = 0

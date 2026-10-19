@@ -1,0 +1,643 @@
+# REMIX LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/remix/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code
+# blocks and identifiers are copied verbatim, never translated.
+
+pack   = "remix.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet_advanced.01.handoff-go"
+title = "交过来"
+story = "06:50，渣甸坊。阿薇向售货亭要一个数，而售货亭还没算出来就先等着她来拿。"
+brief = '''
+在 **Go** 里，`main` 有 `ch := make(chan int)` —— **无缓冲** —— 之后做 `x := <-ch`。
+`compute()` 返回一个 `int`。放在这两行之间的哪一行能把 `compute()` 的结果送进 `x`，
+而 `main` 不死锁？
+'''
+hints = [
+  "无缓冲的发送会阻塞到有人接收为止。发送者必须是和接收者不同的 goroutine。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet_advanced.02.handoff-rust"
+title = "交过来，FERRIS"
+story = "Ferris 把同一个数端过 Lucky Mac 的柜台，而柜台不让他借用托盘。"
+brief = '''
+在 **Rust** 里，`let (tx, rx) = mpsc::channel::<i32>();`，而 `main` 以
+`let v = rx.recv().unwrap();` 结束。`compute()` 返回一个 `i32`。两行之间的哪一行
+启动一个线程，把 `compute()` 的结果送到 `v` —— 并且能编译？
+'''
+hints = [
+  "spawn 出来的闭包可能活得比 main 的栈帧长，所以它不能借用发送端；它必须拥有它。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet_advanced.03.handoff-python"
+title = "交过来，慢慢地"
+story = "菜市场价目板旁的蟒蛇第三次拿到同一个数，在一个线程上，而这次它必须真的启动。"
+brief = '''
+在 **Python** 里，`q = queue.Queue()`，而 `main` 以 `v = q.get()` 结束。
+`compute()` 返回一个 `int`。两行之间的哪一行在**新线程**上运行 `compute()` 并把
+它的结果送到 `v` —— 使 `q.get()` 能返回而不是永远等下去？
+'''
+hints = [
+  "`target` 要的是一个不带参数就能调用的东西，而只构造却从不 start 的 Thread 什么都不做。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet_advanced.04.counter-go"
+title = "一次一个"
+story = "Lucky Mac 里 Bo 师傅的订单计数器：两个厨师，各一千下，而板子必须恰好显示两千。"
+brief = '''
+在 **Go** 里，
+
+```
+type C struct {
+    mu sync.Mutex
+    n  int
+}
+
+func (c *C) Inc() {
+    // ____
+    c.n++
+}
+```
+
+两个 goroutine 各调用 `Inc` 1000 次。哪一行能让 `c.n` 每次运行都恰好是 2000，
+在 `go test -race` 下干净，并且永远不会把互斥锁一直占着？
+'''
+hints = [
+  "递增本身必须在持有锁的时候发生，而解锁必须安排在方法返回的时候。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet_advanced.05.counter-rust"
+title = "一次一个，FERRIS"
+story = "四只螃蟹，一个计数，怡和街。Ferris 的钳子里攥着 guard，却仍然没法往上加。"
+brief = '''
+在 **Rust** 里，`let counter = Arc::new(Mutex::new(0));`，而每个 spawn 出来的线程
+都持有 `let c = Arc::clone(&counter);`。在线程的循环里，哪一行给共享的数加一 ——
+并且能编译？
+'''
+hints = [
+  "上锁得到一个 Result；里面是一个 guard，而做算术之前必须先解引用 guard。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet_advanced.06.counter-python"
+title = "一次一个，GIL 说的"
+story = "7-32 室在四个线程上数夜班的单子；GIL 对 `+=` 什么都不保证。"
+brief = '''
+在 **Python** 里，`lock = threading.Lock()` 是所有线程共享的那一把锁，而 `n = 0`
+是全局变量：
+
+```
+def work():
+    global n
+    for _ in range(100_000):
+        # ____
+            n += 1
+```
+
+四个线程运行 `work`。哪一行能让 `n` 每次运行都恰好是 400000 —— 每个线程轮流
+使用**同一把**锁？
+'''
+hints = [
+  "锁对象自己就是上下文管理器；acquire() 返回的东西不是。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet_advanced.07.wait-go"
+title = "四个全回来"
+story = "四个速递员离开糖街的货仓；只有每一个都签到回来之后门才上锁。"
+brief = '''
+在 **Go**（1.22，所以每次迭代的 `i` 都是新的）里：
+
+```
+var wg sync.WaitGroup
+for i := 0; i < 4; i++ {
+    wg.Add(1)
+    // ____
+}
+wg.Wait()
+```
+
+哪一行在各自的 goroutine 上启动 `work(i)`，使 `wg.Wait()` 恰好在四个 `work` 调用
+都**完成**时返回 —— 不死锁，也不提前返回？
+'''
+hints = [
+  "得有东西在 work 返回后调用 Done，在干活的那个 goroutine 上，而 go 语句需要一个调用。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet_advanced.08.wait-rust"
+title = "四个全回来，FERRIS"
+story = "Ferris 把摊位自己的价目表同时借给三个帮手，想在卷闸落下之前拿回来，不装箱。"
+brief = '''
+在 **Rust** 里，`let v = vec![1, 2, 3];` 而 `fn work(x: &i32) -> i32`：
+
+```
+thread::scope(|s| {
+    for x in &v {
+        // ____
+    }
+});
+```
+
+哪一行为每个元素启动一个直接借用 `v` 的线程 —— 不用 `Arc`，不用 `'static` ——
+并在作用域结束时被 join？
+'''
+hints = [
+  "通过作用域句柄 spawn，而不是自由函数，并且给它一个闭包，不是一个值。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet_advanced.09.wait-python"
+title = "四个全回来，按顺序"
+story = "蟒蛇把四件活交给市场的搬运工，想按活儿派出去的顺序拿回收据。"
+brief = '''
+在 **Python** 里，`jobs` 是一个列表，而 `work(j)` 返回一个 `int`：
+
+```
+with ThreadPoolExecutor(4) as ex:
+    # ____
+print(out[0], len(out))
+```
+
+哪一行在池的线程上对 `jobs` 运行 `work`，并让 `out` 成为按任务顺序排列的
+**结果列表**，使 `print` 能用？
+'''
+hints = [
+  "executor 自己的 map 保持顺序，但交回的是一个惰性迭代器；submit 交回的是 future。两者都不能取下标。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet_advanced.10.shape-go"
+title = "谁是形状"
+story = "波斯富街的 Alex 从时代广场的平面图上剪下一个正方形，而编译器说它不是形状。"
+brief = '''
+在 **Go** 里，
+
+```
+type Shape interface{ Area() float64 }
+
+type Sq struct{ s float64 }
+
+func (q *Sq) Area() float64    { return q.s * q.s }
+func (q *Sq) Scale(k float64)  { q.s *= k }
+```
+
+哪一行把一个 2×2 的正方形放进 `s` —— 并且能编译？
+'''
+hints = [
+  "看接收者。方法集属于声明它的那个类型，而 Sq 的值不是那个类型。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet_advanced.11.shape-rust"
+title = "谁是形状，FERRIS"
+story = "Ferris 把 trait 写在 Lucky Mac 的餐巾纸上；正方形只需要签个名。"
+brief = '''
+在 **Rust** 里，
+
+```
+trait Shape {
+    fn area(&self) -> f64;
+    fn describe(&self) -> String { format!("{:.1}", self.area()) }
+}
+
+struct Sq { s: f64 }
+// ____
+```
+
+哪一行让 `Sq { s: 2.0 }.describe()` 给出 `"4.0"`？
+'''
+hints = [
+  "trait 实现在类型上，永远不是反过来，而方法的接收者必须和 trait 的完全一致。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet_advanced.12.shape-python"
+title = "谁是形状，它会嘎嘎叫"
+story = "蟒蛇不在乎正方形继承自什么，只在乎它回应 `area` —— 而 `isinstance` 要求白纸黑字写下来。"
+brief = '''
+在 **Python** 3.12 里，`Sq` 是一个有 `area(self) -> float` 方法、没有基类的普通类：
+
+```
+# ____
+class Shape(Protocol):
+    def area(self) -> float: ...
+```
+
+导入未显示。空位里放哪一行，使 `isinstance(Sq(2), Shape)` 回答 `True` 而不是
+抛出 `TypeError`？
+'''
+hints = [
+  "Protocol 只是静态承诺，除非你把它标记为解释器可以在运行时检查的东西；这个标记在 `typing` 里。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet_advanced.13.generic-go"
+title = "任意两个里较大的"
+story = "波斯富街的金铺用同一个函数比较价格、重量和两位顾客的名字。"
+brief = '''
+在 **Go** 1.22 里，`Max(3, 7)`、`Max(1.5, 0.5)` 和 `Max("a", "b")` 都必须能编译：
+
+```
+// ____
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+哪个签名行能做到？
+'''
+hints = [
+  "`>` 需要一个承诺有序的约束；光有相等不够，而 `any` 什么都不承诺。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet_advanced.14.generic-rust"
+title = "任意两个里较大的，FERRIS"
+story = "Ferris 的版本还得比较两个浮点价格，而浮点数拒绝被全序排列。"
+brief = '''
+在 **Rust** 里，`max(1.5, 2.5)` 和 `max("a", "b")` 都必须能编译：
+
+```
+// ____
+    if a > b { a } else { b }
+}
+```
+
+哪个签名行能做到？
+'''
+hints = [
+  "`f64` 只实现了偏序 trait；要求全序的约束会拒绝它。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet_advanced.15.generic-python"
+title = "任意两个里较大的，带约束"
+story = "蟒蛇的类型检查器想在放两个价格通过之前先知道 `<` 是什么意思。"
+brief = '''
+在 **Python** 3.12 里，`Comparable` 是一个带 `__lt__` 的 `Protocol`：
+
+```
+from typing import TypeVar
+
+# ____
+
+def smallest(a: T, b: T) -> T:
+    return a if a < b else b
+```
+
+哪一行声明 `T`，使得只有 `Comparable` 的类型可以使用 —— 并且在模块被导入时不报错？
+'''
+hints = [
+  "TypeVar 先接收它的名字；之后，一个上界类型放在关键字参数里，而裸的位置参数类型是约束，至少要两个。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet_advanced.16.closure-go"
+title = "取票机"
+story = "轩尼诗道银行的排队取票机：每按一次都比上一次多一，而且别人看不到计数。"
+brief = '''
+在 **Go** 里，
+
+```
+func counter() func() int {
+    c := 0
+    // ____
+}
+```
+
+`next := counter(); next(); next()` 必须给出 1 然后 2。空位里放哪一行？
+'''
+hints = [
+  "闭包必须修改外层的 `c`，而不是在自己的作用域里声明一个新的，而且在 Go 里 `++` 是语句，不是值。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet_advanced.17.closure-rust"
+title = "取票机，FERRIS"
+story = "Ferris 造了同一台机器，而借用检查器问：`counter` 返回之后，计数归谁所有？"
+brief = '''
+在 **Rust** 里，
+
+```
+fn counter() -> impl FnMut() -> i32 {
+    let mut c = 0;
+    // ____
+}
+```
+
+`let mut next = counter(); next(); next()` 必须给出 1 然后 2。空位里放哪一行 ——
+并且能编译？
+'''
+hints = [
+  "`c` 会随函数的栈帧一起死去，除非闭包把它拿走；而且它必须被修改，不只是被读。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet_advanced.18.closure-python"
+title = "取票机，嵌套版"
+story = "蟒蛇的机器一直打印一号票，因为内层函数悄悄造了一个自己的 `c`。"
+brief = '''
+在 **Python** 里，
+
+```
+def counter():
+    c = 0
+    def nxt():
+        # ____
+        c += 1
+        return c
+    return nxt
+```
+
+`n = counter(); n(); n()` 必须给出 1 然后 2，没有模块级的 `c`。空位里放哪一行？
+'''
+hints = [
+  "赋值会让名字成为最内层函数的局部变量，除非你说明它属于哪个外层作用域 —— 而模块不是那个作用域。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet_advanced.19.error-go"
+title = "缺的是哪个键"
+story = "到达 Alex 手里的错误从波斯富街的缓存一路往上被包了两层；他仍然想要那个键。"
+brief = '''
+在 **Go** 里，
+
+```
+type NotFound struct{ Key string }
+
+func (e *NotFound) Error() string { return e.Key + " not found" }
+
+func load(k string) error {
+    return fmt.Errorf("load: %w", &NotFound{Key: k})
+}
+```
+
+`err := load("tea")`。哪一行能拿到 `err` 里面的 `*NotFound`，使 `nf.Key` 可以被
+打印 —— 并且不 panic？
+'''
+hints = [
+  "普通的类型断言只看得见最外层的包装。针对*类型*的解包辅助函数需要一个指向该类型变量的指针。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet_advanced.20.error-rust"
+title = "缺的是哪个键，FERRIS"
+story = "Ferris 在 Lucky Mac 的餐巾纸上手写了错误的 Display；`?` 还是不肯把它装箱。"
+brief = '''
+在 **Rust** 里，只用标准库 —— 没有 crate：
+
+```
+#[derive(Debug)]
+struct NotFound(String);
+
+impl fmt::Display for NotFound { /* "<key> not found" */ }
+
+// ____
+
+fn load(k: &str) -> Result<i32, Box<dyn Error>> {
+    Err(Box::new(NotFound(k.into())))
+}
+```
+
+空位里的哪一行能让 `load` 编译，使调用者可以对它用 `?`？
+'''
+hints = [
+  "有了 Debug 和 Display，错误 trait 再没有什么可要求的了 —— 但它仍然必须被实现，带一个空的函数体。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet_advanced.21.error-python"
+title = "缺的是哪个键，以及为什么"
+story = "蟒蛇把市场的 KeyError 重新抛成自己的错误，而回溯仍然必须显示它从哪里开始。"
+brief = '''
+在 **Python** 里，`class NotFound(KeyError): pass`，而
+
+```
+def load(k):
+    try:
+        return d[k]
+    except KeyError as e:
+        # ____
+```
+
+调用者必须捕获到一个 `NotFound`，它的 `__cause__` **就是**原来的 `KeyError`。
+空位里放哪一行？
+'''
+hints = [
+  "在 except 块里抛出会自动记录一个 context；cause 必须显式点名，而用 `None` 做 cause 会把它压掉。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet_advanced.22.iter-go"
+title = "键，按顺序"
+story = "Alex 需要从 Bo 师傅的统计里按字母顺序取出菜名，一行搞定，而 Go 1.23 刚给了他工具。"
+brief = '''
+在 **Go 1.23** 里，`m` 是一个 `map[string]int`，而 `maps` 和 `slices` 已导入。
+哪一行把 map 的键作为升序的 `[]string` 给 `keys` —— 用一个表达式，并且能编译？
+'''
+hints = [
+  "从 1.23 起 maps 包交出的是一个迭代器，不是切片；slices 包有一个函数消费迭代器并返回排好序的切片。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet_advanced.23.iter-rust"
+title = "最大的那个在哪"
+story = "Ferris 想要波斯富街价目板上最高价格的位置，不是价格 —— 而那个元组的把戏差点骗过他。"
+brief = '''
+在 **Rust** 里，`a` 是一个非空、值互不相同的 `Vec<i32>`，比如 `[3, 9, 4, 1]`。
+`let i = ____;` 之后 `a[i]` 必须是最大的值 —— 所以这里 `i` 是 `1`。空位里放哪个表达式？
+'''
+hints = [
+  "给元素编号，然后*按值*取最大，而不是按整个 (index, value) 对 —— 对先按下标比较。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet_advanced.24.iter-python"
+title = "把箱子摊平"
+story = "宝灵顿道市场里箱子套着箱子；蟒蛇想把每颗荔枝都拿出来，一次一颗，惰性地。"
+brief = '''
+在 **Python** 里，
+
+```
+def walk(t):
+    for x in t:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+
+哪一行让 `list(walk([1, [2, [3]], 4]))` 给出 `[1, 2, 3, 4]`？
+'''
+hints = [
+  "递归调用返回一个生成器；把它当作一个元素 yield 出去，和把控制权交给它不是一回事。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet_advanced.25.json-go"
+title = "字段上的标签"
+story = "铜锣湾体育馆的会员表：线路上用小写的键，而留空的人不出现年龄那一行。"
+brief = '''
+在 **Go** 里，
+
+```
+type P struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+
+`json.Marshal(P{Name: "Mei", Age: 35})` 必须给出 `{"name":"Mei","age":35}`，而
+`json.Marshal(P{Name: "Mei"})` 必须给出 `{"name":"Mei"}`。空位里放哪一个字段行？
+'''
+hints = [
+  "键名和选项住在同一对引号里，用逗号隔开；键要和它应该出现的样子拼得一模一样。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet_advanced.26.json-rust"
+title = "花括号，写两遍"
+story = "Lucky Mac 的笔记本上没有 crate，所以 Ferris 手写 JSON，而格式字符串把他的花括号吃掉了。"
+brief = '''
+在 **Rust** 里，只用标准库 —— 没有 serde。`p.name` 是 `String` `"Mei"`，`p.age`
+是 `u32` `35`。哪个表达式构造出 `String` `{"name":"Mei","age":35}` —— 一个数字，
+不是带引号的数字 —— 并且能编译？
+'''
+hints = [
+  "格式字符串里的字面花括号要写两遍；单个的会打开一个占位符。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet_advanced.27.json-python"
+title = "嵌套的 DATACLASS"
+story = "阿薇的地址是一个 dataclass 里的 dataclass，而 `json` 没有帮助就拒绝看任何一个的内部。"
+brief = '''
+在 **Python** 里，
+
+```
+@dataclass
+class Addr:
+    street: str
+    floor: int
+
+@dataclass
+class P:
+    name: str
+    addr: Addr
+```
+
+`p = P("Mei", Addr("Jardine's Bazaar", 5))`。哪一行给 `s` 这段 JSON 文本
+`{"name": "Mei", "addr": {"street": "Jardine's Bazaar", "floor": 5}}` ——
+双引号、嵌套对象，一样不少？
+'''
+hints = [
+  "`json` 只认识 dict 和 list；dataclasses 模块有一个会递归进嵌套 dataclass 的转换器，而 `vars` 在第一层就停了。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet_advanced.28.match-go"
+title = "每个 CASE 一个类型"
+story = "Alex 为了省一行把两个整数类型列在同一个 case 里，而 `v` 又变回接口对付他。"
+brief = '''
+在 **Go** 里，
+
+```
+func describe(x any) string {
+    switch v := x.(type) {
+    // ____
+        return strconv.Itoa(v * 2)
+    case string:
+        return v
+    }
+    return "?"
+}
+```
+
+哪个 case 行能让 `describe(21)` 返回 `"42"` —— 并且能编译？
+'''
+hints = [
+  "只有 case 恰好点名一个类型时 `v` 才取那个 case 的类型；点名两个，`v` 仍然是 `any`，不能做乘法。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet_advanced.29.match-rust"
+title = "又小又奇，FERRIS"
+story = "Ferris 在湾仔的庙里挑幸运数字：一位数、奇数，而且他想在检查的时候留着那个数字。"
+brief = '''
+在 **Rust** 里，`x` 是一个 `Option<i32>`：
+
+```
+match x {
+    // ____ "small odd",
+    Some(_) => "other",
+    None => "none",
+}
+```
+
+哪个分支头匹配一个 1 到 9（含）之间且为**奇数**的值，并把值绑定到 `n` 供检查？
+'''
+hints = [
+  "用 at 符号把一个名字绑定到范围子模式上，然后把算术放进守卫；Rust 的模式里没有 `in` 也没有 `as`。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet_advanced.30.match-python"
+title = "BOSS：位置模式"
+story = "最后一个节点，时代广场。蟒蛇的普通类在说明哪些属性算数、按什么顺序之前，不会按位置匹配。"
+brief = '''
+在 **Python** 3.12 里，`Pt` 是一个普通类 —— **不是** dataclass：
+
+```
+class Pt:
+    # ____
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+没有空位里那一行，`case Pt(a, b):` 会抛出
+`TypeError: Pt() accepts 0 positional sub-patterns`。类体里的哪一行能让
+`case Pt(a, b):` 把 `a` 绑定到 `x`、把 `b` 绑定到 `y`？
+'''
+hints = [
+  "有一个 dunder 正是做这个的，而解释器坚持它必须是一个属性名的元组 —— dataclass 会替你写好。",
+]

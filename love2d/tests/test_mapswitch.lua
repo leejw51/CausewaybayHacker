@@ -92,7 +92,11 @@ return function()
     T.eq(map.category, "basic")
     T.same(asked, { "remix.basic" })
     T.eq(app.category, "basic")
-    -- And Q on REMIX walks only its two roads.
+    -- And Q on REMIX walks only its three roads.
+    map:cycle_category()
+    T.eq(map.category, "cheatsheet")
+    map:cycle_category()
+    T.eq(map.category, "cheatsheet_advanced")
     map:cycle_category()
     T.eq(map.category, "verybasic")
     map:cycle_category()
@@ -188,7 +192,7 @@ return function()
   end)
 
   T.case("Q cycles the category in one action, wrapping", function()
-    -- Five roads on RUST (SPEC §0, PROTOCOL §5.3): VERY BASIC walks first,
+    -- Six roads on RUST (SPEC §0, PROTOCOL §5.3): CHEATSHEET walks first,
     -- FRAMEWORKS last.
     local map, asked = fake_map("rust", "basic")
     map:cycle_category()
@@ -198,11 +202,16 @@ return function()
     map:cycle_category()
     T.eq(map.category, "frameworks", "the crates road, after the interview")
     map:cycle_category()
-    T.eq(map.category, "verybasic", "and round again, through the quiz road")
+    T.eq(map.category, "cheatsheet", "and round again, through the cheatsheet")
+    map:cycle_category()
+    T.eq(map.category, "cheatsheet_advanced", "its advanced half")
+    map:cycle_category()
+    T.eq(map.category, "verybasic", "then the quiz road")
     map:cycle_category()
     T.eq(map.category, "basic")
     T.eq(map.land, "rust", "the land never moved")
-    T.same(asked, { "rust.advanced", "rust.hacker", "rust.frameworks", "rust.verybasic", "rust.basic" })
+    T.same(asked, { "rust.advanced", "rust.hacker", "rust.frameworks", "rust.cheatsheet",
+      "rust.cheatsheet_advanced", "rust.verybasic", "rust.basic" })
   end)
 
   T.case("switching to the map you are already on does nothing", function()

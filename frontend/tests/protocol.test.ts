@@ -2,7 +2,7 @@
 // stop being the same word, and `questLang` is the one place a client turns
 // a quest into the language its code is in.
 import { describe, expect, it } from "vitest";
-import { CATEGORIES, isLand, isLang, LANDS, LANGS, questLang, roadsOf } from "../src/net/protocol";
+import { CATEGORIES, LANDS, LANGS, isLand, isLang, isSheet, questLang, roadsOf } from "../src/net/protocol";
 
 describe("lands and languages", () => {
   it("every language is a land, and remix is the one land that is not a language", () => {
@@ -19,19 +19,25 @@ describe("lands and languages", () => {
 });
 
 describe("roadsOf", () => {
-  it("gives every language land the four roads, rust a fifth, and remix the two grammar roads", () => {
-    const four = ["verybasic", "basic", "advanced", "hacker"];
+  it("gives every land the two sheet roads first, every language land six roads, rust a seventh, and remix four", () => {
+    const six = ["cheatsheet", "cheatsheet_advanced", "verybasic", "basic", "advanced", "hacker"];
     for (const lang of LANGS) {
       if (lang === "rust") continue;
-      expect(roadsOf(lang)).toEqual(four);
+      expect(roadsOf(lang)).toEqual(six);
     }
-    expect(roadsOf("rust")).toEqual([...four, "frameworks"]);
+    expect(roadsOf("rust")).toEqual([...six, "frameworks"]);
     expect(roadsOf("rust")).toEqual(CATEGORIES);
-    expect(roadsOf("remix")).toEqual(["verybasic", "basic"]);
-    expect(roadsOf("zig")).toEqual(four);
-    expect(roadsOf("lua")).toEqual(four);
-    // A land nobody has opened is treated as a language land: four roads.
-    expect(roadsOf("cobol")).toEqual(four);
+    expect(roadsOf("remix")).toEqual(["cheatsheet", "cheatsheet_advanced", "verybasic", "basic"]);
+    expect(roadsOf("zig")).toEqual(six);
+    expect(roadsOf("lua")).toEqual(six);
+    // A land nobody has opened is treated as a language land: six roads.
+    expect(roadsOf("cobol")).toEqual(six);
+    // CHEATSHEET walks first: the grammar off the page, before it is typed;
+    // its ADVANCED half is next, and both are judged without a compiler.
+    expect(CATEGORIES[0]).toBe("cheatsheet");
+    expect(CATEGORIES[1]).toBe("cheatsheet_advanced");
+    expect(isSheet("cheatsheet") && isSheet("cheatsheet_advanced")).toBe(true);
+    expect(isSheet("advanced") || isSheet("verybasic")).toBe(false);
     // FRAMEWORKS walks last: it is the job after the interview.
     expect(CATEGORIES[CATEGORIES.length - 1]).toBe("frameworks");
   });

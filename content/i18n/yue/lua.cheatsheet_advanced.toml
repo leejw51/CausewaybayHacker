@@ -1,0 +1,461 @@
+# LUA LAND — CHEATSHEET ADVANCED, in Cantonese. A translation pack (SPEC
+# §12.1): the prose of `content/lua/cheatsheet_advanced.toml`, quest by quest,
+# and nothing else. The question is the brief; the four choices are code, live
+# in the English pack, and are never translated. Code blocks and identifiers
+# are copied verbatim.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "lua.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.cheatsheet_advanced.01.class-index"
+title = "識答嘅 TABLE"
+story = "21:00，浣紗街。每一節龍身都係一個 table，而 Mei 想啲 method 放埋一個地方。"
+brief = '''
+`Dragon` 係一個 method 嘅 table（`Dragon.length`、…），而佢個 constructor 已經寫好：
+
+```
+function Dragon.new(n)
+  return setmetatable({n = n}, Dragon)
+end
+```
+
+寫嗰一行，放喺 constructor 前面，令 `Dragon.new(3):length()` 搵到 `Dragon.length`。
+'''
+hints = [
+  "instance 嘅 metatable 係 `Dragon`；一個唔存在嘅 key 會喺嗰個 metatable 嘅 lookup 欄位指住嘅嘢度搵 —— 而佢可以指住個 class 本身。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.cheatsheet_advanced.02.inherit"
+title = "燈籠下面嗰一節"
+story = "燈籠係一節龍身加上面一團火；佢自己做唔到嘅嘢，由下面嗰節做。"
+brief = '''
+`Segment` 係一個普通嘅 function table（`Segment.burn`、…），自己冇任何 metatable
+欄位。`Lantern` 係一個慣常 pattern 嘅 class（`Lantern.__index = Lantern`，
+instance 用 `setmetatable({}, Lantern)` 整）。寫嗰一行，令一個燈籠對任何
+`Lantern` 冇定義嘅 method 都會退返去 `Segment` —— 同時保留 `Lantern` 自己嘅 method。
+'''
+hints = [
+  "個 class 本身需要一個 metatable；`Segment` 冇 lookup 欄位，所以佢照咁樣做唔到嗰個 metatable。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.cheatsheet_advanced.03.lt-sort"
+title = "佢哋自己排隊"
+story = "鼓隊有分數；司儀想排好佢哋，但唔想每次都寫一個 comparator。"
+brief = '''
+`Score` 係一個 class（`Score.__index = Score`）；每個 instance 有一個數字欄位 `v`。
+`scores` 係一個佢哋嘅 list。寫 metamethod 嗰一行，令 `table.sort(scores)` ——
+**冇 comparator** —— 將佢哋由最細嘅 `v` 開始排。
+'''
+hints = [
+  "冇 comparator 嘅話，sort 用 `<` 嚟比較，而兩個 table 之間嘅 `<` 會向佢哋嘅 metatable 要一個特定嘅欄位。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.cheatsheet_advanced.04.eq"
+title = "同一點，兩個 TABLE"
+story = "兩個跑手用兩個獨立嘅 table 標記大坑道上面同一個位，而張地圖一定要話佢哋相等。"
+brief = '''
+`P` 係一個 class（`P.__index = P`），佢嘅 instance 有數字欄位 `x` 同 `y`。
+`a` 同 `b` 係兩個欄位相等嘅**唔同** instance。寫 metamethod 嗰一行，令 `a == b` 係 true。
+'''
+hints = [
+  "喺 metamethod 入面，對兩個 table 做 `a == b` 會再呼叫個 metamethod；比較啲欄位，唔係啲 table。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.cheatsheet_advanced.05.call"
+title = "直接呼叫個 CLASS"
+story = "Mei 想 `Pad(5)` 讀落似一個 constructor，好似佢枱上面啲 LÖVE 代碼咁。"
+brief = '''
+`Pad` 係一個 class，有 `Pad.__index = Pad` 同一個 constructor `Pad.new(n)`。
+`mt` 係一個已經裝做 **`Pad` 自己**嘅 metatable 嘅 table（`setmetatable(Pad, mt)`）。
+寫嗰一行，令 `Pad(5)` 表現得同 `Pad.new(5)` 一樣。
+'''
+hints = [
+  "呼叫 `Pad` 會查 `Pad` 嘅 metatable，唔係 `Pad` 本身 —— 而個 handler 收到嘅第一個 argument 係被呼叫嗰個 table。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.cheatsheet_advanced.06.newindex-rawset"
+title = "先記低，再存入"
+story = "香燭賬簿每個新項目都先記 log；之後本賬簿仍然要揸住佢。"
+brief = '''
+`log` 係一個 list。`t` 係一個空 table，佢嘅 metatable 有：
+
+```
+__newindex = function(t, k, v)
+  log[#log + 1] = k
+  -- ____
+end
+```
+
+填個空位，令個值真係存入 `t`（之後 `t[k]` 讀得返），而且**唔會**第二次行呢個 handler。
+'''
+hints = [
+  "handler 行嗰陣個 key 仍然係唔存在嘅，所以普通賦值會再次觸發 handler，直到永遠；個存入要繞過個 metatable。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.cheatsheet_advanced.07.rawget-default"
+title = "有冇寫過"
+story = "計數 table 對任何名都答零；司儀想知邊啲名係真係輸入過。"
+brief = '''
+`counts` 係咁樣整嘅
+
+```
+local counts = setmetatable({}, {__index = function() return 0 end})
+```
+
+所以任何唔存在嘅 key 讀出嚟都係 `0`。開一個 `if`，淨係當 `k` **真係**存過入
+`counts` 嗰陣先係 true —— 存咗嘅 `0` 算存過，從來冇寫過嘅 key 唔算。
+'''
+hints = [
+  "普通讀取會經過個預設值；跳過 metatable 嗰個讀取係一個 global function，唔係 method。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.cheatsheet_advanced.08.len-trap"
+title = "個 STACK 有幾長"
+story = "備用香燭嗰疊 stack 俾一個睇過 5.2 手冊嘅人加咗一個 length metamethod。"
+brief = '''
+`Stack` 將佢啲值放喺 `s.items`（一個 list）。佢嘅 metatable 係一個私有 table，
+定義咗 `__len` 回傳 `#s.items`；冇 `len` method。喺呢個 land 嘅 LuaJIT 上面，
+將 `n` 整做 stack `s` 入面值嘅數目。
+'''
+hints = [
+  "LuaJIT 係 Lua 5.1：length metamethod 淨係對 userdata 有效，所以對個物件用 `#` 得到嘅係一個空 table 嘅原始長度 —— 0。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.cheatsheet_advanced.09.loop-closure"
+title = "每個燈籠自己個數"
+story = "維園三個燈籠，每個有一個掣，遲啲㩒嗰陣一定要講自己個號碼。"
+brief = '''
+`fns` 係一個空 table。用三個 function 填滿佢，令 `fns[1]()`、`fns[2]()` 同
+`fns[3]()` 回傳 `1`、`2` 同 `3` —— 每個 closure 都保留自己個數。
+'''
+hints = [
+  "數字 `for` 每次迭代都整一個新嘅 local；將佢 copy 入一個外層變數會令每個 closure 都攞到同一個最終值。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.cheatsheet_advanced.10.false-default"
+title = "FALSE 都係一個答案"
+story = "班底可以故意將 cache 關咗；有一晚個設定讀出嚟仍然係開，Mei 就搵到原因。"
+brief = '''
+`given` 係呼叫者傳入嘅選項：`true`、`false`，或者冇傳（`nil`）；`default` 係 `true`。
+將 `cache` 整做傳入嘅值 —— **包括 `false`** —— 而淨係喺乜都冇傳嗰陣先係 `default`。一行。
+'''
+hints = [
+  "`x and y or z` 同 `x or z` 都會將 `false` 當 `nil` 咁處理；淨係明確同 `nil` 比較先分得開兩者。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.cheatsheet_advanced.11.select-n"
+title = "第二聲"
+story = "點名嘅答覆點嚟就點嚟；司儀想要第二個答覆，就算第一個抬龍嘅乜都冇講。"
+brief = '''
+`f` 收任何數量嘅 argument（`function f(...)`）。喺佢入面，將 `second` 整做
+啱啱好佢嘅第二個 argument —— 就算第一個係 `nil`，就算後面仲有更多。
+'''
+hints = [
+  "vararg list 可以喺某個位置切開；將結果賦值畀一個 local 就淨係保留剩低嘅第一個值。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.cheatsheet_advanced.12.unpack-range"
+title = "每一個，連窿都要"
+story = "啲名跟住叫出嚟嘅樣沿住條龍傳落去，連空隙都傳，去到數佢哋嗰一節。"
+brief = '''
+`t` 係 `{...}`，而 `n` 係 `select("#", ...)`，所以 `t` 可能有 `nil` 窿
+（`t = {1, nil, nil}`，`n = 3`）。用**全部** `n` 個值呼叫 `g`，連窿都要。
+'''
+hints = [
+  "對有窿嘅 table 用 `#` 得到嘅係一個 border，唔係數目；unpacker 收明確嘅第一個同最後一個 index，而喺 LuaJIT 上面佢係一個 global。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.cheatsheet_advanced.13.truncate"
+title = "淨係第一個"
+story = "`f` 報告一個值同一個狀態；節目單想要一個淨係裝住個值嘅 list。"
+brief = '''
+`f()` 回傳兩個值，`1, 2`。將 `t` 整做一個裝住**啱啱好一個**元素嘅 list，
+即係第一個值 —— 唔用臨時變數。
+'''
+hints = [
+  "constructor 最後一個位置嘅呼叫會展開每一個結果；將個呼叫包起就會將佢調整做一個值。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.cheatsheet_advanced.14.wrap"
+title = "可以呼叫嘅跑手"
+story = "每一節一個香燭跑手：司儀想好似呼叫 function 咁呼叫每一個，然後攞到下一個燈籠號碼。"
+brief = '''
+`producer` 係一個會 yield 一個值幾次嘅 function（loop 入面嘅 `coroutine.yield(i)`）。
+將 `gen` 整做一個普通 **function**：每次 `gen()` 回傳下一個 yield 出嚟嘅值，
+而且佢可以直接用喺 `for v in gen do` 入面。
+'''
+hints = [
+  "建立一個 coroutine 會畀一個 thread 值，呼叫唔到；個 library 有第二個 constructor，交返嘅係一個 function。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.cheatsheet_advanced.15.resume-value"
+title = "跑手帶返嚟嘅嘢"
+story = "跑手將一個數沿住條龍交上去，然後等一個落返嚟先完。"
+brief = '''
+```
+local co = coroutine.create(function(a)
+  local b = coroutine.yield(a * 2)
+  return b + 1
+end)
+```
+
+`co` 已經用 `5` 開咗一次；嗰次呼叫回傳咗 `true, 10`，而 `coroutine.status(co)`
+而家係 `"suspended"`。寫下一行，令 `ok, v` 係 `true, 8`，而個 coroutine 完結（`"dead"`）。
+'''
+hints = [
+  "第二次 resume 嘅 argument 會變成等緊嗰個 yield 嘅結果 —— 啱啱好嗰啲 argument，唔會多。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.cheatsheet_advanced.16.error-table"
+title = "有結構嘅失敗"
+story = "一個失敗嘅查找應該講明佢係用邊個 code 失敗，唔係交一句說話畀呼叫者去 parse。"
+brief = '''
+`lookup` 一定要用一種令佢嘅呼叫者可以咁做嘅方式失敗
+
+```
+local ok, e = pcall(lookup, id)
+if not ok then print(e.code) end   -- 404
+```
+
+寫 `lookup` 入面 raise 嗰個失敗嘅一行。
+'''
+hints = [
+  "error 值可以係任何 Lua 值，唔止 string；回傳佢而唔係 raise 佢會令 `ok` 仍然係 true。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.cheatsheet_advanced.17.xpcall"
+title = "喺邊度斷"
+story = "條龍停咗喺第四十節。Mei 想要個訊息同佢上面嘅 frame，唔係淨係個訊息。"
+brief = '''
+喺 protected mode 呼叫 `f`；失敗嗰陣 `err` 一定要裝住個訊息**連埋一個 stack
+traceback**，唔係光秃秃嘅訊息。
+'''
+hints = [
+  "收 message handler 嗰個 protected call 想要個 handler 係一個 function 值；喺嗰度呼叫佢會交一個 string 過去，會被拒絕。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.cheatsheet_advanced.18.gmatch-pairs"
+title = "KEY、等號、VALUE"
+story = "鼓隊嘅 config 以一行 `name=value` 對嘅形式喺奧士比街嚟到。"
+brief = '''
+`s` 係 `"a=1 bb=22 c=3"`。開一個 loop，逐對行過，`k` 係個名，`v` 係啲數字，
+兩個都係 string —— `a`/`1`、`bb`/`22`、`c`/`3`。
+'''
+hints = [
+  "pattern 入面每個 capture 都變成一個 loop 變數；冇 capture 嘅話個 loop 攞到嘅係成個匹配，其他乜都冇。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.cheatsheet_advanced.19.gsub-table"
+title = "填空"
+story = "節目單模板有 `$name` 嘅窿；班底名單填佢哋，而部打印機想知佢填咗幾多個。"
+brief = '''
+`vars` 係 `{name = "Mei", st = "Tai Hang"}`，而 `s` 係 `"hi $name of $st"`。
+將**每一個** `$word` 換做 `vars[word]`，並且將 `n` 整做換咗幾多個 —— 一個呼叫，冇 loop。
+'''
+hints = [
+  "用 table 做替換嗰陣，第一個 capture 就係查找用嘅 key；個數目係個呼叫嘅第二個結果。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.cheatsheet_advanced.20.frontier"
+title = "成個字"
+story = "數節目筆記入面嘅 `the`，Mei 一直連 `there` 同 `thesis` 都捉埋。"
+brief = '''
+`s` 係 `"the thesis there; the other, the."`。將 `n` 整做 `the` 以**完整一個字**
+出現嘅次數 —— 呢度係 `3`，唔係 `6`。（`out` 冇用到。）
+'''
+hints = [
+  "Lua pattern 冇 `\\b`；frontier 項匹配嘅係進入或者離開一個字元類別嘅空轉換，包括喺 string 兩端。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.cheatsheet_advanced.21.format-widths"
+title = "節目單嘅欄"
+story = "蓮花宮個檔口嘅價錢板對齊成欄，而評判逐個 byte 咁 diff 佢。"
+brief = '''
+`name` 係 `"tea"`，`price` 係 `3.5`，`n` 係 `7`。印出啱啱好
+
+```
+tea       | 3.50|007
+```
+
+—— 個名喺 10 欄入面靠左，價錢喺 5 欄入面兩位小數，個數補零到 3 位。
+'''
+hints = [
+  "闊度入面一個負號係靠左，開頭一個零係補零，而個 float 闊度數嘅係成個 `3.50`。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.cheatsheet_advanced.22.sort-strict"
+title = "打和唔死機"
+story = "四十隊鼓隊，大部分同分，而個 sort 喺評判面前 raise 咗 `invalid order function`。"
+brief = '''
+`t` 係一個有數字欄位 `score` 嘅紀錄 list，而且**好多都打和**。將佢由最高分
+開始排，而 LuaJIT 唔會 raise `invalid order function for sorting`。
+'''
+hints = [
+  "comparator 一定要係嚴格順序：相等嘅元素係 false，而且係一個 boolean，唔係數字。（個 sort 唔係 stable 嘅；打和嘅紀錄可以任何次序出嚟。）",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.cheatsheet_advanced.23.next-empty"
+title = "賬簿入面乜都冇"
+story = "本賬簿係用抬龍嘅人嘅名做 key；`#` 無論佢係空定係滿都話零。"
+brief = '''
+`t` 係用抬龍嘅人嘅名做 key —— 淨係 string key —— 所以無論佢有冇嘢，`#t` 都係 `0`。
+開一個 `if`，淨係當 `t` 完全**冇**任何項目嗰陣先係 true。
+'''
+hints = [
+  "`pairs` 背後嗰個 iterator primitive 會回傳一個 table 嘅第一個 key，冇就係 `nil`；每個 table 都係自己一個值，所以 `{}` 乜都唔等於。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.cheatsheet_advanced.24.big-digits"
+title = "全部位數"
+story = "燈籠數去到十六位數，而打印出嚟係科學記數法。"
+brief = '''
+`n` 係 `2^50` —— 即係 `1125899906842624` 呢個數。印晒每一個位數，冇指數
+（LuaJIT 嘅 `print` 顯示 `1.1258999068426e+15`）。
+'''
+hints = [
+  "呢度每個數都係 double，而預設轉換係 `%.14g`；`format` 入面嘅整數轉換會寫晒十六個位數。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.cheatsheet_advanced.25.bit-test"
+title = "個 FLAG 有冇舉起"
+story = "每一節嘅狀態係一個 flag 數；司儀檢查 `lit` 嗰一個 bit。"
+brief = '''
+`flags` 係一個當一排 bit 用嘅數，`i` 係一個由 `0` 數起嘅 bit 位置；LuaJIT 嘅
+`bit` library 已經 load 做 `bit`。開一個 `if`，啱啱好當 `flags` 嘅第 `i` 個 bit
+係 set 嗰陣先係 true。
+'''
+hints = [
+  "LuaJIT 冇 operator 做呢樣嘢 —— 係兩個 library 呼叫 —— 而 `0` 喺 Lua 係 true，所以個結果仍然要比較。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.cheatsheet_advanced.26.goto-continue"
+title = "跳過呢個"
+story = "雙數節呢圈休息；個 loop 行過佢哋，唔使將成個 body 包喺一個 `if` 入面。"
+brief = '''
+```
+for _, v in ipairs(t) do
+  -- ____
+  io.write(v, " ")
+  ::continue::
+end
+```
+
+填個空位，令雙數值被跳過而個 loop 繼續行（LuaJIT 2.1）。
+'''
+hints = [
+  "Lua 冇 `continue` 關鍵字；LuaJIT 有 5.2 嘅跳轉語句，而 body 尾嗰個 label 就係佢嘅目標。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.cheatsheet_advanced.27.local-function"
+title = "知道自己個名嘅 FUNCTION"
+story = "書館街個階乘係 local、遞歸，而且第二次呼叫就死機 —— `attempt to call global 'fact'`。"
+brief = '''
+將 `fact` 宣告做一個 **local** function，body 係
+
+```
+  if n <= 1 then return 1 end
+  return n * fact(n - 1)
+```
+
+令遞歸呼叫搵得到佢（唔存在叫 `fact` 嘅 global）。寫開頭嗰一行。
+'''
+hints = [
+  "喺 `local x = <expr>` 入面，個名要到個表達式之後先入 scope，所以咁樣賦值嘅 function 值見唔到自己。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.cheatsheet_advanced.28.ffi-array"
+title = "真正嘅 C ARRAY"
+story = "LÖVE client 底下個錢包 binding 同 C 講嘢；佢交出去嘅 buffer 一定要係一個 C array，唔係 Lua table。"
+brief = '''
+`ffi` 係 `require("ffi")`，而 `n` 係一個運行時先知嘅數。將 `buf` 整做一個
+有 `n` 個 `int` 嘅 C array —— 填零、由 `0` 開始 index、大小係 `n`。
+'''
+hints = [
+  "C type string 入面唔可以有 Lua 變數；可變長度 array 用一個 placeholder 宣告，而佢嘅數目做下一個 argument。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.cheatsheet_advanced.29.weak-cache"
+title = "識放手嘅 CACHE"
+story = "render cache 用燈籠物件做 key；燒完嘅燈籠唔可以被自己嘅 cache 項目留住條命。"
+brief = '''
+`cache` 將物件（當 key 用嘅 table）對應到計好嘅值。令一個冇其他嘢 reference
+嘅物件可以被回收 —— 佢嘅項目跟住消失 —— 而為一個仲生存嘅物件存嘅值就留住。
+'''
+hints = [
+  "弱引用係一個裝住 string 嘅 metatable 欄位；佢入面有邊個字母決定係 key、value，定係兩樣都弱。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.cheatsheet_advanced.30.sandbox"
+title = "畀月亮嘅沙池"
+story = "午夜。最後一個挑戰係一個陌生人打嘅一行 Lua，而佢喺一間除咗 `x` 乜都冇嘅房入面行。"
+brief = '''
+`src` 係一個 Lua string，`"return x * 2"`，而 `env` 係 `{x = 10}`。將佢編譯做
+一個 function `f`，佢嘅 global **淨係**得 `env` —— 令 `f()` 回傳 `20`，而
+`print` 喺入面係見唔到嘅。一行，LuaJIT。
+'''
+hints = [
+  "編譯一個 string 會得到一個 function（或者 nil 加一個訊息 —— 所以要 assert）；5.1 嗰個換走 function 嘅 global table 嘅呼叫會回傳同一個 function。",
+]

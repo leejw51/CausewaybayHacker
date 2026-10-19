@@ -24,6 +24,7 @@ import {
 import { seconds, Tween } from "../engine/motion";
 import {
   LANDS,
+  isSheet,
   roadsOf,
   type Category,
   type CategorySummary,
@@ -158,10 +159,13 @@ export function roadColumn(
   const tight = fixed + Math.max(playH, tileFull) > h;
   const tileH = tight ? playH : Math.max(playH, tileFull);
   const tile: Rect = [x, y, w, tileH];
-  const record: Rect = [x, y + tileH + gap, w, recH];
   const buttons: Rect = [x, y + h - playH, w, playH];
-  const rowsTop = record[1] + recH + gap * 2;
-  const rowsBottom = buttons[1] - gap * 2;
+  // The record sits under the roads, not between them and the tile: the
+  // first road is CHEATSHEET, and it reads straight after the playground —
+  // the two main things on this screen, one under the other.
+  const record: Rect = [x, buttons[1] - gap * 2 - recH, w, recH];
+  const rowsTop = y + tileH + gap * 2;
+  const rowsBottom = record[1] - gap;
   const share = Math.floor((rowsBottom - rowsTop) / Math.max(1, roads)) - gap;
   const rowH = Math.max(floorH, Math.min(minRowH, share));
   const rows: Rect[] = [];
@@ -321,6 +325,8 @@ export function landGrid(
 }
 
 const CAT_LINE: Record<Category, () => string> = {
+  cheatsheet: () => t("lands.cheatsheetBlurb"),
+  cheatsheet_advanced: () => t("lands.cheatsheetAdvancedBlurb"),
   verybasic: () => t("lands.verybasicBlurb"),
   basic: () => t("lands.basicBlurb"),
   advanced: () => t("lands.advancedBlurb"),
@@ -1215,7 +1221,7 @@ export class LandsScene implements Scene {
       );
       const inlineAll = nameW + countW + Math.round(8 * s) <= colTw;
 
-      let y = col.rows[0]?.[1] ?? col.record[1] + recH + gap * 2;
+      let y = col.rows[0]?.[1] ?? col.tile[1] + col.tile[3] + gap * 2;
       for (const c of cats) {
         // Nothing is *locked* (PROTOCOL §4.7): a road with streets in it is a
         // road you may walk down today, whatever you have cleared. `open` is
@@ -1233,6 +1239,14 @@ export class LandsScene implements Scene {
         const accent = landColour(this.land);
 
         fill(g, empty ? Theme.dim : Theme.navy, rx, y, barW, rowH, empty ? 0.35 : 0.9);
+        // The two sheet roads lead the roads and are framed like the tile
+        // above them: the drill for the live coding test is the second main
+        // thing here.
+        const lead = isSheet(c.category) && !empty;
+        if (lead) {
+          fill(g, Theme.coin, rx, y, barW, rowH, 0.35 + 0.65 * lit);
+          fill(g, Theme.navy, rx + 2, y + 2, barW - 4, rowH - 4, 0.97);
+        }
         // The lit face is the land's own colour at a whisper, so hovering GO
         // and hovering RUST do not feel like the same screen.
         if (lit > 0.01) fill(g, accent, rx, y, barW, rowH, 0.18 * lit);
@@ -1336,7 +1350,7 @@ export class LandsScene implements Scene {
         const twoLines = rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
         const countBelow = !inlineAll && twoLines;
         const showCount = inlineAll || twoLines;
-        g.fillStyle = css(empty ? Theme.dim : Theme.cream);
+        g.fillStyle = css(empty ? Theme.dim : lead ? Theme.coin : Theme.cream);
         printf(g, fonts.button, catName, tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.

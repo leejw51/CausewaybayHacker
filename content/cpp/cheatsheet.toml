@@ -1,0 +1,874 @@
+# C++ LAND — CHEATSHEET. The grammar off the page, asked: one question per
+# section of a modern C++ (17/20) live-coding cheatsheet — fast I/O, a whole
+# line, fixed decimals, a wide product, a loop that writes back, a grid, a
+# sort, a tally, a lookup, a heap, an erase, a failed parse. Four lines, one
+# right. Nothing is typed and nothing is compiled — the pick is the
+# submission, and the server judges it against the quiz (SPEC §0). The three
+# wrong lines are near-misses: another language's spelling, a copy where a
+# reference was meant, a call that compiles and does the wrong thing.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "cpp.cheatsheet"
+land = "cpp"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "cpp.cheatsheet.01.fast-io"
+node        = 1
+title       = "OPEN THE FLOODGATE"
+difficulty  = 1
+story       = "06:00, the typhoon shelter. A million fish prices arrive at once, and the default streams are too polite to keep up."
+concepts    = ["io", "types"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+First thing in `main`, before any I/O: stop `cin`/`cout` from syncing with
+C's stdio, and untie `cin` from `cout` so reading does not flush output.
+
+Which line is it?
+'''
+solution    = 'std::ios::sync_with_stdio(false); std::cin.tie(nullptr);'
+hints = [
+  "Sync off is `false`; `tie` takes a pointer to the stream to flush, and `nullptr` means none.",
+]
+
+[quest.quiz]
+choices = [
+  'std::ios::sync_with_stdio(true); std::cin.tie(nullptr);',
+  'std::cin.tie(std::cout); std::ios::sync_with_stdio(false);',
+  'std::ios::fast_io(true);',
+  'std::ios::sync_with_stdio(false); std::cin.tie(nullptr);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "cpp.cheatsheet.02.getline"
+node        = 2
+title       = "SPACES INCLUDED"
+difficulty  = 1
+story       = "The address on the delivery slip is 'Flat 7, 32 Percival Street' — and every space in it matters."
+concepts    = ["io", "strings"]
+requires    = ["cpp.cheatsheet.01.fast-io"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`std::string line;` — read one **whole line** of input into it, spaces and
+all.
+'''
+solution    = 'std::getline(std::cin, line);'
+hints = [
+  "`>>` stops at the first whitespace. The free function takes the stream first, the string second.",
+]
+
+[quest.quiz]
+choices = [
+  'std::getline(std::cin, line);',
+  'std::cin >> line;',
+  'std::cin.getline(line);',
+  'line = std::cin.readLine();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "cpp.cheatsheet.03.fixed"
+node        = 3
+title       = "TWO PLACES"
+difficulty  = 1
+story       = "The exchange booth on Hennessy Road shows every rate to exactly two decimal places."
+concepts    = ["io", "types"]
+requires    = ["cpp.cheatsheet.02.getline"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`double x = 3.14159;` and `<iomanip>` is included. Print `3.14` — exactly two
+digits **after the decimal point**.
+'''
+solution    = 'std::cout << std::fixed << std::setprecision(2) << x;'
+hints = [
+  "On its own, `setprecision` counts significant digits. `std::fixed` makes it count decimals.",
+]
+
+[quest.quiz]
+choices = [
+  'std::cout << std::setprecision(2) << x;',
+  'printf("%.2d", x);',
+  'std::cout << std::fixed << std::setprecision(2) << x;',
+  'std::cout << std::round(x, 2);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "cpp.cheatsheet.04.long-long"
+node        = 4
+title       = "THE WIDE PRODUCT"
+difficulty  = 1
+story       = "Two billion-dollar bids at the Causeway Bay auction house, multiplied. An int cannot hold the answer."
+concepts    = ["types", "math"]
+requires    = ["cpp.cheatsheet.03.fixed"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`int a, b;` each up to 10^9. Store `a` times `b` in `p` without overflow.
+'''
+solution    = 'long long p = (long long)a * b;'
+hints = [
+  "The multiplication happens in the type of its operands. Widen one of them before the `*`, not after.",
+]
+
+[quest.quiz]
+choices = [
+  'long long p = a * b;',
+  'long long p = (long long)a * b;',
+  'long long p = (long long)(a * b);',
+  'int p = a * b;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "cpp.cheatsheet.05.range-for"
+node        = 5
+title       = "WRITE IT BACK"
+difficulty  = 1
+story       = "Double-points night at the Sogo arcade. Every score on the board has to change, not a copy of it."
+concepts    = ["iteration", "collections"]
+requires    = ["cpp.cheatsheet.04.long-long"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+Double every element of `std::vector<int> v`, **in place**.
+'''
+solution    = 'for (auto& x : v) x *= 2;'
+hints = [
+  "`auto x` is a copy of each element. Bind a reference to change the vector itself.",
+]
+
+[quest.quiz]
+choices = [
+  'for (auto& x : v) x *= 2;',
+  'for (auto x : v) x *= 2;',
+  'for (x in v) x *= 2;',
+  'for (auto x : v) v[x] *= 2;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "cpp.cheatsheet.06.grid"
+node        = 6
+title       = "THE FLOOR PLAN"
+difficulty  = 2
+story       = "Windsor House, floor by floor, shop by shop: an n-by-m plan with every unit empty."
+concepts    = ["collections", "matrix"]
+requires    = ["cpp.cheatsheet.05.range-for"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`n` and `m` are read at run time. Make `g`, an `n`-by-`m` grid of `int`, every
+cell `0`, indexable as `g[i][j]`.
+'''
+solution    = 'std::vector<std::vector<int>> g(n, std::vector<int>(m, 0));'
+hints = [
+  "The second constructor argument is the value each of the `n` rows starts as — so make it a whole row.",
+]
+
+[quest.quiz]
+choices = [
+  'std::vector<int> g(n, m);',
+  'int g[n][m] = {0};',
+  'std::vector<std::vector<int>> g(n * m);',
+  'std::vector<std::vector<int>> g(n, std::vector<int>(m, 0));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "cpp.cheatsheet.07.desc"
+node        = 7
+title       = "BIGGEST FIRST"
+difficulty  = 2
+story       = "The rent board on Paterson Street lists the most expensive shopfront at the top."
+concepts    = ["sorting", "closures"]
+requires    = ["cpp.cheatsheet.06.grid"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`std::vector<int> v` holds numbers in no particular order. Sort it in
+**descending** order.
+'''
+solution    = 'std::sort(v.begin(), v.end(), std::greater<int>());'
+hints = [
+  "Ascending is the default; the third argument of `sort` turns it round — reversing afterwards is a second pass.",
+]
+
+[quest.quiz]
+choices = [
+  'std::sort(v.begin(), v.end(), std::less<int>());',
+  'std::sort(v.begin(), v.end(), std::greater<int>());',
+  'std::reverse(v.begin(), v.end());',
+  'v.sort(std::greater<int>());',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "cpp.cheatsheet.08.count"
+node        = 8
+title       = "THE TALLY"
+difficulty  = 2
+story       = "The cha chaan teng counts milk teas by table, and a new table starts at zero."
+concepts    = ["hashing", "collections"]
+requires    = ["cpp.cheatsheet.07.desc"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`std::unordered_map<std::string, int> cnt;` — add one to the count for word
+`w`. A word not seen yet starts at 0.
+'''
+solution    = '++cnt[w];'
+hints = [
+  "`operator[]` inserts a missing key with a value-initialised `int`, which is 0. `at` throws instead.",
+]
+
+[quest.quiz]
+choices = [
+  'cnt.at(w)++;',
+  'cnt.insert(w, 1);',
+  '++cnt[w];',
+  'cnt.get(w) += 1;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "cpp.cheatsheet.09.find"
+node        = 9
+title       = "JUST LOOKING"
+difficulty  = 2
+story       = "The guard at the Lee Garden lobby checks the visitor list. He is not allowed to write on it."
+concepts    = ["hashing", "collections"]
+requires    = ["cpp.cheatsheet.08.count"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`m` is a `std::map<std::string, int>`. Test whether key `k` is present —
+**without** adding it to the map.
+'''
+solution    = 'if (m.find(k) != m.end()) {'
+hints = [
+  "`m[k]` inserts a default value when the key is missing. `find` returns `end()` instead.",
+]
+
+[quest.quiz]
+choices = [
+  'if (m[k]) {',
+  'if (m.find(k) != m.end()) {',
+  'if (m.has(k)) {',
+  'if (k in m) {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "cpp.cheatsheet.10.min-heap"
+node        = 10
+title       = "SMALLEST ON TOP"
+difficulty  = 3
+story       = "The minibus stand on Tang Lung Street sends the shortest trip first. A priority_queue only knows how to put the biggest on top."
+concepts    = ["heaps", "generics"]
+requires    = ["cpp.cheatsheet.09.find"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+A `std::priority_queue` pops the **largest** first by default. Declare `pq` so
+that `pq.top()` is the **smallest** `int`.
+'''
+solution    = 'std::priority_queue<int, std::vector<int>, std::greater<int>> pq;'
+hints = [
+  "The template takes three arguments: the type, the container, then the comparator. You cannot skip the middle one.",
+]
+
+[quest.quiz]
+choices = [
+  'std::priority_queue<int> pq;',
+  'std::priority_queue<int, std::greater<int>> pq;',
+  'std::min_heap<int> pq;',
+  'std::priority_queue<int, std::vector<int>, std::greater<int>> pq;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "cpp.cheatsheet.11.erase-remove"
+node        = 11
+title       = "SWEEP THE ZEROS"
+difficulty  = 3
+story       = "Closing time at the Jardine's Crescent stalls. The empty crates go, and the row gets shorter."
+concepts    = ["collections", "iteration"]
+requires    = ["cpp.cheatsheet.10.min-heap"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+Delete every `0` from `std::vector<int> v`, so that `v.size()` shrinks.
+'''
+solution    = 'v.erase(std::remove(v.begin(), v.end(), 0), v.end());'
+hints = [
+  "`std::remove` only shuffles the keepers forward and returns the new end; `erase` the range from there to the old end.",
+]
+
+[quest.quiz]
+choices = [
+  'v.erase(std::remove(v.begin(), v.end(), 0), v.end());',
+  'std::remove(v.begin(), v.end(), 0);',
+  'v.erase(std::remove(v.begin(), v.end(), 0));',
+  'v.remove(0);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "cpp.cheatsheet.12.stoi"
+node        = 12
+title       = "THE BAD NUMBER"
+difficulty  = 3
+story       = "The ledger in Room 7-32 has a cell that reads 'abc'. The parser throws, and somebody has to catch it."
+concepts    = ["error-handling", "strings"]
+requires    = ["cpp.cheatsheet.11.erase-remove"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`std::string s` might be `"abc"`, and `std::stoi` throws on that. Set `int n`
+to the parsed value, or to `-1` when `s` is not a number.
+'''
+solution    = 'try { n = std::stoi(s); } catch (const std::invalid_argument& e) { n = -1; }'
+hints = [
+  "A `catch` only matches the type that was thrown. `stoi` throws `std::invalid_argument` when there is no number.",
+]
+
+[quest.quiz]
+choices = [
+  'n = std::stoi(s, -1);',
+  'try { n = std::stoi(s); } catch (std::string e) { n = -1; }',
+  'try { n = std::stoi(s); } catch (const std::invalid_argument& e) { n = -1; }',
+  'n = std::atoi(s);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "cpp.cheatsheet.13.words"
+node        = 13
+title       = "WORD BY WORD"
+difficulty  = 2
+story       = "The Noon Day Gun's log line reads 'fired   12:00  Jardine' — and the gaps between the words are not always one space wide."
+concepts    = ["strings", "io"]
+requires    = ["cpp.cheatsheet.12.stoi"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`std::string line` holds words separated by **one or more** spaces.
+`<sstream>` is included, and `std::string w;` and
+`std::vector<std::string> words;` are declared. Push every word into
+`words`, in order, with no empty strings among them.
+'''
+solution    = 'std::istringstream ss(line); while (ss >> w) words.push_back(w);'
+hints = [
+  "`>>` on a string stream skips any run of whitespace before each word and stops at the next — a delimiter-based read does not skip anything.",
+]
+
+[quest.quiz]
+choices = [
+  "std::istringstream ss(line); while (std::getline(ss, w, ' ')) words.push_back(w);",
+  "for (auto& t : line.split(' ')) words.push_back(t);",
+  'std::istringstream ss(line); while (ss >> w) words.push_back(w);',
+  'std::istringstream ss(line); while (ss >> w) words.push(w);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "cpp.cheatsheet.14.capture"
+node        = 14
+title       = "THE RUNNING TOTAL"
+difficulty  = 2
+story       = "The sampan ferry at the typhoon shelter keeps one fare box, and every boarding has to land in that box — not in a photocopy of it."
+concepts    = ["closures", "mutability"]
+requires    = ["cpp.cheatsheet.13.words"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`int total = 0;` is a local in `main`. Define `add` so that `add(5);` adds
+`5` to **that very `total`** — afterwards `total` reads `5`.
+'''
+solution    = 'auto add = [&](int x) { total += x; };'
+hints = [
+  "A lambda sees nothing from outside unless the brackets say so, and a copy-capture is read-only unless you ask otherwise — and even then it is only a copy.",
+]
+
+[quest.quiz]
+choices = [
+  'auto add = [=](int x) { total += x; };',
+  'auto add = [](int x) { total += x; };',
+  'auto add = [=](int x) mutable { total += x; };',
+  'auto add = [&](int x) { total += x; };',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "cpp.cheatsheet.15.bindings"
+node        = 15
+title       = "KEY AND VALUE, BY NAME"
+difficulty  = 2
+story       = "Rent review on Yee Wo Street: every shop in the ledger goes up by one, and it is the ledger itself that has to change."
+concepts    = ["pattern-matching", "collections", "iteration"]
+requires    = ["cpp.cheatsheet.14.capture"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`std::map<std::string, int> m;` — add `1` to **every value stored in `m`**,
+naming the key `k` and the value `v` right in the loop header (no `.first`
+or `.second`).
+'''
+solution    = 'for (auto& [k, v] : m) v += 1;'
+hints = [
+  "The square brackets unpack each pair into two names. Whether those names alias the map's own pair or a copy of it depends on what comes before them.",
+]
+
+[quest.quiz]
+choices = [
+  'for (auto& [k, v] : m) v += 1;',
+  'for (auto [k, v] : m) v += 1;',
+  'for (const auto& [k, v] : m) v += 1;',
+  'for (auto& [k, v] in m) v += 1;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "cpp.cheatsheet.16.sort-by"
+node        = 16
+title       = "SECOND FIRST"
+difficulty  = 2
+story       = "The slipway winch log at the Yacht Club pairs each hull number with a skipper's name, and the harbour master wants it alphabetical by skipper."
+concepts    = ["sorting", "closures"]
+requires    = ["cpp.cheatsheet.15.bindings"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`std::vector<std::pair<int, std::string>> v;` — the lines below are the
+third argument to `std::sort(v.begin(), v.end(), …)`. Pick the one that
+orders `v` by the **string**, A to Z.
+'''
+solution    = '[](auto& a, auto& b) { return a.second < b.second; }'
+hints = [
+  "The comparator answers one question — does `a` go before `b`? — about the member you care about, with a strict `<`.",
+]
+
+[quest.quiz]
+choices = [
+  '[](auto& a, auto& b) { return a.first < b.first; }',
+  '[](auto& a, auto& b) { return a.second < b.second; }',
+  '[](auto& a, auto& b) { return a.second > b.second; }',
+  '[](auto& a, auto& b) { return a.second.size() < b.second.size(); }',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "cpp.cheatsheet.17.ordering"
+node        = 17
+title       = "A SEAT IN THE SET"
+difficulty  = 3
+story       = "Every sampan in the typhoon shelter is a (row, column) berth, and the harbour office keeps them in a std::set — which refuses anything it cannot order."
+concepts    = ["structs", "sorting", "collections"]
+requires    = ["cpp.cheatsheet.16.sort-by"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+```cpp
+struct Pt { int r, c; };
+std::set<Pt> taken;
+```
+
+This does not compile yet. Add **one member** inside `Pt` so that `taken`
+works and orders by `r`, then by `c` to break ties. C++20, `<tuple>` is
+included.
+'''
+solution    = 'bool operator<(const Pt& o) const { return std::tie(r, c) < std::tie(o.r, o.c); }'
+hints = [
+  "The set compares `const` elements, and a lexicographic order means the second field only matters when the first one ties.",
+]
+
+[quest.quiz]
+choices = [
+  'bool operator<(const Pt& o) const { return r < o.r; }',
+  'bool operator<(const Pt& o) const { return r < o.r && c < o.c; }',
+  'bool operator<(const Pt& o) { return std::tie(r, c) < std::tie(o.r, o.c); }',
+  'bool operator<(const Pt& o) const { return std::tie(r, c) < std::tie(o.r, o.c); }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "cpp.cheatsheet.18.optional"
+node        = 18
+title       = "MAYBE A NUMBER"
+difficulty  = 3
+story       = "The pump room under Victoria Park's fountain reports a pressure reading, or nothing at all when the sensor is unplugged — and the display must never crash on nothing."
+concepts    = ["error-handling", "zero-values"]
+requires    = ["cpp.cheatsheet.17.ordering"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`std::optional<int> r = read_sensor();` — set `int n` to the reading, or to
+`-1` when `r` holds nothing. Nothing may throw.
+'''
+solution    = 'int n = r.value_or(-1);'
+hints = [
+  "An optional is not a number, so it cannot sit in a `?:` next to one. One of its members takes the fallback as an argument.",
+]
+
+[quest.quiz]
+choices = [
+  'int n = r.value();',
+  'int n = r ? r : -1;',
+  'int n = r.value_or(-1);',
+  'int n = r.unwrap_or(-1);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "cpp.cheatsheet.19.lower-bound"
+node        = 19
+title       = "WHERE IT WOULD GO"
+difficulty  = 3
+story       = "The tram-stop board on Yee Wo Street lists the departure minutes in order, and the question is which slot the next tram takes."
+concepts    = ["binary-search", "slices", "types"]
+requires    = ["cpp.cheatsheet.18.optional"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`std::vector<int> v` is sorted ascending and `int x` is given. Set `int i` to
+the index of the **first element that is not less than** `x` — so `i` equals
+`v.size()` when every element is smaller, and when `x` occurs it is `x`'s
+first index.
+'''
+solution    = 'int i = std::lower_bound(v.begin(), v.end(), x) - v.begin();'
+hints = [
+  "The algorithm hands back an iterator, not a number; an iterator minus the beginning is a distance. And mind which bound: the other one skips past every `x`.",
+]
+
+[quest.quiz]
+choices = [
+  'int i = std::lower_bound(v.begin(), v.end(), x) - v.begin();',
+  'int i = std::lower_bound(v.begin(), v.end(), x);',
+  'int i = std::upper_bound(v.begin(), v.end(), x) - v.begin();',
+  'int i = v.lower_bound(x);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "cpp.cheatsheet.20.wide-sum"
+node        = 20
+title       = "THE SUM THAT OVERFLOWED"
+difficulty  = 4
+story       = "Noon, the gun fires, and the tunnel toll register adds up two hundred thousand fares of up to a billion each — a total no int has ever held."
+concepts    = ["math", "types", "iteration"]
+requires    = ["cpp.cheatsheet.19.lower-bound"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`std::vector<int> v` has 2·10^5 elements, each up to 10^9, and `<numeric>`
+is included. Store the **exact** sum in `long long s`.
+'''
+solution    = 'long long s = std::accumulate(v.begin(), v.end(), 0LL);'
+hints = [
+  "The running total has the type of the initial value, not the type of `s` — every addition happens in that type before anything is stored.",
+]
+
+[quest.quiz]
+choices = [
+  'long long s = std::accumulate(v.begin(), v.end(), 0);',
+  'long long s = std::accumulate(v.begin(), v.end(), 0LL);',
+  'long long s = (long long)std::accumulate(v.begin(), v.end(), 0);',
+  'long long s = std::reduce(v.begin(), v.end());',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "cpp.cheatsheet.21.push-back"
+node        = 21
+title       = "ONE MORE ON THE PILE"
+difficulty  = 1
+story       = "A new crate lands at the back of the Jardine's Crescent stall, and the row of crates is a vector that has to grow by one."
+concepts    = ["slices", "collections"]
+requires    = ["cpp.cheatsheet.20.wide-sum"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`std::vector<int> v;` and `int x;` — add `x` to the **end** of `v`, so
+`v.size()` grows by one and `v.back()` is `x`.
+'''
+solution    = 'v.push_back(x);'
+hints = [
+  "A vector grows at one end only, and the member that does it says which end in its name — `append` and `push` on their own are other languages' words.",
+]
+
+[quest.quiz]
+choices = [
+  'v.append(x);',
+  'v.push(x);',
+  'v.push_back(x);',
+  'v += x;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "cpp.cheatsheet.22.queue-pop"
+node        = 22
+title       = "NEXT IN LINE"
+difficulty  = 2
+story       = "The minibus queue on Tang Lung Street: the person at the front boards, and the line is one shorter."
+concepts    = ["stacks-queues", "collections"]
+requires    = ["cpp.cheatsheet.21.push-back"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`std::queue<int> q;` is not empty. Store the **front** element in `int x`
+**and remove it** from `q`, so `q.size()` drops by one.
+'''
+solution    = 'int x = q.front(); q.pop();'
+hints = [
+  "In the standard containers, removing and reading are two different members — the one that removes gives nothing back.",
+]
+
+[quest.quiz]
+choices = [
+  'int x = q.pop();',
+  'int x = q.front(); q.pop();',
+  'int x = q.pop_front();',
+  'int x = q.front();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "cpp.cheatsheet.23.reverse"
+node        = 23
+title       = "BACK TO FRONT"
+difficulty  = 1
+story       = "The tram turns round at the Causeway Bay terminus, and the list of stops it just made has to be read the other way."
+concepts    = ["iteration", "slices"]
+requires    = ["cpp.cheatsheet.22.queue-pop"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`std::vector<int> v` holds `3, 1, 2`. Reverse it **in place** so it reads
+`2, 1, 3`. `<algorithm>` is included.
+'''
+solution    = 'std::reverse(v.begin(), v.end());'
+hints = [
+  "`vector` has no member for it; the algorithm takes a pair of iterators. And sorting over reverse iterators sorts — it does not turn the order round.",
+]
+
+[quest.quiz]
+choices = [
+  'v.reverse();',
+  'std::sort(v.rbegin(), v.rend());',
+  'v = std::reversed(v);',
+  'std::reverse(v.begin(), v.end());',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "cpp.cheatsheet.24.copy"
+node        = 24
+title       = "A COPY, NOT A WINDOW"
+difficulty  = 2
+story       = "The Lee Garden lobby prints a second visitor list for the night guard, and what he scribbles on his must never show up on the day shift's."
+concepts    = ["ownership", "move-semantics", "slices"]
+requires    = ["cpp.cheatsheet.23.reverse"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`std::vector<int> a{1, 2};` — make `b` an **independent** copy of `a`, so
+that after `b.push_back(3);` the vector `a` still has 2 elements and `b`
+has 3.
+'''
+solution    = 'std::vector<int> b = a;'
+hints = [
+  "A vector copies itself by plain assignment. An `&` in the declaration makes a second name for the same vector, and `std::move` empties the one you moved from.",
+]
+
+[quest.quiz]
+choices = [
+  'std::vector<int>& b = a;',
+  'auto b = std::move(a);',
+  'std::vector<int> b = a.copy();',
+  'std::vector<int> b = a;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "cpp.cheatsheet.25.digit"
+node        = 25
+title       = "THE DIGIT BEHIND THE CHAR"
+difficulty  = 1
+story       = "The shop number painted on the Windsor House door is a '7', and the lift controller wants the number seven, not the code for the glyph."
+concepts    = ["types", "strings"]
+requires    = ["cpp.cheatsheet.24.copy"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`char c = '7';` — set `int d` to the number `7` (not `55`, which is the
+character's code).
+'''
+solution    = "int d = c - '0';"
+hints = [
+  "A char is already a small integer, so a cast only renames the code. The digits sit next to each other in the table — subtract the one they start from.",
+]
+
+[quest.quiz]
+choices = [
+  "int d = c - '0';",
+  'int d = (int)c;',
+  'int d = std::stoi(c);',
+  'int d = c - 0;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "cpp.cheatsheet.26.real-division"
+node        = 26
+title       = "HALF A DOLLAR"
+difficulty  = 2
+story       = "Seven dollars split between two at the Hennessy Road exchange booth is three fifty — unless the register divides like an int."
+concepts    = ["types", "math"]
+requires    = ["cpp.cheatsheet.25.digit"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`int a = 7, b = 2;` — set `double q` to `3.5`.
+'''
+solution    = 'double q = static_cast<double>(a) / b;'
+hints = [
+  "Division happens in the type of its operands, before anything is stored or converted. Widen an operand, not the result.",
+]
+
+[quest.quiz]
+choices = [
+  'double q = a / b;',
+  'double q = static_cast<double>(a) / b;',
+  'double q = static_cast<double>(a / b);',
+  'double q = a / b * 1.0;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "cpp.cheatsheet.27.max-mixed"
+node        = 27
+title       = "THE LARGER OF TWO KINDS"
+difficulty  = 2
+story       = "The rent board on Paterson Street lists one shop in whole dollars and the next with a half — and wants the higher of the pair."
+concepts    = ["generics", "types"]
+requires    = ["cpp.cheatsheet.26.real-division"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`int a = 2; double b = 2.5;` — set `double m` to the larger of the two, so
+`m` is `2.5`. `<algorithm>` is included.
+'''
+solution    = 'double m = std::max<double>(a, b);'
+hints = [
+  "`std::max` is a template with one type parameter, and it refuses to guess when the two arguments disagree. Tell it the type — the one that keeps the half.",
+]
+
+[quest.quiz]
+choices = [
+  'double m = std::max(a, b);',
+  'double m = std::max(a, (int)b);',
+  'double m = std::max<double>(a, b);',
+  'double m = std::max({a, b});',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "cpp.cheatsheet.28.enum-class"
+node        = 28
+title       = "WHICH LINE"
+difficulty  = 2
+story       = "The MTR board at Causeway Bay station names its lines, and the platform code wants to ask about one of them without spelling it as a number."
+concepts    = ["enums", "types", "control-flow"]
+requires    = ["cpp.cheatsheet.27.max-mixed"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+```cpp
+enum class Line { Island, TsuenWan };
+Line l = read_line();
+```
+
+Open an `if` that is taken exactly when `l` is the first case of the enum.
+'''
+solution    = 'if (l == Line::Island) {'
+hints = [
+  "A scoped enum puts its names inside the enum, and it does not turn into an `int` or a string on its own.",
+]
+
+[quest.quiz]
+choices = [
+  'if (l == Island) {',
+  'if (l == 0) {',
+  'if (l == "Island") {',
+  'if (l == Line::Island) {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "cpp.cheatsheet.29.substr"
+node        = 29
+title       = "THE MIDDLE WORD"
+difficulty  = 2
+story       = "The address on the delivery slip reads 'Causeway Bay, HK', and the courier only wants the word that starts at the tenth character."
+concepts    = ["strings", "slices"]
+requires    = ["cpp.cheatsheet.28.enum-class"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`std::string s = "Causeway Bay, HK";` — set `std::string t` to `"Bay"`,
+the three characters starting at index `9`.
+'''
+solution    = 'std::string t = s.substr(9, 3);'
+hints = [
+  "The second argument is not where the piece ends. Hand it an end index and you get everything to the end of the sentence.",
+]
+
+[quest.quiz]
+choices = [
+  'std::string t = s.substr(9, 12);',
+  'std::string t = s[9:12];',
+  'std::string t = s.substr(9, 3);',
+  'std::string t = s.slice(9, 12);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "cpp.cheatsheet.30.positive-mod"
+node        = 30
+title       = "THE WRAP THAT WENT NEGATIVE"
+difficulty  = 3
+story       = "The Noon Day Gun's ring buffer has three slots, and stepping back seven from slot zero must land on slot two — not on slot minus one, which the platypus has been sitting on all morning."
+concepts    = ["math", "types"]
+requires    = ["cpp.cheatsheet.29.substr"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`int x, m;` with `m > 0`; `x` can be **any** `int`, including `-7` or
+`-100`. Set `int r` to the remainder of `x` divided by `m` in the range
+`0..m-1` — for `x = -7, m = 3` that is `2`.
+'''
+solution    = 'int r = ((x % m) + m) % m;'
+hints = [
+  "In C++ the sign of `%` follows the dividend, so a negative `x` gives a negative remainder — one step short of the right slot. Adding `m` once is not enough for every `x`; add it, then reduce again.",
+]
+
+[quest.quiz]
+choices = [
+  'int r = x % m;',
+  'int r = std::abs(x) % m;',
+  'int r = (x + m) % m;',
+  'int r = ((x % m) + m) % m;',
+]
+answer  = 3

@@ -149,6 +149,10 @@ export const ko: Partial<Catalogue> = {
     "테이블, 클로저, 메타테이블, 코루틴. 모든 것이 하나의 구조이고, 번호는 1부터 시작한다.",
   "lands.remixBlurb":
     "Go, Rust, Python: 같은 프로그램을 세 번. 하나의 개념, 세 가지 문법을 손가락에 나란히.",
+  "lands.cheatsheetBlurb":
+    "치트시트 기초. 종이 위의 핵심 문법을 묻는다. 네 줄 중 하나가 맞다. 고르면 클리어.",
+  "lands.cheatsheetAdvancedBlurb":
+    "치트시트 고급. 트레이트, 채널, 제네릭, 클로저 — 라이브 코딩의 승부처가 되는 패턴들. 네 줄 중 하나가 맞다.",
   "lands.verybasicBlurb": "퀴즈. 어느 줄이 맞는 문법인가? 넷 중 하나를 고르고, 그 줄을 친다.",
   "lands.basicBlurb":
     "아침 산책. 문법 하나씩 설명을 읽고 한 줄에서 네 줄만 채운다 — 라이브 코딩 화면이 손에 익었다고 가정하는 그 문법.",
@@ -179,6 +183,8 @@ export const ko: Partial<Catalogue> = {
   "map.playground": "연습장",
   "map.allMapsShort": "지도",
   "map.playgroundShort": "연습",
+  "map.cheatsheet": "치트시트 기초",
+  "map.cheatsheet_advanced": "치트시트 고급",
   "map.verybasic": "입문",
   "map.basic": "기초",
   "map.advanced": "심화",
@@ -219,6 +225,10 @@ export const ko: Partial<Catalogue> = {
   "map.footer": "←→  거리   ENTER  들어가기   TAB  지역   Q/E  분류   F1  화면 방향",
 
   "quest.loading": "여는 중",
+  "quest.sheetPick": "맞는 줄을 고르세요  (1–4)",
+  "quest.sheetRight": "정답",
+  "quest.sheetStreak": "연속 ×{n}",
+  "quest.sheetCombo": "×{n} 콤보",
   "quest.quizPick": "맞는 줄을 고르고, 그 줄을 치세요  (1–4)",
   "quest.quizRight": "정답 — 이제 그 줄을 치세요",
   "quest.job": "오늘의 과제",
@@ -296,6 +306,7 @@ export const ko: Partial<Catalogue> = {
   "quest.noFormat": "이 서버에는 아직 정렬 기능이 없습니다",
   "quest.formatSilent": "포매터가 응답하지 않았습니다",
   "quest.briefEnglish": "과제 본문은 영어입니다 — 문제는 아직 번역되지 않았습니다",
+  "quest.sheetFooter": "1–4  고르기   ESC  지도",
   "quest.footer":
     "CTRL+ENTER  실행   CTRL+SHIFT+ENTER  제출   CTRL+SHIFT+F  정렬   PGUP/PGDN  로그   ESC  지도",
   "verdict.accepted": "예시는 통과했습니다",

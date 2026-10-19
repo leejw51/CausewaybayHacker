@@ -1,0 +1,1040 @@
+# GO LAND — CHEATSHEET ADVANCED. The second road off the page: the patterns
+# an interviewer uses to tell a fluent Go candidate from one who knows the
+# grammar. Channels and what closes them, select with a way out, context and
+# the cancel that must be deferred, WaitGroup placement, mutex vs RWMutex vs
+# atomic, Once, fan-in, the error channel that stands in for errgroup,
+# generics and their constraints, errors.As with a custom type, recover that
+# actually recovers, defer's early arguments, struct tags, the Builder that
+# must not be copied, the Scanner that chokes on a long line, stable sorts,
+# heap.Pop vs h.Pop, iota, Duration arithmetic, struct keys. Four lines, one
+# right. Nothing is typed and nothing is compiled — the pick is the
+# submission, and the server judges it against the quiz (SPEC §0). The three
+# wrong lines are near-misses: a reversed arrow, a copied lock, a Done that
+# was never deferred, a constraint one tilde short.
+#
+# Toolchain: Go 1.22, std only. Where the loop-variable or `range n` rules
+# matter, the brief says so.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "go.cheatsheet_advanced"
+land     = "go"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "go.cheatsheet_advanced.01.buffered"
+node        = 1
+title       = "ROOM FOR ONE"
+difficulty  = 3
+story       = "The Lucky Mac pass window at 12:30: the cook holds a tray out, nobody takes it, and the whole kitchen stops behind him."
+concepts    = ["channels", "deadlock", "concurrency"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+These three lines run in `main`, with no other goroutine alive. Which
+declaration lets the send go through, so the receive prints `1`?
+
+```
+// ____
+ch <- 1
+fmt.Println(<-ch)
+```
+'''
+solution    = 'ch := make(chan int, 1)'
+hints = [
+  "An unbuffered send waits for a receiver, and here the receiver is the same goroutine, one line later. Give the channel somewhere to put the value.",
+]
+
+[quest.quiz]
+choices = [
+  'ch := make(chan int)',
+  'var ch chan int',
+  'ch := make(chan int, 1)',
+  'ch := new(chan int)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "go.cheatsheet_advanced.02.wg-launch"
+node        = 2
+title       = "COUNT BEFORE YOU GO"
+difficulty  = 3
+story       = "Forty riders leave the Lucky Mac at once and the dispatcher shuts the shop before the list of who went out is even written."
+concepts    = ["concurrency", "closures", "data-races"]
+requires    = ["go.cheatsheet_advanced.01.buffered"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`go.mod` says `go 1.22`, so each iteration has its own `i`. Launch
+`work(i)` for every `i` in a goroutine, and make sure the final `Wait`
+really waits for all `n` of them — nothing may race the counter.
+
+```
+var wg sync.WaitGroup
+for i := range n {
+    // ____
+}
+wg.Wait()
+```
+'''
+solution    = 'wg.Add(1); go func() { defer wg.Done(); work(i) }()'
+hints = [
+  "The counter goes up in the goroutine that will call `Wait`, before the `go`; it goes down inside the new one, deferred, and `defer` needs a call.",
+]
+
+[quest.quiz]
+choices = [
+  'wg.Add(1); go func() { defer wg.Done(); work(i) }()',
+  'go func() { wg.Add(1); defer wg.Done(); work(i) }()',
+  'wg.Add(1); go func() { work(i); wg.Done }()',
+  'wg.Add(1); go work(i); wg.Done()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "go.cheatsheet_advanced.03.close-range"
+node        = 3
+title       = "LAST PLATE, SHUTTER DOWN"
+difficulty  = 3
+story       = "The pass sends out the last plate of the lunch rush and the runner keeps standing there, because nobody told him the kitchen is done."
+concepts    = ["channels", "deadlock", "iteration"]
+requires    = ["go.cheatsheet_advanced.02.wg-launch"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+The consumer in `main` loops `for v := range ch { ... }` and then prints
+`done`. Which line at the end of the producer makes that loop finish,
+with every value delivered and no goroutine left waiting?
+
+```
+func produce(ch chan<- int) {
+    for i := range 3 {
+        ch <- i
+    }
+    // ____
+}
+```
+'''
+solution    = 'close(ch)'
+hints = [
+  "A range over a channel ends only when the channel is closed and drained. A sentinel value is just one more value; the loop keeps waiting.",
+]
+
+[quest.quiz]
+choices = [
+  'ch <- -1',
+  'close(ch)',
+  'ch = nil',
+  'ch.Close()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "go.cheatsheet_advanced.04.worker-sig"
+node        = 4
+title       = "ONE WAY IN, ONE WAY OUT"
+difficulty  = 3
+story       = "Four cooks on the Lucky Mac line take orders from one rail and put plates on another; the new hire keeps putting orders back on the rail."
+concepts    = ["channels", "concurrency", "functions"]
+requires    = ["go.cheatsheet_advanced.03.close-range"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+A worker pool: `main` makes `jobs` and `results` as plain `chan int`,
+starts four workers, sends nine jobs, closes `jobs`, then collects nine
+results with `<-results`. Which signature compiles with this body — and
+makes the compiler refuse a send on `jobs` or a receive from `results`
+inside the worker?
+
+```
+// ____
+    for j := range jobs {
+        results <- j * j
+    }
+}
+```
+'''
+solution    = 'func worker(jobs <-chan int, results chan<- int) {'
+hints = [
+  "The arrow sits on the side the data flows: before `chan` to only take out, after `chan` to only put in. A bidirectional channel converts to either.",
+]
+
+[quest.quiz]
+choices = [
+  'func worker(jobs chan<- int, results <-chan int) {',
+  'func worker(jobs <-chan int, results <-chan int) {',
+  'func worker(jobs <-chan int, results ->chan int) {',
+  'func worker(jobs <-chan int, results chan<- int) {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "go.cheatsheet_advanced.05.try-send"
+node        = 5
+title       = "DROP IT, DON'T WAIT"
+difficulty  = 3
+story       = "The arrivals board at Tin Hau logs every train it hears about; when the log fills up, the board itself must not freeze."
+concepts    = ["channels", "deadlock", "control-flow"]
+requires    = ["go.cheatsheet_advanced.04.worker-sig"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`ch` is a `chan string` with capacity 2 and several goroutines send on
+it. In `log(v)`, hand `v` to the channel if there is room, otherwise drop
+it — the caller must never block, and no goroutine may be left waiting
+on the send.
+'''
+solution    = 'select { case ch <- v: default: }'
+hints = [
+  "A `select` with a fallback branch never blocks; the fallback must do nothing at all, not another send.",
+]
+
+[quest.quiz]
+choices = [
+  'select { case ch <- v: default: }',
+  'select { case ch <- v: }',
+  'go func() { ch <- v }()',
+  'select { default: ch <- v }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "go.cheatsheet_advanced.06.timeout-case"
+node        = 6
+title       = "TWO SECONDS, THEN GIVE UP"
+difficulty  = 3
+story       = "The platform screen at Causeway Bay waits for the next-train signal. It waits two seconds, or it waits for ever — the firmware was not sure which."
+concepts    = ["channels", "cancellation", "concurrency"]
+requires    = ["go.cheatsheet_advanced.05.try-send"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`ch` is a `<-chan int` and `ctx` a `context.Context`. Fill the third case
+so the function gives up after two seconds of nothing arriving.
+
+```
+select {
+case v := <-ch:
+    use(v)
+    return nil
+case <-ctx.Done():
+    return ctx.Err()
+// ____
+    return errTimeout
+}
+```
+'''
+solution    = 'case <-time.After(2 * time.Second):'
+hints = [
+  "A select case must be a send or a receive. `time` has a function that returns a channel which fires after a `Duration`, and a bare `2` is two nanoseconds.",
+]
+
+[quest.quiz]
+choices = [
+  'case time.After(2 * time.Second):',
+  'case <-time.Sleep(2 * time.Second):',
+  'case <-time.After(2 * time.Second):',
+  'case <-time.After(2):',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "go.cheatsheet_advanced.07.defer-cancel"
+node        = 7
+title       = "LET GO ON THE WAY OUT"
+difficulty  = 3
+story       = "Every fare lookup at Admiralty opens a three-second timer and nobody ever stops it; by the evening rush the gate is holding ten thousand timers."
+concepts    = ["cancellation", "functions", "concurrency"]
+requires    = ["go.cheatsheet_advanced.06.timeout-case"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`fetch(ctx)` must run with the three-second limit still live, and the
+timer's resources must be released however `get` returns — early
+return, error, or success. (`WithCancel` hands back the same pair.)
+
+```
+func get() error {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    // ____
+    return fetch(ctx)
+}
+```
+'''
+solution    = 'defer cancel()'
+hints = [
+  "Calling the cancel function now would cancel `ctx` before `fetch` sees it. Schedule the call for when `get` returns — and `defer` wants a call, parentheses included.",
+]
+
+[quest.quiz]
+choices = [
+  'cancel()',
+  'defer cancel()',
+  'defer cancel',
+  'defer ctx.Cancel()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "go.cheatsheet_advanced.08.mutex-inc"
+node        = 8
+title       = "WRITE LOCK, NOT READ LOCK"
+difficulty  = 3
+story       = "Fifty gates at Causeway Bay interchange count passengers into one number, and the number comes out short by an amount nobody can reproduce."
+concepts    = ["shared-state", "data-races", "structs"]
+requires    = ["go.cheatsheet_advanced.07.defer-cancel"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+Fifty goroutines call `Inc` a thousand times each; afterwards `Get`
+must return `50000`.
+
+```
+type Ctr struct {
+    mu sync.RWMutex
+    n  int
+}
+func (c *Ctr) Get() int { c.mu.RLock(); defer c.mu.RUnlock(); return c.n }
+// ____
+```
+'''
+solution    = 'func (c *Ctr) Inc() { c.mu.Lock(); defer c.mu.Unlock(); c.n++ }'
+hints = [
+  "A write needs the exclusive lock, not the shared one; a value receiver copies the struct, lock and all, so the real `n` never moves.",
+]
+
+[quest.quiz]
+choices = [
+  'func (c Ctr) Inc() { c.mu.Lock(); defer c.mu.Unlock(); c.n++ }',
+  'func (c *Ctr) Inc() { c.mu.RLock(); defer c.mu.RUnlock(); c.n++ }',
+  'func (c *Ctr) Inc() { defer c.mu.Lock(); c.n++; c.mu.Unlock() }',
+  'func (c *Ctr) Inc() { c.mu.Lock(); defer c.mu.Unlock(); c.n++ }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "go.cheatsheet_advanced.09.once"
+node        = 9
+title       = "ONE WARM-UP ONLY"
+difficulty  = 3
+story       = "Twenty riders open the Lucky Mac app at the same second and the backend opens twenty database connections, one each, all called the first."
+concepts    = ["shared-state", "concurrency", "data-races"]
+requires    = ["go.cheatsheet_advanced.08.mutex-inc"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`initDB()` is a `func()` that sets the package-level `db`. `conn()` is
+called from twenty goroutines at once; `initDB` must run exactly one
+time, and every caller must see the finished `db`.
+
+```
+var once sync.Once
+func conn() *DB {
+    // ____
+    return db
+}
+```
+'''
+solution    = 'once.Do(initDB)'
+hints = [
+  "`Once` takes the function itself, not the result of calling it — and a bare name inside a closure is an unused value, which does not compile.",
+]
+
+[quest.quiz]
+choices = [
+  'once.Do(initDB())',
+  'if db == nil { initDB() }',
+  'once.Do(initDB)',
+  'once.Do(func() { initDB })',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "go.cheatsheet_advanced.10.atomic-add"
+node        = 10
+title       = "ONE TICK, NO LOCK"
+difficulty  = 3
+story       = "The hit counter on the Island Line status page loses ticks under load, and a mutex around a single integer feels like overkill to Alex."
+concepts    = ["shared-state", "data-races", "thread-safety"]
+requires    = ["go.cheatsheet_advanced.09.once"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`var hits atomic.Int64` is incremented from a hundred goroutines, ten
+thousand times each. Which line counts every one, so `hits.Load()` ends
+at `1000000`?
+'''
+solution    = 'hits.Add(1)'
+hints = [
+  "The typed atomic has methods; a load followed by a store is two operations with a gap between them.",
+]
+
+[quest.quiz]
+choices = [
+  'hits++',
+  'hits.Add(1)',
+  'atomic.AddInt64(&hits, 1)',
+  'hits.Store(hits.Load() + 1)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "go.cheatsheet_advanced.11.fan-in"
+node        = 11
+title       = "MANY LINES, ONE PLATFORM"
+difficulty  = 4
+story       = "Trains from Tsuen Wan and Kwun Tong feed one platform at Admiralty; the merge works until the last train of the night, when the platform never clears."
+concepts    = ["channels", "concurrency", "closures"]
+requires    = ["go.cheatsheet_advanced.10.atomic-add"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+Fan-in. `go.mod` says `go 1.22`, so each iteration has its own `c`.
+Start a forwarder for every input that copies it into `out` and then
+counts itself done, so the closer below can close `out`.
+
+```
+func merge(ins ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+    wg.Add(len(ins))
+    for _, c := range ins {
+        // ____
+    }
+    go func() { wg.Wait(); close(out) }()
+    return out
+}
+```
+'''
+solution    = 'go func() { defer wg.Done(); for v := range c { out <- v } }()'
+hints = [
+  "It has to run in its own goroutine (the `go` keyword and the trailing call), and it has to tell the group when it is finished — otherwise `Wait` never returns and `out` is never closed.",
+]
+
+[quest.quiz]
+choices = [
+  'go func() { defer wg.Done(); for v := range c { out <- v } }()',
+  'go func() { defer wg.Done(); for v := range c { out <- v } }',
+  'go func() { for v := range c { out <- v } }()',
+  'func() { defer wg.Done(); for v := range c { out <- v } }()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "go.cheatsheet_advanced.12.defer-args"
+node        = 12
+title       = "WHEN WAS THAT READ?"
+difficulty  = 3
+story       = "The Tin Hau ticket office prints the till total on the way out, and it prints the total from the moment the shift started."
+concepts    = ["functions", "closures", "bindings"]
+requires    = ["go.cheatsheet_advanced.11.fan-in"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+Print `2` — the value `x` has when `main` returns.
+
+```
+func main() {
+    x := 1
+    // ____
+    x = 2
+}
+```
+'''
+solution    = 'defer func() { fmt.Println(x) }()'
+hints = [
+  "A deferred call's arguments are evaluated at the `defer`, not when it runs. Only a closure that reads `x` itself sees the later write.",
+]
+
+[quest.quiz]
+choices = [
+  'defer fmt.Println(x)',
+  'defer func(x int) { fmt.Println(x) }(x)',
+  'defer fmt.Println(&x)',
+  'defer func() { fmt.Println(x) }()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "go.cheatsheet_advanced.13.recover"
+node        = 13
+title       = "CATCH IT ON THE WAY DOWN"
+difficulty  = 4
+story       = "One bad order on the Lucky Mac line throws a wooden spoon, and the whole kitchen goes dark instead of that one plate coming back marked failed."
+concepts    = ["panics", "error-handling", "functions"]
+requires    = ["go.cheatsheet_advanced.12.defer-args"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`f` may panic. `safe` must swallow the panic and return `errPanic`
+instead; a well-behaved `f` returns `nil`.
+
+```
+func safe(f func()) (err error) {
+    // ____
+    f()
+    return nil
+}
+```
+'''
+solution    = 'defer func() { if recover() != nil { err = errPanic } }()'
+hints = [
+  "It only works from inside a deferred function — deferring the builtin itself does nothing — and the only way out is to assign the named result.",
+]
+
+[quest.quiz]
+choices = [
+  'defer recover()',
+  'defer func() { if recover() != nil { err = errPanic } }()',
+  'if r := recover(); r != nil { err = errPanic }',
+  'defer func() { if recover() != nil { return errPanic } }()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "go.cheatsheet_advanced.14.errors-as"
+node        = 14
+title       = "WHICH KIND OF WRONG"
+difficulty  = 4
+story       = "A rider id comes back from the Lucky Mac lookup wrapped in three layers of context, and the desk needs the key that was missing, not the sentence."
+concepts    = ["error-handling", "pattern-matching", "structs"]
+requires    = ["go.cheatsheet_advanced.13.recover"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`err` was built as `fmt.Errorf("lookup: %w", &NotFound{Key: k})`; a
+plain `errors.Is` would only say yes or no. Open the `if` whose body can
+print `nf.Key` — without a panic.
+
+```
+type NotFound struct{ Key string }
+func (e *NotFound) Error() string { return e.Key + " not found" }
+```
+'''
+solution    = 'var nf *NotFound; if errors.As(err, &nf) {'
+hints = [
+  "A direct assertion cannot see through the wrapping. The target is a pointer to a variable whose type implements `error` — and that type is the pointer type here.",
+]
+
+[quest.quiz]
+choices = [
+  'if nf, ok := err.(*NotFound); ok {',
+  'var nf NotFound; if errors.As(err, &nf) {',
+  'var nf *NotFound; if errors.As(err, &nf) {',
+  'var nf *NotFound; if errors.As(err, nf) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "go.cheatsheet_advanced.15.assert-ok"
+node        = 15
+title       = "DOES IT SPEAK?"
+difficulty  = 3
+story       = "The announcement board at Tin Hau asks every object on the feed to describe itself, and the first plain integer takes the board down."
+concepts    = ["interfaces", "pattern-matching", "error-handling"]
+requires    = ["go.cheatsheet_advanced.14.errors-as"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`x` is an `any`. `Stop` has a `String() string` method and so satisfies
+`fmt.Stringer` without saying so; `42` does not. Bind `s` and `ok` so the
+next line can be `if !ok { return "plain" }` — for either input,
+without crashing. (A type switch would do it too, but in more lines.)
+'''
+solution    = 's, ok := x.(fmt.Stringer)'
+hints = [
+  "The two-value form of the assertion reports instead of panicking; the interface's full name lives in `fmt`.",
+]
+
+[quest.quiz]
+choices = [
+  's, ok := x.(fmt.Stringer)',
+  's := x.(fmt.Stringer); ok := s != nil',
+  's, ok := x.(Stringer)',
+  's, ok := fmt.Stringer(x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "go.cheatsheet_advanced.16.promoted"
+node        = 16
+title       = "BORROWED VOICE"
+difficulty  = 3
+story       = "The status server at Causeway Bay station carries a logger inside it, and the runner that was handed the server's logging prints with no prefix at all."
+concepts    = ["structs", "functions", "closures"]
+requires    = ["go.cheatsheet_advanced.15.assert-ok"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`run` wants a `func(string)`. Hand it `srv`'s logging, bound to `srv`,
+so it prints `[mtr] up`.
+
+```
+type Logger struct{ prefix string }
+func (l Logger) Log(s string) { fmt.Println(l.prefix, s) }
+type Server struct {
+    Logger
+    addr string
+}
+func run(log func(string)) { log("up") }
+srv := Server{Logger{"[mtr]"}, ":8080"}
+```
+'''
+solution    = 'run(srv.Log)'
+hints = [
+  "An embedded field's methods are promoted onto the outer struct, and naming a method without calling it gives a function value with the receiver already bound.",
+]
+
+[quest.quiz]
+choices = [
+  'run(Logger.Log)',
+  'run(srv.Log())',
+  'run(&srv.Log)',
+  'run(srv.Log)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "go.cheatsheet_advanced.17.generic-map"
+node        = 17
+title       = "ANY IN, ANY OUT"
+difficulty  = 3
+story       = "The Yee Wo Street arrival board gets train numbers as `[]int` and wants `[]string`; Alex refuses to write the same four-line loop a third time."
+concepts    = ["generics", "functions", "slices"]
+requires    = ["go.cheatsheet_advanced.16.promoted"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+Declare a generic `Map` over two type parameters so that
+`Map([]int{1, 2, 3}, strconv.Itoa)` gives `[]string{"1", "2", "3"}`.
+
+```
+// ____
+    out := make([]U, 0, len(xs))
+    for _, x := range xs {
+        out = append(out, f(x))
+    }
+    return out
+}
+```
+'''
+solution    = 'func Map[T, U any](xs []T, f func(T) U) []U {'
+hints = [
+  "Every type parameter needs a constraint, and parameters that share one can share it the way `a, b int` do.",
+]
+
+[quest.quiz]
+choices = [
+  'func Map[T, U](xs []T, f func(T) U) []U {',
+  'func Map[T, U any](xs []T, f func(T) U) []U {',
+  'func Map[T any, U](xs []T, f func(T) U) []U {',
+  'func Map[T any](xs []T, f func(T) U) []U {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "go.cheatsheet_advanced.18.ordered"
+node        = 18
+title       = "ANYTHING WITH A GREATER-THAN"
+difficulty  = 4
+story       = "The platform thermometer at Admiralty reports in `Celsius`, a named integer type, and the generic comparison written for plain ints refuses it."
+concepts    = ["generics", "types", "dispatch"]
+requires    = ["go.cheatsheet_advanced.17.generic-map"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`type Celsius int`. All three calls must compile:
+`Max(3, 5)`, `Max(2.5, 1.0)` and `Max(Celsius(30), Celsius(28))`.
+The body uses the builtin `max`, which needs a type that `<` works on.
+'''
+solution    = 'func Max[T cmp.Ordered](a, b T) T { return max(a, b) }'
+hints = [
+  "A constraint that lists `int` without a tilde rejects every type *derived* from int. The standard library has one constraint for everything `<` works on.",
+]
+
+[quest.quiz]
+choices = [
+  'func Max[T any](a, b T) T { return max(a, b) }',
+  'func Max[T int | float64](a, b T) T { return max(a, b) }',
+  'func Max[T comparable](a, b T) T { return max(a, b) }',
+  'func Max[T cmp.Ordered](a, b T) T { return max(a, b) }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "go.cheatsheet_advanced.19.generic-stack"
+node        = 19
+title       = "PUSH THAT STICKS"
+difficulty  = 4
+story       = "The station-name stack behind the Island Line announcer accepts every push and is empty every time anyone looks."
+concepts    = ["generics", "structs", "slices"]
+requires    = ["go.cheatsheet_advanced.18.ordered"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`type Stack[T any] struct{ items []T }`. After `var s Stack[string]`,
+`s.Push("Tin Hau")` and `s.Push("Causeway Bay")`, `len(s.items)` must
+be `2`.
+'''
+solution    = 'func (s *Stack[T]) Push(v T) { s.items = append(s.items, v) }'
+hints = [
+  "The receiver of a generic type repeats the type parameter, and a method that mutates needs the pointer form or it edits a copy. `append` returns the new slice; something has to keep it.",
+]
+
+[quest.quiz]
+choices = [
+  'func (s *Stack[T]) Push(v T) { s.items = append(s.items, v) }',
+  'func (s Stack[T]) Push(v T) { s.items = append(s.items, v) }',
+  'func (s *Stack) Push(v T) { s.items = append(s.items, v) }',
+  'func (s *Stack[T]) Push(v T) { append(s.items, v) }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "go.cheatsheet_advanced.20.sort-desc-safe"
+node        = 20
+title       = "BIGGEST FIRST, NO WRAP"
+difficulty  = 4
+story       = "The leaderboard of fare balances at Causeway Bay has one account at the very top of `int` and one at the very bottom, and the sort puts them in the wrong order."
+concepts    = ["sorting", "closures", "math"]
+requires    = ["go.cheatsheet_advanced.19.generic-stack"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`xs` is a `[]int` that contains both `math.MaxInt` and `math.MinInt`.
+Sort it in place, largest first — correctly for those two as well.
+'''
+solution    = 'slices.SortFunc(xs, func(a, b int) int { return cmp.Compare(b, a) })'
+hints = [
+  "Subtracting two far-apart ints overflows and flips the sign; there is a three-way comparison in `cmp`. And `sort.Slice`'s function receives indices, not elements.",
+]
+
+[quest.quiz]
+choices = [
+  'slices.SortFunc(xs, func(a, b int) int { return b - a })',
+  'sort.Slice(xs, func(a, b int) bool { return a > b })',
+  'slices.SortFunc(xs, func(a, b int) int { return cmp.Compare(b, a) })',
+  'slices.SortFunc(xs, func(a, b int) bool { return a > b })',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "go.cheatsheet_advanced.21.bisect"
+node        = 21
+title       = "HALVE IT"
+difficulty  = 3
+story       = "The sorted list of train ids at the Island Line control room has ten million entries, and the lookup walks all of them, every time."
+concepts    = ["binary-search", "slices", "complexity"]
+requires    = ["go.cheatsheet_advanced.20.sort-desc-safe"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`xs` is a `[]int` sorted ascending. In one line and O(log n), set `i`
+to where `7` is (or would be inserted) and `found` to whether it is
+there.
+'''
+solution    = 'i, found := slices.BinarySearch(xs, 7)'
+hints = [
+  "The `slices` package has a search that returns both the position and a bool; `sort.SearchInts` returns only the position, and `Index` walks the slice.",
+]
+
+[quest.quiz]
+choices = [
+  'i, found := slices.Index(xs, 7)',
+  'i, found := slices.BinarySearch(xs, 7)',
+  'i, found := sort.SearchInts(xs, 7)',
+  'found := slices.Contains(xs, 7)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "go.cheatsheet_advanced.22.omitempty"
+node        = 22
+title       = "LEAVE THE BLANK OUT"
+difficulty  = 4
+story       = "The rider profile the Lucky Mac app sends out has an empty `bike` field on every walker, and the dashboard renders forty empty bicycles."
+concepts    = ["serialization", "structs", "strings"]
+requires    = ["go.cheatsheet_advanced.21.bisect"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`json.Marshal(Rider{Name: "Alex"})` must give `{"name":"Alex"}` and
+`json.Marshal(Rider{Name: "Alex", Bike: "e-7"})` must give
+`{"name":"Alex","bike":"e-7"}`. Which field declaration does it?
+
+```
+type Rider struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+'''
+solution    = 'Bike string `json:"bike,omitempty"`'
+hints = [
+  "The option goes inside the same quoted value as the name, separated by a comma — and an unexported field is never marshalled at all.",
+]
+
+[quest.quiz]
+choices = [
+  'Bike string `json:"bike", omitempty`',
+  'bike string `json:"bike,omitempty"`',
+  'Bike string `json:"bike;omitempty"`',
+  'Bike string `json:"bike,omitempty"`',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "go.cheatsheet_advanced.23.scanner-buffer"
+node        = 23
+title       = "LONGER THAN THE LINE"
+difficulty  = 4
+story       = "The night export from the Island Line gate logs is one 100,000-character line, and the reader hands back nothing and no error anyone printed."
+concepts    = ["io", "strings", "zero-values"]
+requires    = ["go.cheatsheet_advanced.22.omitempty"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`sc := bufio.NewScanner(os.Stdin)`; the next input line is 100,000
+bytes long. Which line, placed before the first `sc.Scan()`, lets that
+scan succeed?
+'''
+solution    = 'sc.Buffer(make([]byte, 1<<20), 1<<20)'
+hints = [
+  "The default token limit is 64 KiB. The scanner has a method that takes an initial byte slice and a maximum size — two arguments, not one — and the split function has nothing to do with it.",
+]
+
+[quest.quiz]
+choices = [
+  'sc.Buffer(make([]byte, 1<<20), 1<<20)',
+  'sc.Buffer(1<<20)',
+  'sc = bufio.NewScannerSize(os.Stdin, 1<<20)',
+  'sc.Split(bufio.ScanLines)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "go.cheatsheet_advanced.24.stable"
+node        = 24
+title       = "TIES STAY PUT"
+difficulty  = 3
+story       = "Two hundred gate staff at Admiralty are grouped by seniority for the roster, and people with the same seniority keep swapping places between one print and the next."
+concepts    = ["sorting", "closures", "structs"]
+requires    = ["go.cheatsheet_advanced.23.scanner-buffer"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`ps` is a `[]P` with two hundred entries and
+`less := func(i, j int) bool { return ps[i].S < ps[j].S }`. Sort `ps`
+by `S` so that entries with equal `S` are guaranteed to keep their
+original relative order.
+'''
+solution    = 'sort.SliceStable(ps, less)'
+hints = [
+  "`less` takes indices, so it fits the `sort` package's slice functions, not the `slices` ones — and only one of the two slice sorts promises to keep ties in place.",
+]
+
+[quest.quiz]
+choices = [
+  'sort.Slice(ps, less)',
+  'sort.Stable(ps, less)',
+  'sort.SliceStable(ps, less)',
+  'slices.SortStableFunc(ps, less)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "go.cheatsheet_advanced.25.duration"
+node        = 25
+title       = "MILLISECONDS, NOT NANOS"
+difficulty  = 4
+story       = "The dwell time at Causeway Bay arrives as the text `250` and the doors close two hundred and fifty nanoseconds after they open."
+concepts    = ["types", "strings", "math"]
+requires    = ["go.cheatsheet_advanced.24.stable"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`s` is `"250"`, a number of milliseconds. After
+`n, err := strconv.ParseInt(s, 10, 64)` (no error), make `d` a
+`time.Duration` that prints as `250ms`.
+'''
+solution    = 'd := time.Duration(n) * time.Millisecond'
+hints = [
+  "A variable `int64` cannot be multiplied by a `Duration` — only an untyped constant can. Convert the number first, then scale it by the unit.",
+]
+
+[quest.quiz]
+choices = [
+  'd := time.Duration(n) * time.Millisecond',
+  'd := n * time.Millisecond',
+  'd := time.Duration(n)',
+  'd := time.Duration(n * time.Millisecond)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "go.cheatsheet_advanced.26.struct-key"
+node        = 26
+title       = "SAME CELL, SAME BUCKET"
+difficulty  = 4
+story       = "Riders are grouped by the grid cell they are waiting in; the second rider at the same corner of Yee Wo Street erases the first."
+concepts    = ["collections", "structs", "slices", "hashing"]
+requires    = ["go.cheatsheet_advanced.25.duration"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`type pt struct{ r, c int }` and `m` is a `map[pt][]int` (structs of
+comparable fields are fine as keys). Add rider `id` under the cell
+`(r, c)`, keeping any ids already there — including when the key has
+never been seen.
+'''
+solution    = 'm[pt{r, c}] = append(m[pt{r, c}], id)'
+hints = [
+  "A missing key reads as a nil slice, and appending to a nil slice is fine; the result must be stored back under the same value key.",
+]
+
+[quest.quiz]
+choices = [
+  'm[pt{r, c}] = []int{id}',
+  'm[pt{r, c}] = append(m[pt{r, c}], id)',
+  'm[&pt{r, c}] = append(m[&pt{r, c}], id)',
+  'm[pt{r, c}].append(id)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "go.cheatsheet_advanced.27.builder-ptr"
+node        = 27
+title       = "DON'T COPY THE BUILDER"
+difficulty  = 5
+story       = "The announcement for Island Line is assembled piece by piece, and the helper that adds the last piece crashes with a message about an illegal copy."
+concepts    = ["strings", "structs", "panics"]
+requires    = ["go.cheatsheet_advanced.26.struct-key"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`sb` is a `strings.Builder` that already holds `"Island"`. Declare
+`add` so that after `add(…, " Line")` — called with whatever argument
+the signature needs — `sb.String()` is `"Island Line"`, with no panic.
+'''
+solution    = 'func add(sb *strings.Builder, w string) { sb.WriteString(w) }'
+hints = [
+  "A non-zero `Builder` passed by value is copied, and the first write to the copy panics. The builder has no `+=`; it has a method that returns two values, which is fine to ignore but not to dereference.",
+]
+
+[quest.quiz]
+choices = [
+  'func add(sb strings.Builder, w string) { sb.WriteString(w) }',
+  'func add(sb *strings.Builder, w string) { sb += w }',
+  'func add(sb *strings.Builder, w string) { sb.WriteString(w) }',
+  'func add(sb *strings.Builder, w string) { *sb.WriteString(w) }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "go.cheatsheet_advanced.28.heap-pop"
+node        = 28
+title       = "TOP OF THE HEAP"
+difficulty  = 5
+story       = "The dispatcher's priority list at the Lucky Mac hands out the most urgent order, and the third order it hands out is the one that was due last."
+concepts    = ["heaps", "interfaces", "slices"]
+requires    = ["go.cheatsheet_advanced.27.builder-ptr"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`IntHeap` implements `heap.Interface` with `Less` written as
+`h[i] > h[j]`, and `h` is a `*IntHeap` already initialised with
+`heap.Init(h)`. Take the largest value out into `x`, an `int`, leaving
+the heap valid for the next take.
+'''
+solution    = 'x := heap.Pop(h).(int)'
+hints = [
+  "The method you wrote on the type only removes the last element; the package function is what moves the root out and re-heaps. It returns `any`.",
+]
+
+[quest.quiz]
+choices = [
+  'x := h.Pop().(int)',
+  'x := heap.Pop(h).(int)',
+  'x := heap.Pop(h)',
+  'x := (*h)[0]; *h = (*h)[1:]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "go.cheatsheet_advanced.29.iota"
+node        = 29
+title       = "ZERO, ONE, TWO"
+difficulty  = 5
+story       = "The three MTR lines on the board at Admiralty are all numbered zero, and the colour lookup paints every one of them Island Line blue."
+concepts    = ["enums", "types", "bindings"]
+requires    = ["go.cheatsheet_advanced.28.heap-pop"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`type Line int` has a `String()` method that indexes a three-element
+array. Declare `Island`, `TsuenWan` and `KwunTong` as `0`, `1`, `2` —
+all of type `Line`.
+'''
+solution    = 'const ( Island Line = iota; TsuenWan; KwunTong )'
+hints = [
+  "Inside a `const` block, a constant with no expression repeats the previous line's whole expression — type included. Only one expression counts upward.",
+]
+
+[quest.quiz]
+choices = [
+  'const ( Island Line = 0; TsuenWan; KwunTong )',
+  'const ( Island = iota; TsuenWan = iota + 1; KwunTong )',
+  'const ( Island, TsuenWan, KwunTong Line = iota )',
+  'const ( Island Line = iota; TsuenWan; KwunTong )',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "go.cheatsheet_advanced.30.errc"
+node        = 30
+title       = "THE FIRST BAD NEWS"
+difficulty  = 5
+story       = "Eight stations on the Island Line are pinged at once; the moment one reports down the control room moves on, and seven pingers are still standing at a window nobody will ever open."
+concepts    = ["channels", "concurrency", "error-handling", "deadlock"]
+requires    = ["go.cheatsheet_advanced.29.iota"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+No `errgroup` here — std only. Each of `n` goroutines sends exactly one
+`error` (often `nil`) on `errc`. `checkAll` returns the first non-nil
+error without waiting for the rest, and no goroutine may be left blocked
+on its send afterwards. Declare `errc`.
+
+```
+func checkAll(n int) error {
+    // ____
+    for i := range n {
+        go func() { errc <- check(i) }()
+    }
+    for range n {
+        if err := <-errc; err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+'''
+solution    = 'errc := make(chan error, n)'
+hints = [
+  "Once `checkAll` has returned, nobody receives any more. Every sender has to be able to finish its one send without a receiver — size the buffer for all of them.",
+]
+
+[quest.quiz]
+choices = [
+  'errc := make(chan error)',
+  'errc := make(chan error, 1)',
+  'errc := make([]error, n)',
+  'errc := make(chan error, n)',
+]
+answer  = 3

@@ -139,6 +139,9 @@ export const zh: Partial<Catalogue> = {
     "可选值、错误即值、comptime。没有什么是隐藏的：每次分配都要付出代价，每次失败都有名字。",
   "lands.luaBlurb": "表、闭包、元表、协程。一种结构装下一切，而且从 1 开始编号。",
   "lands.remixBlurb": "Go、Rust、Python：同一个程序写三遍。一个概念，三种语法，并排记进手指。",
+  "lands.cheatsheetBlurb": "速查表基础。纸上的核心语法，问你：四行里只有一行对。选中就通关。",
+  "lands.cheatsheetAdvancedBlurb":
+    "速查表进阶。Trait、channel、泛型、闭包——现场编程见真章的模式。四行里只有一行对。",
   "lands.verybasicBlurb": "小测验。哪一行才是对的语法？四选一，然后把它敲出来。",
   "lands.basicBlurb":
     "早晨的散步。一次一个语法点，先讲解，再填一到四行 — 现场编程屏幕默认你已烂熟于手的那些语法。",
@@ -169,6 +172,8 @@ export const zh: Partial<Catalogue> = {
   "map.playground": "练习场",
   "map.allMapsShort": "地图",
   "map.playgroundShort": "练习",
+  "map.cheatsheet": "速查表基础",
+  "map.cheatsheet_advanced": "速查表进阶",
   "map.verybasic": "入门",
   "map.basic": "基础",
   "map.advanced": "进阶",
@@ -209,6 +214,10 @@ export const zh: Partial<Catalogue> = {
   "map.footer": "←→  街道   ENTER  进去   TAB  领地   Q/E  分类   F1  屏幕方向",
 
   "quest.loading": "载入中",
+  "quest.sheetPick": "选出对的那一行  (1–4)",
+  "quest.sheetRight": "答对了",
+  "quest.sheetStreak": "连胜 ×{n}",
+  "quest.sheetCombo": "×{n} 连击",
   "quest.quizPick": "选出对的那一行，然后敲出来  (1–4)",
   "quest.quizRight": "答对了 — 现在把它敲出来",
   "quest.job": "这次的任务",
@@ -284,6 +293,7 @@ export const zh: Partial<Catalogue> = {
   "quest.noFormat": "这台服务器还没有格式化",
   "quest.formatSilent": "格式化工具没有回应",
   "quest.briefEnglish": "任务正文是英文 — 题目还没有翻译",
+  "quest.sheetFooter": "1–4  选择   ESC  地图",
   "quest.footer":
     "CTRL+ENTER  运行   CTRL+SHIFT+ENTER  提交   CTRL+SHIFT+F  格式化   PGUP/PGDN  日志   ESC  地图",
   "verdict.accepted": "样例通过了",

@@ -1,0 +1,594 @@
+# ZIG LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/zig/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "zig.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.cheatsheet_advanced.01.generic-fn"
+title = "VĚTŠÍ Z LIBOVOLNÝCH DVOU"
+story = "22:00 u portálu. Velín porovnává dvě jízdná, dvě hmotnosti, dvě časové značky a chce to porovnání napsat jen jednou."
+brief = '''
+`max` vrací větší ze dvou hodnot jednoho typu a volá se s typem uvedeným
+výslovně: `max(i64, 3, 7)`, `max(f64, 2.5, 1.0)`. Který řádek ji
+otevírá?
+
+```
+// ____
+    return if (a > b) a else b;
+}
+```
+'''
+hints = [
+  "Typ je první argument, známý při překladu, a zbylé dva parametry i návratový typ se píší pomocí něj.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.cheatsheet_advanced.02.this"
+title = "TYP, KTERÝ JEŠTĚ NEMÁ JMÉNO"
+story = "Stoh kontejnerů vezme jakýkoli náklad. Uvnitř potřebují metody jméno pro struct, ve kterém se právě píší."
+brief = '''
+Uvnitř structu, který `Stack` vrací, naváž `Self` na typ toho structu
+samého, aby `push` mohl brát `self: *Self`.
+
+```
+fn Stack(comptime T: type) type {
+    return struct {
+        // ____
+        items: std.ArrayList(T) = .empty,
+        pub fn push(self: *Self, gpa: std.mem.Allocator, v: T) !void {
+            try self.items.append(gpa, v);
+        }
+    };
+}
+```
+'''
+hints = [
+  "Anonymní struct nemá jméno, kterým by se na sebe odkázal; jedna vestavěná funkce vrací nejvnitřnější právě definovaný struct, enum nebo union.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.cheatsheet_advanced.03.fn-pointer"
+title = "KTERÉ PRAVIDLO DNES V NOCI"
+story = "Pravidlo pro jízdné v budce 2 se o půlnoci vymění: před ní zdvojnásobit, po ní negovat. Budka drží pravidlo v proměnné a volá ho."
+brief = '''
+`double` i `negate` jsou obě `fn (i32) i32`. Deklaruj **běhovou
+proměnnou** `f`, která začíná jako `double`, dá se později přepsat na
+`negate` a volá se jako `f(3)`.
+'''
+hints = [
+  "Holý typ `fn` existuje jen při překladu a nemůže žít ve `var`; běhová funkční hodnota je ukazatel na funkci, a funkce je `const`.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.cheatsheet_advanced.04.inline-for-fields"
+title = "KAŽDÉ POLE, JMÉNEM"
+story = "Noční audit vypíše každé pole každého záznamu, který dostane, ať je to jakýkoli struct, aniž by mu někdo řekl jména polí."
+brief = '''
+`dump` vypíše jméno a hodnotu každého pole libovolného structu, který
+dostane. Otevři smyčku přes pole tak, aby se `f.name` dalo použít
+v `@field` (Zig 0.16: značka v type-info se píše malými písmeny).
+
+```
+fn dump(v: anytype) void {
+    const T = @TypeOf(v);
+    if (@typeInfo(T) != .@"struct") @compileError("not a struct: " ++ @typeName(T));
+    // ____
+        std.debug.print("{s}: {any}\n", .{ f.name, @field(v, f.name) });
+    }
+}
+```
+'''
+hints = [
+  "Seznam polí jsou data známá při překladu, takže obyčejná smyčka ho indexovat nemůže; smyčka se musí rozbalit, a `struct` je klíčové slovo, které jako jméno pole potřebuje uvozovky.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.cheatsheet_advanced.05.has-field"
+title = "MÁ TO ZNAČKU"
+story = "Auta mají značku, kola ne. Jedna funkce na štítky dostane obojí a musí při překladu vědět, co právě drží."
+brief = '''
+`label` se volá s `Car` (který má pole `plate`) a s `Bike` (který nemá
+pole `plate` ani deklaraci toho jména). Otevři `if`, jehož větev se
+vezme pro `Car` a pro `Bike` se odřízne, takže `v.plate` se přeloží jen
+tam, kde existuje.
+
+```
+fn label(v: anytype) []const u8 {
+    const T = @TypeOf(v);
+    // ____
+        return v.plate;
+    } else return "no plate";
+}
+```
+'''
+hints = [
+  "Jedna vestavěná funkce se ptá typu, zda má pole daného jména, zadaného jako řetězec; ta, která se ptá na deklarace, u pole odpoví ne.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.cheatsheet_advanced.06.comptime-var"
+title = "SPOČÍTÁNO PŘED SESTAVENÍM"
+story = "Pět tabulek se čtverci pruhů je vyplněno dřív, než program vůbec běží; smyčku, která je plní, rozbalí překladač."
+brief = '''
+Uvnitř **běhové** funkce deklaruj počítadlo smyčky `i` tak, aby se
+`inline while` níže rozbalilo, s `i` známým při překladu v každé
+iteraci.
+
+```
+fn squares() [5]u32 {
+    var out: [5]u32 = undefined;
+    // ____
+    inline while (i < 5) : (i += 1) {
+        out[i] = @intCast(i * i);
+    }
+    return out;
+}
+```
+'''
+hints = [
+  "Běhová `var` nemůže řídit inline smyčku, `const` se nedá posouvat; klíčové slovo, které vynutí proměnlivou hodnotu při překladu, stojí před `var`.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.cheatsheet_advanced.07.error-merge"
+title = "DVA SEZNAMY ZPŮSOBŮ, JAK SELHAT"
+story = "Čtení lístku může selhat dvěma způsoby, jeho naúčtování třetím. Účtovací funkce jmenuje všechny tři v jedné množině."
+brief = '''
+`ParseError` je `error{ Empty, BadDigit }`. Definuj `TollError` jako
+množinu, která drží ty dvě chyby **a** `Overdrawn`, aby
+`fn charge(s: []const u8) TollError!i64` mohla vrátit kteroukoli ze tří.
+'''
+hints = [
+  "Množiny chyb se slučují dvouznakovým operátorem; jedna svislice je bitové or a typy nebere.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.cheatsheet_advanced.08.switch-on-error"
+title = "KUDY TO SELHALO"
+story = "Rozmazaný lístek nemá žádnou cenu; lístek s příliš mnoha číslicemi má cenu maxima. Budka rozhoduje podle chyby, kterou zachytila."
+brief = '''
+`std.fmt.parseInt(i64, tok, 10)` selže s `InvalidCharacter` nebo
+`Overflow`. Chyba se zachytí a udělá se na ní switch. Která větev dá 0
+za špatný znak?
+
+```
+return std.fmt.parseInt(i64, tok, 10) catch |e| switch (e) {
+    // ____
+    error.Overflow => std.math.maxInt(i64),
+};
+```
+'''
+hints = [
+  "Switch přes množinu chyb jmenuje každý případ s předponou `error.`; tečkový tvar enum literálu je jiný typ.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.cheatsheet_advanced.09.walk-optional"
+title = "PO ŘETĚZU DOLŮ"
+story = "Noční účtenky jsou zřetězený seznam, každý uzel ukazuje na další nebo na nic. Audit ho projde až na konec a sečte."
+brief = '''
+`Node` je `struct { v: i64, next: ?*Node }` a `cur` je `var` typu
+`?*Node`. Otevři smyčku, která spustí tělo s `node` navázaným postupně na
+každý uzel a zastaví se na `null`, přičemž krok na další uzel je napsaný
+v hlavičce smyčky, ne v těle.
+
+```
+var total: i64 = 0;
+var cur = head;
+// ____
+    total += node.v;
+}
+```
+'''
+hints = [
+  "Podmínka je sám optional, zachycení je rozbalený ukazatel a pokračovací výraz za dvojtečkou posouvá optional, ne zachycení.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.cheatsheet_advanced.10.union-payload"
+title = "JAK ZAPLATILI"
+story = "Auto platí mincemi, kartou Octopus, nebo je mávnutím puštěno. Součet přičítá mince v nominální hodnotě a kartu dvojnásobně."
+brief = '''
+`Pay` je `union(enum) { coin: i64, octopus: i64, waved: void }` a `p`
+je `Pay`. Která větev přičte k `t` hodnotu (payload) varianty coin?
+
+```
+switch (p) {
+    // ____
+    .octopus => |amount| t += amount * 2,
+    .waved => {},
+}
+```
+'''
+hints = [
+  "Obsah se naváže zachycením za šipkou, stejnými svislicemi jako `if` na optionalu; prosté zachycení je hodnota, `|*x|` je ukazatel na ni.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.cheatsheet_advanced.11.enum-from-int"
+title = "ČÍSLO Z DRÁTU"
+story = "Senzor náprav posílá třídu pruhu jako bajt. Tabulka poplatků je klíčovaná enumem, který zná svůj poplatek sám."
+brief = '''
+`n` je běhové `u8` držící platnou hodnotu značky. Udělej z `lane`
+odpovídající `Lane`, aby se `lane.fee()` přeložilo.
+
+```
+const Lane = enum(u8) {
+    car, van, truck, bus,
+    pub fn fee(self: Lane) i64 {
+        return switch (self) { .car, .van => 10, .truck => 20, .bus => 15 };
+    }
+};
+// ____
+return lane.fee();
+```
+'''
+hints = [
+  "Vestavěná funkce bere jen celé číslo; enum, kterým se stane, je typ výsledku, takže ho musí uvést vazba. Opačný směr je `@intFromEnum`.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.cheatsheet_advanced.12.labeled-block"
+title = "PRVNÍ TĚŽKÝ"
+story = "Záznam mostní váhy se prohledává po první hodnotu přes sto tun; odpověď je hodnota, ne skok ven z funkce."
+brief = '''
+`xs` zaručeně obsahuje hodnotu přes 100. `found` se musí stát prvním
+takovým `x` a funkce pak `found` dál používá. Který řádek vydá `x` ven
+z bloku?
+
+```
+const found = blk: {
+    for (xs) |x| {
+        if (x > 100) // ____
+    }
+    unreachable;
+};
+return found * 2;
+```
+'''
+hints = [
+  "Blok s návěštím vydá svou hodnotu přes break, který jmenuje návěští s dvojtečkou před ním a nese hodnotu; `return` by opustil funkci se špatným číslem a návěští by zůstalo nevyužité.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.cheatsheet_advanced.13.span"
+title = "ŘETĚZEC Z CÉČKOVÉ STRANY"
+story = "Ovladač kamery na značky je v C. Předává jméno jako ukazatel, který končí nulovým bajtem, a zigová strana chce řez s délkou."
+brief = '''
+`c_name` je `[*:0]const u8` — vícepoložkový ukazatel bez délky,
+ukončený 0. Udělej z `s` `[]const u8` přes jeho bajty až po
+(nikoli včetně) zakončení, bez kopírování.
+'''
+hints = [
+  "Vícepoložkový ukazatel se na řez nepřevede sám: něco musí dojít k sentinelu, aby našlo délku. Jedna funkce ze std.mem dělá přesně to a bere jen ukazatel.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.cheatsheet_advanced.14.to-owned-slice"
+title = "PŘEDEJ SEZNAM"
+story = "Sudé pruhy se sbírají do seznamu a volající chce holý řez, který po použití uvolní přes gpa.free."
+brief = '''
+`list` je `std.ArrayList(i64)` naplněný přes `gpa`. Vrať jeho obsah
+jako `[]i64`, který volající uvolní přes `gpa.free`, tak aby `list`
+neměl co uvolňovat a nic se nekopírovalo (Zig 0.16: seznam žádný
+alokátor nedrží).
+
+```
+fn evens(gpa: std.mem.Allocator, xs: []const i64) ![]i64 {
+    var list: std.ArrayList(i64) = .empty;
+    errdefer list.deinit(gpa);
+    for (xs) |x| if (@rem(x, 2) == 0) try list.append(gpa, x);
+    // ____
+}
+```
+'''
+hints = [
+  "`.items` pořád vlastní seznam a uvolnilo by se dvakrát nebo nikdy; volání, které předává vlastnictví, zmenšuje na míru, takže může selhat a bere alokátor.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.cheatsheet_advanced.15.get-or-put"
+title = "JEDNO HLEDÁNÍ, NE DVĚ"
+story = "Počítadlo značek ve velínu cvakne jednou za auto a noční směna odmítá hashovat stejnou značku dvakrát."
+brief = '''
+`counts` je `std.AutoHashMap(i64, i64)`. Započítej `x` jediným
+hledáním: klíč viděný poprvé začíná před inkrementem na 0, klíč, který
+už tam je, si svůj počet nechá.
+
+```
+const gop = try counts.getOrPut(x);
+// ____
+gop.value_ptr.* += 1;
+```
+'''
+hints = [
+  "Výsledek nese příznak, zda klíč už byl přítomen, a ukazatel na slot; čerstvý slot je undefined, dokud do něj nezapíšeš.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.cheatsheet_advanced.16.dupe-key"
+title = "KLÍČ, KTERÝ PŘEŽIJE ŘÁDEK"
+story = "Značky přicházejí po jedné na řádek do stejného bufferu. Množina značek viděných dnes v noci nesmí ukazovat do bufferu, který se za chvíli přepíše."
+brief = '''
+`seen` je `std.StringHashMap(void)` vytvořená s `gpa` a `word` je řez
+`[]const u8` do řádkového bufferu, který další čtení přepíše. Vlož
+`word` jako klíč, který zůstane platný i poté, co se buffer změní.
+Klíče se na konci uvolňují jeden po druhém.
+'''
+hints = [
+  "Řetězcová mapa ukládá řez, který jí dáš, ne bajty; nejdřív je zkopíruj alokátorem, a i ta kopie může selhat.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.cheatsheet_advanced.17.debug-allocator"
+title = "ALOKÁTOR, KTERÝ TĚ PRÁSKNE"
+story = "Noční build běží s alokátorem, který nahlásí každý nevrácený bajt. V 0.16 se přejmenoval a ten starý se nepřeloží."
+brief = '''
+Zig 0.16. Deklaruj `dbg`, obecný alokátor hlídající úniky, tak aby se
+dva řádky níže přeložily — `deinit` ho mění a hlásí úniky.
+
+```
+// ____
+defer _ = dbg.deinit();
+const gpa = dbg.allocator();
+```
+'''
+hints = [
+  "`GeneralPurposeAllocator` ze std.heap v 0.16 zmizel; typ bere konfigurační n-tici a inicializuje se decl literálem, ne voláním.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.cheatsheet_advanced.18.arena"
+title = "ZAPLAŤ JEDNOU, NA KONCI"
+story = "Pracovní uzly a řetězce jednoho požadavku umřou všechny naráz s ním. Nikdo je neuvolňuje po jednom."
+brief = '''
+`page` je `std.heap.page_allocator`. Udělej z `arena` arénu nad ním,
+aby `a.create(Node)` i `std.fmt.allocPrint(a, ...)` níže uvolnil
+jediný `deinit`.
+
+```
+// ____
+defer arena.deinit();
+const a = arena.allocator();
+```
+'''
+hints = [
+  "Aréna se staví nad podřízeným alokátorem, který bere jako svůj jediný argument; není to generický typ a žádnou konfigurační n-tici nemá.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.cheatsheet_advanced.19.defer-order"
+title = "POSLEDNÍ DOVNITŘ, PRVNÍ VEN"
+story = "Tři razítka na cestě z budky, dvě z nich odložená přes defer. Kniha ukazuje pořadí, v jakém dopadla."
+brief = '''
+Co tato funkce vypíše, celé?
+
+```
+fn stamp() void {
+    defer std.debug.print("1", .{});
+    defer std.debug.print("2", .{});
+    std.debug.print("3", .{});
+}
+```
+'''
+hints = [
+  "Odložené příkazy běží při opuštění rozsahu v opačném pořadí, než v jakém byly odloženy: poslední zaregistrovaný jde první.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.cheatsheet_advanced.20.split-keeps-empties"
+title = "PRÁZDNÝ SLOUPEC SE POČÍTÁ"
+story = "Export mýtného je oddělený čárkami a chybějící sloupec je prázdné pole, ne pole, které nikdy nebylo. `a,,b` jsou tři sloupce."
+brief = '''
+`line` je `[]const u8`. Udělej z `it` iterátor přes pole `line`
+oddělená čárkami takový, že `while (it.next()) |f| n += 1;` napočítá
+u `"a,,b"` **3** pole a u `"a"` 1.
+'''
+hints = [
+  "Dva iterátory ze std.mem berou jednobajtový oddělovač; tokenizer polyká běhy oddělovačů a napočítal by dvě, splitter vydá i prázdné pole mezi nimi.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.cheatsheet_advanced.21.sort-context"
+title = "ŘAZENÍ PODLE CIZÍCH ČÍSEL"
+story = "Indexy pruhů se přerovnají podle hmotností v oddělené tabulce. Zig nemá uzávěru, která by tabulku zachytila, tak se předá řazení."
+brief = '''
+`idx` je `[]usize` a `keys` je `[]const i64`. Seřaď `idx` vzestupně
+podle `keys[i]` tímto komparátorem:
+
+```
+fn byKey(keys: []const i64, a: usize, b: usize) bool {
+    return keys[a] < keys[b];
+}
+```
+'''
+hints = [
+  "Třetí argument je kontext, který komparátor dostane jako svůj první parametr; typ komparátoru mu musí přesně odpovídat, takže `{}` sedí jen na kontext `void`.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.cheatsheet_advanced.22.truncate"
+title = "JEN DOLNÍ BAJT"
+story = "Senzor náprav balí čtyři hodnoty do jednoho u32. Budka chce nejnižší bajt a nesmí zpanikařit, když zbytek není nula."
+brief = '''
+`x` je běhové `u32` držící `0x1234`. Udělej z `lo` `u8` držící
+`0x34` — dolních osm bitů — bez bezpečnostní paniky v režimu Debug.
+'''
+hints = [
+  "Přetypování, které kontroluje, zda se hodnota vejde, na 0x1234 zpanikaří; to, které horní bity zahodí, bere jeden argument a šířku si bere z vazby.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.cheatsheet_advanced.23.wrapping"
+title = "PŘETOČIT, NEZASTAVIT"
+story = "Hash značky má přetékat, tisíckrát za noc. V režimu Debug je nevyžádané přetečení panika a zavřená závora."
+brief = '''
+`h` je `u32`, které začíná blízko `std.math.maxInt(u32)`, a `c` je `u8`.
+Napiš krok hashe `h = h * 31 + c` tak, aby se **přetáčel** modulo
+2^32 — ne panika, ne zaseknutí na maximu.
+'''
+hints = [
+  "Obyčejné operátory při přetečení v Debugu panikaří a maska použitá až potom přijde pozdě — násobení už přeteklo. Zig má dvě rodiny operátorů s příponou: jedna se nasytí na maximu, druhá se přetočí.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.cheatsheet_advanced.24.expect-equal"
+title = "DOKAŽ JÍZDNÉ"
+story = "Než to spustí zkoušející, uchazeč pustí `zig test` na tabulku jízdného a průměr, a test říká, co očekává."
+brief = '''
+`fare(3)` vrací `i64`, které má být 7. Uvnitř testovacího bloku to
+ověř — test musí selhat, když je hodnota špatně, a musí se přeložit.
+
+```
+fn avg(sum: i64, n: i64) f64 {
+    return @as(f64, @floatFromInt(sum)) / @as(f64, @floatFromInt(n));
+}
+
+test "fare" {
+    // ____
+    try std.testing.expect(avg(5, 2) == 2.5);
+}
+```
+'''
+hints = [
+  "Porovnání vrací chybové sjednocení, takže se musí `try`, jinak ho překladač odmítne ignorovat; jednoargumentový `expect` bere bool.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.cheatsheet_advanced.25.main-init"
+title = "KUDY PŘICHÁZÍ RUNTIME"
+story = "Zig 0.16 předává mainu jeho I/O runtime a alokátor v jedné struktuře. Staré signatury se přeloží jen tehdy, když ani jedno nepoužijí."
+brief = '''
+Zig 0.16. Otevři `main` tak, aby se tělo níže přeložilo: čte `io` a
+`gpa` z parametru a používá `try`.
+
+```
+// ____
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+}
+```
+'''
+hints = [
+  "Vstupní bod musí být `pub`, musí kvůli `try` umět vrátit chybu a bere jeden parametr typu ze std.process, ze kterého tělo čte pole.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.cheatsheet_advanced.26.stdin-lines"
+title = "PO JEDNOM ŘÁDKU"
+story = "Proud značek je nekonečný a velín ho čte po řádcích, přes čtečku z 0.16, dokud se proud nezavře."
+brief = '''
+Zig 0.16. `r` je `&stdin.interface`, `*std.Io.Reader` nad bufferovaným
+stdin. Otevři smyčku, která naváže každý řádek (bez konce řádku) na
+`line`, chybu čtení předá volajícímu a na konci vstupu čistě skončí.
+'''
+hints = [
+  "Čtečka z 0.16 má volání take-až-po-oddělovač, které vrací chybové sjednocení kolem volitelného řezu: null na konci proudu, takže `try` a pak zachycení; jeho sourozenec Exclusive volitelný není a na konci dává chybu.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.cheatsheet_advanced.27.spawn"
+title = "JEDNA BUDKA NA VLASTNÍM VLÁKNĚ"
+story = "Budka 5 umocní svůj počet na vlastním vlákně a zapíše odpověď do slotu velínu; velín ji před čtením přes join počká."
+brief = '''
+`fn worker(out: *i64, n: i64) void` a `total` je `var i64`. Spusť
+`worker` na novém vlákně s `&total` a `5` a ponech si popisovač jako `t`,
+aby se `t.join();` na dalším řádku přeložilo.
+'''
+hints = [
+  "Spawn bere konfiguraci, funkci a její argumenty jako jednu n-tici; může selhat a popisovač existuje, až když je z něj chyba sundaná.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.cheatsheet_advanced.28.io-mutex"
+title = "JEDEN TÁCEK, DVĚ RUCE"
+story = "Dvě budky přičítají do jednoho součtu tržby. Zámek kolem něj patří v 0.16 I/O runtimu a std.Thread.Mutex zmizel."
+brief = '''
+Zig 0.16. `m` je `*std.Io.Mutex` a `io` je `std.Io`. Vezmi zámek před
+přičtením; `defer` níže ho vrací. `add` vrací `void` a chybu
+propagovat nemůže.
+
+```
+fn add(io: std.Io, m: *std.Io.Mutex, total: *i64, value: i64) void {
+    // ____
+    defer m.unlock(io);
+    total.* += value;
+}
+```
+'''
+hints = [
+  "Obyčejný `lock` mutexu z 0.16 bere `io` a může vrátit `error.Canceled`, což funkce vracející `void` nemůže `try`; jeho sourozenec, který se zrušit nedá, nevrací nic.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.cheatsheet_advanced.29.atomic"
+title = "JEDNO SLOVO, ŽÁDNÝ ZÁMEK"
+story = "Počítadlo průjezdů pod estakádou je jedno strojové slovo, které zvedá každý pruh naráz, a nikdo nechce mutex kolem jediného sčítání."
+brief = '''
+`hits` je `*std.atomic.Value(u32)` sdílený několika vlákny. Přičti k němu
+atomicky 1 s relaxed (monotonic) uspořádáním, ve funkci vracející `void`,
+kde o starou hodnotu nikdo nestojí.
+'''
+hints = [
+  "Operace read-modify-write vrací předchozí hodnotu a Zig nenechá ne-void výsledek potichu spadnout pod stůl; uspořádání je v 0.16 enum literál malými písmeny.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.cheatsheet_advanced.30.packed-bitcast"
+title = "OSM PŘÍZNAKŮ V JEDNOM BAJTU"
+story = "Řídicí jednotka závory bere jeden bajt na auto: zaplaceno, označeno, tříbitový pruh, tři bity volné. Struktura je rozložená bit po bitu a posílá se jako ten bajt."
+brief = '''
+`Flags` je `packed struct(u8)` — `@sizeOf(Flags)` je 1, na rozdíl od
+`extern struct`, který je rozložený jako v C. `f` je `Flags`. Udělej z
+`bits` `u8`, jehož bitový vzor je vzorem `f`, aby mohl ven na drát.
+
+```
+const Flags = packed struct(u8) {
+    paid: bool,
+    flagged: bool,
+    lane: u3,
+    _pad: u3 = 0,
+};
+```
+'''
+hints = [
+  "Celočíselná přetypování chtějí na vstupu celé číslo; packed struct se bit po bitu přeinterpretuje přetypováním, které bere jeden argument a cíl si bere z vazby.",
+]

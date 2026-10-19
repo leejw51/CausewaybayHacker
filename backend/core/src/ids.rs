@@ -43,6 +43,14 @@ pub fn photo_token() -> String {
 /// A quest id is `<land>.<category>.<node:02d>.<slug>` (SPEC §4.1). The
 /// importer refuses a pack whose ids disagree with its own land/category, so
 /// the check lives here rather than in a comment.
+/// The two sheet roads (SPEC §0): `cheatsheet`, the core grammar, and
+/// `cheatsheet_advanced`, the advanced patterns. On both the quiz is the
+/// quest — four lines, one right, the pick judged without a compiler — so
+/// everything that treats a pick as the submission asks this, not the name.
+pub fn is_sheet(category: &str) -> bool {
+    matches!(category, "cheatsheet" | "cheatsheet_advanced")
+}
+
 pub fn parse_quest_id(id: &str) -> Option<(&str, &str, u32, &str)> {
     let mut parts = id.splitn(4, '.');
     let land = parts.next()?;

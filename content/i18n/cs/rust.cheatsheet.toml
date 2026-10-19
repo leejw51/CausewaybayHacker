@@ -1,0 +1,469 @@
+# RUST LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose of
+# `content/rust/cheatsheet.toml`, quest by quest, and nothing else. The question
+# is the brief; the four choices are code, live in the English pack, and are
+# never translated. Code blocks, identifiers and printed strings are copied
+# verbatim.
+
+pack   = "rust.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet.01.read-all"
+title = "CELÁ PÁSKA"
+story = "06:30, Jardine's Bazaar. Vstup kiosku přichází najednou a kiosek chce všechno."
+brief = '''
+Načti **celý** stdin do `s` jedním voláním.
+
+```
+use std::io::{self, Read};
+let mut s = String::new();
+// ____
+```
+
+Který řádek to je?
+'''
+hints = [
+  "`read_to_string` vezme `&mut String` a naplní ho; vrací Result, takže ho rozbal přes unwrap.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet.02.read-line"
+title = "KONEC ŘÁDKU ZŮSTÁVÁ"
+story = "Na objednávce stojí 42. Pokladna ji čte i se zalomením řádku."
+brief = '''
+`read_line` nechal v `line` hodnotu `"42\n"`. Který řádek z ní udělá `usize` bez paniky?
+'''
+hints = [
+  "`read_line` ponechává `\\n`. Parse na něm selže, tak nejdřív trim.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet.03.width"
+title = "ZAROVNANO VPRAVO"
+story = "Cenová tabule na tržnici zarovnává všechna čísla doprava."
+brief = '''
+Vypiš `x` zarovnané doprava v poli širokém pět znaků.
+'''
+hints = [
+  "Uvnitř složených závorek stojí zarovnání před šířkou: `<` vlevo, `^` na střed, `>` vpravo.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet.04.usize"
+title = "INDEXY JSOU USIZE"
+story = "Skříňka č. 7 na stanici Causeway Bay. Číslo dorazilo jako i32."
+brief = '''
+`i` je `i32` a `v` je `Vec<u8>`. Který řádek přečte prvek `i`?
+'''
+hints = [
+  "Vec se indexuje jen pomocí `usize`. `as` je přetypování.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet.05.inclusive"
+title = "OD JEDNÉ DO DESETI"
+story = "Zastávky tramvaje jsou očíslované od 1 do 10 a na tu poslední se nejčastěji zapomíná."
+brief = '''
+Projdi cyklem 1, 2, … 10, včetně desítky.
+'''
+hints = [
+  "`a..b` skončí před `b`. `a..=b` ho zahrnuje.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet.06.guard"
+title = "STRÁŽ"
+story = "Vyhazovač na Lockhart Road kontroluje kromě jména na seznamu ještě jednu věc."
+brief = '''
+Uvnitř `match x { … }` větev pro libovolné záporné číslo:
+
+```
+match x {
+    0 => "zero",
+    // ____
+    _ => "pos",
+}
+```
+'''
+hints = [
+  "Strážní podmínka má tvar `pattern if condition =>`. Nejdřív hodnotu pojmenuj.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet.07.fnmut"
+title = "KLIKAČ"
+story = "Počítadlo vrátného: každé stisknutí změní číslo, které drží."
+brief = '''
+`let mut cnt = 0;` — uzávěra `inc`, která při každém volání přičte k `cnt` jedničku, aby se `inc(); inc();` přeložilo.
+'''
+hints = [
+  "Uzávěra, která mění zachycenou hodnotu, je `FnMut` a její volání vyžaduje vazbu `mut`.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet.08.desc"
+title = "NEJVĚTŠÍ NAHOŘE"
+story = "Žebříček v herně v suterénu SOGO: nejvyšší skóre nahoře."
+brief = '''
+Seřaď `v: Vec<i32>` **sestupně**, na místě.
+'''
+hints = [
+  "`sort_by` bere porovnávací funkci. Prohoď operandy a pořadí se obrátí.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet.09.count"
+title = "ČÁRKY"
+story = "Dai pai dong počítá objednávky podle jídla a nové jídlo začíná na nule."
+brief = '''
+`m: HashMap<String, i32>`. Přičti jedničku k počtu pro klíč `k`; pokud tam ještě není, začni od 0.
+'''
+hints = [
+  "`entry(k).or_insert(0)` vrací `&mut i32`; dereferencuj ho a přičti.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet.10.min-heap"
+title = "NEJMENŠÍ NAHOŘE"
+story = "Fronta na minibus bere nejdřív nejkratší cestu. BinaryHeap umí dát nahoru jen to největší."
+brief = '''
+`h` je `BinaryHeap<i32>`. Vlož `x` tak, aby `h.pop()` vrátil jako první to **nejmenší**.
+'''
+hints = [
+  "BinaryHeap je max-halda. Hodnotu obal, aby se její pořadí obrátilo.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet.11.clone"
+title = "DVĚ KOPIE"
+story = "Kopírka v kanceláři v Times Square. Originál zůstává na skle."
+brief = '''
+`let a = String::from("x");` — udělej z `b` vlastní `String`, aby šlo `a` použít i potom.
+'''
+hints = [
+  "`let b = a;` String přesune. Hlubokou kopii je třeba napsat výslovně.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet.12.ok-or"
+title = "CHYBĚJÍCÍ ŘÁDEK"
+story = "V účetní knize v Room 7-32 chybí řádek. Funkce, která vrací Result, musí říct proč."
+brief = '''
+Uvnitř `fn … -> Result<i32, &'static str>` je `o` typu `Option<i32>`. Vytáhni hodnotu, nebo vrať chybu `"missing"`.
+'''
+hints = [
+  "`?` na Option ve funkci vracející Result nefunguje. Nejdřív z Optionu udělej Result.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet.13.filter-map-sum"
+title = "NEJDŘÍV FILTR, PAK DRUHÁ MOCNINA"
+story = "Krokoměry na dráze ve Victoria Parku zapíšou mínus, když klesne baterie; Mei chce sečíst druhé mocniny skutečných kol."
+brief = '''
+`v: Vec<i64>` obsahuje kladná **i záporná** čísla. `s` je součet druhých
+mocnin jen těch kladných.
+
+```
+let s: i64 = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Záporná čísla zahoď před umocněním — druhá mocnina znaménko nemá. Nad `.iter()` vidí uzávěra filtru `&&i64`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet.14.iter-mut"
+title = "NA MÍSTĚ"
+story = "7-Eleven na Yee Wo Street přidá dolar ke každé ceně v regálu a regál tam potom musí pořád stát."
+brief = '''
+`let mut v: Vec<i32> = …;` — přičti jedničku ke **každému prvku samotného `v`**,
+a `v` se na dalším řádku dál používá.
+'''
+hints = [
+  "Tři způsoby, jak projít Vec: vypůjčit si ho, vypůjčit si ho výhradně, nebo si ho vzít. Jen jeden z nich dovolí zapisovat přes `x` a `v` si nechat.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet.15.windows"
+title = "SOUSEDÉ"
+story = "Jízdní řád tramvaje po Hennessy Road: Mei chce rozestup mezi každou zastávkou a tou následující."
+brief = '''
+`v: Vec<i64>` s aspoň třemi prvky. `d` obsahuje `v[i+1] - v[i]`
+pro každé `i`, takže je přesně o jedna kratší než `v`.
+
+```
+let d: Vec<i64> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Překrývající se dvojice, ne disjunktní — a každá dvojice přichází jako řez, ne jako n-tice.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet.16.reverse-string"
+title = "POZPÁTKU"
+story = "Čistič oken čte neon na Percival Street z druhého konce; Mei chce písmena v jeho pořadí."
+brief = '''
+`s: &str` může obsahovat i jiné než ASCII znaky. `r` je nový `String`
+se znaky z `s` v obráceném pořadí.
+'''
+hints = [
+  "Projdi znaky (ne bajty — vícebajtový znak by vyšel rozbitý), průchod otoč a posbírej ho do Stringu.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet.17.concat"
+title = "SPOJENO, NE PŘESUNUTO"
+story = "Dvě fronty se slévají pod eskalátorem v Times Square; seznamy obou byly Mei jen půjčeny, ne darovány."
+brief = '''
+`a: Vec<i32>` a `b: Vec<i32>`. `c` je **nový** `Vec<i32>` s prvky `a`,
+za nimiž následují prvky `b` — a `a` i `b` se používají i potom.
+'''
+hints = [
+  "Spojení obou Veců hodnotou je přesune. Spoj místo toho dva vypůjčené řezy.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet.18.derive-hash"
+title = "ZPŮSOBILÝ PRO MNOŽINU"
+story = "Ferris si každý navštívený roh mřížky Causeway Bay špendlí do množiny a překladač chce vědět, jak se dva špendlíky porovnávají."
+brief = '''
+`struct P { x: i32, y: i32 }` musí jít do `HashSet<P>`. Který řádek derive
+nad structem **stačí** k tomu, aby se `set.insert(p)` přeložilo?
+'''
+hints = [
+  "Hashovací množina potřebuje hodnotu hashovat a dvě hodnoty porovnat na úplnou rovnost — a úplná rovnost stojí na částečné rovnosti.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet.19.drop-tx"
+title = "POSLEDNÍ ODCHÁZÍ"
+story = "Čtyři kurýři na Lockhart Road se hlásí přes jednu vysílačku a dispečer musí vědět, kdy se odhlásil poslední z nich."
+brief = '''
+Čtyři producenti, jeden konzument. Smyčka `for` musí skončit, jakmile
+dorazí všechny čtyři zprávy.
+
+```
+let (tx, rx) = mpsc::channel();
+for id in 0..4 {
+    let tx = tx.clone();
+    thread::spawn(move || tx.send(id).unwrap());
+}
+// ____
+for m in rx { println!("{m}"); }
+```
+
+Který řádek patří do mezery?
+'''
+hints = [
+  "Smyčka skončí, až když zmizí každý odesílatel. Čtyři klony odejdou se svými vlákny — jeden odesílatel ale pořád sedí v `main`.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet.20.shared-receiver"
+title = "JEDNA LIŠTA, ČTYŘI KUCHAŘI"
+story = "Noční kuchyně u Lucky Mac: jedna lišta na objednávky, čtyři kuchaři a číst z ní může v jednu chvíli jen jeden."
+brief = '''
+`rx: Receiver<u64>` je fronta úloh. Čtyři pracovní vlákna, každé spuštěné
+s `move`, musí všechna brát úlohy z tohoto **jediného** příjemce. Který řádek
+zabalí `rx` tak, aby se handle dal naklonovat do každého workera?
+'''
+hints = [
+  "Receiver není Sync, takže sdílení mezi vlákny vyžaduje zámek — a zámek potřebuje vláknově bezpečného vlastníka, ne jednovláknového.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet.21.from-str"
+title = "Z DRÁTU"
+story = "Záznam o zákazníkovi přichází po drátě z fintechu na Gloucester Road jako JSON a Mei ho chce jako struct."
+brief = '''
+`s: &str` obsahuje jeden JSON objekt. `User` má odvozený `Deserialize` a má
+pole `name: String`. Doplň mezeru tak, aby se tohle přeložilo:
+
+```
+fn name_of(s: &str) -> Result<String, serde_json::Error> {
+    // ____
+    Ok(u.name)
+}
+```
+'''
+hints = [
+  "`u.name` na dalším řádku nic neurčuje: serde cílový typ neuhodne, tak ho pojmenuj na vazbě. Vstup je text, ne `Value`.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet.22.lower-bound"
+title = "PRVNÍ, CO NENÍ MENŠÍ"
+story = "Cenová tabule v Sogu je seřazená; Mei chce vědět, kde začíná první položka za aspoň `t`."
+brief = '''
+`v: Vec<i64>` je seřazený vzestupně a může obsahovat duplicity; `t: i64`
+v něm být může i nemusí. `i` je index **prvního prvku ≥ `t`**
+(`v.len()`, pokud žádný není) — klasický lower bound, v O(log n), bez
+paniky.
+'''
+hints = [
+  "Řez se dělí na část, kde predikát platí, a část, kde neplatí; vrácený index je první prvek, kde platit přestává. Vyber predikát, který je pravdivý pro všechno *pod* `t`.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet.23.pow"
+title = "UMOCNĚNO"
+story = "Složené nájemné v činžáku bez výtahu v Causeway Bay: základ na mocninu, jenže exponent dorazil ve špatné šířce."
+brief = '''
+`x: u64` a `e: u64` a výsledek se vejde. `p` je `x` umocněné
+na `e`.
+'''
+hints = [
+  "`^` je XOR, ne mocnina. Celočíselná metoda pro mocninu bere exponent v jedné pevné šířce, a není to `u64`.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet.24.read-vec"
+title = "CELÝ ŘÁDEK"
+story = "Poslední pokladna na Jardine's Bazaar předává jeden řádek čísel oddělených mezerami, i se zalomením; všechno dál závisí na tomhle jediném parsování."
+brief = '''
+`line` přišel z `read_line`, takže `\n` je na něm pořád, a čísla
+mohou být oddělena **více než jednou mezerou**. Udělej z něj `Vec<i64>`
+bez paniky na správně utvořeném řádku.
+
+```
+let v: Vec<i64> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Rozděl na posloupnostech bílých znaků (to sežere i zalomení řádku), každý token naparsuj a rozbal přes unwrap, pak posbírej — Vec<i64> se z Resultů posbírat nedá.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet.25.let-mut"
+title = "POČÍTADLO ZAČÍNÁ NA DESETI"
+story = "Stánek s vaječnými vaflemi na Jardine's Bazaar si vede průběžný počet objednávek a ten počet se musí smět měnit."
+brief = '''
+Deklaruj `y` jako **bezznaménkové 64bitové** celé číslo s hodnotou 10, aby se
+další řádek přeložil:
+
+```
+// ____
+y += 1;
+```
+
+Který řádek to je?
+'''
+hints = [
+  "Dvě věci musí sedět: vazba se musí smět měnit a vazba se nastavuje jedním `=`, ne porovnáním.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet.26.fn-add"
+title = "POSLEDNÍ SLOVO"
+story = "Mei píše nejmenší funkci v pokladně nad Jardine's Bazaar a překladač se hádá o poslední znak."
+brief = '''
+Funkce `add`, která bere dvě hodnoty `i32` a vrací jejich součet, aby
+`println!("{}", add(2, 3));` vypsalo `5`. Celá funkce na jednom
+řádku.
+'''
+hints = [
+  "Parametry mají typy, návratový typ se píše za šipku a tělo končící středníkem vrací `()`.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet.27.sub-slice"
+title = "DVA Z PROSTŘEDKA"
+story = "Ve vozovně u Percival Street stojí pět tramvají; Mei se chce podívat jen na druhou a třetí a vozovna si nechá všech pět."
+brief = '''
+`v: Vec<i32>` má aspoň čtyři prvky. `w` je `&[i32]`, který si půjčuje
+**přesně** prvky na indexech 1 a 2 — dva prvky, žádná kopie.
+
+```
+let w: &[i32] = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Indexování Vecu rozsahem dá řez a řez se musí vypůjčit, aby se dal držet. Konec `a..b` se nepočítá; konec `a..=b` ano.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet.28.unwrap-or"
+title = "NEBO NIC"
+story = "Tabule skříněk na stanici Causeway Bay nemusí mít pro číslo žádný záznam a displej přesto musí něco ukázat."
+brief = '''
+`o: Option<i32>`. `n` je `i32`: hodnota uvnitř `o`, nebo 0, když je `o`
+`None` — a řádek nesmí **nikdy panikařit**.
+'''
+hints = [
+  "Existuje metoda, která rozbalí s náhradní hodnotou; náhrada je obyčejná hodnota vnitřního typu, ne další Option.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet.29.pop-front"
+title = "DALŠÍ NA ŘADĚ"
+story = "BFS přes mřížku Causeway Bay bere zastávky v pořadí, v jakém byly nalezeny — fronta na minibus na Yee Wo Street, ne hromádka talířů."
+brief = '''
+`q: VecDeque<usize>` je fronta. Smyčka v každém kole **odebere** prvek
+zepředu a skončí, když je fronta prázdná:
+
+```
+while let Some(u) = ____ {
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "VecDeque má dva konce a oba pojmenovává v názvech svých metod. Nahlížení dopředu bez odebrání by se točilo donekonečna.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet.30.char-count"
+title = "SPOČÍTEJ NEON"
+story = "Nápis nad Lockhart Road hlásá 銅鑼灣 třemi znaky a Mei vyšel první počet mnohem vyšší."
+brief = '''
+`s: &str` obsahuje čínské znaky. `n` je počet
+**znaků** v `s` — takže pro `"銅鑼灣"` to jsou 3, ne 9.
+
+```
+let n = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "`&str` se měří v bajtech a čínský znak jsou tři. Měř znaky, ne bajty — a iterátor znaků svou délku předem ohlásit neumí, jen kolik kroků udělal.",
+]

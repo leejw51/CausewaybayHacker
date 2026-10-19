@@ -1,0 +1,488 @@
+# PYTORCH LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code
+# blocks and identifiers are copied verbatim, never translated.
+
+pack   = "pytorch.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.01.autograd-grad"
+title = "斜率，不要文书"
+story = "回到周亦卿楼的地下室。推车上的控制台要的是一个导数，不是一个副作用。"
+brief = '''
+```
+x = torch.tensor([1.0, 2.0], requires_grad=True)
+y = (x ** 3).sum()
+```
+
+让 `g` 成为梯度 dy/dx，一个形状为 `(2,)` 的**张量** —— 而之后 `x.grad`
+必须仍然是 `None`。
+'''
+hints = [
+  "函数式 API 为每个输入返回一个梯度，打包在一个元组里，所以要解包；`y` 上的那个方法是写进 `.grad`，什么都不返回。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.02.detach-clone"
+title = "一份不欠任何东西的副本"
+story = "机架走道里给每个权重留着一份草稿副本。在上面乱涂绝不能波及原件。"
+brief = '''
+`x` 是一个形状为 `(3,)`、`requires_grad=True`、挂在图上的浮点张量。
+让 `y` 成为一份与 `x` **不共享任何内存**并且**从图上切断**的副本，
+使得之后的 `y.add_(1.0)` 既不改变 `x`，也不改变 `x` 将要反向传播的任何东西。
+'''
+hints = [
+  "两个方法，各管一件事：一个切断图但保留存储，另一个复制存储但保留图。两个都要，按这个顺序。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.03.inplace-leaf"
+title = "趁没人看的时候碰它"
+story = "两次运行之间，操作员在风扇墙上拨了一下旋钮。她这么做的时候记录仪必须是关着的。"
+brief = '''
+`w` 是一个 `requires_grad=True` 的叶子张量。在两次实验之间，把它**原地**
+加 `+1.0` —— 同一块存储，仍然是叶子，下一次运行仍然被跟踪 —— 而且 autograd
+不能报错。
+'''
+hints = [
+  "记录开着的时候，对被跟踪的叶子做原地写入会被拒绝；只为那一条语句关掉记录，叶子仍然是叶子。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.04.set-grad-enabled"
+title = "一个开关，两个方向"
+story = "同一个控制台脚本既跑训练轮也跑验证轮。一个标志决定磁带转不转。"
+brief = '''
+`train` 是一个 Python `bool`。一个代码块为两个阶段运行前向传播，而
+**只有当 `train` 为 `True` 时**才能记录计算图。哪一行打开这个代码块？
+
+```
+# ____
+    out = model(xb)
+```
+'''
+hints = [
+  "有一个上下文直接把标志本身当参数。no-grad 的那个根本不接参数，而 inference 的那个接收的标志意思正相反。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.05.modulelist"
+title = "登记在册"
+story = "渣甸坊楼上一座层层相同的塔。房东只向登记在册的楼层收租。"
+brief = '''
+```
+class Tower(nn.Module):
+    def __init__(self, depth):
+        super().__init__()
+        blocks = [nn.Linear(64, 64) for _ in range(depth)]
+        # ____
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = torch.relu(layer(x))
+        return x
+```
+
+填上空白，使每一层的权重都出现在 `model.parameters()` 和 `model.state_dict()` 里。
+'''
+hints = [
+  "普通的 Python 容器会把它的内容藏在模块注册表之外。负责注册的容器整个接收列表；Sequential 要的是解包后的层，不是列表。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.06.parameter"
+title = "优化器能拧的旋钮"
+story = "控制台上有一个标量决定 softmax 有多尖锐。它应该像机架里的其他东西一样去学习。"
+brief = '''
+在 `__init__` 里，`super().__init__()` 之后：给模块一个**可学习**的标量
+`self.temperature`，初始值 `1.0`，出现在 `model.parameters()` 里，这样
+优化器才会更新它。
+'''
+hints = [
+  "把张量包进 parameter 类才会让模块注册它；一个开了梯度的裸张量对优化器是看不见的，而这个包装要的是张量，不是 float。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.07.register-buffer"
+title = "跟着机架走，什么都不学"
+story = "因果掩码在模型搬到显卡上时跟着一起走，也跟着一起保存。没有人会去训练一个三角形。"
+brief = '''
+在 `__init__` 里，`super().__init__()` 之后：把一个 `T` 乘 `T` 的因果掩码 ——
+对角线上及**以下**为 1，以上为 0 —— 存为 `self.mask`。它必须随 `model.to(device)`
+一起移动并保存在 `state_dict()` 里，但**绝不能**收到梯度或出现在 `model.parameters()` 里。
+'''
+hints = [
+  "不是参数的状态有一个专门的注册表：它随模块一起移动和保存。下三角辅助函数构造这个掩码；它的上三角兄弟构造的是错的那个。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.08.param-count"
+title = "一万四千，上下浮动"
+story = "机架上的牌子写着一万四千个参数。面试官要的是从模型得出的数字，不是牌子上的。"
+brief = '''
+`model` 是一个 `nn.Module`，其中每个参数都可训练。哪一行给出 `n`，
+即模型中**标量权重的总数**，一个普通的 `int`？
+'''
+hints = [
+  "每个参数张量都知道自己的元素个数；把它们加起来。迭代器的长度是张量的个数，而形状不能和 int 相加。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.09.freeze-backbone"
+title = "冻结下面的楼层"
+story = "预训练的主干从教学集群上传了下来。只有顶上新加的头允许动。"
+brief = '''
+`model.backbone` 和 `model.head` 是子模块。用**一行**冻结 backbone 的每一个
+权重 —— 全部关掉梯度跟踪，这样优化器的 step 不会碰它们 —— 其他什么都不动。
+'''
+hints = [
+  "模块有一个带尾随下划线的原地方法，会走遍底下的每一个参数。在模块上设一个普通属性什么都不会注册，而 eval 模式管的是 dropout，不是梯度。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.10.kaiming"
+title = "HE 说要正态"
+story = "机架里的一个新层从构造函数选的任何东西开始。ReLU 塔想手动设定方差。"
+brief = '''
+```
+self.fc = nn.Linear(256, 256)
+# ____
+```
+
+填上空白，使该层的权重用 He（Kaiming）正态初始化**原地**重新初始化 ——
+ReLU 堆叠想要的那种。
+'''
+hints = [
+  "初始化器接收张量本身并修改它 —— 尾随下划线就是这个意思。模块或形状都不是张量，而把一个裸张量赋值到参数上会被拒绝。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.11.functional-dropout"
+title = "知道现在几点的 DROPOUT"
+story = "控制台上的函数式 dropout 在验证时也丢单元，除非有人告诉它模型已经安静下来了。"
+brief = '''
+```
+def forward(self, x):
+    x = torch.relu(self.fc1(x))
+    # ____
+    return self.fc2(x)
+```
+
+`F` 是 `torch.nn.functional`。用 `p=0.1` 的**函数式** dropout 填上空白：训练时
+丢弃单元，而一旦调用了 `model.eval()` 就**停止丢弃**。
+'''
+hints = [
+  "函数式形式不知道模块处于哪种模式，除非你把模块自己的布尔标志传给它；它的默认是丢弃。在 forward 里新建的层永远处于训练模式。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.12.bce-with-logits"
+title = "是或否，请用同样的形状"
+story = "地下室门口的闸门检测器每帧说一个数。目标是一列 0 和 1。"
+brief = '''
+`logits` 的形状是 `(N, 1)` —— 来自单单元头的原始浮点分数 —— 而 `target` 的
+形状是 `(N,)`、dtype 为 `int64`，装着 `0` 或 `1`。哪一行是正确的**二分类**损失，
+并自己应用 sigmoid？
+'''
+hints = [
+  "二分类损失要输入和目标有相同的形状和相同的浮点 dtype。普通的 BCE 要的是概率，而多分类损失会把列数读成类别数。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.13.token-loss"
+title = "除了填充，每个 TOKEN 都算"
+story = "机架里的序列模型给每个批次行的每个位置打分。短行末尾的填充不能算数。"
+brief = '''
+`lg` 的形状是 `(B, T, V)` —— 每个位置的 logits —— 而 `y` 的形状是 `(B, T)`，
+`int64` 的 token id。token id `0` 是**填充**，不能对损失有贡献。`F` 是
+`torch.nn.functional`。哪一行是正确的 token 级交叉熵？
+'''
+hints = [
+  "把两者分别展平成 `(N, V)` 和 `(N,)` —— 损失恰好接受这两种 —— 并用关键字告诉它跳过哪个类别下标；没有那个关键字，填充会像其他 token 一样被打分。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.14.adamw"
+title = "衰减，解耦"
+story = "7-32 室的面试官要的权重衰减不只是折进梯度里的 L2。有一个类专门做这个。"
+brief = '''
+`params = model.parameters()`。构建 `opt`，学习率 `3e-4`，**解耦的**权重衰减
+`0.01` —— 衰减直接作用在权重上，而不是作为 L2 项加进梯度。
+'''
+hints = [
+  "Adam 的 `weight_decay` 是折进梯度里的 L2；解耦的那种是它自己的优化器类。两者都要参数的可迭代对象，不是模块，而关键字要完整拼出来。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.15.scheduler-step"
+title = "每圈降温一次"
+story = "机架上的余弦退火：学习率每个 epoch 稍微降一点，在优化器轮过之后。"
+brief = '''
+```
+sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+for epoch in range(epochs):
+    for xb, yb in loader:
+        opt.zero_grad()
+        loss = loss_fn(model(xb), yb)
+        loss.backward()
+        opt.step()
+    # ____
+```
+
+填上空白，使学习率调度**每个 epoch 推进一次**。
+'''
+hints = [
+  "调度器有它自己的 step，在优化器的 step 之后调用 —— 这里是每个 epoch 一次。读取当前学习率不会推进任何东西，而优化器并不拥有调度器。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.16.grad-scaler"
+title = "缩放、STEP、更新"
+story = "3 号机架显卡上的半精度：小梯度会下溢，除非先把损失放大，并且 step 知道这一点。"
+brief = '''
+```
+scaler = torch.amp.GradScaler("cuda")
+for xb, yb in loader:
+    opt.zero_grad(set_to_none=True)
+    with torch.autocast(device_type="cuda", dtype=torch.float16):
+        loss = loss_fn(model(xb), yb)
+    # ____
+```
+
+CUDA 上的 `float16` 混合精度。用一个训练 step 的三个调用填上空白，使得 backward
+在一个被 scaler 放大过的损失上运行，优化器**绝不应用仍处于缩放状态的梯度**
+（而梯度中含有 inf 的那一步会被跳过），并且缩放因子只在那一步之后才调整。
+'''
+hints = [
+  "三个调用全都经过 scaler。直接 step 优化器会让梯度保持缩放状态；scaler 拒绝为它从未缩放过的损失做 step，也拒绝在 step 之前 update。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.17.map-location"
+title = "显卡不在这里"
+story = "检查点是在集群的 GPU 上写的。现在在 Lucky Mac 的一台完全没有显卡的笔记本上读它。"
+brief = '''
+`p` 是一个在 CUDA 机器上用 `torch.save(model.state_dict(), p)` 写出的文件 ——
+文件里装的就是 state dict 本身。在这台**只有 CPU** 的笔记本上把它加载成一个
+dict `sd`，并让加载器**拒绝反序列化任意对象**。
+'''
+hints = [
+  "设备重映射是加载器上的一个关键字，不是返回值上的方法，而安全反序列化开关是另一个关键字。结果就是那个 dict 本身，外面没有键包着。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.18.random-split"
+title = "八二分，每次都切在同一处"
+story = "地下室摄像头的一千张带标签的帧。验证的那五分之一明天必须还是同一个五分之一。"
+brief = '''
+`ds` 是一个有 1000 个条目的 map 式 `Dataset`（定义了 `__len__` 和 `__getitem__`），
+`random_split` 已从 `torch.utils.data` 导入，而 `g = torch.Generator().manual_seed(0)`。
+把它**随机**按 80/20 切成两个 `Dataset` 对象，由 `g` 保证可复现。
+'''
+hints = [
+  "切分器接收一个比例（或长度）列表，以及按关键字传的 generator 对象 —— 不是种子，也不是单个 float。对数据集切片既不随机也不是数据集。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.19.collate-fn"
+title = "参差不齐的行，一个张量"
+story = "中央图书馆终端送来的句子长短不一。加载器默认的堆叠器要它们全都一样长。"
+brief = '''
+`ds` 的每个条目都是一个长度**各不相同**的一维 `int64` 张量，所以加载器的默认
+堆叠会失败。`pad_batch(samples)` 已经写好：它接收一个条目列表，返回一个填充过的
+`(B, T_max)` 张量。构建批大小为 16、使用它的 `loader`（worker 数量不是问题所在）。
+'''
+hints = [
+  "默认的 collate 做堆叠，而参差不齐的张量堆不起来。用完整的关键字名把你自己的 collate 函数交给加载器；Python 的 `map` 没有长度，也不是数据集。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.20.distributed-sampler"
+title = "每个 RANK 自己的一片"
+story = "机架里四张卡，每张一个进程。如果每个进程都读整个数据集，集群就有四倍的工作量，却一点都不快。"
+brief = '''
+多 GPU，每张卡一个进程：
+
+```
+dist.init_process_group("nccl")
+rank = dist.get_rank()
+model = DistributedDataParallel(model.to(rank), device_ids=[rank])
+sampler = DistributedSampler(ds)
+```
+
+构建批大小为 32 的 `loader`，使每个 rank 看到的是 `ds` 中**自己的、互不重叠的
+分片**，由 sampler 打乱（每个 epoch 都会调用 `sampler.set_epoch`）。
+'''
+hints = [
+  "sampler 取代了加载器自己的打乱，这两个关键字互斥 —— 两个都传加载器会报错。数据集仍然是第一个参数。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.21.compile"
+title = "融合它"
+story = "机架上的前向传播是一千个小内核。2.x 的编译器能把它们焊成几个，只要问法对。"
+brief = '''
+`model` 是一个 `nn.Module`。把 `model` 重新绑定到一个版本，其前向传播由
+PyTorch 2.x 编译器以**默认**模式追踪并融合。
+'''
+hints = [
+  "编译器是一个顶层的 torch 函数，接收模块对象 —— 不是它的输出 —— 并返回一个包装后的模块。它的模式叫 default、reduce-overhead 和 max-autotune；JIT 包里没有叫这个名字的东西。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.22.expand"
+title = "同一块内存，更多的行"
+story = "批次里每一行都要一张位置表。每行复制一份会白白把显卡填满。"
+brief = '''
+`pos` 是一张形状为 `(T, D)` 的位置表，而 `x` 的形状是 `(B, T, D)`。
+让 `pe` 的形状为 `(B, T, D)` 并与 `pos` **共享内存** —— 一个视图，不复制 ——
+使 `x + pe` 给每一行加上同一张表。
+'''
+hints = [
+  "一个方法会实体化出副本，另一个在同一块内存上按步长跨越。`-1` 表示保持那个尺寸，只有按步长的那个接受它；复制的那个要求每个轴都给正数。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.23.permute-contiguous"
+title = "步长不会撒谎"
+story = "从机架出来是 channels-first，进头部要 time-first。在内存按形状所说的方式排好之前，view 拒绝工作。"
+brief = '''
+`x` 的形状是 `(B, C, T)` 且是连续的。用 `view` 让 `y` 的形状为 `(B, T*C)`，
+其中每一行内**时间变化最慢** —— 先是第 0 步的全部 `C` 个通道，然后是第 1 步的
+全部 `C` 个，依此类推。
+'''
+hints = [
+  "permute 之后步长和内存不再对应，`view` 会拒绝；先复制到新内存里，view 才合法。直接从 `x` 做 view 会让通道变化最慢，而行数必须是 `B`。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.24.chunk-qkv"
+title = "一次投影出三个"
+story = "机架里的一个 Linear 并排产出 query、key 和 value。注意力块需要它们分开。"
+brief = '''
+`qkv` 的形状是 `(B, T, 3*D)`，其中 `B = 8`、`D = 64`：query、key 和 value 的
+投影沿**最后一个**轴拼接。哪一行给出形状各为 `(B, T, D)` 的 `q`、`k`、`v`？
+'''
+hints = [
+  "两个切分器中一个数的是块数，另一个数的是每块的大小 —— 而轴默认是第一个，在那里八行切三份会给出错误的形状，还不报错。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.25.gather"
+title = "每行挑一个"
+story = "六十四行对数概率，十个类别。手算的损失每行恰好需要一个数：真实类别的那个。"
+brief = '''
+`logp` 的形状是 `(N, C)`，其中 `N = 64`、`C = 10` —— 对数概率，`log_softmax`
+已沿 dim 1 应用 —— 而 `y` 的形状是 `(N,)`，`int64` 类别下标。让 `lp` 的形状为
+`(N,)`：对每一行，取该行**真实**类别的对数概率。
+'''
+hints = [
+  "索引张量的维数必须和源一样多 —— 给它加一个尾随轴 —— 而挑选沿着类别轴进行，不是行轴。只用 `y` 做索引选出的是整行。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.26.masked-fill"
+title = "未来归负无穷"
+story = "地下室里的那个块不能往前看。对角线以上的每个分数在 softmax 看到它之前都变成负无穷。"
+brief = '''
+`scores` 的形状是 `(B, T, T)`，而 `mask = torch.tril(torch.ones(T, T))` ——
+一个**浮点**张量，允许注意的地方是 `1.`，对角线以上是 `0.`。哪一行把每个
+被禁止的分数替换成负无穷，使随后的 softmax 给那些位置零权重？
+'''
+hints = [
+  "填充要一个布尔掩码，洞所在处为 True —— 把浮点掩码做一次比较就得到了 —— 还要一个表示负无穷的 Python float。张量上的 `where` 在条件为 True 的地方保留原值。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.27.sdpa"
+title = "一次调用，不许偷看"
+story = "显卡上的融合注意力内核一趟做完分数、掩码和 softmax —— 只要标志拼对了。"
+brief = '''
+`q`、`k`、`v` 的形状各为 `(B, H, T, Dh)`，而 `F` 是 `torch.nn.functional`。
+哪一行用**融合**内核计算注意力，使每个位置只注意自己和过去？
+'''
+hints = [
+  "融合调用有一个表示因果掩码的布尔关键字，而且它不是简单拼成 `causal`。事后对输出做掩码掩的是错的张量；不开标志则处处都注意。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.28.einsum"
+title = "用字母标轴"
+story = "7-32 室的面试官把乘积写成白板上的下标，等着看批次那个字母能不能活下来。"
+brief = '''
+`a` 的形状是 `(B, 3, 4)`，`b` 的形状是 `(B, 4, 5)`。用 `einsum` 让 `c` 的形状为
+`(B, 3, 5)`：**批量矩阵乘积**，每个批次行做一次 `(3, 4) @ (4, 5)`。
+'''
+hints = [
+  "每个输入轴都有一个字母，共享的字母被求和消去，而批次字母必须出现在输出里，否则它也会被求和。字母按轴的顺序读，所以对调两个会改变哪些尺寸必须一致。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.29.checkpoint"
+title = "现在忘掉，稍后重算"
+story = "一万四千个参数笔记本装得下；每个块的激活值装不下。用算力换内存，一块一块来。"
+brief = '''
+```
+from torch.utils.checkpoint import checkpoint
+
+def forward(self, h):
+    for block in self.blocks:
+        # ____
+    return h
+```
+
+填上空白，使每个块的激活值在前向传播中**不被存储**，而在 backward 期间重新计算 ——
+**非重入**变体。
+'''
+hints = [
+  "checkpoint 函数把可调用对象和它的输入作为单独的参数接收，并替你调用它。传块的输出意味着前向已经跑过了，而那个模块对象不是可调用参数。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.30.multihead-attention"
+title = "意思正相反的掩码"
+story = "地下室里最后一个块是库自带的注意力模块，它的布尔掩码把 True 读成禁止。阿薇把符号检查了两遍。"
+brief = '''
+```
+attn = nn.MultiheadAttention(embed_dim=64, num_heads=4, batch_first=True)
+causal = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+```
+
+`x` 的形状是 `(B, T, 64)`。在这个模块里，布尔 `attn_mask` 为 `True` 的地方表示
+注意力**被禁止**，而 `causal` 在严格对角线以上为 `True`。哪一行给出 `out` ——
+形状为 `(B, T, 64)` 的自注意力输出，且没有 token 往前看？
+'''
+hints = [
+  "模块要把 query、key 和 value 作为三个位置参数张量接收，并返回一对 —— 要解包。掩码原样传入，因为这里 True 已经表示被挡住；取反会让每个 token 只能读未来。",
+]

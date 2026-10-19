@@ -1,0 +1,1080 @@
+# ZIG LAND — CHEATSHEET ADVANCED. The lines an interviewer uses to tell a
+# fluent Zig hand from one who has only read the grammar page, asked: a
+# generic function over a comptime type, @This() inside a type-returning
+# fn, a function pointer, an inline for over a struct's fields, @hasField,
+# a comptime var driving an inline while, two error sets merged, a switch
+# on a caught error, a while that walks an optional pointer with its step
+# in the header, a tagged union's payload captured, @enumFromInt, a
+# labelled block that breaks with a value, a C string spanned to a slice,
+# toOwnedSlice, getOrPut, a map key copied before the buffer is reused,
+# the 0.16 DebugAllocator, an arena, the order defers run, splitScalar
+# against tokenizeScalar, a sort with a context, @truncate, wrapping
+# arithmetic, expectEqual, the 0.16 main(init), stdin read a line at a
+# time through a 0.16 reader, Thread.spawn, the 0.16 std.Io.Mutex, an
+# atomic fetchAdd, and for the boss a packed struct @bitCast to its byte —
+# the Causeway Bay portal of the Cross-Harbour Tunnel after dark, when the
+# control room above the booths does the night's accounting. Four lines,
+# one right. Nothing is typed and nothing is compiled — the pick is the
+# submission, and the server judges it against the quiz (SPEC §0). The
+# three wrong lines are near-misses: a 0.15 spelling the 0.16 std no
+# longer has, a cast that panics where another truncates, a `try` left
+# off, a result thrown away, a type the builtin will not take.
+#
+# The spellings are the land's Zig 0.16 ones (zig/basic.toml,
+# zig/advanced.toml), checked line by line against `zig version` 0.16.0:
+# an ArrayList is `.empty` and takes `gpa` on every call that may grow it;
+# the general-purpose allocator is `std.heap.DebugAllocator`; the mutex is
+# `std.Io.Mutex` and takes the `io` runtime; a line of stdin comes off
+# `std.Io.File.stdin().readerStreaming(io, &buf).interface`.
+#
+# This is the ADVANCED road: zig/cheatsheet.toml (the BASIC road) already
+# asks the opening of `fn Stack(comptime T: type) type`, `self: *Counter`,
+# `errdefer`, the inclusive switch range, `!i64`, `if (maybe) |v|`,
+# `break :outer`, `orelse`, `catch 0`, `@intCast` and `std.mem.sort` with
+# `std.sort.desc`; none of those is asked again here.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "zig.cheatsheet_advanced"
+land     = "zig"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "zig.cheatsheet_advanced.01.generic-fn"
+node        = 1
+title       = "THE BIGGER OF ANY TWO"
+difficulty  = 3
+story       = "22:00 at the portal. The control room compares two fares, two weights, two timestamps, and wants to write the comparison once."
+concepts    = ["generics", "functions", "types"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`max` returns the larger of two values of one type, and is called with the
+type spelled out: `max(i64, 3, 7)`, `max(f64, 2.5, 1.0)`. Which line opens
+it?
+
+```
+// ____
+    return if (a > b) a else b;
+}
+```
+'''
+solution    = 'fn max(comptime T: type, a: T, b: T) T {'
+hints = [
+  "The type is the first argument, known at compile time, and the other two parameters and the return are spelled in terms of it.",
+]
+
+[quest.quiz]
+choices = [
+  'fn max<T>(a: T, b: T) T {',
+  'fn max(a: anytype, b: anytype) @TypeOf(a) {',
+  'fn max(comptime T: type, a: T, b: T) T {',
+  'fn max(comptime T, a: T, b: T) T {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "zig.cheatsheet_advanced.02.this"
+node        = 2
+title       = "THE TYPE WITH NO NAME YET"
+difficulty  = 3
+story       = "The container stack takes any cargo. Inside it, the methods need a name for the struct they are being written in."
+concepts    = ["generics", "structs"]
+requires    = ["zig.cheatsheet_advanced.01.generic-fn"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+Inside the struct that `Stack` returns, bind `Self` to that struct's own
+type so that `push` can take `self: *Self`.
+
+```
+fn Stack(comptime T: type) type {
+    return struct {
+        // ____
+        items: std.ArrayList(T) = .empty,
+        pub fn push(self: *Self, gpa: std.mem.Allocator, v: T) !void {
+            try self.items.append(gpa, v);
+        }
+    };
+}
+```
+'''
+solution    = 'const Self = @This();'
+hints = [
+  "An anonymous struct has no name to refer to itself by; a builtin hands back the innermost struct, enum or union being defined.",
+]
+
+[quest.quiz]
+choices = [
+  'const Self = @This();',
+  'const Self = @Self();',
+  'const Self = @TypeOf(self);',
+  'const Self = this;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "zig.cheatsheet_advanced.03.fn-pointer"
+node        = 3
+title       = "WHICH RULE TONIGHT"
+difficulty  = 3
+story       = "The fare rule at booth 2 is swapped at midnight: double before, negate after. The booth holds the rule in a variable and calls it."
+concepts    = ["closures", "functions", "types"]
+requires    = ["zig.cheatsheet_advanced.02.this"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`double` and `negate` are both `fn (i32) i32`. Declare a **runtime
+variable** `f` that starts as `double`, can later be reassigned to
+`negate`, and is called as `f(3)`.
+'''
+solution    = 'var f: *const fn (i32) i32 = double;'
+hints = [
+  "A bare `fn` type is comptime-only and cannot live in a `var`; a runtime function value is a pointer to one, and a function is `const`.",
+]
+
+[quest.quiz]
+choices = [
+  'var f: fn (i32) i32 = double;',
+  'var f: *fn (i32) i32 = double;',
+  'var f: fn(i32) -> i32 = double;',
+  'var f: *const fn (i32) i32 = double;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "zig.cheatsheet_advanced.04.inline-for-fields"
+node        = 4
+title       = "EVERY FIELD, BY NAME"
+difficulty  = 4
+story       = "The night audit prints every field of every record it is handed, whatever the struct, without being told the field names."
+concepts    = ["generics", "iteration", "structs"]
+requires    = ["zig.cheatsheet_advanced.03.fn-pointer"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`dump` prints each field's name and value for any struct it is given.
+Open the loop over the fields so that `f.name` is usable in `@field`
+(Zig 0.16: the type-info tag is spelled in lowercase).
+
+```
+fn dump(v: anytype) void {
+    const T = @TypeOf(v);
+    if (@typeInfo(T) != .@"struct") @compileError("not a struct: " ++ @typeName(T));
+    // ____
+        std.debug.print("{s}: {any}\n", .{ f.name, @field(v, f.name) });
+    }
+}
+```
+'''
+solution    = 'inline for (@typeInfo(T).@"struct".fields) |f| {'
+hints = [
+  "The field list is compile-time data, so a plain loop cannot index it; the loop must be unrolled, and `struct` is a keyword that needs quoting as a field name.",
+]
+
+[quest.quiz]
+choices = [
+  'for (@typeInfo(T).@"struct".fields) |f| {',
+  'inline for (@typeInfo(T).@"struct".fields) |f| {',
+  'inline for (@typeInfo(T).fields) |f| {',
+  'inline for (T.fields) |f| {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "zig.cheatsheet_advanced.05.has-field"
+node        = 5
+title       = "DOES IT HAVE A PLATE"
+difficulty  = 3
+story       = "Cars have a plate, bicycles do not. The one label function is handed both and must know at compile time which it is holding."
+concepts    = ["generics", "types", "dispatch"]
+requires    = ["zig.cheatsheet_advanced.04.inline-for-fields"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`label` is called with a `Car` (which has a field `plate`) and with a
+`Bike` (which has no field `plate` and no declaration of that name).
+Open the `if` whose branch is taken for `Car` and pruned for `Bike`, so
+`v.plate` is only compiled where it exists.
+
+```
+fn label(v: anytype) []const u8 {
+    const T = @TypeOf(v);
+    // ____
+        return v.plate;
+    } else return "no plate";
+}
+```
+'''
+solution    = 'if (@hasField(T, "plate")) {'
+hints = [
+  "A builtin asks a type whether it has a field of a given name, given as a string; the one that asks about declarations says no for a field.",
+]
+
+[quest.quiz]
+choices = [
+  'if (@hasField(T, "plate")) {',
+  'if (@hasDecl(T, "plate")) {',
+  'if (@hasField(T, .plate)) {',
+  'if (T.plate != null) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "zig.cheatsheet_advanced.06.comptime-var"
+node        = 6
+title       = "COUNTED BEFORE THE BUILD"
+difficulty  = 4
+story       = "The five lane-square tables are filled in before the program ever runs; the loop that fills them is unrolled by the compiler."
+concepts    = ["generics", "bindings", "control-flow"]
+requires    = ["zig.cheatsheet_advanced.05.has-field"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Inside a **runtime** function, declare the loop counter `i` so that the
+`inline while` below unrolls, with `i` known at compile time in every
+iteration.
+
+```
+fn squares() [5]u32 {
+    var out: [5]u32 = undefined;
+    // ____
+    inline while (i < 5) : (i += 1) {
+        out[i] = @intCast(i * i);
+    }
+    return out;
+}
+```
+'''
+solution    = 'comptime var i: usize = 0;'
+hints = [
+  "A runtime `var` cannot drive an inline loop, a `const` cannot be stepped; the keyword that forces a mutable compile-time value goes before `var`.",
+]
+
+[quest.quiz]
+choices = [
+  'var i: usize = 0;',
+  'comptime i: usize = 0;',
+  'comptime var i: usize = 0;',
+  'comptime const i: usize = 0;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "zig.cheatsheet_advanced.07.error-merge"
+node        = 7
+title       = "TWO LISTS OF WAYS TO FAIL"
+difficulty  = 3
+story       = "Parsing a ticket can fail two ways, charging it a third. The charging function names all three in one set."
+concepts    = ["error-handling", "types"]
+requires    = ["zig.cheatsheet_advanced.06.comptime-var"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`ParseError` is `error{ Empty, BadDigit }`. Define `TollError` as the set
+holding those two errors **and** `Overdrawn`, so that
+`fn charge(s: []const u8) TollError!i64` can return any of the three.
+'''
+solution    = 'const TollError = ParseError || error{Overdrawn};'
+hints = [
+  "Error sets are merged with a two-character operator; a single bar is the bitwise or and does not take types.",
+]
+
+[quest.quiz]
+choices = [
+  'const TollError = ParseError | error{Overdrawn};',
+  'const TollError = ParseError || error{Overdrawn};',
+  'const TollError = ParseError ++ error{Overdrawn};',
+  'const TollError = error{ParseError, Overdrawn};',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "zig.cheatsheet_advanced.08.switch-on-error"
+node        = 8
+title       = "WHICH WAY IT FAILED"
+difficulty  = 3
+story       = "A smudged ticket is worth nothing; a ticket with too many digits is worth the maximum. The booth decides by the error it caught."
+concepts    = ["error-handling", "pattern-matching"]
+requires    = ["zig.cheatsheet_advanced.07.error-merge"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`std.fmt.parseInt(i64, tok, 10)` fails with `InvalidCharacter` or
+`Overflow`. The error is caught and switched on. Which prong gives 0 for
+a bad character?
+
+```
+return std.fmt.parseInt(i64, tok, 10) catch |e| switch (e) {
+    // ____
+    error.Overflow => std.math.maxInt(i64),
+};
+```
+'''
+solution    = 'error.InvalidCharacter => 0,'
+hints = [
+  "A switch over an error set names each case with the `error.` prefix; the enum-literal dot form is a different type.",
+]
+
+[quest.quiz]
+choices = [
+  '.InvalidCharacter => 0,',
+  'InvalidCharacter => 0,',
+  'error.InvalidCharacter: 0,',
+  'error.InvalidCharacter => 0,',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "zig.cheatsheet_advanced.09.walk-optional"
+node        = 9
+title       = "DOWN THE CHAIN"
+difficulty  = 4
+story       = "The night's receipts are a linked chain, each node pointing at the next or at nothing. The audit walks it to the end and adds it up."
+concepts    = ["error-handling", "zero-values", "linked-lists"]
+requires    = ["zig.cheatsheet_advanced.08.switch-on-error"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`Node` is `struct { v: i64, next: ?*Node }` and `cur` is a `var` of type
+`?*Node`. Open a loop that runs the body with `node` bound to each node
+in turn and stops at `null`, with the step to the next node written in
+the loop header rather than in the body.
+
+```
+var total: i64 = 0;
+var cur = head;
+// ____
+    total += node.v;
+}
+```
+'''
+solution    = 'while (cur) |node| : (cur = node.next) {'
+hints = [
+  "The condition is the optional itself, the capture is the unwrapped pointer, and the continue expression after the colon advances the optional, not the capture.",
+]
+
+[quest.quiz]
+choices = [
+  'while (cur) |node| : (cur = node.next) {',
+  'while (cur != null) |node| : (cur = node.next) {',
+  'while (cur.?) |node| : (cur = node.next) {',
+  'while (cur) |node| : (node = node.next) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "zig.cheatsheet_advanced.10.union-payload"
+node        = 10
+title       = "HOW THEY PAID"
+difficulty  = 3
+story       = "A car pays in coin, by Octopus card, or is waved through. The tally adds coin at face value and card at double."
+concepts    = ["enums", "pattern-matching"]
+requires    = ["zig.cheatsheet_advanced.09.walk-optional"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`Pay` is `union(enum) { coin: i64, octopus: i64, waved: void }` and `p`
+is a `Pay`. Which prong adds the coin payload to `t`?
+
+```
+switch (p) {
+    // ____
+    .octopus => |amount| t += amount * 2,
+    .waved => {},
+}
+```
+'''
+solution    = '.coin => |amount| t += amount,'
+hints = [
+  "The payload is bound by a capture after the arrow, the same bars as an `if` on an optional; a plain capture is the value, `|*x|` is a pointer to it.",
+]
+
+[quest.quiz]
+choices = [
+  '.coin(amount) => t += amount,',
+  '.coin => t += amount,',
+  '.coin => |amount| t += amount,',
+  '.coin => |*amount| t += amount,',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "zig.cheatsheet_advanced.11.enum-from-int"
+node        = 11
+title       = "A NUMBER OFF THE WIRE"
+difficulty  = 3
+story       = "The axle sensor sends a lane class as a byte. The fee table is keyed by the enum, which knows its own fee."
+concepts    = ["enums", "types"]
+requires    = ["zig.cheatsheet_advanced.10.union-payload"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`n` is a runtime `u8` holding a valid tag value. Make `lane` the
+matching `Lane` so that `lane.fee()` compiles.
+
+```
+const Lane = enum(u8) {
+    car, van, truck, bus,
+    pub fn fee(self: Lane) i64 {
+        return switch (self) { .car, .van => 10, .truck => 20, .bus => 15 };
+    }
+};
+// ____
+return lane.fee();
+```
+'''
+solution    = 'const lane: Lane = @enumFromInt(n);'
+hints = [
+  "The builtin takes only the integer; the enum it becomes is the result type, so the binding has to name it. The reverse direction is `@intFromEnum`.",
+]
+
+[quest.quiz]
+choices = [
+  'const lane = @enumFromInt(Lane, n);',
+  'const lane = @intToEnum(Lane, n);',
+  'const lane: Lane = @as(Lane, n);',
+  'const lane: Lane = @enumFromInt(n);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "zig.cheatsheet_advanced.12.labeled-block"
+node        = 12
+title       = "THE FIRST HEAVY ONE"
+difficulty  = 3
+story       = "The weighbridge log is scanned for the first reading over a hundred tonnes; the answer is a value, not a jump out of the function."
+concepts    = ["control-flow", "bindings"]
+requires    = ["zig.cheatsheet_advanced.11.enum-from-int"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`xs` is guaranteed to hold a value over 100. `found` must become the
+first such `x`, and the function then goes on to use `found`. Which
+line hands `x` out of the block?
+
+```
+const found = blk: {
+    for (xs) |x| {
+        if (x > 100) // ____
+    }
+    unreachable;
+};
+return found * 2;
+```
+'''
+solution    = 'break :blk x;'
+hints = [
+  "A labelled block yields its value through a break that names the label with a colon in front and carries the value; `return` would leave the function with the wrong number and the label unused.",
+]
+
+[quest.quiz]
+choices = [
+  'break blk x;',
+  'break :blk x;',
+  'return x;',
+  'break x;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "zig.cheatsheet_advanced.13.span"
+node        = 13
+title       = "A STRING FROM THE C SIDE"
+difficulty  = 4
+story       = "The plate camera's driver is C. It hands over a name as a pointer that ends at a zero byte, and the Zig side wants a slice with a length."
+concepts    = ["slices", "strings", "pointers"]
+requires    = ["zig.cheatsheet_advanced.12.labeled-block"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`c_name` is a `[*:0]const u8` — a many-item pointer with no length,
+terminated by a 0. Make `s` a `[]const u8` over its bytes up to (not
+including) the terminator, without copying.
+'''
+solution    = 'const s: []const u8 = std.mem.span(c_name);'
+hints = [
+  "A many-pointer does not coerce to a slice: something has to walk to the sentinel to find the length. One std.mem function does exactly that, and takes only the pointer.",
+]
+
+[quest.quiz]
+choices = [
+  'const s: []const u8 = std.mem.span(c_name);',
+  'const s: []const u8 = std.mem.sliceTo(c_name);',
+  'const s: []const u8 = c_name[0..];',
+  'const s: []const u8 = @as([]const u8, c_name);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "zig.cheatsheet_advanced.14.to-owned-slice"
+node        = 14
+title       = "HAND OVER THE LIST"
+difficulty  = 3
+story       = "The even-numbered lanes are collected into a list, and the caller wants the bare slice, to free with gpa.free when done."
+concepts    = ["slices", "collections", "ownership"]
+requires    = ["zig.cheatsheet_advanced.13.span"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`list` is a `std.ArrayList(i64)` filled with `gpa`. Return its contents
+as a `[]i64` that the caller frees with `gpa.free`, leaving nothing for
+`list` to free and copying nothing (Zig 0.16: the list holds no
+allocator).
+
+```
+fn evens(gpa: std.mem.Allocator, xs: []const i64) ![]i64 {
+    var list: std.ArrayList(i64) = .empty;
+    errdefer list.deinit(gpa);
+    for (xs) |x| if (@rem(x, 2) == 0) try list.append(gpa, x);
+    // ____
+}
+```
+'''
+solution    = 'return try list.toOwnedSlice(gpa);'
+hints = [
+  "`.items` is still owned by the list and would be freed twice or never; the call that transfers ownership shrinks to fit, so it can fail and takes the allocator.",
+]
+
+[quest.quiz]
+choices = [
+  'return list.items;',
+  'return try list.toOwnedSlice();',
+  'return try gpa.dupe(i64, list.items);',
+  'return try list.toOwnedSlice(gpa);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "zig.cheatsheet_advanced.15.get-or-put"
+node        = 15
+title       = "ONE LOOKUP, NOT TWO"
+difficulty  = 4
+story       = "The plate tally in the control room ticks up once per car, and the night shift refuses to hash the same plate twice."
+concepts    = ["hashing", "collections"]
+requires    = ["zig.cheatsheet_advanced.14.to-owned-slice"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`counts` is a `std.AutoHashMap(i64, i64)`. Count `x` with a single
+lookup: a key seen for the first time starts at 0 before the increment,
+a key already there keeps its count.
+
+```
+const gop = try counts.getOrPut(x);
+// ____
+gop.value_ptr.* += 1;
+```
+'''
+solution    = 'if (!gop.found_existing) gop.value_ptr.* = 0;'
+hints = [
+  "The result carries a flag saying whether the key was already present and a pointer to the slot; a fresh slot is undefined until you write it.",
+]
+
+[quest.quiz]
+choices = [
+  'if (gop.found_existing) gop.value_ptr.* = 0;',
+  'if (!gop.found) gop.value_ptr.* = 0;',
+  'if (!gop.found_existing) gop.value_ptr.* = 0;',
+  'if (!gop.found_existing) gop.value = 0;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "zig.cheatsheet_advanced.16.dupe-key"
+node        = 16
+title       = "A KEY THAT OUTLIVES THE LINE"
+difficulty  = 4
+story       = "Plates come in one per line into the same buffer. The set of plates seen tonight must not point into a buffer that is about to be overwritten."
+concepts    = ["collections", "strings", "pointers"]
+requires    = ["zig.cheatsheet_advanced.15.get-or-put"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`seen` is a `std.StringHashMap(void)` made with `gpa`, and `word` is a
+`[]const u8` slice into a line buffer that is overwritten by the next
+read. Insert `word` as a key that stays valid after the buffer changes.
+The keys are freed one by one at the end.
+'''
+solution    = 'try seen.put(try gpa.dupe(u8, word), {});'
+hints = [
+  "A string map stores the slice you give it, not the bytes; copy them with the allocator first, and the copy can fail too.",
+]
+
+[quest.quiz]
+choices = [
+  'try seen.put(word, {});',
+  'try seen.put(try gpa.dupe(u8, word), {});',
+  'try seen.put(gpa.dupe(u8, word), {});',
+  'try seen.put(word.clone(), {});',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "zig.cheatsheet_advanced.17.debug-allocator"
+node        = 17
+title       = "THE ALLOCATOR THAT TELLS ON YOU"
+difficulty  = 4
+story       = "The night build runs with the allocator that reports every byte not handed back. Its name changed in 0.16, and the old one does not compile."
+concepts    = ["ownership", "raii", "bindings"]
+requires    = ["zig.cheatsheet_advanced.16.dupe-key"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+Zig 0.16. Declare the leak-checking general-purpose allocator `dbg` so
+that the two lines below compile — `deinit` mutates it and reports leaks.
+
+```
+// ____
+defer _ = dbg.deinit();
+const gpa = dbg.allocator();
+```
+'''
+solution    = 'var dbg: std.heap.DebugAllocator(.{}) = .init;'
+hints = [
+  "`GeneralPurposeAllocator` is gone from 0.16's std.heap; the type takes a config tuple and is initialised from a decl literal, not a call.",
+]
+
+[quest.quiz]
+choices = [
+  'var dbg: std.heap.DebugAllocator(.{}) = .init;',
+  'var dbg = std.heap.GeneralPurposeAllocator(.{}){};',
+  'var dbg: std.heap.DebugAllocator = .init;',
+  'var dbg = std.heap.DebugAllocator(.{}).init();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "zig.cheatsheet_advanced.18.arena"
+node        = 18
+title       = "PAY ONCE, AT THE END"
+difficulty  = 3
+story       = "One request's scratch nodes and strings all die together when the request does. Nobody frees them one at a time."
+concepts    = ["raii", "ownership"]
+requires    = ["zig.cheatsheet_advanced.17.debug-allocator"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`page` is `std.heap.page_allocator`. Make `arena` an arena on top of it,
+so that `a.create(Node)` and `std.fmt.allocPrint(a, ...)` below are all
+released by the one `deinit`.
+
+```
+// ____
+defer arena.deinit();
+const a = arena.allocator();
+```
+'''
+solution    = 'var arena = std.heap.ArenaAllocator.init(page);'
+hints = [
+  "An arena is built over a child allocator it takes as its one argument; it is not a generic type and has no config tuple.",
+]
+
+[quest.quiz]
+choices = [
+  'var arena = std.heap.ArenaAllocator.init();',
+  'var arena: std.heap.ArenaAllocator = .init;',
+  'var arena = std.heap.ArenaAllocator{ .child = page };',
+  'var arena = std.heap.ArenaAllocator.init(page);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "zig.cheatsheet_advanced.19.defer-order"
+node        = 19
+title       = "LAST IN, FIRST OUT"
+difficulty  = 3
+story       = "Three stamps on the way out of the booth, two of them deferred. The ledger shows the order they landed in."
+concepts    = ["functions", "raii", "control-flow"]
+requires    = ["zig.cheatsheet_advanced.18.arena"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+What does this function print, in full?
+
+```
+fn stamp() void {
+    defer std.debug.print("1", .{});
+    defer std.debug.print("2", .{});
+    std.debug.print("3", .{});
+}
+```
+'''
+solution    = '321'
+hints = [
+  "Deferred statements run at scope exit in the reverse of the order they were deferred: the last one registered goes first.",
+]
+
+[quest.quiz]
+choices = [
+  '123',
+  '321',
+  '312',
+  '132',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "zig.cheatsheet_advanced.20.split-keeps-empties"
+node        = 20
+title       = "THE EMPTY COLUMN COUNTS"
+difficulty  = 4
+story       = "The toll export is comma-separated and a missing column is an empty field, not a field that was never there. `a,,b` is three columns."
+concepts    = ["strings", "iteration"]
+requires    = ["zig.cheatsheet_advanced.19.defer-order"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`line` is a `[]const u8`. Make `it` an iterator over the comma-separated
+fields of `line` such that `while (it.next()) |f| n += 1;` counts
+`"a,,b"` as **3** fields and `"a"` as 1.
+'''
+solution    = "var it = std.mem.splitScalar(u8, line, ',');"
+hints = [
+  "Two std.mem iterators take a single-byte delimiter; the tokenizer swallows runs of delimiters and would count two, the splitter yields the empty field between.",
+]
+
+[quest.quiz]
+choices = [
+  "var it = std.mem.tokenizeScalar(u8, line, ',');",
+  "var it = std.mem.split(u8, line, \",\");",
+  "var it = std.mem.splitScalar(u8, line, ',');",
+  "var it = std.mem.splitScalar(line, ',');",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "zig.cheatsheet_advanced.21.sort-context"
+node        = 21
+title       = "SORT BY SOMEONE ELSE'S NUMBERS"
+difficulty  = 4
+story       = "The lane indices are reordered by the weights in a separate table. Zig has no closure to capture the table, so the sort is handed it."
+concepts    = ["sorting", "closures", "slices"]
+requires    = ["zig.cheatsheet_advanced.20.split-keeps-empties"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`idx` is a `[]usize` and `keys` a `[]const i64`. Sort `idx` ascending by
+`keys[i]` using this comparator:
+
+```
+fn byKey(keys: []const i64, a: usize, b: usize) bool {
+    return keys[a] < keys[b];
+}
+```
+'''
+solution    = 'std.mem.sort(usize, idx, keys, byKey);'
+hints = [
+  "The third argument is the context the comparator receives as its first parameter; the comparator's type must match it exactly, so `{}` only fits a `void` context.",
+]
+
+[quest.quiz]
+choices = [
+  'std.mem.sort(usize, idx, keys, byKey);',
+  'std.mem.sort(usize, idx, {}, byKey);',
+  'std.mem.sort(usize, idx, byKey);',
+  'std.mem.sort(usize, idx, keys, std.sort.asc(usize));',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "zig.cheatsheet_advanced.22.truncate"
+node        = 22
+title       = "JUST THE LOW BYTE"
+difficulty  = 3
+story       = "The axle sensor packs four readings into a u32. The booth wants the lowest byte and must not panic when the rest is not zero."
+concepts    = ["types", "math"]
+requires    = ["zig.cheatsheet_advanced.21.sort-context"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`x` is a runtime `u32` holding `0x1234`. Make `lo` a `u8` holding
+`0x34` — the low eight bits — without a safety panic in Debug mode.
+'''
+solution    = 'const lo: u8 = @truncate(x);'
+hints = [
+  "The cast that checks the value fits will panic on 0x1234; the one that drops the high bits takes one argument and gets its width from the binding.",
+]
+
+[quest.quiz]
+choices = [
+  'const lo: u8 = @intCast(x);',
+  'const lo = @truncate(u8, x);',
+  'const lo: u8 = x & 0xff;',
+  'const lo: u8 = @truncate(x);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "zig.cheatsheet_advanced.23.wrapping"
+node        = 23
+title       = "ROLL OVER, DO NOT STOP"
+difficulty  = 4
+story       = "The plate hash is meant to overflow, thousands of times a night. In Debug mode an overflow that is not asked for is a panic and a closed barrier."
+concepts    = ["math", "types", "bit-manipulation"]
+requires    = ["zig.cheatsheet_advanced.22.truncate"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`h` is a `u32` that starts near `std.math.maxInt(u32)` and `c` is a `u8`.
+Write the hash step `h = h * 31 + c` so that it **wraps around** modulo
+2^32 — not a panic, not a clamp at the maximum.
+'''
+solution    = 'h = h *% 31 +% c;'
+hints = [
+  "Plain operators panic on overflow in Debug, and a mask applied afterwards is too late — the multiply has already overflowed. Zig has two families of suffixed operators: one saturates at the maximum, the other wraps.",
+]
+
+[quest.quiz]
+choices = [
+  'h = h * 31 + c;',
+  'h = h *% 31 +% c;',
+  'h = h *| 31 +| c;',
+  'h = (h * 31 + c) & 0xffffffff;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "zig.cheatsheet_advanced.24.expect-equal"
+node        = 24
+title       = "PROVE THE FARE"
+difficulty  = 3
+story       = "Before the interviewer runs it, the candidate runs `zig test` on the fare table and the average, and the test says what it expects."
+concepts    = ["testing", "functions"]
+requires    = ["zig.cheatsheet_advanced.23.wrapping"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`fare(3)` returns an `i64` that should be 7. Inside the test block,
+assert it — the test must fail if the value is wrong and must compile.
+
+```
+fn avg(sum: i64, n: i64) f64 {
+    return @as(f64, @floatFromInt(sum)) / @as(f64, @floatFromInt(n));
+}
+
+test "fare" {
+    // ____
+    try std.testing.expect(avg(5, 2) == 2.5);
+}
+```
+'''
+solution    = 'try std.testing.expectEqual(7, fare(3));'
+hints = [
+  "The comparison returns an error union, so it must be `try`'d or the compiler refuses to ignore it; the one-argument `expect` takes a bool.",
+]
+
+[quest.quiz]
+choices = [
+  'std.testing.expectEqual(7, fare(3));',
+  'try std.testing.expect(7, fare(3));',
+  'try std.testing.expectEqual(7, fare(3));',
+  'assert_eq!(7, fare(3));',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "zig.cheatsheet_advanced.25.main-init"
+node        = 25
+title       = "WHERE THE RUNTIME COMES IN"
+difficulty  = 4
+story       = "Zig 0.16 hands main its I/O runtime and its allocator in one struct. The old signatures still compile only if they never use either."
+concepts    = ["io", "functions"]
+requires    = ["zig.cheatsheet_advanced.24.expect-equal"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+Zig 0.16. Open `main` so that the body below compiles: it reads `io` and
+`gpa` off the parameter, and it uses `try`.
+
+```
+// ____
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+}
+```
+'''
+solution    = 'pub fn main(init: std.process.Init) !void {'
+hints = [
+  "The entry point must be `pub`, must be able to return an error for the `try`, and takes one parameter of the std.process type the body reads fields from.",
+]
+
+[quest.quiz]
+choices = [
+  'pub fn main(init: std.process.Init) !void {',
+  'pub fn main(gpa: std.mem.Allocator) !void {',
+  'pub fn main(init: std.process.Init) void {',
+  'fn main(init: std.process.Init) !void {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "zig.cheatsheet_advanced.26.stdin-lines"
+node        = 26
+title       = "ONE LINE AT A TIME"
+difficulty  = 4
+story       = "The plate feed is endless and the control room reads it a line at a time, through the 0.16 reader, until the feed closes."
+concepts    = ["io", "iteration", "error-handling"]
+requires    = ["zig.cheatsheet_advanced.25.main-init"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+Zig 0.16. `r` is `&stdin.interface`, a `*std.Io.Reader` over a buffered
+stdin. Open a loop that binds each line (without its newline) to `line`,
+passes a read failure up to the caller, and ends cleanly at end of input.
+'''
+solution    = "while (try r.takeDelimiter('\\n')) |line| {"
+hints = [
+  "The 0.16 reader has a take-up-to-delimiter call that returns an error union around an optional slice: null at end of stream, so a `try` then a capture; its Exclusive sibling is not optional and errors at the end.",
+]
+
+[quest.quiz]
+choices = [
+  "while (try r.readUntilDelimiterOrEof(&in_buf, '\\n')) |line| {",
+  "while (try r.takeDelimiterExclusive('\\n')) |line| {",
+  "while (r.takeDelimiter('\\n')) |line| {",
+  "while (try r.takeDelimiter('\\n')) |line| {",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "zig.cheatsheet_advanced.27.spawn"
+node        = 27
+title       = "ONE BOOTH ON ITS OWN THREAD"
+difficulty  = 4
+story       = "Booth 5 squares its count on a thread of its own and writes the answer into the control room's slot; the room joins it before reading."
+concepts    = ["concurrency", "pointers"]
+requires    = ["zig.cheatsheet_advanced.26.stdin-lines"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`fn worker(out: *i64, n: i64) void` and `total` is a `var i64`. Start
+`worker` on a new thread with `&total` and `5`, keeping the handle as `t`
+so that `t.join();` compiles on the next line.
+'''
+solution    = 'const t = try std.Thread.spawn(.{}, worker, .{ &total, 5 });'
+hints = [
+  "Spawn takes a config, the function, and its arguments as one tuple; it can fail, and the handle only exists once the error is taken off.",
+]
+
+[quest.quiz]
+choices = [
+  'const t = try std.Thread.spawn(.{}, worker(&total, 5));',
+  'const t = try std.Thread.spawn(.{}, worker, .{ &total, 5 });',
+  'const t = std.Thread.spawn(.{}, worker, .{ &total, 5 });',
+  'const t = try std.Thread.spawn(.{}, worker, &total, 5);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "zig.cheatsheet_advanced.28.io-mutex"
+node        = 28
+title       = "ONE TRAY, TWO HANDS"
+difficulty  = 5
+story       = "Two booths add to the one cash total. The lock around it belongs to the I/O runtime in 0.16, and std.Thread.Mutex is gone."
+concepts    = ["shared-state", "concurrency", "data-races"]
+requires    = ["zig.cheatsheet_advanced.27.spawn"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+Zig 0.16. `m` is a `*std.Io.Mutex` and `io` a `std.Io`. Take the lock
+before the add; the `defer` below gives it back. `add` returns `void`
+and cannot propagate an error.
+
+```
+fn add(io: std.Io, m: *std.Io.Mutex, total: *i64, value: i64) void {
+    // ____
+    defer m.unlock(io);
+    total.* += value;
+}
+```
+'''
+solution    = 'm.lockUncancelable(io);'
+hints = [
+  "The 0.16 mutex's plain `lock` takes `io` and can return `error.Canceled`, which a `void` function cannot `try`; its sibling that cannot be cancelled returns nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'm.lock(io);',
+  'm.lock();',
+  'm.lockUncancelable(io);',
+  'try m.lock(io);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "zig.cheatsheet_advanced.29.atomic"
+node        = 29
+title       = "ONE WORD, NO LOCK"
+difficulty  = 5
+story       = "The hit counter under the flyover is one machine word, bumped by every lane at once, and nobody wants a mutex around a single add."
+concepts    = ["shared-state", "data-races", "thread-safety"]
+requires    = ["zig.cheatsheet_advanced.28.io-mutex"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`hits` is a `*std.atomic.Value(u32)` shared by several threads. Add 1 to
+it atomically, with relaxed (monotonic) ordering, in a `void` function
+where the old value is not wanted.
+'''
+solution    = '_ = hits.fetchAdd(1, .monotonic);'
+hints = [
+  "The read-modify-write returns the previous value and Zig will not let a non-void result drop silently; the ordering is a lowercase enum literal in 0.16.",
+]
+
+[quest.quiz]
+choices = [
+  '_ = hits.fetchAdd(1, .monotonic);',
+  'hits.fetchAdd(1, .monotonic);',
+  '_ = hits.fetchAdd(1, .Monotonic);',
+  '_ = hits.fetchAdd(1);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "zig.cheatsheet_advanced.30.packed-bitcast"
+node        = 30
+title       = "EIGHT FLAGS IN ONE BYTE"
+difficulty  = 5
+story       = "The barrier controller takes one byte per car: paid, flagged, a three-bit lane, three bits spare. The struct is laid out bit by bit and sent as that byte."
+concepts    = ["bit-manipulation", "structs", "types"]
+requires    = ["zig.cheatsheet_advanced.29.atomic"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`Flags` is a `packed struct(u8)` — `@sizeOf(Flags)` is 1, unlike an
+`extern struct`, which is laid out like C. `f` is a `Flags`. Make `bits`
+the `u8` whose bit pattern is `f`'s, so it can go out on the wire.
+
+```
+const Flags = packed struct(u8) {
+    paid: bool,
+    flagged: bool,
+    lane: u3,
+    _pad: u3 = 0,
+};
+```
+'''
+solution    = 'const bits: u8 = @bitCast(f);'
+hints = [
+  "The integer casts want an integer in; a packed struct is reinterpreted bit for bit by the cast that takes one argument and gets its target from the binding.",
+]
+
+[quest.quiz]
+choices = [
+  'const bits: u8 = @intCast(f);',
+  'const bits = @bitCast(u8, f);',
+  'const bits: u8 = @as(u8, f);',
+  'const bits: u8 = @bitCast(f);',
+]
+answer  = 3

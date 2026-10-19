@@ -1,0 +1,424 @@
+# PYTHON LAND — CHEATSHEET, in Cantonese (colloquial written). A translation
+# pack (SPEC §12.1): the prose of `content/python/cheatsheet.toml`, quest by
+# quest, and nothing else. The four choices are code, live in the English
+# pack, and are never translated. Code blocks, identifiers and printed strings
+# are copied verbatim.
+
+pack   = "python.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.cheatsheet.01.fast-input"
+title = "快水喉"
+story = "06:30，渣甸坊。部 kiosk 前面有一百萬個數等緊，但 input() 就一啖一啖咁飲。"
+brief = '''
+喺 `import sys` 之後，邊一行可以令之後每一次 `input()` 都直接喺 stdin
+個 buffer 度快快哋讀一行？
+'''
+hints = [
+  "將個名重新綁去個 function 本身 —— 唔好 call 佢。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.cheatsheet.02.star-unpack"
+title = "Push 定 pop"
+story = "大排檔個落單 mon 由同一部 call 機收到 push 5 同 pop。"
+brief = '''
+每行 query 唔係 `push 5` 就係 `pop`。將佢拆做指令 `cmd`，同埋後面啲嘢組成嘅
+list `args`（`pop` 嗰陣係空）。
+'''
+hints = [
+  "左邊有星號嘅名會將剩低嘅全部吸入一個 list，就算剩低乜都冇都得。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.cheatsheet.03.precision"
+title = "三個小數位"
+story = "軒尼詩道間金舖報重量報到小數點後三個位，唔多唔少。"
+brief = '''
+`x = 3.14159`。印 `3.142` 出嚟 —— 小數點後啱啱好三個位。
+'''
+hints = [
+  "精度寫喺點後面；要有 `f` type，佢先會數小數點後嘅位，而唔係有效數字。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.cheatsheet.04.reverse-range"
+title = "倒數"
+story = "除夕夜時代廣場出面：個數一路數落去，一定要停喺零。"
+brief = '''
+等 `i` 行 `n-1, n-2, … 1, 0` —— 連零都要。
+'''
+hints = [
+  "range 嘅終點唔計在內，所以倒數要去到 0，就要喺佢再過一步嗰度停。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.cheatsheet.05.trunc-div"
+title = "地板仲低啲"
+story = "負七蚊嘅退款兩個人分。舊式 C 收銀機話係 -3，Python 嘅 floor 就唔係咁講。"
+brief = '''
+`a = -7`，`b = 2`。整 `q` 做整數 `-3`：好似 C 咁除，向零截。
+'''
+hints = [
+  "`//` 係向下取整，所以負數會跌到 -4。對 float 用 `int()` 會將小數部分向零掉咗。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.cheatsheet.06.grid"
+title = "各自一層"
+story = "世貿中心地底停車場有 n 層，每層 m 個車位。喺一層泊咗車，點知層層都滿晒。"
+brief = '''
+整一個 `n` 行 `m` 列、全部係零嘅格仔 `g`，改 `g[0][0]` 嗰陣淨係改到嗰一格。
+'''
+hints = [
+  "將 list 嘅 list 乘，重複嘅係同一個內層 list。每一行都要整過個新嘅。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.cheatsheet.07.count"
+title = "點數"
+story = "大排檔按餸計單，新餸由零開始。"
+brief = '''
+`d` 係一個普通 `dict`。幫 key `k` 嘅數加一，未有嘅話就由 0 開始。
+'''
+hints = [
+  "用 index 攞一個冇嘅 key 會出 KeyError。`get` 可以俾個預設值。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.cheatsheet.08.two-keys"
+title = "高分先，跟住排名"
+story = "崇光地庫機舖個排行榜：最高分喺最頂，同分就按個名排。"
+brief = '''
+`a` 係一個 `(name, score)` tuple 組成嘅 list。就地 sort：分數**由大到細**，同分就
+按名**由細到大**。
+'''
+hints = [
+  "將個數變負，就淨係反轉嗰一個 key；`reverse=True` 會一次過反轉晒所有 key。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.cheatsheet.09.tuple-key"
+title = "嚟過"
+story = "駱克道一棟唐樓樓梯牆上面嘅粉筆記號：呢個樓梯位已經搜過。"
+brief = '''
+`seen = set()`。將第 `r` 行、第 `c` 列嗰格標記做行過。
+'''
+hints = [
+  "set 嘅成員一定要 hash 得：tuple 得，list 唔得。`add` 淨係收一樣嘢。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.cheatsheet.10.max-heap"
+title = "最大嗰個喺頂"
+story = "銅鑼灣間 club 個 VIP 隊俾最大使嘅客先入。heapq 淨係識將最細嗰個擺喺頂。"
+brief = '''
+`h` 係一個經 `heapq` 用嘅普通 list，啲值用 `-heapq.heappop(h)` 讀返出嚟。放個數
+`x` 入去，等**最大**嗰個最先出。
+'''
+hints = [
+  "heapq 係 min-heap。存個負咗嘅值，攞出嚟嗰陣再變返正。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.cheatsheet.11.nonlocal"
+title = "計數器"
+story = "看門口嗰個嘅計數器：㩒一下，出面一層 scope 入面個數就變一次。"
+brief = '''
+`inc` 要幫屬於 `outer` 嘅 `cnt` 加一。空位應該填邊一行？
+
+```
+def outer():
+    cnt = 0
+    def inc():
+        # ____
+        cnt += 1
+```
+'''
+hints = [
+  "Assign 落一個名，除非另外宣告，佢就係 local。外層 function 唔係 module。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.cheatsheet.12.sentinels"
+title = "一人一個"
+story = "四個速遞員喺波斯富街一間後房等包裹。做完嘢，要逐個話佢哋知可以收工。"
+brief = '''
+四條 worker thread 各自 loop 住 `j = q.get()`，`j is None` 就 `break`。Producer 放晒
+所有工作之後，邊一行可以令**全部** worker 停低，等啲 join 返到嚟？
+
+```
+for i in range(20): q.put(i)
+# ____
+for t in ts: t.join()
+```
+'''
+hints = [
+  "一個 sentinel 啱啱好俾一個 worker 攞走。數下有幾多個 worker。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.cheatsheet.13.parse-ints"
+title = "收據嗰行"
+story = "寶靈頓道街市一卷收銀紙：價錢排成一行，用空格分開，檔口收檔之前要計好個總數。"
+brief = '''
+`s = "3 1 4 1 5"`。整 `a` 做一個真正嘅 `list`，裝住嗰五個整數，令 `len(a)`、`a[-1]`
+同 `sum(a)` 全部用得。
+'''
+hints = [
+  "先按空白拆開，再逐嚿轉 —— 記住 `map` 係 lazy 嘅，唔係 list。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.cheatsheet.14.new-sign"
+title = "新招牌"
+story = "謝斐道間麵舖頂塊霓虹招牌寫住 HELLO；老闆想要 JELLO，而霓虹光管係唔可以就地屈嘅。"
+brief = '''
+`s = "hello"`。呢行之後，`s` 一定要係 `"jello"`：第一個字母換做 `"j"`，其餘保留。
+'''
+hints = [
+  "`str` 唔可以就地改 —— 整個新嘅，再將個名重新綁上去。一個會 return 新字串嘅 call，你唔留住個結果就等於乜都冇做。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.cheatsheet.15.glue"
+title = "一條長帶"
+story = "軒尼詩道間藥房部打印機吐出十萬張細標籤；個客想要佢哋變做一條，中間冇空隙。"
+brief = '''
+一個 loop 行咗 `parts.append(piece)` 十萬次，所以 `parts` 係一個好長嘅字串 list。
+個 loop 之後，整 `s` 做佢哋全部黐埋一齊、中間乜都冇嘅字串，要線性時間。
+'''
+hints = [
+  "個分隔字串先係擁有嗰個 method 嘅，而佢收成個 list 做唯一一個參數。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.cheatsheet.16.prefix-sums"
+title = "累計總數"
+story = "怡和街嘅電車售票員由車廠開始數累計車費，第一個站之前先寫個零。"
+brief = '''
+`from itertools import accumulate` 已經做咗，`a = [1, 2, 3]`。整 `pre` 做 list
+`[0, 1, 3, 6]` —— 前綴和，前面帶個零，令 `sum(a[l:r]) == pre[r] - pre[l]`。
+'''
+hints = [
+  "`accumulate` 係 lazy 咁逐個出 —— 你唔整佢做 list 佢就唔係 list —— 而前面個零要你自己加。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.cheatsheet.17.orderable"
+title = "邊個先行"
+story = "銅鑼灣間茶餐廳嘅廚房用一個 heap 記住啲單；到期時間最早嗰張飛要自己浮上嚟。"
+brief = '''
+`Job` object 係直接 push 落 `heapq` 嘅 list 度，冇用 tuple 包住。邊一行 decorator
+令兩個 job 可以用 `<` 比較，第一個 field 先比，等最細嘅 `due` 去到 `h[0]`？
+
+```
+# ____
+class Job:
+    due: int
+    name: str
+
+h = []
+heapq.heappush(h, Job(3, "tea"))
+heapq.heappush(h, Job(1, "rice"))
+```
+'''
+hints = [
+  "淨係用個 decorator 會俾你 `__init__`、`__repr__` 同 `__eq__` —— 啲比較 method 要開個 flag 先有。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.cheatsheet.18.zero-is-real"
+title = "零都係答案"
+story = "喺大排檔，「零辣」係一個落單，唔係聳聳膊 —— 淨係空白嘅單先係跟店舖預設。"
+brief = '''
+`limit` 係一個參數，可能係任何整數，**包括 `0`**，而 `0` 一定要保持係 `0`。淨係佢係
+`None` 嗰陣先變做 `100`。邊一行做到？
+'''
+hints = [
+  "`0`、`\"\"` 同 `[]` 全部都係 falsy，所以真假值檢查分唔到零同冇。用 identity 問佢係咪 `None`。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.cheatsheet.19.ripples"
+title = "漣漪"
+story = "雨水由維園一個街口一個街口咁浸出去；水先去到近嘅街，再去遠嘅，而張地圖要講明每個街口行咗幾多格。"
+brief = '''
+格仔上面嘅 BFS：`dist` 一定要裝住由 `(sr, sc)` 出發嘅**最短**步數，所以啲格要按入隊嘅次序
+攞出嚟，O(1)。空位填邊一行？
+
+```
+q = deque([(sr, sc)]); dist[sr][sc] = 0
+while q:
+    # ____
+    for dr, dc in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < n and 0 <= nc < m and dist[nr][nc] == -1:
+            dist[nr][nc] = dist[r][c] + 1
+            q.append((nr, nc))
+```
+'''
+hints = [
+  "deque 兩頭 pop 都係 O(1)；你由邊一頭攞，就決定咗呢個係 queue 定係 stack。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.cheatsheet.20.inverse-toll"
+title = "反轉嘅收費"
+story = "紅隧最後一個閘用模運算收費，而收費員要搵嗰個可以抵消 `a` 嘅數 —— 而今晚個模數唔係質數。"
+brief = '''
+`m = 1 << 32` —— **唔係**質數 —— 而 `a` 係單數，所以 `gcd(a, m) == 1`，反元素係存在嘅。
+整 `inv` 做 `range(m)` 入面嗰個令 `(inv * a) % m == 1` 嘅整數，一個 call 搞掂
+（Python 3.8+）。
+'''
+hints = [
+  "費馬小定理要質數模數。嗰個三個參數嘅內建 function 接受負指數，而且唔會經過浮點數。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.cheatsheet.21.swap"
+title = "換位"
+story = "渣甸坊大排檔櫃枱前面兩張櫈仔；兩個熟客想換位，而冇第三張櫈仔可以暫時坐。"
+brief = '''
+`a = 1` 同 `b = 2`。一行將佢哋交換，唔用臨時名，令之後 `a == 2` 同 `b == 1`。
+'''
+hints = [
+  "成個右邊係喺左邊任何一個名改變之前先砌好嘅 —— 仲要留意一個 `=` 係 assign，兩個就淨係比較。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.cheatsheet.22.append"
+title = "疊多一張"
+story = "軒尼詩道間藥房將每張新藥方放喺疊嘢最頂，而之後疊嘢最好仲喺度。"
+brief = '''
+`a = [1, 2]` 同 `x = 3`（一個 int）。將 `x` 放喺尾，令之後 `a` 仍然係一個 list 而且讀出嚟
+係 `[1, 2, 3]`。
+'''
+hints = [
+  "個 method 係就地改個 list 然後交返 None —— 唔好留住佢 return 嘅嘢，亦唔好將 int 餵俾 `+=`。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.cheatsheet.23.return"
+title = "交出嚟"
+story = "寶靈頓道街市個收銀喺一張紙仔度將兩個價錢加埋；佢唔交張紙出嚟嘅話，個客就乜都冇咁走咗。"
+brief = '''
+用一行定義 `add`，令 `add(2, 3)` **就係**整數 `5` —— 一個 caller 可以留住嘅值，唔係
+`None`，亦唔係畫面上面嘅嘢。
+'''
+hints = [
+  "計出一個值，或者印出佢，同交返佢唔係同一回事；冇明寫 return 嘅 function 交返嘅係 None。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.cheatsheet.24.copy"
+title = "自己嗰份"
+story = "渣甸坊兩個檔口共用一塊夾板上面嘅一張價目表；一個塗改，另一個嘅價錢就跟住變。"
+brief = '''
+`a = [1, 2, 3]`，而且乜都冇 import。整 `b` 做一個獨立嘅 list，裝住同樣三件嘢，令
+`b.append(4)` 之後 `a` 仍然係 `[1, 2, 3]`。
+'''
+hints = [
+  "Assign 從來唔會 copy —— 佢係幫同一個 list 改多一個名。個 list 識得複製自己，用嘅係 Python 嘅叫法，唔係 Rust 嘅 —— 而且唔 import 嘅話，冇一個淨係叫呢個名嘅 function。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.cheatsheet.25.sort-desc"
+title = "大豪客排先"
+story = "崇光地庫間機舖重印佢個積分榜，而要改嘅係個榜本身 —— 唔係佢嘅影印本。"
+brief = '''
+`a = [3, 1, 2]`。呢一行之後，`a` 本身一定要係 list `[3, 2, 1]` —— 最大嘅排先。
+'''
+hints = [
+  "其中一個係砌一個新 list 然後掉咗佢，一個係掉咗個舊 list，一個淨係將佢掉轉頭。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.cheatsheet.26.bounds"
+title = "圍欄之內"
+story = "維園 n 支燈柱由零開始編號；個維修 app 要拒絕任何一頭超出範圍嘅號碼。"
+brief = '''
+`a` 有 `n` 件嘢，index 由 `0 … n-1`。邊一行 `if` 啱啱好喺 `i` 係 `a` 嘅有效 index 嗰陣
+先係 true？
+'''
+hints = [
+  "Python 嘅比較可以串埋一齊，所以兩個界限一氣呵成唔使 `and` —— 留意邊一頭包括在內，邊一頭唔包括。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.cheatsheet.27.empty"
+title = "架上乜都冇"
+story = "怡和街間 7-Eleven 補貨之前會先睇吓個架；係空嘅架，唔係冇咗個架。"
+brief = '''
+`a` 永遠係一個 list —— 從來唔會係 `None`。邊一行 `if` 啱啱好喺 `a` 冇任何嘢嗰陣先行佢個
+body？
+'''
+hints = [
+  "空嘅容器本身就係 falsy。`is` 比較嘅係 identity，而一個新鮮嘅 `[]` literal 永遠唔會同 `a` 係同一個 object。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.cheatsheet.28.mirror"
+title = "鏡中招牌"
+story = "謝斐道間麵舖嘅霓虹燈係由街上面讀嘅；櫥窗塊鏡就反轉咁顯示佢，做第二塊招牌，而第一塊冇俾人掂過。"
+brief = '''
+`s = "stressed"`。整 `r` 做 `str` `"desserts"` —— 即係 `s` 倒轉 —— 而 `s` 保持原狀。
+'''
+hints = [
+  "字串冇倒轉嘅 method，而嗰個內建 function 俾你嘅係 iterator，唔係 str。負數步長嘅 slice 係倒住行嘅。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.cheatsheet.29.raise"
+title = "報上去"
+story = "軒尼詩道間金舖唔收低過零嘅重量；個店員唔係聳聳膊 —— 佢打俾經理，單生意就停咗。"
+brief = '''
+`w` 係負數。邊一行可以喺呢度即刻停咗個 function，並且將一個帶住訊息 `bad weight` 嘅
+`ValueError` 送上去俾 caller？
+'''
+hints = [
+  "個關鍵字唔係 C 系嗰個，Python 2 嗰種逗號寫法已經 parse 唔到，而斯斯文文咁將一個 exception object 交返出去係停唔到任何嘢嘅。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.cheatsheet.30.short-list"
+title = "短名單"
+story = "大排檔收工嗰陣嘅盤點：淨係賣得出嘅餸先會為聽日嘅備料加倍，賣唔出嘅就索性唔入名單。"
+brief = '''
+`a = [3, -1, 4, 0]`。整 `b` 做 list `[6, 8]`：每個正數加倍，非正數就**唔要** —— 所以
+`len(b)` 係正數嘅數目，唔係 `len(a)`。
+'''
+hints = [
+  "個 filter 係放喺 comprehension 嘅尾嘅。放喺頭嘅 if-else 係一個值，而佢每一件嘢都會留住。",
+]

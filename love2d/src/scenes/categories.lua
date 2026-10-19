@@ -18,6 +18,8 @@ local Categories = {}
 Categories.__index = Categories
 
 local BLURB = {
+  cheatsheet = "the cheatsheet, basic. four lines, one right; pick it and the node is cleared.",
+  cheatsheet_advanced = "the cheatsheet, advanced. traits, channels, generics, closures; four lines, one right.",
   verybasic = "the quiz. four lines, one right; pick it, then type it.",
   basic = "grammar. one construct, one to four lines, untimed.",
   advanced = "the live coding test, untimed. whole programs, hidden cases.",
@@ -28,7 +30,9 @@ local BLURB = {
 -- SPEC §0's order. `world.lands` does not promise one, and which row is drawn
 -- first is presentation rather than a rule — but a category list that
 -- reorders itself between two calls is a category list a player mis-clicks.
-local ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4, frameworks = 5 }
+local ORDER = {
+  cheatsheet = 0, cheatsheet_advanced = 1, verybasic = 2, basic = 3, advanced = 4, hacker = 5, frameworks = 6,
+}
 
 local function ordered(categories)
   local out = {}

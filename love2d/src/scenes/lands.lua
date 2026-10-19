@@ -17,7 +17,9 @@ local Lands = {}
 Lands.__index = Lands
 
 local LAND_ORDER = Land.ORDER
-local CATEGORY_ORDER = { verybasic = 1, basic = 2, advanced = 3, hacker = 4, frameworks = 5 }
+local CATEGORY_ORDER = {
+  cheatsheet = 0, cheatsheet_advanced = 1, verybasic = 2, basic = 3, advanced = 4, hacker = 5, frameworks = 6,
+}
 
 --- SPEC §0's order. `world.lands` does not promise one, and the rows were
 --- arriving alphabetical — ADVANCED, BASIC, HACKER — which reads as a list of

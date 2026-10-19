@@ -1,0 +1,496 @@
+# PYTORCH LAND — CHEATSHEET ADVANCED, in Cantonese (colloquial written
+# Cantonese, traditional characters). A translation pack (SPEC §12.1): the
+# prose of `content/pytorch/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks and identifiers are
+# copied verbatim.
+
+pack   = "pytorch.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.01.autograd-grad"
+title = "個斜率，唔使填表"
+story = "返到周亦卿樓個地庫。架手推車上面個 console 想要一個導數，唔係一個副作用。"
+brief = '''
+```
+x = torch.tensor([1.0, 2.0], requires_grad=True)
+y = (x ** 3).sum()
+```
+
+將 `g` 整做梯度 dy/dx，一個形狀係 `(2,)` 嘅 **tensor** —— 而且之後
+`x.grad` 一定仍然係 `None`。
+'''
+hints = [
+  "functional API 每個輸入回傳一個梯度，包喺一個 tuple 入面，所以要 unpack；`y` 上面嗰個 method 係寫入 `.grad`，乜都唔回傳。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.02.detach-clone"
+title = "乜都唔欠嘅副本"
+story = "機架通道為每個權重留一個草稿副本。喺上面塗鴉永遠唔可以影響到原本嗰個。"
+brief = '''
+`x` 係一個形狀 `(3,)`、`requires_grad=True` 嘅 float tensor，坐喺個圖上面。
+將 `y` 整做一個同 `x` **唔共用任何記憶體**而且**由個圖切開咗**嘅副本，
+令之後嘅 `y.add_(1.0)` 既唔會改 `x`，亦唔會改任何 `x` 會反向傳播嘅嘢。
+'''
+hints = [
+  "兩個 method，各做一件事：一個切開個圖但保留 storage，另一個 copy 個 storage 但保留個圖。你兩個都要，按呢個次序。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.03.inplace-leaf"
+title = "冇人望嗰陣先掂佢"
+story = "兩次運行之間，操作員喺風扇牆上面扭一下個掣。佢做嗰陣，部錄音機一定要係熄咗。"
+brief = '''
+`w` 係一個 `requires_grad=True` 嘅 leaf tensor。喺兩個實驗之間，將佢
+**原地**加 `+1.0` —— 同一個 storage，仍然係 leaf，下一次運行仍然追蹤緊 ——
+而 autograd 唔可以 raise。
+'''
+hints = [
+  "錄製開緊嗰陣，對一個追蹤緊嘅 leaf 做原地寫入會被拒絕；淨係為嗰一句關咗錄製，個 leaf 就仍然係 leaf。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.04.set-grad-enabled"
+title = "一個掣，兩個方向"
+story = "同一個 console script 行訓練同驗證兩個 pass。一個 flag 決定條帶係咪轉緊。"
+brief = '''
+`train` 係一個 Python `bool`。一個 block 為兩個階段行 forward pass，
+而**淨係當 `train` 係 `True`** 先可以錄一個圖。邊一行開個 block？
+
+```
+# ____
+    out = model(xb)
+```
+'''
+hints = [
+  "有一個 context 將個 flag 本身當 argument 收。no-grad 嗰個一個 argument 都唔收，而 inference 嗰個收嘅 flag 意思係相反。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.05.modulelist"
+title = "上咗登記冊"
+story = "渣甸坊上面一幢一模一樣嘅樓層疊起嘅塔。個業主淨係向登記冊上面嘅樓層收租。"
+brief = '''
+```
+class Tower(nn.Module):
+    def __init__(self, depth):
+        super().__init__()
+        blocks = [nn.Linear(64, 64) for _ in range(depth)]
+        # ____
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = torch.relu(layer(x))
+        return x
+```
+
+填個空位，令每一層嘅權重都出現喺 `model.parameters()` 同 `model.state_dict()` 入面。
+'''
+hints = [
+  "普通 Python container 會將入面嘅嘢收埋，module registry 見唔到。會登記嘅 container 係成個 list 咁收；Sequential 想要啲 layer unpack 咗，唔係一個 list。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.06.parameter"
+title = "OPTIMISER 扭得郁嘅掣"
+story = "console 上面一個 scalar 決定個 softmax 有幾尖。佢應該好似機架入面其他嘢一樣識學。"
+brief = '''
+喺 `__init__` 入面、`super().__init__()` 之後：畀個 module 一個**可學習**嘅
+scalar `self.temperature`，初始值 `1.0`，會出現喺 `model.parameters()` 入面，
+令 optimiser 會更新佢。
+'''
+hints = [
+  "將一個 tensor 包入 parameter class 先會令個 module 登記佢；一個開咗梯度嘅光秃秃 tensor 對 optimiser 嚟講係隱形嘅，而個 wrapper 想要一個 tensor，唔係一個 float。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.07.register-buffer"
+title = "跟住機架走，乜都唔學"
+story = "個 model 搬去張卡嗰陣，個 causal mask 跟住一齊去，而且一齊存。冇人會訓練一個三角形。"
+brief = '''
+喺 `__init__` 入面、`super().__init__()` 之後：將一個 `T` 乘 `T` 嘅 causal mask ——
+對角線上面同**以下**係 1，上面係 0 —— 存做 `self.mask`。佢一定要跟住
+`model.to(device)` 搬，而且要存入 `state_dict()`，但**永遠**唔可以收到梯度
+或者出現喺 `model.parameters()` 入面。
+'''
+hints = [
+  "唔係 parameter 嘅狀態有一個登記處：佢會跟住個 module 搬同存。下三角嗰個 helper 砌到個 mask；佢上三角嗰個兄弟砌出嚟係錯嘅。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.08.param-count"
+title = "一萬四千，上下"
+story = "機架上面個牌寫住一萬四千個參數。面試官想要由個 model 數出嚟嘅數，唔係個牌嘅。"
+brief = '''
+`model` 係一個 `nn.Module`，入面每個參數都係可訓練嘅。邊一行可以得到 `n`，
+即係個 model 入面**scalar 權重嘅總數**，一個普通 `int`？
+'''
+hints = [
+  "每個參數 tensor 都知自己有幾多個元素；將佢哋加起嚟。個 iterator 嘅長度係 tensor 嘅數目，而一個 shape 同一個 int 加唔埋。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.09.freeze-backbone"
+title = "凍結下面啲樓層"
+story = "預訓練嘅主幹由教學 cluster 落嚟。淨係上面個新 head 可以郁。"
+brief = '''
+`model.backbone` 同 `model.head` 係 submodule。用**一行**，凍結 backbone 嘅
+每一個權重 —— 全部關閉梯度追蹤，令 optimiser 嘅 step 唔會掂佢哋 ——
+其他嘢唔好掂。
+'''
+hints = [
+  "Module 有一個原地 method，尾有底線，會行過下面每一個參數。喺個 module 上面設一個普通屬性乜都唔會登記，而 eval mode 係關於 dropout，唔係梯度。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.10.kaiming"
+title = "HE 話要 NORMAL"
+story = "機架入面一層新層由 constructor 揀嘅嘢開始。個 ReLU 塔想用手設個 variance。"
+brief = '''
+```
+self.fc = nn.Linear(256, 256)
+# ____
+```
+
+填個空位，令嗰層嘅 weight 用 He (Kaiming) normal 初始化**原地**重新初始化，
+即係一疊 ReLU 想要嗰種。
+'''
+hints = [
+  "啲 initialiser 收個 tensor 本身然後改佢 —— 尾嗰條底線就係講呢樣。一個 module 或者一個 shape 唔係 tensor，而將一個光秃秃嘅 tensor 賦值蓋過一個 parameter 會被拒絕。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.11.functional-dropout"
+title = "知道而家幾點嘅 DROPOUT"
+story = "console 上面個 functional dropout 連驗證嗰陣都丟單元，除非有人話佢知個 model 已經靜咗落嚟。"
+brief = '''
+```
+def forward(self, x):
+    x = torch.relu(self.fc1(x))
+    # ____
+    return self.fc2(x)
+```
+
+`F` 係 `torch.nn.functional`。喺空位填 `p=0.1` 嘅 **functional** dropout，
+訓練嗰陣會丟單元，而一旦呼叫咗 `model.eval()` 就**停止丟**。
+'''
+hints = [
+  "functional 形式唔知個 module 處於邊個 mode，除非你將個 module 自己嗰個 boolean flag 傳畀佢；佢嘅預設係丟。喺 forward 入面新建嘅 layer 永遠都係 training mode。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.12.bce-with-logits"
+title = "係或者唔係，麻煩同一個形狀"
+story = "地庫門口個閘機偵測器每個 frame 講一個數。個 target 係一欄 0 同 1。"
+brief = '''
+`logits` 形狀係 `(N, 1)` —— 由一個單單元 head 出嚟嘅原始 float 分數 —— 而
+`target` 形狀係 `(N,)`，dtype 係 `int64`，裝住 `0` 或者 `1`。邊一行係啱嘅
+**二元** loss，自己套用 sigmoid？
+'''
+hints = [
+  "二元 loss 想要輸入同 target 係同一個形狀、同一個 float dtype。普通 BCE 想要概率，而多類別 loss 會將欄數讀做類別數。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.13.token-loss"
+title = "每個 TOKEN，除咗 PADDING"
+story = "機架入面個序列 model 為每個 batch row 嘅每個位置打分。短 row 尾嘅 padding 一定唔可以計。"
+brief = '''
+`lg` 形狀係 `(B, T, V)` —— 每個位置嘅 logits —— 而 `y` 形狀係 `(B, T)`，
+`int64` token id。token id `0` 係 **padding**，一定唔可以貢獻到個 loss。
+`F` 係 `torch.nn.functional`。邊一行係啱嘅 token 層級 cross-entropy？
+'''
+hints = [
+  "將兩個分別攤平做 `(N, V)` 同 `(N,)` —— 個 loss 啱啱好接受呢兩種 —— 然後用 keyword 話佢知要跳過邊個 class index；冇嗰個 keyword，padding 就會好似其他 token 咁被打分。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.14.adamw"
+title = "DECAY，解耦"
+story = "7-32 室個面試官要求嘅 weight decay 唔係淨係將 L2 摺入梯度。有一個 class 專做呢樣。"
+brief = '''
+`params = model.parameters()`。砌一個 `opt`，learning rate 係 `3e-4`，
+而且有 `0.01` 嘅**解耦** weight decay —— 個 decay 直接套用喺權重上面，
+唔係當 L2 項加落梯度度。
+'''
+hints = [
+  "Adam 嘅 `weight_decay` 係將 L2 摺入梯度；解耦嗰種係自己一個 optimiser class。兩個都想要個 parameter iterable，唔係個 module，而個 keyword 係全寫。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.15.scheduler-step"
+title = "每圈降溫一次"
+story = "機架上面嘅 cosine annealing：每個 epoch，learning rate 都放鬆少少，喺 optimiser 行完佢嗰步之後。"
+brief = '''
+```
+sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+for epoch in range(epochs):
+    for xb, yb in loader:
+        opt.zero_grad()
+        loss = loss_fn(model(xb), yb)
+        loss.backward()
+        opt.step()
+    # ____
+```
+
+填個空位，令 learning-rate schedule **每個 epoch 推進一次**。
+'''
+hints = [
+  "個 scheduler 有自己嘅 step，喺 optimiser 嗰步之後呼叫 —— 呢度係每個 epoch 一次。讀當前嘅 rate 乜都唔會推進，而 optimiser 唔擁有個 scheduler。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.16.grad-scaler"
+title = "SCALE、STEP、UPDATE"
+story = "3 號機架張卡上面嘅半精度：細嘅梯度會 underflow，除非個 loss 先放大，而個 step 知道呢件事。"
+brief = '''
+```
+scaler = torch.amp.GradScaler("cuda")
+for xb, yb in loader:
+    opt.zero_grad(set_to_none=True)
+    with torch.autocast(device_type="cuda", dtype=torch.float16):
+        loss = loss_fn(model(xb), yb)
+    # ____
+```
+
+CUDA 上面 `float16` 嘅混合精度。用一個訓練步嘅三個呼叫填個空位，令
+backward 係喺一個經個 scaler 放大咗嘅 loss 上面行，optimiser **永遠唔會套用
+仍然 scale 住嘅梯度**（而且梯度入面有 inf 嗰一步會被跳過），而 scale factor
+淨係喺嗰一步之後先調整。
+'''
+hints = [
+  "三個呼叫全部都經個 scaler。直接 step 個 optimiser 會令啲梯度仲係 scale 咗嘅；個 scaler 拒絕 step 一個佢從來冇 scale 過嘅 loss，亦拒絕喺 step 之前 update。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.17.map-location"
+title = "張卡唔喺度"
+story = "個 checkpoint 係喺 cluster 嘅 GPU 上面寫嘅。而家喺 Lucky Mac 一部完全冇卡嘅手提電腦上面讀。"
+brief = '''
+`p` 係一個喺 CUDA 機器上面用 `torch.save(model.state_dict(), p)` 寫出嚟嘅檔案 ——
+個檔案裝住嘅係 state dict 本身。喺呢部**只有 CPU** 嘅手提電腦上面將佢
+load 做一個 dict `sd`，而個 loader **拒絕 unpickle 任意物件**。
+'''
+hints = [
+  "device 重新對應係個 loader 上面嘅 keyword，唔係返嚟嗰樣嘢上面嘅 method，而安全 unpickle 個掣係另一個 keyword。結果係個 dict 本身，外面冇 key 包住。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.18.random-split"
+title = "八二開，每次一樣咁切"
+story = "地庫攝錄機一千個標記好嘅 frame。驗證嗰五分一聽日一定要係同一個五分一。"
+brief = '''
+`ds` 係一個有 1000 個 item 嘅 map-style `Dataset`（佢定義咗 `__len__` 同
+`__getitem__`），`random_split` 由 `torch.utils.data` import 咗，而
+`g = torch.Generator().manual_seed(0)`。將佢**隨機** 80/20 切做兩個 `Dataset`
+物件，由 `g` 可重現。
+'''
+hints = [
+  "個 splitter 收一個分數（或者長度）嘅 list，同埋用 keyword 收個 generator 物件 —— 唔係一個 seed，唔係一個 float。對 dataset 切片既唔隨機亦唔係 dataset。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.19.collate-fn"
+title = "長短不一嘅行，一個 TENSOR"
+story = "中央圖書館啲終端機送嚟嘅句子乜長度都有。個 loader 預設嘅疊砌器想佢哋全部一樣長。"
+brief = '''
+`ds` 嘅每個 item 都係一個長度**唔同**嘅一維 `int64` tensor，所以個 loader
+預設嘅疊砌會失敗。`pad_batch(samples)` 已經寫好：佢收一個 item 嘅 list，
+回傳一個 pad 好嘅 `(B, T_max)` tensor。砌一個 `loader`，batch 係 16，用佢
+（worker 數目唔係問題所在）。
+'''
+hints = [
+  "預設嘅 collate 係疊砌，而長短不一嘅 tensor 疊唔埋。用佢個完整 keyword 名將你自己嘅 collate function 交畀個 loader；Python 嘅 `map` 冇長度，亦唔係 dataset。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.20.distributed-sampler"
+title = "每個 RANK 自己一份"
+story = "機架入面四張卡，一張卡一個 process。如果每個 process 都讀成個 dataset，個 cluster 就會有四倍嘅工作而冇任何提速。"
+brief = '''
+多 GPU，一張卡一個 process：
+
+```
+dist.init_process_group("nccl")
+rank = dist.get_rank()
+model = DistributedDataParallel(model.to(rank), device_ids=[rank])
+sampler = DistributedSampler(ds)
+```
+
+砌一個 batch 係 32 嘅 `loader`，令每個 rank 見到 `ds` **自己嗰份互不重疊嘅
+shard**，由個 sampler 洗牌（`sampler.set_epoch` 每個 epoch 都會呼叫）。
+'''
+hints = [
+  "sampler 會取代個 loader 自己嘅洗牌，而嗰兩個 keyword 係互斥嘅 —— 兩個都傳個 loader 會 raise。dataset 仍然係第一個 argument。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.21.compile"
+title = "融合佢"
+story = "機架上面個 forward pass 係一千個細 kernel。2.x 嘅 compiler 可以將佢哋焊成幾個，只要問得啱。"
+brief = '''
+`model` 係一個 `nn.Module`。將 `model` 重新綁定做一個 forward pass 由
+PyTorch 2.x compiler trace 同融合過嘅版本，用佢嘅**預設** mode。
+'''
+hints = [
+  "個 compiler 係一個頂層 torch function，收個 module 物件 —— 唔係佢嘅輸出 —— 然後回傳一個包好嘅。佢嘅 mode 叫 default、reduce-overhead 同 max-autotune；JIT package 冇呢個名嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.22.expand"
+title = "同一舊記憶體，多幾行"
+story = "batch 入面每一行一張位置表。逐行 copy 會白白塞滿張卡。"
+brief = '''
+`pos` 係一張形狀 `(T, D)` 嘅位置表，而 `x` 形狀係 `(B, T, D)`。將 `pe` 整做
+形狀 `(B, T, D)`，同 `pos` **共用記憶體** —— 一個 view，冇 copy —— 令
+`x + pe` 將同一張表加落每一行。
+'''
+hints = [
+  "一個 method 會實體化啲副本，另一個會用 stride 行過同一舊記憶體。`-1` 代表保留嗰個尺寸，而淨係 stride 嗰個接受佢；copy 嗰個每條軸都要一個正數。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.23.permute-contiguous"
+title = "STRIDE 唔會講大話"
+story = "由機架出嚟係 channels-first，入 head 係 time-first。個 view 拒絕，直到記憶體嘅排列同個 shape 講嘅一致。"
+brief = '''
+`x` 形狀係 `(B, C, T)`，而且係 contiguous。用 `view` 將 `y` 整做形狀
+`(B, T*C)`，每一行入面**時間行得最慢** —— 第 0 步嘅全部 `C` 個 channel，
+然後第 1 步嘅全部 `C` 個，如此類推。
+'''
+hints = [
+  "permute 之後啲 stride 同記憶體唔再一致，`view` 會拒絕；先 copy 入一舊新記憶體，個 view 先合法。直接喺 `x` 上面 view 會保持 channel 最慢，而行數一定要係 `B`。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.24.chunk-qkv"
+title = "一個投影出三個"
+story = "機架入面一個 Linear 並排產出 query、key 同 value。attention block 需要佢哋分開。"
+brief = '''
+`qkv` 形狀係 `(B, T, 3*D)`，`B = 8`，`D = 64`：query、key 同 value 嘅投影
+沿住**最後**一條軸串埋。邊一行得到 `q`、`k`、`v`，每個形狀係 `(B, T, D)`？
+'''
+hints = [
+  "兩個切割器之中，一個數有幾多份，另一個數每份有幾大 —— 而條軸預設係第一條，八行切三份喺嗰度會得到錯嘅形狀而唔會報錯。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.25.gather"
+title = "每行揀一個"
+story = "六十四行 log 概率，十個類別。用手計嘅 loss 每行啱啱好需要一個數：真正嗰個 class 嘅。"
+brief = '''
+`logp` 形狀係 `(N, C)`，`N = 64`，`C = 10` —— log 概率，`log_softmax` 已經
+沿 dim 1 套用咗 —— 而 `y` 形狀係 `(N,)`，`int64` class index。將 `lp` 整做
+形狀 `(N,)`：每一行，嗰行**真正** class 嘅 log 概率。
+'''
+hints = [
+  "index tensor 嘅維數一定要同來源一樣 —— 畀佢加一條尾軸 —— 而揀選係沿住 class 軸行，唔係 row 軸。淨係用 `y` 嚟 index 會揀出成行。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.26.masked-fill"
+title = "未來嘅畀負無限"
+story = "地庫個 block 唔可以偷睇前面。對角線上面每個分數喺 softmax 見到之前都要變做負無限。"
+brief = '''
+`scores` 形狀係 `(B, T, T)`，而 `mask = torch.tril(torch.ones(T, T))` ——
+一個 **float** tensor，容許 attend 嘅地方係 `1.`，對角線上面係 `0.`。
+邊一行將每個禁止嘅分數換做負無限，令跟住嘅 softmax 畀嗰啲位置零權重？
+'''
+hints = [
+  "個 fill 想要一個 boolean mask，True 嘅地方就係要開窿嘅地方 —— 比較個 float mask 就得到一個 —— 加一個代表負無限嘅 Python float。tensor 上面嘅 `where` 係喺條件係 True 嘅地方保留值。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.27.sdpa"
+title = "一個呼叫，唔准偷睇"
+story = "張卡上面嘅融合 attention kernel 一次過做晒分數、mask 同 softmax —— 只要個 flag 串得啱。"
+brief = '''
+`q`、`k`、`v` 每個形狀都係 `(B, H, T, Dh)`，而 `F` 係 `torch.nn.functional`。
+邊一行用**融合** kernel 計 attention，令每個位置淨係 attend 自己同過去？
+'''
+hints = [
+  "融合嗰個呼叫有一個 boolean keyword 畀 causal mask，而佢唔係串做淨係 `causal`。事後 mask 個輸出係 mask 錯咗個 tensor；唔開個 flag 就會周圍都 attend。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.28.einsum"
+title = "用字母代表軸"
+story = "7-32 室個面試官喺白板上面用下標寫個乘積，然後等個 batch 字母生存落嚟。"
+brief = '''
+`a` 形狀係 `(B, 3, 4)`，而 `b` 形狀係 `(B, 4, 5)`。用 `einsum` 將 `c` 整做
+形狀 `(B, 3, 5)`：**batched 矩陣乘積**，每個 batch row 一個 `(3, 4) @ (4, 5)`。
+'''
+hints = [
+  "每條輸入軸都有一個字母，共用嘅字母會被加總走，而個 batch 字母一定要出現喺輸出，否則佢都會被加總。字母係按軸嘅次序讀，所以調轉其中兩個會改變邊啲尺寸要一致。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.29.checkpoint"
+title = "而家唔記得，遲啲再計"
+story = "一萬四千個參數放得入手提電腦；每個 block 嘅 activation 就放唔入。用計算換記憶體，一個 block 一個 block 咁換。"
+brief = '''
+```
+from torch.utils.checkpoint import checkpoint
+
+def forward(self, h):
+    for block in self.blocks:
+        # ____
+    return h
+```
+
+填個空位，令每個 block 嘅 activation 喺 forward pass **唔會儲存**，而係
+喺 backward 嗰陣重新計算 —— **non-reentrant** 嗰個變體。
+'''
+hints = [
+  "checkpoint function 將個 callable 同佢嘅輸入當獨立 argument 咁收，然後幫你呼叫佢。傳個 block 嘅輸出即係 forward 已經行咗，而個 module 本身唔係 callable。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.30.multihead-attention"
+title = "意思相反嘅 MASK"
+story = "地庫最後一個 block 係個 library 自己嘅 attention module，而佢個 boolean mask 將 True 讀做禁止。Mei 將個正負號檢查咗兩次。"
+brief = '''
+```
+attn = nn.MultiheadAttention(embed_dim=64, num_heads=4, batch_first=True)
+causal = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+```
+
+`x` 形狀係 `(B, T, 64)`。喺呢個 module 入面，boolean `attn_mask` 係 `True`
+嘅地方代表**禁止** attention，而 `causal` 喺對角線嚴格上方係 `True`。
+邊一行得到 `out`，即係形狀 `(B, T, 64)` 嘅 self-attention 輸出，冇 token 偷睇前面？
+'''
+hints = [
+  "個 module 想要 query、key 同 value 三個 positional tensor，然後回傳一個 pair —— 要 unpack。個 mask 原封不動咁傳，因為呢度 True 已經代表封鎖；反轉佢會令每個 token 淨係讀到未來。",
+]

@@ -49,7 +49,8 @@ import {
   titledPanel,
   type Stack,
 } from "../ui/chrome";
-import { CLOCK, clockPulse, reducedMotion, seconds, Tween } from "../engine/motion";
+import { CLOCK, clockPulse, reducedMotion, seconds, slideIn, Tween } from "../engine/motion";
+import { flashAlpha, zoomIn, zoomOut } from "../engine/celebrate";
 import {
   Editor,
   MAIN_FILE,
@@ -70,7 +71,23 @@ import {
   type Blank,
   type Target,
 } from "../ui/editor";
-import { burstPlan, coinPlan, fillPlan } from "../engine/burst";
+import {
+  beamPlan,
+  burstPlan,
+  clearPlan,
+  coinPlan,
+  comboPlan,
+  fillPlan,
+  lightTrailPlan,
+  loopPlan,
+  pointerPlan,
+  rubblePlan,
+  shockPlan,
+  SHEET_ADVANCED,
+  SHEET_BASIC,
+  type Rubble,
+  type SheetPalette,
+} from "../engine/burst";
 import { Overlay } from "../ui/overlay";
 import { ToolFilter } from "../ui/toolfilter";
 import { CodeFx } from "../ui/codefx";
@@ -95,7 +112,7 @@ import type {
   Quest,
   RunStage,
 } from "../net/protocol";
-import { questLang } from "../net/protocol";
+import { isSheet, questLang } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
 import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
@@ -342,6 +359,12 @@ function verdictLine(v: Attempt["verdict"]): string {
 }
 
 /**
+ * The toolbar on a CHEATSHEET quest: the way out, the brief to copy, and the
+ * type size. Everything else on the bar is about code, and there is none.
+ */
+const SHEET_TOOLS = new Set(["back", "lobby", "copybrief", "fontdown", "fontup"]);
+
+/**
  * The street this quest happens on, as a painted backdrop.
  *
  * Six briefs, six places. Before this the quest screen had no backdrop at all
@@ -388,6 +411,13 @@ interface Fill {
   /** `[from, to)` of a word that finished itself, in document offsets. */
   word: [number, number] | null;
 }
+
+/**
+ * First-try picks in a row on each sheet road, kept across quests for the
+ * session: the streak is the thing the fountain and the "×N" are sized to,
+ * and a streak that forgot itself between two nodes would never pass two.
+ */
+const SHEET_STREAK = new Map<string, number>();
 
 export class QuestScene implements Scene {
   readonly name = "quest";
@@ -486,6 +516,20 @@ export class QuestScene implements Scene {
   private quizRight = false;
   private quizWrong: number | null = null;
   private quizWrongAt = -1;
+  /**
+   * CHEATSHEET's four lines as last drawn — each one's box, where its
+   * characters sit and the size of one — so a pick can throw its sparks at
+   * the exact line the finger landed on.
+   */
+  private choiceGeom: {
+    rect: Rect;
+    lines: { x: number; y: number; text: string }[];
+    cell: [number, number];
+  }[] = [];
+  /** The pointer's last stop on a CHEATSHEET quest, for the thread it leaves. */
+  private pointerLast: { x: number; y: number; t: number } | null = null;
+  /** When neon dust last drifted over a CHEATSHEET brief. */
+  private dustAt = 0;
   private consoleOpen = false;
   private logScroll = 0;
   /** How many lines of the log are above the window, as last drawn. */
@@ -517,6 +561,20 @@ export class QuestScene implements Scene {
    */
   private briefDrag: { y: number; scroll: number; moved: boolean } | null = null;
   private readonly briefIn = new Tween(seconds("panel"));
+  /** The four lines arriving one after another when a sheet question opens. */
+  private choiceIn: Tween[] = [];
+  /** The whole frame lit for a moment: red for a miss, gold for a streak. */
+  private flash: { at: number; life: number; color: RGBA } | null = null;
+  /** "×N" over the line that was right, zooming in, for a run of first-try picks. */
+  private sheetCombo: { at: number; n: number; x: number; y: number } | null = null;
+  /** The streak counter's swell when it grows. */
+  private readonly streakIn = new Tween(seconds("star"), 0, true);
+  /**
+   * The page's own jolt on a wrong pick, 0..1 and decaying. `app.shake`
+   * sits out while the DOM overlay has anything in it, and the particle
+   * canvas lives there, so the sheet shakes its panels itself.
+   */
+  private jolt = 0;
   /** The clock arriving, once, when a timed quest opens. */
   private readonly clockIn = new Tween(seconds("clock"), seconds("stagger") * 2);
   /**
@@ -728,6 +786,19 @@ export class QuestScene implements Scene {
       // The quiz comes first on VERY BASIC: the editor opens locked and the
       // right choice is the key. A cleared quest is past its quiz.
       this.quizRight = !startsLocked(res.quest.quiz, res.quest.state);
+      // CHEATSHEET is the quiz and nothing after it: the pick is the
+      // submission, so the editor never opens and a cleared node can be
+      // answered again.
+      if (this.cheatsheet()) {
+        this.quizRight = false;
+        // The question is the whole screen: there is no code to write, so
+        // the editor's half and its bench are not offered at all.
+        this.view = "brief";
+        // The four lines deal themselves out, one after another.
+        this.choiceIn = (res.quest.quiz?.choices ?? []).map(
+          (_, i) => new Tween(seconds("panel"), seconds("stagger") * (i + 1)),
+        );
+      }
       if (!this.quizRight) this.editor.setLocked(true);
       this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
       // After the editor, so it is painted over it.
@@ -875,6 +946,8 @@ export class QuestScene implements Scene {
    */
   private async execute(kind: "quest.submit" | "quest.run"): Promise<void> {
     if (!this.quest || !this.editor || this.stage !== "idle") return;
+    // Nothing on CHEATSHEET is compiled; the pick is sent by `answer`.
+    if (this.cheatsheet()) return;
     this.attemptId = null;
     this.log = new LogBuffer("");
     this.stage = "queued";
@@ -2097,7 +2170,14 @@ export class QuestScene implements Scene {
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
-    if (name === "a" && (ev.ctrlKey || ev.metaKey) && ev.shiftKey && this.coder) {
+    // Not on CHEATSHEET: the coder writes into an editor that road hides.
+    if (
+      name === "a" &&
+      (ev.ctrlKey || ev.metaKey) &&
+      ev.shiftKey &&
+      this.coder &&
+      !this.cheatsheet()
+    ) {
       this.focus = true;
       this.coder.panel.open = true;
       this.coder.key(name, ev);
@@ -2153,7 +2233,7 @@ export class QuestScene implements Scene {
     // The binding people already have in their fingers, as close as this
     // plumbing allows: a keystroke only reaches a scene from inside the editor
     // when Ctrl or Cmd is held, so Shift+Alt+F could never arrive here.
-    if (name === "f" && (ev.metaKey || ev.ctrlKey) && ev.shiftKey) {
+    if (name === "f" && (ev.metaKey || ev.ctrlKey) && ev.shiftKey && !this.cheatsheet()) {
       ev.preventDefault();
       void this.format();
     }
@@ -2248,7 +2328,9 @@ export class QuestScene implements Scene {
     if (phase === "move") {
       this.buttons.hovered = this.buttons.hit(x, y)?.id ?? null;
       this.bar.hovered = this.bar.hit(x, y)?.id ?? null;
+      const was = this.choiceBtns.hovered;
       this.choiceBtns.hovered = this.choiceBtns.hit(x, y)?.id ?? null;
+      if (this.cheatsheet()) this.sheetPointer(x, y, was);
       return;
     }
     if (phase !== "down") return;
@@ -2392,6 +2474,20 @@ export class QuestScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.fx?.frame(dt);
+    for (const c of this.choiceIn) c.update(dt);
+    this.streakIn.update(dt);
+    if (this.jolt > 0) this.jolt = Math.max(0, this.jolt - dt * 2.4);
+    if (this.cheatsheet() && this.fx && !reducedMotion() && this.t - this.dustAt > 0.35) {
+      // Neon dust drifting up over the question — an ember every few
+      // frames, so the page is alive while the player reads it.
+      this.dustAt = this.t;
+      const [bx, by, bw, bh] = this.briefRect;
+      if (bw > 0 && bh > 0) {
+        const x = bx + Math.random() * bw;
+        const y = by + Math.random() * bh;
+        this.fx.play(pointerPlan(x, y, (Math.random() - 0.5) * 60, 30 + Math.random() * 50));
+      }
+    }
     this.coder?.update(dt);
     this.ghostIn.update(dt);
     this.glow();
@@ -2451,7 +2547,14 @@ export class QuestScene implements Scene {
     this.app.clear(g, Theme.void);
     const accent = landColour(this.land);
     const street = this.app.assets?.picture(
-      STREET[`${this.land}/${this.category}`] ?? "bg_street",
+      // CHEATSHEET is the print shop on every land: the sheets on the cork
+      // board are the ones the questions come from. ADVANCED is the floor
+      // above it, after hours, where the patterns are pinned up.
+      this.category === "cheatsheet"
+        ? "bg_cheatsheet"
+        : this.category === "cheatsheet_advanced"
+          ? "bg_cheatsheet_pro"
+          : (STREET[`${this.land}/${this.category}`] ?? "bg_street"),
       layout.isPortrait(),
     );
     if (street) {
@@ -2571,6 +2674,9 @@ export class QuestScene implements Scene {
     const right: Rect =
       this.view === "code" ? whole : [f.right[0], f.right[1], f.right[2], f.right[3] - room];
 
+    const [jx, jy] = this.joltOffset(s);
+    g.save();
+    g.translate(jx, jy);
     if (this.view !== "code") {
       arriving(g, f, "left", this.briefIn, () => {
         // The clock takes the top of the brief column and the brief starts under
@@ -2597,6 +2703,7 @@ export class QuestScene implements Scene {
       // where the bench last put it, it would float over the brief.
       this.overlay?.hide();
     }
+    g.restore();
 
     this.buttons.draw(g, fonts.tool);
     this.bar.draw(g, fonts.tool);
@@ -2620,8 +2727,86 @@ export class QuestScene implements Scene {
     }
     // The keys that are *only* keys. `ESC MAP` used to sit under a button that
     // already said MAP, which is the footer explaining the screen to itself.
-    footer(g, layout, t("quest.footer"));
+    this.drawSheetMoments(g, fonts);
+    footer(g, layout, t(this.cheatsheet() ? "quest.sheetFooter" : "quest.footer"));
     this.coder?.draw();
+  }
+
+  /** The page's jolt right now, in virtual pixels: two sines on the trauma squared. */
+  private joltOffset(s: number): [number, number] {
+    if (this.jolt <= 0.001) return [0, 0];
+    const k = this.jolt * this.jolt * 18 * s;
+    return [
+      Math.round(Math.sin(this.t * 41.3) * k),
+      Math.round(Math.sin(this.t * 57.9) * k * 0.7),
+    ];
+  }
+
+  /**
+   * The sheet roads' two screen-wide moments, painted over the panels: the
+   * flash — the whole frame lit and let go on the expo curve, red for a
+   * miss and gold for a streak — and the "×N" of a streak, zooming in from
+   * far too big over the line that was right and leaving the way it came.
+   */
+  private drawSheetMoments(g: Ctx, fonts: ReturnType<typeof ensureFonts>): void {
+    const { vw, vh } = this.app.layout;
+    if (this.flash) {
+      const a = flashAlpha(this.t - this.flash.at, this.flash.life);
+      if (a > 0) {
+        g.globalAlpha = a * 0.6;
+        g.fillStyle = css(this.flash.color);
+        g.fillRect(0, 0, vw, vh);
+        g.globalAlpha = 1;
+      } else if (this.t - this.flash.at >= this.flash.life) {
+        this.flash = null;
+      }
+    }
+    if (this.sheetCombo) {
+      const hold = seconds("verdict");
+      const age = this.t - this.sheetCombo.at;
+      if (age > hold * 2.2) {
+        this.sheetCombo = null;
+        return;
+      }
+      const u = age / hold;
+      const { scale, alpha } = u < 1 ? zoomIn(u) : u < 1.6 ? { scale: 1, alpha: 1 } : zoomOut((u - 1.6) / 0.6);
+      const font = fonts.title;
+      const label = t("quest.sheetCombo", { n: this.sheetCombo.n });
+      const cx = this.sheetCombo.x;
+      const cy = this.sheetCombo.y;
+      g.save();
+      g.globalAlpha = alpha;
+      g.translate(cx, cy);
+      g.scale(scale, scale);
+      g.translate(-cx, -cy);
+      g.fillStyle = css(Theme.ink, 0.85);
+      for (const [ox, oy] of [
+        [-2, 0],
+        [2, 0],
+        [0, -2],
+        [0, 2],
+      ]) {
+        printf(g, font, label, cx - vw / 2 + ox, cy - font.height / 2 + oy, vw, "center");
+      }
+      g.fillStyle = css(this.sheetCombo.n >= 5 ? Theme.pink : Theme.coin);
+      printf(g, font, label, cx - vw / 2, cy - font.height / 2, vw, "center");
+      g.restore();
+      g.globalAlpha = 1;
+    }
+  }
+
+  /** The light a sheet road throws: BASIC's cyan and gold, ADVANCED's violet and pink. */
+  private sheetPalette(): SheetPalette {
+    return this.category === "cheatsheet_advanced" ? SHEET_ADVANCED : SHEET_BASIC;
+  }
+
+  private streakKey(): string {
+    return `${this.land}/${this.category}`;
+  }
+
+  /** First-try picks in a row on this road, this session. */
+  private sheetStreak(): number {
+    return SHEET_STREAK.get(this.streakKey()) ?? 0;
   }
 
   /**
@@ -2686,7 +2871,12 @@ export class QuestScene implements Scene {
       // The paper under the code — the playground's preference too.
       { id: "theme", label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark") },
       { id: "focus", label: t("quest.code") },
-    ].filter((i) => keep(i.id) && (!filtered || this.tools.keeps(i)));
+    ].filter(
+      (i) =>
+        keep(i.id) &&
+        (!filtered || this.tools.keeps(i)) &&
+        (!this.cheatsheet() || SHEET_TOOLS.has(i.id)),
+    );
   }
 
   private toolLabels(
@@ -2963,10 +3153,168 @@ export class QuestScene implements Scene {
     this.tools.draw(g, [x, y, filterW, Math.max(layout.minTouchH(), f.height + 20)], f);
   }
 
+  /** Whether this is a CHEATSHEET quest, where the pick is the answer. */
+  private cheatsheet(): boolean {
+    return isSheet(this.quest?.category ?? "");
+  }
+
+  /**
+   * CHEATSHEET: send the picked line as the submission. The server judges it
+   * against the quiz and records it like any verdict — a wrong pick costs a
+   * star, the right one clears the node and goes to the verdict screen.
+   */
+  private async answer(i: number): Promise<void> {
+    const q = this.quest;
+    if (!q?.quiz) return;
+    this.stage = "queued";
+    this.error = "";
+    try {
+      const res = await this.app.client.request("quest.submit", {
+        quest_id: q.id,
+        source: q.quiz.choices[i],
+        lang: this.lang,
+      });
+      this.stage = "idle";
+      if ("xp" in res) this.app.client.applyXp(res.xp);
+      if (res.attempt.verdict === "accepted") {
+        // The fireworks get their moment before the verdict screen takes
+        // over — and a player who has already left is not pulled back.
+        await new Promise((r) => setTimeout(r, reducedMotion() ? 150 : 1100));
+        if (this.gone) return;
+        this.showResult(res.attempt, "xp" in res ? res.xp : undefined);
+      } else {
+        // The server's word is final: a line this client took for right
+        // and the server did not leaves the four open.
+        this.quizRight = false;
+      }
+    } catch (e) {
+      this.stage = "idle";
+      // The pick did not reach a verdict, so it is not taken: the four are
+      // open again.
+      this.quizRight = false;
+      const dropped = e instanceof WireError && e.payload.detail.disconnected === true;
+      this.error = dropped
+        ? t("quest.dropped")
+        : e instanceof WireError
+          ? playerText(e.payload.code)
+          : t("quest.runFailed");
+    }
+  }
+
+  /**
+   * CHEATSHEET's moments, played the way a game plays them. A wrong line
+   * breaks into red brick and falls — the way a deleted line does in the
+   * editor — with a burst where the finger landed; the right one gets gold
+   * stars run round it, the street-cleared firework over its box, and coins
+   * up to the header. The plans are `engine/burst.ts`'s, painted by the
+   * same WebGL layer the editor's typing uses: there is no editor on this
+   * road, so the layer has the question to itself.
+   */
+  private sheetFx(verdict: "right" | "wrong", i: number): void {
+    const geom = this.choiceGeom[i];
+    if (!geom || !this.fx) return;
+    const [cw, ch] = geom.cell;
+    const [rx, ry, rw, rh] = geom.rect;
+    const centre: [number, number] = [rx + rw / 2, ry + rh / 2];
+    if (verdict === "wrong") {
+      const cells: Rubble[] = [];
+      for (const line of geom.lines) {
+        for (let k = 0; k < line.text.length; k++) {
+          if (line.text[k] === " ") continue;
+          cells.push({ x: line.x + k * cw, y: line.y, color: Theme.red });
+        }
+      }
+      this.fx.play(rubblePlan(cells, [cw, ch]));
+      this.spark(centre, 18, Theme.red, 0.8);
+      // The hit: the page jolts and the frame goes red for a beat.
+      this.jolt = Math.min(1, this.jolt + 0.7);
+      this.flash = { at: this.t, life: 0.35, color: Theme.red };
+      SHEET_STREAK.set(this.streakKey(), 0);
+      this.app.chip.fail();
+      return;
+    }
+    const palette = this.sheetPalette();
+    const first = geom.lines[0];
+    const last = geom.lines[geom.lines.length - 1];
+    if (first && last) {
+      const open: [number, number] = [first.x + cw / 2, first.y + ch / 2];
+      const close: [number, number] = [
+        last.x + Math.max(0.5, last.text.trimEnd().length - 0.5) * cw,
+        last.y + ch / 2,
+      ];
+      this.fx.play(loopPlan(open, close, [cw, ch]));
+      // The beam down each line of the choice, top line first.
+      for (let k = 0; k < geom.lines.length; k++) {
+        const line = geom.lines[k];
+        const span = Math.max(cw, line.text.trimEnd().length * cw);
+        const beam = beamPlan(line.x, line.y + ch / 2, line.x + span, [cw, ch], palette.glow);
+        for (const p of beam.particles) p.delay += k * 0.1;
+        for (const r of beam.rings) r.delay += k * 0.1;
+        this.fx.play(beam);
+      }
+    }
+    this.fx.play(shockPlan(centre[0], centre[1], Math.max(90, rw * 0.35), palette.trail));
+    // Gold all over for a first-try pick; the ordinary firework after a miss.
+    const firstTry = this.quizWrong === null;
+    this.fx.play(clearPlan({ x: rx, y: ry, w: rw, h: rh }, firstTry));
+    const [bx, by, bw] = this.briefRect;
+    this.fx.play(coinPlan(centre[0], centre[1], bx + bw - 24, by + 8, 10).plan);
+    // The streak: first-try picks in a row. Two is a fountain and a "×2";
+    // three lights the frame gold; the counter swells every time.
+    const streak = firstTry ? this.sheetStreak() + 1 : 0;
+    SHEET_STREAK.set(this.streakKey(), streak);
+    this.streakIn.restart();
+    if (streak >= 2) {
+      this.fx.play(comboPlan(centre[0], ry + rh, streak - 1));
+      this.sheetCombo = { at: this.t, n: streak, x: centre[0], y: Math.max(by + 40, ry - 24) };
+    }
+    if (streak >= 3) this.flash = { at: this.t, life: 0.3, color: Theme.coin };
+  }
+
+  /**
+   * The pointer over a CHEATSHEET quest: the thread of light it leaves on
+   * the code page, here over the question, and a run of sparks along a
+   * line the moment it comes under the cursor.
+   */
+  private sheetPointer(x: number, y: number, was: string | null): void {
+    if (!this.fx || reducedMotion()) return;
+    const now = this.t;
+    const last = this.pointerLast;
+    this.pointerLast = { x, y, t: now };
+    if (last) {
+      const dt = Math.max(1 / 120, now - last.t);
+      const dx = x - last.x;
+      const dy = y - last.y;
+      if (Math.hypot(dx, dy) >= 3) {
+        this.fx.play(lightTrailPlan(x, y, dx / dt, dy / dt, this.sheetPalette()));
+      }
+    }
+    const hovered = this.choiceBtns.hovered;
+    if (hovered === was || !hovered?.startsWith("choice:") || this.quizRight) return;
+    const geom = this.choiceGeom[Number(hovered.slice(7))];
+    const line = geom?.lines[0];
+    if (!geom || !line) return;
+    const [cw, ch] = geom.cell;
+    const span = line.text.trimEnd().length * cw;
+    const mid = line.y + ch / 2;
+    this.fx.play(fillPlan(line.x, mid, line.x + span, mid, [cw, ch], this.sheetPalette().glow));
+  }
+
   /** One of the four, chosen. */
   private pick(i: number): void {
+    if (this.cheatsheet() && this.stage !== "idle") return;
     const verdict = quizPick(this.quest?.quiz, i, this.quizRight);
     if (verdict === "ignored") return;
+    if (this.cheatsheet()) {
+      this.sheetFx(verdict, i);
+      void this.answer(i);
+    }
+    if (verdict === "right" && this.cheatsheet()) {
+      this.quizRight = true;
+      this.quizWrong = null;
+      this.app.chip.coin();
+      return;
+    }
     if (verdict === "right") {
       this.quizRight = true;
       this.quizWrong = null;
@@ -3006,12 +3354,35 @@ export class QuestScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      this.quizRight ? t("quest.quizRight") : t("quest.quizPick"),
+      this.cheatsheet()
+        ? this.quizRight
+          ? t("quest.sheetRight")
+          : t("quest.sheetPick")
+        : this.quizRight
+          ? t("quest.quizRight")
+          : t("quest.quizPick"),
       x,
       yy,
       w,
       "left",
     );
+    const streak = this.cheatsheet() ? this.sheetStreak() : 0;
+    if (streak > 0) {
+      // The streak, beside the label: it swells as it grows, and goes pink
+      // past five so a long run reads as a different thing from a short one.
+      const swell = 1 + 0.6 * (1 - this.streakIn.out);
+      const label = t("quest.sheetStreak", { n: streak });
+      const lw = width(fonts.stationSm, label);
+      const cx = x + w - lw / 2;
+      const cy = yy + fonts.stationSm.height / 2;
+      g.save();
+      g.translate(cx, cy);
+      g.scale(swell, swell);
+      g.translate(-cx, -cy);
+      g.fillStyle = css(streak >= 5 ? Theme.pink : Theme.coin);
+      printf(g, fonts.stationSm, label, x, yy, w, "right");
+      g.restore();
+    }
     yy += fonts.stationSm.height + Math.round(6 * s);
     const gap = Math.round(6 * s);
     for (let i = 0; i < quiz.choices.length; i++) {
@@ -3021,6 +3392,14 @@ export class QuestScene implements Scene {
       const right = this.quizRight && i === quiz.answer;
       const wrong = this.quizWrong === i && this.t - this.quizWrongAt < 0.9;
       const hover = this.choiceBtns.hovered === `choice:${i}` && !this.quizRight;
+      // On a sheet road the line deals in from the right and settles; its
+      // hit box is where it settles, so a quick key is never a miss.
+      const arrive = this.choiceIn[i];
+      const dealt = arrive ? Math.round(slideIn(arrive, 48 * s)) : 0;
+      const home = x;
+      x = home + dealt;
+      g.save();
+      if (arrive) g.globalAlpha = Math.min(1, 0.15 + arrive.out);
       fill(g, Theme.ink, x, yy, w, h, 0.9);
       fill(
         g,
@@ -3043,10 +3422,21 @@ export class QuestScene implements Scene {
       );
       g.fillStyle = css(this.quizRight && !right ? Theme.dim : Theme.cream);
       let cy = yy + Math.round(6 * s);
+      const drawn: { x: number; y: number; text: string }[] = [];
       for (const line of lines) {
         printf(g, fonts.code, line, x + Math.round(28 * s), cy, w - Math.round(34 * s), "left");
+        drawn.push({ x: x + Math.round(28 * s), y: cy, text: line });
         cy += fonts.code.height;
       }
+      if (this.cheatsheet()) {
+        this.choiceGeom[i] = {
+          rect: [x, yy, w, h],
+          lines: drawn,
+          cell: [Math.max(1, width(fonts.code, "M")), fonts.code.height],
+        };
+      }
+      g.restore();
+      x = home;
       // The hit box is the visible part: the brief scrolls, and a choice
       // scrolled out of the panel must not take a tap meant for the well.
       const box = visibleBox([x, yy, w, h], clip);

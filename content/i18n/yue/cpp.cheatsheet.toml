@@ -1,0 +1,387 @@
+# C++ LAND — CHEATSHEET, in Cantonese. A translation pack (SPEC §12.1): the
+# prose of `content/cpp/cheatsheet.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code, live in the English
+# pack, and are never translated. Code blocks, identifiers and printed
+# strings are copied verbatim.
+
+pack   = "cpp.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet.01.fast-io"
+title = "開閘"
+story = "06:00，避風塘。一百萬行魚價一齊湧入嚟，預設嘅 stream 太有禮貌，追唔切。"
+brief = '''
+喺 `main` 第一句、未做任何輸入輸出之前：叫 `cin`/`cout` 唔好再同 C 嘅 stdio 同步，再將 `cin` 同 `cout` 鬆綁，咁每次讀嘢都唔會 flush 輸出。
+
+係邊一行？
+'''
+hints = [
+  "熄同步用 `false`；`tie` 收嘅係要 flush 嗰個 stream 嘅指標，`nullptr` 即係冇。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet.02.getline"
+title = "連空格一齊"
+story = "送貨單上面個地址係 'Flat 7, 32 Percival Street'——入面每個空格都有用。"
+brief = '''
+`std::string line;`——將輸入嘅**成行**連埋空格讀入去。
+'''
+hints = [
+  "`>>` 一撞到空白就停。呢個自由函數先收 stream，再收字串。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet.03.fixed"
+title = "兩個位"
+story = "軒尼詩道間找換店，每個匯率都啱啱好顯示到小數點後兩個位。"
+brief = '''
+`double x = 3.14159;`，`<iomanip>` 已經 include 咗。印 `3.14` 出嚟——**小數點後**啱啱好兩個位。
+'''
+hints = [
+  "淨係用 `setprecision` 數嘅係有效數字。加埋 `std::fixed` 先至數小數位。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet.04.long-long"
+title = "闊啲嘅乘積"
+story = "銅鑼灣拍賣行，兩口十億蚊嘅出價乘埋一齊。int 裝唔落個答案。"
+brief = '''
+`int a, b;` 每個最大 10^9。將 `a` 乘 `b` 擺入 `p`，唔可以溢出。
+'''
+hints = [
+  "乘數係用運算元嘅類型計。要喺 `*` 之前將其中一個整闊，唔係之後。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet.05.range-for"
+title = "寫返入去"
+story = "崇光機舖嘅雙倍分數夜。要改嘅係計分板上面嘅分數本身，唔係佢個副本。"
+brief = '''
+將 `std::vector<int> v` 每個元素**就地**變兩倍。
+'''
+hints = [
+  "`auto x` 係每個元素嘅副本。想改個 vector 本身，就要用 reference。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet.06.grid"
+title = "樓層圖"
+story = "皇室堡，一層一層、一間一間：一張 n×m 嘅圖，每個舖位都吉嘅。"
+brief = '''
+`n` 同 `m` 係行緊先讀入嚟。整個 `g`：一個 `int` 嘅 `n`×`m` 格仔，每格都係 `0`，可以用 `g[i][j]` 攞。
+'''
+hints = [
+  "constructor 第二個參數係 `n` 行入面每一行嘅初始值——所以俾佢成行。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet.07.desc"
+title = "大嘅行先"
+story = "百德新街個租金牌，將最貴嗰間舖擺喺最頂。"
+brief = '''
+`std::vector<int> v` 入面嘅數字冇特定次序。將佢由大排到細（**降序**）。
+'''
+hints = [
+  "預設係升序；`sort` 第三個參數可以將次序反轉——排完再反轉就係多走一次。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet.08.count"
+title = "點數"
+story = "茶餐廳逐枱數奶茶，新開嗰枱由零計起。"
+brief = '''
+`std::unordered_map<std::string, int> cnt;`——幫個字 `w` 嘅數加一。未見過嘅字由 0 開始。
+'''
+hints = [
+  "`operator[]` 會用值初始化嘅 `int`（即係 0）塞入冇嘅 key。`at` 就會掟 exception。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet.09.find"
+title = "淨係睇"
+story = "利園大堂個看更對訪客名單。佢唔准喺上面寫嘢。"
+brief = '''
+`m` 係 `std::map<std::string, int>`。睇吓 key `k` 喺唔喺度——**唔好**將佢加入個 map。
+'''
+hints = [
+  "key 唔存在嘅時候，`m[k]` 會塞個預設值入去。`find` 就會俾返 `end()`。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet.10.min-heap"
+title = "細嘅喺頂"
+story = "登龍街個小巴站，最短嗰程最先開。priority_queue 淨係識將最大嗰個擺喺頂。"
+brief = '''
+`std::priority_queue` 預設會先 pop **最大**嗰個。宣告 `pq`，等 `pq.top()` 係**最細**嘅 `int`。
+'''
+hints = [
+  "template 有三個參數：類型、容器，跟住先至係比較器。中間嗰個唔可以跳過。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet.11.erase-remove"
+title = "掃走啲零"
+story = "渣甸坊啲檔口收檔。吉箱搬走，嗰行就短咗。"
+brief = '''
+喺 `std::vector<int> v` 刪走所有 `0`，等 `v.size()` 變細。
+'''
+hints = [
+  "`std::remove` 淨係將要留低嘅搬去前面，再俾返個新結尾；跟住要將嗰度去到舊結尾成段 `erase` 走。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet.12.stoi"
+title = "壞咗嘅數字"
+story = "7-32 號房本數簿有一格寫住 'abc'。parser 掟咗 exception，總要有人接住佢。"
+brief = '''
+`std::string s` 可能係 `"abc"`，咁 `std::stoi` 就會掟 exception。將 `int n` 設做 parse 到嘅值；如果 `s` 唔係數字，就設做 `-1`。
+'''
+hints = [
+  "`catch` 淨係接到掟出嚟嗰個類型。冇數字嘅時候，`stoi` 掟嘅係 `std::invalid_argument`。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet.13.words"
+title = "逐個字"
+story = "午炮嘅紀錄行寫住 'fired   12:00  Jardine'——而字同字之間嘅空隙唔一定係一個空格咁闊。"
+brief = '''
+`std::string line` 入面啲字係用**一個或以上**空格分開嘅。`<sstream>` 已經 include 咗，`std::string w;` 同 `std::vector<std::string> words;` 都宣告咗。將每個字順序 push 入 `words`，入面唔可以有空字串。
+'''
+hints = [
+  "喺 string stream 上面用 `>>`，每個字前面嗰段空白會跳過，去到下一段就停——用分隔符嘅讀法乜都唔會跳。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet.14.capture"
+title = "累計總數"
+story = "避風塘隻舢舨渡輪得一個錢箱，每次上船嘅錢都要落入嗰個箱——唔係佢嘅影印本。"
+brief = '''
+`int total = 0;` 係 `main` 入面嘅 local。定義 `add`，令 `add(5);` 將 `5` 加落**嗰個 `total` 本身**——之後 `total` 讀出嚟係 `5`。
+'''
+hints = [
+  "Lambda 唔會見到出面任何嘢，除非個方括號有講；而 copy capture 係唯讀嘅，除非你另外要求——就算咁都只係一個副本。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet.15.bindings"
+title = "key 同 value，叫埋個名"
+story = "怡和街租金檢討：本數簿每間舖都加一，而要改嘅係本數簿本身。"
+brief = '''
+`std::map<std::string, int> m;`——將 **`m` 入面存住嘅每一個 value** 加 `1`，直接喺 loop 頭度將 key 叫做 `k`、value 叫做 `v`（唔用 `.first` 或者 `.second`）。
+'''
+hints = [
+  "方括號會將每一對拆做兩個名。嗰兩個名係指住個 map 自己嗰對，定係佢嘅副本，就睇佢哋前面寫咗啲乜。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet.16.sort-by"
+title = "第二個排先"
+story = "遊艇會滑道絞盤嘅紀錄，每個船身號碼配一個船長嘅名，而港務主任要按船長排字母次序。"
+brief = '''
+`std::vector<std::pair<int, std::string>> v;`——下面啲行係 `std::sort(v.begin(), v.end(), …)` 嘅第三個參數。揀出按**字串**由 A 到 Z 排 `v` 嗰個。
+'''
+hints = [
+  "比較器答嘅只係一個問題——`a` 係咪排喺 `b` 前面？——針對你關心嗰個 member，用嚴格嘅 `<`。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet.17.ordering"
+title = "set 入面一個位"
+story = "避風塘每隻舢舨都係一個 (row, column) 泊位，港務處用一個 std::set 嚟記——排唔到次序嘅佢一律唔收。"
+brief = '''
+```cpp
+struct Pt { int r, c; };
+std::set<Pt> taken;
+```
+
+呢段暫時 compile 唔到。喺 `Pt` 入面加**一個 member**，令 `taken` 用得，而且先按 `r` 排，`r` 一樣就按 `c` 分勝負。C++20，`<tuple>` 已經 include 咗。
+'''
+hints = [
+  "個 set 比較嘅係 `const` 元素，而字典序即係第一個 field 打和嗰陣，第二個 field 先至有份。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet.18.optional"
+title = "可能係個數"
+story = "維園噴水池底下個泵房會報一個壓力讀數，感應器拔咗嘅話就乜都冇——而個顯示屏遇到冇嘢絕對唔可以死機。"
+brief = '''
+`std::optional<int> r = read_sensor();`——將 `int n` 設做個讀數，`r` 冇嘢嘅話就設做 `-1`。唔可以掟任何 exception。
+'''
+hints = [
+  "optional 唔係數字，所以佢唔可以同數字一齊坐喺 `?:` 入面。佢其中一個 member 會收個後備值做參數。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet.19.lower-bound"
+title = "應該擺喺邊"
+story = "怡和街電車站塊牌順序列出開車嘅分鐘，問題係下一班車入邊一格。"
+brief = '''
+`std::vector<int> v` 升序排好，`int x` 已經俾咗。將 `int i` 設做**第一個唔細過** `x` 嘅元素嘅 index——所以每個元素都細過 `x` 嗰陣 `i` 等於 `v.size()`，而 `x` 有出現嗰陣佢就係 `x` 第一次出現嘅 index。
+'''
+hints = [
+  "個算法交返嘅係 iterator，唔係數字；iterator 減個開頭就係距離。仲要留意係邊個 bound：另一個會跳過所有 `x`。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet.20.wide-sum"
+title = "溢出咗嘅總和"
+story = "正午，炮一響，隧道收費機將二十萬個每個高達十億嘅車費加埋——一個從來冇 int 裝得落嘅總數。"
+brief = '''
+`std::vector<int> v` 有 2·10^5 個元素，每個最大 10^9，`<numeric>` 已經 include 咗。將**準確**嘅總和存入 `long long s`。
+'''
+hints = [
+  "累計值嘅類型係跟初始值嘅，唔係跟 `s` 嘅——每一次相加都係喺嗰個類型度做，之後先存落去。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet.21.push-back"
+title = "疊多一箱"
+story = "渣甸街個檔口後面落多咗一箱貨，而嗰排箱係一個要長多一個嘅 vector。"
+brief = '''
+`std::vector<int> v;` 同 `int x;`——將 `x` 加到 `v` 嘅**尾**，令 `v.size()` 大一而
+`v.back()` 係 `x`。
+'''
+hints = [
+  "vector 淨係喺一頭生長，而做呢件事嗰個 member 個名會講明係邊一頭——淨係 `append` 同 `push` 係其他語言嘅字。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet.22.queue-pop"
+title = "下一個"
+story = "登龍街嘅小巴隊：排最前嗰個上車，條隊就短咗一個。"
+brief = '''
+`std::queue<int> q;` 唔係空嘅。將**最前**嗰個元素存入 `int x` **並且將佢由 `q` 移走**，
+令 `q.size()` 減一。
+'''
+hints = [
+  "喺標準容器入面，移走同讀取係兩個唔同嘅 member——負責移走嗰個乜都唔交返。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet.23.reverse"
+title = "由尾到頭"
+story = "電車喺銅鑼灣總站掉頭，而佢啱啱行過嘅站表要倒轉嚟讀。"
+brief = '''
+`std::vector<int> v` 裝住 `3, 1, 2`。**就地**倒轉佢，令佢讀出嚟係 `2, 1, 3`。
+`<algorithm>` 已經 include 咗。
+'''
+hints = [
+  "`vector` 冇呢個 member；個算法收一對 iterator。而對住 reverse iterator 排序係排序——佢唔會將次序倒轉。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet.24.copy"
+title = "副本，唔係窗口"
+story = "利園大堂幫夜更保安多印一張訪客名單，而佢喺自己嗰張上面塗乜都絕對唔可以出現喺日更嗰張度。"
+brief = '''
+`std::vector<int> a{1, 2};`——整 `b` 做 `a` 嘅一個**獨立**副本，令 `b.push_back(3);` 之後
+`a` 仍然有 2 個元素而 `b` 有 3 個。
+'''
+hints = [
+  "vector 用普通 assign 就會複製自己。宣告入面加個 `&` 係幫同一個 vector 改多一個名，而 `std::move` 會將你 move 出嚟嗰個清空。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet.25.digit"
+title = "char 背後嘅數字"
+story = "溫莎公爵大廈道門上面油住嘅舖號係個 '7'，而部𨋢控制器要嘅係數字七，唔係嗰個字形嘅代碼。"
+brief = '''
+`char c = '7';`——將 `int d` 設做數字 `7`（唔係 `55`，嗰個係個字元嘅代碼）。
+'''
+hints = [
+  "char 本身已經係一個細整數，所以 cast 淨係幫個代碼改個名。啲數字喺個表入面係排埋一齊嘅——減走佢哋開始嗰個。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet.26.real-division"
+title = "半蚊"
+story = "軒尼詩道間找換店七蚊兩個人分係三個半——除非部收銀機係當 int 咁除。"
+brief = '''
+`int a = 7, b = 2;`——將 `double q` 設做 `3.5`。
+'''
+hints = [
+  "除法係喺運算元嘅 type 度做嘅，之後先存落去或者轉型。要擴闊嘅係運算元，唔係結果。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet.27.max-mixed"
+title = "兩種入面大嗰個"
+story = "百德新街塊租金牌，一間舖係整數蚊，隔籬嗰間就帶個半——而佢要嗰對入面高嗰個。"
+brief = '''
+`int a = 2; double b = 2.5;`——將 `double m` 設做兩個入面大嗰個，令 `m` 係 `2.5`。
+`<algorithm>` 已經 include 咗。
+'''
+hints = [
+  "`std::max` 係一個得一個 type 參數嘅 template，兩個參數唔一致嗰陣佢係唔肯估嘅。話俾佢聽個 type——留得住個半嗰個。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet.28.enum-class"
+title = "邊條線"
+story = "銅鑼灣站個港鐵板會講出各條線嘅名，而月台嘅程式想問其中一條，但唔想將佢串做一個數字。"
+brief = '''
+```cpp
+enum class Line { Island, TsuenWan };
+Line l = read_line();
+```
+
+開一個 `if`，淨係 `l` 係個 enum 第一個 case 嗰陣先會行入去。
+'''
+hints = [
+  "有 scope 嘅 enum 將啲名放喺 enum 入面，而且佢唔會自己變做 `int` 或者字串。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet.29.substr"
+title = "中間嗰個字"
+story = "送貨單上面個地址寫住 'Causeway Bay, HK'，而速遞員淨係想要由第十個字元開始嗰個字。"
+brief = '''
+`std::string s = "Causeway Bay, HK";`——將 `std::string t` 設做 `"Bay"`，即係由 index `9`
+開始嘅三個字元。
+'''
+hints = [
+  "第二個參數唔係塊嘢完結嘅位置。交個結尾 index 俾佢，你會攞到由嗰度去到成句尾嘅全部嘢。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet.30.positive-mod"
+title = "兜到負數嘅環"
+story = "午炮個 ring buffer 得三個格，由零號格倒退七步一定要落喺二號格——唔係負一號格，嗰度隻鴨嘴獸已經坐咗成個朝早。"
+brief = '''
+`int x, m;`，`m > 0`；`x` 可以係**任何** `int`，包括 `-7` 或者 `-100`。將 `int r` 設做 `x`
+除以 `m` 嘅餘數，範圍係 `0..m-1`——`x = -7, m = 3` 嘅話就係 `2`。
+'''
+hints = [
+  "喺 C++ 入面 `%` 嘅符號跟被除數，所以負數 `x` 會得出負數餘數——差一步先到啱嘅格。加一次 `m` 唔係對每個 `x` 都夠；加完再取一次餘。",
+]

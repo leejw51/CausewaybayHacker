@@ -1,0 +1,387 @@
+# TYPESCRIPT LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/cheatsheet.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live
+# in the English pack, and are never translated. Code blocks, identifiers
+# and printed strings are copied verbatim.
+
+pack   = "typescript.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet.01.read-all"
+title = "CELÝ PŘENOS"
+story = "19:00 nad Times Square. Přenos pro velkou obrazovku dorazí naráz a chce ho celý."
+brief = '''
+V Node načtěte **celý** standardní vstup do `input` jako jeden `string`.
+'''
+hints = [
+  "Deskriptor souboru 0 je stdin. Bez kódování dostanete Buffer, ne řetězec.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet.02.lines"
+title = "ŽÁDNÝ PŘÍZRAČNÝ ŘÁDEK"
+story = "Světelný pás na Yee Wo Street končí každou zprávu zalomením řádku a poslední řádek je vždy prázdný."
+brief = '''
+`input` končí znakem nového řádku. Rozdělte ho do `lines` tak, aby na konci **nebyl** prázdný řetězec.
+'''
+hints = [
+  "Rozdělení `\"a\\nb\\n\"` podle nového řádku dá tři části, poslední prázdnou. Nejdřív trim.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet.03.numbers"
+title = "SLOVA NA ČÍSLA"
+story = "Stánek s loterií na Lockhart Road čte vítězná čísla z proužku textu."
+brief = '''
+`lines[1]` je `"3 1 2"`. Který řádek dá `nums` jako `number[]` `[3, 1, 2]`?
+'''
+hints = [
+  "`map` předává jako druhý argument index a `parseInt` ho bere jako základ soustavy. `Number` bere jediný argument.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet.04.to-fixed"
+title = "DVĚ MÍSTA"
+story = "Směnárna na Hennessy Road ukazuje každý kurz přesně na dvě desetinná místa."
+brief = '''
+`const x = 3.14159;` Vypište `3.14` — přesně dvě číslice **za desetinnou tečkou**.
+'''
+hints = [
+  "`toPrecision` počítá platné číslice; desetinná místa počítá ta druhá metoda.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet.05.floor-div"
+title = "ŽÁDNÉ PŮL LÍSTKY"
+story = "Sedm tramvajových žetonů pro dva cestující. Nikdo nedostane půl žetonu."
+brief = '''
+`a = 7`, `b = 2`, obě nezáporná celá čísla. `q` musí být `3` — celočíselné dělení.
+'''
+hints = [
+  "Každé number je s plovoucí čárkou: `/` dá 3.5. Zaokrouhlete dolů.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet.06.for-of"
+title = "HODNOTY, NE KLÍČE"
+story = "Vývěsní štíty podél Great George Street, čtené jeden po druhém — jména, ne čísla domů."
+brief = '''
+Začněte cyklus přes **hodnoty** (ne indexy) pole `arr: number[]`.
+'''
+hints = [
+  "`in` prochází klíče — indexy jako řetězce. `of` prochází hodnoty.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet.07.sort"
+title = "DESET PO DEVÍTCE"
+story = "Pořadové lístky u pultu v Sogu: 10 přijde po 9, ať si abeceda říká co chce."
+brief = '''
+`arr: number[]` obsahuje `[10, 9, 1]`. Seřaďte ho **vzestupně podle hodnoty**, na místě.
+'''
+hints = [
+  "Bez komparátoru `sort` porovnává řetězce, takže \"10\" < \"9\". Komparátor vrací číslo: záporné nechá `a` vpředu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet.08.count"
+title = "ČÁRKOVÁNÍ"
+story = "Dai pai dong počítá objednávky podle jídla a nové jídlo začíná od nuly."
+brief = '''
+`m: Map<string, number>`. Přičtěte jedničku k počtu pro klíč `w`; pokud tam ještě není, začněte od 0. `strict` je zapnutý.
+'''
+hints = [
+  "`get` vrací `number | undefined`. Chybějícímu případu dejte výchozí hodnotu přes `??`.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet.09.grid"
+title = "PŮDORYS"
+story = "Windsor House, patro po patře, obchod po obchodu: plán n krát m, každá jednotka prázdná — a každé patro samo za sebe."
+brief = '''
+Vytvořte `g`, mřížku nul `n` krát `m`, ve které zápis `g[0][0] = 1` změní **jen** tu jednu buňku.
+'''
+hints = [
+  "`fill` s polem vloží do každé pozice totéž pole. Pro každý index postavte nový řádek.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet.10.heap-parent"
+title = "KDO JE NAHOŘE"
+story = "Ve standardní knihovně žádná halda není, takže fronta na minibus si vede vlastní — v obyčejném poli."
+brief = '''
+Binární halda žije v poli `h` indexovaném od 0: potomci indexu `p` jsou `2*p + 1` a `2*p + 2`. Který řádek dá pro `i > 0` rodiče `i`?
+'''
+hints = [
+  "Obraťte vzorec pro potomka: odečtěte jedna, pak vydělte dvěma a zaokrouhlete dolů. Zkuste `i = 2`.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet.11.char-code"
+title = "A JE NULA"
+story = "Poštovní schránky v hale Causeway Bay Plaza jsou očíslované písmeny a až z, od nuly."
+brief = '''
+`s` je celé malými písmeny. Převeďte písmeno na indexu `i` na `k` v rozsahu 0..25, kde `'a'` je 0.
+'''
+hints = [
+  "Řetězce se odečítat nedají. Nejdřív získejte kód znaku jako číslo; 'a' je 97.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet.12.unknown-catch"
+title = "NEZNÁMÝ THROW"
+story = "Přenos, který přichází před půlnocí, něco vyhodí. Nikdo neslíbil, že je to Error."
+brief = '''
+Při `strict` má `e` v `catch (e) { … }` typ `unknown`. Vypište jeho `message` tak, aby to šlo přeložit a nikdy to nespadlo.
+'''
+hints = [
+  "Z `unknown` nelze číst vlastnosti. Nejdřív ho zužte kontrolou za běhu.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet.13.map-entries"
+title = "KLÍČ A POČET"
+story = "Čárkování v dai pai dongu je hotové; teď si ho majitel čte zpátky, jídlo po jídle, s počtem vedle."
+brief = '''
+`m: Map<string, number>`. Otevřete smyčku, která navštíví **každou** dvojici v `m`,
+s klíčem v `k` a hodnotou ve `v`.
+'''
+hints = [
+  "Map se iteruje po dvojicích — každou destrukturujte. `Object.entries` vidí jen vlastní vlastnosti a Map žádné nemá.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet.14.head-tail"
+title = "HLAVA A OCAS"
+story = "První autobus ve frontě na Jardine's Bazaar jede hned; všichni za ním čekají pohromadě."
+brief = '''
+`a: number[]` je `[5, 6, 7]`. V jedné deklaraci udělejte z `first` číslo
+`5` a z `rest` `number[]` `[6, 7]`.
+'''
+hints = [
+  "Destrukturujte hranatými závorkami. Ocas se sbírá třemi tečkami, ne dvěma, a ne hvězdičkou.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet.15.zero-is-a-value"
+title = "NULA JE HODNOTA"
+story = "Patro 0 v Hysan Place je skutečné patro. Panel výtahu vás nesmí poslat na výchozí."
+brief = '''
+`x: number | undefined`. Ať se `d` rovná `x`, když je `x` definované — **i
+když je `x` rovno `0`** — a `10` jen tehdy, když je `x` `undefined`.
+'''
+hints = [
+  "`0` je falsy, takže cokoli, co se ptá \"je to truthy?\", nulu zahodí. Ptejte se místo toho \"je to null nebo undefined?\".",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet.16.await-all"
+title = "VŠECHNO NAJEDNOU"
+story = "Šest rozvozových kurýrů vyjelo ze Sugar Street společně. Kuchyně čeká na všech šest, ne na jednoho po druhém."
+brief = '''
+Uvnitř `async` funkce, `ps: Promise<number>[]`. Udělejte z `rs`
+`number[]` všech výsledků a počkejte na všechny společně.
+'''
+hints = [
+  "Await na poli vám dá totéž pole promisů. Nejdřív je spojte do jednoho promisu a pak awaitujte ten.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet.17.param-property"
+title = "TŘÍDA NA JEDEN ŘÁDEK"
+story = "Polední salva se staví jednou, s pevně daným kalibrem, a nikdo mimo baterii to nastavení nečte."
+brief = '''
+`class P { … }` nemá v těle nic než jeden řádek konstruktoru. Bere
+`x: number` a ukládá ho jako pole `x`, které je **privátní** (čtení
+`p.x` mimo třídu je chyba překladu) a **jen pro čtení** (pozdější přiřazení
+do `this.x` je chyba překladu). `strict` je zapnutý.
+'''
+hints = [
+  "Modifikátor na parametru konstruktoru pole deklaruje a přiřadí. Modifikátor přístupu stojí před tím pro čtení.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet.18.typeof-narrow"
+title = "JE TO ŘETĚZEC"
+story = "Cedule na Paterson Street je někdy jméno a někdy číslo. Jen jméno se vykřikne velkými písmeny."
+brief = '''
+`v: string | number`, `strict` zapnutý. Otevřete `if`, uvnitř kterého se
+`v.toUpperCase()` přeloží.
+'''
+hints = [
+  "Primitivní hodnota není instancí ničeho. Běhová kontrola, která primitivní hodnotu zúží, porovnává s řetězcem malými písmeny.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet.19.bigint"
+title = "ZA BEZPEČNOU HRANICÍ"
+story = "Tajfunové přístaviště v Causeway Bay počítá každou vlnu od roku 1883. Float ztratil přehled už dávno."
+brief = '''
+`target` je ES2022. Udělejte z `big` `bigint` obsahující přesně
+`9223372036854775807` — tedy 2 na 63. minus jedna.
+'''
+hints = [
+  "`number` je 64bitový float: nad 2^53 zaokrouhluje a pozdější převod zaokrouhlení zachová. Každý operand potřebuje `n`.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet.20.toward-zero"
+title = "SMĚREM K NULE"
+story = "Půlnoc na mýtnici Cross-Harbour Tunnelu: vratka osmi dolarů dělená na tři a céčkař v budce zaokrouhluje k nule."
+brief = '''
+`a = -8`, `b = 3`, obě celá čísla. `q` musí být `-2` — podíl zaokrouhlený
+**směrem k nule**, tak jak `/` funguje na celých číslech v C, Go a Rustu.
+'''
+hints = [
+  "Zaokrouhlení dolů i na nejbližší tu obě skončí na -3. Chcete useknout zlomek, ať je znaménko jakékoli.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet.21.push"
+title = "KONEC FRONTY"
+story = "Do fronty na minibus na Tang Lung Street se přidá další cestující — na konec, kam se cestující přidávají."
+brief = '''
+`a: number[]`, `x: number`. Přidejte `x` na **konec** `a`, na místě, aby `a`
+bylo potom o prvek delší. `strict` je zapnutý.
+'''
+hints = [
+  "`concat` postaví nové pole a `a` nechá být. Metoda na místě vrací novou délku, ne pole — nepřiřazujte ji zpátky.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet.22.inclusive-loop"
+title = "JEDNA AŽ DESET"
+story = "Výtah v Lee Garden staví v každém patře od 1 do 10 a desáté není nepovinné."
+brief = '''
+Otevřete smyčku, jejíž tělo běží pro `i = 1, 2, … 10` — **desetkrát**, s `10`
+včetně. `i` není deklarováno nikde jinde. `strict` je zapnutý.
+'''
+hints = [
+  "Deklarujte čítač něčím, co se smí měnit, a porovnávejte tak, aby poslední hodnota ještě prošla.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet.23.add-function"
+title = "DVĚ ČÍSLA DOVNITŘ"
+story = "Směnárna na Hennessy Road sčítá dvě částky; pod strict chce taky vědět, jaký druh částek."
+brief = '''
+Definujte `add` tak, aby `add(2, 3)` bylo `5` a soubor se přeložil pod `strict`
+(`noImplicitAny` je zapnutý).
+'''
+hints = [
+  "Netypovaný parametr je implicitní `any`, který strict odmítá. Tělo bez `return` dá `undefined`.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet.24.join"
+title = "LEPIDLO"
+story = "Hlasatel v Sogu čte vítězné stánky nahlas: mezi každým jménem jedna mezera a žádné čárky."
+brief = '''
+`xs: string[]` je `["a", "b", "c"]`. Vypište `a b c` — prvky oddělené
+**jednou mezerou**.
+'''
+hints = [
+  "Metoda je na poli, ne na oddělovači — a zavolaná bez argumentu dává jako oddělovač čárku.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet.25.empty-check"
+title = "NIKDO VE FRONTĚ"
+story = "Autobusová zastávka Jardine's Bazaar ve 03:00. Čeká někdo? Prázdná fronta je pořád fronta."
+brief = '''
+`a: number[]`. Otevřete `if`, do kterého se vstoupí **jen** tehdy, když `a` nemá žádné
+prvky. `strict` je zapnutý.
+'''
+hints = [
+  "Prázdné pole je pravdivé a dvě pole si nikdy nejsou `===`. Porovnejte to jedno číslo, které říká kolik.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet.26.max-of-array"
+title = "NEJVYŠŠÍ"
+story = "Z věží podél Gloucester Road chce úředník tu nejvyšší — ze seznamu, ne z dvojice."
+brief = '''
+`arr: number[]` je `[3, 9, 2]` (krátké pole). Udělejte z `m` číslo `9`.
+'''
+hints = [
+  "`Math.max` bere čísla po jednom, ne pole — podat mu pole je chyba překladu. Rozbalte pole na samostatné argumenty.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet.27.copy"
+title = "VLASTNÍ KOPIE"
+story = "Seznam lístků z Times Square se kopíruje pro noční směnu; změna na jednom seznamu se nesmí objevit na druhém."
+brief = '''
+`a: number[]`. Udělejte z `b` **samostatné** pole se stejnými prvky, aby
+`b[0] = 9` potom nechalo `a` beze změny.
+'''
+hints = [
+  "Přiřazení pole kopíruje referenci, ne prvky. `Array(a)` udělá nové pole s `a` jako jeho jediným prvkem.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet.28.reverse-string"
+title = "POZPÁTKU"
+story = "Neon na Percival Street, čtený odzadu z horní paluby tramvaje."
+brief = '''
+`s` je `"abc"`. Udělejte z `r` **řetězec** `"cba"`.
+'''
+hints = [
+  "Řetězce nemají `reverse`; pole ano. Přejděte na pole a zpět — a pozor, co `join` dá mezi kusy, když mu nedáte nic.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet.29.queue-front"
+title = "ČELO FRONTY"
+story = "BFS ven z Victoria Parku: první zastávka, která přišla, jde první ven, a frontu opouští."
+brief = '''
+`q: number[]` je `[1, 2, 3]`, používané jako fronta FIFO. **Odeberte** přední položku
+a dejte ji do `x` — aby `x` bylo `1` a `q` zůstalo jako `[2, 3]`.
+'''
+hints = [
+  "`pop` bere z konce a indexování čte bez odebrání. Metoda, která bere zepředu, posune všechno ostatní o místo dolů.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet.30.wrap-modulo"
+title = "PŘETOČENÍ"
+story = "Znovu půlnoc na mýtnici Cross-Harbour Tunnelu: sedm dolarů v mínusu, tři pruhy a index pruhu musí být pořád 0, 1 nebo 2."
+brief = '''
+`b = 3`. `a` je celé číslo, které může být `-7`, `0` nebo `4`. Udělejte z `r`
+matematický zbytek — vždy v `0..b-1`, aby `-7` dalo `2`, `0` dalo
+`0` a `4` dalo `1`.
+'''
+hints = [
+  "`%` si nechává znaménko levého operandu, takže jedno `%` dá pro -7 hodnotu -1. Přičtení `b` spraví záporná a rozbije `0` i kladná; udělejte s tím něco.",
+]

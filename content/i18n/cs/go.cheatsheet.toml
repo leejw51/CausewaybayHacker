@@ -1,0 +1,455 @@
+# GO LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/go/cheatsheet.toml`, quest by quest, and nothing else. The four
+# choices are code, live in the English pack, and are never translated. Code
+# blocks, identifiers and printed strings are copied verbatim.
+
+pack   = "go.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.cheatsheet.01.flush"
+title = "FLUSH, NEBO NIC"
+story = "06:30, Jardine's Bazaar. Kiosek celou noc tiskl do bufferu a nikdo neviděl ani řádek."
+brief = '''
+Výstup jde přes bufferovaný writer. Který řádek zajistí, že všechno zapsané
+do `out` se opravdu objeví na obrazovce, až `main` skončí?
+
+```
+out := bufio.NewWriter(os.Stdout)
+// ____
+fmt.Fprintln(out, ans)
+```
+'''
+hints = [
+  "`bufio.Writer` drží bajty, dokud není vyprázdněn, a `defer` potřebuje volání i se závorkami.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.cheatsheet.02.fields"
+title = "VOLNÉ MEZERY"
+story = "Na lístku s objednávkou z cha chaan teng stojí 3   5, naťukané spěchajícím číšníkem."
+brief = '''
+`sc.Scan()` právě načetl řádek `"3   5"` (mezi nimi několik mezer). Který
+řádek z něj udělá dva tokeny `["3", "5"]`?
+'''
+hints = [
+  "Dělení podle jedné mezery nechá mezi mezerami prázdné řetězce. Existuje funkce, která dělí podle libovolného úseku bílých znaků.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.cheatsheet.03.zero-pad"
+title = "PĚT ČÍSLIC"
+story = "Pořadová čísla u přepážky v Hysan Place mají vždy pět číslic, vpředu nuly."
+brief = '''
+`n` je `42`. Vypište ho jako `00042` a pak nový řádek.
+'''
+hints = [
+  "`0` před šířkou doplňuje nulami místo mezer.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.cheatsheet.04.inclusive"
+title = "OD JEDNÉ DO DESETI"
+story = "Zastávky tramvaje mají čísla 1 až 10 a lidé vždycky zapomenou na tu poslední."
+brief = '''
+Smyčka přes 1, 2, … 10 — včetně desítky.
+'''
+hints = [
+  "Go má jediné klíčové slovo pro smyčku a jeho klauzule nejsou v závorkách. `range 10` počítá od 0.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.cheatsheet.05.float-div"
+title = "PŮL MISKY"
+story = "Sedm misek wonton nudlí na dva. Pokladna trvá na tom, že každý dostane tři."
+brief = '''
+`n := 7` a `m := 2` jsou `int`. Ať je `f` hodnota typu `float64` `3.5`.
+'''
+hints = [
+  "`int / int` usekne desetiny dřív, než dojde ke konverzi. Převeďte nejdřív obě strany.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.cheatsheet.06.append"
+title = "VŽDY ZNOVU PŘIŘADIT"
+story = "Fronta před výtahem v Sogu se prodloužila o jednoho. Seznam na desce to musí říct taky."
+brief = '''
+`s` je `[]int`. Přidejte `x` na jeho konec.
+'''
+hints = [
+  "`append` řez jen vrací — možná s novým polem pod ním — a sám `s` nezmění.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.cheatsheet.07.comma-ok"
+title = "NULA TAKY EXISTUJE"
+story = "Stánek na Paterson Street dnes prodal nula vaječných koláčků. To není totéž, jako kdyby tam žádný stánek nebyl."
+brief = '''
+`m` je `map[string]int`. Vstupte do bloku jen tehdy, když klíč `k` existuje
+— uložená `0` se počítá jako existující.
+'''
+hints = [
+  "Chybějící klíč se přečte jako nulová hodnota. Zeptejte se mapy na její druhý výsledek.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.cheatsheet.08.rune"
+title = "DVA BAJTY, JEDNO PÍSMENO"
+story = "Vývěsní štít kavárny na Lee Garden Road má diakritiku a počítadlo bajtů spletlo druhé písmeno."
+brief = '''
+`s := "héllo"`. Ať je `r` druhý znak, `'é'`, jako `rune`.
+'''
+hints = [
+  "Indexování řetězce dává bajt a `é` má v UTF-8 dva bajty. Nejdřív převeďte na runy.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.cheatsheet.09.rec-closure"
+title = "NEJDŘÍV JMÉNO"
+story = "Uličky za Yiu Wa Street se stáčejí zpátky do sebe. Chodec musí znát své jméno, aby mohl jít dál."
+brief = '''
+Uvnitř `main` closure `dfs`, která volá sama sebe. Který první řádek se
+přeloží?
+
+```
+// ____
+    vis[u] = true
+    for _, v := range adj[u] { if !vis[v] { dfs(v) } }
+}
+```
+'''
+hints = [
+  "Proměnná ještě není v rozsahu uvnitř vlastního inicializátoru. Deklarujte ji, potom přiřaďte.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.cheatsheet.10.ptr-receiver"
+title = "POSUŇ TEN SKUTEČNÝ"
+story = "Špendlík na mapě Times Square se má posunout o blok na východ. Posouvat fotokopii mapy nic nezmění."
+brief = '''
+`type P struct{ X, Y int }`. Napište metodu `Shift` tak, aby po `p.Shift(1)`
+volajícímu `p.X` opravdu vzrostlo o jedna.
+'''
+hints = [
+  "Hodnotový příjemce pracuje s kopií. Přístup k polím přes ukazatel je automatický.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.cheatsheet.11.wrap"
+title = "ZACHOVEJ PŘÍČINU"
+story = "Formulář pro stížnosti na poště v Causeway Bay má kolonku na poznámku a původní dopis je za ním sešitý."
+brief = '''
+Uvnitř `func parse(s string) (int, error)`. Vraťte chybu s doplněným
+kontextem tak, aby volajícímu `errors.Is(err, strconv.ErrSyntax)` stále
+odpovídalo.
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+'''
+hints = [
+  "Jen jedno formátovací sloveso chybu zabalí tak, aby přes ni `errors.Is` viděl.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.cheatsheet.12.close-results"
+title = "POSLEDNÍ ZHASÍNÁ"
+story = "Čtyři kurýři pracují v noci ze zadní místnosti na Percival Street. Někdo musí zamknout, až se vrátí poslední — a ne dřív."
+brief = '''
+Pool workerů. Každý worker zavolá `wg.Done()`, když `jobs` dojdou, a `jobs`
+zavírá producent. Který řádek zajistí, že závěrečný `range` skončí, jakmile
+jsou všichni workeři hotoví — bez deadlocku a bez paniky?
+
+```
+results := make(chan int) // unbuffered
+for w := 0; w < 4; w++ { wg.Add(1); go worker(jobs, results, &wg) }
+// ____
+for r := range results { fmt.Println(r) }
+```
+'''
+hints = [
+  "Čekání musí běžet vedle čtenáře, ne před ním: workeři visí na nebufferovaném odeslání, dokud `main` nečte.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.cheatsheet.13.concat"
+title = "NOVÉ PODKLADOVÉ POLE"
+story = "Dvě fronty se slévají na přechodu u Soga a pořadatel chce úplně nový seznam — ne něco načmáraného přes podložku první fronty."
+brief = '''
+`a` a `b` jsou `[]int`. Udělejte z `c` jeden slice s prvky `a`, za nimiž
+následují prvky `b`, tak, aby pozdější `c[0] = 9` nechalo `a` netknuté —
+i když má `a` volnou kapacitu navíc.
+'''
+hints = [
+  "`append` znovu použije podkladové pole prvního argumentu, když je v něm místo. Go 1.22 přidalo funkci, která vždy alokuje nové.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.cheatsheet.14.sort-desc"
+title = "NEJLEPŠÍ NAHOŘE"
+story = "Ligová tabulka vaječných koláčků jde dnes večer na zeď pekárny v Tai Hang, nejlepší skóre nahoře."
+brief = '''
+`type P struct{ N string; S int }` a `ps` je `[]P`. Seřaďte `ps` na
+místě tak, aby nejvyšší `S` bylo první.
+'''
+hints = [
+  "Indexový komparátor odpovídá na otázku \"má jít `i` před `j`?\" — pro nejvyšší napřed jde větší první.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.cheatsheet.15.nil-map"
+title = "ZATÍM BEZ STRÁNEK"
+story = "Nová sčítací kniha ve stánku na Jardine's Crescent ještě nemá žádné stránky; první čárka projede rovnou skrz desky."
+brief = '''
+Všechny tři řádky stojí pohromadě v `main`, ve stejném bloku. Který řádek
+patří do mezery, aby inkrementace nevyvolala paniku?
+
+```
+var m map[string]int
+// ____
+m["a"]++
+```
+'''
+hints = [
+  "Mapa deklarovaná, ale nikdy nevytvořená, je nil: čtení dává nulovou hodnotu, zápis panikaří. A `:=` nemůže `m` ve stejném bloku znovu deklarovat.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.cheatsheet.16.recv-ok"
+title = "NULA JE POČET BALÍKŮ"
+story = "Kurýr z Hoi Ping Road hlásí vysílačkou počty balíků a nula balíků je skutečné hlášení. Jen stažená roleta znamená, že den skončil."
+brief = '''
+`ch` je `chan int`. Odesílatel klidně může poslat `0` jako skutečnou hodnotu
+a až skončí, `ch` zavře. Přijměte do `v` a ať je `ok` false
+teprve tehdy, když je `ch` zavřený a vyprázdněný.
+'''
+hints = [
+  "Výraz pro příjem má dvouhodnotový tvar, stejně jako vyhledání v mapě.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.cheatsheet.17.cancel-send"
+title = "ZAVÍRÁME"
+story = "Noční kuchyně na Matheson Street si podává talíře po lince. Když vedoucí zavolá, že se zavírá, kuchař talíř položí — i když ho nemá kdo převzít."
+brief = '''
+Uvnitř fáze pipeline,
+`func send(ctx context.Context, out chan<- int, v int) error`.
+Pošlete `v` na `out`, ale ve chvíli, kdy je `ctx` zrušen, to vzdejte
+a vraťte chybu kontextu — i když `out` nikdo nečte.
+'''
+hints = [
+  "Jen `select` čeká na dvě věci najednou a každý jeho case musí být odeslání nebo příjem — `Done()` vám dá kanál.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.cheatsheet.18.unmarshal"
+title = "VYPLŇTE SKUTEČNÝ FORMULÁŘ"
+story = "Rezervace dorazí na recepci hotelu Lee Garden jako JSON. Vyplnit se musí formulář na pultu — ne jeho fotokopie."
+brief = '''
+`s` je `string` obsahující JSON a `var u User` je obyčejná hodnota.
+Naplňte `u` z `s` a chybu nechte v `err`.
+'''
+hints = [
+  "Dekodér bere bajty a musí umět zapisovat do samotného `u`, ne do jeho kopie.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.cheatsheet.19.bfs-queue"
+title = "NEJSTARŠÍ PRVNÍ"
+story = "Dešťová voda se šíří parkovištěm pod Times Square stání po stání, ven od kanálu."
+brief = '''
+BFS v mřížce. Který řádek vezme další bod z fronty tak, aby hledání
+zůstalo do šířky — a smyčka opravdu skončila?
+
+```
+q := []pt{{sr, sc}}
+for len(q) > 0 {
+    // ____
+    for _, d := range dirs {
+        nr, nc := cur.r+d.r, cur.c+d.c
+        if !okCell(nr, nc) { continue }
+        q = append(q, pt{nr, nc})
+    }
+}
+```
+'''
+hints = [
+  "Do šířky znamená, že nejstarší záznam jde první. Uvnitř těla smyčky vytvoří `:=` nové `q` a to vnější se nikdy nezkrátí.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.cheatsheet.20.itoa"
+title = "ČÍSLICE, PROSÍM"
+story = "Automat na lístky v metru Causeway Bay ukazuje bránu 65. Tiskárna přes halu místo toho vydá jediné písmeno."
+brief = '''
+`n := 65` je `int`. Udělejte z `s` řetězec `65` — dva znaky,
+číslice.
+'''
+hints = [
+  "Převod celého čísla na `string` dá znak s tímto kódovým bodem, ne jeho číslice. Podívejte se do `strconv` a dejte pozor na typ argumentu.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.cheatsheet.21.both"
+title = "OBĚ SVĚTLA ZELENÁ"
+story = "Přechod na Yee Wo Street se uvolní, jen když se zelený panáček a pípák shodnou, a pípák má své názory."
+brief = '''
+`ready` a `valid` jsou obě `bool`. Napište podmínku, která je pravdivá,
+jen když jsou obě pravdivé.
+'''
+hints = [
+  "Go píše logické operátory po céčkovsku a jednoznaková podoba na `bool` vůbec není definovaná.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.cheatsheet.22.last"
+title = "KONEC LINKY"
+story = "Revizor nastupuje do poslední noční tramvaje na konečné Causeway Bay a vozovna čísluje tramvaje od nuly."
+brief = '''
+`a` je neprázdný `[]int`. Udělejte z `x` jeho poslední prvek.
+'''
+hints = [
+  "Go neumí indexovat od konce — záporný konstantní index se ani nepřeloží — a délka je o jedna za posledním indexem.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.cheatsheet.23.empty"
+title = "POŘÁD JE TO TÁC"
+story = "Některá odpoledne vyjede vozík s dim sum na Lockhart Road s ničím na sobě a pořád je to vozík s dvanácti místy."
+brief = '''
+`s` je `[]int`, který klidně může být ne-nil a mít místo navíc — udělaný
+třeba přes `make([]int, 0, 16)` nebo zkrácený na `s[:0]`. Vstupte do
+bloku, jen když neobsahuje žádné prvky.
+'''
+hints = [
+  "Prázdný slice nemusí být nil a kapacita je místo, ne obsah.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.cheatsheet.24.func-add"
+title = "TYPY ZA JMÉNY"
+story = "Alex na Percival Street píše sčítací rutinu pokladny po gočkovsku; nováček ji pořád píše po céčkovsku a diví se, proč je build červený."
+brief = '''
+Deklarujte `add`, která bere dva `int`y a vrací jejich součet jako `int`,
+aby `fmt.Println(add(1, 2))` vypsalo `3`.
+'''
+hints = [
+  "Nejdřív jména, pak typ, a typ výsledku sedí za seznamem parametrů — funkce deklarovaná bez něj nemůže nic vrátit.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.cheatsheet.25.sort-asc"
+title = "NEJMENŠÍ PRVNÍ"
+story = "Útržky lístků z tramvajové zastávky Sugar Street přistávají na stole úředníka v libovolném pořadí a úředník chce nejnižší číslo nahoře."
+brief = '''
+`a` je `[]int` a `slices` je importované (Go 1.21+). Seřaďte `a` na
+místě, vzestupně, jedním voláním.
+'''
+hints = [
+  "Generický balíček bere jeden argument — slice samotný, ne jeho adresu. Starý balíček `sort` chce `Interface` nebo komparátor.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.cheatsheet.26.reverse"
+title = "ODZADU DOPŘEDU"
+story = "Po polední salvě dav odchází bránou na nábřeží přesně v opačném pořadí, než v jakém přišel."
+brief = '''
+`a` je `[]int` a `slices` je importované (Go 1.21+). Obraťte `a` na
+místě, na jednom řádku, a `a` dál používejte.
+'''
+hints = [
+  "Pracuje na slice, který dostane, a nic nevrací, takže není co přiřazovat — a stejnojmenná funkce ze `sort` je pro `Interface`.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.cheatsheet.27.clone"
+title = "VLASTNÍ KOPIE"
+story = "Zapisovací arch z Fashion Walk se okopíruje pro druhý obchod a fajfka na kopii se nesmí objevit na originálu."
+brief = '''
+`s` je `[]int` a `slices` je importované (Go 1.21+). Udělejte z `c` kopii
+`s` takovou, že pozdější `c[0] = 9` nechá `s` nedotčený.
+'''
+hints = [
+  "Přiřazení i nové řezání rozdávají stejné pole pod sebou a vestavěná funkce, která kopíruje, chce cíl, který jste už vytvořili.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.cheatsheet.28.switch"
+title = "JEDEN NEBO DVA"
+story = "Lucky Mac na Russell Street říká stolu pro jednoho či dva „malý“ a hosteska je unavená z toho psát pravidlo dvakrát."
+brief = '''
+`x` je `int`. Doplňte mezeru tak, aby se `s` stalo `"small"`, když je `x`
+1 nebo 2 — a ostatní případy dál dělají to, co dělají.
+
+```
+switch x {
+case 0:
+    s = "zero"
+// ____
+default:
+    s = "big"
+}
+```
+'''
+hints = [
+  "Case v Go končí tam, kde začíná další — nic samo nepropadá — a jeden case může uvést víc než jednu hodnotu.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.cheatsheet.29.abs"
+title = "O TŘI DLAŽDICE KRATŠÍ"
+story = "Pod nadjezdem Canal Road se pantofle, která přistane o tři dlaždice blíž, počítá stejně jako ta, která přistane o tři dlaždice dál."
+brief = '''
+`x` je `int`, který může být záporný (a dost malý na to, aby `-x`
+nepřeteklo). Udělejte z `a` jeho absolutní hodnotu — Go 1.21+, žádné
+další importy.
+'''
+hints = [
+  "Standardní knihovna nemá celočíselnou absolutní hodnotu a ta z `math` bere `float64`. V 1.21 přišly dvě vestavěné funkce, které porovnávají.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.cheatsheet.30.mod"
+title = "PŘETOČIT HODINY"
+story = "Sedm zastávek zpátky od konečné Victoria Park na smyčce o třech zastávkách a tabule musí pořád ukázat číslo zastávky, ne mínus."
+brief = '''
+`x` a `m` jsou `int`y, `m > 0` a `x` může být záporné — hlouběji
+pod nulou než `-m`, jako v `x = -7`, `m = 3`. Udělejte z `r` zbytek
+v `0 .. m-1`, aby tahle dvojice dala `2`.
+'''
+hints = [
+  "V Go znaménko `%` následuje dělenec a jediné přičtení zachrání hodnoty jen do `-m`.",
+]

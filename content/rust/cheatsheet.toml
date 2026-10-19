@@ -1,0 +1,933 @@
+# RUST LAND — CHEATSHEET. The grammar off the page, asked: one question per
+# section of the Rust live-coding cheatsheet (~/vivid/Cheatsheet,
+# rust_cheatsheet.html), four lines, one right. Nothing is typed and nothing
+# is compiled — the pick is the submission, and the server judges it against
+# the quiz (SPEC §0). The three wrong lines are near-misses: another
+# language's spelling, a missing `mut`, a borrow that is not one.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "rust.cheatsheet"
+land = "rust"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "rust.cheatsheet.01.read-all"
+node        = 1
+title       = "THE WHOLE TAPE"
+difficulty  = 1
+story       = "06:30, Jardine's Bazaar. The kiosk's input arrives all at once, and it wants all of it."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+Read **all** of stdin into `s` in one call.
+
+```
+use std::io::{self, Read};
+let mut s = String::new();
+// ____
+```
+
+Which line is it?
+'''
+solution    = 'io::stdin().read_to_string(&mut s).unwrap();'
+hints = [
+  "`read_to_string` takes a `&mut String` and fills it; it returns a Result, so unwrap it.",
+]
+
+[quest.quiz]
+choices = [
+  'io::stdin().read_line(s);',
+  'io::stdin().read_to_string(&mut s).unwrap();',
+  'let s = io::stdin().read_all();',
+  'io::stdin().read_to_string(s).unwrap();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "rust.cheatsheet.02.read-line"
+node        = 2
+title       = "THE NEWLINE STAYS"
+difficulty  = 1
+story       = "The order slip says 42. The till reads it with the line break still on."
+concepts    = ["io", "strings"]
+requires    = ["rust.cheatsheet.01.read-all"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`read_line` left `"42\n"` in `line`. Which line turns it into a `usize`
+without panicking?
+'''
+solution    = 'let n: usize = line.trim().parse().unwrap();'
+hints = [
+  "`read_line` keeps the `\\n`. Parse fails on it, so trim first.",
+]
+
+[quest.quiz]
+choices = [
+  'let n: usize = line.parse().unwrap();',
+  'let n = line.trim() as usize;',
+  'let n: usize = line.trim().parse().unwrap();',
+  'let n: usize = int(line);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "rust.cheatsheet.03.width"
+node        = 3
+title       = "RIGHT-ALIGNED"
+difficulty  = 1
+story       = "The price board at the wet market lines every number up on the right."
+concepts    = ["io", "strings"]
+requires    = ["rust.cheatsheet.02.read-line"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+Print `x` right-aligned in a field five characters wide.
+'''
+solution    = 'println!("{:>5}", x);'
+hints = [
+  "Alignment comes before the width inside the braces: `<` left, `^` centre, `>` right.",
+]
+
+[quest.quiz]
+choices = [
+  'println!("{:<5}", x);',
+  'println!("{:5>}", x);',
+  'println!("%5d", x);',
+  'println!("{:>5}", x);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "rust.cheatsheet.04.usize"
+node        = 4
+title       = "INDEXES ARE USIZE"
+difficulty  = 1
+story       = "Locker 7 at Causeway Bay station. The number came in as an i32."
+concepts    = ["types", "collections"]
+requires    = ["rust.cheatsheet.03.width"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`i` is an `i32` and `v` is a `Vec<u8>`. Which line reads element `i`?
+'''
+solution    = 'let x = v[i as usize];'
+hints = [
+  "A Vec is indexed by `usize` only. `as` is the cast.",
+]
+
+[quest.quiz]
+choices = [
+  'let x = v[i as usize];',
+  'let x = v[i];',
+  'let x = v[usize(i)];',
+  'let x = v[i.into()];',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "rust.cheatsheet.05.inclusive"
+node        = 5
+title       = "ONE TO TEN"
+difficulty  = 1
+story       = "The tram stops are numbered 1 to 10, and the last one is the one people forget."
+concepts    = ["control-flow", "iteration"]
+requires    = ["rust.cheatsheet.04.usize"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+Loop over 1, 2, … 10 — ten included.
+'''
+solution    = 'for i in 1..=10 {'
+hints = [
+  "`a..b` stops before `b`. `a..=b` includes it.",
+]
+
+[quest.quiz]
+choices = [
+  'for i in 1..10 {',
+  'for i in 1..=10 {',
+  'for i in range(1, 11) {',
+  'for (i = 1; i <= 10; i++) {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "rust.cheatsheet.06.guard"
+node        = 6
+title       = "THE GUARD"
+difficulty  = 2
+story       = "The bouncer on Lockhart Road checks one thing past the name on the list."
+concepts    = ["pattern-matching", "control-flow"]
+requires    = ["rust.cheatsheet.05.inclusive"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Inside `match x { … }`, the arm for any negative number:
+
+```
+match x {
+    0 => "zero",
+    // ____
+    _ => "pos",
+}
+```
+'''
+solution    = 'n if n < 0 => "neg",'
+hints = [
+  "A guard is `pattern if condition =>`. Bind the value to a name first.",
+]
+
+[quest.quiz]
+choices = [
+  'n < 0 => "neg",',
+  'if n < 0 => "neg",',
+  'n if n < 0 => "neg",',
+  'case n < 0: "neg",',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "rust.cheatsheet.07.fnmut"
+node        = 7
+title       = "THE CLICKER"
+difficulty  = 2
+story       = "The doorman's tally counter: every press changes the number it holds."
+concepts    = ["closures", "mutability"]
+requires    = ["rust.cheatsheet.06.guard"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`let mut cnt = 0;` — a closure `inc` that adds one to `cnt` each call, so
+that `inc(); inc();` compiles.
+'''
+solution    = 'let mut inc = || cnt += 1;'
+hints = [
+  "A closure that changes what it captured is `FnMut`, and calling one needs a `mut` binding.",
+]
+
+[quest.quiz]
+choices = [
+  'let inc = || cnt += 1;',
+  'let mut inc = |cnt| += 1;',
+  'fn inc() { cnt += 1 }',
+  'let mut inc = || cnt += 1;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "rust.cheatsheet.08.desc"
+node        = 8
+title       = "BIGGEST FIRST"
+difficulty  = 2
+story       = "The leaderboard at the arcade in Sogo's basement: the high score on top."
+concepts    = ["sorting", "closures"]
+requires    = ["rust.cheatsheet.07.fnmut"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+Sort `v: Vec<i32>` in **descending** order, in place.
+'''
+solution    = 'v.sort_by(|a, b| b.cmp(a));'
+hints = [
+  "`sort_by` takes a comparator. Swap the operands to flip the order.",
+]
+
+[quest.quiz]
+choices = [
+  'v.sort_by(|a, b| b.cmp(a));',
+  'v.sort_by(|a, b| a.cmp(b));',
+  'v.sort(reverse=True);',
+  'v.sort_desc();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.cheatsheet.09.count"
+node        = 9
+title       = "THE TALLY"
+difficulty  = 2
+story       = "The dai pai dong counts orders by dish, and a new dish starts at zero."
+concepts    = ["hashing", "collections"]
+requires    = ["rust.cheatsheet.08.desc"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`m: HashMap<String, i32>`. Add one to the count for key `k`, starting at
+0 if it is not there yet.
+'''
+solution    = '*m.entry(k).or_insert(0) += 1;'
+hints = [
+  "`entry(k).or_insert(0)` hands back a `&mut i32`; deref it to add.",
+]
+
+[quest.quiz]
+choices = [
+  'm.entry(k).or_insert(0) += 1;',
+  '*m.entry(k).or_insert(0) += 1;',
+  'm[k] += 1;',
+  'm.get(k) += 1;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "rust.cheatsheet.10.min-heap"
+node        = 10
+title       = "SMALLEST ON TOP"
+difficulty  = 3
+story       = "The minibus queue takes the shortest trip first. BinaryHeap only knows how to put the biggest on top."
+concepts    = ["heaps", "collections"]
+requires    = ["rust.cheatsheet.09.count"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`h` is a `BinaryHeap<i32>`. Push `x` so that `h.pop()` gives the
+**smallest** first.
+'''
+solution    = 'h.push(Reverse(x));'
+hints = [
+  "BinaryHeap is a max-heap. Wrap the value so its order flips.",
+]
+
+[quest.quiz]
+choices = [
+  'h.push_min(x);',
+  'h.push(x); h.reverse();',
+  'h.push(Reverse(x));',
+  'let h = BinaryHeap::min();',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "rust.cheatsheet.11.clone"
+node        = 11
+title       = "TWO COPIES"
+difficulty  = 3
+story       = "The photocopier in the Times Square office. The original stays on the glass."
+concepts    = ["ownership", "move-semantics"]
+requires    = ["rust.cheatsheet.10.min-heap"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`let a = String::from("x");` — make `b` a `String` of its own, so `a` can
+still be used after.
+'''
+solution    = 'let b = a.clone();'
+hints = [
+  "`let b = a;` moves the String. A deep copy is spelled out.",
+]
+
+[quest.quiz]
+choices = [
+  'let b = a;',
+  'let b = *a;',
+  'let b = copy(a);',
+  'let b = a.clone();',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "rust.cheatsheet.12.ok-or"
+node        = 12
+title       = "THE MISSING ROW"
+difficulty  = 3
+story       = "The ledger in Room 7-32 has a gap. A function that returns Result has to say why."
+concepts    = ["error-handling", "enums"]
+requires    = ["rust.cheatsheet.11.clone"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+Inside a `fn … -> Result<i32, &'static str>`, `o` is an `Option<i32>`. Get
+the value out, or return the error `"missing"`.
+'''
+solution    = 'let v = o.ok_or("missing")?;'
+hints = [
+  "`?` on an Option does not work in a Result function. Turn the Option into a Result first.",
+]
+
+[quest.quiz]
+choices = [
+  'let v = o.ok_or("missing")?;',
+  'let v = o?;',
+  'let v = o.unwrap_or_err("missing");',
+  'let v = o.ok()?;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.cheatsheet.13.filter-map-sum"
+node        = 13
+title       = "FILTER, THEN SQUARE"
+difficulty  = 2
+story       = "The step counters on the Victoria Park track log a minus when the battery dips; Mei wants the squares of the real laps, added up."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.cheatsheet.12.ok-or"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`v: Vec<i64>` holds positive **and negative** numbers. `s` is the sum of
+the squares of the positive ones only.
+
+```
+let s: i64 = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'v.iter().filter(|&&x| x > 0).map(|x| x * x).sum()'
+hints = [
+  "Drop the negatives before squaring — a square has no sign. On `.iter()` the filter closure sees `&&i64`.",
+]
+
+[quest.quiz]
+choices = [
+  'v.iter().filter(|&&x| x > 0).map(|x| x * x).sum()',
+  'v.iter().filter(|x| x > 0).map(|x| x * x).sum()',
+  'v.iter().map(|x| x * x).filter(|&x| x > 0).sum()',
+  'v.iter().filter(|&&x| x > 0).map(|x| x * x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.cheatsheet.14.iter-mut"
+node        = 14
+title       = "IN PLACE"
+difficulty  = 2
+story       = "The 7-Eleven on Yee Wo Street puts a dollar on every price on the shelf, and the shelf has to still be there afterwards."
+concepts    = ["iteration", "borrowing", "mutability"]
+requires    = ["rust.cheatsheet.13.filter-map-sum"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`let mut v: Vec<i32> = …;` — add one to **every element of `v` itself**,
+and `v` is still used on the next line.
+'''
+solution    = 'for x in v.iter_mut() { *x += 1; }'
+hints = [
+  "Three ways to walk a Vec: borrow it, borrow it exclusively, or take it away. Only one of them lets you write through `x` and keep `v`.",
+]
+
+[quest.quiz]
+choices = [
+  'for x in v.iter() { *x += 1; }',
+  'for x in v.into_iter() { *x += 1; }',
+  'for x in v.iter_mut() { *x += 1; }',
+  'for mut x in v.clone() { x += 1; }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.cheatsheet.15.windows"
+node        = 15
+title       = "NEIGHBOURS"
+difficulty  = 2
+story       = "The tram timetable down Hennessy Road: Mei wants the gap between each stop and the one after it."
+concepts    = ["slices", "iteration"]
+requires    = ["rust.cheatsheet.14.iter-mut"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`v: Vec<i64>` with at least three elements. `d` holds `v[i+1] - v[i]`
+for every `i`, so it is exactly one shorter than `v`.
+
+```
+let d: Vec<i64> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'v.windows(2).map(|w| w[1] - w[0]).collect()'
+hints = [
+  "Overlapping pairs, not disjoint ones — and each pair arrives as a slice, not a tuple.",
+]
+
+[quest.quiz]
+choices = [
+  'v.chunks(2).map(|w| w[1] - w[0]).collect()',
+  'v.windows(2).map(|w| w[0] - w[1]).collect()',
+  'v.windows(2).map(|(a, b)| b - a).collect()',
+  'v.windows(2).map(|w| w[1] - w[0]).collect()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "rust.cheatsheet.16.reverse-string"
+node        = 16
+title       = "BACK TO FRONT"
+difficulty  = 2
+story       = "The window-cleaner reads the Percival Street neon from the far end; Mei wants the letters in his order."
+concepts    = ["strings", "iteration"]
+requires    = ["rust.cheatsheet.15.windows"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`s: &str` may contain non-ASCII characters. `r` is a new `String` with
+the characters of `s` in reverse order.
+'''
+solution    = 'let r: String = s.chars().rev().collect();'
+hints = [
+  "Walk the characters (not the bytes — a multibyte char would come out broken), turn the walk around, and gather it into a String.",
+]
+
+[quest.quiz]
+choices = [
+  'let r: String = s.bytes().rev().collect();',
+  'let r: String = s.chars().rev().collect();',
+  'let r = s.chars().reverse();',
+  'let r = s.chars().rev().to_string();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "rust.cheatsheet.17.concat"
+node        = 17
+title       = "JOINED, NOT MOVED"
+difficulty  = 2
+story       = "Two queues merge at the foot of the Times Square escalator; the lists for each were lent to Mei, not given."
+concepts    = ["slices", "ownership"]
+requires    = ["rust.cheatsheet.16.reverse-string"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`a: Vec<i32>` and `b: Vec<i32>`. `c` is a **new** `Vec<i32>` with `a`'s
+elements followed by `b`'s — and both `a` and `b` are still used after.
+'''
+solution    = 'let c = [&a[..], &b[..]].concat();'
+hints = [
+  "Joining the two Vecs by value moves them. Join two borrowed slices instead.",
+]
+
+[quest.quiz]
+choices = [
+  'let c = [a, b].concat();',
+  'let c: Vec<i32> = a.iter().chain(&b).collect();',
+  'let c = [&a[..], &b[..]].concat();',
+  'let c = a + &b;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "rust.cheatsheet.18.derive-hash"
+node        = 18
+title       = "FIT FOR A SET"
+difficulty  = 3
+story       = "Ferris pins every visited corner of the Causeway Bay grid into a set, and the compiler wants to know how two pins are compared."
+concepts    = ["structs", "traits", "hashing"]
+requires    = ["rust.cheatsheet.17.concat"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`struct P { x: i32, y: i32 }` must go into a `HashSet<P>`. Which derive
+line above the struct is **enough** for `set.insert(p)` to compile?
+'''
+solution    = '#[derive(PartialEq, Eq, Hash)]'
+hints = [
+  "A hash set needs to hash the value and to compare two of them for full equality — and full equality is built on partial equality.",
+]
+
+[quest.quiz]
+choices = [
+  '#[derive(PartialEq, Hash)]',
+  '#[derive(Eq, Hash)]',
+  '#[derive(Clone, PartialEq, Eq)]',
+  '#[derive(PartialEq, Eq, Hash)]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "rust.cheatsheet.19.drop-tx"
+node        = 19
+title       = "LAST ONE OUT"
+difficulty  = 3
+story       = "Four couriers on Lockhart Road report in on one radio, and the dispatcher must know when the last of them has signed off."
+concepts    = ["channels", "concurrency", "ownership"]
+requires    = ["rust.cheatsheet.18.derive-hash"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+Four producers, one consumer. The `for` loop must end once the four
+messages have arrived.
+
+```
+let (tx, rx) = mpsc::channel();
+for id in 0..4 {
+    let tx = tx.clone();
+    thread::spawn(move || tx.send(id).unwrap());
+}
+// ____
+for m in rx { println!("{m}"); }
+```
+
+Which line goes in the blank?
+'''
+solution    = 'drop(tx);'
+hints = [
+  "The loop ends only when every sender is gone. The four clones go with their threads — one sender is still sitting in `main`.",
+]
+
+[quest.quiz]
+choices = [
+  'drop(tx);',
+  'tx.close();',
+  'drop(rx);',
+  'tx.send(-1).unwrap();',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "rust.cheatsheet.20.shared-receiver"
+node        = 20
+title       = "ONE RAIL, FOUR COOKS"
+difficulty  = 3
+story       = "Lucky Mac's night kitchen: one ticket rail, four cooks, and only one of them can be reading it at a time."
+concepts    = ["shared-state", "channels", "smart-pointers"]
+requires    = ["rust.cheatsheet.19.drop-tx"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`rx: Receiver<u64>` is the job queue. Four worker threads, each spawned
+with `move`, must all pull jobs from this **one** receiver. Which line
+wraps `rx` so that a handle can be cloned into every worker?
+'''
+solution    = 'let rx = Arc::new(Mutex::new(rx));'
+hints = [
+  "A Receiver is not Sync, so sharing it across threads needs a lock — and the lock needs a thread-safe owner, not a single-thread one.",
+]
+
+[quest.quiz]
+choices = [
+  'let rx = Arc::new(rx);',
+  'let rx = Arc::new(Mutex::new(rx));',
+  'let rx = Rc::new(RefCell::new(rx));',
+  'let rx = Mutex::new(rx);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "rust.cheatsheet.21.from-str"
+node        = 21
+title       = "OFF THE WIRE"
+difficulty  = 3
+story       = "A customer record comes down the wire from the fintech on Gloucester Road as JSON, and Mei wants it as a struct."
+concepts    = ["serialization", "structs", "error-handling"]
+requires    = ["rust.cheatsheet.20.shared-receiver"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`s: &str` holds one JSON object. `User` derives `Deserialize` and has a
+`name: String` field. Fill the blank so this compiles:
+
+```
+fn name_of(s: &str) -> Result<String, serde_json::Error> {
+    // ____
+    Ok(u.name)
+}
+```
+'''
+solution    = 'let u: User = serde_json::from_str(s)?;'
+hints = [
+  "`u.name` on the next line pins nothing: serde cannot guess the target type, so name it on the binding. The input is text, not a `Value`.",
+]
+
+[quest.quiz]
+choices = [
+  'let u = serde_json::from_str(s)?;',
+  'let u: User = serde_json::from_value(s)?;',
+  'let u: User = serde_json::from_str(s)?;',
+  'let u: User = serde_json::parse(s)?;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "rust.cheatsheet.22.lower-bound"
+node        = 22
+title       = "THE FIRST NOT LESS"
+difficulty  = 3
+story       = "The Sogo price board is sorted; Mei wants where the first item costing at least `t` begins."
+concepts    = ["binary-search", "slices", "closures"]
+requires    = ["rust.cheatsheet.21.from-str"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`v: Vec<i64>` is sorted ascending and may contain duplicates; `t: i64`
+may or may not be in it. `i` is the index of the **first element ≥ `t`**
+(`v.len()` if there is none) — the classic lower bound, in O(log n), no
+panic.
+'''
+solution    = 'let i = v.partition_point(|&x| x < t);'
+hints = [
+  "The slice splits into the part where a predicate holds and the part where it does not; the index returned is the first element where it stops holding. Pick the predicate that is true for everything *below* `t`.",
+]
+
+[quest.quiz]
+choices = [
+  'let i = v.partition_point(|&x| x <= t);',
+  'let i = v.binary_search(&t).unwrap();',
+  'let i = v.partition_point(|x| x < t);',
+  'let i = v.partition_point(|&x| x < t);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "rust.cheatsheet.23.pow"
+node        = 23
+title       = "RAISED"
+difficulty  = 3
+story       = "Compound rent on a Causeway Bay walk-up: a base to a power, and the exponent arrived as the wrong width."
+concepts    = ["math", "types"]
+requires    = ["rust.cheatsheet.22.lower-bound"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`x: u64` and `e: u64`, and the result fits. `p` is `x` raised to the
+power `e`.
+'''
+solution    = 'let p = x.pow(e as u32);'
+hints = [
+  "`^` is XOR, not a power. The integer power method takes its exponent as one fixed width, and it is not `u64`.",
+]
+
+[quest.quiz]
+choices = [
+  'let p = x.pow(e);',
+  'let p = x ^ e;',
+  'let p = x.pow(e as u32);',
+  'let p = x.powi(e as i32);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "rust.cheatsheet.24.read-vec"
+node        = 24
+title       = "THE WHOLE LINE"
+difficulty  = 4
+story       = "The last till on Jardine's Bazaar hands over one line of space-separated numbers, newline and all; everything upstream depends on this one parse."
+concepts    = ["io", "strings", "iteration", "error-handling"]
+requires    = ["rust.cheatsheet.23.pow"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`line` came from `read_line`, so the `\n` is still on it, and the numbers
+may be separated by **more than one space**. Turn it into a `Vec<i64>`
+without panicking on a well-formed line.
+
+```
+let v: Vec<i64> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'line.split_whitespace().map(|x| x.parse().unwrap()).collect()'
+hints = [
+  "Split on runs of whitespace (that also eats the newline), parse each token and unwrap it, then gather — a Vec<i64> cannot be gathered from Results.",
+]
+
+[quest.quiz]
+choices = [
+  'line.split_whitespace().map(|x| x.parse()).collect()',
+  'line.split_whitespace().map(|x| x.parse().unwrap()).collect()',
+  "line.split(' ').map(|x| x.parse().unwrap()).collect()",
+  'line.split_whitespace().map(|x| x.parse().unwrap())',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "rust.cheatsheet.25.let-mut"
+node        = 25
+title       = "THE COUNTER STARTS AT TEN"
+difficulty  = 1
+story       = "The egg-waffle stall on Jardine's Bazaar keeps a running count of orders, and the count has to be allowed to change."
+concepts    = ["bindings", "types", "mutability"]
+requires    = ["rust.cheatsheet.24.read-vec"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+Declare `y` as an **unsigned 64-bit** integer holding 10, so that the
+next line compiles:
+
+```
+// ____
+y += 1;
+```
+
+Which line is it?
+'''
+solution    = 'let mut y: u64 = 10;'
+hints = [
+  "Two things to get right: the binding must be allowed to change, and a binding is set with one `=`, not the comparison.",
+]
+
+[quest.quiz]
+choices = [
+  'let y: u64 = 10;',
+  'let mut y: u64 == 10;',
+  'let mut y: u64 = 10.0;',
+  'let mut y: u64 = 10;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "rust.cheatsheet.26.fn-add"
+node        = 26
+title       = "THE LAST WORD"
+difficulty  = 1
+story       = "Mei writes the smallest function in the till above Jardine's Bazaar, and the compiler argues about the last character."
+concepts    = ["functions", "types", "control-flow"]
+requires    = ["rust.cheatsheet.25.let-mut"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+A function `add` that takes two `i32` values and returns their sum, so
+that `println!("{}", add(2, 3));` prints `5`. The whole function on one
+line.
+'''
+solution    = 'fn add(a: i32, b: i32) -> i32 { a + b }'
+hints = [
+  "Parameters are typed, the return type is written after the arrow, and a body ending in a semicolon returns `()`.",
+]
+
+[quest.quiz]
+choices = [
+  'fn add(a: i32, b: i32) -> i32 { a + b }',
+  'fn add(a: i32, b: i32) -> i32 { a + b; }',
+  'fn add(a: i32, b: i32) { a + b }',
+  'fn add(a, b) -> i32 { a + b }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "rust.cheatsheet.27.sub-slice"
+node        = 27
+title       = "TWO OUT OF THE MIDDLE"
+difficulty  = 2
+story       = "Five trams sit in the depot off Percival Street; Mei only wants to look at the second and the third, and the depot keeps all five."
+concepts    = ["slices", "borrowing"]
+requires    = ["rust.cheatsheet.26.fn-add"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`v: Vec<i32>` has at least four elements. `w` is a `&[i32]` that borrows
+**exactly** the elements at indices 1 and 2 — two elements, no copy.
+
+```
+let w: &[i32] = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = '&v[1..3]'
+hints = [
+  "A range index on a Vec gives a slice, and a slice has to be borrowed to be held. The end of `a..b` is not included; the end of `a..=b` is.",
+]
+
+[quest.quiz]
+choices = [
+  'v[1..3]',
+  '&v[1..=3]',
+  '&v[1..3]',
+  '&v[1:3]',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "rust.cheatsheet.28.unwrap-or"
+node        = 28
+title       = "OR NOTHING"
+difficulty  = 2
+story       = "The locker board at Causeway Bay station may have no entry for a number, and the display still has to show something."
+concepts    = ["error-handling", "zero-values", "enums"]
+requires    = ["rust.cheatsheet.27.sub-slice"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`o: Option<i32>`. `n` is an `i32`: the value inside `o`, or 0 if `o` is
+`None` — and the line must **never panic**.
+'''
+solution    = 'let n = o.unwrap_or(0);'
+hints = [
+  "There is a method that unwraps with a fallback; the fallback is a plain value of the inner type, not another Option.",
+]
+
+[quest.quiz]
+choices = [
+  'let n = o.unwrap();',
+  'let n = o.unwrap_or(0);',
+  'let n = o.or(0);',
+  'let n = o.unwrap_or(Some(0));',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "rust.cheatsheet.29.pop-front"
+node        = 29
+title       = "NEXT IN LINE"
+difficulty  = 2
+story       = "The BFS over the Causeway Bay grid takes stops in the order they were found — the minibus queue at Yee Wo Street, not a stack of plates."
+concepts    = ["stacks-queues", "collections", "pattern-matching"]
+requires    = ["rust.cheatsheet.28.unwrap-or"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`q: VecDeque<usize>` is the queue. The loop **removes** the element at
+the front each round and ends when the queue is empty:
+
+```
+while let Some(u) = ____ {
+```
+
+Which expression fills the blank?
+'''
+solution    = 'q.pop_front()'
+hints = [
+  "A VecDeque has two ends and names both in its method names. Peeking at the front without taking it would spin forever.",
+]
+
+[quest.quiz]
+choices = [
+  'q.pop()',
+  'q.front()',
+  'q.popleft()',
+  'q.pop_front()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "rust.cheatsheet.30.char-count"
+node        = 30
+title       = "COUNT THE NEON"
+difficulty  = 3
+story       = "The sign over Lockhart Road reads 銅鑼灣 in three characters, and Mei's first count came back far too high."
+concepts    = ["strings", "types", "iteration"]
+requires    = ["rust.cheatsheet.29.pop-front"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`s: &str` contains Chinese characters. `n` is the number of
+**characters** in `s` — so for `"銅鑼灣"` it is 3, not 9.
+
+```
+let n = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 's.chars().count()'
+hints = [
+  "A `&str` measures itself in bytes, and a Chinese character is three of them. Measure the characters, not the bytes — and the character iterator cannot report its length up front, only how many steps it took.",
+]
+
+[quest.quiz]
+choices = [
+  's.chars().count()',
+  's.len()',
+  's.chars().len()',
+  's.bytes().count()',
+]
+answer  = 0

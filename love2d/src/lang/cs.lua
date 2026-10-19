@@ -265,6 +265,12 @@ return {
   -- rather than by compromise.
   ["F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"] = "F5 spusť  F2 formát  TAB jazyk  CTRL-S ulož  CTRL-N nový  ESC zpět",
   ["F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"] = "F6 reset   F7 nápověda   F8 log   F9 $EDITOR   ESC mapa",
+  ["CHEATSHEET BASIC"] = "TAHÁK ZÁKLAD",
+  ["CHEATSHEET ADVANCED"] = "TAHÁK POKROČILÝ",
+  ["the cheatsheet, basic. four lines, one right; pick it and the node is cleared."] = "tahák, základ. čtyři řádky, jeden správný; vyber ho a uzel je hotový.",
+  ["the cheatsheet, advanced. traits, channels, generics, closures; four lines, one right."] = "tahák, pokročilý. traity, kanály, generika, uzávěry; čtyři řádky, jeden správný.",
+  ["PICK THE RIGHT LINE  (1–4)"] = "VYBER SPRÁVNÝ ŘÁDEK  (1–4)",
+  ["RIGHT"] = "SPRÁVNĚ",
   ["VERY BASIC"] = "ÚPLNÝ ZÁKLAD",
   ["BASIC"] = "ZÁKLADY",
   ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",

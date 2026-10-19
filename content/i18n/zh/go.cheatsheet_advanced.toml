@@ -1,0 +1,561 @@
+# GO LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC
+# §12.1): the prose of `content/go/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The four choices are code, live in the English pack, and are
+# never translated. Code blocks, identifiers and printed strings are copied
+# verbatim.
+
+pack   = "go.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.cheatsheet_advanced.01.buffered"
+title = "容得下一个"
+story = "12:30，Lucky Mac 的出餐口：厨师端着托盘伸出去，没有人接，整个厨房都堵在他身后。"
+brief = '''
+这三行在 `main` 里运行，没有其他 goroutine 存活。哪个声明能让
+发送通过，使接收打印出 `1`？
+
+```
+// ____
+ch <- 1
+fmt.Println(<-ch)
+```
+'''
+hints = [
+  "无缓冲的发送会等一个接收者，而这里的接收者是同一个 goroutine，在一行之后。给通道一个放值的地方。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.cheatsheet_advanced.02.wg-launch"
+title = "出发前先数好"
+story = "四十个骑手同时离开 Lucky Mac，调度员还没来得及写下谁出了门就把店关了。"
+brief = '''
+`go.mod` 写着 `go 1.22`，所以每次迭代都有自己的 `i`。为每个 `i`
+在一个 goroutine 里启动 `work(i)`，并确保最后的 `Wait` 真的等齐了
+全部 `n` 个 —— 什么都不能和计数器赛跑。
+
+```
+var wg sync.WaitGroup
+for i := range n {
+    // ____
+}
+wg.Wait()
+```
+'''
+hints = [
+  "计数器在将要调用 `Wait` 的那个 goroutine 里、在 `go` 之前加上去；在新的那个里面用 defer 减下去，而 `defer` 需要一个调用。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.cheatsheet_advanced.03.close-range"
+title = "最后一盘，卷闸落下"
+story = "出餐口送出午市最后一盘菜，传菜员还一直站在那里，因为没有人告诉他厨房已经收工。"
+brief = '''
+`main` 里的消费者循环 `for v := range ch { ... }`，然后打印 `done`。
+生产者末尾的哪一行能让那个循环结束 —— 每个值都送达，
+并且没有 goroutine 留在那里等待？
+
+```
+func produce(ch chan<- int) {
+    for i := range 3 {
+        ch <- i
+    }
+    // ____
+}
+```
+'''
+hints = [
+  "对通道的 range 只有在通道被关闭并排空后才结束。哨兵值只不过是又一个值；循环还会继续等。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.cheatsheet_advanced.04.worker-sig"
+title = "一边进，一边出"
+story = "Lucky Mac 流水线上的四个厨师从一条轨上取单、把盘子放到另一条轨上；新来的却一直把订单放回取单的轨上。"
+brief = '''
+一个 worker 池：`main` 把 `jobs` 和 `results` 做成普通的 `chan int`，
+启动四个 worker，发送九个任务，关闭 `jobs`，再用 `<-results` 收集九个
+结果。哪个签名能和这个函数体一起编译 —— 并且让编译器拒绝 worker 里
+对 `jobs` 的发送或对 `results` 的接收？
+
+```
+// ____
+    for j := range jobs {
+        results <- j * j
+    }
+}
+```
+'''
+hints = [
+  "箭头放在数据流动的那一侧：在 `chan` 前面表示只能取出，在 `chan` 后面表示只能放入。双向通道能转换成任意一种。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.cheatsheet_advanced.05.try-send"
+title = "丢掉，别等"
+story = "天后的到站板记录它听到的每一班车；日志满了的时候，板子本身绝不能卡住。"
+brief = '''
+`ch` 是容量为 2 的 `chan string`，有多个 goroutine 往上面发送。
+在 `log(v)` 里，如果有空位就把 `v` 交给通道，否则丢掉 ——
+调用者绝不能阻塞，也不能有 goroutine 留在发送上等待。
+'''
+hints = [
+  "带后备分支的 `select` 永不阻塞；那个后备分支必须什么都不做，而不是再发送一次。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.cheatsheet_advanced.06.timeout-case"
+title = "两秒，然后放弃"
+story = "铜锣湾站的站台屏幕等着下一班车的信号。它等两秒，或者永远等下去 —— 固件也没搞清楚是哪一种。"
+brief = '''
+`ch` 是一个 `<-chan int`，`ctx` 是一个 `context.Context`。填上第三个 case，
+让函数在两秒内什么都没到达时放弃。
+
+```
+select {
+case v := <-ch:
+    use(v)
+    return nil
+case <-ctx.Done():
+    return ctx.Err()
+// ____
+    return errTimeout
+}
+```
+'''
+hints = [
+  "select 的 case 必须是一次发送或接收。`time` 里有个函数返回一个在 `Duration` 之后触发的通道，而光秃秃的 `2` 是两纳秒。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.cheatsheet_advanced.07.defer-cancel"
+title = "出门时放手"
+story = "金钟的每次票价查询都开一个三秒的计时器，却从来没人停掉它；到了晚高峰，闸机手里攥着一万个计时器。"
+brief = '''
+`fetch(ctx)` 必须在三秒限制仍然有效的情况下运行，而计时器的资源
+必须在 `get` 以任何方式返回时都得到释放 —— 提前返回、出错，或成功。
+（`WithCancel` 交回的是同样的一对。）
+
+```
+func get() error {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    // ____
+    return fetch(ctx)
+}
+```
+'''
+hints = [
+  "现在就调用 cancel 函数会在 `fetch` 看到 `ctx` 之前把它取消掉。把这个调用安排到 `get` 返回时 —— 而 `defer` 要的是一个调用，括号也得带上。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.cheatsheet_advanced.08.mutex-inc"
+title = "写锁，不是读锁"
+story = "铜锣湾转乘站的五十个闸机把乘客数进同一个数字，而这个数字总是少一截，少多少谁也复现不出来。"
+brief = '''
+五十个 goroutine 各调用 `Inc` 一千次；之后 `Get` 必须返回 `50000`。
+
+```
+type Ctr struct {
+    mu sync.RWMutex
+    n  int
+}
+func (c *Ctr) Get() int { c.mu.RLock(); defer c.mu.RUnlock(); return c.n }
+// ____
+```
+'''
+hints = [
+  "写入需要独占锁，不是共享锁；值接收者会把结构体连锁一起复制一份，所以真正的 `n` 纹丝不动。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.cheatsheet_advanced.09.once"
+title = "只预热一次"
+story = "二十个骑手在同一秒打开 Lucky Mac 的 app，后端开了二十个数据库连接，每人一个，个个都叫“第一个”。"
+brief = '''
+`initDB()` 是一个设置包级变量 `db` 的 `func()`。`conn()` 同时被二十个
+goroutine 调用；`initDB` 必须恰好运行一次，而每个调用者都必须看到
+已经就绪的 `db`。
+
+```
+var once sync.Once
+func conn() *DB {
+    // ____
+    return db
+}
+```
+'''
+hints = [
+  "`Once` 接收的是函数本身，不是调用它的结果 —— 而闭包里一个光秃秃的名字是一个未使用的值，编译不过。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.cheatsheet_advanced.10.atomic-add"
+title = "一次计数，不加锁"
+story = "港岛线状态页的点击计数器在高负载下会丢计数，而给一个整数套一把互斥锁，Alex 觉得太小题大做。"
+brief = '''
+`var hits atomic.Int64` 被一百个 goroutine 各自递增一万次。哪一行能
+一次不漏地计数，让 `hits.Load()` 最终是 `1000000`？
+'''
+hints = [
+  "带类型的 atomic 有方法；先 load 再 store 是两个操作，中间有空档。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.cheatsheet_advanced.11.fan-in"
+title = "多条线，一个站台"
+story = "荃湾线和观塘线的列车汇入金钟的同一个站台；合并一直正常，直到末班车那一晚，站台再也清不空。"
+brief = '''
+扇入。`go.mod` 写着 `go 1.22`，所以每次迭代都有自己的 `c`。
+为每个输入启动一个转发器，把它复制进 `out`，然后把自己计为完成，
+这样下面的关闭者才能关闭 `out`。
+
+```
+func merge(ins ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+    wg.Add(len(ins))
+    for _, c := range ins {
+        // ____
+    }
+    go func() { wg.Wait(); close(out) }()
+    return out
+}
+```
+'''
+hints = [
+  "它必须跑在自己的 goroutine 里（`go` 关键字加上末尾的调用），而且做完时必须告诉 group —— 否则 `Wait` 永远不返回，`out` 也永远不会被关闭。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.cheatsheet_advanced.12.defer-args"
+title = "那是什么时候读的？"
+story = "天后售票处在下班时打印收银总额，打印出来的却是开班那一刻的总额。"
+brief = '''
+打印 `2` —— `main` 返回时 `x` 的值。
+
+```
+func main() {
+    x := 1
+    // ____
+    x = 2
+}
+```
+'''
+hints = [
+  "被 defer 的调用的参数在 `defer` 处求值，而不是在它运行时。只有自己去读 `x` 的闭包才看得到后来的写入。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.cheatsheet_advanced.13.recover"
+title = "在坠落途中接住"
+story = "Lucky Mac 流水线上一份坏订单扔出一把木勺，整个厨房都黑了，而不是那一盘被标成失败退回来。"
+brief = '''
+`f` 可能 panic。`safe` 必须吞下这个 panic，改为返回 `errPanic`；
+行为良好的 `f` 则返回 `nil`。
+
+```
+func safe(f func()) (err error) {
+    // ____
+    f()
+    return nil
+}
+```
+'''
+hints = [
+  "它只在被 defer 的函数内部才起作用 —— 直接 defer 那个内置函数本身什么用都没有 —— 而唯一的出路是给命名返回值赋值。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.cheatsheet_advanced.14.errors-as"
+title = "哪一种错"
+story = "一个骑手 id 从 Lucky Mac 的查询里裹着三层上下文回来，而柜台需要的是那个缺失的键，不是那句话。"
+brief = '''
+`err` 是用 `fmt.Errorf("lookup: %w", &NotFound{Key: k})` 构造的；
+普通的 `errors.Is` 只会回答是或否。写出那个 `if` 的开头，让它的函数体
+能打印 `nf.Key` —— 而不 panic。
+
+```
+type NotFound struct{ Key string }
+func (e *NotFound) Error() string { return e.Key + " not found" }
+```
+'''
+hints = [
+  "直接断言看不穿包装。目标是一个指向变量的指针，而这个变量的类型实现了 `error` —— 在这里那个类型是指针类型。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.cheatsheet_advanced.15.assert-ok"
+title = "它会说话吗？"
+story = "天后的公告板让数据流里的每个对象描述自己，而第一个普通整数就把板子弄垮了。"
+brief = '''
+`x` 是一个 `any`。`Stop` 有 `String() string` 方法，因此无需声明就满足
+`fmt.Stringer`；`42` 则不满足。绑定 `s` 和 `ok`，让下一行可以写
+`if !ok { return "plain" }` —— 对两种输入都行，并且不崩溃。
+（类型 switch 也能做到，但要更多行。）
+'''
+hints = [
+  "断言的双值形式会报告而不是 panic；这个接口的全名在 `fmt` 里。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.cheatsheet_advanced.16.promoted"
+title = "借来的嗓子"
+story = "铜锣湾站的状态服务器体内带着一个 logger，而拿到服务器日志功能的那个跑腿打印出来的东西一点前缀都没有。"
+brief = '''
+`run` 要一个 `func(string)`。把 `srv` 的日志功能交给它，绑定在 `srv` 上，
+让它打印 `[mtr] up`。
+
+```
+type Logger struct{ prefix string }
+func (l Logger) Log(s string) { fmt.Println(l.prefix, s) }
+type Server struct {
+    Logger
+    addr string
+}
+func run(log func(string)) { log("up") }
+srv := Server{Logger{"[mtr]"}, ":8080"}
+```
+'''
+hints = [
+  "内嵌字段的方法会提升到外层结构体上，而只写方法名不调用，得到的是一个接收者已经绑好的函数值。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.cheatsheet_advanced.17.generic-map"
+title = "任意进，任意出"
+story = "怡和街的到站板拿到的车次是 `[]int`，想要的是 `[]string`；Alex 拒绝第三次写同样的四行循环。"
+brief = '''
+声明一个带两个类型参数的泛型 `Map`，使得
+`Map([]int{1, 2, 3}, strconv.Itoa)` 得到 `[]string{"1", "2", "3"}`。
+
+```
+// ____
+    out := make([]U, 0, len(xs))
+    for _, x := range xs {
+        out = append(out, f(x))
+    }
+    return out
+}
+```
+'''
+hints = [
+  "每个类型参数都需要一个约束，而共用一个约束的参数可以像 `a, b int` 那样共用它。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.cheatsheet_advanced.18.ordered"
+title = "凡是有大于号的"
+story = "金钟站台的温度计用 `Celsius` 报数 —— 一个有名字的整数类型 —— 而为普通 int 写的泛型比较拒绝了它。"
+brief = '''
+`type Celsius int`。这三个调用都必须能编译：
+`Max(3, 5)`、`Max(2.5, 1.0)` 和 `Max(Celsius(30), Celsius(28))`。
+函数体用的是内置的 `max`，它需要一个 `<` 能用的类型。
+'''
+hints = [
+  "不带波浪号列出 `int` 的约束会拒绝每一个从 int *派生*出来的类型。标准库有一个约束，涵盖所有 `<` 能用的类型。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.cheatsheet_advanced.19.generic-stack"
+title = "推得进去的 PUSH"
+story = "港岛线广播员身后的站名栈接受每一次 push，而每次有人去看，它都是空的。"
+brief = '''
+`type Stack[T any] struct{ items []T }`。在 `var s Stack[string]`、
+`s.Push("Tin Hau")` 和 `s.Push("Causeway Bay")` 之后，`len(s.items)`
+必须是 `2`。
+'''
+hints = [
+  "泛型类型的接收者要重复写类型参数，而会修改的方法需要指针形式，否则改的是副本。`append` 返回新切片；得有东西把它留住。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.cheatsheet_advanced.20.sort-desc-safe"
+title = "最大的在前，不回绕"
+story = "铜锣湾的票价余额排行榜上，有一个账户正好在 `int` 的最顶端，另一个正好在最底端，而排序把它们的顺序排反了。"
+brief = '''
+`xs` 是一个 `[]int`，同时含有 `math.MaxInt` 和 `math.MinInt`。
+原地排序，最大的在前 —— 对这两个也要正确。
+'''
+hints = [
+  "两个相距很远的 int 相减会溢出并翻转符号；`cmp` 里有一个三路比较。而且 `sort.Slice` 的函数接收的是下标，不是元素。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.cheatsheet_advanced.21.bisect"
+title = "对半切"
+story = "港岛线控制室里排好序的列车 id 清单有一千万条，而查找每次都把它们全走一遍。"
+brief = '''
+`xs` 是一个升序排好的 `[]int`。用一行、O(log n) 的时间，把 `i` 设成
+`7` 所在（或应插入）的位置，把 `found` 设成它是否在里面。
+'''
+hints = [
+  "`slices` 包里有一个搜索同时返回位置和一个 bool；`sort.SearchInts` 只返回位置，而 `Index` 会把切片走一遍。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.cheatsheet_advanced.22.omitempty"
+title = "空的就别写"
+story = "Lucky Mac 的 app 发出去的骑手资料里，每个步行者的 `bike` 字段都是空的，仪表盘上画出四十辆空自行车。"
+brief = '''
+`json.Marshal(Rider{Name: "Alex"})` 必须得到 `{"name":"Alex"}`，而
+`json.Marshal(Rider{Name: "Alex", Bike: "e-7"})` 必须得到
+`{"name":"Alex","bike":"e-7"}`。哪个字段声明能做到？
+
+```
+type Rider struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+'''
+hints = [
+  "选项写在和名字同一对引号里，用逗号隔开 —— 而未导出的字段根本不会被序列化。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.cheatsheet_advanced.23.scanner-buffer"
+title = "比一行还长"
+story = "港岛线闸机日志的夜间导出是一条十万字符的行，而读取器什么都没交回来，也没有任何人打印出来的错误。"
+brief = '''
+`sc := bufio.NewScanner(os.Stdin)`；下一行输入有 100,000 字节长。
+放在第一次 `sc.Scan()` 之前的哪一行能让那次扫描成功？
+'''
+hints = [
+  "默认的 token 上限是 64 KiB。scanner 有一个方法接收一个初始字节切片和一个最大尺寸 —— 两个参数，不是一个 —— 而分割函数跟这事毫无关系。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.cheatsheet_advanced.24.stable"
+title = "并列的不动"
+story = "金钟两百名闸机员工按资历分组排班，而资历相同的人在每两次打印之间不停地换位置。"
+brief = '''
+`ps` 是一个有两百个条目的 `[]P`，并且
+`less := func(i, j int) bool { return ps[i].S < ps[j].S }`。按 `S` 给 `ps`
+排序，使 `S` 相等的条目保证保持原来的相对顺序。
+'''
+hints = [
+  "`less` 接收下标，所以它适合 `sort` 包的切片函数，而不是 `slices` 的那些 —— 而两个切片排序里只有一个承诺让并列的保持原位。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.cheatsheet_advanced.25.duration"
+title = "毫秒，不是纳秒"
+story = "铜锣湾的停站时间以文本 `250` 到达，而车门在打开后两百五十纳秒就关上了。"
+brief = '''
+`s` 是 `"250"`，一个毫秒数。在 `n, err := strconv.ParseInt(s, 10, 64)`
+（没有错误）之后，让 `d` 成为一个打印出来是 `250ms` 的 `time.Duration`。
+'''
+hints = [
+  "`int64` 变量不能和 `Duration` 相乘 —— 只有无类型常量可以。先转换这个数，再按单位缩放。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.cheatsheet_advanced.26.struct-key"
+title = "同一格，同一桶"
+story = "骑手按他们等候的网格格子分组；怡和街同一个街角的第二个骑手把第一个抹掉了。"
+brief = '''
+`type pt struct{ r, c int }`，而 `m` 是一个 `map[pt][]int`（字段都可比较的
+结构体可以做键）。把骑手 `id` 加到格子 `(r, c)` 下面，保留已经在那里的
+任何 id —— 包括这个键从未出现过的情况。
+'''
+hints = [
+  "缺失的键读出来是一个 nil 切片，而往 nil 切片上 append 没有问题；结果必须存回同一个值键下面。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.cheatsheet_advanced.27.builder-ptr"
+title = "别复制 BUILDER"
+story = "港岛线的广播一块一块地拼起来，而负责加最后一块的辅助函数崩溃了，报的是一条关于非法复制的消息。"
+brief = '''
+`sb` 是一个已经装着 `"Island"` 的 `strings.Builder`。声明 `add`，
+使得在 `add(…, " Line")` 之后 —— 用签名需要的任何参数调用 ——
+`sb.String()` 是 `"Island Line"`，并且不 panic。
+'''
+hints = [
+  "非零的 `Builder` 按值传递会被复制，而对副本的第一次写入会 panic。builder 没有 `+=`；它有一个返回两个值的方法，忽略它们没问题，解引用就不行。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.cheatsheet_advanced.28.heap-pop"
+title = "堆顶"
+story = "Lucky Mac 调度员的优先级清单交出最紧急的订单，而它交出的第三张单子却是最晚才到期的那张。"
+brief = '''
+`IntHeap` 实现了 `heap.Interface`，`Less` 写成 `h[i] > h[j]`，而 `h` 是
+一个已经用 `heap.Init(h)` 初始化过的 `*IntHeap`。把最大值取出到 `x`
+（一个 `int`）里，并让堆对下一次取出仍然有效。
+'''
+hints = [
+  "你在类型上写的那个方法只会移除最后一个元素；包里的函数才是把根移出来并重新堆化的那个。它返回 `any`。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.cheatsheet_advanced.29.iota"
+title = "零、一、二"
+story = "金钟板子上的三条港铁线全都编号为零，而颜色查找把每一条都涂成港岛线的蓝色。"
+brief = '''
+`type Line int` 有一个 `String()` 方法，对一个三元素数组取下标。
+把 `Island`、`TsuenWan` 和 `KwunTong` 声明为 `0`、`1`、`2` ——
+全都是 `Line` 类型。
+'''
+hints = [
+  "在 `const` 块里，没有表达式的常量会重复上一行的整个表达式 —— 包括类型。只有一个表达式会向上计数。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.cheatsheet_advanced.30.errc"
+title = "第一个坏消息"
+story = "港岛线的八个车站同时被 ping；一有一个报告故障，控制室就转头去忙别的，而七个 ping 程序还站在一扇永远不会有人打开的窗口前。"
+brief = '''
+这里没有 `errgroup` —— 只用标准库。`n` 个 goroutine 中的每一个都恰好往
+`errc` 发送一个 `error`（通常是 `nil`）。`checkAll` 返回第一个非 nil 的错误，
+不等其余的，而之后不能有任何 goroutine 卡在它的发送上。声明 `errc`。
+
+```
+func checkAll(n int) error {
+    // ____
+    for i := range n {
+        go func() { errc <- check(i) }()
+    }
+    for range n {
+        if err := <-errc; err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+'''
+hints = [
+  "`checkAll` 一旦返回，就再也没有人接收了。每个发送者都必须能在没有接收者的情况下完成它那一次发送 —— 缓冲区要按它们的总数来定。",
+]

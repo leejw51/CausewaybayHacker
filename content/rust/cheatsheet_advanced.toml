@@ -1,0 +1,1036 @@
+# RUST LAND — CHEATSHEET ADVANCED. The part of the cheatsheet an interviewer
+# uses to tell a fluent candidate from one who only knows the grammar: traits
+# and trait objects, bounds, closures and what they capture, lifetimes, the
+# smart pointers, threads, channels, the iterator adaptors, custom errors and
+# the traps that bite under time pressure (overflow, a `const` that is a copy,
+# a float that will not sort). Four lines, one right. Nothing is typed and
+# nothing is compiled — the pick is the submission (SPEC §0). The wrong lines
+# are near-misses: `Fn` for `FnMut`, `..` for `..=`, `Rc` where `Arc` is
+# needed, an `Into` where `?` wants a `From`.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+# Every line was compiled against rustc 1.98 (edition 2024) before it was kept.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "rust.cheatsheet_advanced"
+land     = "rust"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "rust.cheatsheet_advanced.01.default-method"
+node        = 1
+title       = "THE SPARE LINE"
+difficulty  = 3
+story       = "06:50, above Jardine's Bazaar. Every shop on Mei's list can say its name; she wants them all to greet, without writing a greeting for each."
+concepts    = ["traits", "functions", "dispatch"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`Greet` already requires `name`. Add `hello` to the trait so that
+`impl Greet for Shop` writes **only** `name`, and `Shop.hello()` still
+compiles and returns whatever `name` returns.
+
+```
+trait Greet {
+    fn name(&self) -> String;
+    // ____
+}
+impl Greet for Shop { fn name(&self) -> String { "Sogo".into() } }
+```
+'''
+solution    = "fn hello(&self) -> String { self.name() }"
+hints = [
+  "A trait method with a body is optional for implementors; one with only a signature is not. There is no keyword for it — the body is the whole signal.",
+]
+
+[quest.quiz]
+choices = [
+  "fn hello(&self) -> String;",
+  "default fn hello(&self) -> String { self.name() }",
+  "fn hello(&self) -> String { self.name() }",
+  "fn hello(&self) -> String => self.name();",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "rust.cheatsheet_advanced.02.trait-objects"
+node        = 2
+title       = "ANY SHAPE WILL DO"
+difficulty  = 3
+story       = "The sign shop on Jaffe Road takes squares and circles in the same order book, and each one knows its own area."
+concepts    = ["dispatch", "traits", "smart-pointers"]
+requires    = ["rust.cheatsheet_advanced.01.default-method"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`Shape` is a trait with `fn area(&self) -> f64`; `Sq` and `Ci` both
+implement it. Declare `shapes` as a growable list that can hold a `Sq`
+**and** a `Ci` at the same time, each on the heap, so that
+`shapes.iter().map(|s| s.area()).sum::<f64>()` works.
+'''
+solution    = "let mut shapes: Vec<Box<dyn Shape>> = Vec::new();"
+hints = [
+  "Two concrete types in one Vec need a pointer to a trait object; a generic parameter would fix the type to one of them, and a bare trait is not a type at all.",
+]
+
+[quest.quiz]
+choices = [
+  "let mut shapes: Vec<dyn Shape> = Vec::new();",
+  "let mut shapes: Vec<impl Shape> = Vec::new();",
+  "let mut shapes: Vec<&Shape> = Vec::new();",
+  "let mut shapes: Vec<Box<dyn Shape>> = Vec::new();",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "rust.cheatsheet_advanced.03.where-bound"
+node        = 3
+title       = "THE BIGGEST, WHATEVER IT IS"
+difficulty  = 3
+story       = "The Sogo price board holds prices as f64 and stock counts as i32, and Ferris wants the largest of either without two functions."
+concepts    = ["generics", "traits", "functions"]
+requires    = ["rust.cheatsheet_advanced.02.trait-objects"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`largest` is called on a `&[f64]` **and** on a `&[i32]`. It compares
+with `>` and hands back a reference to the winner. The bound goes in a
+`where` clause.
+
+```
+// ____
+    let mut m = &v[0];
+    for x in v { if x > m { m = x; } }
+    m
+}
+```
+'''
+solution    = "fn largest<T>(v: &[T]) -> &T where T: PartialOrd {"
+hints = [
+  "`>` needs a partial order, nothing more — a bound that asks for total order or full equality shuts the door on floats. And the body returns `&T`, not `T`.",
+]
+
+[quest.quiz]
+choices = [
+  "fn largest<T>(v: &[T]) -> &T where T: PartialOrd {",
+  "fn largest<T>(v: &[T]) -> &T where T: Ord {",
+  "fn largest<T>(v: &[T]) -> T where T: PartialOrd {",
+  "fn largest<T>(v: &[T]) -> &T where T: PartialOrd + Eq {",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "rust.cheatsheet_advanced.04.next-signature"
+node        = 4
+title       = "WHAT FIB HANDS OVER"
+difficulty  = 3
+story       = "The tram numbers on Hennessy Road come out one at a time, each one from the two before it."
+concepts    = ["traits", "iteration", "structs"]
+requires    = ["rust.cheatsheet_advanced.03.where-bound"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`Fib { a: u64, b: u64 }` becomes an iterator over `u64`:
+
+```
+impl Iterator for Fib {
+    type Item = u64;
+    // ____
+        let r = self.a;
+        self.a = self.b;
+        self.b += r;
+        Some(r)
+    }
+}
+```
+
+Which signature does the trait require for the method in the blank?
+'''
+solution    = "fn next(&mut self) -> Option<Self::Item> {"
+hints = [
+  "The method advances the state, so it needs an exclusive borrow of `self`; and it must be able to say there is nothing more, so it returns the item wrapped, not bare.",
+]
+
+[quest.quiz]
+choices = [
+  "fn next(&self) -> Option<Self::Item> {",
+  "fn next(&mut self) -> Option<Self::Item> {",
+  "fn next(&mut self) -> Self::Item {",
+  "fn next(mut self) -> Option<Self::Item> {",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "rust.cheatsheet_advanced.05.box-dyn-error"
+node        = 5
+title       = "TWO KINDS OF TROUBLE"
+difficulty  = 3
+story       = "The payment path off Gloucester Road can fail in the parser or in the ledger, and `main` has to swallow both with one `?`."
+concepts    = ["error-handling", "dispatch", "smart-pointers"]
+requires    = ["rust.cheatsheet_advanced.04.next-signature"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`AppError` is a custom error:
+
+```
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "app: {}", self.0) }
+}
+impl std::error::Error for AppError {}
+```
+
+Those are its only impls — `AppError` has **no** `From` conversions.
+Inside `main`, `?` is used on a `ParseIntError` **and** on an `AppError`.
+Which signature for `main` lets both compile?
+'''
+solution    = "fn main() -> Result<(), Box<dyn Error>> {"
+hints = [
+  "Two different error types through one `?` need a return type both can be converted into: a trait object, and one that is sized — so it sits behind a pointer.",
+]
+
+[quest.quiz]
+choices = [
+  "fn main() -> Result<(), dyn Error> {",
+  "fn main() -> Result<(), AppError> {",
+  "fn main() -> Result<(), Box<dyn Error>> {",
+  "fn main() -> Result<(), Box<Error>> {",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "rust.cheatsheet_advanced.06.from-for-question-mark"
+node        = 6
+title       = "THE CONVERTER"
+difficulty  = 4
+story       = "The till at Jardine's Bazaar reports a parse failure in its own words; the ledger wants it in its own enum, without a `map_err` on every line."
+concepts    = ["traits", "error-handling", "enums"]
+requires    = ["rust.cheatsheet_advanced.05.box-dyn-error"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`enum AppError { Parse(ParseIntError), Neg }`. The function below must
+compile exactly as written — `?` does the conversion:
+
+```
+fn read(s: &str) -> Result<i32, AppError> {
+    let n: i32 = s.trim().parse()?;
+    if n < 0 { return Err(AppError::Neg); }
+    Ok(n)
+}
+```
+
+Which impl header, with `fn from(e: ParseIntError) -> Self { AppError::Parse(e) }`
+inside it, makes that work?
+'''
+solution    = "impl From<ParseIntError> for AppError {"
+hints = [
+  "`?` calls one specific trait to convert the error, and it is implemented on the target type, for the source type — not the other way round, and not its mirror-image cousin.",
+]
+
+[quest.quiz]
+choices = [
+  "impl Into<AppError> for ParseIntError {",
+  "impl From<AppError> for ParseIntError {",
+  "impl AppError: From<ParseIntError> {",
+  "impl From<ParseIntError> for AppError {",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "rust.cheatsheet_advanced.07.map-err-chain"
+node        = 7
+title       = "IN HER OWN WORDS"
+difficulty  = 3
+story       = "Room 7-32's ledger logs failures as plain text, so the parser's error has to become a String before it leaves the function."
+concepts    = ["error-handling", "closures", "strings"]
+requires    = ["rust.cheatsheet_advanced.06.from-for-question-mark"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+The function returns `Result<i32, String>`. `n` is the parsed `i32` of
+`s`, and a bad `s` returns the parser's message as the `Err`, in one line.
+
+```
+fn read(s: &str) -> Result<i32, String> {
+    // ____
+    Ok(n * 2)
+}
+```
+'''
+solution    = "let n = s.trim().parse::<i32>().map_err(|e| e.to_string())?;"
+hints = [
+  "There is no built-in conversion from the parser's error into a String, so `?` alone will not do it; transform the error first, then propagate.",
+]
+
+[quest.quiz]
+choices = [
+  "let n = s.trim().parse::<i32>()?;",
+  "let n = s.trim().parse::<i32>().map_err(|e| e.to_string())?;",
+  "let n = s.trim().parse::<i32>().map_err(|e| e.to_string());",
+  "let n = s.trim().parse::<i32>().or_else(|e| e.to_string())?;",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "rust.cheatsheet_advanced.08.option-chain"
+node        = 8
+title       = "MAYBE AN INDEX"
+difficulty  = 4
+story       = "Locker number `o` at Causeway Bay station may be None, or may be past the last locker; Mei wants the contents or -1, and no panic."
+concepts    = ["error-handling", "closures", "slices"]
+requires    = ["rust.cheatsheet_advanced.07.map-err-chain"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`v: Vec<i32>`, `o: Option<usize>`. `x` is an `i32`: the element of `v`
+at that index, or `-1` if `o` is `None` **or** the index is out of range.
+It must not panic for any `o`.
+'''
+solution    = "let x = o.and_then(|i| v.get(i)).copied().unwrap_or(-1);"
+hints = [
+  "A lookup that itself returns an Option must be chained, not mapped, or you get an Option inside an Option. And the lookup hands back a reference — copy it out before the default.",
+]
+
+[quest.quiz]
+choices = [
+  "let x = o.and_then(|i| v.get(i)).copied().unwrap_or(-1);",
+  "let x = o.map(|i| v.get(i)).copied().unwrap_or(-1);",
+  "let x = o.and_then(|i| v.get(i)).unwrap_or(-1);",
+  "let x = o.and_then(|i| v[i]).unwrap_or(-1);",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "rust.cheatsheet_advanced.09.let-else"
+node        = 9
+title       = "FIRST WORD OR LEAVE"
+difficulty  = 3
+story       = "The order slip at the dai pai dong may be blank; if there is no first word, Mei walks away with 0."
+concepts    = ["pattern-matching", "error-handling", "control-flow"]
+requires    = ["rust.cheatsheet_advanced.08.option-chain"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`w` must be the first whitespace-separated word of `s` — a `&str` used
+on the next line. If there is none, the function returns `0` right there.
+
+```
+fn first_num(s: &str) -> i32 {
+    // ____
+    w.parse().unwrap_or(0)
+}
+```
+'''
+solution    = "let Some(w) = s.split_whitespace().next() else { return 0; };"
+hints = [
+  "A refutable pattern on `let` needs an else branch, and that branch must leave — return, break, continue or panic; handing back a value is not leaving.",
+]
+
+[quest.quiz]
+choices = [
+  "let Some(w) = s.split_whitespace().next() else { return 0; };",
+  "let Some(w) = s.split_whitespace().next() else { 0 };",
+  "if let Some(w) = s.split_whitespace().next() else { return 0; };",
+  "let w = s.split_whitespace().next() else { return 0; };",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "rust.cheatsheet_advanced.10.binding-and-guard"
+node        = 10
+title       = "SHORT ODD WALKS"
+difficulty  = 3
+story       = "Alex's walking orders on Percival Street: a walk of 1 to 5 blocks is short, and Mei only cares about the odd ones."
+concepts    = ["pattern-matching", "enums", "control-flow"]
+requires    = ["rust.cheatsheet_advanced.09.let-else"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`enum Cmd { Walk(i32), Wait }`. In `Cmd::label(&self)`, add the arm for
+a `Walk` whose distance is in 1 to 5 — **5 included** — and odd, printing
+the distance:
+
+```
+match self {
+    Cmd::Wait => "wait".into(),
+    // ____
+    Cmd::Walk(_) => "walk".into(),
+}
+```
+'''
+solution    = 'Cmd::Walk(n @ 1..=5) if n % 2 == 1 => format!("odd {n}"),'
+hints = [
+  "Bind a name to a range pattern with `@`, then the guard can test the name. Mind which range form includes its upper end.",
+]
+
+[quest.quiz]
+choices = [
+  'Cmd::Walk(n @ 1..5) if n % 2 == 1 => format!("odd {n}"),',
+  'Cmd::Walk(n @ 1..=5) if n % 2 == 1 => format!("odd {n}"),',
+  'Cmd::Walk(1..=5 as n) if n % 2 == 1 => format!("odd {n}"),',
+  'Cmd::Walk(n) in 1..=5 if n % 2 == 1 => format!("odd {n}"),',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "rust.cheatsheet_advanced.11.struct-lifetime"
+node        = 11
+title       = "A SLICE OF THE LINE"
+difficulty  = 3
+story       = "The ticket from the Yee Wo Street kiosk is one line; the token Mei keeps is a slice of it, so it cannot outlive the line."
+concepts    = ["lifetimes", "structs", "borrowing"]
+requires    = ["rust.cheatsheet_advanced.10.binding-and-guard"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`Token` holds a borrowed `&str` pointing into the caller's string.
+Declare it so that this compiles:
+
+```
+fn first_word<'a>(s: &'a str) -> Token<'a> {
+    Token { text: s.split_whitespace().next().unwrap_or("") }
+}
+```
+'''
+solution    = "struct Token<'a> { text: &'a str }"
+hints = [
+  "A struct that holds a reference carries a lifetime parameter, and the field has to use that same parameter — declaring it and not using it is the usual slip.",
+]
+
+[quest.quiz]
+choices = [
+  "struct Token { text: &str }",
+  "struct Token<'a> { text: &str }",
+  "struct Token<'a> { text: &'a str }",
+  "struct Token { text: &'static str }",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "rust.cheatsheet_advanced.12.counter-closure"
+node        = 12
+title       = "THE DOORMAN'S CLICKER"
+difficulty  = 4
+story       = "The doorman on Lockhart Road makes a fresh clicker for every event; each press changes the number inside it."
+concepts    = ["closures", "ownership", "dispatch"]
+requires    = ["rust.cheatsheet_advanced.11.struct-lifetime"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+The body of `counter` is `let mut c = 0; move || { c += 1; c }` — not
+boxed. The caller does `let mut next = counter(); next(); next();`.
+Which signature for `counter` compiles?
+
+```
+// ____
+    let mut c = 0;
+    move || { c += 1; c }
+}
+```
+'''
+solution    = "fn counter() -> impl FnMut() -> u32 {"
+hints = [
+  "The closure mutates what it captured, so it is one kind of closure; it is called twice, so it is not the one-shot kind; and nothing in the body wraps it in a Box.",
+]
+
+[quest.quiz]
+choices = [
+  "fn counter() -> impl Fn() -> u32 {",
+  "fn counter() -> Box<dyn FnMut() -> u32> {",
+  "fn counter() -> impl FnOnce() -> u32 {",
+  "fn counter() -> impl FnMut() -> u32 {",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "rust.cheatsheet_advanced.13.longest"
+node        = 13
+title       = "THE LONGER NAME"
+difficulty  = 4
+story       = "Two street names, one lent from the tram stop and one from a sign that is about to come down; Mei returns whichever is longer."
+concepts    = ["lifetimes", "borrowing", "functions"]
+requires    = ["rust.cheatsheet_advanced.12.counter-closure"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`longest` returns `a` or `b`, whichever is longer. Which signature compiles?
+
+```
+// ____
+    if a.len() >= b.len() { a } else { b }
+}
+```
+'''
+solution    = "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {"
+hints = [
+  "With two reference inputs the compiler cannot guess which one the output borrows from; name one lifetime and tie it to both inputs and the output.",
+]
+
+[quest.quiz]
+choices = [
+  "fn longest(a: &str, b: &str) -> &str {",
+  "fn longest<'a>(a: &'a str, b: &str) -> &'a str {",
+  "fn longest<'a>(a: &str, b: &str) -> &'a str {",
+  "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "rust.cheatsheet_advanced.14.letter-from-index"
+node        = 14
+title       = "THE I-TH LETTER"
+difficulty  = 3
+story       = "The lockers at Victoria Park are lettered a to z, and the booking came in as a number."
+concepts    = ["types", "strings", "bindings"]
+requires    = ["rust.cheatsheet_advanced.13.longest"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`i: usize`, with `0 <= i < 26`. `c` is a `char`: the `i`-th lowercase
+ASCII letter, so `0 → 'a'`, `7 → 'h'`, `25 → 'z'`.
+'''
+solution    = "let c = (b'a' + i as u8) as char;"
+hints = [
+  "Only one integer width casts straight to a char, and it is the byte. Add to a byte literal, then cast — and the std digit helper counts 0 to 9 before it reaches the letters.",
+]
+
+[quest.quiz]
+choices = [
+  "let c = (b'a' + i as u8) as char;",
+  "let c = ('a' + i) as char;",
+  "let c = (b'a' + i) as char;",
+  "let c = char::from_digit(i as u32, 36).unwrap();",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "rust.cheatsheet_advanced.15.filter-map-parse"
+node        = 15
+title       = "KEEP WHAT PARSES"
+difficulty  = 3
+story       = "The 7-Eleven receipt roll is half numbers and half smudges; Mei wants the numbers, in order, and no fuss about the rest."
+concepts    = ["iteration", "closures", "error-handling"]
+requires    = ["rust.cheatsheet_advanced.14.letter-from-index"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`ws: [&str; 4]` mixes numbers and junk, e.g. `["12", "x", "7", "3.5"]`.
+`v` holds the ones that parse as `i32`, in order; junk is skipped
+silently.
+
+```
+let v: Vec<i32> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = "ws.iter().filter_map(|w| w.parse().ok()).collect()"
+hints = [
+  "One adaptor both filters and maps when the closure hands back an Option — and a parse result is not an Option until you make it one.",
+]
+
+[quest.quiz]
+choices = [
+  "ws.iter().filter(|w| w.parse().is_ok()).collect()",
+  "ws.iter().filter_map(|w| w.parse().ok()).collect()",
+  "ws.iter().map(|w| w.parse().ok()).collect()",
+  "ws.iter().filter_map(|w| w.parse()).collect()",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "rust.cheatsheet_advanced.16.collect-result"
+node        = 16
+title       = "ALL OR NOTHING"
+difficulty  = 4
+story       = "The till on Jardine's Bazaar rejects the whole line if one token is bad; there is no partial total."
+concepts    = ["iteration", "error-handling", "generics"]
+requires    = ["rust.cheatsheet_advanced.15.filter-map-parse"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+Inside `main` (which returns `()`), `ws: [&str; 3]`. `r` is `Ok` with
+**all** the numbers, or the first parse error if any token is bad.
+
+```
+let r: Result<Vec<i32>, ParseIntError> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = "ws.iter().map(|w| w.parse()).collect()"
+hints = [
+  "Gathering an iterator of Results into a Result of a Vec is one call with the right target type — the annotation on `r` already names it. No `?` is needed, and `main` here could not take one anyway.",
+]
+
+[quest.quiz]
+choices = [
+  "ws.iter().map(|w| w.parse()).collect::<Vec<_>>()",
+  "ws.iter().filter_map(|w| w.parse().ok()).collect()",
+  "ws.iter().map(|w| w.parse()).collect()",
+  "ws.iter().map(|w| w.parse()?).collect()",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "rust.cheatsheet_advanced.17.zip-into-map"
+node        = 17
+title       = "TWO COLUMNS, ONE MAP"
+difficulty  = 3
+story       = "The wet market's price board is two lists — names on the left, prices on the right — and Mei wants to look prices up by name."
+concepts    = ["collections", "iteration", "hashing"]
+requires    = ["rust.cheatsheet_advanced.16.collect-result"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`keys: Vec<String>` and `vals: Vec<u32>`, the same length, and neither
+is used afterwards. `m` is built from them in one expression:
+
+```
+let m: HashMap<String, u32> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = "keys.into_iter().zip(vals).collect()"
+hints = [
+  "Pair the two sequences up, then gather the pairs. The map wants owned Strings and plain u32s, so walk the Vecs by value, not by reference.",
+]
+
+[quest.quiz]
+choices = [
+  "keys.into_iter().zip(vals).collect()",
+  "HashMap::from(keys, vals)",
+  "keys.iter().zip(vals.iter()).collect()",
+  "keys.zip(vals).collect()",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "rust.cheatsheet_advanced.18.sort-floats-desc"
+node        = 18
+title       = "DEAREST FIRST"
+difficulty  = 4
+story       = "Rents in the Causeway Bay walk-ups are floats, and the landlord wants the dearest at the top."
+concepts    = ["sorting", "closures", "types"]
+requires    = ["rust.cheatsheet_advanced.17.zip-into-map"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`v: Vec<f64>` with no NaNs. Sort it in place, **descending**.
+'''
+solution    = "v.sort_by(|a, b| b.partial_cmp(a).unwrap());"
+hints = [
+  "Floats have no total order, so the plain sort and the key-based sort refuse them; give a comparator that uses the partial comparison and flips the operands.",
+]
+
+[quest.quiz]
+choices = [
+  "v.sort_by(|a, b| b.cmp(a));",
+  "v.sort_by(|a, b| b.partial_cmp(a).unwrap());",
+  "v.sort_by_key(|&x| Reverse(x));",
+  "v.sort(); v.reverse();",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "rust.cheatsheet_advanced.19.lazy-cache"
+node        = 19
+title       = "COMPUTE ONLY ON A MISS"
+difficulty  = 4
+story       = "Lucky Mac's kitchen computes a dish's cost once and pins it to the board; Chef Bo will not redo the sum for a dish already up there."
+concepts    = ["collections", "hashing", "closures"]
+requires    = ["rust.cheatsheet_advanced.18.sort-floats-desc"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`cache: HashMap<u64, u64>` and `fn slow(n: u64) -> u64` prints
+`computing n` every time it runs. Over `for n in [3, 3, 4]`, `v` is the
+cached value of `n`, and `slow` must print **exactly twice**.
+'''
+solution    = "let v = *cache.entry(n).or_insert_with(|| slow(n));"
+hints = [
+  "The entry API has two ways to fill a hole: one takes a value (already computed, every time), the other takes a closure that only runs when the key is missing.",
+]
+
+[quest.quiz]
+choices = [
+  "let v = *cache.entry(n).or_insert(slow(n));",
+  "let v = *cache.entry(n).or_insert_with(slow(n));",
+  "let v = *cache.get(&n).unwrap_or_else(|| slow(n));",
+  "let v = *cache.entry(n).or_insert_with(|| slow(n));",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "rust.cheatsheet_advanced.20.btree-range"
+node        = 20
+title       = "TEN TO TWENTY"
+difficulty  = 3
+story       = "The tram stops in the ordered ledger are numbered; Mei wants stops 10 through 20, in order, without reading the whole book."
+concepts    = ["collections", "iteration"]
+requires    = ["rust.cheatsheet_advanced.19.lazy-cache"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`m: BTreeMap<u32, &str>`. Loop over the entries with keys from 10 to
+20 — **both included** — ascending, without walking the whole map.
+
+```
+// ____
+    print!("{k}{v} ");
+}
+```
+'''
+solution    = "for (k, v) in m.range(10..=20) {"
+hints = [
+  "An ordered map can hand you a sub-range by key; it takes one range argument, and which range syntax includes its upper end is the question.",
+]
+
+[quest.quiz]
+choices = [
+  "for (k, v) in m.range(10, 20) {",
+  "for (k, v) in m[10..=20] {",
+  "for (k, v) in m.range(10..=20) {",
+  "for (k, v) in m.range(10..20) {",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "rust.cheatsheet_advanced.21.checked-digits"
+node        = 21
+title       = "NO SILENT WRAP"
+difficulty  = 4
+story       = "The Gloucester Road settlement parses amounts by hand; an overflow must come back as None, never as a number that merely looks plausible."
+concepts    = ["math", "error-handling", "types"]
+requires    = ["rust.cheatsheet_advanced.20.btree-range"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`parse_u64` returns `Option<u64>`: `None` on overflow (not a wrapped
+number), and it never panics. `d: u32` is the digit's value.
+
+```
+fn parse_u64(s: &str) -> Option<u64> {
+    let mut acc: u64 = 0;
+    for c in s.chars() {
+        let d = c.to_digit(10)?;
+        // ____
+    }
+    Some(acc)
+}
+```
+'''
+solution    = "acc = acc.checked_mul(10)?.checked_add(d as u64)?;"
+hints = [
+  "The arithmetic methods that return an Option can each be followed by `?` inside this function. Plain operators panic in debug, and the wrapping ones return the wrong number in silence.",
+]
+
+[quest.quiz]
+choices = [
+  "acc = acc.checked_mul(10)?.checked_add(d as u64)?;",
+  "acc = acc * 10 + d as u64;",
+  "acc = acc.checked_mul(10).checked_add(d as u64)?;",
+  "acc = acc.wrapping_mul(10).wrapping_add(d as u64);",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "rust.cheatsheet_advanced.22.derive-ord-fields"
+node        = 22
+title       = "PRIORITY, THEN NAME"
+difficulty  = 4
+story       = "The night kitchen's tickets sort by priority first and by dish name within the same priority, and the derive does exactly what the fields tell it."
+concepts    = ["traits", "structs", "sorting"]
+requires    = ["rust.cheatsheet_advanced.21.checked-digits"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+The line `#[derive(PartialEq, Eq, PartialOrd, Ord)]` sits above the
+struct. `tasks.sort()` must order by `pri` first (1 before 2), and
+**within equal `pri`** by `name`. The fields are `pri: u32` and
+`name: String`. Which declaration does it?
+'''
+solution    = "struct Task { pri: u32, name: String }"
+hints = [
+  "A derived ordering compares fields in the order they are declared, top to bottom; the first field that differs decides.",
+]
+
+[quest.quiz]
+choices = [
+  "struct Task { name: String, pri: u32 }",
+  "struct Task { pri: u32, name: String }",
+  "struct Task { pri: u32, name: &str }",
+  "struct Task(String, u32);",
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "rust.cheatsheet_advanced.23.struct-update"
+node        = 23
+title       = "ONLY THE PORT"
+difficulty  = 3
+story       = "The fintech's config has a dozen fields and Mei wants to change one; the rest should be whatever the empty config says."
+concepts    = ["structs", "zero-values", "traits"]
+requires    = ["rust.cheatsheet_advanced.22.derive-ord-fields"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`Config` has fields `host: String`, `port: u16`, `retries: u8`,
+`verbose: bool` and derives `Default`. Build `c` with `port` set to
+`8080` and **every other field at its default**, naming no other field.
+'''
+solution    = "let c = Config { port: 8080, ..Default::default() };"
+hints = [
+  "Struct update syntax fills the fields you did not name from another instance — two dots, then an expression that yields a `Config`, not a trait name.",
+]
+
+[quest.quiz]
+choices = [
+  "let c = Config { port: 8080, ...Default::default() };",
+  "let c = Config { port: 8080 };",
+  "let c = Config { port: 8080, ..Default::default() };",
+  "let c = Config { port: 8080, ..Default };",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "rust.cheatsheet_advanced.24.rc-refcell"
+node        = 24
+title       = "TWO HANDLES, ONE LOG"
+difficulty  = 4
+story       = "Ferris and Mei both hold a handle to the same single-threaded log; Ferris writes, Mei reads it back."
+concepts    = ["smart-pointers", "interior-mutability", "mutability"]
+requires    = ["rust.cheatsheet_advanced.23.struct-update"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`log` is `Rc<RefCell<Vec<&str>>>` and `let b = Rc::clone(&log);`. Push
+`"tram"` through `b` so that `log.borrow()` shows it.
+'''
+solution    = 'b.borrow_mut().push("tram");'
+hints = [
+  "`Rc` only ever hands out shared access; the cell inside is what lets you borrow mutably at run time — ask it for the mutable borrow, not the shared one.",
+]
+
+[quest.quiz]
+choices = [
+  'b.get_mut().push("tram");',
+  'b.push("tram");',
+  'b.borrow().push("tram");',
+  'b.borrow_mut().push("tram");',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "rust.cheatsheet_advanced.25.arc-mutex"
+node        = 25
+title       = "FOUR DOORS, ONE TALLY"
+difficulty  = 4
+story       = "Four doors at the Sogo basement arcade count admissions into one tally, and the total must be exact."
+concepts    = ["shared-state", "concurrency", "interior-mutability"]
+requires    = ["rust.cheatsheet_advanced.24.rc-refcell"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`hits` is `Arc<Mutex<u32>>`. In each of four spawned threads, `c` is
+`Arc::clone(&hits)`, and each thread adds one to the count 1000 times.
+Which line, inside the thread, adds one?
+
+```
+hs.push(thread::spawn(move || {
+    for _ in 0..1000 { /* ____ */ }
+}));
+for h in hs { h.join().unwrap(); }
+```
+'''
+solution    = "*c.lock().unwrap() += 1;"
+hints = [
+  "Locking returns a Result; unwrap it to get the guard, then dereference the guard to reach the number. Three steps — and the near-misses each skip one.",
+]
+
+[quest.quiz]
+choices = [
+  "*c.lock().unwrap() += 1;",
+  "c.lock().unwrap() += 1;",
+  "*c.lock() += 1;",
+  "c += 1;",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "rust.cheatsheet_advanced.26.scoped-thread"
+node        = 26
+title       = "BORROWED FOR THE SPAN"
+difficulty  = 4
+story       = "The Times Square escalator count is on loan to a helper for a moment; no copying it, no shared owner, and it is needed again when the helper is done."
+concepts    = ["concurrency", "borrowing", "lifetimes"]
+requires    = ["rust.cheatsheet_advanced.25.arc-mutex"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`v: Vec<i32>`. Print it from another thread by **borrowing** it — no
+`Arc`, no clone, no `move` — and `v` is used again right after on the
+next line.
+'''
+solution    = 'thread::scope(|s| { s.spawn(|| println!("{:?}", v)); });'
+hints = [
+  "A plain spawned thread may outlive the function, so it cannot borrow. The scoped kind is guaranteed to finish before the scope returns, and its spawn goes through the scope handle.",
+]
+
+[quest.quiz]
+choices = [
+  'thread::spawn(|| println!("{:?}", v)).join().unwrap();',
+  'thread::scope(|s| { s.spawn(|| println!("{:?}", v)); });',
+  'thread::scope(|s| { s.spawn(move || println!("{:?}", v)); });',
+  'thread::scope(|| { thread::spawn(|| println!("{:?}", v)); });',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "rust.cheatsheet_advanced.27.take-n-messages"
+node        = 27
+title       = "EXACTLY FOUR, NO HANGING"
+difficulty  = 5
+story       = "Four couriers on Lockhart Road each radio one number back; the dispatcher keeps her own radio on and must still stop listening after four."
+concepts    = ["channels", "concurrency", "iteration"]
+requires    = ["rust.cheatsheet_advanced.26.scoped-thread"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`n: usize = 4`. Four threads were each given a `tx.clone()` and each
+sends **one** `u64` after some work. The original `tx` is **not**
+dropped and `main` keeps it. `r` holds all four messages and `main` must
+not hang.
+
+```
+let (tx, rx) = mpsc::channel::<u64>();
+for id in 0..n as u64 {
+    let tx = tx.clone();
+    thread::spawn(move || { work(); tx.send(id * id).unwrap() });
+}
+// ____
+```
+'''
+solution    = "let r: Vec<u64> = rx.iter().take(n).collect();"
+hints = [
+  "The blocking iterator over a receiver ends only when every sender is gone; with one still in `main`, stop it by count. The non-blocking iterator returns whatever has arrived so far — maybe nothing.",
+]
+
+[quest.quiz]
+choices = [
+  "let r: Vec<u64> = rx.recv().take(n).collect();",
+  "let r: Vec<u64> = rx.iter().collect();",
+  "let r: Vec<u64> = rx.try_iter().take(n).collect();",
+  "let r: Vec<u64> = rx.iter().take(n).collect();",
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "rust.cheatsheet_advanced.28.global-counter"
+node        = 28
+title       = "ONE NUMBER FOR THE BUILDING"
+difficulty  = 5
+story       = "A single admissions counter for the whole of Times Square, bumped from every door at once, and it had better not be a fresh copy in every hand."
+concepts    = ["shared-state", "thread-safety", "bindings"]
+requires    = ["rust.cheatsheet_advanced.27.take-n-messages"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+A program-wide counter shared by every thread, no `unsafe` anywhere.
+`fn hit() { HITS.fetch_add(1, Ordering::Relaxed); }` is called 1000
+times from each of four threads, and after joining them
+`HITS.load(Ordering::Relaxed)` must be `4000`.
+
+Which declaration of `HITS` at module level does it?
+'''
+solution    = "static HITS: AtomicUsize = AtomicUsize::new(0);"
+hints = [
+  "One of the wrong lines compiles and prints 0: a `const` is inlined as a fresh value at every use, so every `fetch_add` bumps a copy. The one place in memory needs the other item keyword — and the mutable form of it is `unsafe` to touch.",
+]
+
+[quest.quiz]
+choices = [
+  "static mut HITS: AtomicUsize = AtomicUsize::new(0);",
+  "let HITS: AtomicUsize = AtomicUsize::new(0);",
+  "static HITS: AtomicUsize = AtomicUsize::new(0);",
+  "const HITS: AtomicUsize = AtomicUsize::new(0);",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "rust.cheatsheet_advanced.29.take-the-batch"
+node        = 29
+title       = "HAND IT ALL OVER"
+difficulty  = 4
+story       = "Chef Bo hands the whole ticket rail to the runner and keeps an empty rail — no copying tickets, and the rail stays his."
+concepts    = ["ownership", "borrowing", "mutability"]
+requires    = ["rust.cheatsheet_advanced.28.global-counter"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`Batch { items: Vec<String> }`. `flush(&mut self) -> Vec<String>` hands
+back everything in `items` and leaves `self.items` **empty**, without
+cloning.
+
+```
+fn flush(&mut self) -> Vec<String> {
+    // ____
+}
+```
+'''
+solution    = "std::mem::take(&mut self.items)"
+hints = [
+  "You cannot move a field out from behind `&mut self`, but `std::mem` can swap the field for its default and give you the old one — through a mutable reference to the field.",
+]
+
+[quest.quiz]
+choices = [
+  "std::mem::take(&mut self.items)",
+  "self.items",
+  "std::mem::take(self.items)",
+  "std::mem::swap(&mut self.items, Vec::new())",
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "rust.cheatsheet_advanced.30.dijkstra-pop"
+node        = 30
+title       = "SMALLEST DISTANCE OUT"
+difficulty  = 5
+story       = "Dijkstra over the Causeway Bay grid: the heap holds (distance, node) wrapped so the nearest comes out first, and the loop must unwrap both."
+concepts    = ["heaps", "pattern-matching", "collections"]
+requires    = ["rust.cheatsheet_advanced.29.take-the-batch"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`heap: BinaryHeap<Reverse<(u64, usize)>>` holds `(distance, node)` pairs
+so that the **smallest distance** pops first. Write the loop header that
+pops until the heap is empty and binds `d` and `u`:
+
+```
+heap.push(Reverse((0u64, 0usize)));
+// ____
+    if d > dist[u] { continue; }
+    for &(v, w) in &adj[u] { /* relax */ }
+}
+```
+'''
+solution    = "while let Some(Reverse((d, u))) = heap.pop() {"
+hints = [
+  "Pop gives an Option; inside it is the wrapper, and inside the wrapper is the tuple — three layers, and the wrapper has exactly one field.",
+]
+
+[quest.quiz]
+choices = [
+  "while let Some((d, u)) = heap.pop() {",
+  "while let Some(Reverse(d, u)) = heap.pop() {",
+  "while let Some(Reverse((d, u))) = heap.pop().unwrap() {",
+  "while let Some(Reverse((d, u))) = heap.pop() {",
+]
+answer  = 3

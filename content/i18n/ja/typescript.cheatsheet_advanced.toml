@@ -1,0 +1,514 @@
+# TYPESCRIPT LAND — CHEATSHEET ADVANCED, in Japanese. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live
+# in the English pack, and are never translated. Code blocks, identifiers
+# and printed strings are copied verbatim.
+
+pack   = "typescript.cheatsheet_advanced"
+locale = "ja"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet_advanced.01.generic-bound"
+title = "id を持つものなら何でも"
+story = "19:10、三十階の管制室。島のすべてのスクリーンには id がある。検索テーブルはそのどんなリストでも受け取れるべきで、しかも変更は許されない。"
+brief = '''
+`xs` は `readonly Screen[]`（つまり `ReadonlyArray<Screen>`）で、`Screen` は
+`id: string` を持ちます。本体が
+
+```ts
+return new Map(xs.map(x => [x.id, x] as const));
+```
+
+であるジェネリック関数 `byId` を開いてください。`xs` — そして文字列の `id` を
+持つものの他のどんな読み取り専用配列も — を受け取り、その本体がコンパイルできる
+ようにします。`strict` はオンです。
+'''
+hints = [
+  "裸の `T` には `id` がありません。パラメータに境界を与えましょう。そして読み取り専用配列は、可変配列が要求される場所では通りません。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet_advanced.02.mapped-draft"
+title = "すべてのキーを、たぶん"
+story = "希慎広場のスクリーン設定の下書きは半分だけ埋まっていてもまだ編集できる。形は本物のものにキー一つずつ従う。"
+brief = '''
+`Draft<T>` を手で書いてください — これをする組み込みのユーティリティ型ではなく:
+`T` と同じキー、すべてが省略可能、それぞれ自分の型を保ち、なお書き込み可能。
+`type Screen = { id: string; w: number }` のとき、`const d: Draft<Screen> = { w: 3 };`
+と `d.w = 5;` の両方がコンパイルできます。
+'''
+hints = [
+  "マップ型は `keyof T` を歩きます。角括弧の後の `?` が各キーを省略可能にし（それが手書きの `Partial<T>`）、`-?` は必須にし（`Required<T>`）、前の `readonly` は凍結します（`Readonly<T>`）。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet_advanced.03.as-const-union"
+title = "三つの単語、enum なし"
+story = "怡和街の到着掲示板は三種類のパネルを表示する。リストを保管するための四つ目のファイルなど誰も欲しくない。"
+brief = '''
+```ts
+const KINDS = ["ad", "news", "tram"] as const;
+```
+
+`KINDS` から `Kind` を導出して、ちょうどその三つの文字列のユニオンになるように
+してください — `const k: Kind = "ad";` はコンパイルでき、`const b: Kind = "bus";`
+はできません。enum ではなく、リテラルのユニオンです。
+'''
+hints = [
+  "値は型ではありません: まず値*の*型を求め、それからタプルを `number` で添字付けして要素がなりうるものを取り出しましょう。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet_advanced.04.pick-card"
+title = "表側だけ"
+story = "利園のアプリはスクリーンごとにカードを表示する: id とタイトル。feed フィールドは管制室に残る。"
+brief = '''
+`Screen` は `id`、`title`、`feed`、`w` を持ちます。`Card` を `id` と `title`
+**だけ** を持つオブジェクト型として、`Screen` が変わればそれに従うようユーティリティ
+型で `Screen` から組み立てて宣言してください。
+'''
+hints = [
+  "一方のユーティリティは名指ししたキーを残し、その双子は落とします。どちらもキーを別々の引数ではなく一つのユニオンとして取ります。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet_advanced.05.awaited-return"
+title = "load が返すもの"
+story = "三十階のフィードローダはスプリントごとに形が変わる。その結果を名付ける型も一緒に変わるべきで、また打ち直すべきではない。"
+brief = '''
+```ts
+async function load() { return { items: [1, 2], at: Date.now() }; }
+```
+
+`Feed` を、`load` が解決する **アンラップ済みの** オブジェクト型 —
+`{ items: number[]; at: number }` — として、`load` 自身から導出して宣言し、
+`const f: Feed = { items: [1], at: 0 };` がコンパイルできるようにしてください。
+'''
+hints = [
+  "`load` は値なので、まずその型が要ります。出てくるのは `Promise` で、もう一つのユーティリティが promise を外します。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet_advanced.06.infer-elem"
+title = "箱の中身は何か"
+story = "タイムズスクエアのスクリーン用パネルの木箱: ラベルはパネル一枚が何かを言うべきで、木箱でなければ何も言わない。"
+brief = '''
+`Elem<T>` を書いてください: 配列型ならその要素型（`Elem<string[]>` は `string`）、
+配列 **でない** ものなら `never`。
+'''
+hints = [
+  "条件型はマッチした部分に名前を付けられますが、前にキーワードが要ります — そして配列の接尾辞には括弧が要ります。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet_advanced.07.template-id"
+title = "screen ダッシュ数字"
+story = "島のすべての掲示板は screen-何か と名付けられ、その何かは数字だ。コンパイラにその線を守らせられる。"
+brief = '''
+`"screen-12"` は代入でき、`"screen-x"` も `"led-12"` も代入できないように
+`ScreenId` を宣言してください。
+'''
+hints = [
+  "型はテンプレートリテラルにできます: バッククォートで、プレースホルダの型はプリミティブです。普通の引用符では素の文字列リテラルになります。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet_advanced.08.satisfies-palette"
+title = "検査はするが、広げない"
+story = "LED 壁のパレットは契約に対して検査される — だが赤は三つ組のまま。シェーダがそれを添字で引くからだ。"
+brief = '''
+`type Palette = Record<string, [number, number, number] | string>`。
+`r: [255, 0, 0]` と `s: "#8cf"` を持つ `p` を、`Palette` に対して検査されるように
+宣言してください — 形の間違った値、たとえば `r: [255, 0]` はコンパイルエラー — それでも
+その後 `p.r.map(x => x / 255)` と `p.s.toUpperCase()` がコンパイルできなければ
+なりません: `p` はリテラル自身のより狭い型を保ちます。TypeScript 5。
+'''
+hints = [
+  "注釈やキャストはリテラルの型を `Palette` に置き換え、そうなるとすべての値が `tuple | string` です。検査だけをする演算子（4.9+）があります。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet_advanced.09.labeled-rest-tuple"
+title = "コマンドとその数字"
+story = "管制室のコンソールは動詞を取り、その後に動詞が必要とするだけの数字を取る。`show 1 2 3`、`clear`、決して `1 2` ではない。"
+brief = '''
+**一つ** のレストパラメータ `args` を取り、ラベル付きタプルとして型付けされた関数
+`run` を開いてください: 最初に `cmd: string`、その後に任意個の `nums: number`。
+`run("show", 1, 2, 3)` と `run("clear")` はコンパイルでき、`run(1, 2)` はできません。
+'''
+hints = [
+  "ラベルはタプルの中に入り、開いた末尾はそれ自体がレスト要素です — ドット三つと配列型。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet_advanced.10.declaration-merging"
+title = "同じ名前に、もう一つフィールド"
+story = "ベンダーのスクリーン型には輝度がなく、ベンダーのファイルは読み取り専用。管制室は今夜、すべてのスクリーンに輝度が必要だ。"
+brief = '''
+`interface Screen { id: string }` が、編集してはいけないファイルで宣言されています。
+自分のファイルで、その同じ `Screen` にもう一つのフィールド `brightness: number` を
+与え、`{ id: "a", brightness: 3 }` がどこでも `Screen` になるようにしてください —
+新しい名前ではなく（`interface Big extends Screen { … }` も `type Big = Screen & { … }`
+もどちらも新しい名前を作ります）、識別子重複のエラーもなしに。
+'''
+hints = [
+  "一つのインタフェースの二つの宣言はマージされます。`type` エイリアスはマージされず、インタフェースは自分自身を extends できません。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet_advanced.11.hash-private"
+title = "実行時にも隠す"
+story = "トラム停留所カウンタの集計は誰にも関係ない: サブクラスにも、シリアライザにも、`Object.keys` にも。"
+brief = '''
+```ts
+abstract class Panel { abstract draw(): string; }
+interface Tally { bump(): void }
+
+class Counter extends Panel implements Tally {
+  // the field goes here
+  protected label = "c";
+  get value(): number { /* returns the field */ }
+  set value(v: number) { /* stores v in the field */ }
+  bump() { /* adds one to the field */ }
+  draw() { return `${this.label}=${this.value}`; }
+}
+```
+
+`0` から始まる `count` フィールドを、コンパイル時だけでなく **実行時** にも隠れる
+ように足してください: `new Counter()` の後、`Object.keys(c)` も `JSON.stringify(c)` も
+それを見せてはいけません。`strict` はオンです。
+'''
+hints = [
+  "`private` キーワードは型と一緒に消され、フィールドは JavaScript の中にまだあります。`#` 名はエンジン自体で private です — アクセス修飾子は取らず、初期化子が要ります。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet_advanced.12.overload-impl"
+title = "オーバーロードの下の行"
+story = "到着掲示板の `parse` は両方向に働く: 文字列を入れれば数字が、数字を入れれば文字列が出る。約束は二つ、本体は一つ。"
+brief = '''
+```ts
+function parse(x: string): number;
+function parse(x: number): string;
+```
+
+その二つのオーバーロードに続く実装の行を、本体を
+`return typeof x === "string" ? Number(x) : String(x);` として書いてください —
+`strict` の下で `parse("42")` が `number`、`parse(7)` が `string` になるように。
+'''
+hints = [
+  "実装シグネチャはすべてのオーバーロードを覆えるだけ広くなければならず、本体を持たなければならず、`strict` の下ではそのパラメータを型なしのままにはできません。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet_advanced.13.nullish-assign"
+title = "空でもキャッシュ済み"
+story = "希慎の壁のキャプションキャッシュ: いくつかのスクリーンはわざと空のキャプションを持つ。それを毎フレーム再読み込みしたのが、先週の火曜に壁を固まらせた原因だ。"
+brief = '''
+`cache: Record<string, string>`。`load(k)` は高価です。キーが **一度も** 設定されて
+いないときだけ `cache[k]` を `load(k)` で埋めてください — キャッシュされた `""` は
+本物の有効な値で、再読み込みを引き起こしてはいけません。一文で。
+'''
+hints = [
+  "`\"\"` は falsy です。「truthy か?」と尋ねるものはどれも再読み込みします。「null か undefined か?」と尋ねる代入演算子はしません。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet_advanced.14.find-last-chain"
+title = "最後の広告、あれば"
+story = "タイムズスクエアのローテーションで一番新しい広告はリストの最後のもので、今夜はそのうち一つがわざと幅ゼロピクセルだ。"
+brief = '''
+`xs: S[]` は `feeds.flatMap(f => f.panels)` で、`S` は `kind: string` と
+`width: number` を持ちます。`w` を、kind が `"ad"` である **最後の** 要素の幅に、
+なければ `-1` にしてください。幅 `0` は `0` として通らなければなりません。非 null
+アサーションなし、`strict` はオンです。Node 22。
+'''
+hints = [
+  "末尾から始める検索があります（Node 18+）。`xs.at(-1)` は最後の*要素*にすぎず、最後の一致ではありません。その結果は `undefined` かもしれないので、プロパティの読み取りにはオプショナルチェーンが要ります — そしてデフォルトはゼロを飲み込んではいけません。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet_advanced.15.destructure-rename"
+title = "幅、w と呼ぶ"
+story = "ジャフィ・ロードの看板屋はスクリーンの仕様をフィードから読む: kind はそのまま、幅は短い名前で、誰も埋めなかったら百。"
+brief = '''
+`screen: { kind: string; width?: number }`。一つの分割代入宣言で `kind` を束縛し、
+`width` を **新しい名前** `w` に、`width` がないときのデフォルトを `100` として
+束縛してください。
+'''
+hints = [
+  "オブジェクトパターンではプロパティ名が先で、新しい束縛はコロンの後です — 見た目と逆 — そしてデフォルトは束縛の後に `=` で続きます。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet_advanced.16.range-from-length"
+title = "ゼロから n 引く 1 まで"
+story = "希慎の壁に五枚のパネル、ゼロから番号付き。どれかが点灯する前に、その番号のリストが要る。"
+brief = '''
+`n: number`。`ix: number[]` をリスト `[0, 1, …, n - 1]` に一つの式でしてください。
+すべての要素が本当にそこにあるように — `ix` を反復すると `n` 個の数を訪れなければ
+なりません。
+'''
+hints = [
+  "`Array(n)` は `n` 個の穴で、`map` は穴を飛ばします。`length` を持つ配列風のものから組み立て、マッパーの **二番目** の引数が添字です。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet_advanced.17.sorted-two-keys"
+title = "多い順、次に名前順"
+story = "タイムズスクエアのスクリーンのランキング: ヒットが多いものが先、同点は名前で — そしてフィード自身のリストは他のスクリーンの足元で並べ替えられてはならない。"
+brief = '''
+`rs: { id: string; n: number }[]` は `Record<string, number>` の集計から
+`Object.entries(tally).map(([id, n]) => ({ id, n }))` で作られました — entries は
+`[string, number][]` です。`top` の式: 行を `n` の **降順** に、同点は `id` のロケール
+文字列順の昇順で — そして `rs` 自体は元のまま正確に残らなければなりません。
+Node 22、`strict` オン。
+'''
+hints = [
+  "Node 20+ にはコピーを返すソートがあります。比較関数は数を返さなければならないので、文字列の同点処理は `<` にはできません — 文字列には比較して数を返すメソッドがあります。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet_advanced.18.map-group-push"
+title = "正しいバケツへ"
+story = "怡和街の真夜中: すべてのパネルが種類ごとにバケツへ分けられる。古典的なバグは、誰も保持しないバケツに push する。"
+brief = '''
+`m: Map<string, string[]>`、最初は空です。`for (const [k, v] of pairs)` の中で、
+`k` の下に格納されたリストに `v` を足し、`k` を初めて見たときにそのリストを作って
+ください — **一文** で、その後 `m` が本当にすべての値を持つように。`strict` はオンです。
+'''
+hints = [
+  "`get` はリストか `undefined` を返します。`?? []` は push する先をくれますが、新しい `[]` はあなたが入れない限りマップにはありません（`has` してから `set` では二文になります）。Map に `[k]` はなく、`get` はデフォルトを取りません — そして JSON として出ていくときは `Object.fromEntries(m)` が出口です。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet_advanced.19.deep-copy"
+title = "コピーであるコピー"
+story = "希慎の壁のリハーサル用フィードは今夜のものの本物のコピーでなければならない — id の Set、数字の行 — リハーサルがそこに落書きできるように。"
+brief = '''
+`feed` は `{ ids: Set<string>; rows: number[][] }` です。`copy` を **深い** コピーに
+してください: `copy.ids.add("c")` と `copy.rows[0].push(9)` は `feed` に触れては
+ならず — そして `copy.ids` は `add` を持つ `Set` のままでなければなりません。Node 22。
+'''
+hints = [
+  "スプレッドと `Object.assign` は一段だけコピーします。JSON の往復は Set を失います（`{}` になります）。Node 17+ にはプラットフォーム自身の深いコピーがあります。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet_advanced.20.bigint-sum"
+title = "カウンターで混ぜるな"
+story = "台風シェルターの波の数は 2 の 63 乗を超えた。今夜のあと七つの波は普通の数で、和は正確でなければならない。"
+brief = '''
+`big` は 2 の 63 乗を超える `bigint` で、`n` は `number` —
+`today.reduce<number>((s, w) => s + w, 0)` — で小さな整数を持ちます
+（`Number.isInteger(n)` は true）。`total` をその **正確な** 和にしてください。
+`number` は 2 の 53 乗を超えると丸められ、`|0` は 32 ビットでラップします。
+'''
+hints = [
+  "オペランドは同じ種類でなければならず、キャストは変換ではありません。小さいほうを上に変換しましょう — 関数で。`n` 接尾辞はリテラルにしか効きません。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet_advanced.21.named-groups"
+title = "その行のすべての年"
+story = "ヌーンデイ・ガンの下の銘板フィード: 建造、改装、予定。その中の四桁の年はすべて掲示板に載る。"
+brief = '''
+`s` は `"built 1998, refit 2015, due 2031"` で、`ys: string[]` は空です
+（各年は後で `y.slice(-2).padStart(2, "0")` として表示されます）。四桁の名前付き
+グループ `y` の **すべての** 一致に対するループを開き、この本体が各年を集める
+ようにしてください:
+
+```ts
+  ys.push(m.groups?.y ?? "");
+```
+
+Node 22、TypeScript 5。
+'''
+hints = [
+  "あるメソッドはすべての一致をグループ付きで返します — そしてパターンがグローバルフラグを持たないと実行時に例外を投げます。名前付きグループは `(?<name>…)` で、Python の `P` はここでは構文エラーです。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet_advanced.22.loop-closure"
+title = "それぞれ自分の番号"
+story = "希慎の壁の三枚のパネルは後で点灯するよう仕込まれ、それぞれ自分の番号を持つ。三枚とも 3 と言うバグは、スカイネットが最初に提案したものだった。"
+brief = '''
+```ts
+class Board {
+  q: (() => void)[] = [];
+  show(i: number) { /* lights panel i */ }
+  arm(n: number) {
+    // the loop goes here
+  }
+}
+```
+
+`arm(n)` の中で、`n` 個のクロージャを `this.q` に push してください。k 番目のものは
+**後で** 呼ばれたとき、自分の `k` で `this.show(k)` を呼ばなければなりません —
+`arm(3)` の後に全部を走らせると `3, 3, 3` ではなく `0, 1, 2` が点灯します。
+`strict` はオンです。
+'''
+hints = [
+  "`var` はループ全体で一つの変数です。ブロックスコープの束縛は一周ごとに新しくなります。そして `function () {}` は自分の `this` を持ち、strict モードはそれを推測するのを拒みます。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet_advanced.23.type-only-import"
+title = "痕跡を残さない import"
+story = "スクリーンモジュールは読み込まれた瞬間に管制室へログを出す。アプリが欲しいのはその型だけで、ビルド時にそのログを欲しがる者はいない。"
+brief = '''
+`screen.ts` は `export interface Screen { … }` — **名前付き** エクスポート、default
+なし — と、モジュールが読み込まれるたびに走るトップレベルの `console.log` を持ちます。
+`verbatimModuleSyntax` はオンです。型注釈で使うために `Screen` を import し、
+出力される JavaScript に import の **何も** 残らないようにしてください: ログが
+発火してはいけません。
+'''
+hints = [
+  "`verbatimModuleSyntax` の下では型の素の import はエラーで、波括弧の*中*の `type` 修飾子ではモジュールを読み込む `import {}` が残ります。修飾子は文全体に付けましょう。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet_advanced.24.error-cause"
+title = "元のものを保て"
+story = "フィードの取得は三階下で TypeError で失敗した。管制室は自分のエラーを上に置き、本物をその下に付けたままにしたい。"
+brief = '''
+`catch (e: unknown)` の中で、メッセージが `"feed failed"` で、`e` を元の原因として
+付けたままにする（ES2022）**新しい** `Error` を throw し、呼び出し側が付いている
+ものに対して `instanceof TypeError` をまだ実行できるようにしてください。`strict` は
+オンです。
+'''
+hints = [
+  "`Error` は第二引数を取ります — エラー自体ではなく、オプションオブジェクトです。そして `e` は `unknown` です: 絞り込みなしに `.message` を読むことはできません。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet_advanced.25.all-settled"
+title = "着いたものを数えろ"
+story = "六人の配達員が糖街を出た。一人は雨に降られた。厨房は届いたものを足し合わせ、届かなかった一人のために夜を捨てたりしない。"
+brief = '''
+`ps: Promise<number>[]` と `rs = await Promise.allSettled(ps)`。
+`for (const r of rs)` の中で、**成功した** すべての promise の値を `total` に足し、
+失敗したものは飛ばしてください — `strict` の下でコンパイルできる一行で。
+'''
+hints = [
+  "各結果は `status` による判別可能ユニオンで、成功した分岐だけが `value` を持ちます。二つの status 文字列は仕様が使うもので、\"resolved\" でも `ok` でもありません。（`Promise.all` なら最初の失敗で throw していたし、`Promise.race` は一つしか返しません。）",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet_advanced.26.for-await"
+title = "一つずつ届くたびに"
+story = "怡和街の掲示板からの tick フィードは一つずつ、それぞれ待ちの後に届く。和は届くたびに増え、全部そろってからではない。"
+brief = '''
+`ticks()` は `AsyncGenerator<number>` を返します。`async` 関数の中で、各 `t` を
+届いたときに受け取るループを開き、本体 `sum += t;` が `strict` の下でコンパイル
+できるようにしてください。
+'''
+hints = [
+  "非同期イテラブルには `[Symbol.iterator]` がないので、素の `for…of` は拒否されます — そしてジェネレータオブジェクトを await しても助けになりません。`await` は `for` のものです。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet_advanced.27.iterable-stack"
+title = "スタックをスプレッド"
+story = "管制室の undo スタックは、フロアの他のものと同じく配列にスプレッドでき、`for…of` で歩けるべきだ。"
+brief = '''
+```ts
+class Stack<T> {
+  #items: T[] = [];
+  push(x: T) { this.#items.push(x); }
+  pop(): T | undefined { return this.#items.pop(); }
+  // one more method goes here
+}
+```
+
+`s.push(1); s.push(2)` の後に `[...s]` が `[1, 2]` を返し、`for (const x of s)` が
+コンパイルできるようにする、その一つのメソッドを足してください。`strict` はオンです。
+'''
+hints = [
+  "メソッドの名前は角括弧の中の well-known symbol で、ジェネレータ（星印）でなければならず、`yield*` で配列に委譲すると要素を一つずつ渡します — 素の `yield` は配列全体を一つの要素として渡します。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet_advanced.28.exhaustive-never"
+title = "四つ目の種類がビルドを壊す"
+story = "今日はパネルが二種類。次のスプリントで誰かが三つ目を足したら、ビルドはこの switch で失敗しなければならない — 19:00 のタイムズスクエアのスクリーンではなく。"
+brief = '''
+`Shape` は `{ kind: "ad"; w: number } | { kind: "news"; len: number }` で、
+`area(s: Shape): number` は `s.kind` で switch します。`case "ad"` と `case "news"` が
+それぞれ `return` した後、関数が今日コンパイルでき、**かつ** `Shape` に三つ目の
+種類が足された日にコンパイルできなくなるように `default` を書いてください。
+`strict` はオンです。
+'''
+hints = [
+  "すべての case が return した後、`s` はボトム型です。それをその型の変数に代入するのは今日は無料で、種類が一つ残った瞬間に型エラーになります。キャストや `any` は何も検査せず、`throw` は 19:00 になって初めて気づきます。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet_advanced.29.type-guard"
+title = "配線から降りてきたもの"
+story = "JSON が三十階に届き、型は消えた。一つの関数が実行時にそれを見て、何を見たかコンパイラに伝えなければならない。"
+brief = '''
+`data: unknown` は `JSON.parse` から来ており、`Screen` は `{ id: string; w: number }`
+です。本体が
+
+```ts
+return typeof x === "object" && x !== null && "id" in x && "w" in x;
+```
+
+である関数 `isScreen` を開き、`if (isScreen(data)) console.log(data.id.toUpperCase());`
+がコンパイルできるようにしてください — `if` の中では `data` は `Screen` です。
+`strict` はオンです。
+'''
+hints = [
+  "`boolean` を返してもコンパイラには `x` について何も伝わりません。戻り値位置の型述語なら伝わります — パラメータ名、その単語、型。パラメータは `unknown` を受け取らなければならず、アサーションシグネチャは `if` の中には置けません。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet_advanced.30.asserts-defined"
+title = "アサーション"
+story = "真夜中。島のスクリーンが暗くなる前の最後の検索: 値はそこにあるか、さもなければ夜は throw された Error で終わる。そしてその行の後、コンパイラは彼女の言葉を信じなければならない。"
+brief = '''
+本体は `if (x === undefined || x === null) throw new Error("missing");` です。
+ジェネリック関数 `must` を開き、
+
+```ts
+const v = m.get("a");   // m: Map<string, number>, so v: number | undefined
+must(v);
+```
+
+の後で行 `v + 1` がコンパイルできるようにしてください — `must` はそれ以降 `v` が
+`null` でも `undefined` でもないとコンパイラに約束します。`strict` はオンです。
+'''
+hints = [
+  "何も返さない関数は型述語にはなれません。アサーションシグネチャにはなれます。そして `x is T` をアサートしても何も絞り込まれません — 型から `null` と `undefined` を取り除くユーティリティがアサートすべきものです。",
+]

@@ -1,0 +1,896 @@
+# LUA LAND — CHEATSHEET. The grammar off the page, asked: thirty of the Lua
+# lines a live-coding test leans on and a hand forgets — io.read, `~=`, `#t`,
+# `local`, `..`, ipairs, string.format, a table.sort comparator, a closure
+# that keeps its count, setmetatable, the `:` call and pcall, then
+# table.remove, gmatch + tonumber, 1-based sub, pairs vs ipairs,
+# select("#", ...), table.concat, math.floor and `%` below zero,
+# string.byte/char, and the ten that close the core grammar: table.insert,
+# a numeric for with a step, `(x or 0) + 1`, a local function, two return
+# values caught at once, `#t == 0`, the one-line swap, error(), the
+# `and … or` conditional and a list copy through unpack — in Tai Hang on
+# fire-dragon night. Four lines, one right. Nothing is typed and nothing is
+# run — the pick is the submission, and the server judges it against the quiz
+# (SPEC §0). The three wrong lines are near-misses: another language's
+# spelling, a `.` where a `:` goes, a call made outside the protection.
+#
+# Every right answer here means the same thing in Lua 5.1 (the land's LuaJIT
+# runtime) and Lua 5.4, except node 30, the one deliberate 5.1-ism: `unpack`
+# is a global there and table.unpack does not exist. Nothing leans on `//`.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "lua.cheatsheet"
+land = "lua"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "lua.cheatsheet.01.read-line"
+node        = 1
+title       = "THE FIRST LINE"
+difficulty  = 1
+story       = "21:00 on Wun Sha Street. The crew list comes in one line at a time."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+Read one line of standard input into `line`, as a string, without its
+newline.
+'''
+solution    = 'local line = io.read("*l")'
+hints = [
+  "io.read takes a format: one for a line, one for a number, one for all of it.",
+]
+
+[quest.quiz]
+choices = [
+  'local line = io.read("*n")',
+  'local line = io.readline()',
+  'local line = input()',
+  'local line = io.read("*l")',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "lua.cheatsheet.02.not-equal"
+node        = 2
+title       = "NOT THE SAME"
+difficulty  = 1
+story       = "Two carriers claim the same segment of the dragon. The marshal checks that the numbers differ."
+concepts    = ["control-flow", "math"]
+requires    = ["lua.cheatsheet.01.read-line"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+Open an `if` that is true when `a` and `b` are **not** equal.
+'''
+solution    = 'if a ~= b then'
+hints = [
+  "Lua spells not-equal with a tilde, not with an exclamation mark.",
+]
+
+[quest.quiz]
+choices = [
+  'if a != b then',
+  'if a ~= b then',
+  'if not a == b then',
+  'if a <> b then',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "lua.cheatsheet.03.last"
+node        = 3
+title       = "THE TAIL"
+difficulty  = 1
+story       = "The dragon's head is segment 1. The marshal wants the tail, however long the dragon is tonight."
+concepts    = ["collections", "slices"]
+requires    = ["lua.cheatsheet.02.not-equal"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`t` is a list such as `{10, 20, 30}`. Make `last` its final element, for any
+length.
+'''
+solution    = 'local last = t[#t]'
+hints = [
+  "Lists start at 1, so the length is also the index of the last element.",
+]
+
+[quest.quiz]
+choices = [
+  'local last = t[#t]',
+  'local last = t[#t - 1]',
+  'local last = t[-1]',
+  'local last = t[len(t)]',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "lua.cheatsheet.04.local"
+node        = 4
+title       = "KEEP IT HERE"
+difficulty  = 1
+story       = "Each segment keeps its own incense count. Nobody else on the street should see it."
+concepts    = ["bindings", "mutability"]
+requires    = ["lua.cheatsheet.03.last"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+Make `count` a variable that starts at 0 and is visible only in the current
+block — not a global.
+'''
+solution    = 'local count = 0'
+hints = [
+  "A bare assignment to a new name makes a global. Scoping it takes one keyword.",
+]
+
+[quest.quiz]
+choices = [
+  'count = 0',
+  'var count = 0',
+  'local count = 0',
+  'let count = 0',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "lua.cheatsheet.05.concat"
+node        = 5
+title       = "THE TAG"
+difficulty  = 1
+story       = "Every carrier gets a paper tag: the word, a dash, and the number."
+concepts    = ["strings", "types"]
+requires    = ["lua.cheatsheet.04.local"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`n` is the number 7. Make `s` the string `"id-7"`.
+'''
+solution    = 'local s = "id-" .. n'
+hints = [
+  "`+` is only arithmetic in Lua. Strings are joined with two dots.",
+]
+
+[quest.quiz]
+choices = [
+  'local s = "id-" + n',
+  'local s = "id-" .. n',
+  'local s = "id-" & n',
+  'local s = string.concat("id-", n)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "lua.cheatsheet.06.ipairs"
+node        = 6
+title       = "HEAD TO TAIL"
+difficulty  = 2
+story       = "The roll call goes segment by segment, from the head, in order."
+concepts    = ["iteration", "collections"]
+requires    = ["lua.cheatsheet.05.concat"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Loop over the list `t` in order 1, 2, 3, … with the index as `i` and the
+element as `v`.
+'''
+solution    = 'for i, v in ipairs(t) do'
+hints = [
+  "A table is not itself an iterator. One built-in walks the list part in order and gives index, then value.",
+]
+
+[quest.quiz]
+choices = [
+  'for i, v in t do',
+  'for v in ipairs(t) do',
+  'for i, v in range(t) do',
+  'for i, v in ipairs(t) do',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "lua.cheatsheet.07.format"
+node        = 7
+title       = "TWO PLACES"
+difficulty  = 2
+story       = "The printed programme gives each carrier's share of the incense to two decimal places."
+concepts    = ["strings", "io"]
+requires    = ["lua.cheatsheet.06.ipairs"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`x` is `3.14159`. Print it with exactly two digits after the point: `3.14`.
+'''
+solution    = 'print(string.format("%.2f", x))'
+hints = [
+  "string.format takes C's printf codes; the precision goes after a dot.",
+]
+
+[quest.quiz]
+choices = [
+  'print(string.format("%.2f", x))',
+  'print(string.format("{:.2f}", x))',
+  'print(x:format("%.2f"))',
+  'print(string.format("%2f", x))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "lua.cheatsheet.08.sort-desc"
+node        = 8
+title       = "TALLEST FIRST"
+difficulty  = 2
+story       = "The pole bearers line up by height, tallest at the front."
+concepts    = ["sorting", "closures"]
+requires    = ["lua.cheatsheet.07.format"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`t` is a list of numbers. Sort it in **descending** order, in place.
+'''
+solution    = 'table.sort(t, function(a, b) return a > b end)'
+hints = [
+  "table.sort takes a function that says whether `a` goes before `b`.",
+]
+
+[quest.quiz]
+choices = [
+  'table.sort(t, function(a, b) return a < b end)',
+  'table.sort(t, true)',
+  'table.sort(t, function(a, b) return a > b end)',
+  't:sort(function(a, b) return a > b end)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "lua.cheatsheet.09.closure"
+node        = 9
+title       = "THE CLICKER"
+difficulty  = 2
+story       = "The marshal at the Lin Fa Kung gate counts the lanterns with a clicker that remembers."
+concepts    = ["closures", "mutability"]
+requires    = ["lua.cheatsheet.08.sort-desc"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`counter()` returns a function that counts up by one each call:
+
+```
+local function counter()
+  local n = 0
+  -- ____
+end
+local c = counter()
+print(c(), c())  -- 1  2
+```
+'''
+solution    = 'return function() n = n + 1; return n end'
+hints = [
+  "The inner function changes the outer `n` itself, and hands it back. There is no `+=` in Lua.",
+]
+
+[quest.quiz]
+choices = [
+  'return function() local n = n + 1; return n end',
+  'return function() n = n + 1; return n end',
+  'return function() n += 1; return n end',
+  'return function() n = n + 1 end',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "lua.cheatsheet.10.setmetatable"
+node        = 10
+title       = "A NEW STACK"
+difficulty  = 3
+story       = "The incense sticks are stacked on the shed table, and each segment wants a stack of its own."
+concepts    = ["structs", "dispatch"]
+requires    = ["lua.cheatsheet.09.closure"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+Make `s` a new, empty table whose method lookups fall back to `Stack`.
+
+```
+local Stack = {}
+Stack.__index = Stack
+function Stack:push(x) self[#self + 1] = x end
+-- ____
+s:push(5)
+```
+'''
+solution    = 'local s = setmetatable({}, Stack)'
+hints = [
+  "A missing key is looked up through the metatable's `__index`. setmetatable sets it and returns the table.",
+]
+
+[quest.quiz]
+choices = [
+  'local s = {__index = Stack}',
+  'local s = new Stack()',
+  'local s = Stack()',
+  'local s = setmetatable({}, Stack)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "lua.cheatsheet.11.colon"
+node        = 11
+title       = "THE COLON"
+difficulty  = 3
+story       = "One more stick on the pile. The call has to know whose pile it is."
+concepts    = ["structs", "functions"]
+requires    = ["lua.cheatsheet.10.setmetatable"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`Stack.push` was defined as `function Stack:push(x)`, and `s` is a stack.
+Push 5 onto `s`.
+'''
+solution    = 's:push(5)'
+hints = [
+  "A method defined with `:` has a hidden first parameter, `self`. The call must pass the table as it.",
+]
+
+[quest.quiz]
+choices = [
+  's:push(5)',
+  's.push(5)',
+  's->push(5)',
+  'Stack.push(5)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "lua.cheatsheet.12.pcall"
+node        = 12
+title       = "THE DRAGON'S HEAD"
+difficulty  = 3
+story       = "Midnight. The dragon's head goes up the steps of the temple, and one bad stick must not bring it down."
+concepts    = ["error-handling", "functions"]
+requires    = ["lua.cheatsheet.11.colon"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`f(x)` may raise an error. Call it so the error is caught: `ok` is `false`
+and `err` holds the message when it fails.
+'''
+solution    = 'local ok, err = pcall(f, x)'
+hints = [
+  "Hand pcall the function and its arguments separately; it calls them itself, and the status comes first.",
+]
+
+[quest.quiz]
+choices = [
+  'local ok, err = pcall(f(x))',
+  'local err, ok = pcall(f, x)',
+  'local ok, err = pcall(f, x)',
+  'local ok, err = try(f, x)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "lua.cheatsheet.13.pop"
+node        = 13
+title       = "OFF THE TOP"
+difficulty  = 2
+story       = "Incense sticks go onto the pile one at a time; the lighter takes the top one off again."
+concepts    = ["collections", "slices"]
+requires    = ["lua.cheatsheet.12.pcall"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`t` is a list used as a stack; sticks go on with `table.insert(t, x)`.
+Take the **top** (last) element off `t` into `top`, so `#t` shrinks by one.
+'''
+solution    = 'local top = table.remove(t)'
+hints = [
+  "The same library that appends also removes, and with no position given it takes the end.",
+]
+
+[quest.quiz]
+choices = [
+  'local top = table.remove(t, 1)',
+  'local top = t.pop()',
+  'local top = table.remove(t)',
+  'local top = table.remove(t, #t - 1)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "lua.cheatsheet.14.gmatch-numbers"
+node        = 14
+title       = "THE NUMBERS ON THE LINE"
+difficulty  = 2
+story       = "The segment counts arrive as one line of digits with spaces between: `3 14 15`."
+concepts    = ["strings", "io", "types"]
+requires    = ["lua.cheatsheet.13.pop"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`line` is `"3 14 15"` and `t` is an empty table. Fill `t` with the three
+**numbers** 3, 14, 15 — so that `t[1] == 3` is true and `#t` is 3.
+'''
+solution    = 'for w in line:gmatch("%d+") do t[#t+1] = tonumber(w) end'
+hints = [
+  "A pattern iterator hands out each run of digits as a string; a run is one or more, and a string is not yet a number.",
+]
+
+[quest.quiz]
+choices = [
+  'for w in line:gmatch("%d+") do t[#t+1] = tonumber(w) end',
+  'for w in line:gmatch("%d") do t[#t+1] = tonumber(w) end',
+  'for w in line:split(" ") do t[#t+1] = tonumber(w) end',
+  'for w in line:gmatch("%d+") do t[#t+1] = w end',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "lua.cheatsheet.15.sub"
+node        = 15
+title       = "THE FIRST THREE"
+difficulty  = 2
+story       = "The route board at Causeway Bay shows only the first three letters of each street."
+concepts    = ["strings", "slices"]
+requires    = ["lua.cheatsheet.14.gmatch-numbers"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`s` is `"CausewayBay"`. Make `head` its first three characters, `"Cau"`.
+'''
+solution    = 'local head = s:sub(1, 3)'
+hints = [
+  "Lua strings count from 1, and the substring method takes a start and an inclusive end.",
+]
+
+[quest.quiz]
+choices = [
+  'local head = s[1:3]',
+  'local head = s:sub(0, 2)',
+  'local head = s:substr(1, 3)',
+  'local head = s:sub(1, 3)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "lua.cheatsheet.16.pairs"
+node        = 16
+title       = "EVERY KEY"
+difficulty  = 2
+story       = "The incense ledger is kept by carrier name, not by number, and the marshal wants every entry read out."
+concepts    = ["iteration", "collections"]
+requires    = ["lua.cheatsheet.15.sub"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`t` is `{ann = 3, bo = 5, cy = 2}` — string keys, no list part. Open a loop
+that visits **every** entry with the key as `k` and the value as `v`.
+'''
+solution    = 'for k, v in pairs(t) do'
+hints = [
+  "ipairs walks 1, 2, 3, … and stops at the first missing index; this table has no `t[1]` at all.",
+]
+
+[quest.quiz]
+choices = [
+  'for k, v in ipairs(t) do',
+  'for k, v in pairs(t) do',
+  'for k, v in t do',
+  'for k, v in t:items() do',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "lua.cheatsheet.17.select"
+node        = 17
+title       = "HOW MANY CAME"
+difficulty  = 3
+story       = "Carriers answer the roll call by shouting their names; some shout nothing, and the marshal still counts them."
+concepts    = ["functions", "collections"]
+requires    = ["lua.cheatsheet.16.pairs"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`count` takes any number of arguments. Make `n` how many were passed,
+**including** `nil`s:
+
+```
+local function count(...)
+  -- ____
+  return n
+end
+print(count(1, nil, 3))  -- 3
+```
+'''
+solution    = 'local n = select("#", ...)'
+hints = [
+  "Packing the varargs into a table loses the holes; the built-in that picks arguments by position also has a special first argument that only counts them.",
+]
+
+[quest.quiz]
+choices = [
+  'local n = #{...}',
+  'local n = select(#, ...)',
+  'local n = select("n", ...)',
+  'local n = select("#", ...)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "lua.cheatsheet.18.concat"
+node        = 18
+title       = "ONE LINE OF NAMES"
+difficulty  = 2
+story       = "The programme lists the pole bearers in one line, a space between each name."
+concepts    = ["strings", "collections"]
+requires    = ["lua.cheatsheet.17.select"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`parts` is `{"Tai", "Hang", "Road"}`. Make `s` the single string
+`"Tai Hang Road"` — without a `..` loop.
+'''
+solution    = 'local s = table.concat(parts, " ")'
+hints = [
+  "The table library joins a list of strings in one call; the separator is the second argument.",
+]
+
+[quest.quiz]
+choices = [
+  'local s = parts:concat(" ")',
+  'local s = table.concat(parts, " ")',
+  'local s = table.concat(parts)',
+  'local s = " ".join(parts)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "lua.cheatsheet.19.floor-div"
+node        = 19
+title       = "SHARE AND REMAINDER"
+difficulty  = 3
+story       = "The sticks are shared out in threes; the count went negative when the shed lent some to Lin Fa Kung."
+concepts    = ["math", "types"]
+requires    = ["lua.cheatsheet.18.concat"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`a` is `-7` and `b` is `3`. Make `q` the quotient rounded **down** (`-3`)
+and `r` the **non-negative** remainder (`2`), so `q * b + r == a`.
+'''
+solution    = 'local q, r = math.floor(a / b), a % b'
+hints = [
+  "LuaJIT has no integer-division operator, and `/` is always a float. `%` already rounds toward minus infinity; fmod does not.",
+]
+
+[quest.quiz]
+choices = [
+  'local q, r = a // b, a % b',
+  'local q, r = math.floor(a / b), math.fmod(a, b)',
+  'local q, r = math.floor(a / b), a % b',
+  'local q, r = a / b, a % b',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "lua.cheatsheet.20.shift-letter"
+node        = 20
+title       = "THE DRAGON TURNS"
+difficulty  = 4
+story       = "Midnight on Tai Hang Road. The dragon's head wheels round the block, and the carrier at `z` steps forward to become `a` again."
+concepts    = ["strings", "types", "math"]
+requires    = ["lua.cheatsheet.19.floor-div"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`c` is one lowercase letter and `k` a non-negative number. Make `out` the
+letter `k` places later in the alphabet, wrapping round — `"z"` with `k = 1`
+gives `"a"`. Lowercase `a` is byte 97.
+'''
+solution    = 'local out = string.char((c:byte() - 97 + k) % 26 + 97)'
+hints = [
+  "A string has no arithmetic; get its byte, shift that within 0..25, and turn the byte back into a one-character string.",
+]
+
+[quest.quiz]
+choices = [
+  'local out = string.char((c:byte() - 97 + k) % 26 + 97)',
+  'local out = string.char((c:byte() + k) % 26 + 97)',
+  'local out = string.char(c:byte() + k)',
+  'local out = chr((ord(c) - 97 + k) % 26 + 97)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "lua.cheatsheet.21.insert"
+node        = 21
+title       = "ONE MORE NAME"
+difficulty  = 1
+story       = "A late carrier reaches the shed on Wun Sha Street, and his name goes on the end of the roll."
+concepts    = ["collections", "slices"]
+requires    = ["lua.cheatsheet.20.shift-letter"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`t` is a list of names. Put `x` at the **end** of `t` with the table
+library — no index arithmetic — so `#t` grows by one and `t[#t]` is `x`.
+'''
+solution    = 'table.insert(t, x)'
+hints = [
+  "The library call that grows a list takes the table first; with no position given it puts the value after the last one.",
+]
+
+[quest.quiz]
+choices = [
+  't[#t] = x',
+  'table.insert(t, x)',
+  't:insert(x)',
+  't.append(x)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "lua.cheatsheet.22.countdown"
+node        = 22
+title       = "TEN TO ONE"
+difficulty  = 2
+story       = "The countdown to lighting the dragon's head runs from ten down to one, shouted across Tai Hang Road."
+concepts    = ["control-flow", "iteration"]
+requires    = ["lua.cheatsheet.21.insert"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+Open a numeric loop that gives `i` the values 10, 9, 8, …, 1 — in that
+order, all ten of them.
+'''
+solution    = 'for i = 10, 1, -1 do'
+hints = [
+  "A numeric for climbs by one unless a third value says otherwise — and with no third value, a start above the end runs zero times.",
+]
+
+[quest.quiz]
+choices = [
+  'for i = 10, 1 do',
+  'for i in 10, 1, -1 do',
+  'for i = 10 downto 1 do',
+  'for i = 10, 1, -1 do',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "lua.cheatsheet.23.tally"
+node        = 23
+title       = "THE TALLY"
+difficulty  = 2
+story       = "The marshal tallies how many sticks each carrier has taken, name by name, starting from an empty ledger."
+concepts    = ["collections", "zero-values", "control-flow"]
+requires    = ["lua.cheatsheet.22.countdown"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`seen` is a table that starts empty and `k` is a carrier's name. Add one to
+`seen[k]`, treating a name not yet in the table as 0 — the first time it
+becomes 1, not an error.
+'''
+solution    = 'seen[k] = (seen[k] or 0) + 1'
+hints = [
+  "Arithmetic on nil raises, and `+` binds tighter than `or`. Supply the default before the addition, not after it.",
+]
+
+[quest.quiz]
+choices = [
+  'seen[k] = (seen[k] or 0) + 1',
+  'seen[k] = seen[k] + 1',
+  'seen[k] = seen[k] + 1 or 1',
+  'seen[k] = seen.get(k, 0) + 1',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "lua.cheatsheet.24.function"
+node        = 24
+title       = "THE SUM OF TWO"
+difficulty  = 1
+story       = "Two sheds pool their incense, and the total needs a named function the whole street can call."
+concepts    = ["functions", "bindings"]
+requires    = ["lua.cheatsheet.23.tally"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+Define `add` as a **local** function of two numbers that returns their sum,
+on one line.
+'''
+solution    = 'local function add(a, b) return a + b end'
+hints = [
+  "A Lua body hands nothing back on its own, and what opens with `function` closes with a word, not a brace.",
+]
+
+[quest.quiz]
+choices = [
+  'local function add(a, b) a + b end',
+  'def add(a, b) return a + b end',
+  'local function add(a, b) return a + b end',
+  'local function add(a, b) { return a + b }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "lua.cheatsheet.25.two-returns"
+node        = 25
+title       = "BOTH AT ONCE"
+difficulty  = 2
+story       = "The shed hands out sticks in bundles of three, and the marshal wants the bundle count and the loose ones in one go."
+concepts    = ["functions", "bindings"]
+requires    = ["lua.cheatsheet.24.function"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`divmod` returns two values. Catch both:
+
+```
+local function divmod(a, b)
+  return math.floor(a / b), a % b
+end
+-- ____
+print(q, r)  -- 2  1
+```
+'''
+solution    = 'local q, r = divmod(7, 3)'
+hints = [
+  "A call can hand back several values, and a comma-separated list of names catches them as they come — no wrapper, no brackets.",
+]
+
+[quest.quiz]
+choices = [
+  'local (q, r) = divmod(7, 3)',
+  'local q, r = divmod(7, 3)',
+  'local q, r = unpack(divmod(7, 3))',
+  'local q, r = divmod(7, 3)[1], divmod(7, 3)[2]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "lua.cheatsheet.26.empty"
+node        = 26
+title       = "NOBODY YET"
+difficulty  = 1
+story       = "Before the first drum, the marshal checks whether anyone has signed the roll at all."
+concepts    = ["collections", "zero-values", "control-flow"]
+requires    = ["lua.cheatsheet.25.two-returns"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`t` is a list with no holes, possibly empty. Open an `if` that is true
+exactly when `t` has **no** elements.
+'''
+solution    = 'if #t == 0 then'
+hints = [
+  "An empty table is still a table, and every table is truthy; two different tables are never equal. Ask about the count.",
+]
+
+[quest.quiz]
+choices = [
+  'if #t == 0 then',
+  'if not t then',
+  'if t == {} then',
+  'if t.empty() then',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "lua.cheatsheet.27.swap"
+node        = 27
+title       = "CHANGE PLACES"
+difficulty  = 1
+story       = "Two carriers trade segments mid-route, and the roll must swap their numbers without a scrap of paper."
+concepts    = ["bindings", "mutability"]
+requires    = ["lua.cheatsheet.26.empty"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`a` and `b` are two existing variables. Exchange their values in one
+statement, with no temporary.
+'''
+solution    = 'a, b = b, a'
+hints = [
+  "Lua assigns a list of values to a list of names, and evaluates every right-hand side before it stores any of them.",
+]
+
+[quest.quiz]
+choices = [
+  'a = b; b = a',
+  'swap(a, b)',
+  '(a, b) = (b, a)',
+  'a, b = b, a',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "lua.cheatsheet.28.error"
+node        = 28
+title       = "STOP THE DRUM"
+difficulty  = 2
+story       = "A stick with no incense is a fault, and the lighter must halt the line with a message rather than carry on."
+concepts    = ["error-handling", "panics", "functions"]
+requires    = ["lua.cheatsheet.27.swap"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+Stop the current function with an error whose message is `"bad"`, so a
+`pcall` around it returns `false` and a message containing `bad`.
+'''
+solution    = 'error("bad")'
+hints = [
+  "assert only complains when its first argument is nil or false, and a string is neither. The raising built-in takes the message straight.",
+]
+
+[quest.quiz]
+choices = [
+  'raise("bad")',
+  'assert("bad")',
+  'error("bad")',
+  'throw("bad")',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "lua.cheatsheet.29.and-or"
+node        = 29
+title       = "ONE OR THE OTHER"
+difficulty  = 3
+story       = "Carriers with more than ten sticks pay a 5-dollar levy at the shed; everyone else pays 8."
+concepts    = ["control-flow", "types"]
+requires    = ["lua.cheatsheet.28.error"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`n` is a number. Make `fee` 5 when `n > 10` and 8 otherwise — one
+expression, no `if` statement.
+'''
+solution    = 'local fee = n > 10 and 5 or 8'
+hints = [
+  "One keyword yields its right side when the left is true; another fills in when it is not. Read which value lands where.",
+]
+
+[quest.quiz]
+choices = [
+  'local fee = n > 10 and 5 or 8',
+  'local fee = n > 10 and 8 or 5',
+  'local fee = if n > 10 then 5 else 8',
+  'local fee = n > 10 and 5 else 8',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "lua.cheatsheet.30.copy"
+node        = 30
+title       = "THE SECOND ROLL"
+difficulty  = 3
+story       = "Midnight. The marshal copies tonight's roll so tomorrow's corrections do not touch the record of fire-dragon night."
+concepts    = ["collections", "slices", "bindings"]
+requires    = ["lua.cheatsheet.29.and-or"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`src` is a list of numbers. Make `cp` a **new** list with the same
+elements, so that `cp[1] = 99` leaves `src[1]` as it was. This land runs
+LuaJIT (Lua 5.1).
+'''
+solution    = 'local cp = {unpack(src)}'
+hints = [
+  "Assigning a table copies a reference, not the table. Spread the list's values into a fresh constructor — and in 5.1 the spreader is a global, not a field of `table`.",
+]
+
+[quest.quiz]
+choices = [
+  'local cp = src',
+  'local cp = table.copy(src)',
+  'local cp = {table.unpack(src)}',
+  'local cp = {unpack(src)}',
+]
+answer  = 3
