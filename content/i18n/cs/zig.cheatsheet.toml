@@ -1,0 +1,480 @@
+# ZIG LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/zig/cheatsheet.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack,
+# and are never translated. Code blocks and identifiers are copied verbatim.
+
+pack   = "zig.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.cheatsheet.01.print"
+title = "TABULE S MÝTNÝM"
+story = "06:00 u vjezdu do tunelu pod přístavem v Causeway Bay. Tabule nad budkou 1 ukáže mýtné, jen když ho tam někdo zapíše."
+brief = '''
+`w` je bufferovaný writer nad stdout. Vypište `n` v desítkové soustavě a pak
+nový řádek.
+
+```
+const w = &stdout.interface;
+defer w.flush() catch {};
+const n: i64 = 42;
+// ____
+```
+
+Který řádek to je?
+'''
+hints = [
+  "Argumenty patří do n-tice `.{ ... }` a print může selhat, takže před ním je `try`.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.cheatsheet.02.parse-int"
+title = "MINCE NA ČÍSLA"
+story = "Tácek na mince v budce 2 počítá v textu. Pokladna chce celé číslo."
+brief = '''
+`tok` je `[]const u8` s obsahem `"42"`. Udělejte z něj `n` typu `i64` v
+desítkové soustavě a chybu špatného tokenu předejte volajícímu.
+'''
+hints = [
+  "Nejdřív typ, pak text, pak základ. Vrací chybové sjednocení, takže `try`.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.cheatsheet.03.for-index"
+title = "ČÍSLA PRUHŮ"
+story = "Počítadlo náprav zapisuje každé auto s pruhem, kterým projelo, počítáno od nuly."
+brief = '''
+`xs` je `[]const i64`. Projděte ho smyčkou, každý prvek jako `x` a jeho index
+jako `i`.
+'''
+hints = [
+  "Smyčka for umí procházet dvě věci naráz: řez a otevřený rozsah od 0. Každá má svou proměnnou.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.cheatsheet.04.div-trunc"
+title = "DĚLENÍ TRŽBY"
+story = "Tržba za celou noc se dělí mezi budky a účetní kniha může jít do mínusu."
+brief = '''
+`a` a `b` jsou běhová `i64`, kterékoli může být záporné. Udělejte z `q` jejich
+podíl zaokrouhlený **směrem k nule**, jako v C.
+'''
+hints = [
+  "Obyčejné `/` se na znaménkových běhových celých číslech nepřeloží: Zig chce, abyste zaokrouhlení pojmenovali.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.cheatsheet.05.eql"
+title = "STEJNÁ ZNAČKA"
+story = "Čtečka značek na estakádě porovnává každé auto se značkou ze seznamu hledaných."
+brief = '''
+`a` i `b` jsou `[]const u8`. Otevřete `if`, které platí, když obsahují stejné
+bajty.
+'''
+hints = [
+  "`==` na řezech definováno není. Porovnání ze std.mem bere jako první typ prvku.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.cheatsheet.06.orelse"
+title = "BEZ ZÁZNAMU"
+story = "I značka, kterou sčítání ještě nevidělo, má počet. A ten počet je nula."
+brief = '''
+`counts` je `std.StringHashMap(i64)` a `get` vrací `?i64`. Nastavte `c` na počet
+pro klíč `k`, nebo 0, když tam `k` není.
+'''
+hints = [
+  "Volitelnou hodnotu s výchozí hodnotou rozbalí `orelse`; `catch` je pro chybová sjednocení.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.cheatsheet.07.append"
+title = "JEŠTĚ JEDNO AUTO"
+story = "Fronta u budky 3 se prodlouží o jedno auto a každý její bajt je zaplacený."
+brief = '''
+Přidejte `x` na konec seznamu.
+
+```
+var xs: std.ArrayList(i64) = .empty;
+defer xs.deinit(gpa);
+// ____
+```
+'''
+hints = [
+  "Seznam si alokátor nepamatuje: předejte mu `gpa` při každém volání, které ho může zvětšit, a výsledek `try`.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.cheatsheet.08.sort-desc"
+title = "NEJTĚŽŠÍ NAHOŘE"
+story = "Mostní váha pod Canal Road řadí kamiony s nejtěžším nahoře."
+brief = '''
+`xs` je `std.ArrayList(i64)`. Seřaďte jeho items **sestupně**, na místě.
+'''
+hints = [
+  "std.mem.sort bere typ, řez, kontext a komparátor; std.sort má jeden pro každý směr.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.cheatsheet.09.catch-default"
+title = "ROZMAZANÝ LÍSTEK"
+story = "Lístek z automatu je rozmazaný. Budka ho počítá jako nulu a auto pustí."
+brief = '''
+`tok` nemusí být číslo. Převeďte ho jako desítkové `i64` do `n` a když převod
+selže, použijte 0 místo vrácení chyby.
+'''
+hints = [
+  "Chybové sjednocení dostane výchozí hodnotu přes `catch`; `orelse` je pro volitelné hodnoty.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.cheatsheet.10.comptime-type"
+title = "JAKÝKOLI NÁKLAD"
+story = "Stoh kontejnerů u vjezdu vezme cokoli, co kamion přiveze, pokud se při překladu dozví co."
+brief = '''
+`Stack` je funkce, která bere typ prvku a vrací z něj sestavený typ struct.
+Který řádek ji otevírá?
+
+```
+// ____
+    return struct {
+        items: []T,
+    };
+}
+```
+'''
+hints = [
+  "Typ je hodnota známá při překladu, a tak je tak označen i jeho parametr; funkce vrací `type`.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.cheatsheet.11.self-ptr"
+title = "POČÍTACÍ SKŘÍŇKA"
+story = "Počítadlo přišroubované k budce 4 cvakne jednou za auto. Jeho kopie by cvakala sama pro sebe."
+brief = '''
+Metoda `inc`, která přičte jedničku k počítadlu, na kterém je volána:
+
+```
+const Counter = struct {
+    n: i64 = 0,
+    // ____
+        self.n += 1;
+    }
+};
+```
+'''
+hints = [
+  "Parametr je konstantní kopie. Chcete-li změnit strukturu volajícího, vezměte si ukazatel na ni.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.cheatsheet.12.errdefer"
+title = "JEN PŘI SELHÁNÍ"
+story = "Závora u ústí tunelu pustí auto, když mýtné projde, a vezme lístek zpět, když ne."
+brief = '''
+Uvolněte `buf`, když `fill` selže, ale při úspěchu ho nedotčený předejte
+volajícímu.
+
+```
+fn load(gpa: std.mem.Allocator, n: usize) ![]u8 {
+    const buf = try gpa.alloc(u8, n);
+    // ____
+    try fill(buf);
+    return buf;
+}
+```
+'''
+hints = [
+  "Obyčejný `defer` proběhne při každém odchodu, i při úspěchu. Existuje tvar, který proběhne jen při návratu s chybou.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.cheatsheet.13.slice"
+title = "PROSTŘEDNÍ PRUHY"
+story = "Z pěti pruhů u portálu jsou dnes v noci pod kamerou ty dva uprostřed."
+brief = '''
+`xs` je `[]const i64` o pěti prvcích. Udělejte z `mid` pohled na
+prvky s indexy 1 a 2 — přesně dva, bez kopie.
+'''
+hints = [
+  "Podřez je `[start..end]` s vyloučeným koncem; když konec úplně vynecháte, sahá až k `xs.len`.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.cheatsheet.14.while-step"
+title = "SPOČÍTEJTE BUDKY"
+story = "Inspektor obchází budky od nuly až po poslední, o jeden krok po každé kontrole."
+brief = '''
+`i` a `n` jsou `usize`, `i` začíná na 0. Otevřete smyčku, která spustí tělo
+pro `i = 0, 1, …, n-1`, s krokem zapsaným v hlavičce smyčky, a ne
+na konci těla.
+'''
+hints = [
+  "Zig nemá `for` ve stylu C: je to `while`, jehož pokračovací výraz stojí za dvojtečkou, a žádné `++` neexistuje.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.cheatsheet.15.switch-range"
+title = "HMOTNOSTNÍ TŘÍDA"
+story = "Mostní váha třídí každé vozidlo podle tun, které naměří, a nejtěžší třída je shora otevřená."
+brief = '''
+`t` je `i64`. Která větev dá `"light"` pro každou hodnotu od 0 do 9
+včetně?
+
+```
+const class = switch (t) {
+    // ____
+    10...99 => "medium",
+    else => "heavy",
+};
+```
+'''
+hints = [
+  "Rozsah ve switchi je uzavřený z obou stran a píše se o jednu tečku víc než rozsah řezu.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.cheatsheet.16.error-union"
+title = "MŮŽE SELHAT, A ŘÍKÁ TO"
+story = "Čtečka lístků v budce 5 buď vrátí číslo, nebo přizná, že lístek nepřečetla, a její štítek říká obojí."
+brief = '''
+`parse` převádí token na `i64` a selhání převodu předává výš
+volajícímu. Který řádek ji otevírá?
+
+```
+// ____
+    return try std.fmt.parseInt(i64, s, 10);
+}
+```
+'''
+hints = [
+  "`try` uvnitř funkce se přeloží jen tehdy, když návratový typ unese chybu; odvozená množina chyb se píše jedním znakem před typem.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.cheatsheet.17.if-capture"
+title = "POKUD JE TAM ZNAČKA"
+story = "Kamera nad pruhem 3 mohla a nemusela přečíst značku; počítadlo se pohne, jen když ano."
+brief = '''
+`maybe` je `?i64`. Otevřete `if`, jehož tělo proběhne jen tehdy, když `maybe`
+obsahuje hodnotu, přičemž ta hodnota je uvnitř těla navázaná na `v`.
+'''
+hints = [
+  "Podmínka je sám optional, ne porovnání, a zachycení za ním je rozbalená hodnota.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.cheatsheet.18.hashmap-count"
+title = "JEŠTĚ JEDEN TAKOVÝ"
+story = "Počítadlo značek v řídicí místnosti cvakne jednou za každé auto a značka, kterou ještě nevidělo, začíná od ničeho."
+brief = '''
+Přičtěte jedničku k počtu uloženému pod klíčem `x`, přičemž klíč, který tam
+ještě není, berte jako 0.
+
+```
+var counts: std.AutoHashMap(i64, i64) = .init(gpa);
+defer counts.deinit();
+// ____
+```
+'''
+hints = [
+  "`get` vrací optional, takže před jakoukoli aritmetikou potřebuje výchozí hodnotu; tahle mapa si svůj alokátor pamatuje, takže ukládací volání žádný nebere.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.cheatsheet.19.intcast"
+title = "ČÍSLO PRUHU SE ZNAMÉNKEM"
+story = "Číslo pruhu přišlo po drátě jako celé číslo se znaménkem; tabulka pruhů bere jen velikost."
+brief = '''
+`k` je běhové `i64`, o kterém se ví, že je nezáporné a v rozsahu. Udělejte z `idx`
+`usize` se stejnou hodnotou, aby se `xs[idx]` přeložilo.
+'''
+hints = [
+  "Přetypování bere jeden argument a cílovou šířku si bere z vazby, do které dopadne, takže vazba musí typ uvést.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.cheatsheet.20.labeled-break"
+title = "VEN Z OBOU SMYČEK"
+story = "Hledání té jedné kradené značky běží pruh po pruhu a auto po autu a ve chvíli, kdy se najde, celý průzkum končí."
+brief = '''
+`grid` je řez řádků. Když se cíl najde, opusťte **obě** smyčky
+najednou — vnější smyčka nesmí pokračovat dalším řádkem.
+
+```
+outer: for (grid) |row| {
+    for (row) |c| {
+        if (c == target) {
+            found = c;
+            // ____
+        }
+    }
+}
+```
+'''
+hints = [
+  "Smyčka s návěštím se opouští uvedením jejího návěští za klíčovým slovem, s dvojtečkou před jménem; druhý skok s návěštím by jen přeskočil na další řádek.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.cheatsheet.21.var-typed"
+title = "PRŮBĚŽNÝ SOUČET"
+story = "Kniha noční směny v budce 1 začíná na ničem a bere každé jízdné, které jí smyčka podá."
+brief = '''
+`xs` je `[]const i64`. Deklarujte `total` jako `i64` začínající na 0 tak,
+aby do něj smyčka níže mohla přičítat.
+
+```
+// ____
+for (xs) |x| total += x;
+```
+'''
+hints = [
+  "Vazba, do které smyčka zapisuje, potřebuje klíčové slovo pro proměnlivost, a holý celočíselný literál nemá vlastní běhový typ — deklarace ho musí uvést.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.cheatsheet.22.range-for"
+title = "DESETKRÁT DOKOLA"
+story = "Revizorka na své obchůzce zkusí každou z deseti budek jednou, budku 10 včetně."
+brief = '''
+Otevřete `for`, který spustí své tělo **desetkrát**, přičemž `i` bere postupně hodnoty
+1, 2, …, 10 — poslední průchod musí vidět `i == 10`.
+'''
+hints = [
+  "For přes rozsah vylučuje svou horní mez, přesně jako řez `[a..b]`, takže mez je o jedna za poslední hodnotou, kterou chcete.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.cheatsheet.23.bool-and"
+title = "OBĚ SVĚTLA ZELENÁ"
+story = "Závora v pruhu 2 se zvedne, jen když se lístek načetl a jízdné prošlo."
+brief = '''
+`ready` a `valid` jsou běhové `bool`y. Otevřete `if`, jehož tělo běží,
+jen když jsou obě pravdivé.
+'''
+hints = [
+  "Zig píše logické operátory jako klíčová slova, ne jako zdvojené symboly — céčkový zápis je tu chyba překladu — a podmínka pořád potřebuje své závorky.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.cheatsheet.24.float-from-int"
+title = "PŮL JÍZDNÉHO"
+story = "Noční jízdné za polovic: mýto na ceduli je celé číslo a sleva ne."
+brief = '''
+`n` je běhové `i64`. Udělejte z `f` `f64` se stejnou hodnotou, aby
+se `f / 2.0` přeložilo.
+'''
+hints = [
+  "Implicitní převod z celého čísla na float neexistuje a vestavěná funkce, která ho dělá, bere jen hodnotu — cílový typ si bere z vazby, takže vazba musí nějaký uvést.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.cheatsheet.25.abs"
+title = "O KOLIK VEDLE"
+story = "Počítadlo náprav v budce 4 přes noc ujelo; velín chce vědět o kolik, ne kterým směrem."
+brief = '''
+`x` je běhové `i64`, které může být záporné. Udělejte z `a` jeho absolutní
+hodnotu — a pamatujte, že výsledek je **bez znaménka** (`u64`).
+'''
+hints = [
+  "Od 0.12 je to vestavěná funkce, ne funkce ze std.math, a vrací bezznaménkové dvojče vstupního typu — vazba se znaménkem ho nepřijme.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.cheatsheet.26.reverse"
+title = "ZPÁTKY, KUDY PŘIJELY"
+story = "Odtahovka couvá s frontou z ústí tunelu v opačném pořadí, než v jakém přijela."
+brief = '''
+`xs` je `std.ArrayList(i64)`. Obraťte jeho položky na místě.
+'''
+hints = [
+  "Řezy nemají metody; pomocník ze std.mem bere nejdřív typ prvku, stejně jako sort a eql.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.cheatsheet.27.dupe"
+title = "KOPIE PRO ARCHIV"
+story = "Seznam značek za směnu jde nahoru do archivu v Causeway Bay a archiv si drží vlastní kopii."
+brief = '''
+`xs` je `[]const i64`. Udělejte z `c` jeho nezávislou kopii na haldě, vlastněnou
+`gpa` — volající ji později uvolní přes `gpa.free(c)`.
+'''
+hints = [
+  "Kopie je metoda na alokátoru, ne na std.mem, a typ prvku se jí říká před řezem. Alokace může selhat.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.cheatsheet.28.items-len"
+title = "JAK DLOUHÁ JE FRONTA"
+story = "Cedule u portálu ukazuje, kolik aut čeká u budky 3."
+brief = '''
+`xs` je `std.ArrayList(i64)`. Udělejte z `n` počet prvků, které
+obsahuje.
+'''
+hints = [
+  "Seznam žádnou vlastní délku nemá; prvky žijí v řezu, který je jeho členem, a délka řezu je člen, ne volání.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.cheatsheet.29.return-error"
+title = "ŘEKNĚTE, CO SE POKAZILO"
+story = "Budka 5 chtěla první auto z fronty, která žádné neměla, a čtečka to musí říct."
+brief = '''
+Předejte volajícímu chybu jménem `Empty`, když řez nic neobsahuje.
+
+```
+fn first(xs: []const i64) !i64 {
+    if (xs.len == 0) {
+        // ____
+    }
+    return xs[0];
+}
+```
+'''
+hints = [
+  "Chyba je hodnota, vrací se jako každá jiná; nová se píše tečkou za jmenným prostorem s malým písmenem — nevolá se jako funkce — a nepotřebuje žádnou deklaraci.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.cheatsheet.30.mod"
+title = "CO ZBYDE"
+story = "Noční tržba se dělí na tři díly a zbylé mince jdou do sklenice na dýško — nikdy ne záporná hrst."
+brief = '''
+`a` a `b` jsou běhová `i64`; `b` je kladné a `a` může být záporné.
+Udělejte z `r` zbytek, který **nikdy není záporný**: s `a = -7` a
+`b = 3` musí být `r` rovno `2`.
+'''
+hints = [
+  "Stejně jako `/` odmítá znak `%` běhové operandy se znaménkem a nutí vás vybrat vestavěnou funkci: jedna následuje znaménko dělence, druhá znaménko dělitele.",
+]

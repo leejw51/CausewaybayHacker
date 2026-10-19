@@ -163,6 +163,30 @@
       "h": 768
     },
     {
+      "name": "bg_cheatsheet",
+      "file": "bg_cheatsheet.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_cheatsheet_p",
+      "file": "bg_cheatsheet_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "bg_cheatsheet_pro",
+      "file": "bg_cheatsheet_pro.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_cheatsheet_pro_p",
+      "file": "bg_cheatsheet_pro_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "sprite_mei",
       "file": "sprite_mei.png",
       "w": 128,

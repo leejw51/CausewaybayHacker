@@ -42,7 +42,7 @@ Skynet's plan all along — and takes it back one street at a time.
   in Go, Rust and Python, and every quest of it carries a `lang` of its own
   (§12) naming which of the three judges it. A land is a place on the lands
   screen; a language is what compiles. In eight lands they are the same word.
-* Four **categories** per land: `verybasic` (the quiz: four lines, one right,
+* Four **categories** per land (six with the two sheet roads, below): `verybasic` (the quiz: four lines, one right,
   pick it then type it), `basic` (grammar activation: a construct
   shown, one to four lines to type — in Rust Land the language's own
   grammar: ownership, borrows, lifetimes, threads, channels), `advanced`
@@ -56,8 +56,20 @@ Skynet's plan all along — and takes it back one street at a time.
   serde, clap, regex, chrono, itertools, rayon, crossbeam, tokio, …),
   untimed, built by cargo against the pinned **crate shelf** (§5.1) rather
   than by `rustc` alone. It is Rust's alone because the shelf is a cargo
-  shelf; no other land has one. The order the roads are walked is
-  `verybasic`, `basic`, `advanced`, `hacker`, `frameworks`.
+  shelf; no other land has one. Every land also has two **sheet roads**,
+  walked first: **`cheatsheet`** (CHEATSHEET BASIC on screen), the core
+  grammar off the live-coding cheatsheet (~/vivid/Cheatsheet) — every
+  section of the sheet and the drills of its game — and
+  **`cheatsheet_advanced`** (CHEATSHEET ADVANCED), the patterns a live
+  coding test turns on: traits, channels, generics, closures, the
+  concurrency idioms, the standard library's sharper tools. Both are four
+  lines and one right. Nothing is typed and nothing is compiled — the pick
+  is sent as the submission's `source`, and the server judges it against
+  the quiz rather than the runner (§12: a sheet quest has a `quiz`, its
+  `solution` is the right choice, and it has no `tests`). A wrong pick is a
+  failed attempt like any other. The order the roads are walked is
+  `cheatsheet`, `cheatsheet_advanced`, `verybasic`, `basic`, `advanced`,
+  `hacker`, `frameworks`.
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
 * A node holds one **quest**. A quest is code the player writes, that the server
@@ -275,7 +287,7 @@ CREATE TABLE quests (
   id            TEXT PRIMARY KEY,          -- 'rust.basic.03.shadowing' (§4.1)
   pack          TEXT NOT NULL,             -- content pack that supplied it
   land          TEXT NOT NULL CHECK (land IN ('rust','go')),
-  category      TEXT NOT NULL CHECK (category IN ('verybasic','basic','advanced','hacker','frameworks')),
+  category      TEXT NOT NULL CHECK (category IN ('verybasic','basic','advanced','hacker','frameworks','cheatsheet','cheatsheet_advanced')),
   node          INTEGER NOT NULL,          -- position on the map, 1-based
   title         TEXT NOT NULL,
   brief         TEXT NOT NULL,             -- markdown shown in the quest panel

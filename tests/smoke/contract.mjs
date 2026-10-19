@@ -1408,7 +1408,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
       );
       for (const cat of l.categories) {
         assert(
-          ["verybasic", "basic", "advanced", "hacker", "frameworks"].includes(cat.category),
+          ["cheatsheet", "verybasic", "basic", "advanced", "hacker", "frameworks"].includes(cat.category),
           `§4.6: category ${cat.category}`,
         );
         // SPEC §0: the fifth road is RUST LAND's alone.
@@ -1425,7 +1425,7 @@ check(null, "beyond: world.lands, world.map and quest.get match §5", async () =
     assertEq(map.payload.category, "basic", "§4.7: the map echoes its category");
     for (const n of nodes) {
       assert(
-        /^(rust|go|cpp|python|pytorch|typescript|zig|lua|remix)\.(verybasic|basic|advanced|hacker|frameworks)\.\d{2}\..+$/.test(
+        /^(rust|go|cpp|python|pytorch|typescript|zig|lua|remix)\.(cheatsheet|verybasic|basic|advanced|hacker|frameworks)\.\d{2}\..+$/.test(
           n.quest_id,
         ),
         `SPEC §4.1: quest_id ${n.quest_id}`,

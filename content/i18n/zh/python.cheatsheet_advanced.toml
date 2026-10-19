@@ -1,0 +1,535 @@
+# PYTHON LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/python/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code
+# blocks and identifiers are copied verbatim, never translated.
+
+pack   = "python.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.cheatsheet_advanced.01.yield-from"
+title = "箱子套箱子"
+story = "送到渣甸坊楼上唐楼的一批货：纸箱里套着纸箱，而蟒蛇想把每一件都摆到地上，一次一件。"
+brief = '''
+`flatten` 必须是一个生成器，按顺序产出任意嵌套列表的每一个叶子：
+`list(flatten([1, [2, [3, 4]], 5]))` 是 `[1, 2, 3, 4, 5]`。空白处填哪一行？
+
+```
+def flatten(xs):
+    for x in xs:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+'''
+hints = [
+  "递归调用返回的是一个生成器；你要的是它的元素，一个一个往上交 —— 有一个两个词的写法专门做这个。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.cheatsheet_advanced.02.first-or-default"
+title = "第一个偶数，否则没人"
+story = "怡和街的电车队伍：第一个持偶数票的乘客上车，一个都没有的话售票员就写 -1。"
+brief = '''
+`xs` 是一个很长的 int 列表。让 `first` 成为其中第一个偶数，没有的话就是
+`-1` —— 在第一次命中时停下，不构建第二个列表。
+'''
+hints = [
+  "不是唯一参数的生成器表达式需要自己的括号，而那个取出一个元素的内置函数接收一个默认值。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.cheatsheet_advanced.03.read-until-empty"
+title = "直到水龙头流干"
+story = "渣甸街夜市的扫描器以 4 KB 一口的方式读收据卷，哪一口读回来是空的就停下。"
+brief = '''
+`f` 是一个以二进制模式打开的文件。让 `chunk` 依次遍历连续的 `f.read(4096)`
+结果，并在读取返回 `b""` 时停下，用某个内置函数的双参数形式。
+'''
+hints = [
+  "这个内置函数要的是一个能反复调用的东西，再加上表示停止的那个值 —— 一个已经读完的结果两者都不是。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.cheatsheet_advanced.04.keep-the-name"
+title = "还叫 GREET"
+story = "波斯富街前台的名牌必须在制服套上去之后还活着。"
+brief = '''
+`import functools` 已经做了。把 `@logged` 应用到 `greet` 之后，
+`greet.__name__` 必须仍然是 `"greet"`，而 `greet.__doc__` 必须是 greet
+自己的。空白处填哪一行？
+
+```
+def logged(fn):
+    # ____
+    def inner(*a, **kw):
+        print(fn.__name__)
+        return fn(*a, **kw)
+    return inner
+```
+'''
+hints = [
+  "这个辅助函数是一个装饰器工厂：用被包装的函数调用它，它返回的东西再去装饰包装器。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.cheatsheet_advanced.05.three-layers"
+title = "第三次走运"
+story = "骆克道的速递员按三次门铃才放弃，而调度员不用 @ 语法糖就把这条规则接了上去。"
+brief = '''
+`retry` 是一个带参数的装饰器：`def` 上方的 `@retry(3)` 让那个函数最多
+尝试三次。
+
+```
+def retry(times):
+    def deco(fn):
+        def inner(*a, **kw):
+            ...
+        return inner
+    return deco
+```
+
+`fetch` 已经定义好了，没有任何装饰器。手工重新绑定 `fetch`，让它被重试三次 ——
+和 `@retry(3)` 做的事一模一样。
+'''
+hints = [
+  "有三层。最外层的调用接收那个数字并交回真正的装饰器；函数再放进那个装饰器里。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.cheatsheet_advanced.06.memo"
+title = "问一次，永远有答案"
+story = "宝灵顿道街市的算盘记得它算过的每一个小计，所以摊位从不把同一列加两遍。"
+brief = '''
+`import functools` 和 `import sys` 是仅有的导入，并且 `sys.setrecursionlimit(10_000)`
+已经调高。`fib(300)` 必须在毫秒内返回：每个 `fib(n)` 只计算一次并被记住，
+没有大小限制。`def` 上方放哪一行？
+
+```
+# ____
+def fib(n):
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+```
+'''
+hints = [
+  "那个无上限的记忆化工具（3.9+）直接裸用 —— 它不是工厂，所以不加括号 —— 而且只导入了模块名。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.cheatsheet_advanced.07.old-style-compare"
+title = "老式比较器"
+story = "一位 C 语言老时代的裁判坐在时代广场游戏厅里，带着一条双参数规则 —— 小于、等于、大于 —— 而排行榜必须原样使用它。"
+brief = '''
+`from functools import cmp_to_key` 已经做了。`cmp(a, b)` 是一个返回 `-1`、`0`
+或 `1` 的双参数比较器。让 `ys` 成为按那个比较器排序后的列表 `xs`。
+'''
+hints = [
+  "Python 3 只按单参数的 key 排序；那个适配器把双参数比较器变成单参数的，而你交出去的是适配器的结果。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.cheatsheet_advanced.08.own-list"
+title = "每份一个新袋子"
+story = "谢斐道面店的每份订单都有自己的一个空配料袋；共用一个袋子会把这桌的辣椒放到那桌去。"
+brief = '''
+`from dataclasses import dataclass, field` 已经做了。每个 `Order` 都必须从
+**自己的**空 `tags` 列表开始 —— `Order("a").tags.append("hot")` 必须让
+`Order("b").tags` 保持为空 —— 而且这个类仍然必须能无错定义。空白处填哪一行？
+
+```
+@dataclass
+class Order:
+    id: str
+    # ____
+```
+'''
+hints = [
+  "可变默认值在创建类时就会被拒绝。field 辅助函数要的是一个每个实例都能调用一次的东西 —— 类本身，而不是一个实例。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.cheatsheet_advanced.09.alt-constructor"
+title = "子类拿到自己的"
+story = "崇光礼品柜台把 \"1,2\" 解析成一个坐标，而隔壁的尊享柜台期望拿回一个尊享坐标，不是普通的那种。"
+brief = '''
+`Point3(Point)` 是一个什么都不加的子类。`Point3.parse("1,2")` 必须返回一个
+`Point3`，而不是 `Point`。空白处填哪一行？
+
+```
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @property
+    def norm(self):
+        return abs(self.x) + abs(self.y)
+
+    @classmethod
+    def parse(cls, s):
+        a, b = s.split(",")
+        # ____
+```
+'''
+hints = [
+  "classmethod 的第一个参数是调用经由的那个类，不管它是哪个。手写基类的名字就把它钉死在基类上了。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.cheatsheet_advanced.10.hash-with-eq"
+title = "同一张卡，同一个人"
+story = "轩尼诗道健身房里两次签到用的是同一个会员号，那就是同一个会员，而出席集合必须认同这一点。"
+brief = '''
+`uid` 是一个 `str`。定义了 `__eq__` 让 `User` 变得不可哈希，所以实例进不了 `set`。
+哪一行能恢复哈希，使 `len({User("a"), User("a"), User("b")})` 为 `2`？
+
+```
+class User:
+    def __init__(self, uid):
+        self.uid = uid
+
+    def __eq__(self, o):
+        return isinstance(o, User) and self.uid == o.uid
+
+    # ____
+```
+'''
+hints = [
+  "相等的对象必须哈希相等，所以要哈希 `__eq__` 比较的那同一个东西 —— 而且这个方法必须返回 int，不是 str。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.cheatsheet_advanced.11.deck-iter"
+title = "一张张发给我"
+story = "铜锣湾道唐楼里的麻将桌想用普通的 for 循环把一副牌走一遍，而不是伸手进它的抽屉。"
+brief = '''
+`for card in Deck()` 必须一次一个地访问 `"A"`、`"K"`、`"Q"`，而 `len(deck)`
+已经能用了。空白处填哪一行？
+
+```
+class Deck:
+    def __init__(self):
+        self._cards = ["A", "K", "Q"]
+
+    def __len__(self):
+        return len(self._cards)
+
+    # ____
+```
+'''
+hints = [
+  "这个 dunder 必须返回一个迭代器，而不是列表本身；yield 整个列表只会交回一个元素，就是整个列表。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.cheatsheet_advanced.12.exit-protocol"
+title = "关上，但别捂嘴"
+story = "渣甸坊摊位的卷闸不管里面发生了什么都会落下，但火警在外面仍然必须听得见。"
+brief = '''
+`Res` 以 `with Res() as r:` 的方式使用。离开代码块时，`self.close()` 必须运行 ——
+而代码块里抛出的异常仍然必须**传播**给调用者。空白处填哪一行？
+
+```
+class Res:
+    def __enter__(self):
+        return self
+
+    def close(self):
+        ...
+
+    # ____
+```
+'''
+hints = [
+  "exit dunder 被调用时带三个额外参数，而从它返回真值会吞掉异常。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.cheatsheet_advanced.13.chain-the-cause"
+title = "而原因是"
+story = "告士打道那家金融科技公司的配置职员用自己的印章拒绝一个坏端口，但把原始的投诉钉在下面留着。"
+brief = '''
+存在 `class ConfigError(Exception): pass`。在 `except ValueError as e:` 里面，
+抛出一个 `ConfigError("bad port")`，使调用者捕获到的 `ConfigError` 的
+`__cause__` 是原来的 `ValueError`。
+'''
+hints = [
+  "新异常被抛出；旧的那个在它后面被点名作为原因。在那里写 `None` 反而会把原因藏起来。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.cheatsheet_advanced.14.two-faults-one-net"
+title = "两种故障，一张网"
+story = "Lucky Mac 的订单表可能缺了端口，也可能里面写了个单词，不管哪种收银员都说一声 \"bad\" 然后继续。"
+brief = '''
+`parse({})` 必须返回 `"bad"`（一个 `KeyError`），`parse({"port": "x"})` 必须
+返回 `"bad"`（一个 `ValueError`），而 `parse({"port": "80"})` 必须返回 `80`。
+空白处填哪一行？
+
+```
+def parse(d):
+    try:
+        v = int(d["port"])
+    # ____
+        return "bad"
+    else:
+        return v
+```
+'''
+hints = [
+  "一个子句里的多个类型以元组的形式出现；在这里光写一个逗号是语法错误，而 `or` 只会求值成第一个类。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.cheatsheet_advanced.15.sort-then-group"
+title = "分组之前先排序"
+story = "宝灵顿道的鱼贩按大小给渔获分筐，但要先把鱼按大小排成一行 —— 否则同一个筐会出现五次。"
+brief = '''
+`from itertools import groupby` 已经做了，而 `words` 是一个未排序的字符串列表。
+循环 `k, g`，使每个不同的长度**恰好出现一次**，而 `g` 装着那个长度的每一个词。
+'''
+hints = [
+  "分组器只合并相邻的。先按同一个 key 把词排成一行 —— 而 `list.sort` 返回 None。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.cheatsheet_advanced.16.every-pair-once"
+title = "每一对，一次"
+story = "利园山道的三家茶楼想试行一份共享菜单，每两家恰好碰面一次。"
+brief = '''
+`import itertools` 已经做了，而 `xs = ["a", "b", "c"]`。让 `pairs` 成为列表
+`[("a", "b"), ("a", "c"), ("b", "c")]` —— 每个无序对一次，没有元素和自己配对，
+没有 `("b", "a")`。
+'''
+hints = [
+  "顺序无关，而且没有重复；itertools 里它的两个邻居分别给出有序对和自配对。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.cheatsheet_advanced.17.ten-off-the-stream"
+title = "从流里取十个"
+story = "湾仔渡轮码头源源不断地送来一排排乘客；职员要的是前十个人，不是前十排。"
+brief = '''
+`from itertools import chain, islice` 已经做了。`rows` 是一个**无限的**列表生成器。
+让 `first` 成为跨越各行的前 10 个单个元素的列表，并且永远不耗尽 `rows`。
+'''
+hints = [
+  "对无尽的生成器做星号解包永远结束不了，而 chain 不能用方括号切片 —— 在那个展平用的 classmethod 上用切片适配器。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.cheatsheet_advanced.18.neighbour-gaps"
+title = "到下一班电车的间隔"
+story = "铜锣湾总站的电车到达时间从线路上一个一个地传来；查票员想要每一班和下一班之间的等待。"
+brief = '''
+`from itertools import pairwise, zip_longest` 已经做了，而 `xs` 是一个 int 的
+**迭代器**（没有 `len`，不能切片）。让 `gaps` 成为每个元素与下一个之差的列表，
+例如 `1, 4, 9, 16` 给出 `[3, 5, 7]`。
+'''
+hints = [
+  "迭代器不能切片，而把它和自己 zip 起来每一步会吃掉两个元素。3.10 的那个适配器产出重叠的相邻对。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.cheatsheet_advanced.19.top-two"
+title = "消费最高的两位"
+story = "铜锣湾会所的 VIP 台想要今晚按金额最大的两张账单，又不想把每张收据都排序。"
+brief = '''
+`import heapq` 已经做了，而 `xs` 是一个 `(name, amount)` 元组的列表。
+让 `top` 成为 `amount` **最大**的两个元组，最大的在前。
+'''
+hints = [
+  "数量在可迭代对象之前，而没有 key 的话元组会按名字比较。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.cheatsheet_advanced.20.slot-it-in"
+title = "按分数插进去"
+story = "崇光楼下的游戏厅排行榜一直按分数排好序；新名字必须落到正确的位置，而位置由数字决定，不是名字。"
+brief = '''
+`from bisect import insort, bisect_left` 已经做了。`xs` 是一个按 `score` 升序
+保持有序的 `(name, score)` 元组列表。插入 `(name, s)`，使 `xs` 仍按分数有序
+（Python 3.10+）。
+'''
+hints = [
+  "key 既作用于元素也作用于被插入的东西，所以要插入整条记录，而不是光秃秃的分数。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.cheatsheet_advanced.21.port-in-both"
+title = "两个口袋里都有端口"
+story = "告士打道的金融科技公司有一个默认端口和一个命令行端口，而 `connect` 不会接受同一个关键字两次。"
+brief = '''
+`def connect(host="x", port=0)` 只接收关键字参数。
+`defaults = {"host": "db", "port": 5432}` 而 `opts = {"port": 6543}`。
+用被 `opts` 覆盖后的默认值调用 `connect`，让它收到 `host="db", port=6543`。
+'''
+hints = [
+  "两个共享同一个键的 `**` 解包会抛异常。先合并两个 dict，覆盖的放在右边，再解包合并后的那个。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.cheatsheet_advanced.22.name-it-in-passing"
+title = "顺手给它起个名"
+story = "轩尼诗道金铺的鉴定师又慢又贵，所以每件首饰只称一次，只留下有赚头的那些。"
+brief = '''
+`f` 很昂贵，每个元素必须**恰好调用一次**。用一个推导式让 `ys` 成为
+大于 0 的那些 `f(x)` 值的列表。
+'''
+hints = [
+  "赋值表达式在条件里需要自己的括号，而且它绑定的是结果 —— 不是比较。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.cheatsheet_advanced.23.far-click"
+title = "远点击或远拖拽"
+story = "时代广场自助机的触摸屏对点击和拖拽一视同仁，但只在它们落在很靠右的地方时才这样。"
+brief = '''
+`Click` 和 `Drag` 是带属性 `x` 和 `y` 的普通类，**没有** `__match_args__`。
+`far(ev)` 对 `x` 大于 100 的 `Click` 或 `Drag` 必须返回 `"far"`，对其他任何东西
+返回 `"near"`。空白处填哪一行？
+
+```
+def far(ev):
+    match ev:
+        # ____
+            return "far"
+        case _:
+            return "near"
+```
+'''
+hints = [
+  "没有 match args 时子模式必须是关键字形式的；多个备选用竖线连接，而守卫放在它们全部之后。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.cheatsheet_advanced.24.pool-with-a-timeout"
+title = "四个取件员，一个超时"
+story = "四个跑腿同时离开波斯富街的办公室，每人都被告知两秒后放弃，而调度员要按顺序拿回结果。"
+brief = '''
+`ex` 是一个 `ThreadPoolExecutor`，而 `fetch(url, timeout=10)` 是一个函数；
+导入未显示。让 `results` 成为对 `urls` 里每个 `u` 的 `fetch(u, timeout=2)`
+的列表，按顺序，在池上运行。
+'''
+hints = [
+  "池的 map 有一个自己的 `timeout`，它永远到不了 `fetch`。先把这个关键字绑进函数里。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.cheatsheet_advanced.25.tick-it-off"
+title = "划掉它"
+story = "Lucky Mac 的夜厨房：经理在出餐口旁等到每张单子都做好了，而不只是被拿走了，每个厨师都得说一声哪盘做完了。"
+brief = '''
+`q` 是一个 `queue.Queue`。主线程在放入每个任务之后调用 `q.join()`，必须阻塞到
+每个任务都被**处理完**。worker 循环体的末尾放哪一行，才能让 `q.join()` 返回？
+
+```
+def worker():
+    while True:
+        job = q.get()
+        with lock:
+            done.append(process(job))
+        # ____
+
+for _ in range(4):
+    threading.Thread(target=worker, daemon=True).start()
+```
+'''
+hints = [
+  "`get` 只是取走任务。队列数的是未完成的任务，worker 得告诉它完成了一个 —— 不带参数。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.cheatsheet_advanced.26.all-the-cores"
+title = "所有的核"
+story = "渲染维多利亚公园的烟花地图是纯 CPU 活；GIL 一次只放一个线程进去，所以活儿交给了独立的进程。"
+brief = '''
+`cpu_heavy(x)` 是模块里的一个顶层函数，而 `p` 是一个 `multiprocessing.Pool`
+（在 `__main__` 保护之下）。让 `out` 成为对 `xs` 里每个 `x` 的 `cpu_heavy(x)`
+的列表，按顺序，分散到各个进程上。
+'''
+hints = [
+  "工作是通过 pickle 可调用对象送到另一个进程的；lambda 不能被 pickle。池的 map 分别接收函数和可迭代对象。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.cheatsheet_advanced.27.all-at-once"
+title = "三个一起，不是一个一个"
+story = "从骆克道的公寓点了三份外卖，每份路上要一秒；一份接一份地点会让蟒蛇等三秒。"
+brief = '''
+`fetch(u)` 是一个 `async def`，它 await `asyncio.sleep(1)` 并返回 `u`。
+在由 `asyncio.run(main())` 运行的 `async def main()` 里，让 `results` 成为
+`urls` 的结果列表，按顺序 —— 三次 fetch 全部**并发**，这样 `main` 大约花
+一秒，而不是三秒。
+'''
+hints = [
+  "逐个 await 每个协程会把它们串行化。那个组合器把可等待对象作为单独的参数接收，而不是一个列表，而且它本身必须被 await。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.cheatsheet_advanced.28.generic-first"
+title = "任何东西的第一个"
+story = "轩尼诗道的药房想要一个 `first`，既能用在一架药片上也能用在一架创可贴上，而标签得说明它拿到的是哪种。"
+brief = '''
+Python 3.12。`from collections.abc import Sequence` 已经做了，而且任何地方都
+**没有**声明过 `TypeVar`。写出泛型 `first` 的 `def` 行：它接收一个 `Sequence[T]`
+并返回一个 `T`，`T` 在函数自身上声明。
+'''
+hints = [
+  "3.12 允许函数声明自己的类型参数，写在名字之后的方括号里。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.cheatsheet_advanced.29.shared-bag"
+title = "永远倒不空的袋子"
+story = "大排档的“新袋子”默认值只有一个袋子，在菜单印出来时做了一次 —— 每份信任它的订单都在里面发现上一桌的筷子。"
+brief = '''
+`add(x, xs)` 把 `x` 追加到 `xs` 并返回 `xs`。不带第二个参数调用两次，
+`add(1)` 然后 `add(2)` 必须给出 `[1]` 然后 `[2]` —— 每次一个新列表。
+函数体在追加之前会把**省略的** `xs` 换成一个新的空列表。哪个 `def` 行是对的？
+'''
+hints = [
+  "默认值只在 `def` 时求值一次，被每次调用共享。用一个哨兵，在里面构建列表。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.cheatsheet_advanced.30.late-binding"
+title = "三个门童，一个数"
+story = "谢斐道的三个门童各自被告知“记住你的号码”—— 但他们记住的都是那个号码的名字，到打烊时每个人的都是 2。"
+brief = '''
+构建 `fs`，一个由三个零参数函数组成的列表，使 `[f() for f in fs]` 是
+`[0, 2, 4]` —— 每一个都把创建它时的 `i` 翻倍。
+'''
+hints = [
+  "闭包在被调用时才去查 `i`，那时循环早已结束。默认参数在 lambda 创建时求值。",
+]

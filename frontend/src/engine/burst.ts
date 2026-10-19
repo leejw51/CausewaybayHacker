@@ -854,3 +854,231 @@ export function loopPlan(
   rings.push(...finale.rings);
   return { particles, rings };
 }
+
+// ---------------------------------------------------------------------------
+// The sheet roads' effects. Causewaybay Hacker addition.
+//
+// CHEATSHEET BASIC and CHEATSHEET ADVANCED have no editor: the question and
+// its four lines are the whole screen, so the particle layer has the page to
+// itself and the moments on it are played the way a game plays them — a
+// light trail behind the pointer, a beam swept down the line that was right,
+// a shockwave out of it, and a fountain for a streak. Same bargain as the
+// plans above: plain arithmetic, a `rng` that can be pinned, nothing that
+// needs a GPU to be looked at.
+// ---------------------------------------------------------------------------
+
+/** The light one sheet road throws: the trail's body, its glow, and the hot core. */
+export interface SheetPalette {
+  trail: RGBA;
+  glow: RGBA;
+  hot: RGBA;
+}
+
+/** BASIC is the print shop's cyan and gold. */
+export const SHEET_BASIC: SheetPalette = { trail: Theme.cyan, glow: Theme.coin, hot: Theme.cream };
+/** ADVANCED is the floor above, after hours: violet and pink. */
+export const SHEET_ADVANCED: SheetPalette = {
+  trail: [0.72, 0.45, 1, 1],
+  glow: Theme.pink,
+  hot: Theme.cream,
+};
+
+/**
+ * The light trail behind the pointer on a sheet question: a body in the
+ * road's colour with the shader's ghosts for a tail, a hot core inside it,
+ * and now and then a spark thrown off to the side. Thicker and longer-lived
+ * than `pointerPlan`'s single ember — there is no code under it to keep
+ * legible — and it drifts *against* the motion so the ribbon lengthens with
+ * speed, whiter the faster it went.
+ */
+export function lightTrailPlan(
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  palette: SheetPalette,
+  rng: Rng = Math.random,
+): Plan {
+  const speed = Math.hypot(vx, vy);
+  const nx = speed > 1 ? -vx / speed : 0;
+  const ny = speed > 1 ? -vy / speed : 0;
+  const heat = Math.min(1, speed / SMEAR_HOT);
+  const drift = between(rng, 8, 16) * (0.6 + heat);
+  const c = palette.trail;
+  const body: RGBA = [c[0] + (1 - c[0]) * heat * 0.5, c[1] + (1 - c[1]) * heat * 0.5, c[2], 1];
+  const particles: Particle[] = [
+    thrown(x, y, nx * drift, ny * drift, {
+      life: between(rng, 0.42, 0.6),
+      delay: 0,
+      size: 8 + 5 * heat,
+      color: body,
+      shape: 6,
+      trail: true,
+      gravity: 0,
+      seed: rng(),
+    }),
+    thrown(x, y, nx * drift * 0.5, ny * drift * 0.5, {
+      life: between(rng, 0.2, 0.3),
+      delay: 0,
+      size: 3.5 + 2 * heat,
+      color: palette.hot,
+      shape: 6,
+      trail: true,
+      gravity: 0,
+      seed: rng(),
+    }),
+  ];
+  // A spark off the side, one time in three, more when it is going fast.
+  if (rng() < 0.3 + 0.5 * heat) {
+    const side = rng() < 0.5 ? 1 : -1;
+    particles.push(
+      thrown(x, y, -ny * side * between(rng, 10, 26), nx * side * between(rng, 10, 26), {
+        life: between(rng, 0.3, 0.5),
+        delay: 0,
+        size: between(rng, 3, 5),
+        color: palette.glow,
+        shape: 0,
+        trail: true,
+        gravity: 60,
+        seed: rng(),
+      }),
+    );
+  }
+  return { particles, rings: [] };
+}
+
+/**
+ * The beam: light swept along the line that was right, left to right, a
+ * third of a second from end to end. Sparks lift off the line in order as
+ * the light passes, a run of glows marks where it is, and a ring closes it
+ * at the far end. `x0..x1` on the baseline `y`; sized to the type like the
+ * editor's plans.
+ */
+export function beamPlan(
+  x0: number,
+  y: number,
+  x1: number,
+  cell: Cell,
+  color: RGBA,
+  rng: Rng = Math.random,
+): Plan {
+  const [cw, ch] = cell;
+  const span = Math.max(cw, x1 - x0);
+  const sweep = 0.32;
+  const count = Math.max(6, Math.min(24, Math.round(span / cw)));
+  const particles: Particle[] = [];
+  const rings: Ring[] = [];
+  for (let i = 0; i < count; i++) {
+    const u = count === 1 ? 1 : i / (count - 1);
+    const x = x0 + span * u;
+    const ang = -Math.PI / 2 + (rng() - 0.5) * 0.7;
+    const reach = between(rng, 0.8, 2.0) * ch;
+    particles.push(
+      thrown(x, y, Math.cos(ang) * reach, Math.sin(ang) * reach, {
+        life: between(rng, 0.4, 0.7),
+        delay: u * sweep + rng() * 0.02,
+        size: between(rng, 0.25, 0.5) * ch,
+        color: i % 3 === 2 ? Theme.cream : color,
+        shape: 0,
+        trail: true,
+        gravity: 160,
+        seed: rng(),
+      }),
+    );
+  }
+  // Where the light is, as it goes: five glows along the line in order.
+  for (let k = 0; k <= 4; k++) {
+    const u = k / 4;
+    rings.push({
+      x: x0 + span * u,
+      y,
+      radius: ch * 1.3,
+      life: 0.22,
+      delay: u * sweep,
+      color,
+      glow: true,
+    });
+  }
+  rings.push({ x: x1, y, radius: ch * 2.6, life: 0.4, delay: sweep, color: Theme.cream, glow: false });
+  return { particles, rings };
+}
+
+/**
+ * The shockwave: a flash where the finger landed, two rings out of it, and
+ * a halo of sparks thrown straight outward with tails — the hit a right
+ * answer is. `radius` is how far the last ring reaches.
+ */
+export function shockPlan(
+  x: number,
+  y: number,
+  radius: number,
+  color: RGBA,
+  rng: Rng = Math.random,
+): Plan {
+  const particles: Particle[] = [];
+  const rings: Ring[] = [
+    { x, y, radius: radius * 0.5, life: 0.35, delay: 0, color: Theme.cream, glow: true },
+    { x, y, radius, life: 0.55, delay: 0, color, glow: false },
+    { x, y, radius: radius * 1.35, life: 0.7, delay: 0.08, color: Theme.cream, glow: false },
+  ];
+  const n = 24;
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * Math.PI * 2 + rng() * 0.2;
+    const reach = between(rng, 0.8, 1.1) * radius;
+    particles.push(
+      thrown(x, y, Math.cos(ang) * reach, Math.sin(ang) * reach, {
+        life: between(rng, 0.5, 0.7),
+        delay: rng() * 0.03,
+        size: between(rng, 5, 9),
+        color: i % 2 === 0 ? color : Theme.cream,
+        shape: 0,
+        trail: true,
+        gravity: 0,
+        seed: rng(),
+      }),
+    );
+  }
+  return { particles, rings };
+}
+
+/**
+ * The streak: a fountain of gold stars up out of the line, taller and
+ * fuller the longer the run of first-try picks (`level` is the run minus
+ * one), and one ring per level climbing out of it. Capped so a ten-streak
+ * is a show and not a frame drop.
+ */
+export function comboPlan(x: number, y: number, level: number, rng: Rng = Math.random): Plan {
+  const lv = Math.max(1, Math.min(8, Math.round(level)));
+  const particles: Particle[] = [];
+  const rings: Ring[] = [];
+  const n = Math.min(60, 12 + lv * 8);
+  const k = 1 + lv * 0.15;
+  for (let i = 0; i < n; i++) {
+    const ang = -Math.PI / 2 + (rng() - 0.5) * Math.PI * 0.4;
+    const reach = between(rng, 120, 260) * k;
+    particles.push(
+      thrown(x, y, Math.cos(ang) * reach, Math.sin(ang) * reach, {
+        life: between(rng, 1.2, 1.8),
+        delay: rng() * 0.15,
+        size: between(rng, 12, 24),
+        color: i % 5 === 4 ? Theme.pink : pick(rng, GOLD),
+        shape: 1,
+        trail: true,
+        gravity: 220,
+        seed: rng(),
+      }),
+    );
+  }
+  for (let i = 0; i < lv; i++) {
+    rings.push({
+      x,
+      y,
+      radius: 60 + 22 * i,
+      life: 0.5,
+      delay: i * 0.07,
+      color: i % 2 === 0 ? Theme.coin : Theme.pink,
+      glow: i === 0,
+    });
+  }
+  return { particles, rings };
+}

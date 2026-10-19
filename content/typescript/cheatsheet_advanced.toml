@@ -1,0 +1,988 @@
+# TYPESCRIPT LAND — CHEATSHEET ADVANCED. The second page of the cheatsheet,
+# asked: the questions an interviewer uses to tell a fluent TypeScript hand
+# from one who only knows the grammar (tsc 5, `strict` on, Node 22). A
+# generic with a bound, a mapped type by hand, a union pulled out of an
+# `as const` array, the utility types, `infer`, a template literal type,
+# `satisfies`, a labeled rest tuple, declaration merging, a `#private`
+# field, an overload's implementation line, `??=`, an optional chain, a
+# renamed destructuring, a range from a length, a non-mutating sort with
+# two keys, the Map grouping trap, a deep copy, a bigint sum, named regex
+# groups, the loop-closure trap, a type-only import, an error with a cause,
+# `allSettled` narrowing, `for await`, an iterable class, an exhaustive
+# `never`, a type guard, and an assertion function (the boss). Four lines,
+# one right. Nothing is typed and nothing is compiled — the pick is the
+# submission, and the server judges it against the quiz (SPEC §0). The
+# three wrong lines are near-misses: a line strict mode refuses, a call that
+# compiles and answers wrong, another language's spelling.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+# The BASIC road (cheatsheet.toml) owns the core grammar; nothing here
+# repeats it.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "typescript.cheatsheet_advanced"
+land     = "typescript"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "typescript.cheatsheet_advanced.01.generic-bound"
+node        = 1
+title       = "ANYTHING WITH AN ID"
+difficulty  = 3
+story       = "19:10, the control room on the thirtieth floor. Every screen on the island has an id; the lookup table should take any list of them, and not be allowed to change it."
+concepts    = ["generics", "types", "collections"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`xs` is a `readonly Screen[]` (that is, a `ReadonlyArray<Screen>`), and
+`Screen` has `id: string`. Open the generic function `byId` whose body is
+
+```ts
+return new Map(xs.map(x => [x.id, x] as const));
+```
+
+It must accept `xs` — and any other read-only array of things that carry a
+string `id` — and let that body compile. `strict` is on.
+'''
+solution    = 'function byId<T extends { id: string }>(xs: readonly T[]) {'
+hints = [
+  "A bare `T` has no `id`; give the parameter a bound. And a read-only array will not pass where a mutable one is demanded.",
+]
+
+[quest.quiz]
+choices = [
+  'function byId<T>(xs: readonly T[]) {',
+  'function byId<T extends { id: string }>(xs: T[]) {',
+  'function byId<T extends { id: string }>(xs: readonly T[]) {',
+  'function byId<T: { id: string }>(xs: readonly T[]) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "typescript.cheatsheet_advanced.02.mapped-draft"
+node        = 2
+title       = "EVERY KEY, MAYBE"
+difficulty  = 3
+story       = "A draft of a screen config on Hysan Place can be half filled in and still edited. The shape follows the real one, key for key."
+concepts    = ["generics", "types"]
+requires    = ["typescript.cheatsheet_advanced.01.generic-bound"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+Write `Draft<T>` by hand — not with the built-in utility type that does
+this: the same keys as `T`, every one optional, each keeping its own
+type, and still writable. With `type Screen = { id: string; w: number }`,
+both `const d: Draft<Screen> = { w: 3 };` and `d.w = 5;` compile.
+'''
+solution    = 'type Draft<T> = { [K in keyof T]?: T[K] };'
+hints = [
+  "A mapped type walks `keyof T`; a `?` after the bracket makes each key optional (that is `Partial<T>` by hand), a `-?` makes it required (`Required<T>`), and `readonly` before it freezes it (`Readonly<T>`).",
+]
+
+[quest.quiz]
+choices = [
+  'type Draft<T> = { [K in keyof T]?: T[K] };',
+  'type Draft<T> = { [K in keyof T]-?: T[K] };',
+  'type Draft<T> = { readonly [K in keyof T]?: T[K] };',
+  'type Draft<T> = { [K in T]?: T[K] };',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "typescript.cheatsheet_advanced.03.as-const-union"
+node        = 3
+title       = "THREE WORDS, NO ENUM"
+difficulty  = 3
+story       = "The Yee Wo Street arrival boards show three kinds of panel and nobody wants a fourth file to keep the list in."
+concepts    = ["enums", "types"]
+requires    = ["typescript.cheatsheet_advanced.02.mapped-draft"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+```ts
+const KINDS = ["ad", "news", "tram"] as const;
+```
+
+Derive `Kind` from `KINDS` so it is exactly the union of those three
+strings — `const k: Kind = "ad";` compiles and `const b: Kind = "bus";`
+does not. A union of literals, not an enum.
+'''
+solution    = 'type Kind = (typeof KINDS)[number];'
+hints = [
+  "A value is not a type: ask for the type *of* the value first, then index the tuple with `number` to get what its elements can be.",
+]
+
+[quest.quiz]
+choices = [
+  'type Kind = typeof KINDS;',
+  'type Kind = KINDS[number];',
+  'enum Kind { ad, news, tram }',
+  'type Kind = (typeof KINDS)[number];',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "typescript.cheatsheet_advanced.04.pick-card"
+node        = 4
+title       = "ONLY THE FRONT"
+difficulty  = 3
+story       = "The Lee Garden app shows a card per screen: id and title. The feed field stays in the control room."
+concepts    = ["types", "generics"]
+requires    = ["typescript.cheatsheet_advanced.03.as-const-union"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`Screen` has `id`, `title`, `feed` and `w`. Declare `Card` as the object
+type with **only** `id` and `title`, built from `Screen` with a utility
+type so it follows `Screen` when `Screen` changes.
+'''
+solution    = 'type Card = Pick<Screen, "id" | "title">;'
+hints = [
+  "One utility keeps the named keys, its twin drops them. Both take the keys as a single union, not as separate arguments.",
+]
+
+[quest.quiz]
+choices = [
+  'type Card = Omit<Screen, "id" | "title">;',
+  'type Card = Pick<Screen, "id" | "title">;',
+  'type Card = Pick<Screen, "id", "title">;',
+  'type Card = Screen["id" | "title"];',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "typescript.cheatsheet_advanced.05.awaited-return"
+node        = 5
+title       = "WHAT LOAD GIVES BACK"
+difficulty  = 4
+story       = "The feed loader on the thirtieth floor changes shape every sprint. The type that names its result should change with it, not be typed out again."
+concepts    = ["async", "types", "generics"]
+requires    = ["typescript.cheatsheet_advanced.04.pick-card"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+```ts
+async function load() { return { items: [1, 2], at: Date.now() }; }
+```
+
+Declare `Feed` as the **unwrapped** object type `load` resolves to —
+`{ items: number[]; at: number }` — derived from `load` itself, so
+`const f: Feed = { items: [1], at: 0 };` compiles.
+'''
+solution    = 'type Feed = Awaited<ReturnType<typeof load>>;'
+hints = [
+  "`load` is a value, so you need its type first. What comes out is a `Promise`; one more utility takes the promise off.",
+]
+
+[quest.quiz]
+choices = [
+  'type Feed = ReturnType<typeof load>;',
+  'type Feed = Awaited<ReturnType<load>>;',
+  'type Feed = Awaited<ReturnType<typeof load>>;',
+  'type Feed = Parameters<typeof load>[0];',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "typescript.cheatsheet_advanced.06.infer-elem"
+node        = 6
+title       = "WHAT IS IN THE BOX"
+difficulty  = 4
+story       = "A crate of panels for the Times Square screen: the label should say what one panel is, and say nothing if it is not a crate."
+concepts    = ["generics", "types"]
+requires    = ["typescript.cheatsheet_advanced.05.awaited-return"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Write `Elem<T>`: for an array type, its element type (`Elem<string[]>` is
+`string`); for anything that is **not** an array, `never`.
+'''
+solution    = 'type Elem<T> = T extends (infer U)[] ? U : never;'
+hints = [
+  "A conditional type can name the piece it matched, but only with a keyword in front — and the array suffix needs the parentheses.",
+]
+
+[quest.quiz]
+choices = [
+  'type Elem<T> = T extends (infer U)[] ? U : never;',
+  'type Elem<T> = T extends U[] ? U : never;',
+  'type Elem<T> = T extends Array<infer U> ? U : T;',
+  'type Elem<T> = T extends infer U[] ? U : never;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "typescript.cheatsheet_advanced.07.template-id"
+node        = 7
+title       = "SCREEN DASH NUMBER"
+difficulty  = 4
+story       = "Every board on the island is named screen-something, and the something is a number. The compiler can hold that line."
+concepts    = ["types", "strings"]
+requires    = ["typescript.cheatsheet_advanced.06.infer-elem"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+Declare `ScreenId` so that `"screen-12"` is assignable to it, and neither
+`"screen-x"` nor `"led-12"` is.
+'''
+solution    = 'type ScreenId = `screen-${number}`;'
+hints = [
+  "A type can be a template literal: backticks, with a placeholder whose type is a primitive. Ordinary quotes make a plain string literal.",
+]
+
+[quest.quiz]
+choices = [
+  'type ScreenId = "screen-" + number;',
+  'type ScreenId = `screen-${number}`;',
+  'type ScreenId = `screen-${string}`;',
+  'type ScreenId = "screen-${number}";',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "typescript.cheatsheet_advanced.08.satisfies-palette"
+node        = 8
+title       = "CHECKED, NOT WIDENED"
+difficulty  = 4
+story       = "The LED wall's palette is checked against the contract — but the red stays a triple, because the shader indexes it."
+concepts    = ["types", "structs"]
+requires    = ["typescript.cheatsheet_advanced.07.template-id"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`type Palette = Record<string, [number, number, number] | string>`.
+Declare `p` with `r: [255, 0, 0]` and `s: "#8cf"`, checked against
+`Palette` — a value of the wrong shape, say `r: [255, 0]`, is a compile
+error — and yet `p.r.map(x => x / 255)` and `p.s.toUpperCase()` must
+compile afterwards: `p` keeps the literal's own narrower types.
+TypeScript 5.
+'''
+solution    = 'const p = { r: [255, 0, 0], s: "#8cf" } satisfies Palette;'
+hints = [
+  "An annotation or a cast replaces the literal's type with `Palette`, and then every value is `tuple | string`. There is an operator (4.9+) that only checks.",
+]
+
+[quest.quiz]
+choices = [
+  'const p: Palette = { r: [255, 0, 0], s: "#8cf" };',
+  'const p = { r: [255, 0, 0], s: "#8cf" } as Palette;',
+  'const p = <Palette>{ r: [255, 0, 0], s: "#8cf" };',
+  'const p = { r: [255, 0, 0], s: "#8cf" } satisfies Palette;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "typescript.cheatsheet_advanced.09.labeled-rest-tuple"
+node        = 9
+title       = "A COMMAND AND ITS NUMBERS"
+difficulty  = 3
+story       = "The control-room console takes a verb and then as many numbers as the verb needs. `show 1 2 3`, `clear`, never `1 2`."
+concepts    = ["functions", "types", "slices"]
+requires    = ["typescript.cheatsheet_advanced.08.satisfies-palette"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+Open `run`, a function taking **one** rest parameter `args`, typed as a
+labeled tuple: a `cmd: string` first, then any number of `nums: number`.
+`run("show", 1, 2, 3)` and `run("clear")` compile; `run(1, 2)` does not.
+'''
+solution    = 'function run(...args: [cmd: string, ...nums: number[]]) {'
+hints = [
+  "Labels go inside the tuple, and the open-ended tail is itself a rest element — three dots and an array type.",
+]
+
+[quest.quiz]
+choices = [
+  'function run(...args: [cmd: string, ...nums: number[]]) {',
+  'function run(...args: [cmd: string, nums: number[]]) {',
+  'function run(...args: [string, ...number]) {',
+  'function run(cmd: string, ...nums: number) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "typescript.cheatsheet_advanced.10.declaration-merging"
+node        = 10
+title       = "ONE MORE FIELD, SAME NAME"
+difficulty  = 3
+story       = "The vendor's screen type has no brightness, and the vendor's file is read-only. The control room needs brightness on every screen tonight."
+concepts    = ["structs", "types", "imports"]
+requires    = ["typescript.cheatsheet_advanced.09.labeled-rest-tuple"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`interface Screen { id: string }` is declared in a file you may not edit.
+In your own file, give that same `Screen` one more field,
+`brightness: number`, so that `{ id: "a", brightness: 3 }` is a `Screen`
+everywhere — not a new name (`interface Big extends Screen { … }` or
+`type Big = Screen & { … }` would both make one), and no
+duplicate-identifier error.
+'''
+solution    = 'interface Screen { brightness: number }'
+hints = [
+  "Two declarations of one interface merge. A `type` alias does not merge, and an interface cannot extend itself.",
+]
+
+[quest.quiz]
+choices = [
+  'type Screen = { brightness: number };',
+  'interface Screen extends Screen { brightness: number }',
+  'interface Screen { brightness: number }',
+  'Screen.brightness = number;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "typescript.cheatsheet_advanced.11.hash-private"
+node        = 11
+title       = "HIDDEN AT RUNTIME TOO"
+difficulty  = 3
+story       = "The tram-stop counter's tally is nobody's business: not the subclass's, not the serializer's, not `Object.keys`."
+concepts    = ["structs", "types"]
+requires    = ["typescript.cheatsheet_advanced.10.declaration-merging"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+```ts
+abstract class Panel { abstract draw(): string; }
+interface Tally { bump(): void }
+
+class Counter extends Panel implements Tally {
+  // the field goes here
+  protected label = "c";
+  get value(): number { /* returns the field */ }
+  set value(v: number) { /* stores v in the field */ }
+  bump() { /* adds one to the field */ }
+  draw() { return `${this.label}=${this.value}`; }
+}
+```
+
+Add the `count` field, starting at `0`, hidden at **runtime** as well as
+at compile time: after `new Counter()`, neither `Object.keys(c)` nor
+`JSON.stringify(c)` may show it. `strict` is on.
+'''
+solution    = '#count = 0;'
+hints = [
+  "The `private` keyword is erased with the types; the field is still there in the JavaScript. A `#` name is private in the engine itself — and it takes no access modifier and needs its initializer.",
+]
+
+[quest.quiz]
+choices = [
+  'private count = 0;',
+  '#count = 0;',
+  'private #count = 0;',
+  '#count: number;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "typescript.cheatsheet_advanced.12.overload-impl"
+node        = 12
+title       = "THE LINE UNDER THE OVERLOADS"
+difficulty  = 4
+story       = "`parse` on the arrival board goes both ways: a string in gives a number, a number in gives a string. Two promises, one body."
+concepts    = ["functions", "types", "dispatch"]
+requires    = ["typescript.cheatsheet_advanced.11.hash-private"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+```ts
+function parse(x: string): number;
+function parse(x: number): string;
+```
+
+Write the implementation line that follows those two overloads, with the
+body `return typeof x === "string" ? Number(x) : String(x);` — so that
+`parse("42")` is a `number` and `parse(7)` a `string`, under `strict`.
+'''
+solution    = 'function parse(x: string | number): number | string {'
+hints = [
+  "The implementation signature must be wide enough to cover every overload, it must have a body, and under `strict` its parameter cannot be left untyped.",
+]
+
+[quest.quiz]
+choices = [
+  'function parse(x: string): number {',
+  'function parse(x: string | number): number | string;',
+  'function parse(x) {',
+  'function parse(x: string | number): number | string {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "typescript.cheatsheet_advanced.13.nullish-assign"
+node        = 13
+title       = "EMPTY IS STILL CACHED"
+difficulty  = 3
+story       = "The caption cache on the Hysan wall: some screens have an empty caption, on purpose, and reloading them every frame is what froze the wall last Tuesday."
+concepts    = ["zero-values", "collections", "control-flow"]
+requires    = ["typescript.cheatsheet_advanced.12.overload-impl"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`cache: Record<string, string>`; `load(k)` is expensive. Fill `cache[k]`
+with `load(k)` only when the key has **never** been set — a cached `""`
+is a real, valid value and must not trigger a reload. One statement.
+'''
+solution    = 'cache[k] ??= load(k);'
+hints = [
+  "`\"\"` is falsy. Anything that asks \"is it truthy?\" reloads it; the assignment operator that asks \"is it null or undefined?\" does not.",
+]
+
+[quest.quiz]
+choices = [
+  'cache[k] ||= load(k);',
+  'if (!cache[k]) cache[k] = load(k);',
+  'cache[k] ??= load(k);',
+  'cache[k] ?= load(k);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "typescript.cheatsheet_advanced.14.find-last-chain"
+node        = 14
+title       = "THE LAST AD, IF ANY"
+difficulty  = 3
+story       = "The newest ad in the Times Square rotation is the last one in the list, and tonight one of them is zero pixels wide on purpose."
+concepts    = ["iteration", "zero-values", "error-handling"]
+requires    = ["typescript.cheatsheet_advanced.13.nullish-assign"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`xs: S[]` is `feeds.flatMap(f => f.panels)`, where `S` has `kind: string`
+and `width: number`. Make `w` the width of the **last** element whose
+kind is `"ad"`, or `-1` when there is none. A width of `0` must come through as `0`. No non-null assertion;
+`strict` is on. Node 22.
+'''
+solution    = 'const w = xs.findLast(s => s.kind === "ad")?.width ?? -1;'
+hints = [
+  "There is a search that starts from the end (Node 18+); `xs.at(-1)` is only the last *element*, not the last match. Its result may be `undefined`, so the property read needs the optional chain — and the default must not swallow a zero.",
+]
+
+[quest.quiz]
+choices = [
+  'const w = xs.findLast(s => s.kind === "ad")?.width ?? -1;',
+  'const w = xs.findLast(s => s.kind === "ad").width ?? -1;',
+  'const w = xs.find(s => s.kind === "ad")?.width ?? -1;',
+  'const w = xs.findLast(s => s.kind === "ad")?.width || -1;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "typescript.cheatsheet_advanced.15.destructure-rename"
+node        = 15
+title       = "WIDTH, CALLED W"
+difficulty  = 3
+story       = "The sign shop on Jaffe Road reads a screen's spec off the feed: the kind as is, the width under a short name, and a hundred when nobody filled it in."
+concepts    = ["pattern-matching", "bindings", "zero-values"]
+requires    = ["typescript.cheatsheet_advanced.14.find-last-chain"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`screen: { kind: string; width?: number }`. In one destructuring
+declaration, bind `kind`, and bind `width` to a **new name** `w` with
+`100` as its default when `width` is absent.
+'''
+solution    = 'const { width: w = 100, kind } = screen;'
+hints = [
+  "In an object pattern the property name comes first and the new binding after the colon — the opposite of what it looks like — and the default follows the binding with `=`.",
+]
+
+[quest.quiz]
+choices = [
+  'const { width as w = 100, kind } = screen;',
+  'const { width: w = 100, kind } = screen;',
+  'const { w: width = 100, kind } = screen;',
+  'const { width: w ?? 100, kind } = screen;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "typescript.cheatsheet_advanced.16.range-from-length"
+node        = 16
+title       = "ZERO TO N MINUS ONE"
+difficulty  = 3
+story       = "Five panels on the Hysan wall, numbered from zero. The list of their numbers is needed before any of them is lit."
+concepts    = ["slices", "iteration"]
+requires    = ["typescript.cheatsheet_advanced.15.destructure-rename"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`n: number`. Make `ix: number[]` the list `[0, 1, …, n - 1]` in one
+expression, with every element really there — iterating `ix` must visit
+`n` numbers.
+'''
+solution    = 'const ix: number[] = Array.from({ length: n }, (_, i) => i);'
+hints = [
+  "`Array(n)` is `n` holes, and `map` skips holes. Build from an array-like with a `length`, and the mapper's **second** argument is the index.",
+]
+
+[quest.quiz]
+choices = [
+  'const ix: number[] = Array(n).map((_, i) => i);',
+  'const ix: number[] = Array.from(n, (_, i) => i);',
+  'const ix: number[] = Array.from({ length: n }, i => i);',
+  'const ix: number[] = Array.from({ length: n }, (_, i) => i);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "typescript.cheatsheet_advanced.17.sorted-two-keys"
+node        = 17
+title       = "MOST FIRST, THEN BY NAME"
+difficulty  = 4
+story       = "The leaderboard on the Times Square screen: most hits first, ties by name — and the feed's own list must not be reordered under the other screens."
+concepts    = ["sorting", "closures", "strings"]
+requires    = ["typescript.cheatsheet_advanced.16.range-from-length"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`rs: { id: string; n: number }[]` was built from a `Record<string, number>`
+tally as `Object.entries(tally).map(([id, n]) => ({ id, n }))` — the
+entries being `[string, number][]`. The
+expression for `top`: the rows ordered by `n` **descending**, ties broken
+by `id` ascending in the locale's string order — and `rs` itself must
+stay exactly as it was. Node 22, `strict` on.
+'''
+solution    = 'rs.toSorted((a, b) => b.n - a.n || a.id.localeCompare(b.id))'
+hints = [
+  "Node 20+ has a sort that returns a copy. A comparator must return a number, so the tie-break on strings cannot be a `<` — strings have a method that compares and returns a number.",
+]
+
+[quest.quiz]
+choices = [
+  'rs.sort((a, b) => b.n - a.n || a.id.localeCompare(b.id))',
+  'rs.toSorted((a, b) => a.n - b.n || a.id.localeCompare(b.id))',
+  'rs.toSorted((a, b) => b.n - a.n || a.id.localeCompare(b.id))',
+  'rs.toSorted((a, b) => b.n - a.n || a.id < b.id)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "typescript.cheatsheet_advanced.18.map-group-push"
+node        = 18
+title       = "INTO THE RIGHT BUCKET"
+difficulty  = 4
+story       = "Midnight on Yee Wo Street: every panel sorted into a bucket by kind. The classic bug pushes onto a bucket nobody keeps."
+concepts    = ["collections", "hashing", "zero-values"]
+requires    = ["typescript.cheatsheet_advanced.17.sorted-two-keys"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`m: Map<string, string[]>`, empty at first. Inside
+`for (const [k, v] of pairs)`, add `v` to the list stored under `k`,
+creating that list the first time `k` is seen — in **one** statement,
+so that afterwards `m` really holds every value. `strict` is on.
+'''
+solution    = 'm.set(k, [...(m.get(k) ?? []), v]);'
+hints = [
+  "`get` returns the list or `undefined`; `?? []` gives you something to push onto, but a fresh `[]` is not in the map unless you put it there (`has`-then-`set` would be two statements). A Map has no `[k]` and `get` takes no default — and when it leaves as JSON, `Object.fromEntries(m)` is the way out.",
+]
+
+[quest.quiz]
+choices = [
+  '(m.get(k) ?? []).push(v);',
+  'm.set(k, [...(m.get(k) ?? []), v]);',
+  'm.get(k, []).push(v);',
+  'm[k] = [...(m[k] ?? []), v];',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "typescript.cheatsheet_advanced.19.deep-copy"
+node        = 19
+title       = "A COPY THAT IS A COPY"
+difficulty  = 3
+story       = "The rehearsal feed for the Hysan wall must be a real copy of tonight's — a Set of ids, rows of numbers — so the rehearsal can scribble on it."
+concepts    = ["collections", "serialization", "slices"]
+requires    = ["typescript.cheatsheet_advanced.18.map-group-push"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`feed` is `{ ids: Set<string>; rows: number[][] }`. Make `copy` a
+**deep** copy: `copy.ids.add("c")` and `copy.rows[0].push(9)` must leave
+`feed` untouched — and `copy.ids` must still be a `Set` with `add` on it.
+Node 22.
+'''
+solution    = 'const copy = structuredClone(feed);'
+hints = [
+  "Spread and `Object.assign` copy one level. A JSON round trip loses the Set (it becomes `{}`). Node 17+ has the platform's own deep copy.",
+]
+
+[quest.quiz]
+choices = [
+  'const copy = structuredClone(feed);',
+  'const copy = { ...feed };',
+  'const copy = JSON.parse(JSON.stringify(feed));',
+  'const copy = Object.assign({}, feed);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "typescript.cheatsheet_advanced.20.bigint-sum"
+node        = 20
+title       = "NO MIXING AT THE COUNTER"
+difficulty  = 3
+story       = "The typhoon shelter's wave count is past 2 to the 63rd; tonight's seven more waves are an ordinary number, and the sum must be exact."
+concepts    = ["types", "math"]
+requires    = ["typescript.cheatsheet_advanced.19.deep-copy"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`big` is a `bigint` above 2 to the 63rd power, and `n` is a `number` —
+`today.reduce<number>((s, w) => s + w, 0)` — holding a small whole number
+(`Number.isInteger(n)` is true). Make `total` their **exact** sum. A `number` rounds above 2 to the 53rd, and
+`|0` would wrap at 32 bits.
+'''
+solution    = 'const total = big + BigInt(n);'
+hints = [
+  "The operands must be the same kind, and a cast is not a conversion. Convert the small one up — the function, not the `n` suffix, which only works on literals.",
+]
+
+[quest.quiz]
+choices = [
+  'const total = big + n;',
+  'const total = Number(big) + n;',
+  'const total = big + (n as bigint);',
+  'const total = big + BigInt(n);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "typescript.cheatsheet_advanced.21.named-groups"
+node        = 21
+title       = "EVERY YEAR IN THE LINE"
+difficulty  = 4
+story       = "The plaque feed under the Noon Day Gun: built, refitted, due. Every four-digit year in it goes on the board."
+concepts    = ["strings", "iteration", "pattern-matching"]
+requires    = ["typescript.cheatsheet_advanced.20.bigint-sum"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`s` is `"built 1998, refit 2015, due 2031"` and `ys: string[]` is empty
+(each year is later shown as `y.slice(-2).padStart(2, "0")`). Open a loop
+over **every** match of a named group `y` of four digits, so that this
+body collects each year:
+
+```ts
+  ys.push(m.groups?.y ?? "");
+```
+
+Node 22, TypeScript 5.
+'''
+solution    = 'for (const m of s.matchAll(/(?<y>\d{4})/g)) {'
+hints = [
+  "One method returns every match with its groups — and throws at runtime unless the pattern carries the global flag. A named group is `(?<name>…)`; Python's `P` is a syntax error here.",
+]
+
+[quest.quiz]
+choices = [
+  'for (const m of s.matchAll(/(?<y>\d{4})/)) {',
+  'for (const m of s.matchAll(/(?<y>\d{4})/g)) {',
+  'for (const m of s.match(/(?<y>\d{4})/g)) {',
+  'for (const m of s.matchAll(/(?P<y>\d{4})/g)) {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "typescript.cheatsheet_advanced.22.loop-closure"
+node        = 22
+title       = "EACH ONE ITS OWN NUMBER"
+difficulty  = 4
+story       = "Three panels on the Hysan wall are armed to light up later, each with its own number. The bug where all three say 3 was the first thing Skynet ever suggested."
+concepts    = ["closures", "bindings", "structs"]
+requires    = ["typescript.cheatsheet_advanced.21.named-groups"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+```ts
+class Board {
+  q: (() => void)[] = [];
+  show(i: number) { /* lights panel i */ }
+  arm(n: number) {
+    // the loop goes here
+  }
+}
+```
+
+Inside `arm(n)`, push `n` closures onto `this.q`. The k-th one, when
+called **later**, must call `this.show(k)` with its own `k` — running all
+of them after `arm(3)` lights `0, 1, 2`, not `3, 3, 3`. `strict` is on.
+'''
+solution    = 'for (let i = 0; i < n; i++) this.q.push(() => this.show(i));'
+hints = [
+  "A `var` is one variable for the whole loop; a block-scoped binding is fresh each turn. And a `function () {}` has its own `this`, which strict mode refuses to guess.",
+]
+
+[quest.quiz]
+choices = [
+  'for (var i = 0; i < n; i++) this.q.push(() => this.show(i));',
+  'for (let i = 0; i < n; i++) this.q.push(function () { this.show(i); });',
+  'for (let i = 0; i < n; i++) this.q.push(() => this.show(i));',
+  'for (const i = 0; i < n; i++) this.q.push(() => this.show(i));',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "typescript.cheatsheet_advanced.23.type-only-import"
+node        = 23
+title       = "AN IMPORT THAT LEAVES NO TRACE"
+difficulty  = 4
+story       = "The screen module logs to the control room the moment it loads. The app only wants its type, and nobody wants that log at build time."
+concepts    = ["imports", "types"]
+requires    = ["typescript.cheatsheet_advanced.22.loop-closure"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`screen.ts` has `export interface Screen { … }` — a **named** export, no
+default — and a top-level `console.log` that runs whenever the module is
+loaded. `verbatimModuleSyntax` is on. Import `Screen` for use in a type
+annotation so that **nothing** of the import survives in the emitted
+JavaScript: the log must not fire.
+'''
+solution    = 'import type { Screen } from "./screen.js";'
+hints = [
+  "Under `verbatimModuleSyntax` a plain import of a type is an error, and a `type` modifier *inside* the braces still leaves an `import {}` that loads the module. Put the modifier on the whole statement.",
+]
+
+[quest.quiz]
+choices = [
+  'import type { Screen } from "./screen.js";',
+  'import { Screen } from "./screen.js";',
+  'import { type Screen } from "./screen.js";',
+  'import Screen from "./screen.js";',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "typescript.cheatsheet_advanced.24.error-cause"
+node        = 24
+title       = "KEEP THE ORIGINAL"
+difficulty  = 4
+story       = "The feed fetch failed with a TypeError three floors down. The control room wants its own error on top and the real one still attached underneath."
+concepts    = ["error-handling", "types"]
+requires    = ["typescript.cheatsheet_advanced.23.type-only-import"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+Inside `catch (e: unknown)`, throw a **new** `Error` whose message is
+`"feed failed"` and which keeps `e` attached as its original cause
+(ES2022), so the caller can still run `instanceof TypeError` on what is
+attached. `strict` is on.
+'''
+solution    = 'throw new Error("feed failed", { cause: e });'
+hints = [
+  "`Error` takes a second argument — an options object, not the error itself. And `e` is `unknown`: you cannot read `.message` off it without narrowing.",
+]
+
+[quest.quiz]
+choices = [
+  'throw new Error("feed failed", e);',
+  'throw new Error("feed failed: " + e.message);',
+  'throw new Error("feed failed").cause = e;',
+  'throw new Error("feed failed", { cause: e });',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "typescript.cheatsheet_advanced.25.all-settled"
+node        = 25
+title       = "COUNT THE ONES THAT LANDED"
+difficulty  = 4
+story       = "Six riders left Sugar Street; one got rained off. The kitchen adds up what arrived and does not throw the night away over the one that did not."
+concepts    = ["async", "pattern-matching", "error-handling"]
+requires    = ["typescript.cheatsheet_advanced.24.error-cause"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`ps: Promise<number>[]` and `rs = await Promise.allSettled(ps)`. Inside
+`for (const r of rs)`, add the value of every promise that **succeeded**
+to `total`, skipping the failed ones — in one line that compiles under
+`strict`.
+'''
+solution    = 'if (r.status === "fulfilled") total += r.value;'
+hints = [
+  "Each result is a discriminated union on `status`; only the successful branch has a `value`. The two status strings are the ones the spec uses, not \"resolved\" and not `ok`. (`Promise.all` would have thrown at the first failure, and `Promise.race` gives back only one.)",
+]
+
+[quest.quiz]
+choices = [
+  'if (r.status === "resolved") total += r.value;',
+  'if (r.status === "fulfilled") total += r.value;',
+  'if (r.value !== undefined) total += r.value;',
+  'if (r.ok) total += r.value;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "typescript.cheatsheet_advanced.26.for-await"
+node        = 26
+title       = "AS EACH ONE ARRIVES"
+difficulty  = 4
+story       = "The tick feed from the Yee Wo Street boards comes one at a time, each after a wait. The sum grows as they come, not after they are all in."
+concepts    = ["async", "iteration", "generators"]
+requires    = ["typescript.cheatsheet_advanced.25.all-settled"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`ticks()` returns an `AsyncGenerator<number>`. Inside an `async`
+function, open the loop that receives each `t` as it arrives, so the
+body `sum += t;` compiles under `strict`.
+'''
+solution    = 'for await (const t of ticks()) {'
+hints = [
+  "An async iterable has no `[Symbol.iterator]`, so a plain `for…of` is refused — and awaiting the generator object does not help. The `await` belongs to the `for`.",
+]
+
+[quest.quiz]
+choices = [
+  'for (const t of ticks()) {',
+  'for (const t of await ticks()) {',
+  'for await (const t of ticks()) {',
+  'for (await const t of ticks()) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "typescript.cheatsheet_advanced.27.iterable-stack"
+node        = 27
+title       = "SPREAD THE STACK"
+difficulty  = 5
+story       = "The undo stack in the control room should spread into an array and walk in a `for…of` like anything else on the floor."
+concepts    = ["generators", "iteration", "generics", "structs"]
+requires    = ["typescript.cheatsheet_advanced.26.for-await"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+```ts
+class Stack<T> {
+  #items: T[] = [];
+  push(x: T) { this.#items.push(x); }
+  pop(): T | undefined { return this.#items.pop(); }
+  // one more method goes here
+}
+```
+
+Add the one method that makes `[...s]` give `[1, 2]` after
+`s.push(1); s.push(2)`, and lets `for (const x of s)` compile. `strict`
+is on.
+'''
+solution    = '*[Symbol.iterator]() { yield* this.#items; }'
+hints = [
+  "The method's name is a well-known symbol in brackets, it must be a generator (the star), and delegating to the array with `yield*` hands out the items one by one — a plain `yield` hands out the whole array as one item.",
+]
+
+[quest.quiz]
+choices = [
+  '*[Symbol.iterator]() { yield* this.#items; }',
+  '[Symbol.iterator]() { yield* this.#items; }',
+  '*iterator() { yield* this.#items; }',
+  '*[Symbol.iterator]() { yield this.#items; }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "typescript.cheatsheet_advanced.28.exhaustive-never"
+node        = 28
+title       = "THE FOURTH KIND BREAKS THE BUILD"
+difficulty  = 5
+story       = "Two kinds of panel today. When somebody adds a third next sprint, the build must fail on this switch — not the Times Square screen at 19:00."
+concepts    = ["enums", "pattern-matching", "types"]
+requires    = ["typescript.cheatsheet_advanced.27.iterable-stack"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`Shape` is `{ kind: "ad"; w: number } | { kind: "news"; len: number }`
+and `area(s: Shape): number` switches on `s.kind`. After `case "ad"` and
+`case "news"` each `return`, write the `default` so that the function
+compiles today **and** stops compiling the day a third kind is added to
+`Shape`. `strict` is on.
+'''
+solution    = 'default: { const n: never = s; return n; }'
+hints = [
+  "After every case has returned, `s` has the bottom type. Assigning it to a variable of that type is free today and a type error the moment one kind is left over. A cast or an `any` checks nothing; a `throw` only finds out at 19:00.",
+]
+
+[quest.quiz]
+choices = [
+  'default: throw new Error("unhandled kind");',
+  'default: return s as never;',
+  'default: { const n: any = s; return n; }',
+  'default: { const n: never = s; return n; }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "typescript.cheatsheet_advanced.29.type-guard"
+node        = 29
+title       = "WHAT CAME DOWN THE WIRE"
+difficulty  = 5
+story       = "The JSON hit the thirtieth floor and the types are gone. One function has to look at it at runtime and tell the compiler what it saw."
+concepts    = ["serialization", "types", "pattern-matching"]
+requires    = ["typescript.cheatsheet_advanced.28.exhaustive-never"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`data: unknown` came from `JSON.parse`, and `Screen` is
+`{ id: string; w: number }`. Open the function `isScreen` with the body
+
+```ts
+return typeof x === "object" && x !== null && "id" in x && "w" in x;
+```
+
+so that `if (isScreen(data)) console.log(data.id.toUpperCase());`
+compiles — inside the `if`, `data` is a `Screen`. `strict` is on.
+'''
+solution    = 'function isScreen(x: unknown): x is Screen {'
+hints = [
+  "Returning a `boolean` tells the compiler nothing about `x`. A type predicate in the return position does — the parameter's name, the word, the type. The parameter must accept `unknown`, and an assertion signature cannot sit in an `if`.",
+]
+
+[quest.quiz]
+choices = [
+  'function isScreen(x: unknown): boolean {',
+  'function isScreen(x: unknown): x is Screen {',
+  'function isScreen(x: unknown): asserts x is Screen {',
+  'function isScreen(x: Screen): x is Screen {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "typescript.cheatsheet_advanced.30.asserts-defined"
+node        = 30
+title       = "THE ASSERTION"
+difficulty  = 5
+story       = "Midnight. The last lookup before the island's screens go dark: the value is there or the night ends with a thrown Error, and after that line the compiler must take her word for it."
+concepts    = ["types", "error-handling", "generics"]
+requires    = ["typescript.cheatsheet_advanced.29.type-guard"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+The body is `if (x === undefined || x === null) throw new Error("missing");`.
+Open the generic function `must` so that after
+
+```ts
+const v = m.get("a");   // m: Map<string, number>, so v: number | undefined
+must(v);
+```
+
+the line `v + 1` compiles — `must` promises the compiler that `v` is
+neither `null` nor `undefined` from then on. `strict` is on.
+'''
+solution    = 'function must<T>(x: T): asserts x is NonNullable<T> {'
+hints = [
+  "A function that returns nothing cannot be a type predicate; it can be an assertion signature. And asserting `x is T` narrows nothing — the utility that strips `null` and `undefined` from a type is the one to assert.",
+]
+
+[quest.quiz]
+choices = [
+  'function must<T>(x: T): x is NonNullable<T> {',
+  'function must<T>(x: T): asserts x is T {',
+  'function must<T>(x: T): asserts x is NonNullable<T> {',
+  'function must<T>(x: T): asserts x is Required<T> {',
+]
+answer  = 2

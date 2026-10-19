@@ -1,0 +1,573 @@
+# RUST LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/rust/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "rust.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet_advanced.01.default-method"
+title = "ŘÁDEK NAVÍC"
+story = "06:50, nad Jardine's Bazaar. Každý obchod na Meiině seznamu umí říct své jméno; ona chce, aby všechny zdravily, a nechce psát pozdrav pro každý zvlášť."
+brief = '''
+`Greet` už vyžaduje `name`. Přidej do traitu `hello` tak, aby
+`impl Greet for Shop` psal **jen** `name`, a `Shop.hello()` se přesto
+zkompilovalo a vracelo to, co vrací `name`.
+
+```
+trait Greet {
+    fn name(&self) -> String;
+    // ____
+}
+impl Greet for Shop { fn name(&self) -> String { "Sogo".into() } }
+```
+'''
+hints = [
+  "Metoda traitu s tělem je pro implementátory volitelná; metoda jen se signaturou ne. Žádné klíčové slovo na to není — tělo je celý signál.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet_advanced.02.trait-objects"
+title = "JAKÝKOLI TVAR STAČÍ"
+story = "Dílna na cedule na Jaffe Road bere čtverce i kruhy do jedné knihy objednávek a každý z nich zná svou vlastní plochu."
+brief = '''
+`Shape` je trait s `fn area(&self) -> f64`; `Sq` i `Ci` ho implementují.
+Deklaruj `shapes` jako rostoucí seznam, který pojme `Sq` **a zároveň**
+`Ci`, každý na haldě, tak aby fungovalo
+`shapes.iter().map(|s| s.area()).sum::<f64>()`.
+'''
+hints = [
+  "Dva konkrétní typy v jednom Vecu potřebují ukazatel na trait object; generický parametr by typ zafixoval na jeden z nich a holý trait vůbec není typ.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet_advanced.03.where-bound"
+title = "NEJVĚTŠÍ, AŤ JE TO COKOLI"
+story = "Cenová tabule v Sogo drží ceny jako f64 a stavy skladu jako i32 a Ferris chce největší z obojího bez dvou funkcí."
+brief = '''
+`largest` se volá na `&[f64]` **i** na `&[i32]`. Porovnává přes `>`
+a vrací referenci na vítěze. Omezení (bound) patří do klauzule `where`.
+
+```
+// ____
+    let mut m = &v[0];
+    for x in v { if x > m { m = x; } }
+    m
+}
+```
+'''
+hints = [
+  "`>` potřebuje částečné uspořádání, nic víc — omezení, které chce úplné uspořádání nebo plnou rovnost, zavírá dveře floatům. A tělo vrací `&T`, ne `T`.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet_advanced.04.next-signature"
+title = "CO FIB PODÁVÁ DÁL"
+story = "Čísla tramvají na Hennessy Road vycházejí po jednom, každé ze dvou předchozích."
+brief = '''
+`Fib { a: u64, b: u64 }` se stává iterátorem přes `u64`:
+
+```
+impl Iterator for Fib {
+    type Item = u64;
+    // ____
+        let r = self.a;
+        self.a = self.b;
+        self.b += r;
+        Some(r)
+    }
+}
+```
+
+Jakou signaturu trait vyžaduje pro metodu v mezeře?
+'''
+hints = [
+  "Metoda posouvá stav, takže potřebuje výhradní výpůjčku `self`; a musí umět říct, že už nic dalšího není, takže vrací prvek zabalený, ne holý.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet_advanced.05.box-dyn-error"
+title = "DVA DRUHY POTÍŽÍ"
+story = "Platební cesta u Gloucester Road může selhat v parseru nebo v účetní knize a `main` musí spolknout obojí jedním `?`."
+brief = '''
+`AppError` je vlastní chyba:
+
+```
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "app: {}", self.0) }
+}
+impl std::error::Error for AppError {}
+```
+
+To jsou jeho jediné impl bloky — `AppError` **nemá** žádné konverze `From`.
+Uvnitř `main` se `?` používá na `ParseIntError` **a** na `AppError`.
+Která signatura `main` nechá zkompilovat obojí?
+'''
+hints = [
+  "Dva různé typy chyb přes jedno `?` potřebují návratový typ, na který jdou převést oba: trait object, a to takový, který má velikost — takže sedí za ukazatelem.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet_advanced.06.from-for-question-mark"
+title = "PŘEVODNÍK"
+story = "Pokladna na Jardine's Bazaar hlásí selhání parsování vlastními slovy; účetní kniha ho chce ve svém enumu, bez `map_err` na každém řádku."
+brief = '''
+`enum AppError { Parse(ParseIntError), Neg }`. Funkce níže se musí
+zkompilovat přesně tak, jak je napsaná — konverzi dělá `?`:
+
+```
+fn read(s: &str) -> Result<i32, AppError> {
+    let n: i32 = s.trim().parse()?;
+    if n < 0 { return Err(AppError::Neg); }
+    Ok(n)
+}
+```
+
+Která hlavička impl bloku, s `fn from(e: ParseIntError) -> Self { AppError::Parse(e) }`
+uvnitř, to zařídí?
+'''
+hints = [
+  "`?` volá na převod chyby jeden konkrétní trait a ten se implementuje na cílovém typu, pro zdrojový typ — ne naopak, a ne jeho zrcadlový bratránek.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet_advanced.07.map-err-chain"
+title = "JEJÍMI VLASTNÍMI SLOVY"
+story = "Účetní kniha v místnosti 7-32 loguje selhání jako prostý text, takže chyba parseru se musí stát Stringem dřív, než opustí funkci."
+brief = '''
+Funkce vrací `Result<i32, String>`. `n` je naparsované `i32` z `s`
+a špatné `s` vrátí hlášku parseru jako `Err`, na jednom řádku.
+
+```
+fn read(s: &str) -> Result<i32, String> {
+    // ____
+    Ok(n * 2)
+}
+```
+'''
+hints = [
+  "Žádná vestavěná konverze z chyby parseru na String neexistuje, takže samotné `?` to nezvládne; nejdřív chybu přetvoř, pak ji propaguj.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet_advanced.08.option-chain"
+title = "MOŽNÁ INDEX"
+story = "Skříňka číslo `o` na stanici Causeway Bay může být None, nebo může být až za poslední skříňkou; Mei chce obsah nebo -1, a žádnou paniku."
+brief = '''
+`v: Vec<i32>`, `o: Option<usize>`. `x` je `i32`: prvek `v` na tom
+indexu, nebo `-1`, pokud je `o` `None` **nebo** index je mimo rozsah.
+Nesmí to panikařit pro žádné `o`.
+'''
+hints = [
+  "Vyhledání, které samo vrací Option, se musí řetězit, ne mapovat, jinak dostaneš Option uvnitř Optionu. A vyhledání vrací referenci — před výchozí hodnotou ji zkopíruj ven.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet_advanced.09.let-else"
+title = "PRVNÍ SLOVO, NEBO ODCHOD"
+story = "Lístek s objednávkou u dai pai dong může být prázdný; když tam žádné první slovo není, Mei odchází s 0."
+brief = '''
+`w` musí být první slovo `s` oddělené bílými znaky — `&str` použitý
+na dalším řádku. Pokud žádné není, funkce rovnou tam vrací `0`.
+
+```
+fn first_num(s: &str) -> i32 {
+    // ____
+    w.parse().unwrap_or(0)
+}
+```
+'''
+hints = [
+  "Vyvratitelný vzor v `let` potřebuje větev else a ta větev musí odejít — return, break, continue nebo panic; vrátit hodnotu není odchod.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet_advanced.10.binding-and-guard"
+title = "KRÁTKÉ LICHÉ PROCHÁZKY"
+story = "Alexovy pochodové rozkazy na Percival Street: procházka o 1 až 5 blocích je krátká a Mei zajímají jen ty liché."
+brief = '''
+`enum Cmd { Walk(i32), Wait }`. V `Cmd::label(&self)` přidej větev pro
+`Walk`, jehož vzdálenost je od 1 do 5 — **5 včetně** — a lichá, s výpisem
+té vzdálenosti:
+
+```
+match self {
+    Cmd::Wait => "wait".into(),
+    // ____
+    Cmd::Walk(_) => "walk".into(),
+}
+```
+'''
+hints = [
+  "Navaž jméno na rozsahový vzor přes `@`, pak může guard to jméno otestovat. Dej pozor, který tvar rozsahu zahrnuje horní mez.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet_advanced.11.struct-lifetime"
+title = "ŘEZ Z ŘÁDKU"
+story = "Lístek z kiosku na Yee Wo Street je jeden řádek; token, který si Mei nechává, je jeho řez, takže nemůže řádek přežít."
+brief = '''
+`Token` drží vypůjčený `&str` ukazující do řetězce volajícího.
+Deklaruj ho tak, aby se tohle zkompilovalo:
+
+```
+fn first_word<'a>(s: &'a str) -> Token<'a> {
+    Token { text: s.split_whitespace().next().unwrap_or("") }
+}
+```
+'''
+hints = [
+  "Struktura, která drží referenci, nese parametr lifetime a položka musí ten samý parametr použít — deklarovat ho a nepoužít je obvyklé uklouznutí.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet_advanced.12.counter-closure"
+title = "VRÁTNÉHO POČÍTADLO"
+story = "Vrátný na Lockhart Road si na každou akci vyrábí nové počítadlo; každé stisknutí mění číslo uvnitř."
+brief = '''
+Tělo `counter` je `let mut c = 0; move || { c += 1; c }` — bez Boxu.
+Volající dělá `let mut next = counter(); next(); next();`.
+Která signatura `counter` se zkompiluje?
+
+```
+// ____
+    let mut c = 0;
+    move || { c += 1; c }
+}
+```
+'''
+hints = [
+  "Uzávěra mění, co zachytila, takže je to jeden druh uzávěry; volá se dvakrát, takže to není ten jednorázový druh; a nic v těle ji nebalí do Boxu.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet_advanced.13.longest"
+title = "DELŠÍ JMÉNO"
+story = "Dva názvy ulic, jeden půjčený ze zastávky tramvaje a druhý z cedule, která se má každou chvíli sundat; Mei vrací ten delší."
+brief = '''
+`longest` vrací `a` nebo `b`, podle toho, co je delší. Která signatura se zkompiluje?
+
+```
+// ____
+    if a.len() >= b.len() { a } else { b }
+}
+```
+'''
+hints = [
+  "Se dvěma referencemi na vstupu překladač neuhodne, ze které si výstup půjčuje; pojmenuj jeden lifetime a svaž ho s oběma vstupy i výstupem.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet_advanced.14.letter-from-index"
+title = "I-TÉ PÍSMENO"
+story = "Skříňky ve Victoria Parku jsou označené písmeny a až z a rezervace přišla jako číslo."
+brief = '''
+`i: usize`, přičemž `0 <= i < 26`. `c` je `char`: `i`-té malé
+ASCII písmeno, takže `0 → 'a'`, `7 → 'h'`, `25 → 'z'`.
+'''
+hints = [
+  "Jen jedna celočíselná šířka se přetypuje přímo na char, a to bajt. Přičti k bajtovému literálu a pak přetypuj — a pomocník na číslice ze std počítá 0 až 9 dřív, než dojde k písmenům.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet_advanced.15.filter-map-parse"
+title = "NECH, CO SE NAPARSUJE"
+story = "Role účtenek ze 7-Eleven je napůl čísla a napůl šmouhy; Mei chce čísla, v pořadí, a se zbytkem žádné cavyky."
+brief = '''
+`ws: [&str; 4]` míchá čísla a smetí, např. `["12", "x", "7", "3.5"]`.
+`v` drží ty, co se naparsují jako `i32`, v pořadí; smetí se tiše
+přeskočí.
+
+```
+let v: Vec<i32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Jeden adaptor zároveň filtruje i mapuje, když uzávěra vrací Option — a výsledek parsování není Option, dokud z něj Option neuděláš.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet_advanced.16.collect-result"
+title = "VŠECHNO, NEBO NIC"
+story = "Pokladna na Jardine's Bazaar odmítne celý řádek, když je jeden token špatně; žádný částečný součet neexistuje."
+brief = '''
+Uvnitř `main` (který vrací `()`), `ws: [&str; 3]`. `r` je `Ok` se
+**všemi** čísly, nebo první chyba parsování, pokud je nějaký token špatně.
+
+```
+let r: Result<Vec<i32>, ParseIntError> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Sesbírat iterátor Resultů do Resultu s Vecem je jedno volání se správným cílovým typem — anotace na `r` ho už pojmenovává. Žádné `?` není potřeba a `main` by ho tady stejně nesnesl.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet_advanced.17.zip-into-map"
+title = "DVA SLOUPCE, JEDNA MAPA"
+story = "Cenová tabule na mokrém trhu jsou dva seznamy — vlevo názvy, vpravo ceny — a Mei chce vyhledávat ceny podle názvu."
+brief = '''
+`keys: Vec<String>` a `vals: Vec<u32>`, stejné délky, a ani jeden se
+potom už nepoužije. `m` se z nich postaví jedním výrazem:
+
+```
+let m: HashMap<String, u32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Spáruj obě posloupnosti a pak páry sesbírej. Mapa chce vlastněné Stringy a holá u32, takže Vecy projdi hodnotou, ne referencí.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet_advanced.18.sort-floats-desc"
+title = "NEJDRAŽŠÍ NAPŘED"
+story = "Nájmy v činžácích bez výtahu v Causeway Bay jsou floaty a domácí chce ty nejdražší nahoře."
+brief = '''
+`v: Vec<f64>` bez NaN. Seřaď ho na místě, **sestupně**.
+'''
+hints = [
+  "Floaty nemají úplné uspořádání, takže je obyčejný sort i sort podle klíče odmítnou; dej komparátor, který použije částečné porovnání a prohodí operandy.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet_advanced.19.lazy-cache"
+title = "POČÍTEJ JEN PŘI MINUTÍ"
+story = "Kuchyně v Lucky Mac spočítá cenu jídla jednou a připíchne ji na tabuli; šéfkuchař Bo nebude součet pro jídlo, které už tam visí, dělat znovu."
+brief = '''
+`cache: HashMap<u64, u64>` a `fn slow(n: u64) -> u64` při každém běhu
+vypíše `computing n`. Přes `for n in [3, 3, 4]` je `v` hodnota `n`
+z cache a `slow` musí vypsat **přesně dvakrát**.
+'''
+hints = [
+  "Entry API má dva způsoby, jak zaplnit díru: jeden bere hodnotu (už spočítanou, pokaždé), druhý bere uzávěru, která se spustí jen tehdy, když klíč chybí.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet_advanced.20.btree-range"
+title = "DESET AŽ DVACET"
+story = "Zastávky tramvaje v seřazené knize jsou očíslované; Mei chce zastávky 10 až 20, v pořadí, bez čtení celé knihy."
+brief = '''
+`m: BTreeMap<u32, &str>`. Projdi smyčkou položky s klíči od 10 do
+20 — **obojí včetně** — vzestupně, bez průchodu celou mapou.
+
+```
+// ____
+    print!("{k}{v} ");
+}
+```
+'''
+hints = [
+  "Seřazená mapa ti umí podat podrozsah podle klíče; bere jeden argument s rozsahem, a otázka je, která syntaxe rozsahu zahrnuje horní mez.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet_advanced.21.checked-digits"
+title = "ŽÁDNÉ TICHÉ PŘETEČENÍ"
+story = "Vypořádání na Gloucester Road parsuje částky ručně; přetečení se musí vrátit jako None, nikdy jako číslo, které jen vypadá věrohodně."
+brief = '''
+`parse_u64` vrací `Option<u64>`: `None` při přetečení (ne přetočené
+číslo) a nikdy nepanikaří. `d: u32` je hodnota číslice.
+
+```
+fn parse_u64(s: &str) -> Option<u64> {
+    let mut acc: u64 = 0;
+    for c in s.chars() {
+        let d = c.to_digit(10)?;
+        // ____
+    }
+    Some(acc)
+}
+```
+'''
+hints = [
+  "Za aritmetické metody, které vracejí Option, jde uvnitř této funkce vždy dát `?`. Obyčejné operátory v debugu panikaří a ty přetáčející (wrapping) potichu vrátí špatné číslo.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet_advanced.22.derive-ord-fields"
+title = "PRIORITA, PAK JMÉNO"
+story = "Lístky noční kuchyně se řadí nejdřív podle priority a v rámci stejné priority podle názvu jídla, a derive dělá přesně to, co mu položky řeknou."
+brief = '''
+Nad strukturou stojí řádek `#[derive(PartialEq, Eq, PartialOrd, Ord)]`.
+`tasks.sort()` musí řadit nejdřív podle `pri` (1 před 2) a
+**v rámci stejného `pri`** podle `name`. Položky jsou `pri: u32` a
+`name: String`. Která deklarace to dělá?
+'''
+hints = [
+  "Odvozené uspořádání porovnává položky v pořadí deklarace, shora dolů; rozhodne první položka, která se liší.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet_advanced.23.struct-update"
+title = "JEN PORT"
+story = "Konfigurace fintechu má tucet položek a Mei chce změnit jednu; zbytek má být to, co říká prázdná konfigurace."
+brief = '''
+`Config` má položky `host: String`, `port: u16`, `retries: u8`,
+`verbose: bool` a odvozuje `Default`. Postav `c` s `port` nastaveným na
+`8080` a **každou další položkou na výchozí hodnotě**, bez pojmenování
+jakékoli další položky.
+'''
+hints = [
+  "Syntaxe struct update doplní položky, které jsi nepojmenoval, z jiné instance — dvě tečky a pak výraz, který dává `Config`, ne jméno traitu.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet_advanced.24.rc-refcell"
+title = "DVA HANDLY, JEDEN LOG"
+story = "Ferris i Mei drží handle na tentýž jednovláknový log; Ferris zapisuje, Mei ho čte zpátky."
+brief = '''
+`log` je `Rc<RefCell<Vec<&str>>>` a `let b = Rc::clone(&log);`. Vlož
+`"tram"` přes `b` tak, aby ho `log.borrow()` ukázal.
+'''
+hints = [
+  "`Rc` vždycky vydává jen sdílený přístup; to, co dovolí půjčit si měnitelně za běhu, je buňka uvnitř — chtěj po ní měnitelnou výpůjčku, ne sdílenou.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet_advanced.25.arc-mutex"
+title = "ČTYŘI DVEŘE, JEDEN SOUČET"
+story = "Čtyři dveře herny v suterénu Sogo počítají vstupy do jednoho součtu a celek musí být přesný."
+brief = '''
+`hits` je `Arc<Mutex<u32>>`. V každém ze čtyř spuštěných vláken je `c`
+`Arc::clone(&hits)` a každé vlákno přičte k počtu jedničku 1000krát.
+Který řádek, uvnitř vlákna, přičte jedničku?
+
+```
+hs.push(thread::spawn(move || {
+    for _ in 0..1000 { /* ____ */ }
+}));
+for h in hs { h.join().unwrap(); }
+```
+'''
+hints = [
+  "Zamknutí vrací Result; unwrapni ho, abys dostal strážce, a pak strážce dereferencuj, aby ses dostal k číslu. Tři kroky — a každá z chybných variant jeden přeskakuje.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet_advanced.26.scoped-thread"
+title = "PŮJČENO NA CHVÍLI"
+story = "Počet lidí na eskalátorech v Times Square je na chvíli půjčený pomocníkovi; žádné kopírování, žádný sdílený vlastník, a až pomocník skončí, je potřeba znovu."
+brief = '''
+`v: Vec<i32>`. Vypiš ho z jiného vlákna tak, že si ho **půjčíš** — žádný
+`Arc`, žádný clone, žádné `move` — a `v` se hned na dalším řádku zase
+použije.
+'''
+hints = [
+  "Obyčejně spuštěné vlákno může funkci přežít, takže si nemůže půjčovat. Ten scoped druh má zaručeno, že skončí dřív, než se scope vrátí, a jeho spawn jde přes handle scope.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet_advanced.27.take-n-messages"
+title = "PŘESNĚ ČTYŘI, BEZ ZASEKNUTÍ"
+story = "Čtyři kurýři na Lockhart Road každý vysílačkou ohlásí jedno číslo; dispečerka si nechává vlastní vysílačku zapnutou a přesto musí po čtyřech přestat poslouchat."
+brief = '''
+`n: usize = 4`. Čtyři vlákna dostala každé `tx.clone()` a každé po nějaké
+práci pošle **jedno** `u64`. Původní `tx` se **nezahazuje** a `main`
+si ho nechává. `r` drží všechny čtyři zprávy a `main` se nesmí
+zaseknout.
+
+```
+let (tx, rx) = mpsc::channel::<u64>();
+for id in 0..n as u64 {
+    let tx = tx.clone();
+    thread::spawn(move || { work(); tx.send(id * id).unwrap() });
+}
+// ____
+```
+'''
+hints = [
+  "Blokující iterátor přes přijímač končí, až když je pryč každý odesílatel; s jedním stále v `main` ho zastav počtem. Neblokující iterátor vrátí, co zatím dorazilo — třeba nic.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet_advanced.28.global-counter"
+title = "JEDNO ČÍSLO PRO CELOU BUDOVU"
+story = "Jediné počítadlo vstupů pro celý Times Square, navyšované ze všech dveří naráz, a radši ať to není čerstvá kopie v každé ruce."
+brief = '''
+Počítadlo pro celý program, sdílené všemi vlákny, nikde žádné `unsafe`.
+`fn hit() { HITS.fetch_add(1, Ordering::Relaxed); }` se volá 1000krát
+z každého ze čtyř vláken a po jejich joinu musí
+`HITS.load(Ordering::Relaxed)` být `4000`.
+
+Která deklarace `HITS` na úrovni modulu to dělá?
+'''
+hints = [
+  "Jedna z chybných variant se zkompiluje a vypíše 0: `const` se při každém použití vloží jako čerstvá hodnota, takže každé `fetch_add` navyšuje kopii. To jedno místo v paměti potřebuje druhé klíčové slovo pro položku — a jeho měnitelná podoba je na dotek `unsafe`.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet_advanced.29.take-the-batch"
+title = "PŘEDAT VŠECHNO"
+story = "Šéfkuchař Bo předá celou lištu s lístky běžci a nechá si prázdnou lištu — žádné kopírování lístků a lišta zůstává jeho."
+brief = '''
+`Batch { items: Vec<String> }`. `flush(&mut self) -> Vec<String>` vrátí
+všechno z `items` a nechá `self.items` **prázdný**, bez klonování.
+
+```
+fn flush(&mut self) -> Vec<String> {
+    // ____
+}
+```
+'''
+hints = [
+  "Položku nelze přesunout ven zpoza `&mut self`, ale `std::mem` umí položku vyměnit za její výchozí hodnotu a dát ti tu starou — přes měnitelnou referenci na položku.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet_advanced.30.dijkstra-pop"
+title = "NEJMENŠÍ VZDÁLENOST VEN"
+story = "Dijkstra přes síť ulic Causeway Bay: halda drží (vzdálenost, uzel) zabalené tak, aby nejbližší vyšel první, a smyčka musí rozbalit obojí."
+brief = '''
+`heap: BinaryHeap<Reverse<(u64, usize)>>` drží dvojice `(distance, node)`
+tak, aby jako první vyšla **nejmenší vzdálenost**. Napiš hlavičku smyčky,
+která odebírá, dokud halda není prázdná, a váže `d` a `u`:
+
+```
+heap.push(Reverse((0u64, 0usize)));
+// ____
+    if d > dist[u] { continue; }
+    for &(v, w) in &adj[u] { /* relax */ }
+}
+```
+'''
+hints = [
+  "Pop dává Option; uvnitř je obal a uvnitř obalu je n-tice — tři vrstvy, a obal má přesně jednu položku.",
+]

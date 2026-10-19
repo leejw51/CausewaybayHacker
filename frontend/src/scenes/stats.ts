@@ -246,6 +246,8 @@ export class StatsScene implements Scene {
     const [land, category] = parts as [Land, Category];
     if (!isLand(land)) return;
     if (
+      category !== "cheatsheet" &&
+      category !== "cheatsheet_advanced" &&
       category !== "basic" &&
       category !== "advanced" &&
       category !== "hacker" &&

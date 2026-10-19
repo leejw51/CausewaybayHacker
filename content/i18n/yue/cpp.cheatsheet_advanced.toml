@@ -1,0 +1,489 @@
+# C++ LAND — CHEATSHEET ADVANCED, in Cantonese. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "cpp.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet_advanced.01.auto-params"
+title = "求其兩個都得"
+story = "軒尼詩道個找換店將一個用蚊計嘅車費加一個用仙計嘅貼士，唔想每一對類型都寫一個獨立 function。"
+brief = '''
+用**一個**定義嚟定義 `add`，令 `add(1, 2.5)` 編譯得到並且回傳 `3.5`，
+而 `add(std::string("a"), "b")` 都編譯得到。C++20。
+'''
+hints = [
+  "C++20 開始，參數列表入面一個 placeholder 就會令個 function 自動變成 template —— 而每個 placeholder 都係自己一個類型。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet_advanced.02.constrained-member"
+title = "喺個盒外面"
+story = "崇光盤點淨係為整數件嘅貨計一個累計總數 —— 而報總數嗰個 member 係喺 .cpp 入面、class 外面定義嘅。"
+brief = '''
+```cpp
+template <std::integral T>
+struct Stat {
+  T s = 0;
+  void add(T x) { s += x; }
+  T sum() const;
+};
+```
+
+喺個 struct **外面**定義 `sum`。`<concepts>` 已經 include 咗。
+'''
+hints = [
+  "class template 嘅 out-of-line member 要重複個 template header —— 而且一定要係同一個 header，連 constraint 都要。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet_advanced.03.mutable-capture"
+title = "派籌機"
+story = "Lucky Mac 櫃台部派籌機派出 0、1、2 —— 而且自己數住，外面邊度都冇計數變數。"
+brief = '''
+將 `next` 整做一個 callable，連續呼叫會回傳 `0`、然後 `1`、然後 `2`。
+**lambda 外面唔存在任何叫 `n` 嘅變數。**
+'''
+hints = [
+  "capture 可以直接喺方括號入面初始化。lambda 嘅 call operator 係 `const` 嘅，除非你另外講明 —— 而且留意後置同前置遞增嘅分別。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet_advanced.04.this-capture"
+title = "計埋我"
+story = "銅鑼灣站個閘機派出一個計數器；每一下都一定要落喺閘機自己個總數上面，唔係佢嘅副本。"
+brief = '''
+```cpp
+struct Counter {
+  int count = 0;
+  std::function<void()> ticker();
+};
+```
+
+喺 `ticker` 入面回傳一個 lambda。呼叫佢兩次之後，**呢個物件**嘅 `count`
+一定要係 `2`。
+'''
+hints = [
+  "data member 唔係變數，所以唔可以用名放入 capture list。capture 個物件 —— 用指針，咁改嘅先係真嗰個。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet_advanced.05.recursive-lambda"
+title = "自己叫自己"
+story = "渣甸坊間餅店個餅師將蛋撻總數寫成一個自己呼叫自己嘅 function —— 喺 main 入面，附近一個有名嘅 function 都冇。"
+brief = '''
+將 `fib` 定義做一個**自己呼叫自己**嘅本地 lambda，令 `fib(10)` 回傳 `55`。
+`<functional>` 已經 include 咗。
+'''
+hints = [
+  "`auto` 變數唔可以出現喺自己嘅 initializer 入面；一個宣告咗 callable 類型嘅變數就可以 —— 而個 lambda 一定要 capture 佢。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet_advanced.06.if-constexpr"
+title = "淨係一個分支"
+story = "避風塘碼頭個地磅收一個貨箱數或者一個標籤 —— 而且拒絕編譯對佢收到嘅嘢嚟講冇意思嗰個分支。"
+brief = '''
+```cpp
+template <typename T>
+auto weigh(const T& x) {
+  // one line here
+}
+```
+
+當 `T` 係整數類型就回傳 `x * 2`，否則回傳 `x.size()`。`weigh(21)` 同
+`weigh(std::string("abc"))` 都一定要編譯得到。`<type_traits>` 已經 include 咗。
+'''
+hints = [
+  "普通 `if` 對每個 `T` 都仍然會編譯兩個分支。個條件一定要係一個值，唔係一個 trait 類型 —— 而個 `else` 先係令另一個分支唔入去嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet_advanced.07.static-assert"
+title = "BUILD 失敗，唔係 RUN 失敗"
+story = "午炮班底喺上膛之前先檢查火藥嘅平方 —— 如果條數唔啱，乜都唔會出貨。"
+brief = '''
+`constexpr int sq(int x) { return x * x; }` 已經宣告咗。喺 **namespace scope**，
+如果 `sq(12)` 唔係 `144`，就令**編譯**失敗 —— 唔可以有任何嘢喺運行時先檢查。
+'''
+hints = [
+  "`constexpr` 呼叫可以由 compiler 求值，而有一種 assertion 係住喺編譯時嘅；C++17 開始佢嘅訊息係可選嘅，但畀嘅話一定要係 string。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet_advanced.08.enum-class"
+title = "一個數變成一條綫"
+story = "銅鑼灣個港鐵指示牌由線路讀一個綫號，一定要將佢變做一個正式、有 scope、一個 byte 嘅綫碼。"
+brief = '''
+```cpp
+enum class Line : std::uint8_t { Island, TsuenWan, KwunTong };
+```
+
+`int n` 由輸入讀入，係 `0`、`1` 或者 `2`。宣告 `Line l`，裝住對應嘅 enumerator。
+'''
+hints = [
+  "scoped enum 永遠唔會隱式轉換，兩個方向都唔會；brace-init 拒絕將一個運行時嘅 `int` 收窄。其中一個有名嘅 cast 做到。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet_advanced.09.spaceship"
+title = "一個價錢，六個"
+story = "海港辦事處而家想每個泊位點比都比得到 —— 細過、等於、最少 —— 而且拒絕用手寫六個 operator。"
+brief = '''
+`struct Pt { int r, c; };` —— 加**一個 member**，令 `a < b`、`a == b`
+同 `a >= b` 全部編譯得到，先按 `r` 再按 `c` 排序。C++20，`<compare>`
+已經 include 咗。
+'''
+hints = [
+  "一個 default 咗嘅三路 operator 連 `==` 都送埋畀你。佢嘅回傳類型係一個 ordering category —— 畀 compiler 推導 —— 而 default 嘅比較一定要係 `const`。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet_advanced.10.dynamic-cast"
+title = "佢真係個圓形？"
+story = "謝斐道間招牌舖用 base 指針揸住每張訂單，而部圓形招牌機一定要淨係收真係圓形嗰啲。"
+brief = '''
+```cpp
+struct Shape { virtual double area() const = 0; virtual ~Shape() = default; };
+struct Circle : Shape { double r; double area() const override { return 3.14 * r * r; } };
+struct Square : Shape { double s; double area() const override { return s * s; } };
+```
+
+`Shape* s` 指住某個形狀。當佢真係一個 `Circle`，就將 `c` 設做**以 `Circle` 身份**
+指住佢，否則設做 `nullptr`。
+'''
+hints = [
+  "淨係得一個 cast 會喺運行時問個物件佢係乜；其餘嘅只係重新解釋個指針，永遠唔會產生 null。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet_advanced.11.move-unique"
+title = "交咗出去"
+story = "波斯富街貨倉一件包裹只有一個主人；放上貨車就代表速遞員唔再揸住佢。"
+brief = '''
+`auto p = std::make_unique<Node>(5);` 同
+`std::vector<std::unique_ptr<Node>> v;` —— 將 `p` 擁有嘅 node 放入 `v`。
+之後 `p` 一定要係**空**嘅，而且唔可以 copy 任何 `Node`。
+'''
+hints = [
+  "unique pointer 唔可以 copy，而 raw pointer 亦唔會靜靜地變成一個；將擁有權本身交出去。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet_advanced.12.weak-lock"
+title = "仲喺度嗎？"
+story = "渣甸坊樓上個管理員留住 7 號單位租客嘅一張非擁有便條，要檢查佢哋仲住唔住喺度 —— 傾偈嗰陣仲要留住佢哋喺大堂。"
+brief = '''
+`std::weak_ptr<Room> wp;` —— **淨係喺個房仲存在嗰陣**印佢個 `n`，
+而且印嗰陣要揸住佢令佢唔死。
+'''
+hints = [
+  "weak pointer 唔可以直接 deref 或者測試；佢會交返一個 strong 嘅畀你，而物件已經冇咗嗰陣嗰個係空嘅。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet_advanced.13.move-ctor"
+title = "攞咗條匙，乜都唔留"
+story = "怡和街間押舖接手一個儲物櫃入面嘅嘢；張舊飛一定要留低指住乜都冇，否則個櫃會被清兩次。"
+brief = '''
+```cpp
+struct Buf {
+  int* data; int n;
+  explicit Buf(int n) : data(new int[n]), n(n) {}
+  ~Buf() { delete[] data; }
+  Buf(const Buf&) = delete;
+  Buf& operator=(const Buf&) = delete;
+  // the move constructor goes here
+};
+```
+
+加上 move constructor：`Buf b(std::move(a));` 一定要接手 `a` 個 array，
+而被 move 走咗嘅 `a` 一定要**可以安全咁 destroy**。`<utility>` 已經 include 咗。
+'''
+hints = [
+  "個參數係一個 rvalue reference，而如果你打算清空佢，佢唔可以係 `const`。有一個 utility 可以喺一個表達式入面存入新值並且交返舊值。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet_advanced.14.try-emplace"
+title = "新嘅先要"
+story = "電車廠個登記簿一個新車號淨係收一次；重複嘅一定要留低舊紀錄唔郁，而且要講明。"
+brief = '''
+`std::map<std::string, int> m;` 同 `std::string k; int v;` —— **淨係喺 `k` 唔存在嗰陣**
+插入 `k → v`，並且喺同一行將 `ok` 綁定做佢有冇入到去。
+'''
+hints = [
+  "永遠唔會覆寫嗰個 insert 回傳一個 pair；structured binding 用方括號。佢嗰個會覆寫嘅表親都係回傳一個 pair，呢個就係陷阱。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet_advanced.15.optional-view"
+title = "任何文字，一個數或者冇"
+story = "隧道收費亭 parse 任何送到嘅文字 —— reader 嚟嘅 std::string、測試嚟嘅 literal —— 然後答一個收費或者乜都冇。"
+brief = '''
+宣告 `parse`：佢回傳一個 `int` **或者乜都冇**（冇 exception，冇指針），
+而且一定要可以用一個 `std::string` **同埋** literal `"7"` 嚟呼叫，
+唔 copy 啲文字。
+'''
+hints = [
+  "非擁有嘅 string 類型按值收 `std::string` 同 literal 都得；指住佢嘅 reference 兩樣都綁唔到。個回傳類型需要佢嘅 template argument。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet_advanced.16.visit"
+title = "係邊樣就邊樣"
+story = "時代廣場戲院一張飛係一個座位號或者賓客名單上面一個名；帶位員印出佢裝住嘅嗰樣。"
+brief = '''
+```cpp
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+std::variant<int, std::string> v = ...;
+auto pr = overloaded{ [](int i) { std::cout << i; },
+                      [](const std::string& s) { std::cout << s; } };
+```
+
+用 `pr` 印出 `v` 裝住嘅嗰個 alternative。
+'''
+hints = [
+  "個 dispatcher 係一個 free function，唔係 member：先係 callable，然後先係個 variant。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet_advanced.17.span"
+title = "任何一行數字"
+story = "維園個感應器中樞將以 const vector、std::array 或者普通 C array 嚟到嘅讀數加總 —— 一個 function，乜都唔 copy。"
+brief = '''
+宣告 `total`，令**三個**呼叫全部都編譯得到而且唔 copy 任何元素：
+`total(v)`，`v` 係一個 `const std::vector<int>`；`total(a)`，`a` 係一個
+`std::array<int, 3>`；同 `total(c)`，`c` 係 `int c[3]`。C++20。
+'''
+hints = [
+  "一個非擁有嘅 view 涵蓋所有連續序列 —— 但可變元素嘅 view 唔會接受一個 `const` vector。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet_advanced.18.views-pipeline"
+title = "懶惰嘅 PIPELINE"
+story = "崇光遊戲機中心個記分板想要頭三個雙數分數嘅平方，而且淨係喺個板捲到佢哋嗰陣先計。"
+brief = '''
+```cpp
+namespace views = std::views;
+std::vector<int> v = {9, 2, 7, 4, 6, 1, 8, 10};
+std::ranges::sort(v);
+auto even = [](int x) { return x % 2 == 0; };
+auto sq   = [](int x) { return x * x; };
+```
+
+砌一個 lazy range `r`，佢嘅元素係 `4 16 36` —— **頭三個雙數**嘅平方。
+`<ranges>` 已經 include 咗。
+'''
+hints = [
+  "adaptor 用 `|` 組合，由左至右套用：filter 之前先攞三個會攞錯三個，而先 reverse 就會由另一頭攞。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet_advanced.19.multiset-erase-one"
+title = "淨係其中一個"
+story = "避風塘三隻舢舨嘅吃水讀數一樣；其中一隻走咗，個排序 log 一定要啱啱好減一個紀錄，唔係三個。"
+brief = '''
+`std::multiset<int> ms = {3, 5, 5, 5, 8};` 同 `int x = 5;` —— 移除
+**啱啱好一個** `5`，剩低 `3 5 5 8`，O(log n)。
+'''
+hints = [
+  "按值 erase 會移除每一個副本；按 iterator erase 淨係移除一個。member 嘅查找係對數時間 —— free algorithm 會行晒。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet_advanced.20.pair-hash"
+title = "兩半砌成嘅 KEY"
+story = "銅鑼灣個網格用 (row, column) 嚟行，而已行格仔嘅 hashed set 需要一個標準冇提供嘅 hasher。"
+brief = '''
+```cpp
+struct PairHash {
+  // one line here
+    return std::hash<long long>()(((long long)p.first << 32) ^ (unsigned)p.second);
+  }
+};
+std::unordered_map<std::pair<int,int>, int, PairHash> seen;
+```
+
+寫個 hasher 嘅開頭嗰行，令 `seen` 編譯得到。
+'''
+hints = [
+  "hasher 係一個收一個 key、回傳 `size_t` 嘅 call operator —— 而個 container 係喺一個 `const` 物件上面呼叫佢。兩個 key 加一個 `bool` 係 comparator，唔係 hash。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet_advanced.21.heap-comparator"
+title = "最早嗰單喺頂"
+story = "Lucky Mac 夜廚 Bo 師傅條單軌將限期最早嘅單擺喺最頂 —— 而條軌唔知對一張單嚟講「細過」係乜意思。"
+brief = '''
+```cpp
+struct Job { int d; std::string name; };   // no comparison operators
+std::priority_queue<Job, std::vector<Job>, decltype(cmp)> pq(cmp);
+```
+
+（喺個 queue 之前）定義 `cmp`，令 `pq.top()` 永遠係 `d` **最細**嗰個 job。
+'''
+hints = [
+  "comparator 話邊個沉落去：個 queue 將嗰個唔「細過」任何其他元素嘅放喺頂。要最細嘅喺頂，「細過」就要解做大過 —— 而且佢一定要回傳一個真正嘅 bool。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet_advanced.22.getline-delim"
+title = "喺逗號度切"
+story = "送貨清單讀到「Jaffe Road,7,Sogo」—— 三個欄位，其中一個入面有空格，淨係喺逗號度切。"
+brief = '''
+`std::istringstream ss(line); std::string tok; std::vector<std::string> parts;`
+—— `line` 係 `Jaffe Road,7,Sogo`，將 `parts` 填做**三個**欄位，
+第一個係 `Jaffe Road`。
+'''
+hints = [
+  "`>>` 會喺空白度切，咁會將個路名切開兩截。個 line reader 收一個可選嘅分隔符 —— 一個字元，做佢嘅第三個 argument。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet_advanced.23.erase-if"
+title = "掉晒單數嗰啲"
+story = "崇光遊戲機中心將個樽入面每一個單數嘅代幣清走 —— 一行搞掂，唔會有 iterator 行到一半就過期。"
+brief = '''
+`std::vector<int> v = {1, 3, 5, 2, 4, 7, 9};` —— 移除每一個**單數**元素，
+令 `v` 係 `{2, 4}`，`v.size() == 2`。C++20，`<algorithm>` 同 `<vector>`
+已經 include 咗。
+'''
+hints = [
+  "經典嗰個 algorithm 淨係執位，永遠唔會縮細；喺 `++it` loop 入面 erase 用嘅係一個啱啱被 erase 弄到失效嘅 iterator。C++20 加咗一個 free function，成套舞幫你跳晒。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet_advanced.24.popcount"
+title = "數有幾多個窗着燈"
+story = "軒尼詩道幢大廈六十四個單位，一個 bit 一個；個夜更保安數着燈嗰啲 —— 全部六十四個，唔係淨係低嗰半。"
+brief = '''
+`std::uint64_t x = 0xF0000000F0000001;` —— 將 `int c` 設做 `x` 入面
+**set 咗嘅 bit** 嘅數目，即係 `9`。`<bit>` 同 `<bitset>` 已經 include 咗。
+'''
+hints = [
+  "呢啲入面有兩個淨係望一個 64-bit 值嘅 32 個 bit，而有一個數嘅係尾嗰串 1 而唔係全部。C++20 嗰個收任何 unsigned 類型，原封不動。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet_advanced.25.stopwatch"
+title = "用咗幾耐"
+story = "Mei 由午炮響到最後一下鍵計時，想要嘅答案係整數毫秒 —— 唔係納秒，亦都唔係一個編譯錯誤。"
+brief = '''
+```cpp
+using namespace std::chrono;
+auto t0 = steady_clock::now();
+solve();
+auto t1 = steady_clock::now();
+```
+
+將 `ms` 設做經過嘅時間，以整數**毫秒**計。
+'''
+hints = [
+  "兩個 time point 嘅差係一個以該時鐘本身單位計嘅 duration。轉做較粗嘅單位會損失精度，所以一定要明確咁要求。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet_advanced.26.jthread"
+title = "出門嗰陣自己 JOIN"
+story = "波斯富街嘅 Alex 喺第二條 thread 開夜間批次，想個 scope 完嗰陣有人等佢 —— 唔使寫一行佢可能會唔記得嘅嘢。"
+brief = '''
+`void work();` —— 喺一條新 thread `t` 上面開 `work`，當 `t` 離開 scope 嗰陣
+佢會**自動 join**。C++20，`<thread>` 已經 include 咗。
+'''
+hints = [
+  "普通 thread 喺 destroy 嗰陣仲係 joinable 嘅話會終止成個程式；detach 永遠唔會 join。C++20 加咗一種 thread，佢個 destructor 會 join —— 佢個 constructor 係 explicit 嘅，所以唔可以用 `=`。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet_advanced.27.async"
+title = "即刻開，遲啲收"
+story = "找換亭喺客人一到就將匯率查詢交畀另一個職員，需要嗰陣先去收個數。"
+brief = '''
+`int work(int x);` —— **即刻喺另一條 thread 上面**開 `work(5)`，並且攞一個
+handle `f`，令之後 `int r = f.get();` 得到結果。`<future>` 已經 include 咗。
+'''
+hints = [
+  "將 callable 同佢嘅 argument 分開傳 —— 自己呼叫佢就會喺呢度即刻行。deferred policy 喺 `get` 之前乜都唔會開。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet_advanced.28.scoped-lock"
+title = "兩個鎖，冇 DEADLOCK"
+story = "告士打道旁邊間 fintech 兩個櫃員喺同兩個戶口之間相反方向咁過數，而間分行永遠唔可以僵死。"
+brief = '''
+```cpp
+struct Acct { std::mutex m; int bal; };
+void transfer(Acct& from, Acct& to, int amt) {
+  // one line here
+  from.bal -= amt; to.bal += amt;
+}
+```
+
+為個 function 餘下部分鎖住**兩個**戶口。一條 thread 喺 loop 入面行
+`transfer(a, b, 1)`，另一條行 `transfer(b, a, 1)`；個程式永遠唔可以 deadlock。
+'''
+hints = [
+  "一個接一個咁、按 argument 嚟嘅次序攞兩個鎖，正正就係兩條 thread 永遠互相等對方嘅方法。有一個 C++17 嘅 guard 收任何數量嘅 mutex，而且攞嘅時候唔會 deadlock。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet_advanced.29.fetch-add"
+title = "我前面嗰個數"
+story = "銅鑼灣站八個閘機共用一個計數器；每個閘都要自己嗰一下之前嘅數，而且一下都唔可以漏。"
+brief = '''
+`std::atomic<int> hits{0};` 由八條 thread 同時遞增。喺每條 thread 入面，
+加 `1`，並且將 `int before` 設做**呢條 thread 遞增之前嗰一刻**嘅值。
+一次遞增都唔可以漏。
+'''
+hints = [
+  "讀個值然後存一個新值係兩個獨立嘅 atomic 步驟，另一條 thread 可以夾喺中間。前置遞增係 atomic 嘅，但交返嘅係加咗之後嘅值。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet_advanced.30.condition-variable"
+title = "等到有嘢為止"
+story = "中午，炮響，Lucky Mac 個出餐窗口：個走堂瞓到真係有碟嘢先醒，其他嘢都唔會嘈醒佢，而早落咗嘅嗰碟佢永遠唔會漏。"
+brief = '''
+`std::mutex m; std::condition_variable cv; std::queue<int> q;` —— 喺 consumer
+開頭，攞個鎖並且**block 到 `q` 唔係空為止**，就算 producer 喺我哋到之前
+已經 push 咗同 notify 咗都要正確，而且要頂得住 spurious wake-up。
+之後個鎖仍然揸住。
+'''
+hints = [
+  "個 wait 需要一個佢可以放開再攞返嘅鎖，所以唔係簡單嗰個 guard，亦唔係光秃秃嘅 mutex。收 predicate 嗰個 overload 每次醒都會重新檢查，而如果已經成立就即刻返回。",
+]

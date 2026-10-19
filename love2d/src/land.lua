@@ -60,17 +60,27 @@ function Land.name(land)
   return Land.NAME[land] or tostring(land or "?"):upper()
 end
 
---- SPEC §0's roads, in the order they are walked. `verybasic` is the quiz
---- road (PROTOCOL §5.3): the grammar asked before it is typed. `frameworks`
---- is the crates road — the job after the interview — and RUST LAND's alone.
-Land.CATEGORIES = { "verybasic", "basic", "advanced", "hacker", "frameworks" }
+--- SPEC §0's roads, in the order they are walked. `cheatsheet` and
+--- `cheatsheet_advanced` are the grammar off the page — the core and the
+--- patterns — four lines and one right, on every land.
+--- `verybasic` is the quiz road (PROTOCOL §5.3): the grammar asked before it
+--- is typed. `frameworks` is the crates road — the job after the interview —
+--- and RUST LAND's alone.
+Land.CATEGORIES = { "cheatsheet", "cheatsheet_advanced", "verybasic", "basic", "advanced", "hacker", "frameworks" }
 
---- The roads `land` has (SPEC §0): every language land has the four, RUST
---- has FRAMEWORKS as a fifth, and REMIX LAND the two grammar roads only.
+--- The roads `land` has (SPEC §0): every language land has the six, RUST
+--- has FRAMEWORKS as a seventh, and REMIX LAND the two sheet roads and the
+--- two grammar roads only.
 --- What the map's switcher offers and what Q cycles through, so no key
 --- leads to a map the server answers `not_found` for.
-Land.LANGUAGE_ROADS = { "verybasic", "basic", "advanced", "hacker" }
-Land.REMIX_ROADS = { "verybasic", "basic" }
+Land.LANGUAGE_ROADS = { "cheatsheet", "cheatsheet_advanced", "verybasic", "basic", "advanced", "hacker" }
+Land.REMIX_ROADS = { "cheatsheet", "cheatsheet_advanced", "verybasic", "basic" }
+--- The two sheet roads (SPEC §0), where the pick is the answer and nothing
+--- is compiled: CHEATSHEET BASIC and CHEATSHEET ADVANCED.
+function Land.is_sheet(category)
+  return category == "cheatsheet" or category == "cheatsheet_advanced"
+end
+
 function Land.roads(land)
   if land == "remix" then return Land.REMIX_ROADS end
   if land == "rust" then return Land.CATEGORIES end
@@ -81,6 +91,8 @@ end
 --- words on screen; every other road is its id in capitals, as before.
 function Land.category_label(category)
   if category == "verybasic" then return "VERY BASIC" end
+  if category == "cheatsheet" then return "CHEATSHEET BASIC" end
+  if category == "cheatsheet_advanced" then return "CHEATSHEET ADVANCED" end
   return tostring(category or "?"):upper()
 end
 

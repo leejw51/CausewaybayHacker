@@ -502,17 +502,17 @@ describe("roadColumn", () => {
     }
   });
 
-  it("keeps the roads in order under the record, and the buttons at the foot", () => {
+  it("keeps the roads in order under the tile, the record under them, the buttons at the foot", () => {
     const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
     expect(col.rows).toHaveLength(3);
-    expect(col.record[1]).toBeGreaterThan(col.tile[1]);
-    expect(col.rows[0][1]).toBeGreaterThan(col.record[1] + col.record[3]);
+    expect(col.rows[0][1]).toBeGreaterThan(col.tile[1] + col.tile[3]);
+    expect(col.record[1]).toBeGreaterThan(col.rows[2][1] + col.rows[2][3]);
     for (let i = 1; i < col.rows.length; i++) {
       expect(col.rows[i][1]).toBeGreaterThan(col.rows[i - 1][1] + col.rows[i - 1][3]);
       expect(col.rows[i][3]).toBe(col.rows[0][3]);
     }
     expect(col.buttons[1] + col.buttons[3]).toBe(LAND[1] + LAND[3]);
-    expect(col.buttons[1]).toBeGreaterThan(col.rows[2][1] + col.rows[2][3]);
+    expect(col.buttons[1]).toBeGreaterThan(col.record[1] + col.record[3]);
   });
 
   it("never overlaps anything and stays inside the panel", () => {

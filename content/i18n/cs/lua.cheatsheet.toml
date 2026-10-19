@@ -1,0 +1,424 @@
+# LUA LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/lua/cheatsheet.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack,
+# and are never translated. Code blocks and identifiers are copied verbatim.
+
+pack   = "lua.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.cheatsheet.01.read-line"
+title = "PRVNÍ ŘÁDEK"
+story = "21:00 na Wun Sha Street. Seznam nosičů přichází řádek po řádku."
+brief = '''
+Načtěte jeden řádek standardního vstupu do `line` jako řetězec, bez znaku
+nového řádku.
+'''
+hints = [
+  "io.read bere formát: jeden pro řádek, jeden pro číslo, jeden pro všechno.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.cheatsheet.02.not-equal"
+title = "NENÍ TOTÉŽ"
+story = "Dva nosiči si nárokují stejný článek draka. Pořadatel ověřuje, že se čísla liší."
+brief = '''
+Otevřete `if`, které platí, když `a` a `b` **nejsou** stejné.
+'''
+hints = [
+  "Lua píše nerovnost s vlnovkou, ne s vykřičníkem.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.cheatsheet.03.last"
+title = "OCAS"
+story = "Hlava draka je článek 1. Pořadatel chce ocas, ať je drak dnes v noci jakkoli dlouhý."
+brief = '''
+`t` je seznam jako `{10, 20, 30}`. Nastavte `last` na jeho poslední prvek, pro
+libovolnou délku.
+'''
+hints = [
+  "Seznamy začínají od 1, takže délka je zároveň index posledního prvku.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.cheatsheet.04.local"
+title = "JEN TADY"
+story = "Každý článek si počítá vlastní vonné tyčinky. Nikdo jiný na ulici to nemá vidět."
+brief = '''
+Udělejte z `count` proměnnou, která začíná na 0 a je vidět jen v aktuálním
+bloku — ne globální.
+'''
+hints = [
+  "Prosté přiřazení novému jménu vytvoří globální proměnnou. K omezení rozsahu stačí jedno klíčové slovo.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.cheatsheet.05.concat"
+title = "JMENOVKA"
+story = "Každý nosič dostane papírovou jmenovku: slovo, pomlčku a číslo."
+brief = '''
+`n` je číslo 7. Udělejte z `s` řetězec `"id-7"`.
+'''
+hints = [
+  "`+` je v Lua jen aritmetika. Řetězce se spojují dvěma tečkami.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.cheatsheet.06.ipairs"
+title = "OD HLAVY K OCASU"
+story = "Nástup jde článek po článku, od hlavy, popořadě."
+brief = '''
+Projděte seznam `t` v pořadí 1, 2, 3, … s indexem jako `i` a prvkem jako `v`.
+'''
+hints = [
+  "Tabulka sama není iterátor. Jedna vestavěná funkce prochází seznamovou část popořadě a dává index a hodnotu.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.cheatsheet.07.format"
+title = "DVĚ MÍSTA"
+story = "Tištěný program uvádí podíl vonných tyčinek každého nosiče na dvě desetinná místa."
+brief = '''
+`x` je `3.14159`. Vypište ho s přesně dvěma číslicemi za tečkou: `3.14`.
+'''
+hints = [
+  "string.format bere kódy printf z C; přesnost se píše za tečku.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.cheatsheet.08.sort-desc"
+title = "NEJVYŠŠÍ VPŘEDU"
+story = "Nosiči tyčí se řadí podle výšky, nejvyšší vepředu."
+brief = '''
+`t` je seznam čísel. Seřaďte ho **sestupně**, na místě.
+'''
+hints = [
+  "table.sort bere funkci, která říká, zda `a` patří před `b`.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.cheatsheet.09.closure"
+title = "CVAKAČKA"
+story = "Pořadatel u brány Lin Fa Kung počítá lampiony cvakačkou, která si pamatuje."
+brief = '''
+`counter()` vrací funkci, která při každém volání přičte jedničku:
+
+```
+local function counter()
+  local n = 0
+  -- ____
+end
+local c = counter()
+print(c(), c())  -- 1  2
+```
+'''
+hints = [
+  "Vnitřní funkce mění samotné vnější `n` a vrací ho. V Lua žádné `+=` není.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.cheatsheet.10.setmetatable"
+title = "NOVÝ ZÁSOBNÍK"
+story = "Vonné tyčinky leží na hromádce na stole v kůlně a každý článek chce svou vlastní."
+brief = '''
+Udělejte z `s` novou prázdnou tabulku, jejíž hledání metod přechází na `Stack`.
+
+```
+local Stack = {}
+Stack.__index = Stack
+function Stack:push(x) self[#self + 1] = x end
+-- ____
+s:push(5)
+```
+'''
+hints = [
+  "Chybějící klíč se hledá přes `__index` metatabulky. setmetatable ji nastaví a vrátí tabulku.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.cheatsheet.11.colon"
+title = "DVOJTEČKA"
+story = "Ještě jedna tyčinka na hromádku. Volání musí vědět, čí je to hromádka."
+brief = '''
+`Stack.push` byla definována jako `function Stack:push(x)` a `s` je zásobník.
+Vložte 5 do `s`.
+'''
+hints = [
+  "Metoda definovaná s `:` má skrytý první parametr `self`. Volání mu musí předat tabulku.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.cheatsheet.12.pcall"
+title = "DRAČÍ HLAVA"
+story = "Půlnoc. Dračí hlava stoupá po schodech chrámu a jedna špatná tyčinka ji nesmí shodit."
+brief = '''
+`f(x)` může vyvolat chybu. Zavolejte ji tak, aby se chyba zachytila: při
+selhání je `ok` rovno `false` a `err` obsahuje zprávu.
+'''
+hints = [
+  "Předejte pcall funkci a její argumenty zvlášť; zavolá je sám a stav je první.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.cheatsheet.13.pop"
+title = "Z VRŠKU"
+story = "Vonné tyčinky jdou na hromádku po jedné; zapalovač tu horní zase sundá."
+brief = '''
+`t` je seznam používaný jako zásobník; tyčinky se přidávají přes `table.insert(t, x)`.
+Sundejte **vrchní** (poslední) prvek z `t` do `top`, aby se `#t` zmenšilo o jedna.
+'''
+hints = [
+  "Tatáž knihovna, která přidává na konec, také odebírá, a bez zadané pozice bere konec.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.cheatsheet.14.gmatch-numbers"
+title = "ČÍSLA NA ŘÁDKU"
+story = "Počty článků přicházejí jako jeden řádek číslic s mezerami mezi nimi: `3 14 15`."
+brief = '''
+`line` je `"3 14 15"` a `t` je prázdná tabulka. Naplňte `t` třemi
+**čísly** 3, 14, 15 — tak, aby `t[1] == 3` platilo a `#t` bylo 3.
+'''
+hints = [
+  "Iterátor vzoru vydává každý sled číslic jako řetězec; sled je jedna nebo víc a řetězec ještě není číslo.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.cheatsheet.15.sub"
+title = "PRVNÍ TŘI"
+story = "Tabule tras v Causeway Bay ukazuje jen první tři písmena každé ulice."
+brief = '''
+`s` je `"CausewayBay"`. Udělejte z `head` jeho první tři znaky, `"Cau"`.
+'''
+hints = [
+  "Řetězce v Lua se počítají od 1 a metoda pro podřetězec bere začátek a konec včetně.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.cheatsheet.16.pairs"
+title = "KAŽDÝ KLÍČ"
+story = "Kniha vonných tyčinek se vede podle jmen nosičů, ne podle čísel, a pořadatel chce přečíst každý zápis."
+brief = '''
+`t` je `{ann = 3, bo = 5, cy = 2}` — řetězcové klíče, žádná seznamová část. Otevřete smyčku,
+která navštíví **každý** zápis s klíčem jako `k` a hodnotou jako `v`.
+'''
+hints = [
+  "ipairs jde 1, 2, 3, … a zastaví se na prvním chybějícím indexu; tahle tabulka žádné `t[1]` vůbec nemá.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.cheatsheet.17.select"
+title = "KOLIK JICH PŘIŠLO"
+story = "Nosiči odpovídají na prezenci vykřiknutím jména; někteří nevykřiknou nic a pořadatel je přesto počítá."
+brief = '''
+`count` bere libovolný počet argumentů. Udělejte z `n` počet předaných,
+**včetně** hodnot `nil`:
+
+```
+local function count(...)
+  -- ____
+  return n
+end
+print(count(1, nil, 3))  -- 3
+```
+'''
+hints = [
+  "Zabalení varargů do tabulky ztratí díry; vestavěná funkce, která vybírá argumenty podle pozice, má i speciální první argument, který je jen spočítá.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.cheatsheet.18.concat"
+title = "JEDEN ŘÁDEK JMEN"
+story = "Program uvádí nosiče tyčí na jednom řádku, s mezerou mezi jmény."
+brief = '''
+`parts` je `{"Tai", "Hang", "Road"}`. Udělejte z `s` jediný řetězec
+`"Tai Hang Road"` — bez smyčky s `..`.
+'''
+hints = [
+  "Knihovna table spojí seznam řetězců jedním voláním; oddělovač je druhý argument.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.cheatsheet.19.floor-div"
+title = "PODÍL A ZBYTEK"
+story = "Tyčinky se rozdělují po třech; počet šel do mínusu, když kůlna nějaké půjčila Lin Fa Kungu."
+brief = '''
+`a` je `-7` a `b` je `3`. Udělejte z `q` podíl zaokrouhlený **dolů** (`-3`)
+a z `r` **nezáporný** zbytek (`2`), aby `q * b + r == a`.
+'''
+hints = [
+  "LuaJIT nemá operátor celočíselného dělení a `/` je vždy float. `%` už zaokrouhluje k minus nekonečnu; fmod ne.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.cheatsheet.20.shift-letter"
+title = "DRAK SE OTÁČÍ"
+story = "Půlnoc na Tai Hang Road. Dračí hlava se otáčí kolem bloku a nosič u `z` vykročí vpřed, aby se znovu stal `a`."
+brief = '''
+`c` je jedno malé písmeno a `k` nezáporné číslo. Udělejte z `out` písmeno
+o `k` míst dál v abecedě, s přetočením dokola — `"z"` s `k = 1`
+dá `"a"`. Malé `a` je bajt 97.
+'''
+hints = [
+  "Řetězec aritmetiku nemá; vezměte jeho bajt, posuňte ho v rozsahu 0..25 a bajt proměňte zpátky na jednoznakový řetězec.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.cheatsheet.21.insert"
+title = "JEŠTĚ JEDNO JMÉNO"
+story = "Do kůlny na Wun Sha Street dorazí opozdilý nosič a jeho jméno jde na konec seznamu."
+brief = '''
+`t` je seznam jmen. Dejte `x` na **konec** `t` knihovnou table
+— žádná aritmetika s indexy — aby `#t` narostlo o jedna a `t[#t]` bylo `x`.
+'''
+hints = [
+  "Knihovní volání, které seznam zvětšuje, bere tabulku jako první; bez udané pozice dá hodnotu za tu poslední.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.cheatsheet.22.countdown"
+title = "OD DESETI K JEDNÉ"
+story = "Odpočet do zapálení dračí hlavy běží od deseti dolů k jedné, vykřikovaný přes Tai Hang Road."
+brief = '''
+Otevřete číselnou smyčku, která dá `i` hodnoty 10, 9, 8, …, 1 — v tomto
+pořadí, všech deset.
+'''
+hints = [
+  "Číselný for stoupá po jedné, pokud třetí hodnota neřekne jinak — a bez třetí hodnoty start nad koncem proběhne nulakrát.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.cheatsheet.23.tally"
+title = "SČÍTÁNÍ"
+story = "Maršál sčítá, kolik tyčinek si každý nosič vzal, jméno po jménu, od prázdné knihy."
+brief = '''
+`seen` je tabulka, která začíná prázdná, a `k` je jméno nosiče. Přičtěte jedničku k
+`seen[k]`, přičemž jméno, které v tabulce ještě není, berte jako 0 — poprvé
+se stane 1, ne chybou.
+'''
+hints = [
+  "Aritmetika na nil vyhodí chybu a `+` váže těsněji než `or`. Výchozí hodnotu dodejte před sčítáním, ne po něm.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.cheatsheet.24.function"
+title = "SOUČET DVOU"
+story = "Dvě kůlny dávají dohromady své kadidlo a součet potřebuje pojmenovanou funkci, kterou může volat celá ulice."
+brief = '''
+Definujte `add` jako **lokální** funkci dvou čísel, která vrací jejich součet,
+na jednom řádku.
+'''
+hints = [
+  "Tělo v Lua samo od sebe nic nevrací a co se otevírá slovem `function`, zavírá se slovem, ne závorkou.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.cheatsheet.25.two-returns"
+title = "OBOJÍ NAJEDNOU"
+story = "Kůlna vydává tyčinky ve svazcích po třech a maršál chce počet svazků i ty volné jedním vrzem."
+brief = '''
+`divmod` vrací dvě hodnoty. Zachyťte obě:
+
+```
+local function divmod(a, b)
+  return math.floor(a / b), a % b
+end
+-- ____
+print(q, r)  -- 2  1
+```
+'''
+hints = [
+  "Volání může vrátit několik hodnot a seznam jmen oddělený čárkami je zachytí, jak přicházejí — žádný obal, žádné závorky.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.cheatsheet.26.empty"
+title = "ZATÍM NIKDO"
+story = "Před prvním úderem bubnu maršál kontroluje, zda se vůbec někdo zapsal na seznam."
+brief = '''
+`t` je seznam bez děr, možná prázdný. Otevřete `if`, který je pravdivý
+přesně tehdy, když `t` nemá **žádné** prvky.
+'''
+hints = [
+  "Prázdná tabulka je pořád tabulka a každá tabulka je pravdivá; dvě různé tabulky si nikdy nejsou rovny. Ptejte se na počet.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.cheatsheet.27.swap"
+title = "VÝMĚNA MÍST"
+story = "Dva nosiči si uprostřed trasy vymění úseky a seznam musí prohodit jejich čísla bez útržku papíru."
+brief = '''
+`a` a `b` jsou dvě existující proměnné. Vyměňte jejich hodnoty jedním
+příkazem, bez pomocné proměnné.
+'''
+hints = [
+  "Lua přiřazuje seznam hodnot seznamu jmen a vyhodnotí každou pravou stranu dřív, než kteroukoli uloží.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.cheatsheet.28.error"
+title = "ZASTAVTE BUBEN"
+story = "Tyčinka bez kadidla je závada a zapalovač musí řadu zastavit se zprávou, místo aby pokračoval."
+brief = '''
+Zastavte aktuální funkci chybou se zprávou `"bad"`, aby `pcall`
+kolem ní vrátil `false` a zprávu obsahující `bad`.
+'''
+hints = [
+  "assert si stěžuje, jen když je jeho první argument nil nebo false, a řetězec není ani jedno. Vestavěná funkce, která vyhazuje, bere zprávu rovnou.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.cheatsheet.29.and-or"
+title = "JEDNO, NEBO DRUHÉ"
+story = "Nosiči s víc než deseti tyčinkami platí v kůlně poplatek 5 dolarů; všichni ostatní platí 8."
+brief = '''
+`n` je číslo. Udělejte z `fee` 5, když `n > 10`, a 8 jinak — jeden
+výraz, žádný příkaz `if`.
+'''
+hints = [
+  "Jedno klíčové slovo dá svou pravou stranu, když je levá pravdivá; druhé doplní, když není. Čtěte, která hodnota kam dopadne.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.cheatsheet.30.copy"
+title = "DRUHÝ SEZNAM"
+story = "Půlnoc. Maršál kopíruje dnešní seznam, aby zítřejší opravy nesáhly na záznam z noci ohnivého draka."
+brief = '''
+`src` je seznam čísel. Udělejte z `cp` **nový** seznam se stejnými
+prvky, aby `cp[1] = 99` nechalo `src[1]`, jak bylo. Tato země běží na
+LuaJIT (Lua 5.1).
+'''
+hints = [
+  "Přiřazení tabulky kopíruje referenci, ne tabulku. Rozbalte hodnoty seznamu do čerstvého konstruktoru — a v 5.1 je rozbalovač globální, ne položka `table`.",
+]

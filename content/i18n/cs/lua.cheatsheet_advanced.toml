@@ -1,0 +1,480 @@
+# LUA LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/lua/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "lua.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "lua.cheatsheet_advanced.01.class-index"
+title = "TABULKA, KTERÁ ODPOVÍDÁ"
+story = "21:00 na Wun Sha Street. Každý článek draka je tabulka a Mei chce mít metody na jednom místě."
+brief = '''
+`Dragon` je tabulka metod (`Dragon.length`, …) a její konstruktor už je
+napsaný:
+
+```
+function Dragon.new(n)
+  return setmetatable({n = n}, Dragon)
+end
+```
+
+Napište ten jeden řádek, umístěný před konstruktor, díky kterému
+`Dragon.new(3):length()` najde `Dragon.length`.
+'''
+hints = [
+  "Metatabulka instance je `Dragon`; chybějící klíč se hledá tam, kam ukazuje vyhledávací pole té metatabulky — a to může ukazovat na samotnou třídu.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "lua.cheatsheet_advanced.02.inherit"
+title = "ČLÁNEK POD LUCERNOU"
+story = "Lucerna je článek s plamenem navrchu; co neumí sama, udělá článek pod ní."
+brief = '''
+`Segment` je obyčejná tabulka funkcí (`Segment.burn`, …) bez vlastních
+metatabulkových polí. `Lantern` je třída v obvyklém vzoru
+(`Lantern.__index = Lantern`, instance vznikají přes `setmetatable({}, Lantern)`).
+Napište ten jeden řádek, díky kterému lucerna propadne do `Segment` u každé
+metody, kterou `Lantern` nedefinuje — a přitom si `Lantern` zachová vlastní metody.
+'''
+hints = [
+  "Samotná třída potřebuje metatabulku; `Segment` nemá vyhledávací pole, takže tou metatabulkou tak, jak je, být nemůže.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "lua.cheatsheet_advanced.03.lt-sort"
+title = "SEŘADÍ SE SAMY"
+story = "Bubenické týmy dostaly body; pořadatel je chce seřadit, aniž by pokaždé psal komparátor."
+brief = '''
+`Score` je třída (`Score.__index = Score`); každá instance má číselné
+pole `v`. `scores` je jejich seznam. Napište řádek s metametodou, aby je
+`table.sort(scores)` — **bez komparátoru** — seřadilo od nejmenšího `v`.
+'''
+hints = [
+  "Bez komparátoru sort porovnává přes `<` a `<` na dvou tabulkách se ptá jejich metatabulky na jedno konkrétní pole.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "lua.cheatsheet_advanced.04.eq"
+title = "STEJNÝ BOD, DVĚ TABULKY"
+story = "Dva běžci označí totéž místo na Tai Hang Road ve dvou různých tabulkách a mapa je musí prohlásit za stejné."
+brief = '''
+`P` je třída (`P.__index = P`), jejíž instance mají číselná pole `x` a
+`y`. `a` a `b` jsou dvě **různé** instance se stejnými poli. Napište řádek
+s metametodou, díky kterému je `a == b` pravdivé.
+'''
+hints = [
+  "Uvnitř metametody `a == b` na těch dvou tabulkách zavolá metametodu znovu; porovnejte pole, ne tabulky.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "lua.cheatsheet_advanced.05.call"
+title = "ZAVOLEJTE SAMOTNOU TŘÍDU"
+story = "Mei chce, aby `Pad(5)` vypadalo jako konstruktor, tak jak to dělá LÖVE kód na jejím stole."
+brief = '''
+`Pad` je třída s `Pad.__index = Pad` a konstruktorem `Pad.new(n)`.
+`mt` je tabulka už nastavená jako **vlastní** metatabulka `Pad`
+(`setmetatable(Pad, mt)`). Napište řádek, díky kterému se `Pad(5)` chová jako
+`Pad.new(5)`.
+'''
+hints = [
+  "Volání `Pad` se dívá do metatabulky `Pad`, ne do `Pad` samotného — a obsluha dostane volanou tabulku jako první argument.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "lua.cheatsheet_advanced.06.newindex-rawset"
+title = "NEJDŘÍV ZAPSAT, PAK ULOŽIT"
+story = "Každý nový záznam v knize vonných tyčinek se nejdřív zaloguje; kniha ho pak ale pořád musí držet."
+brief = '''
+`log` je seznam. `t` je prázdná tabulka, jejíž metatabulka má:
+
+```
+__newindex = function(t, k, v)
+  log[#log + 1] = k
+  -- ____
+end
+```
+
+Doplňte mezeru tak, aby se hodnota opravdu uložila do `t` (pozdější `t[k]`
+ji přečte zpět) — **aniž** by tato obsluha proběhla podruhé.
+'''
+hints = [
+  "Ve chvíli, kdy obsluha běží, klíč stále chybí, takže obyčejné přiřazení spustí obsluhu znovu, do nekonečna; uložení musí jít mimo metatabulku.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "lua.cheatsheet_advanced.07.rawget-default"
+title = "BYLO TO VŮBEC ZAPSÁNO"
+story = "Tabulka počtů odpoví nulou na jakékoli jméno; pořadatel chce vědět, která jména byla doopravdy zadána."
+brief = '''
+`counts` vzniklo jako
+
+```
+local counts = setmetatable({}, {__index = function() return 0 end})
+```
+
+takže každý chybějící klíč se čte jako `0`. Otevřete `if`, které platí jen
+tehdy, když `k` bylo v `counts` **opravdu** uloženo — uložená `0` se počítá
+jako uložená, nikdy nezapsaný klíč ne.
+'''
+hints = [
+  "Běžné čtení prochází přes výchozí hodnotu; čtení, které metatabulku přeskočí, je globální funkce, ne metoda.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "lua.cheatsheet_advanced.08.len-trap"
+title = "JAK DLOUHÝ JE ZÁSOBNÍK"
+story = "Zásobníku náhradních tyčinek dal metametodu délky někdo, kdo četl manuál k 5.2."
+brief = '''
+`Stack` drží své hodnoty v `s.items` (seznam). Jeho metatabulka je soukromá
+tabulka, která definuje `__len` vracející `#s.items`; žádná metoda `len`
+neexistuje. Na LuaJIT této země udělejte z `n` počet hodnot v zásobníku `s`.
+'''
+hints = [
+  "LuaJIT je Lua 5.1: metametoda délky se respektuje jen u userdata, takže `#` na objektu dá surovou délku prázdné tabulky — 0.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "lua.cheatsheet_advanced.09.loop-closure"
+title = "KAŽDÁ LUCERNA SVÉ ČÍSLO"
+story = "Tři lucerny ve Victoria Parku, každá s tlačítkem, které musí při pozdějším stisku říct své vlastní číslo."
+brief = '''
+`fns` je prázdná tabulka. Naplňte ji třemi funkcemi tak, aby `fns[1]()`,
+`fns[2]()` a `fns[3]()` vracely `1`, `2` a `3` — každý uzávěr si drží
+své vlastní číslo.
+'''
+hints = [
+  "Číselný `for` vytváří v každé iteraci novou lokální proměnnou; zkopírování do jedné vnější proměnné dá každému uzávěru tutéž konečnou hodnotu.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "lua.cheatsheet_advanced.10.false-default"
+title = "FALSE JE TAKÉ ODPOVĚĎ"
+story = "Parta může cache schválně vypnout; tu noc, kdy se nastavení stejně četlo jako zapnuté, Mei zjistila proč."
+brief = '''
+`given` je volba tak, jak ji předal volající: `true`, `false`, nebo chybí
+(`nil`); `default` je `true`. Udělejte z `cache` předanou hodnotu — **včetně
+`false`** — a `default` jen tehdy, když nebylo předáno nic. Jeden řádek.
+'''
+hints = [
+  "`x and y or z` i `x or z` zacházejí s `false` jako s `nil`; ty dvě rozliší jen výslovný test proti `nil`.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "lua.cheatsheet_advanced.11.select-n"
+title = "DRUHÉ ZVOLÁNÍ"
+story = "Prezence přichází, jak přichází; pořadatel chce druhou odpověď, i když první nosič neřekl nic."
+brief = '''
+`f` bere libovolný počet argumentů (`function f(...)`). Uvnitř udělejte z
+`second` přesně její druhý argument — i když je první `nil` a i když
+jich následuje víc.
+'''
+hints = [
+  "Seznam varargů jde oříznout od určité pozice; přiřazení výsledku do jedné lokální proměnné si nechá jen první hodnotu, která zbyla.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "lua.cheatsheet_advanced.12.unpack-range"
+title = "VŠECHNY, I S DÍRAMI"
+story = "Jména se předávají drakem dál přesně tak, jak byla zvolána, i s mezerami, až k článku, který je počítá."
+brief = '''
+`t` je `{...}` a `n` je `select("#", ...)`, takže `t` může mít díry s `nil`
+(`t = {1, nil, nil}`, `n = 3`). Zavolejte `g` se **všemi** `n` hodnotami,
+včetně děr.
+'''
+hints = [
+  "`#` na tabulce s dírami je hranice, ne počet; rozbalovací funkce bere výslovný první a poslední index a na LuaJIT je to globální funkce.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "lua.cheatsheet_advanced.13.truncate"
+title = "JEN TA PRVNÍ"
+story = "`f` hlásí hodnotu a stav; program chce seznam, ve kterém je jen ta hodnota."
+brief = '''
+`f()` vrací dvě hodnoty, `1, 2`. Udělejte z `t` seznam s **přesně jedním**
+prvkem, první hodnotou — bez pomocné proměnné.
+'''
+hints = [
+  "Volání na posledním místě v konstruktoru rozprostře všechny výsledky; obalení volání ho zúží na jednu hodnotu.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "lua.cheatsheet_advanced.14.wrap"
+title = "BĚŽEC, KTERÉHO JDE ZAVOLAT"
+story = "Jeden nosič tyčinek na článek: pořadatel chce každého zavolat jako funkci a dostat číslo další lucerny."
+brief = '''
+`producer` je funkce, která několikrát udělá yield hodnoty
+(`coroutine.yield(i)` ve smyčce). Udělejte z `gen` obyčejnou **funkci**: každé
+`gen()` vrátí další hodnotu z yieldu a funguje přímo ve
+`for v in gen do`.
+'''
+hints = [
+  "Vytvoření korutiny dá hodnotu typu thread, kterou nejde zavolat; knihovna má druhý konstruktor, který místo toho vrátí funkci.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "lua.cheatsheet_advanced.15.resume-value"
+title = "CO BĚŽEC PŘINESE ZPÁTKY"
+story = "Běžec podá číslo drakem nahoru a čeká, až se jedno vrátí dolů, než skončí."
+brief = '''
+```
+local co = coroutine.create(function(a)
+  local b = coroutine.yield(a * 2)
+  return b + 1
+end)
+```
+
+`co` bylo jednou spuštěno s `5`; to volání vrátilo `true, 10` a
+`coroutine.status(co)` je teď `"suspended"`. Napište další řádek tak, aby
+`ok, v` bylo `true, 8` a korutina skončila (`"dead"`).
+'''
+hints = [
+  "Argumenty druhého resume se stanou výsledky čekajícího yieldu — přesně ty argumenty, nic navíc.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "lua.cheatsheet_advanced.16.error-table"
+title = "STRUKTUROVANÉ SELHÁNÍ"
+story = "Vyhledání, které selže, má říct, s jakým kódem selhalo, ne podat volajícímu větu k rozparsování."
+brief = '''
+`lookup` musí selhat tak, aby jeho volající mohl udělat
+
+```
+local ok, e = pcall(lookup, id)
+if not ok then print(e.code) end   -- 404
+```
+
+Napište řádek uvnitř `lookup`, který takové selhání vyvolá.
+'''
+hints = [
+  "Chybová hodnota může být libovolná hodnota Lua, nejen řetězec; když ji místo vyhození vrátíte, `ok` zůstane true.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "lua.cheatsheet_advanced.17.xpcall"
+title = "KDE TO PRASKLO"
+story = "Drak se zastavil na čtyřicátém článku. Mei chce zprávu i rámce nad ní, ne jen samotnou zprávu."
+brief = '''
+Zavolejte `f` v chráněném režimu; při selhání musí `err` obsahovat zprávu
+**s připojeným stack tracebackem**, ne holou zprávu.
+'''
+hints = [
+  "Chráněné volání, které bere obsluhu zprávy, ji chce jako funkční hodnotu; její zavolání na tom místě předá řetězec a ten je odmítnut.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "lua.cheatsheet_advanced.18.gmatch-pairs"
+title = "KLÍČ, ROVNÁ SE, HODNOTA"
+story = "Konfigurace bubenických týmů přichází na Ormsby Street jako jeden řádek dvojic `name=value`."
+brief = '''
+`s` je `"a=1 bb=22 c=3"`. Otevřete smyčku, která projde každou dvojici s `k`
+jako jménem a `v` jako číslicemi, obojí jako řetězce — `a`/`1`, `bb`/`22`, `c`/`3`.
+'''
+hints = [
+  "Každá zachycená skupina ve vzoru se stane jednou proměnnou smyčky; bez zachycení dostane smyčka celou shodu a nic jiného.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "lua.cheatsheet_advanced.19.gsub-table"
+title = "DOPLŇTE PRÁZDNÁ MÍSTA"
+story = "Šablona programu má díry `$name`; seznam party je vyplní a tiskárna chce vědět, kolik jich vyplnila."
+brief = '''
+`vars` je `{name = "Mei", st = "Tai Hang"}` a `s` je
+`"hi $name of $st"`. Nahraďte **každé** `$word` hodnotou `vars[word]` a udělejte z
+`n` počet nahrazení — jedno volání, žádná smyčka.
+'''
+hints = [
+  "S tabulkou jako náhradou je první zachycená skupina klíčem, který se vyhledá; počet je druhý výsledek volání.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "lua.cheatsheet_advanced.20.frontier"
+title = "CELÉ SLOVO"
+story = "Při počítání `the` v poznámkách k programu Mei pořád chytala i `there` a `thesis`."
+brief = '''
+`s` je `"the thesis there; the other, the."`. Udělejte z `n` počet výskytů
+`the` jako **celého slova** — tady `3`, ne `6`. (`out` se nepoužije.)
+'''
+hints = [
+  "Vzory v Lua nemají `\\b`; položka frontier odpovídá prázdnému přechodu do třídy znaků nebo z ní, včetně obou konců řetězce.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "lua.cheatsheet_advanced.21.format-widths"
+title = "SLOUPCE PRO PROGRAM"
+story = "Cenová tabule u stánku před Lin Fa Kung má zarovnané sloupce a rozhodčí ji porovnává bajt po bajtu."
+brief = '''
+`name` je `"tea"`, `price` je `3.5`, `n` je `7`. Vypište přesně
+
+```
+tea       | 3.50|007
+```
+
+— jméno zarovnané doleva na 10 sloupců, cenu na 5 sloupců se dvěma
+desetinnými místy, číslo doplněné nulami na 3.
+'''
+hints = [
+  "Minus v šířce zarovná doleva, úvodní nula doplňuje nulami a šířka floatu počítá celé `3.50`.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "lua.cheatsheet_advanced.22.sort-strict"
+title = "SHODY BEZ PÁDU"
+story = "Čtyřicet bubenických týmů, většina se stejným skóre, a řazení před rozhodčími vyhodilo `invalid order function`."
+brief = '''
+`t` je seznam záznamů s číselným polem `score` a **mnoho z nich má shodné
+skóre**. Seřaďte ho od nejvyššího skóre, aniž by LuaJIT vyhodil
+`invalid order function for sorting`.
+'''
+hints = [
+  "Komparátor musí být ostré uspořádání: false pro stejné prvky, a boolean, ne číslo. (Řazení není stabilní; shodné záznamy mohou vyjít v libovolném pořadí.)",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "lua.cheatsheet_advanced.23.next-empty"
+title = "V KNIZE NIC NENÍ"
+story = "Kniha je klíčovaná jménem nosiče; `#` říká nula, ať je prázdná, nebo plná."
+brief = '''
+`t` je klíčované jménem nosiče — jen řetězcové klíče — takže `#t` je `0`,
+ať něco obsahuje, nebo ne. Otevřete `if`, které platí jen tehdy, když `t`
+nemá **žádné** záznamy.
+'''
+hints = [
+  "Iterační primitivum za `pairs` vrací první klíč tabulky, nebo `nil`, když žádný není; každá tabulka je svou vlastní hodnotou, takže `{}` se nerovná ničemu.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "lua.cheatsheet_advanced.24.big-digits"
+title = "VŠECHNY ČÍSLICE"
+story = "Počet luceren dosáhl šestnácti číslic a výtisk se vrátil ve vědeckém zápisu."
+brief = '''
+`n` je `2^50` — číslo `1125899906842624`. Vypište ho se všemi číslicemi
+a bez exponentu (`print` v LuaJIT ukáže `1.1258999068426e+15`).
+'''
+hints = [
+  "Každé číslo je tu double a výchozí převod je `%.14g`; celočíselný převod ve `format` vypíše všech šestnáct číslic.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "lua.cheatsheet_advanced.25.bit-test"
+title = "JE VLAJKA NAHOŘE"
+story = "Stav každého článku je jedno číslo plné příznaků; pořadatel kontroluje ten jeden bit pro `lit`."
+brief = '''
+`flags` je číslo použité jako řada bitů a `i` je pozice bitu počítaná
+od `0`; knihovna `bit` z LuaJIT je načtená jako `bit`. Otevřete `if`,
+které platí přesně tehdy, když je bit `i` ve `flags` nastavený.
+'''
+hints = [
+  "LuaJIT na to nemá operátor — jsou to dvě volání knihovny — a `0` je v Lua pravdivá, takže výsledek se stejně musí porovnat.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "lua.cheatsheet_advanced.26.goto-continue"
+title = "TENHLE PŘESKOČIT"
+story = "Sudé články mají toto kolo pauzu; smyčka je obejde, aniž by celé tělo zanořila do `if`."
+brief = '''
+```
+for _, v in ipairs(t) do
+  -- ____
+  io.write(v, " ")
+  ::continue::
+end
+```
+
+Doplňte mezeru tak, aby se sudé hodnoty přeskočily a smyčka pokračovala dál
+(LuaJIT 2.1).
+'''
+hints = [
+  "Lua nemá klíčové slovo `continue`; LuaJIT ale má skokový příkaz z 5.2 a návěští na konci těla je jeho cíl.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "lua.cheatsheet_advanced.27.local-function"
+title = "FUNKCE, KTERÁ ZNÁ SVÉ JMÉNO"
+story = "Faktoriál na School Street byl lokální, rekurzivní a spadl při druhém volání — `attempt to call global 'fact'`."
+brief = '''
+Deklarujte `fact` jako **lokální** funkci, jejíž tělo je
+
+```
+  if n <= 1 then return 1 end
+  return n * fact(n - 1)
+```
+
+tak, aby ji rekurzivní volání našlo (žádná globální proměnná `fact` neexistuje).
+Napište úvodní řádek.
+'''
+hints = [
+  "V `local x = <expr>` je jméno v rozsahu až za výrazem, takže funkční hodnota přiřazená tímto způsobem sama sebe nevidí.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "lua.cheatsheet_advanced.28.ffi-array"
+title = "OPRAVDOVÉ POLE V C"
+story = "Vazba na peněženku pod LÖVE klientem mluví s C; buffer, který předává, musí být pole v C, ne tabulka Lua."
+brief = '''
+`ffi` je `require("ffi")` a `n` je číslo známé až za běhu.
+Udělejte z `buf` pole `n` hodnot `int` v C — vyplněné nulami, indexované od `0`,
+o velikosti `n`.
+'''
+hints = [
+  "Řetězec s typem C nemůže obsahovat proměnnou Lua; pole proměnné délky se deklaruje zástupným znakem a svůj počet dostane jako další argument.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "lua.cheatsheet_advanced.29.weak-cache"
+title = "CACHE, KTERÁ PUSTÍ"
+story = "Vykreslovací cache je klíčovaná objektem lucerny; lucerny, které dohoří, nesmí držet naživu jejich vlastní záznam v cache."
+brief = '''
+`cache` mapuje objekty (tabulky použité jako klíče) na spočítané hodnoty.
+Zařiďte, aby objekt, na který už nic jiného neodkazuje, mohl být uklizen
+garbage collectorem — a jeho záznam zmizel s ním — zatímco hodnota uložená
+pro živý objekt zůstane.
+'''
+hints = [
+  "Slabost je pole metatabulky držící řetězec; které písmeno obsahuje, rozhoduje, zda jsou slabé klíče, hodnoty, nebo obojí.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "lua.cheatsheet_advanced.30.sandbox"
+title = "SANDBOX PRO MĚSÍC"
+story = "Půlnoc. Poslední výzva je řádek Lua napsaný cizincem a běží v místnosti, kde není nic než `x`."
+brief = '''
+`src` je řetězec s kódem Lua, `"return x * 2"`, a `env` je `{x = 10}`.
+Zkompilujte ho do funkce `f`, jejíž globální proměnné jsou **jen** `env` — takže
+`f()` vrátí `20` a `print` uvnitř není vidět. Jeden řádek, LuaJIT.
+'''
+hints = [
+  "Kompilace řetězce dá funkci (nebo nil a zprávu — odtud ta assertion); volání z 5.1, které funkci vymění tabulku globálních proměnných, vrátí tutéž funkci.",
+]

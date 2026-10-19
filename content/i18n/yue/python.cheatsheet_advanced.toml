@@ -1,0 +1,541 @@
+# PYTHON LAND — CHEATSHEET ADVANCED, in Cantonese (colloquial written). A
+# translation pack (SPEC §12.1): the prose of
+# `content/python/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The four choices are code, live in the English pack, and are never
+# translated. Code blocks, identifiers and printed strings are copied verbatim.
+
+pack   = "python.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.cheatsheet_advanced.01.yield-from"
+title = "盒入面有盒"
+story = "送貨去渣甸坊樓上嘅唐樓：紙箱入面有紙箱，而條蟒蛇想每件嘢都擺落地下，一件一件咁。"
+brief = '''
+`flatten` 一定要係一個 generator，按次序產出一個任意深度嵌套嘅 list 嘅每一塊葉：
+`list(flatten([1, [2, [3, 4]], 5]))` 係 `[1, 2, 3, 4, 5]`。空位應該填邊一行？
+
+```
+def flatten(xs):
+    for x in xs:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+'''
+hints = [
+  "遞歸呼叫回傳一個 generator；你想要嘅係佢啲 item，一個一個咁交上去 —— 有一個兩個字嘅寫法專做呢樣嘢。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.cheatsheet_advanced.02.first-or-default"
+title = "第一個雙數，或者冇人"
+story = "怡和街嘅電車人龍：第一個攞住雙數飛嘅乘客上車，如果一個都冇，售票員就寫 -1。"
+brief = '''
+`xs` 係一個好長嘅 int list。將 `first` 整做入面第一個雙數，如果冇就係 `-1` ——
+喺第一個命中嗰度停，唔砌第二個 list。
+'''
+hints = [
+  "唔係唯一 argument 嘅 generator expression 要自己加括號，而嗰個抽一個 item 嘅 builtin 收一個預設值。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.cheatsheet_advanced.03.read-until-empty"
+title = "直到個水喉乾為止"
+story = "渣甸街夜市部掃描器一啖 4 KB 咁讀卷收據，讀到一啖返嚟係空嘅就停。"
+brief = '''
+`f` 係一個以二進制模式打開嘅檔案。用某個 builtin 嘅兩個 argument 形式，
+令 `chunk` loop 過連續嘅 `f.read(4096)` 結果，當個 read 回傳 `b""` 就停。
+'''
+hints = [
+  "嗰個 builtin 想要一樣佢可以一次又一次呼叫嘅嘢，加埋代表停嘅值 —— 一個已經讀完嘅結果兩樣都唔係。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.cheatsheet_advanced.04.keep-the-name"
+title = "仲係叫 GREET"
+story = "波斯富街接待處個名牌，着咗制服上去之後仍然要見到。"
+brief = '''
+`import functools` 已經做咗。`@logged` 套用喺 `greet` 上面之後，
+`greet.__name__` 一定仍然係 `"greet"`，而 `greet.__doc__` 一定要係 greet 自己嗰個。
+空位應該填邊一行？
+
+```
+def logged(fn):
+    # ____
+    def inner(*a, **kw):
+        print(fn.__name__)
+        return fn(*a, **kw)
+    return inner
+```
+'''
+hints = [
+  "嗰個 helper 係一個 decorator factory：用被包住嘅 function 嚟呼叫佢，而佢回傳嘅嘢去 decorate 個 wrapper。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.cheatsheet_advanced.05.three-layers"
+title = "第三次好運"
+story = "駱克道個速遞員放棄之前會㩒三次鐘，而調度員唔用 @ 嘅糖衣就將呢條規矩駁上去。"
+brief = '''
+`retry` 係一個收 argument 嘅 decorator：喺一個 `def` 上面寫 `@retry(3)`
+會令嗰個 function 最多試三次。
+
+```
+def retry(times):
+    def deco(fn):
+        def inner(*a, **kw):
+            ...
+        return inner
+    return deco
+```
+
+`fetch` 已經定義咗，冇任何 decorator。用手重新綁定 `fetch`，令佢會重試三次 ——
+同 `@retry(3)` 做嘅嘢一樣。
+'''
+hints = [
+  "有三層。最外層嗰個呼叫收個數字然後交返真正嘅 decorator；個 function 就放入嗰個度。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.cheatsheet_advanced.06.memo"
+title = "問一次，答永遠"
+story = "寶靈頓道街市個算盤記得佢做過嘅每一個小計，所以個檔口永遠唔會加同一欄兩次。"
+brief = '''
+`import functools` 同 `import sys` 係僅有嘅 import，而
+`sys.setrecursionlimit(10_000)` 已經調高咗。`fib(300)` 一定要幾毫秒內回傳：
+每個 `fib(n)` 計一次就記住，冇大小上限。`def` 上面應該放邊一行？
+
+```
+# ____
+def fib(n):
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+```
+'''
+hints = [
+  "無上限嗰個 memoiser（3.9+）係光秃秃咁用嘅 —— 佢唔係 factory，所以冇括號 —— 而且淨係 import 咗個 module 名。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.cheatsheet_advanced.07.old-style-compare"
+title = "舊式 COMPARATOR"
+story = "一個 C 年代嘅老評判坐喺時代廣場遊戲機中心，揸住一條兩個 argument 嘅規矩 —— 細過、等於、大過 —— 而個排行榜要原封不動咁用佢。"
+brief = '''
+`from functools import cmp_to_key` 已經做咗。`cmp(a, b)` 係一個兩個 argument 嘅
+comparator，回傳 `-1`、`0` 或者 `1`。將 `ys` 整做 `xs` 按嗰個 comparator 排好序嘅 list。
+'''
+hints = [
+  "Python 3 淨係按一個 argument 嘅 key 排序；個 adaptor 將一個兩個 argument 嘅 comparator 變做一個，而你交出去嘅係個 adaptor 嘅結果。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.cheatsheet_advanced.08.own-list"
+title = "各有各嘅新袋"
+story = "謝斐道間麵舖每張單都有自己一個空嘅配料袋；共用一個袋就會將一枱嘅辣椒放咗落另一枱度。"
+brief = '''
+`from dataclasses import dataclass, field` 已經做咗。每個 `Order` 一定要由
+自己**獨有**嘅空 `tags` list 開始 —— `Order("a").tags.append("hot")` 之後
+`Order("b").tags` 一定仍然係空 —— 而且個 class 定義嗰陣唔可以出錯。
+空位應該填邊一行？
+
+```
+@dataclass
+class Order:
+    id: str
+    # ____
+```
+'''
+hints = [
+  "可變嘅預設值喺建立 class 嗰陣會被拒絕。個 field helper 想要一樣佢可以每個 instance 呼叫一次嘅嘢 —— 個 class 本身，唔係一個 instance。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.cheatsheet_advanced.09.alt-constructor"
+title = "子類有自己嗰個"
+story = "崇光禮品櫃台將「1,2」parse 做一個座標，而隔籬個尊貴櫃台期望收返一個尊貴座標，唔係普通嗰種。"
+brief = '''
+`Point3(Point)` 係一個乜都冇加嘅子類。`Point3.parse("1,2")` 一定要回傳一個
+`Point3`，唔係 `Point`。空位應該填邊一行？
+
+```
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @property
+    def norm(self):
+        return abs(self.x) + abs(self.y)
+
+    @classmethod
+    def parse(cls, s):
+        a, b = s.split(",")
+        # ____
+```
+'''
+hints = [
+  "classmethod 嘅第一個參數係個呼叫經過嘅嗰個 class。用手寫個 base class 名就會將佢釘死做 base。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.cheatsheet_advanced.10.hash-with-eq"
+title = "同一個牌，同一個人"
+story = "軒尼詩道間健身室兩次簽到用同一個會員號碼就係同一個會員，而個出席 set 一定要同意。"
+brief = '''
+`uid` 係一個 `str`。定義咗 `__eq__` 令 `User` 變成 unhashable，所以 instance
+入唔到 `set`。邊一行可以恢復 hashing，令
+`len({User("a"), User("a"), User("b")})` 係 `2`？
+
+```
+class User:
+    def __init__(self, uid):
+        self.uid = uid
+
+    def __eq__(self, o):
+        return isinstance(o, User) and self.uid == o.uid
+
+    # ____
+```
+'''
+hints = [
+  "相等嘅物件 hash 一定要相等，所以 hash `__eq__` 比較嗰樣嘢 —— 而個 method 一定要回傳 int，唔係 str。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.cheatsheet_advanced.11.deck-iter"
+title = "派畀我"
+story = "銅鑼灣道唐樓嗰張麻雀枱想用普通 for-loop 行過一副牌，唔係伸手入佢個櫃桶。"
+brief = '''
+`for card in Deck()` 一定要逐個行過 `"A"`、`"K"`、`"Q"`，而 `len(deck)`
+已經行得通。空位應該填邊一行？
+
+```
+class Deck:
+    def __init__(self):
+        self._cards = ["A", "K", "Q"]
+
+    def __len__(self):
+        return len(self._cards)
+
+    # ____
+```
+'''
+hints = [
+  "個 dunder 一定要回傳一個 iterator，唔係個 list 本身；yield 個 list 會交返一個 item，即係成個 list。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.cheatsheet_advanced.12.exit-protocol"
+title = "閂，但唔好收聲"
+story = "渣甸坊個檔口嘅捲閘無論入面發生咗乜都會落，但火警鐘喺出面仍然一定要聽到。"
+brief = '''
+`Res` 用法係 `with Res() as r:`。離開個 block 嗰陣，`self.close()` 一定要行 ——
+而喺 block 入面 raise 嘅 exception 一定仍然要**傳播**到呼叫者。空位應該填邊一行？
+
+```
+class Res:
+    def __enter__(self):
+        return self
+
+    def close(self):
+        ...
+
+    # ____
+```
+'''
+hints = [
+  "exit dunder 呼叫嗰陣帶三個額外 argument，而由佢回傳一個 truthy 值會吞咗個 exception。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.cheatsheet_advanced.13.chain-the-cause"
+title = "而原因係"
+story = "告士打道間 fintech 個 config 文員用自己個印拒絕一個壞 port，但將原本嗰份投訴釘喺下面。"
+brief = '''
+`class ConfigError(Exception): pass` 已經存在。喺 `except ValueError as e:`
+入面，raise 一個 `ConfigError("bad port")`，令呼叫者捕捉到一個 `__cause__`
+係原本嗰個 `ValueError` 嘅 `ConfigError`。
+'''
+hints = [
+  "新嘅 exception 被 raise；舊嗰個喺佢後面被點名做 cause。喺嗰度寫 `None` 反而會收埋個 cause。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.cheatsheet_advanced.14.two-faults-one-net"
+title = "兩種錯，一個網"
+story = "Lucky Mac 張落單紙可能冇咗個 port，又可能入面有個字，兩樣點都好，收銀員都係講句「bad」然後繼續。"
+brief = '''
+`parse({})` 一定要回傳 `"bad"`（一個 `KeyError`），`parse({"port": "x"})`
+一定要回傳 `"bad"`（一個 `ValueError`），而 `parse({"port": "80"})` 一定要
+回傳 `80`。空位應該填邊一行？
+
+```
+def parse(d):
+    try:
+        v = int(d["port"])
+    # ____
+        return "bad"
+    else:
+        return v
+```
+'''
+hints = [
+  "一個 clause 入面幾個類型要用 tuple 嚟裝；光秃秃一個逗號喺呢度係 syntax error，而 `or` 只係會求值做第一個 class。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.cheatsheet_advanced.15.sort-then-group"
+title = "GROUP 之前先 SORT"
+story = "寶靈頓道個魚販按大小將啲魚入桶，但要先將啲魚按大小排好 —— 否則同一個桶會出現五次。"
+brief = '''
+`from itertools import groupby` 已經做咗，而 `words` 係一個未排序嘅 string list。
+loop `k, g`，令每個唔同嘅長度**啱啱好出現一次**，而 `g` 裝住嗰個長度嘅每一個字。
+'''
+hints = [
+  "個 grouper 淨係會合併相鄰嘅。先用同一個 key 將啲字排好隊 —— 而 `list.sort` 回傳 None。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.cheatsheet_advanced.16.every-pair-once"
+title = "每一對，一次"
+story = "利園山道三間茶樓想試一個共用餐牌，而每一對茶樓啱啱好見一次面。"
+brief = '''
+`import itertools` 已經做咗，而 `xs = ["a", "b", "c"]`。將 `pairs` 整做
+`[("a", "b"), ("a", "c"), ("b", "c")]` 呢個 list —— 每個無序對一次，
+冇元素同自己配對，冇 `("b", "a")`。
+'''
+hints = [
+  "次序唔重要而且冇嘢重複；itertools 入面佢兩個鄰居分別畀嘅係有序對同自己配自己嘅對。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.cheatsheet_advanced.17.ten-off-the-stream"
+title = "由條河攞十個"
+story = "灣仔碼頭無止境咁餵一排一排嘅乘客；文員想要頭十個人，唔係頭十排。"
+brief = '''
+`from itertools import chain, islice` 已經做咗。`rows` 係一個**無限**嘅
+list generator。將 `first` 整做跨越啲 row 嘅頭 10 個獨立元素嘅 list，
+永遠唔好抽乾 `rows`。
+'''
+hints = [
+  "對一個無盡嘅 generator 做 star-unpacking 永遠唔會完，而 chain 唔可以用方括號切片 —— 喺個攤平用嘅 classmethod 上面用切片嗰個 adaptor。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.cheatsheet_advanced.18.neighbour-gaps"
+title = "距離下一架電車"
+story = "銅鑼灣總站嘅電車到站時間由線路一個一個咁入嚟；稽查員想要每架電車同下一架之間嘅等候時間。"
+brief = '''
+`from itertools import pairwise, zip_longest` 已經做咗，而 `xs` 係一個 int 嘅
+**iterator**（冇 `len`，冇切片）。將 `gaps` 整做每個元素同下一個嘅差嘅 list，
+例如 `1, 4, 9, 16` 得到 `[3, 5, 7]`。
+'''
+hints = [
+  "iterator 唔可以切片，而將佢同自己 zip 每步會食兩個 item。3.10 嗰個 adaptor 產出重疊嘅鄰居。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.cheatsheet_advanced.19.top-two"
+title = "使錢最多嗰兩個"
+story = "銅鑼灣會所個 VIP 櫃台想要今晚按金額計最大嗰兩張單，唔想將每張收據都排晒序。"
+brief = '''
+`import heapq` 已經做咗，而 `xs` 係一個 `(name, amount)` tuple 嘅 list。
+將 `top` 整做 `amount` **最大**嗰兩個 tuple，最大嘅先。
+'''
+hints = [
+  "個數目喺 iterable 前面，而冇 key 嘅話啲 tuple 會按名嚟比較。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.cheatsheet_advanced.20.slot-it-in"
+title = "按分數插入"
+story = "崇光樓下遊戲機中心個排行榜一直按分數排好；一個新名要落喺啱嘅位，而個位係由數字決定，唔係由名。"
+brief = '''
+`from bisect import insort, bisect_left` 已經做咗。`xs` 係一個 `(name, score)`
+tuple 嘅 list，一直按 `score` 升序排好。插入 `(name, s)`，令 `xs` 仍然
+按 score 排好（Python 3.10+）。
+'''
+hints = [
+  "個 key 會套用喺啲元素同被插入嗰樣嘢上面，所以插入成條紀錄，唔係光秃秃個分數。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.cheatsheet_advanced.21.port-in-both"
+title = "兩個袋都有 PORT"
+story = "告士打道間 fintech 有一個預設 port 同一個命令行 port，而 `connect` 唔會收同一個 keyword 兩次。"
+brief = '''
+`def connect(host="x", port=0)` 淨係收 keyword。
+`defaults = {"host": "db", "port": 5432}`，而 `opts = {"port": 6543}`。
+用被 `opts` 覆蓋咗嘅 defaults 呼叫 `connect`，令佢收到 `host="db", port=6543`。
+'''
+hints = [
+  "兩個 `**` unpacking 有共同 key 會 raise。先合併兩個 dict，覆蓋嗰個放右邊，然後 unpack 合併咗嗰個。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.cheatsheet_advanced.22.name-it-in-passing"
+title = "順手幫佢起個名"
+story = "軒尼詩道間金舖個鑑定師又慢又貴，所以每件嘢淨係磅一次，而且淨係留低有賺嗰啲。"
+brief = '''
+`f` 好貴，每個元素一定要**啱啱好呼叫一次**。用一個 comprehension，
+將 `ys` 整做大過 0 嘅 `f(x)` 值嘅 list。
+'''
+hints = [
+  "assignment expression 喺個條件入面要自己加括號，而且佢綁定嘅係結果 —— 唔係個比較。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.cheatsheet_advanced.23.far-click"
+title = "遠處一 CLICK 或者遠處一拖"
+story = "時代廣場個 kiosk 嘅觸控板將一下 click 同一下拖當成一樣，但淨係當佢哋落喺右邊好遠嗰陣。"
+brief = '''
+`Click` 同 `Drag` 係普通 class，有屬性 `x` 同 `y`，**冇** `__match_args__`。
+`far(ev)` 對 `x` 大過 100 嘅 `Click` 或者 `Drag` 一定要回傳 `"far"`，
+對其他任何嘢回傳 `"near"`。空位應該填邊一行？
+
+```
+def far(ev):
+    match ev:
+        # ____
+            return "far"
+        case _:
+            return "near"
+```
+'''
+hints = [
+  "冇 match args 嘅話，啲 sub-pattern 一定要係 keyword 形式；alternative 用一條直線連起，而個 guard 排喺佢哋全部後面。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.cheatsheet_advanced.24.pool-with-a-timeout"
+title = "四個 FETCHER，一個 TIMEOUT"
+story = "四個走腿同時離開波斯富街間寫字樓，每個都被吩咐兩秒之後放棄，而調度員想啲結果按次序返嚟。"
+brief = '''
+`ex` 係一個 `ThreadPoolExecutor`，而 `fetch(url, timeout=10)` 係一個 function；
+啲 import 冇顯示。將 `results` 整做 `urls` 入面每個 `u` 嘅 `fetch(u, timeout=2)`
+嘅 list，按次序，喺個 pool 上面行。
+'''
+hints = [
+  "個 pool 嘅 map 自己有一個 `timeout`，永遠去唔到 `fetch` 度。先將個 keyword 綁入個 function。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.cheatsheet_advanced.25.tick-it-off"
+title = "剔咗佢"
+story = "Lucky Mac 夜廚：經理喺出餐口旁邊等到每張單都煮好，唔係淨係攞走咗，而每個廚師都要講一聲碟嘢做好。"
+brief = '''
+`q` 係一個 `queue.Queue`。主線程放晒每個 job 之後呼叫 `q.join()`，一定要
+block 到每個 job 都**處理完**為止。worker 個 loop body 最尾填邊一行，
+`q.join()` 先會返回？
+
+```
+def worker():
+    while True:
+        job = q.get()
+        with lock:
+            done.append(process(job))
+        # ____
+
+for _ in range(4):
+    threading.Thread(target=worker, daemon=True).start()
+```
+'''
+hints = [
+  "`get` 淨係攞個 job。個 queue 數住未完成嘅 task，而 worker 要話畀佢知有一個完成咗 —— 冇 argument。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.cheatsheet_advanced.26.all-the-cores"
+title = "所有核心"
+story = "渲染維園煙花地圖係純 CPU 工作；GIL 一次淨係放一條 thread 入去，所以份工交畀獨立嘅 process。"
+brief = '''
+`cpu_heavy(x)` 係 module 入面一個頂層 function，而 `p` 係一個
+`multiprocessing.Pool`（喺 `__main__` guard 下面）。將 `out` 整做 `xs` 入面
+每個 `x` 嘅 `cpu_heavy(x)` 嘅 list，按次序，分散喺啲 process 上面。
+'''
+hints = [
+  "工作係靠 pickle 個 callable 送去另一個 process；lambda 唔可以 pickle。個 pool 嘅 map 收個 function 同個 iterable，分開收。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.cheatsheet_advanced.27.all-at-once"
+title = "三個一齊，唔係逐個"
+story = "駱克道個單位叫咗三個外賣，每個係一秒嘅車程；一個接一個咁叫就令條蟒蛇等三秒。"
+brief = '''
+`fetch(u)` 係一個 `async def`，佢 await `asyncio.sleep(1)` 然後回傳 `u`。
+喺 `async def main()`（由 `asyncio.run(main())` 行）入面，將 `results` 整做
+`urls` 嘅結果 list，按次序 —— 三個 fetch 全部**同時**行，令 `main` 大約用
+一秒，唔係三秒。
+'''
+hints = [
+  "逐個 await 每個 coroutine 會令佢哋串行。嗰個 combinator 將啲 awaitable 當獨立 argument 咁收，唔係一個 list，而且佢本身一定要被 await。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.cheatsheet_advanced.28.generic-first"
+title = "任何嘢嘅第一個"
+story = "軒尼詩道間藥房想要一個 `first`，對一排藥丸同一排膠布都用得，而個標籤要講明佢攞到嘅係邊樣。"
+brief = '''
+Python 3.12。`from collections.abc import Sequence` 已經做咗，而且任何地方都
+**冇**宣告過 `TypeVar`。寫一個 generic `first` 嘅 `def` 行，佢收一個
+`Sequence[T]` 並且回傳一個 `T`，而 `T` 係喺個 function 本身上面宣告。
+'''
+hints = [
+  "3.12 容許一個 function 宣告自己嘅類型參數，喺佢個名後面即刻用方括號。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.cheatsheet_advanced.29.shared-bag"
+title = "永遠唔會空嘅袋"
+story = "大牌檔嘅「新袋」預設值係一個袋，印餐牌嗰陣整一次 —— 而每張信佢嘅單都喺入面搵到上一枱嘅筷子。"
+brief = '''
+`add(x, xs)` 將 `x` append 落 `xs` 然後回傳 `xs`。冇第二個 argument 咁呼叫兩次，
+`add(1)` 然後 `add(2)` 一定要分別得到 `[1]` 同 `[2]` —— 每次一個新 list。
+個 body 會喺 append 之前將一個**冇傳**嘅 `xs` 換做一個新嘅空 list。
+邊個 `def` 行先啱？
+'''
+hints = [
+  "預設值喺 `def` 嗰陣求值一次，然後每次呼叫都共用。用一個 sentinel，喺入面先砌個 list。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.cheatsheet_advanced.30.late-binding"
+title = "三個看更，一個數"
+story = "謝斐道三個看更每個都被吩咐「記住你個號碼」—— 但佢哋全部記住嘅係個號碼嘅名，到收工嗰陣個個都係 2。"
+brief = '''
+砌 `fs`，一個有三個零 argument function 嘅 list，令 `[f() for f in fs]` 係
+`[0, 2, 4]` —— 每個都將整佢嗰陣嘅 `i` 乘二。
+'''
+hints = [
+  "closure 係喺被呼叫嗰陣先查 `i`，而嗰陣個 loop 已經完咗。預設 argument 係喺整個 lambda 嗰陣求值。",
+]

@@ -1,0 +1,563 @@
+# RUST LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/rust/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code blocks,
+# identifiers and printed strings are the English pack's and are copied verbatim,
+# never translated.
+
+pack   = "rust.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet_advanced.01.default-method"
+title = "备用的那一行"
+story = "06:50，渣甸坊楼上。阿薇名单上的每家店都能报出自己的名字；她想让它们全都会打招呼，又不想给每家各写一句。"
+brief = '''
+`Greet` 已经要求实现 `name`。往 trait 里加上 `hello`，使得
+`impl Greet for Shop` **只**写 `name`，而 `Shop.hello()` 仍然能编译，
+并返回 `name` 返回的内容。
+
+```
+trait Greet {
+    fn name(&self) -> String;
+    // ____
+}
+impl Greet for Shop { fn name(&self) -> String { "Sogo".into() } }
+```
+'''
+hints = [
+  "带函数体的 trait 方法对实现者来说是可选的；只有签名的则不是。这没有专门的关键字 —— 函数体本身就是全部信号。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet_advanced.02.trait-objects"
+title = "什么形状都行"
+story = "谢斐道的招牌店把正方形和圆形记在同一本订单簿里，每一个都知道自己的面积。"
+brief = '''
+`Shape` 是一个带 `fn area(&self) -> f64` 的 trait；`Sq` 和 `Ci` 都实现了它。
+把 `shapes` 声明成一个可增长的列表，能同时装下一个 `Sq` **和**一个 `Ci`，
+每个都放在堆上，使得 `shapes.iter().map(|s| s.area()).sum::<f64>()` 能用。
+'''
+hints = [
+  "一个 Vec 里装两种具体类型，需要指向 trait 对象的指针；泛型参数会把类型固定成其中一种，而光秃秃的 trait 根本不是类型。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet_advanced.03.where-bound"
+title = "最大的那个，不管是什么"
+story = "崇光的价目板把价格存成 f64、把库存存成 i32，Ferris 想取两者各自的最大值，又不想写两个函数。"
+brief = '''
+`largest` 既在 `&[f64]` 上调用，**也**在 `&[i32]` 上调用。它用 `>`
+比较，并返回指向胜者的引用。约束写在 `where` 子句里。
+
+```
+// ____
+    let mut m = &v[0];
+    for x in v { if x > m { m = x; } }
+    m
+}
+```
+'''
+hints = [
+  "`>` 只需要偏序，别无所求 —— 要求全序或完全相等的约束会把浮点数关在门外。而且函数体返回的是 `&T`，不是 `T`。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet_advanced.04.next-signature"
+title = "FIB 交出来的东西"
+story = "轩尼诗道上的电车号码一个一个地出来，每一个都由前两个得出。"
+brief = '''
+`Fib { a: u64, b: u64 }` 变成一个产出 `u64` 的迭代器：
+
+```
+impl Iterator for Fib {
+    type Item = u64;
+    // ____
+        let r = self.a;
+        self.a = self.b;
+        self.b += r;
+        Some(r)
+    }
+}
+```
+
+空白处的方法，trait 要求的是哪个签名？
+'''
+hints = [
+  "这个方法会推进状态，所以它需要对 `self` 的独占借用；它还必须能表示“没有更多了”，所以返回的是包起来的元素，不是裸值。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet_advanced.05.box-dyn-error"
+title = "两种麻烦"
+story = "告士打道旁的支付路径可能在解析器里失败，也可能在账本里失败，而 `main` 得用一个 `?` 把两种都吞下。"
+brief = '''
+`AppError` 是一个自定义错误：
+
+```
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "app: {}", self.0) }
+}
+impl std::error::Error for AppError {}
+```
+
+这是它仅有的 impl —— `AppError` **没有**任何 `From` 转换。
+在 `main` 里，`?` 既用在一个 `ParseIntError` 上，**也**用在一个 `AppError` 上。
+`main` 用哪个签名能让两者都编译？
+'''
+hints = [
+  "两种不同的错误类型穿过同一个 `?`，需要一个两者都能转换进去的返回类型：一个 trait 对象，而且得是有大小的 —— 所以它要放在指针后面。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet_advanced.06.from-for-question-mark"
+title = "转换器"
+story = "渣甸坊的收银机用自己的话报告解析失败；账本想要的是自己枚举里的说法，又不想每行都写一个 `map_err`。"
+brief = '''
+`enum AppError { Parse(ParseIntError), Neg }`。下面的函数必须
+原样编译通过 —— 转换由 `?` 来做：
+
+```
+fn read(s: &str) -> Result<i32, AppError> {
+    let n: i32 = s.trim().parse()?;
+    if n < 0 { return Err(AppError::Neg); }
+    Ok(n)
+}
+```
+
+哪个 impl 头部，里面放上 `fn from(e: ParseIntError) -> Self { AppError::Parse(e) }`，
+能让它成立？
+'''
+hints = [
+  "`?` 调用一个特定的 trait 来转换错误，而这个 trait 是在目标类型上、为源类型实现的 —— 不是反过来，也不是它那个镜像的表亲。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet_advanced.07.map-err-chain"
+title = "用她自己的话"
+story = "7-32 室的账本把失败记成纯文本，所以解析器的错误在离开函数之前必须变成 String。"
+brief = '''
+这个函数返回 `Result<i32, String>`。`n` 是 `s` 解析出的 `i32`，
+而坏的 `s` 要把解析器的消息作为 `Err` 返回，一行搞定。
+
+```
+fn read(s: &str) -> Result<i32, String> {
+    // ____
+    Ok(n * 2)
+}
+```
+'''
+hints = [
+  "解析器的错误没有内置的到 String 的转换，所以单靠 `?` 做不到；先把错误变换一下，再传播出去。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet_advanced.08.option-chain"
+title = "也许有个下标"
+story = "铜锣湾站的储物柜号 `o` 可能是 None，也可能超出最后一个柜子；阿薇要的是柜子里的东西或者 -1，而且不能 panic。"
+brief = '''
+`v: Vec<i32>`，`o: Option<usize>`。`x` 是一个 `i32`：`v` 在那个下标处的元素；
+如果 `o` 是 `None` **或者**下标越界，就是 `-1`。对任何 `o` 都不能 panic。
+'''
+hints = [
+  "本身就返回 Option 的查找要用链式的方式接上，而不是 map，否则会得到 Option 套 Option。而且查找返回的是引用 —— 在给默认值之前先把它复制出来。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet_advanced.09.let-else"
+title = "第一个词，不然就走"
+story = "大排档的点菜单可能是空白的；要是没有第一个词，阿薇就带着 0 走人。"
+brief = '''
+`w` 必须是 `s` 按空白分隔的第一个词 —— 一个在下一行用到的 `&str`。
+如果一个都没有，函数就在那里直接返回 `0`。
+
+```
+fn first_num(s: &str) -> i32 {
+    // ____
+    w.parse().unwrap_or(0)
+}
+```
+'''
+hints = [
+  "`let` 上的可反驳模式需要一个 else 分支，而那个分支必须离开 —— return、break、continue 或 panic；交回一个值不算离开。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet_advanced.10.binding-and-guard"
+title = "短的奇数步"
+story = "Alex 在波斯富街的步行指令：走 1 到 5 个街区算短，而阿薇只在乎奇数的那些。"
+brief = '''
+`enum Cmd { Walk(i32), Wait }`。在 `Cmd::label(&self)` 里，加上这样一个分支：
+`Walk` 的距离在 1 到 5 之间 —— **包含 5** —— 并且是奇数，打印出距离：
+
+```
+match self {
+    Cmd::Wait => "wait".into(),
+    // ____
+    Cmd::Walk(_) => "walk".into(),
+}
+```
+'''
+hints = [
+  "用 `@` 把一个名字绑定到范围模式上，然后守卫就能检验这个名字。留意哪种范围写法包含它的上端。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet_advanced.11.struct-lifetime"
+title = "那一行的一片"
+story = "怡和街售货亭的票据是一行字；阿薇留下的 token 是它的一个切片，所以活不过那一行。"
+brief = '''
+`Token` 持有一个借来的 `&str`，指向调用者的字符串。
+把它声明出来，使得下面这段能编译：
+
+```
+fn first_word<'a>(s: &'a str) -> Token<'a> {
+    Token { text: s.split_whitespace().next().unwrap_or("") }
+}
+```
+'''
+hints = [
+  "持有引用的结构体带一个生命周期参数，而字段必须用同一个参数 —— 声明了却不用，是常见的失误。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet_advanced.12.counter-closure"
+title = "门童的计数器"
+story = "骆克道的门童给每场活动做一个新计数器；每按一下，里面的数字就变一次。"
+brief = '''
+`counter` 的函数体是 `let mut c = 0; move || { c += 1; c }` —— 没有装箱。
+调用者写 `let mut next = counter(); next(); next();`。
+`counter` 用哪个签名能编译？
+
+```
+// ____
+    let mut c = 0;
+    move || { c += 1; c }
+}
+```
+'''
+hints = [
+  "闭包会修改它捕获的东西，所以它是某一种闭包；它被调用了两次，所以不是一次性的那种；而函数体里没有任何东西把它包进 Box。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet_advanced.13.longest"
+title = "更长的名字"
+story = "两个街名，一个借自电车站，一个借自一块快要拆下来的招牌；阿薇返回较长的那个。"
+brief = '''
+`longest` 返回 `a` 或 `b`，谁更长返回谁。哪个签名能编译？
+
+```
+// ____
+    if a.len() >= b.len() { a } else { b }
+}
+```
+'''
+hints = [
+  "有两个引用输入时，编译器猜不出输出借自哪一个；命名一个生命周期，把它同时系在两个输入和输出上。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet_advanced.14.letter-from-index"
+title = "第 I 个字母"
+story = "维多利亚公园的储物柜用 a 到 z 编号，而预订单送来的是一个数字。"
+brief = '''
+`i: usize`，且 `0 <= i < 26`。`c` 是一个 `char`：第 `i` 个小写 ASCII 字母，
+所以 `0 → 'a'`，`7 → 'h'`，`25 → 'z'`。
+'''
+hints = [
+  "只有一种整数宽度能直接转成 char，那就是字节。给字节字面量做加法，再转换 —— 而标准库里那个数字辅助函数在到达字母之前先数 0 到 9。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet_advanced.15.filter-map-parse"
+title = "留下能解析的"
+story = "7-Eleven 的收据卷一半是数字一半是污渍；阿薇要的是那些数字，按顺序，其余的不必操心。"
+brief = '''
+`ws: [&str; 4]` 混杂着数字和垃圾，比如 `["12", "x", "7", "3.5"]`。
+`v` 装的是能解析成 `i32` 的那些，按顺序；垃圾被静默跳过。
+
+```
+let v: Vec<i32> = ____;
+```
+
+哪个表达式填进空白？
+'''
+hints = [
+  "当闭包交回一个 Option 时，有一个适配器能同时做筛选和映射 —— 而解析结果在你把它变成 Option 之前并不是 Option。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet_advanced.16.collect-result"
+title = "全有或全无"
+story = "渣甸坊的收银机只要有一个 token 坏了就拒绝整行；没有部分合计这回事。"
+brief = '''
+在 `main` 里（它返回 `()`），`ws: [&str; 3]`。`r` 是装着**全部**数字的 `Ok`，
+或者是第一个解析错误 —— 只要有任何一个 token 坏了。
+
+```
+let r: Result<Vec<i32>, ParseIntError> = ____;
+```
+
+哪个表达式填进空白？
+'''
+hints = [
+  "把一个 Result 的迭代器收集成一个 Vec 的 Result，只需一次带正确目标类型的调用 —— `r` 上的类型标注已经写明了。不需要 `?`，这里的 `main` 也容不下它。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet_advanced.17.zip-into-map"
+title = "两列，一张表"
+story = "菜市场的价目板是两张清单 —— 左边是名字，右边是价格 —— 阿薇想按名字查价格。"
+brief = '''
+`keys: Vec<String>` 和 `vals: Vec<u32>`，长度相同，之后都不再使用。
+`m` 由它们用一个表达式构建出来：
+
+```
+let m: HashMap<String, u32> = ____;
+```
+
+哪个表达式填进空白？
+'''
+hints = [
+  "把两个序列配成对，再把这些对收集起来。这张表要的是拥有所有权的 String 和普通的 u32，所以按值遍历两个 Vec，而不是按引用。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet_advanced.18.sort-floats-desc"
+title = "最贵的在前"
+story = "铜锣湾唐楼的租金是浮点数，房东想让最贵的排在最上面。"
+brief = '''
+`v: Vec<f64>`，没有 NaN。原地排序，**降序**。
+'''
+hints = [
+  "浮点数没有全序，所以普通排序和按 key 排序都拒绝它们；给一个比较器，用偏序比较，并把两个操作数对调。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet_advanced.19.lazy-cache"
+title = "只在未命中时计算"
+story = "Lucky Mac 的厨房把一道菜的成本算一次就钉上板子；已经在板上的菜，Bo 师傅不会再算一遍。"
+brief = '''
+`cache: HashMap<u64, u64>`，而 `fn slow(n: u64) -> u64` 每次运行都打印
+`computing n`。在 `for n in [3, 3, 4]` 里，`v` 是 `n` 的缓存值，
+而 `slow` 必须**恰好打印两次**。
+'''
+hints = [
+  "entry API 填空位有两种方式：一种接收一个值（每次都已经算好了），另一种接收一个只在键缺失时才运行的闭包。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet_advanced.20.btree-range"
+title = "十到二十"
+story = "有序账本里的电车站是编了号的；阿薇想要 10 到 20 号站，按顺序，又不想把整本书读完。"
+brief = '''
+`m: BTreeMap<u32, &str>`。遍历键在 10 到 20 之间 —— **两端都包含** —— 的条目，
+升序，并且不走遍整张表。
+
+```
+// ____
+    print!("{k}{v} ");
+}
+```
+'''
+hints = [
+  "有序表能按键交给你一个子范围；它接收一个范围参数，而哪种范围语法包含上端就是问题所在。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet_advanced.21.checked-digits"
+title = "不许悄悄回绕"
+story = "告士打道的结算系统手工解析金额；溢出必须以 None 返回，绝不能是一个只是看起来像样的数字。"
+brief = '''
+`parse_u64` 返回 `Option<u64>`：溢出时返回 `None`（而不是回绕后的数字），
+并且永不 panic。`d: u32` 是这一位数字的值。
+
+```
+fn parse_u64(s: &str) -> Option<u64> {
+    let mut acc: u64 = 0;
+    for c in s.chars() {
+        let d = c.to_digit(10)?;
+        // ____
+    }
+    Some(acc)
+}
+```
+'''
+hints = [
+  "那些返回 Option 的算术方法，在这个函数里每一个后面都可以跟 `?`。普通运算符在 debug 下会 panic，而 wrapping 的那些会不声不响地返回错误的数字。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet_advanced.22.derive-ord-fields"
+title = "先优先级，再名字"
+story = "夜厨房的单子先按优先级排，同一优先级里按菜名排，而 derive 做的正是字段告诉它的事。"
+brief = '''
+结构体上方是 `#[derive(PartialEq, Eq, PartialOrd, Ord)]` 这一行。
+`tasks.sort()` 必须先按 `pri` 排（1 在 2 前面），**`pri` 相同时**再按 `name` 排。
+字段是 `pri: u32` 和 `name: String`。哪个声明能做到？
+'''
+hints = [
+  "derive 出来的排序按字段声明的顺序从上到下比较；第一个不同的字段决定结果。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet_advanced.23.struct-update"
+title = "只改端口"
+story = "那家金融科技公司的配置有十几个字段，阿薇只想改一个；其余的就按空配置说的来。"
+brief = '''
+`Config` 有字段 `host: String`、`port: u16`、`retries: u8`、`verbose: bool`，
+并派生了 `Default`。构造 `c`，把 `port` 设为 `8080`，**其他每个字段都取默认值**，
+且不写出任何其他字段的名字。
+'''
+hints = [
+  "结构体更新语法用另一个实例来填你没写的字段 —— 两个点，然后是一个产出 `Config` 的表达式，而不是一个 trait 名。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet_advanced.24.rc-refcell"
+title = "两个把手，一本日志"
+story = "Ferris 和阿薇各握着同一本单线程日志的一个把手；Ferris 写，阿薇读回来。"
+brief = '''
+`log` 是 `Rc<RefCell<Vec<&str>>>`，并且 `let b = Rc::clone(&log);`。
+通过 `b` 把 `"tram"` push 进去，使得 `log.borrow()` 能看到它。
+'''
+hints = [
+  "`Rc` 只会交出共享访问；里面那个 cell 才是让你在运行时可变借用的东西 —— 向它要可变借用，不是共享借用。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet_advanced.25.arc-mutex"
+title = "四扇门，一个计数"
+story = "崇光地库游戏厅的四扇门把入场人数计进同一个总数，而总数必须分毫不差。"
+brief = '''
+`hits` 是 `Arc<Mutex<u32>>`。在四个 spawn 出来的线程里，每个线程的 `c` 是
+`Arc::clone(&hits)`，并且每个线程给计数加一 1000 次。
+线程里面的哪一行是加一？
+
+```
+hs.push(thread::spawn(move || {
+    for _ in 0..1000 { /* ____ */ }
+}));
+for h in hs { h.join().unwrap(); }
+```
+'''
+hints = [
+  "上锁返回一个 Result；unwrap 它拿到 guard，再解引用 guard 才碰得到数字。三步 —— 而那些近似的错误答案各漏了一步。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet_advanced.26.scoped-thread"
+title = "借用这一段时间"
+story = "时代广场扶手电梯的计数暂时借给一个帮手一会儿；不复制，没有共享所有者，而帮手做完之后它还要再用。"
+brief = '''
+`v: Vec<i32>`。通过**借用**在另一个线程里打印它 —— 不用 `Arc`，不 clone，
+不用 `move` —— 而 `v` 紧接着在下一行再次被使用。
+'''
+hints = [
+  "普通 spawn 出来的线程可能活得比函数还久，所以它不能借用。作用域线程保证在作用域返回之前结束，而它的 spawn 要经过作用域句柄。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet_advanced.27.take-n-messages"
+title = "恰好四条，不许挂起"
+story = "骆克道的四个速递员各自用对讲机报回一个数字；调度员自己的对讲机还开着，却仍然必须在四条之后停止收听。"
+brief = '''
+`n: usize = 4`。四个线程各拿到一个 `tx.clone()`，每个在做完一些工作后发送
+**一个** `u64`。原始的 `tx` **没有**被 drop，`main` 还留着它。
+`r` 装着全部四条消息，而 `main` 不能挂起。
+
+```
+let (tx, rx) = mpsc::channel::<u64>();
+for id in 0..n as u64 {
+    let tx = tx.clone();
+    thread::spawn(move || { work(); tx.send(id * id).unwrap() });
+}
+// ____
+```
+'''
+hints = [
+  "接收端上的阻塞迭代器只有在每个发送者都消失后才结束；`main` 里还留着一个，就按数量停下。非阻塞迭代器只返回到目前为止已到达的 —— 也许一条都没有。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet_advanced.28.global-counter"
+title = "整栋楼一个数"
+story = "整个时代广场只有一个入场计数器，从每扇门同时往上加，而它最好别在每只手里都是一份新副本。"
+brief = '''
+一个全程序范围、由每个线程共享的计数器，哪里都没有 `unsafe`。
+`fn hit() { HITS.fetch_add(1, Ordering::Relaxed); }` 在四个线程里各调用 1000 次，
+join 它们之后 `HITS.load(Ordering::Relaxed)` 必须是 `4000`。
+
+模块级的 `HITS` 用哪个声明能做到？
+'''
+hints = [
+  "有一个错误选项能编译并打印 0：`const` 在每次使用处都内联成一个新值，所以每次 `fetch_add` 加的都是副本。内存里那唯一的一个位置需要另一个项关键字 —— 而它的可变形式碰起来是 `unsafe` 的。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet_advanced.29.take-the-batch"
+title = "全部交出去"
+story = "Bo 师傅把整条点单轨交给传菜员，自己留着一条空轨 —— 不复制单子，而轨道还是他的。"
+brief = '''
+`Batch { items: Vec<String> }`。`flush(&mut self) -> Vec<String>` 交出
+`items` 里的全部内容，并让 `self.items` 变**空**，不做 clone。
+
+```
+fn flush(&mut self) -> Vec<String> {
+    // ____
+}
+```
+'''
+hints = [
+  "你不能从 `&mut self` 后面把字段移出来，但 `std::mem` 能把字段换成它的默认值并把旧值给你 —— 通过指向字段的可变引用。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet_advanced.30.dijkstra-pop"
+title = "最小距离先出"
+story = "在铜锣湾网格上跑 Dijkstra：堆里装着包起来的 (distance, node)，让最近的先出来，而循环得把两层都拆开。"
+brief = '''
+`heap: BinaryHeap<Reverse<(u64, usize)>>` 装着 `(distance, node)` 对，
+使得**最小的距离**先弹出。写出那个循环头：一直弹出直到堆空，并绑定 `d` 和 `u`：
+
+```
+heap.push(Reverse((0u64, 0usize)));
+// ____
+    if d > dist[u] { continue; }
+    for &(v, w) in &adj[u] { /* relax */ }
+}
+```
+'''
+hints = [
+  "pop 给的是一个 Option；里面是包装器，包装器里面才是元组 —— 三层，而包装器恰好只有一个字段。",
+]

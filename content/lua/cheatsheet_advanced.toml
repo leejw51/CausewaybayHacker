@@ -1,0 +1,954 @@
+# LUA LAND — CHEATSHEET ADVANCED. The grammar past the napkin, asked: thirty
+# of the Lua lines an interviewer uses to tell a fluent hand from one who only
+# knows the basics — `__index` and the class pattern, inheritance through a
+# second metatable, `__lt`/`__eq`/`__call`, `rawset` inside `__newindex`,
+# `rawget` past a default, the `__len` that LuaJIT ignores, a closure per
+# loop iteration, `select(2, ...)`, `unpack(t, 1, n)`, `(f())` truncation,
+# `coroutine.wrap`/`resume` with values both ways, `error` with a table,
+# `xpcall` + `debug.traceback`, gmatch captures, gsub with a table and its
+# count, the `%f` frontier, `%-10s|%5.2f|%03d`, the `>=` comparator that
+# raises, `next(t) == nil`, `%d` for sixteen digits, `bit.band`, the ffi's
+# `int[?]`, `goto continue`, `local function` recursion, a weak-keyed cache
+# and `setfenv` — in Tai Hang on fire-dragon night. Four lines, one right.
+# Nothing is typed and nothing is run — the pick is the submission, and the
+# server judges it against the quiz (SPEC §0). The three wrong lines are
+# near-misses: the `__call` on the wrong table, `t[k] = v` inside the
+# handler that fires on `t[k] = v`, the `and … or` that swallows `false`.
+#
+# Every right answer here is LuaJIT 2.1's Lua — 5.1 plus `bit`, `ffi` and
+# `goto` — the land's runtime (the one the LÖVE client ships). Nothing on
+# this road leans on `//`, native bitwise operators, `continue`,
+# `table.unpack` or a `__len` on a table; where one of those is offered it
+# is a wrong line. The BASIC road (`lua.cheatsheet`) is the core grammar;
+# none of its questions is repeated here.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "lua.cheatsheet_advanced"
+land     = "lua"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "lua.cheatsheet_advanced.01.class-index"
+node        = 1
+title       = "THE TABLE THAT ANSWERS"
+difficulty  = 3
+story       = "21:00 on Wun Sha Street. Every dragon segment is a table, and Mei wants the methods kept in one place."
+concepts    = ["structs", "dispatch"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`Dragon` is a table of methods (`Dragon.length`, …) and its constructor is
+already written:
+
+```
+function Dragon.new(n)
+  return setmetatable({n = n}, Dragon)
+end
+```
+
+Write the one line, placed before the constructor, that makes
+`Dragon.new(3):length()` find `Dragon.length`.
+'''
+solution    = 'Dragon.__index = Dragon'
+hints = [
+  "An instance's metatable is `Dragon`; a missing key is looked up in whatever that metatable's lookup field points at — and it can point at the class itself.",
+]
+
+[quest.quiz]
+choices = [
+  'Dragon.__index = Dragon.new',
+  'Dragon.__index = Dragon',
+  'Dragon.index = Dragon',
+  'setmetatable(Dragon, Dragon)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "lua.cheatsheet_advanced.02.inherit"
+node        = 2
+title       = "THE SEGMENT UNDER THE LANTERN"
+difficulty  = 3
+story       = "A lantern is a segment with a flame on top; what it cannot do itself, the segment underneath does."
+concepts    = ["structs", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.01.class-index"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`Segment` is a plain table of functions (`Segment.burn`, …) with no
+metatable fields of its own. `Lantern` is a class in the usual pattern
+(`Lantern.__index = Lantern`, instances made with `setmetatable({}, Lantern)`).
+Write the one line that makes a lantern fall back to `Segment` for any
+method `Lantern` does not define — while keeping `Lantern`'s own methods.
+'''
+solution    = 'setmetatable(Lantern, {__index = Segment})'
+hints = [
+  "The class itself needs a metatable; `Segment` has no lookup field, so it cannot be that metatable as it stands.",
+]
+
+[quest.quiz]
+choices = [
+  'setmetatable(Lantern, Segment)',
+  'Lantern.__index = Segment',
+  'setmetatable(Lantern, {__index = Segment})',
+  'Lantern.__base = Segment',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "lua.cheatsheet_advanced.03.lt-sort"
+node        = 3
+title       = "THEY LINE UP THEMSELVES"
+difficulty  = 3
+story       = "The drum teams are scored; the marshal wants them sorted without writing a comparator every time."
+concepts    = ["structs", "dispatch", "sorting"]
+requires    = ["lua.cheatsheet_advanced.02.inherit"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`Score` is a class (`Score.__index = Score`); each instance has a number
+field `v`. `scores` is a list of them. Write the metamethod line so that
+`table.sort(scores)` — **no comparator** — orders them smallest `v` first.
+'''
+solution    = 'Score.__lt = function(a, b) return a.v < b.v end'
+hints = [
+  "Without a comparator, sort compares with `<`, and `<` on two tables asks their metatable for one specific field.",
+]
+
+[quest.quiz]
+choices = [
+  'Score.__lt = function(a, b) return a.v < b.v end',
+  'Score.__cmp = function(a, b) return a.v - b.v end',
+  'Score.__lt = function(a, b) return a.v > b.v end',
+  'Score.__sort = function(a, b) return a.v < b.v end',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "lua.cheatsheet_advanced.04.eq"
+node        = 4
+title       = "SAME POINT, TWO TABLES"
+difficulty  = 4
+story       = "Two runners mark the same spot on Tai Hang Road in two separate tables, and the map must call them equal."
+concepts    = ["structs", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.03.lt-sort"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`P` is a class (`P.__index = P`) whose instances have number fields `x` and
+`y`. `a` and `b` are two **different** instances with equal fields. Write the
+metamethod line that makes `a == b` true.
+'''
+solution    = 'P.__eq = function(a, b) return a.x == b.x and a.y == b.y end'
+hints = [
+  "Inside the metamethod, `a == b` on the two tables calls the metamethod again; compare the fields, not the tables.",
+]
+
+[quest.quiz]
+choices = [
+  'P.__eq = function(a, b) return rawequal(a, b) end',
+  'P.__eq = function(a, b) return a == b end',
+  'P.eq = function(a, b) return a.x == b.x and a.y == b.y end',
+  'P.__eq = function(a, b) return a.x == b.x and a.y == b.y end',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "lua.cheatsheet_advanced.05.call"
+node        = 5
+title       = "CALL THE CLASS ITSELF"
+difficulty  = 4
+story       = "Mei wants `Pad(5)` to read like a constructor, the way the LÖVE code on her desk does."
+concepts    = ["structs", "functions", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.04.eq"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`Pad` is a class with `Pad.__index = Pad` and a constructor `Pad.new(n)`.
+`mt` is a table already installed as **`Pad`'s own** metatable
+(`setmetatable(Pad, mt)`). Write the line that makes `Pad(5)` behave as
+`Pad.new(5)`.
+'''
+solution    = 'mt.__call = function(_, n) return Pad.new(n) end'
+hints = [
+  "Calling `Pad` consults `Pad`'s metatable, not `Pad` itself — and the handler receives the called table as its first argument.",
+]
+
+[quest.quiz]
+choices = [
+  'mt.__call = function(_, n) return Pad.new(n) end',
+  'Pad.__call = function(_, n) return Pad.new(n) end',
+  'mt.__call = function(n) return Pad.new(n) end',
+  'mt.__invoke = function(_, n) return Pad.new(n) end',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "lua.cheatsheet_advanced.06.newindex-rawset"
+node        = 6
+title       = "WRITE IT DOWN, THEN STORE IT"
+difficulty  = 4
+story       = "Every new entry in the incense ledger is logged first; the ledger still has to hold it afterwards."
+concepts    = ["structs", "collections", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.05.call"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`log` is a list. `t` is an empty table whose metatable has:
+
+```
+__newindex = function(t, k, v)
+  log[#log + 1] = k
+  -- ____
+end
+```
+
+Fill the blank so the value is really stored in `t` (a later `t[k]` reads
+it back) **without** running this handler a second time.
+'''
+solution    = 'rawset(t, k, v)'
+hints = [
+  "The key is still absent when the handler runs, so a plain assignment fires the handler again, forever; the store has to go past the metatable.",
+]
+
+[quest.quiz]
+choices = [
+  't[k] = v',
+  'rawset(t, k, v)',
+  't.k = v',
+  'rawset(t, v, k)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "lua.cheatsheet_advanced.07.rawget-default"
+node        = 7
+title       = "WAS IT EVER WRITTEN"
+difficulty  = 4
+story       = "The count table answers zero for any name; the marshal wants to know which names were actually entered."
+concepts    = ["collections", "zero-values", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.06.newindex-rawset"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`counts` was made as
+
+```
+local counts = setmetatable({}, {__index = function() return 0 end})
+```
+
+so any missing key reads as `0`. Open an `if` that is true only when `k`
+has **really** been stored in `counts` — a stored `0` counts as stored, a
+never-written key does not.
+'''
+solution    = 'if rawget(counts, k) ~= nil then'
+hints = [
+  "A normal read goes through the default; the read that skips the metatable is a global function, not a method.",
+]
+
+[quest.quiz]
+choices = [
+  'if counts[k] ~= nil then',
+  'if counts[k] ~= 0 then',
+  'if counts:rawget(k) ~= nil then',
+  'if rawget(counts, k) ~= nil then',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "lua.cheatsheet_advanced.08.len-trap"
+node        = 8
+title       = "HOW LONG IS THE STACK"
+difficulty  = 4
+story       = "The stack of spare incense was given a length metamethod by someone who had read the 5.2 manual."
+concepts    = ["structs", "slices", "dispatch"]
+requires    = ["lua.cheatsheet_advanced.07.rawget-default"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`Stack` keeps its values in `s.items` (a list). Its metatable is a private
+table that defines `__len` to return `#s.items`; there is no `len` method.
+On the land's LuaJIT, make `n` the number of values in the stack `s`.
+'''
+solution    = 'local n = #s.items'
+hints = [
+  "LuaJIT is Lua 5.1: the length metamethod is honoured for userdata only, so `#` on the object gives the raw length of an empty table — 0.",
+]
+
+[quest.quiz]
+choices = [
+  'local n = #s',
+  'local n = s:len()',
+  'local n = #s.items',
+  'local n = s.__len(s)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "lua.cheatsheet_advanced.09.loop-closure"
+node        = 9
+title       = "EACH LANTERN ITS OWN NUMBER"
+difficulty  = 3
+story       = "Three lanterns in Victoria Park, each with a button that must say its own number when pressed later."
+concepts    = ["closures", "bindings", "control-flow"]
+requires    = ["lua.cheatsheet_advanced.08.len-trap"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`fns` is an empty table. Fill it with three functions so that `fns[1]()`,
+`fns[2]()` and `fns[3]()` return `1`, `2` and `3` — each closure keeping
+its own number.
+'''
+solution    = 'for i = 1, 3 do fns[i] = function() return i end end'
+hints = [
+  "A numeric `for` makes a fresh local each iteration; copying it into one outer variable gives every closure the same final value.",
+]
+
+[quest.quiz]
+choices = [
+  'for i = 1, 3 do fns[i] = function() return i end end',
+  'for i = 1, 3 do n = i fns[i] = function() return n end end',
+  'for i = 1, 3 do fns[i] = function(i) return i end end',
+  'for i = 1, 3 do fns[i] = function() return #fns end end',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "lua.cheatsheet_advanced.10.false-default"
+node        = 10
+title       = "FALSE IS AN ANSWER TOO"
+difficulty  = 4
+story       = "The crew can switch the cache off on purpose; the night the setting read as on anyway, Mei found out why."
+concepts    = ["zero-values", "control-flow", "bindings"]
+requires    = ["lua.cheatsheet_advanced.09.loop-closure"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`given` is the option as the caller passed it: `true`, `false`, or absent
+(`nil`); `default` is `true`. Make `cache` the given value — **`false`
+included** — and `default` only when nothing was given. One line.
+'''
+solution    = 'local cache = given if cache == nil then cache = default end'
+hints = [
+  "`x and y or z` and `x or z` both treat `false` like `nil`; only an explicit test against `nil` tells the two apart.",
+]
+
+[quest.quiz]
+choices = [
+  'local cache = given or default',
+  'local cache = given ~= nil and given or default',
+  'local cache = given if cache == nil then cache = default end',
+  'local cache = given == nil and default',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "lua.cheatsheet_advanced.11.select-n"
+node        = 11
+title       = "THE SECOND SHOUT"
+difficulty  = 3
+story       = "The roll call comes in as it comes; the marshal wants the second answer even when the first carrier said nothing."
+concepts    = ["functions", "zero-values"]
+requires    = ["lua.cheatsheet_advanced.10.false-default"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`f` takes any number of arguments (`function f(...)`). Inside it, make
+`second` exactly its second argument — even when the first is `nil`, and
+even when more follow.
+'''
+solution    = 'local second = select(2, ...)'
+hints = [
+  "The vararg list can be cut at a position; assigning the result to one local keeps just the first value that is left.",
+]
+
+[quest.quiz]
+choices = [
+  'local second = select(1, ...)',
+  'local second = select(2, ...)',
+  'local second = arg[2]',
+  'local second = ...[2]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "lua.cheatsheet_advanced.12.unpack-range"
+node        = 12
+title       = "EVERY ONE, HOLES AND ALL"
+difficulty  = 4
+story       = "The names are passed down the dragon exactly as shouted, gaps included, to the segment that counts them."
+concepts    = ["functions", "slices", "zero-values"]
+requires    = ["lua.cheatsheet_advanced.11.select-n"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`t` is `{...}` and `n` is `select("#", ...)`, so `t` may have `nil` holes
+(`t = {1, nil, nil}`, `n = 3`). Call `g` with **all** `n` values, holes
+included.
+'''
+solution    = 'g(unpack(t, 1, n))'
+hints = [
+  "`#` on a table with holes is a border, not the count; the unpacker takes an explicit first and last index, and on LuaJIT it is a global.",
+]
+
+[quest.quiz]
+choices = [
+  'g(unpack(t))',
+  'g(table.unpack(t, 1, n))',
+  'g(unpack(t, 1, n))',
+  'g(unpack(t, n))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "lua.cheatsheet_advanced.13.truncate"
+node        = 13
+title       = "ONLY THE FIRST"
+difficulty  = 4
+story       = "`f` reports a value and a status; the programme wants a list with only the value in it."
+concepts    = ["functions", "slices"]
+requires    = ["lua.cheatsheet_advanced.12.unpack-range"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`f()` returns two values, `1, 2`. Make `t` a list holding **exactly one**
+element, the first value — without a temporary variable.
+'''
+solution    = 'local t = {(f())}'
+hints = [
+  "A call in the last position of a constructor spreads every result; wrapping the call adjusts it to one value.",
+]
+
+[quest.quiz]
+choices = [
+  'local t = {f()}',
+  'local t = {(f())}',
+  'local t = {f()[1]}',
+  'local t = {select(1, f())}',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "lua.cheatsheet_advanced.14.wrap"
+node        = 14
+title       = "A RUNNER YOU CAN CALL"
+difficulty  = 3
+story       = "An incense runner per segment: the marshal wants to call each one like a function and get the next lantern number."
+concepts    = ["generators", "functions"]
+requires    = ["lua.cheatsheet_advanced.13.truncate"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`producer` is a function that yields a value several times
+(`coroutine.yield(i)` in a loop). Make `gen` a plain **function**: each
+`gen()` returns the next yielded value, and it works directly in
+`for v in gen do`.
+'''
+solution    = 'local gen = coroutine.wrap(producer)'
+hints = [
+  "Creating a coroutine gives a thread value, which cannot be called; the library has a second constructor that hands back a function instead.",
+]
+
+[quest.quiz]
+choices = [
+  'local gen = coroutine.wrap(producer)',
+  'local gen = coroutine.create(producer)',
+  'local gen = coroutine.resume(producer)',
+  'local gen = coroutine.wrap(producer())',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "lua.cheatsheet_advanced.15.resume-value"
+node        = 15
+title       = "WHAT THE RUNNER BRINGS BACK"
+difficulty  = 4
+story       = "The runner hands a number up the dragon and waits for one to come back down before finishing."
+concepts    = ["generators", "functions"]
+requires    = ["lua.cheatsheet_advanced.14.wrap"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+```
+local co = coroutine.create(function(a)
+  local b = coroutine.yield(a * 2)
+  return b + 1
+end)
+```
+
+`co` has been started once with `5`; that call returned `true, 10`, and
+`coroutine.status(co)` is now `"suspended"`. Write the next line so that
+`ok, v` is `true, 8` and the coroutine finishes (`"dead"`).
+'''
+solution    = 'local ok, v = coroutine.resume(co, 7)'
+hints = [
+  "The arguments of the second resume become the results of the pending yield — exactly the arguments, no more.",
+]
+
+[quest.quiz]
+choices = [
+  'local ok, v = coroutine.resume(co)',
+  'local ok, v = coroutine.resume(co, 7)',
+  'local ok, v = coroutine.yield(co, 7)',
+  'local ok, v = coroutine.resume(co, 5, 7)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "lua.cheatsheet_advanced.16.error-table"
+node        = 16
+title       = "A STRUCTURED FAILURE"
+difficulty  = 3
+story       = "A lookup that fails should say which code it failed with, not hand the caller a sentence to parse."
+concepts    = ["error-handling", "panics"]
+requires    = ["lua.cheatsheet_advanced.15.resume-value"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`lookup` must fail in a way that lets its caller do
+
+```
+local ok, e = pcall(lookup, id)
+if not ok then print(e.code) end   -- 404
+```
+
+Write the line inside `lookup` that raises that failure.
+'''
+solution    = 'error({code = 404})'
+hints = [
+  "The error value can be any Lua value, not only a string; returning it instead of raising it leaves `ok` true.",
+]
+
+[quest.quiz]
+choices = [
+  'error("code = 404")',
+  'return nil, {code = 404}',
+  'throw({code = 404})',
+  'error({code = 404})',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "lua.cheatsheet_advanced.17.xpcall"
+node        = 17
+title       = "WHERE IT BROKE"
+difficulty  = 3
+story       = "The dragon stopped on segment forty. Mei wants the message and the frames above it, not the message alone."
+concepts    = ["error-handling", "panics"]
+requires    = ["lua.cheatsheet_advanced.16.error-table"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+Call `f` in protected mode; on failure `err` must hold the message **with a
+stack traceback** appended, not the bare message.
+'''
+solution    = 'local ok, err = xpcall(f, debug.traceback)'
+hints = [
+  "The protected call that takes a message handler wants the handler as a function value; calling it there hands over a string, which is refused.",
+]
+
+[quest.quiz]
+choices = [
+  'local ok, err = xpcall(f, debug.traceback)',
+  'local ok, err = pcall(f, debug.traceback)',
+  'local ok, err = xpcall(f, debug.traceback())',
+  'local ok, err = xpcall(debug.traceback, f)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "lua.cheatsheet_advanced.18.gmatch-pairs"
+node        = 18
+title       = "KEY, EQUALS, VALUE"
+difficulty  = 3
+story       = "The config for the drum teams arrives as one line of `name=value` pairs on Ormsby Street."
+concepts    = ["strings", "iteration"]
+requires    = ["lua.cheatsheet_advanced.17.xpcall"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`s` is `"a=1 bb=22 c=3"`. Open a loop that visits each pair with `k` the
+name and `v` the digits, both as strings — `a`/`1`, `bb`/`22`, `c`/`3`.
+'''
+solution    = 'for k, v in s:gmatch("(%w+)=(%w+)") do'
+hints = [
+  "Each capture in the pattern becomes one loop variable; with no captures the loop gets the whole match and nothing else.",
+]
+
+[quest.quiz]
+choices = [
+  'for k, v in s:gmatch("%w+=%w+") do',
+  'for k, v in string.gmatch("(%w+)=(%w+)", s) do',
+  'for k, v in s:gmatch("(%w+)=(%w+)") do',
+  'for k, v in s:gmatch("(\\w+)=(\\w+)") do',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "lua.cheatsheet_advanced.19.gsub-table"
+node        = 19
+title       = "FILL IN THE BLANKS"
+difficulty  = 4
+story       = "The programme template has `$name` holes; the crew list fills them and the printer wants to know how many it filled."
+concepts    = ["strings", "collections"]
+requires    = ["lua.cheatsheet_advanced.18.gmatch-pairs"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`vars` is `{name = "Mei", st = "Tai Hang"}` and `s` is
+`"hi $name of $st"`. Replace **every** `$word` with `vars[word]` and make
+`n` how many were replaced — one call, no loop.
+'''
+solution    = 'local out, n = s:gsub("%$(%w+)", vars)'
+hints = [
+  "With a table as the replacement, the first capture is the key looked up; the count is the call's second result.",
+]
+
+[quest.quiz]
+choices = [
+  'local out, n = s:gsub("%$%w+", vars)',
+  'local out, n = s:gsub("%$(%w+)", vars, 1)',
+  'local n, out = s:gsub("%$(%w+)", vars)',
+  'local out, n = s:gsub("%$(%w+)", vars)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "lua.cheatsheet_advanced.20.frontier"
+node        = 20
+title       = "THE WHOLE WORD"
+difficulty  = 4
+story       = "Counting `the` in the programme notes, Mei kept catching `there` and `thesis` as well."
+concepts    = ["strings", "iteration"]
+requires    = ["lua.cheatsheet_advanced.19.gsub-table"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`s` is `"the thesis there; the other, the."`. Make `n` the number of times
+`the` occurs as a **whole word** — `3` here, not `6`. (`out` is unused.)
+'''
+solution    = 'local out, n = s:gsub("%f[%w]the%f[%W]", "")'
+hints = [
+  "Lua patterns have no `\\b`; the frontier item matches the empty transition into or out of a character class, including at the ends of the string.",
+]
+
+[quest.quiz]
+choices = [
+  'local out, n = s:gsub("the", "")',
+  'local out, n = s:gsub("\\bthe\\b", "")',
+  'local out, n = s:gsub("[^%w]the[^%w]", "")',
+  'local out, n = s:gsub("%f[%w]the%f[%W]", "")',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "lua.cheatsheet_advanced.21.format-widths"
+node        = 21
+title       = "COLUMNS FOR THE PROGRAMME"
+difficulty  = 3
+story       = "The price board at the Lin Fa Kung stall lines up in columns, and the judge diffs it byte for byte."
+concepts    = ["io", "strings"]
+requires    = ["lua.cheatsheet_advanced.20.frontier"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`name` is `"tea"`, `price` is `3.5`, `n` is `7`. Print exactly
+
+```
+tea       | 3.50|007
+```
+
+— the name left-aligned in 10 columns, the price in 5 columns with two
+decimals, the number zero-padded to 3.
+'''
+solution    = 'print(("%-10s|%5.2f|%03d"):format(name, price, n))'
+hints = [
+  "A minus sign in the width left-aligns, a leading zero pads with zeros, and the float width counts the whole `3.50`.",
+]
+
+[quest.quiz]
+choices = [
+  'print(("%-10s|%5.2f|%03d"):format(name, price, n))',
+  'print(("%10s|%5.2f|%03d"):format(name, price, n))',
+  'print(("%-10s|%5.2f|%3d"):format(name, price, n))',
+  'print(("%-10s|%.2f|%03d"):format(name, price, n))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "lua.cheatsheet_advanced.22.sort-strict"
+node        = 22
+title       = "TIES WITHOUT A CRASH"
+difficulty  = 4
+story       = "Forty drum teams, most on the same score, and the sort raised `invalid order function` in front of the judges."
+concepts    = ["sorting", "closures", "panics"]
+requires    = ["lua.cheatsheet_advanced.21.format-widths"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`t` is a list of records with a number field `score`, and **many of them
+tie**. Sort it highest score first without LuaJIT raising
+`invalid order function for sorting`.
+'''
+solution    = 'table.sort(t, function(a, b) return a.score > b.score end)'
+hints = [
+  "The comparator must be a strict order: false for equal elements, and a boolean, not a number. (The sort is not stable; tied records may come out in any order.)",
+]
+
+[quest.quiz]
+choices = [
+  'table.sort(t, function(a, b) return a.score >= b.score end)',
+  'table.sort(t, function(a, b) return b.score - a.score end)',
+  'table.sort(t, function(a, b) return a.score > b.score end)',
+  'table.sort(t, function(a, b) return a.score < b.score end)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "lua.cheatsheet_advanced.23.next-empty"
+node        = 23
+title       = "NOTHING IN THE LEDGER"
+difficulty  = 3
+story       = "The ledger is keyed by carrier name; `#` says zero whether it is empty or full."
+concepts    = ["collections", "zero-values"]
+requires    = ["lua.cheatsheet_advanced.22.sort-strict"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`t` is keyed by carrier name — string keys only — so `#t` is `0` whether
+or not it holds anything. Open an `if` that is true only when `t` has
+**no** entries at all.
+'''
+solution    = 'if next(t) == nil then'
+hints = [
+  "The iterator primitive behind `pairs` returns the first key of a table, or `nil` when there is none; every table is its own value, so `{}` equals nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'if #t == 0 then',
+  'if next(t) == nil then',
+  'if t == {} then',
+  'if not t then',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "lua.cheatsheet_advanced.24.big-digits"
+node        = 24
+title       = "ALL THE DIGITS"
+difficulty  = 4
+story       = "The lantern count hit sixteen digits and the printout came back in scientific notation."
+concepts    = ["io", "math", "types"]
+requires    = ["lua.cheatsheet_advanced.23.next-empty"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`n` is `2^50` — the number `1125899906842624`. Print it with every digit
+and no exponent (LuaJIT's `print` shows `1.1258999068426e+15`).
+'''
+solution    = 'print(string.format("%d", n))'
+hints = [
+  "Every number is a double here, and the default conversion is `%.14g`; the integer conversion in `format` writes all sixteen digits.",
+]
+
+[quest.quiz]
+choices = [
+  'print(n)',
+  'print(tostring(n))',
+  'print(math.floor(n))',
+  'print(string.format("%d", n))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "lua.cheatsheet_advanced.25.bit-test"
+node        = 25
+title       = "IS THE FLAG UP"
+difficulty  = 4
+story       = "Each segment's state is one number of flags; the marshal checks the one bit for `lit`."
+concepts    = ["bit-manipulation", "control-flow"]
+requires    = ["lua.cheatsheet_advanced.24.big-digits"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`flags` is a number used as a row of bits and `i` is a bit position
+counted from `0`; LuaJIT's `bit` library is loaded as `bit`. Open an `if`
+that is true exactly when bit `i` of `flags` is set.
+'''
+solution    = 'if bit.band(flags, bit.lshift(1, i)) ~= 0 then'
+hints = [
+  "LuaJIT has no operator for this — it is two library calls — and `0` is true in Lua, so the result still has to be compared.",
+]
+
+[quest.quiz]
+choices = [
+  'if bit.band(flags, bit.lshift(1, i)) then',
+  'if flags & (1 << i) ~= 0 then',
+  'if bit.band(flags, bit.lshift(1, i)) ~= 0 then',
+  'if bit.band(flags, bit.lshift(i, 1)) ~= 0 then',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "lua.cheatsheet_advanced.26.goto-continue"
+node        = 26
+title       = "SKIP THIS ONE"
+difficulty  = 3
+story       = "Even-numbered segments rest this lap; the loop walks on past them without nesting the whole body in an `if`."
+concepts    = ["control-flow", "iteration"]
+requires    = ["lua.cheatsheet_advanced.25.bit-test"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+```
+for _, v in ipairs(t) do
+  -- ____
+  io.write(v, " ")
+  ::continue::
+end
+```
+
+Fill the blank so even values are skipped and the loop carries on
+(LuaJIT 2.1).
+'''
+solution    = 'if v % 2 == 0 then goto continue end'
+hints = [
+  "Lua has no `continue` keyword; LuaJIT does have the 5.2 jump statement, and the label at the end of the body is its target.",
+]
+
+[quest.quiz]
+choices = [
+  'if v % 2 == 0 then continue end',
+  'if v % 2 == 0 then goto continue end',
+  'if v % 2 == 0 then goto ::continue:: end',
+  'if v % 2 == 0 then break end',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "lua.cheatsheet_advanced.27.local-function"
+node        = 27
+title       = "A FUNCTION THAT KNOWS ITS NAME"
+difficulty  = 4
+story       = "The factorial on School Street was local, recursive, and crashed on its second call — `attempt to call global 'fact'`."
+concepts    = ["functions", "recursion", "bindings"]
+requires    = ["lua.cheatsheet_advanced.26.goto-continue"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+Declare `fact` as a **local** function whose body is
+
+```
+  if n <= 1 then return 1 end
+  return n * fact(n - 1)
+```
+
+so that the recursive call finds it (no global named `fact` exists).
+Write the opening line.
+'''
+solution    = 'local function fact(n)'
+hints = [
+  "In `local x = <expr>`, the name is not in scope until after the expression, so a function value assigned that way cannot see itself.",
+]
+
+[quest.quiz]
+choices = [
+  'local fact = function(n)',
+  'local function fact(n)',
+  'function local fact(n)',
+  'local fact(n)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "lua.cheatsheet_advanced.28.ffi-array"
+node        = 28
+title       = "A REAL C ARRAY"
+difficulty  = 5
+story       = "The wallet binding under the LÖVE client talks to C; the buffer it hands over has to be a C array, not a Lua table."
+concepts    = ["types", "slices", "imports"]
+requires    = ["lua.cheatsheet_advanced.27.local-function"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`ffi` is `require("ffi")` and `n` is a number known only at run time.
+Make `buf` a C array of `n` `int`s — zero-filled, indexed from `0`, sized
+to `n`.
+'''
+solution    = 'local buf = ffi.new("int[?]", n)'
+hints = [
+  "A C type string cannot contain a Lua variable; a variable-length array is declared with a placeholder and gets its count as the next argument.",
+]
+
+[quest.quiz]
+choices = [
+  'local buf = ffi.new("int[n]")',
+  'local buf = ffi.new("int", n)',
+  'local buf = ffi.new("int[]", n)',
+  'local buf = ffi.new("int[?]", n)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "lua.cheatsheet_advanced.29.weak-cache"
+node        = 29
+title       = "A CACHE THAT LETS GO"
+difficulty  = 5
+story       = "The render cache is keyed by lantern object; lanterns that burn out must not be kept alive by their own cache entry."
+concepts    = ["collections", "structs"]
+requires    = ["lua.cheatsheet_advanced.28.ffi-array"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`cache` maps objects (tables used as keys) to computed values. Make it so
+an object that nothing else references can be collected — its entry
+vanishing with it — while the value stored for a live object stays.
+'''
+solution    = 'local cache = setmetatable({}, {__mode = "k"})'
+hints = [
+  "Weakness is a metatable field holding a string; which letter it contains decides whether keys, values, or both are weak.",
+]
+
+[quest.quiz]
+choices = [
+  'local cache = setmetatable({}, {__mode = "k"})',
+  'local cache = setmetatable({}, {__weak = true})',
+  'local cache = setmetatable({}, {__mode = "v"})',
+  'local cache = setmetatable({}, {__gc = true})',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "lua.cheatsheet_advanced.30.sandbox"
+node        = 30
+title       = "A SANDBOX FOR THE MOON"
+difficulty  = 5
+story       = "Midnight. The last challenge is a line of Lua typed by a stranger, and it runs in a room with nothing in it but `x`."
+concepts    = ["functions", "bindings", "error-handling"]
+requires    = ["lua.cheatsheet_advanced.29.weak-cache"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`src` is a string of Lua, `"return x * 2"`, and `env` is `{x = 10}`.
+Compile it into a function `f` whose globals are **only** `env` — so
+`f()` returns `20` and `print` is not visible inside. One line, LuaJIT.
+'''
+solution    = 'local f = setfenv(assert(loadstring(src)), env)'
+hints = [
+  "Compiling a string gives a function (or nil and a message — hence the assertion); the 5.1 call that swaps a function's global table returns that same function.",
+]
+
+[quest.quiz]
+choices = [
+  'local f = setfenv(assert(loadstring(src)), env)',
+  'local f = assert(loadstring(src, env))',
+  'local f = assert(loadstring(src)):setfenv(env)',
+  'local f = assert(loadstring(src), env)',
+]
+answer  = 0

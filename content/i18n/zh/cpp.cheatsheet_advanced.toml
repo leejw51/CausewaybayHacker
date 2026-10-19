@@ -1,0 +1,484 @@
+# CPP LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/cpp/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code
+# blocks and identifiers are copied verbatim, never translated.
+
+pack   = "cpp.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet_advanced.01.auto-params"
+title = "随便哪两个都行"
+story = "轩尼诗道的找换店把以元计的车费和以分计的小费相加，又不想给每一对类型各写一个函数。"
+brief = '''
+用**一个**定义写出 `add`，使得 `add(1, 2.5)` 能编译并返回 `3.5`，
+而 `add(std::string("a"), "b")` 也能编译。C++20。
+'''
+hints = [
+  "从 C++20 起，参数列表里的占位符本身就让函数成为模板 —— 而每个占位符都是各自独立的类型。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet_advanced.02.constrained-member"
+title = "拿到外面去"
+story = "崇光的盘点只累计整件的货品 —— 而负责报数的成员定义在 .cpp 里，在类的外面。"
+brief = '''
+```cpp
+template <std::integral T>
+struct Stat {
+  T s = 0;
+  void add(T x) { s += x; }
+  T sum() const;
+};
+```
+
+在 struct **外面**定义 `sum`。`<concepts>` 已经包含。
+'''
+hints = [
+  "类模板的类外成员要重复模板头 —— 而且必须是同一个头，连约束也一样。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet_advanced.03.mutable-capture"
+title = "取票机"
+story = "Lucky Mac 柜台的排队取票机发出 0、1、2 —— 它自己记数，外面哪里都没有计数变量。"
+brief = '''
+让 `next` 成为一个可调用对象，连续调用时依次返回 `0`、`1`、`2`。
+**lambda 外面不存在任何名为 `n` 的变量。**
+'''
+hints = [
+  "捕获可以直接在方括号里初始化。lambda 的调用运算符默认是 `const` 的，除非你另外声明 —— 还要留意后置自增和前置自增的区别。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet_advanced.04.this-capture"
+title = "算我一个"
+story = "铜锣湾站的旋转闸发出一个计数器；每一次点击都必须落在闸机自己的计数上，而不是它的副本上。"
+brief = '''
+```cpp
+struct Counter {
+  int count = 0;
+  std::function<void()> ticker();
+};
+```
+
+在 `ticker` 里返回一个 lambda。调用它两次之后，**这个对象的** `count`
+必须是 `2`。
+'''
+hints = [
+  "数据成员不是变量，所以不能按名字放进捕获列表。捕获这个对象 —— 按指针，这样改的才是真正的那个。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet_advanced.05.recursive-lambda"
+title = "调用自己"
+story = "渣甸坊面包店的点心师傅把蛋挞的统计写成一个调用自己的函数 —— 在 main 里，视线所及没有任何具名函数。"
+brief = '''
+把 `fib` 定义成一个**调用自己**的局部 lambda，使得 `fib(10)` 返回 `55`。
+`<functional>` 已经包含。
+'''
+hints = [
+  "`auto` 变量不能出现在自己的初始化式里；声明了可调用类型的变量可以 —— 而 lambda 必须捕获它。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet_advanced.06.if-constexpr"
+title = "只留一个分支"
+story = "避风塘码头的地磅接收一个箱数或者一个标签 —— 并拒绝编译对它拿到的东西来说毫无意义的那个分支。"
+brief = '''
+```cpp
+template <typename T>
+auto weigh(const T& x) {
+  // one line here
+}
+```
+
+当 `T` 是整数类型时返回 `x * 2`，否则返回 `x.size()`。`weigh(21)` 和
+`weigh(std::string("abc"))` 都必须能编译。`<type_traits>` 已经包含。
+'''
+hints = [
+  "普通的 `if` 对每个 `T` 仍然会把两个分支都编译。条件必须是一个值，而不是一个 trait 类型 —— 而 `else` 才是把另一个分支挡在外面的东西。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet_advanced.07.static-assert"
+title = "让构建失败，不是让运行失败"
+story = "午炮的炮手在装炮之前就检查装药量的平方 —— 算术要是不对，什么都不会出厂。"
+brief = '''
+已声明 `constexpr int sq(int x) { return x * x; }`。在**命名空间作用域**，
+让 `sq(12)` 不等于 `144` 时**编译**失败 —— 任何东西都不能在运行时检查。
+'''
+hints = [
+  "`constexpr` 调用可以由编译器求值，而且有一种断言活在编译期；从 C++17 起它的消息是可选的，但一旦给出就必须是字符串。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet_advanced.08.enum-class"
+title = "数字变成线路"
+story = "铜锣湾的港铁指示牌从线路上读到一个线路号，必须把它变成一个正规的、有作用域的、一字节的线路代码。"
+brief = '''
+```cpp
+enum class Line : std::uint8_t { Island, TsuenWan, KwunTong };
+```
+
+`int n` 从输入读入，是 `0`、`1` 或 `2`。声明 `Line l`，持有对应的枚举值。
+'''
+hints = [
+  "有作用域的枚举在任何方向上都不会隐式转换；花括号初始化拒绝把运行时的 `int` 收窄。有一个具名转换能做这件事。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet_advanced.09.spaceship"
+title = "一个的价钱买六个"
+story = "港务处现在要求每个泊位都能以各种方式比较 —— 小于、等于、不小于 —— 又拒绝手写六个运算符。"
+brief = '''
+`struct Pt { int r, c; };` —— 添加**一个成员**，使得 `a < b`、`a == b`
+和 `a >= b` 都能编译，先按 `r` 再按 `c` 排序。C++20，`<compare>` 已经包含。
+'''
+hints = [
+  "一个 defaulted 的三路比较运算符也会顺带给你 `==`。它的返回类型是一个排序类别 —— 让编译器推导 —— 而 defaulted 的比较必须是 `const`。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet_advanced.10.dynamic-cast"
+title = "真的是圆吗"
+story = "谢斐道的招牌店通过基类指针持有每一张订单，而圆形招牌机只能拿到那些真正是圆的。"
+brief = '''
+```cpp
+struct Shape { virtual double area() const = 0; virtual ~Shape() = default; };
+struct Circle : Shape { double r; double area() const override { return 3.14 * r * r; } };
+struct Square : Shape { double s; double area() const override { return s * s; } };
+```
+
+`Shape* s` 指向某个形状。当它真的是一个圆时，让 `c` **以 `Circle`
+的身份**指向它，否则为 `nullptr`。
+'''
+hints = [
+  "只有一种转换会在运行时问对象它是什么；其他几种只是重新解释指针，永远不会产生空指针。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet_advanced.11.move-unique"
+title = "交出去了"
+story = "波斯富街货仓的一个包裹只有一个主人；把它放上货车，意味着速递员不再持有它。"
+brief = '''
+`auto p = std::make_unique<Node>(5);` 和
+`std::vector<std::unique_ptr<Node>> v;` —— 把 `p` 拥有的节点放进 `v`。
+之后 `p` 必须是**空的**，并且不能复制任何 `Node`。
+'''
+hints = [
+  "unique 指针不能复制，而裸指针也不会悄悄变成一个；把所有权本身交出去。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet_advanced.12.weak-lock"
+title = "还在吗？"
+story = "渣甸坊楼上的管理员记着 7 号房住客的一条非拥有的备注，必须查他们是否还住在那里 —— 并且在说话期间把他们留在大堂。"
+brief = '''
+`std::weak_ptr<Room> wp;` —— **只在房间仍然存在时**打印房间的 `n`，
+并在打印期间让它保持存活。
+'''
+hints = [
+  "weak 指针不能直接解引用或检测；它交还给你一个强指针，对象已经没了的时候那个强指针是空的。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet_advanced.13.move-ctor"
+title = "拿走钥匙，什么都别留"
+story = "怡和街的当铺接管一个储物柜的内容；旧票据必须留成指向空无，否则柜子会被清空两次。"
+brief = '''
+```cpp
+struct Buf {
+  int* data; int n;
+  explicit Buf(int n) : data(new int[n]), n(n) {}
+  ~Buf() { delete[] data; }
+  Buf(const Buf&) = delete;
+  Buf& operator=(const Buf&) = delete;
+  // the move constructor goes here
+};
+```
+
+添加移动构造函数：`Buf b(std::move(a));` 必须接管 `a` 的数组，而被移走的
+`a` 必须**可以安全销毁**。`<utility>` 已经包含。
+'''
+hints = [
+  "参数是右值引用，而如果你打算把它掏空，它就不能是 `const`。有一个工具函数能在一个表达式里存入新值并交回旧值。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet_advanced.14.try-emplace"
+title = "只在是新的时候"
+story = "电车厂的登记簿只接收一次新车号；重复的必须让旧条目原封不动，并且说明这一点。"
+brief = '''
+`std::map<std::string, int> m;`，另有 `std::string k; int v;` ——
+**仅当 `k` 不存在时**插入 `k → v`，并在同一行把 `ok` 绑定到它是否被插入。
+'''
+hints = [
+  "从不覆盖的那个插入返回一个 pair；结构化绑定用方括号。它那个会覆盖的表亲也返回一个 pair，这正是陷阱。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet_advanced.15.optional-view"
+title = "一个数，或者没有，来自任何文本"
+story = "隧道收费亭解析送来的任何文本 —— 读取器给的 std::string，测试给的字面量 —— 回答一个车费，或者什么都没有。"
+brief = '''
+声明 `parse`：它返回一个 `int` **或者什么都没有**（不用异常，不用指针），
+而且必须既能用 `std::string` 调用，**也**能用字面量 `"7"` 调用，并且不复制文本。
+'''
+hints = [
+  "非拥有的字符串类型按值接收 `std::string` 和字面量；对它的引用两者都绑不上。返回类型需要它的模板实参。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet_advanced.16.visit"
+title = "不管是哪一个"
+story = "时代广场电影院的一张票要么是座位号，要么是宾客名单上的名字；引座员打印它装着的那一个。"
+brief = '''
+```cpp
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+std::variant<int, std::string> v = ...;
+auto pr = overloaded{ [](int i) { std::cout << i; },
+                      [](const std::string& s) { std::cout << s; } };
+```
+
+用 `pr` 打印 `v` 当前持有的那个备选项。
+'''
+hints = [
+  "分发器是一个自由函数，不是成员：可调用对象在前，variant 在后。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet_advanced.17.span"
+title = "任何一排数字"
+story = "维多利亚公园的传感器集线器对读数求和，读数可能以 const vector、std::array 或普通 C 数组送来 —— 一个函数，什么都不复制。"
+brief = '''
+声明 `total`，使得**全部三个**调用都能编译且不复制任何元素：`total(v)`，
+其中 `v` 是 `const std::vector<int>`；`total(a)`，其中 `a` 是
+`std::array<int, 3>`；以及 `total(c)`，其中 `c` 是 `int c[3]`。C++20。
+'''
+hints = [
+  "一种非拥有的视图覆盖所有连续序列 —— 但指向可变元素的视图不会接受 `const` 的 vector。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet_advanced.18.views-pipeline"
+title = "惰性流水线"
+story = "崇光游戏厅的记分板要前三个偶数分数的平方，只在板子滚动到它们时才计算。"
+brief = '''
+```cpp
+namespace views = std::views;
+std::vector<int> v = {9, 2, 7, 4, 6, 1, 8, 10};
+std::ranges::sort(v);
+auto even = [](int x) { return x % 2 == 0; };
+auto sq   = [](int x) { return x * x; };
+```
+
+构造惰性范围 `r`，它的元素是 `4 16 36` —— **前三个偶数**的平方。
+`<ranges>` 已经包含。
+'''
+hints = [
+  "适配器用 `|` 组合，从左到右生效：先取三个再筛选取到的是错的三个，而先反转则会从远端取。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet_advanced.19.multiset-erase-one"
+title = "只去掉其中一个"
+story = "避风塘里三条舢板的吃水读数相同；一条离开时，排好序的日志必须恰好去掉一条记录，而不是三条全去。"
+brief = '''
+`std::multiset<int> ms = {3, 5, 5, 5, 8};` 和 `int x = 5;` —— 删除
+**恰好一个** `5`，留下 `3 5 5 8`，O(log n)。
+'''
+hints = [
+  "按值删除会把每一份都删掉；按迭代器删除只删一个。成员查找是对数的 —— 自由算法则是逐个走。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet_advanced.20.pair-hash"
+title = "两半拼成的键"
+story = "铜锣湾网格按 (row, column) 访问，而已访问格子的哈希集合需要一个标准库没有提供的哈希器。"
+brief = '''
+```cpp
+struct PairHash {
+  // one line here
+    return std::hash<long long>()(((long long)p.first << 32) ^ (unsigned)p.second);
+  }
+};
+std::unordered_map<std::pair<int,int>, int, PairHash> seen;
+```
+
+写出哈希器的开头那一行，让 `seen` 能编译。
+'''
+hints = [
+  "哈希器是一个接收一个键、返回 `size_t` 的调用运算符 —— 而容器是在 `const` 对象上调用它的。接收两个键返回 `bool` 的是比较器，不是哈希。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet_advanced.21.heap-comparator"
+title = "最早到期的在顶上"
+story = "Lucky Mac 夜厨房里 Bo 师傅的点单轨把截止时间最早的订单放在顶上 —— 而轨道不知道对一张单子来说“小于”是什么意思。"
+brief = '''
+```cpp
+struct Job { int d; std::string name; };   // no comparison operators
+std::priority_queue<Job, std::vector<Job>, decltype(cmp)> pq(cmp);
+```
+
+定义 `cmp`（在队列之前），使得 `pq.top()` 总是 `d` **最小**的那个 job。
+'''
+hints = [
+  "比较器决定谁往下沉：队列把不“小于”任何其他元素的那个放在顶上。要让最小的在顶上，“小于”就得表示更大 —— 而且它必须返回真正的 bool。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet_advanced.22.getline-delim"
+title = "按逗号切"
+story = "送货清单上读到 'Jaffe Road,7,Sogo' —— 三个字段，其中一个里面带空格，只按逗号切分。"
+brief = '''
+`std::istringstream ss(line); std::string tok; std::vector<std::string> parts;`
+—— `line` 是 `Jaffe Road,7,Sogo`，把 `parts` 填成**三个**字段，
+第一个是 `Jaffe Road`。
+'''
+hints = [
+  "`>>` 按空白切分，会把路名切成两半。读行的那个函数接收一个可选的分隔符 —— 单个字符，作为第三个参数。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet_advanced.23.erase-if"
+title = "扔掉奇数的"
+story = "崇光游戏厅把罐子里所有奇数号的代币清掉 —— 一行搞定，不让迭代器在半路失效。"
+brief = '''
+`std::vector<int> v = {1, 3, 5, 2, 4, 7, 9};` —— 删除所有**奇数**元素，
+使 `v` 是 `{2, 4}` 且 `v.size() == 2`。C++20，`<algorithm>` 和 `<vector>`
+已经包含。
+'''
+hints = [
+  "经典算法只会挪动，从不收缩；在 `++it` 循环里 erase 用的是刚被 erase 作废的迭代器。C++20 加了一个自由函数，把整套舞步都替你跳完。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet_advanced.24.popcount"
+title = "数亮着的窗"
+story = "轩尼诗道大厦的六十四户，每户一个比特；夜班更夫数亮着的那些 —— 全部六十四户，不只是低的那一半。"
+brief = '''
+`std::uint64_t x = 0xF0000000F0000001;` —— 把 `int c` 设为 `x` 中**置位比特**
+的个数，也就是 `9`。`<bit>` 和 `<bitset>` 已经包含。
+'''
+hints = [
+  "其中两个只看 64 位值的 32 位，还有一个数的是末尾的 1 而不是全部。C++20 的那个原样接收任何无符号类型。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet_advanced.25.stopwatch"
+title = "那花了多久"
+story = "阿薇从午炮响起到最后一次敲键给解题计时，想要以整数毫秒给出答案 —— 不是纳秒，也不是编译错误。"
+brief = '''
+```cpp
+using namespace std::chrono;
+auto t0 = steady_clock::now();
+solve();
+auto t1 = steady_clock::now();
+```
+
+把 `ms` 设为经过的时间，以**毫秒**为单位的整数。
+'''
+hints = [
+  "两个时间点之差是一个以时钟自身单位计的 duration。转换成更粗的单位会丢精度，所以必须显式地要求。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet_advanced.26.jthread"
+title = "出门时自己 JOIN"
+story = "波斯富街的 Alex 在第二个线程上启动夜间批处理，想让它在作用域结束时被等待 —— 不靠一行他可能忘掉的代码。"
+brief = '''
+`void work();` —— 在新线程 `t` 上启动 `work`，并在 `t` 离开作用域时
+**自动 join**。C++20，`<thread>` 已经包含。
+'''
+hints = [
+  "普通线程在析构时仍然 joinable 会终止程序；detach 则永远不会 join。C++20 加了一种析构函数会 join 的线程 —— 它的构造函数是 explicit 的，所以不能用 `=`。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet_advanced.27.async"
+title = "现在开始，稍后收取"
+story = "找换亭在顾客到达的那一刻就把汇率查询派给另一个职员，需要时再去取那个数。"
+brief = '''
+`int work(int x);` —— **立即在另一个线程上**启动 `work(5)`，并拿到一个
+句柄 `f`，使得之后 `int r = f.get();` 能得到结果。`<future>` 已经包含。
+'''
+hints = [
+  "把可调用对象和它的参数分开传 —— 你自己调用它就等于就地运行。deferred 策略在 `get` 之前什么都不会启动。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet_advanced.28.scoped-lock"
+title = "两把锁，不死锁"
+story = "告士打道旁那家金融科技公司的两个柜员在同两个账户之间反向转钱，而分行绝不能卡死。"
+brief = '''
+```cpp
+struct Acct { std::mutex m; int bal; };
+void transfer(Acct& from, Acct& to, int amt) {
+  // one line here
+  from.bal -= amt; to.bal += amt;
+}
+```
+
+在函数余下的部分锁住**两个**账户。一个线程循环运行 `transfer(a, b, 1)`，
+另一个运行 `transfer(b, a, 1)`；程序绝不能死锁。
+'''
+hints = [
+  "按参数送来的顺序一个接一个地拿两把锁，正是两个线程永远互相等待的方式。有一个 C++17 的 guard 能接收任意数量的互斥量，并无死锁地获取它们。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet_advanced.29.fetch-add"
+title = "我前面的那个数"
+story = "铜锣湾站的八个旋转闸共用一个计数器；每个闸口都需要自己那一下之前的计数，而且一下都不能丢。"
+brief = '''
+`std::atomic<int> hits{0};` 被八个线程同时递增。在每个线程里，加 `1`，
+并把 `int before` 设为**这个线程递增之前**的那个值。不能丢失任何一次递增。
+'''
+hints = [
+  "先读值再存新值是两个独立的原子步骤，另一个线程能挤在中间。前置自增是原子的，但交回的是之后的值。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet_advanced.30.condition-variable"
+title = "等到有东西为止"
+story = "正午，炮响，Lucky Mac 的传菜窗口：传菜员一直睡到真的有盘子在那里，不为别的醒来，也绝不错过提早放下的那一盘。"
+brief = '''
+`std::mutex m; std::condition_variable cv; std::queue<int> q;` —— 在消费者
+的开头，取得锁并**阻塞到 `q` 非空为止**，即使生产者在我们到达之前就已经
+push 并 notify 过也要正确，而且要能抵御虚假唤醒。之后锁仍然持有。
+'''
+hints = [
+  "等待需要一把它能释放再重新获取的锁，所以不是那个简单的 guard，也不是裸的互斥量。接收谓词的那个重载在每次醒来时都重新检查它，而如果它已经成立就立即返回。",
+]

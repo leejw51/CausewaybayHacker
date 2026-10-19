@@ -1,0 +1,514 @@
+# PYTORCH LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/pytorch/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "pytorch.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.01.autograd-grad"
+title = "SKLON BEZ PAPÍROVÁNÍ"
+story = "Zpátky ve sklepě budovy Chow Yei Ching. Konzole na vozíku chce derivaci, ne vedlejší efekt."
+brief = '''
+```
+x = torch.tensor([1.0, 2.0], requires_grad=True)
+y = (x ** 3).sum()
+```
+
+Udělej z `g` gradient dy/dx jako **tenzor** tvaru `(2,)` — a `x.grad`
+musí potom pořád být `None`.
+'''
+hints = [
+  "Funkcionální API vrací jeden gradient na každý vstup, zabalené v n-tici, takže ji rozbal; metoda na `y` zapisuje do `.grad` a nic nevrací.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.02.detach-clone"
+title = "KOPIE, KTERÁ NIKOMU NIC NEDLUŽÍ"
+story = "Ulička mezi racky drží pracovní kopii každé váhy. Čmárání do ní se nikdy nesmí dostat k originálu."
+brief = '''
+`x` je float tenzor tvaru `(3,)` s `requires_grad=True`, zapojený v grafu.
+Udělej z `y` kopii, která **nesdílí žádnou paměť** s `x` a je **odříznutá
+od grafu**, takže pozdější `y.add_(1.0)` nezmění ani `x`, ani nic, co
+`x` bude zpětně propagovat.
+'''
+hints = [
+  "Dvě metody, každá na jednu věc: jedna odřízne graf, ale nechá úložiště, druhá zkopíruje úložiště, ale nechá graf. Potřebuješ obě, v tomhle pořadí.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.03.inplace-leaf"
+title = "SÁHNI NA TO, KDYŽ SE NIKDO NEDÍVÁ"
+story = "Mezi dvěma běhy operátorka pootočí knoflíkem na stěně s ventilátory. Záznam musí být po tu dobu vypnutý."
+brief = '''
+`w` je listový tenzor s `requires_grad=True`. Mezi dvěma experimenty ho
+posuň o `+1.0` **na místě** — stejné úložiště, pořád list, pořád
+sledovaný pro další běh — a autograd nesmí vyhodit výjimku.
+'''
+hints = [
+  "Zápis na místě do sledovaného listu je odmítnut, dokud běží záznam; vypni záznam jen pro ten jeden příkaz a list zůstane listem.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.04.set-grad-enabled"
+title = "JEDEN PŘEPÍNAČ, OBA SMĚRY"
+story = "Tentýž skript na konzoli pouští trénovací i validační průchod. Jeden příznak rozhoduje, jestli se páska točí."
+brief = '''
+`train` je pythonovský `bool`. Jeden blok pouští dopředný průchod pro obě
+fáze a graf se musí zaznamenávat **jen když je `train` `True`**.
+Který řádek ten blok otevírá?
+
+```
+# ____
+    out = model(xb)
+```
+'''
+hints = [
+  "Jeden kontext bere jako argument přímo ten příznak. Ten bezgradientový nebere žádný argument a ten inferenční bere příznak s opačným významem.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.05.modulelist"
+title = "V REGISTRU"
+story = "Věž stejných pater nad Jardine's Bazaar. Majitel vybírá nájem jen z pater, která jsou v registru."
+brief = '''
+```
+class Tower(nn.Module):
+    def __init__(self, depth):
+        super().__init__()
+        blocks = [nn.Linear(64, 64) for _ in range(depth)]
+        # ____
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = torch.relu(layer(x))
+        return x
+```
+
+Doplň mezeru tak, aby se váhy každé vrstvy objevily v
+`model.parameters()` i v `model.state_dict()`.
+'''
+hints = [
+  "Obyčejný pythonovský kontejner schová svůj obsah před registrem modulu. Registrující kontejner bere seznam vcelku; Sequential chce vrstvy rozbalené, ne seznam.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.06.parameter"
+title = "KNOFLÍK, KTERÝM OPTIMALIZÁTOR UMÍ OTOČIT"
+story = "Jeden skalár na konzoli určuje, jak ostrý je softmax. Měl by se učit jako všechno ostatní v racku."
+brief = '''
+Uvnitř `__init__`, za `super().__init__()`: dej modulu **učitelný**
+skalár `self.temperature` s počáteční hodnotou `1.0`, který se objeví v
+`model.parameters()`, aby ho optimalizátor aktualizoval.
+'''
+hints = [
+  "Zabalení tenzoru do třídy parametru je to, co modul přiměje ho zaregistrovat; holý tenzor se zapnutými gradienty je pro optimalizátor neviditelný a obal chce tenzor, ne float.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.07.register-buffer"
+title = "CESTUJE S RACKEM, NIC SE NEUČÍ"
+story = "Kauzální maska jede s modelem na kartu a ukládá se spolu s ním. Trojúhelník nikdo netrénuje."
+brief = '''
+Uvnitř `__init__`, za `super().__init__()`: ulož kauzální masku `T` krát
+`T` — jedničky na diagonále a **pod** ní, nuly nad ní — jako `self.mask`.
+Musí se stěhovat s `model.to(device)` a ukládat ve `state_dict()`, ale
+**nikdy** nesmí dostat gradient ani se objevit v `model.parameters()`.
+'''
+hints = [
+  "Pro stav, který není parametr, existuje registr: cestuje a ukládá se s modulem. Masku staví dolnotrojúhelníkový pomocník; jeho hornotrojúhelníkový sourozenec staví tu špatnou.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.08.param-count"
+title = "ČTRNÁCT TISÍC, PLUS MINUS"
+story = "Na cedulce na racku stojí čtrnáct tisíc parametrů. Zkoušející chce to číslo z modelu, ne z cedulky."
+brief = '''
+`model` je `nn.Module` a každý parametr v něm je trénovatelný. Který
+řádek dá `n`, **celkový počet skalárních vah** v modelu, jako obyčejný
+`int`?
+'''
+hints = [
+  "Každý tenzor parametru zná svůj počet prvků; ty sečti. Délka iterátoru je počet tenzorů a tvar se k intu nepřičte.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.09.freeze-backbone"
+title = "ZMRAZIT SPODNÍ PATRA"
+story = "Předtrénovaný trup přišel z výukového clusteru. Hýbat se smí jen nová hlava nahoře."
+brief = '''
+`model.backbone` a `model.head` jsou podmoduly. **Jedním řádkem** zmraz
+každou váhu backbonu — sledování gradientů vypnuté pro všechny, takže je
+krok optimalizátoru nechá netknuté — a nic jiného.
+'''
+hints = [
+  "Moduly mají metodu na místě, s podtržítkem na konci, která projde každý parametr pod sebou. Nastavení obyčejného atributu na modulu nic neregistruje a režim eval je o dropoutu, ne o gradientech.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.10.kaiming"
+title = "HE ŘEKL NORMÁLNÍ"
+story = "Čerstvá vrstva v racku začíná s tím, co vybral konstruktor. Věž s ReLU chce rozptyl nastavený ručně."
+brief = '''
+```
+self.fc = nn.Linear(256, 256)
+# ____
+```
+
+Doplň mezeru tak, aby se váha vrstvy znovu inicializovala **na místě**
+Heovou (Kaimingovou) normální inicializací, tou, kterou chce stoh ReLU.
+'''
+hints = [
+  "Inicializátory berou samotný tenzor a mění ho — podtržítko na konci to říká. Modul ani tvar není tenzor a přiřazení holého tenzoru přes parametr je odmítnuto.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.11.functional-dropout"
+title = "DROPOUT, KTERÝ VÍ, KOLIK JE HODIN"
+story = "Funkcionální dropout na konzoli vyhazuje jednotky i při validaci, dokud mu někdo neřekne, že model ztichl."
+brief = '''
+```
+def forward(self, x):
+    x = torch.relu(self.fc1(x))
+    # ____
+    return self.fc2(x)
+```
+
+`F` je `torch.nn.functional`. Doplň mezeru **funkcionálním** dropoutem
+s `p=0.1`, který vyhazuje jednotky při trénování a **přestane vyhazovat**,
+jakmile bylo zavoláno `model.eval()`.
+'''
+hints = [
+  "Funkcionální podoba netuší, v jakém režimu modul je, dokud jí nepředáš vlastní booleovský příznak modulu; ve výchozím stavu vyhazuje. Vrstva postavená čerstvě uvnitř forward je vždycky v trénovacím režimu.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.12.bce-with-logits"
+title = "ANO NEBO NE, STEJNÝ TVAR PROSÍM"
+story = "Detektor brány u dveří do sklepa říká jedno číslo na snímek. Cíl je sloupec nul a jedniček."
+brief = '''
+`logits` má tvar `(N, 1)` — surová float skóre z hlavy s jednou jednotkou
+— a `target` má tvar `(N,)` a dtype `int64`, drží `0` nebo `1`. Který
+řádek je správná **binární** ztráta, která si sigmoid aplikuje sama?
+'''
+hints = [
+  "Binární ztráty chtějí vstup a cíl stejného tvaru a stejného float dtype. Obyčejná BCE chce pravděpodobnosti a vícetřídní ztráta čte počet sloupců jako počet tříd.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.13.token-loss"
+title = "KAŽDÝ TOKEN KROMĚ PADDINGU"
+story = "Sekvenční model v racku boduje každou pozici každého řádku dávky. Padding na konci krátkých řádků se nesmí počítat."
+brief = '''
+`lg` má tvar `(B, T, V)` — logity pro každou pozici — a `y` má tvar
+`(B, T)`, `int64` id tokenů. Id tokenu `0` je **padding** a nesmí do
+ztráty přispívat. `F` je `torch.nn.functional`. Který řádek je správná
+cross-entropy na úrovni tokenů?
+'''
+hints = [
+  "Zploštit oba na `(N, V)` a `(N,)` — přesně to ztráta přijímá — a klíčovým slovem jí říct, který index třídy přeskočit; bez toho klíčového slova se padding boduje jako každý jiný token.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.14.adamw"
+title = "DECAY, ODDĚLENĚ"
+story = "Zkoušející v místnosti 7-32 chce weight decay, který není jen L2 přimíchané do gradientu. Je na to třída."
+brief = '''
+`params = model.parameters()`. Postav `opt` s rychlostí učení `3e-4` a
+**odděleným** (decoupled) weight decay `0.01` — decay aplikovaný přímo na
+váhy, ne přičtený do gradientu jako člen L2.
+'''
+hints = [
+  "`weight_decay` u Adama je L2 přimíchané do gradientu; oddělená varianta je vlastní třída optimalizátoru. Obě chtějí iterovatelnou kolekci parametrů, ne modul, a klíčové slovo se píše celé.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.15.scheduler-step"
+title = "ZCHLADIT JEDNOU ZA KOLO"
+story = "Kosinové žíhání v racku: rychlost učení každou epochu trochu povolí, až když optimalizátor měl svůj tah."
+brief = '''
+```
+sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+for epoch in range(epochs):
+    for xb, yb in loader:
+        opt.zero_grad()
+        loss = loss_fn(model(xb), yb)
+        loss.backward()
+        opt.step()
+    # ____
+```
+
+Doplň mezeru tak, aby se rozvrh rychlosti učení **posunul jednou za
+epochu**.
+'''
+hints = [
+  "Scheduler má vlastní krok, volaný po kroku optimalizátoru — tady jednou za epochu. Čtení aktuální rychlosti nic neposune a optimalizátor scheduler nevlastní.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.16.grad-scaler"
+title = "ŠKÁLOVAT, KROK, AKTUALIZOVAT"
+story = "Poloviční přesnost na kartě v racku 3: malé gradienty podtečou, pokud se ztráta napřed nenafoukne a krok o tom neví."
+brief = '''
+```
+scaler = torch.amp.GradScaler("cuda")
+for xb, yb in loader:
+    opt.zero_grad(set_to_none=True)
+    with torch.autocast(device_type="cuda", dtype=torch.float16):
+        loss = loss_fn(model(xb), yb)
+    # ____
+```
+
+Smíšená přesnost ve `float16` na CUDA. Doplň mezeru třemi voláními jednoho
+tréninkového kroku tak, aby backward běžel na ztrátě, kterou scaler zvětšil,
+optimalizátor **nikdy nepoužil stále naškálované gradienty** (a krok, jehož
+gradienty obsahují inf, se přeskočil) a škálovací faktor se upravil až po
+tomto kroku.
+'''
+hints = [
+  "Všechna tři volání jdou přes scaler. Přímé krokování optimalizátoru nechá gradienty naškálované; scaler odmítne krokovat ztrátu, kterou nikdy neškáloval, a odmítne aktualizovat, dokud nekrokoval.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.17.map-location"
+title = "KARTA TU NENÍ"
+story = "Checkpoint byl zapsán na GPU clusteru. Čte se na notebooku v Lucky Macu, kde žádná karta není."
+brief = '''
+`p` je název souboru zapsaného na stroji s CUDA přes
+`torch.save(model.state_dict(), p)` — soubor drží samotný state dict.
+Načti ho na tomhle notebooku **jen s CPU** jako dict `sd`, přičemž
+zavaděč **odmítne unpicklovat libovolné objekty**.
+'''
+hints = [
+  "Přemapování zařízení je klíčové slovo zavaděče, ne metoda na tom, co vrátí, a přepínač bezpečného unpicklování je další klíčové slovo. Výsledek je samotný dict, bez žádného klíče okolo.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.18.random-split"
+title = "OSMDESÁT NA DVACET, POKAŽDÉ STEJNÝ ŘEZ"
+story = "Tisíc označených snímků z kamery ve sklepě. Validační pětina musí být zítra tatáž pětina."
+brief = '''
+`ds` je `Dataset` mapového stylu (definuje `__len__` a `__getitem__`)
+s 1000 položkami, `random_split` je importovaný z `torch.utils.data` a
+`g = torch.Generator().manual_seed(0)`. Rozděl ho **náhodně** 80/20 na
+dva objekty `Dataset`, reprodukovatelně podle `g`.
+'''
+hints = [
+  "Rozdělovač bere seznam podílů (nebo délek) a objekt generátoru klíčovým slovem — ne seed, ne jediný float. Slicování datasetu není ani náhodné, ani dataset.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.19.collate-fn"
+title = "NEROVNÉ ŘÁDKY, JEDEN TENZOR"
+story = "Věty z terminálů Ústřední knihovny chodí v každé délce. Výchozí skládač loaderu je chce všechny stejné."
+brief = '''
+Každá položka `ds` je 1-rozměrný `int64` tenzor **jiné** délky, takže
+výchozí skládání loaderu selže. `pad_batch(samples)` už je napsaný:
+bere seznam položek a vrací jeden dopaddovaný tenzor `(B, T_max)`.
+Postav `loader` s dávkami po 16, který ho používá (počet workerů není
+předmětem otázky).
+'''
+hints = [
+  "Výchozí collate skládá a nerovné tenzory se neskládají. Předej loaderu vlastní collate funkci pod jejím plným klíčovým slovem; pythonovský `map` nemá délku a není dataset.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.20.distributed-sampler"
+title = "KAŽDÝ RANK SVŮJ DÍL"
+story = "Čtyři karty v racku, na každé jeden proces. Když každý proces čte celý dataset, má cluster čtyřikrát tolik práce a žádnou rychlost."
+brief = '''
+Multi-GPU, jeden proces na kartu:
+
+```
+dist.init_process_group("nccl")
+rank = dist.get_rank()
+model = DistributedDataParallel(model.to(rank), device_ids=[rank])
+sampler = DistributedSampler(ds)
+```
+
+Postav `loader` s dávkami po 32 tak, aby každý rank viděl svůj **vlastní
+disjunktní díl** `ds`, zamíchaný samplerem (`sampler.set_epoch` se volá
+každou epochu).
+'''
+hints = [
+  "Sampler nahrazuje vlastní míchání loaderu a ta dvě klíčová slova se navzájem vylučují — loader vyhodí výjimku, když předáš obě. Dataset je pořád první argument.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.21.compile"
+title = "SVAŘIT TO"
+story = "Dopředný průchod v racku je tisíc drobných kernelů. Kompilátor řady 2.x je umí svařit do pár kusů, když se zeptáš správně."
+brief = '''
+`model` je `nn.Module`. Převaž `model` na verzi, jejíž dopředný průchod
+je trasovaný a sfúzovaný kompilátorem PyTorch 2.x, v jeho **výchozím**
+režimu.
+'''
+hints = [
+  "Kompilátor je funkce na nejvyšší úrovni torche, která bere objekt modulu — ne jeho výstup — a vrací obalený. Její režimy se jmenují default, reduce-overhead a max-autotune; balík JIT nic takového jména nemá.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.22.expand"
+title = "STEJNÁ PAMĚŤ, VÍC ŘÁDKŮ"
+story = "Jedna poziční tabulka pro každý řádek dávky. Kopírovat ji na každý řádek by zbytečně zaplnilo kartu."
+brief = '''
+`pos` je poziční tabulka tvaru `(T, D)` a `x` má tvar `(B, T, D)`. Udělej
+`pe` tvaru `(B, T, D)`, které **sdílí paměť** s `pos` — pohled, žádná
+kopie — takže `x + pe` přičte tutéž tabulku ke každému řádku.
+'''
+hints = [
+  "Jedna metoda materializuje kopie, druhá krokuje přes tutéž paměť. `-1` znamená ponechat tu velikost a přijímá ho jen ta krokující; kopírující chce kladný počet na každé ose.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.23.permute-contiguous"
+title = "STRIDY NELŽOU"
+story = "Z racku kanály napřed, do hlavy čas napřed. Pohled se vzpírá, dokud paměť neleží tak, jak tvar říká."
+brief = '''
+`x` má tvar `(B, C, T)` a je souvislý (contiguous). Udělej `y` tvaru
+`(B, T*C)`, ve kterém uvnitř každého řádku **čas běží nejpomaleji** —
+všech `C` kanálů kroku 0, pak všech `C` kroku 1 a tak dál — pomocí `view`.
+'''
+hints = [
+  "Po permute už stridy neodpovídají paměti a `view` odmítne; kopie do čerstvé paměti napřed udělá pohled legálním. Pohled rovnou z `x` nechá nejpomalejší kanály a počet řádků musí být `B`.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.24.chunk-qkv"
+title = "TŘI Z JEDNÉ PROJEKCE"
+story = "Jeden Linear v racku vyrábí query, key a value vedle sebe. Attention blok je potřebuje zvlášť."
+brief = '''
+`qkv` má tvar `(B, T, 3*D)` s `B = 8` a `D = 64`: projekce query, key a
+value zřetězené podél **poslední** osy. Který řádek dá `q`, `k`, `v`,
+každé tvaru `(B, T, D)`?
+'''
+hints = [
+  "Jeden ze dvou děličů počítá kusy, druhý velikost každého kusu — a osa je ve výchozím stavu ta první, kde osm řádků rozřezaných natřikrát dá špatné tvary bez jediné chyby.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.25.gather"
+title = "VYBER JEDNO NA ŘÁDEK"
+story = "Šedesát čtyři řádků log-pravděpodobností, deset tříd. Ztráta počítaná ručně potřebuje přesně jedno číslo na řádek: to od správné třídy."
+brief = '''
+`logp` má tvar `(N, C)` s `N = 64`, `C = 10` — log-pravděpodobnosti,
+`log_softmax` už aplikovaný podél dim 1 — a `y` má tvar `(N,)`, `int64`
+indexy tříd. Udělej `lp` tvaru `(N,)`: pro každý řádek log-pravděpodobnost
+**správné** třídy toho řádku.
+'''
+hints = [
+  "Indexový tenzor musí mít tolik rozměrů co zdroj — dej mu koncovou osu — a výběr běží podél osy tříd, ne osy řádků. Indexování samotným `y` vybírá celé řádky.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.26.masked-fill"
+title = "MÍNUS NEKONEČNO PRO BUDOUCNOST"
+story = "Blok ve sklepě nesmí číst dopředu. Každé skóre nad diagonálou jde na mínus nekonečno, než ho uvidí softmax."
+brief = '''
+`scores` má tvar `(B, T, T)` a `mask = torch.tril(torch.ones(T, T))`
+— **float** tenzor, `1.` kde je attention dovolený, `0.` nad diagonálou.
+Který řádek nahradí každé zakázané skóre mínus nekonečnem, aby softmax,
+který následuje, dal těm pozicím nulovou váhu?
+'''
+hints = [
+  "Výplň chce booleovskou masku, která je True tam, kde má být díra — porovnej float masku, abys ji dostal — a pythonovský float pro mínus nekonečno. `where` na tenzoru ponechá hodnoty tam, kde je jeho podmínka True.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.27.sdpa"
+title = "JEDNO VOLÁNÍ, ŽÁDNÉ NAKUKOVÁNÍ"
+story = "Fúzovaný attention kernel na kartě udělá skóre, masku i softmax v jednom průchodu — pokud je příznak napsaný správně."
+brief = '''
+`q`, `k`, `v` mají každé tvar `(B, H, T, Dh)` a `F` je
+`torch.nn.functional`. Který řádek spočítá attention **fúzovaným**
+kernelem tak, že každá pozice vidí jen sebe a minulost?
+'''
+hints = [
+  "Fúzované volání má booleovské klíčové slovo pro kauzální masku a nepíše se prostě `causal`. Maskování výstupu dodatečně maskuje špatný tenzor; bez příznaku se vidí všude.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.28.einsum"
+title = "PÍSMENA PRO OSY"
+story = "Zkoušející v místnosti 7-32 píše součin jako indexy na tabuli a čeká, jestli písmeno dávky přežije."
+brief = '''
+`a` má tvar `(B, 3, 4)` a `b` má tvar `(B, 4, 5)`. Pomocí `einsum` udělej
+`c` tvaru `(B, 3, 5)`: **dávkový maticový součin**, jeden
+`(3, 4) @ (4, 5)` na každý řádek dávky.
+'''
+hints = [
+  "Každá vstupní osa dostane písmeno, sdílené písmeno se vysčítá pryč a písmeno dávky se musí objevit ve výstupu, jinak se vysčítá taky. Písmena se čtou v pořadí os, takže prohození dvou z nich mění, které velikosti se musí shodovat.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.29.checkpoint"
+title = "TEĎ ZAPOMENOUT, POZDĚJI DOPOČÍTAT"
+story = "Čtrnáct tisíc parametrů se na notebook vejde; aktivace každého bloku ne. Vyměň výpočet za paměť, blok po bloku."
+brief = '''
+```
+from torch.utils.checkpoint import checkpoint
+
+def forward(self, h):
+    for block in self.blocks:
+        # ____
+    return h
+```
+
+Doplň mezeru tak, aby se aktivace každého bloku v dopředném průchodu
+**neukládaly**, ale dopočítaly během backwardu — **nereentrantní**
+varianta.
+'''
+hints = [
+  "Funkce checkpoint bere volatelný objekt a jeho vstupy jako oddělené argumenty a zavolá ho za tebe. Předání výstupu bloku znamená, že forward už proběhl, a modul není volatelný.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.cheatsheet_advanced.30.multihead-attention"
+title = "MASKA, KTERÁ ZNAMENÁ OPAK"
+story = "Poslední blok ve sklepě je attention modul přímo z knihovny a jeho booleovská maska čte True jako zakázáno. Mei kontroluje znaménko dvakrát."
+brief = '''
+```
+attn = nn.MultiheadAttention(embed_dim=64, num_heads=4, batch_first=True)
+causal = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+```
+
+`x` má tvar `(B, T, 64)`. V tomhle modulu je booleovský `attn_mask`
+`True` tam, kde je attention **zakázaný**, a `causal` je `True` přísně
+nad diagonálou. Který řádek dá `out`, výstup self-attention tvaru
+`(B, T, 64)`, ve kterém žádný token nečte dopředu?
+'''
+hints = [
+  "Modul chce query, key a value jako tři poziční tenzory a vrací dvojici — rozbal ji. Maska se předá přesně tak, jak je postavená, protože True tady už znamená zablokováno; její invertování nechá každý token číst jen budoucnost.",
+]

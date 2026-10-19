@@ -1,0 +1,898 @@
+# PYTHON LAND — CHEATSHEET. The grammar off the page, asked: one question per
+# section of the Python live-coding cheatsheet (~/vivid/Cheatsheet,
+# python_cheatsheet.html), four lines, one right. Nothing is typed and
+# nothing is run — the pick is the submission, and the server judges it
+# against the quiz (SPEC §0). The three wrong lines are near-misses: another
+# language's spelling, a call where a reference was meant, rows that alias.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "python.cheatsheet"
+land = "python"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "python.cheatsheet.01.fast-input"
+node        = 1
+title       = "THE FAST TAP"
+difficulty  = 1
+story       = "06:30, Jardine's Bazaar. A million numbers wait at the kiosk, and input() drinks them one sip at a time."
+concepts    = ["io", "imports"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+After `import sys`, which line makes every later `input()` call read one
+line straight off the stdin buffer, the fast way?
+'''
+solution    = 'input = sys.stdin.readline'
+hints = [
+  "Rebind the name to the function itself — do not call it.",
+]
+
+[quest.quiz]
+choices = [
+  'input = sys.stdin.readline()',
+  'import sys.stdin.readline as input',
+  'input = sys.stdin.read',
+  'input = sys.stdin.readline',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "python.cheatsheet.02.star-unpack"
+node        = 2
+title       = "PUSH OR POP"
+difficulty  = 1
+story       = "The order screen at the dai pai dong takes \"push 5\" and \"pop\" from the same pager."
+concepts    = ["io", "strings"]
+requires    = ["python.cheatsheet.01.fast-input"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+Each query line is either `push 5` or `pop`. Split it into the command
+`cmd` and a list `args` of whatever follows (empty for `pop`).
+'''
+solution    = 'cmd, *args = input().split()'
+hints = [
+  "A starred name on the left soaks up the rest into a list, even when the rest is nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'cmd, args = input().split()',
+  'cmd, *args = input().split()',
+  'cmd, ...args = input().split()',
+  '*cmd, args = input().split()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "python.cheatsheet.03.precision"
+node        = 3
+title       = "THREE PLACES"
+difficulty  = 1
+story       = "The gold shop on Hennessy Road quotes the weight to three decimals, never more, never fewer."
+concepts    = ["io", "strings"]
+requires    = ["python.cheatsheet.02.star-unpack"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`x = 3.14159`. Print `3.142` — exactly three digits after the point.
+'''
+solution    = 'print(f"{x:.3f}")'
+hints = [
+  "Precision follows a dot; the `f` type makes it count digits after the point, not significant digits.",
+]
+
+[quest.quiz]
+choices = [
+  'print(f"{x:.3f}")',
+  'print(f"{x:3f}")',
+  'print(f"{x:.3}")',
+  'print("%.3f" x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "python.cheatsheet.04.reverse-range"
+node        = 4
+title       = "COUNTDOWN"
+difficulty  = 1
+story       = "New Year's Eve outside Times Square: the count runs down, and it has to land on zero."
+concepts    = ["control-flow", "iteration"]
+requires    = ["python.cheatsheet.03.precision"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+Loop `i` over `n-1, n-2, … 1, 0` — zero included.
+'''
+solution    = 'for i in range(n - 1, -1, -1):'
+hints = [
+  "The stop of a range is excluded, so to reach 0 going down, stop one step past it.",
+]
+
+[quest.quiz]
+choices = [
+  'for i in range(n - 1, 0, -1):',
+  'for i in range(n, -1, -1):',
+  'for i in range(n - 1, -1, -1):',
+  'for i in reversed(range(n - 1)):',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "python.cheatsheet.05.trunc-div"
+node        = 5
+title       = "THE FLOOR IS LOWER"
+difficulty  = 1
+story       = "A refund of minus seven dollars split two ways. The old C till says -3; Python's floor says otherwise."
+concepts    = ["types", "math"]
+requires    = ["python.cheatsheet.04.reverse-range"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`a = -7` and `b = 2`. Make `q` the integer `-3`: divide and truncate
+toward zero, the way C does.
+'''
+solution    = 'q = int(a / b)'
+hints = [
+  "`//` floors, so negatives go down to -4. `int()` of a float drops the fraction toward zero.",
+]
+
+[quest.quiz]
+choices = [
+  'q = a // b',
+  'q = int(a / b)',
+  'q = math.floor(a / b)',
+  'q = a / b',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "python.cheatsheet.06.grid"
+node        = 6
+title       = "SEPARATE FLOORS"
+difficulty  = 2
+story       = "The car park under World Trade Centre has n floors of m bays. Park on one floor and every floor fills up."
+concepts    = ["collections", "matrix"]
+requires    = ["python.cheatsheet.05.trunc-div"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Build `g`, an `n`-row by `m`-column grid of zeros, where changing
+`g[0][0]` changes only that one cell.
+'''
+solution    = 'g = [[0] * m for _ in range(n)]'
+hints = [
+  "Multiplying a list of lists repeats the same inner list. Build each row fresh.",
+]
+
+[quest.quiz]
+choices = [
+  'g = [[0] * m for _ in range(n)]',
+  'g = [[0] * m] * n',
+  'g = [0] * m * n',
+  'g = [[0] * n for _ in range(m)]',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "python.cheatsheet.07.count"
+node        = 7
+title       = "THE TALLY"
+difficulty  = 2
+story       = "The dai pai dong counts orders by dish, and a new dish starts at zero."
+concepts    = ["hashing", "collections"]
+requires    = ["python.cheatsheet.06.grid"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`d` is a plain `dict`. Add one to the count for key `k`, starting at 0 if
+it is not there yet.
+'''
+solution    = 'd[k] = d.get(k, 0) + 1'
+hints = [
+  "Indexing a missing key raises KeyError. `get` takes a default.",
+]
+
+[quest.quiz]
+choices = [
+  'd[k] += 1',
+  'd.get(k) += 1',
+  'd[k] = d.get(k) + 1',
+  'd[k] = d.get(k, 0) + 1',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "python.cheatsheet.08.two-keys"
+node        = 8
+title       = "BIGGEST FIRST, THEN A TO Z"
+difficulty  = 2
+story       = "The leaderboard at the arcade in Sogo's basement: high score on top, ties by name."
+concepts    = ["sorting", "closures"]
+requires    = ["python.cheatsheet.07.count"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`a` is a list of `(name, score)` tuples. Sort it in place: score
+**descending**, and equal scores by name **ascending**.
+'''
+solution    = 'a.sort(key=lambda p: (-p[1], p[0]))'
+hints = [
+  "Negate the number to flip just that key; `reverse=True` flips every key at once.",
+]
+
+[quest.quiz]
+choices = [
+  'a.sort(key=lambda p: (p[1], p[0]), reverse=True)',
+  'a.sort(key=lambda p: (-p[1], -p[0]))',
+  'a.sort(key=lambda p: (-p[1], p[0]))',
+  'a.sort(lambda p: (-p[1], p[0]))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "python.cheatsheet.09.tuple-key"
+node        = 9
+title       = "BEEN HERE"
+difficulty  = 2
+story       = "Chalk marks on the stairwell walls of a Lockhart Road walk-up: this landing, already searched."
+concepts    = ["hashing", "collections"]
+requires    = ["python.cheatsheet.08.two-keys"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`seen = set()`. Mark the grid cell at row `r`, column `c` as visited.
+'''
+solution    = 'seen.add((r, c))'
+hints = [
+  "Set members must be hashable: a tuple is, a list is not. `add` takes one item.",
+]
+
+[quest.quiz]
+choices = [
+  'seen.add([r, c])',
+  'seen.add((r, c))',
+  'seen.append((r, c))',
+  'seen.add(r, c)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "python.cheatsheet.10.max-heap"
+node        = 10
+title       = "BIGGEST ON TOP"
+difficulty  = 3
+story       = "The VIP line at the Causeway Bay club lets the biggest spender in first. heapq only knows how to put the smallest on top."
+concepts    = ["heaps", "stacks-queues"]
+requires    = ["python.cheatsheet.09.tuple-key"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`h` is a plain list used through `heapq`, and values are read back with
+`-heapq.heappop(h)`. Push the number `x` so that the **largest** comes
+out first.
+'''
+solution    = 'heapq.heappush(h, -x)'
+hints = [
+  "heapq is a min-heap. Store the value negated, and negate it again on the way out.",
+]
+
+[quest.quiz]
+choices = [
+  'heapq.heappush(h, -x)',
+  'heapq.heappush(h, x)',
+  'heapq.heappush(-h, x)',
+  'h.push(-x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "python.cheatsheet.11.nonlocal"
+node        = 11
+title       = "THE CLICKER"
+difficulty  = 3
+story       = "The doorman's tally counter: every press changes the number it holds, one scope out."
+concepts    = ["closures", "functions"]
+requires    = ["python.cheatsheet.10.max-heap"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`inc` must add one to the `cnt` that belongs to `outer`. Which line goes
+in the gap?
+
+```
+def outer():
+    cnt = 0
+    def inc():
+        # ____
+        cnt += 1
+```
+'''
+solution    = 'nonlocal cnt'
+hints = [
+  "Assigning to a name makes it local unless it is declared otherwise. The enclosing function is not the module.",
+]
+
+[quest.quiz]
+choices = [
+  'global cnt',
+  'cnt = cnt',
+  'nonlocal cnt',
+  'mut cnt',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "python.cheatsheet.12.sentinels"
+node        = 12
+title       = "ONE FOR EACH"
+difficulty  = 3
+story       = "Four couriers wait in a Percival Street back room for parcels. When the work is done, each one needs to be told to go home."
+concepts    = ["concurrency", "stacks-queues"]
+requires    = ["python.cheatsheet.11.nonlocal"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+Four worker threads each loop on `j = q.get()` and `break` when `j is
+None`. After the producer has put every job, which line lets **all** of
+them stop, so the joins return?
+
+```
+for i in range(20): q.put(i)
+# ____
+for t in ts: t.join()
+```
+'''
+solution    = 'for _ in ts: q.put(None)'
+hints = [
+  "A sentinel is taken by exactly one worker. Count the workers.",
+]
+
+[quest.quiz]
+choices = [
+  'q.put(None)',
+  'q.join()',
+  'q.close()',
+  'for _ in ts: q.put(None)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "python.cheatsheet.13.parse-ints"
+node        = 13
+title       = "THE RECEIPT LINE"
+difficulty  = 2
+story       = "One till roll from the wet market on Bowrington Road: prices in a row, separated by spaces, and the sum is due before the stall closes."
+concepts    = ["types", "strings", "iteration"]
+requires    = ["python.cheatsheet.12.sentinels"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`s = "3 1 4 1 5"`. Make `a` a real `list` of the five integers, so that
+`len(a)`, `a[-1]` and `sum(a)` all work on it.
+'''
+solution    = 'a = list(map(int, s.split()))'
+hints = [
+  "Split on whitespace first, then convert each piece — and remember that `map` is lazy, not a list.",
+]
+
+[quest.quiz]
+choices = [
+  'a = map(int, s.split())',
+  'a = [int(s.split())]',
+  'a = list(map(int, s.split()))',
+  'a = list(int(x) for x in s)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "python.cheatsheet.14.new-sign"
+node        = 14
+title       = "A NEW SIGN"
+difficulty  = 2
+story       = "The neon sign over the noodle shop on Jaffe Road reads HELLO; the owner wants JELLO, and a neon tube cannot be bent in place."
+concepts    = ["strings", "slices"]
+requires    = ["python.cheatsheet.13.parse-ints"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`s = "hello"`. After this line, `s` must be `"jello"`: the first letter
+swapped for `"j"`, the rest kept.
+'''
+solution    = 's = "j" + s[1:]'
+hints = [
+  "A `str` cannot be changed in place — build a new one and rebind the name. A call that returns a new string does nothing unless you keep the result.",
+]
+
+[quest.quiz]
+choices = [
+  's[0] = "j"',
+  's = "j" + s[1:]',
+  's.replace("h", "j")',
+  's = "j" + s[1]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "python.cheatsheet.15.glue"
+node        = 15
+title       = "ONE LONG RIBBON"
+difficulty  = 2
+story       = "The printer at the Hennessy Road pharmacy spits a hundred thousand little labels; the customer wants them as one strip, no gaps."
+concepts    = ["strings", "iteration"]
+requires    = ["python.cheatsheet.14.new-sign"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+A loop ran `parts.append(piece)` a hundred thousand times, so `parts` is
+a long list of strings. After the loop, make `s` all of them glued
+together with nothing in between, in linear time.
+'''
+solution    = 's = "".join(parts)'
+hints = [
+  "The separator string owns the method, and it takes the whole list as its one argument.",
+]
+
+[quest.quiz]
+choices = [
+  's = "".join(parts)',
+  's = parts.join("")',
+  's = sum(parts, "")',
+  's = "".join(*parts)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "python.cheatsheet.16.prefix-sums"
+node        = 16
+title       = "THE RUNNING TOTAL"
+difficulty  = 3
+story       = "The tram conductor on Yee Wo Street keeps a running fare count from the depot, with a zero written before the first stop."
+concepts    = ["prefix-sums", "generators", "iteration"]
+requires    = ["python.cheatsheet.15.glue"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`from itertools import accumulate` is done and `a = [1, 2, 3]`. Make
+`pre` the list `[0, 1, 3, 6]` — the prefix sums with a leading zero, so
+that `sum(a[l:r]) == pre[r] - pre[l]`.
+'''
+solution    = 'pre = [0] + list(accumulate(a))'
+hints = [
+  "`accumulate` yields lazily — it is not a list until you make it one — and the leading zero is yours to add.",
+]
+
+[quest.quiz]
+choices = [
+  'pre = list(accumulate(a))',
+  'pre = [0] + accumulate(a)',
+  'pre = [0].extend(accumulate(a))',
+  'pre = [0] + list(accumulate(a))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "python.cheatsheet.17.orderable"
+node        = 17
+title       = "WHO GOES FIRST"
+difficulty  = 3
+story       = "The kitchen at the Causeway Bay cha chaan teng keeps its orders in a heap; the ticket with the earliest due time has to float up on its own."
+concepts    = ["structs", "decorators", "heaps"]
+requires    = ["python.cheatsheet.16.prefix-sums"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`Job` objects are pushed onto a `heapq` list directly, not wrapped in
+tuples. Which decorator line makes two jobs comparable with `<`, first
+field first, so the smallest `due` ends up at `h[0]`?
+
+```
+# ____
+class Job:
+    due: int
+    name: str
+
+h = []
+heapq.heappush(h, Job(3, "tea"))
+heapq.heappush(h, Job(1, "rice"))
+```
+'''
+solution    = '@dataclass(order=True)'
+hints = [
+  "The plain decorator gives you `__init__`, `__repr__` and `__eq__` — the comparison methods are behind a flag.",
+]
+
+[quest.quiz]
+choices = [
+  '@dataclass(order=True)',
+  '@dataclass',
+  '@dataclass(sort=True)',
+  '@dataclass(lt=True)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "python.cheatsheet.18.zero-is-real"
+node        = 18
+title       = "ZERO IS AN ANSWER"
+difficulty  = 3
+story       = "At the dai pai dong, \"zero chili\" is an order, not a shrug — only a blank ticket means the house default."
+concepts    = ["zero-values", "error-handling", "types"]
+requires    = ["python.cheatsheet.17.orderable"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`limit` is a parameter that may be any integer, **including `0`**, which
+must stay `0`. Only when it is `None` should it become `100`. Which line
+does that?
+'''
+solution    = 'limit = 100 if limit is None else limit'
+hints = [
+  "`0`, `\"\"` and `[]` are all falsy, so a truthiness check cannot tell zero from absent. Ask about `None` by identity.",
+]
+
+[quest.quiz]
+choices = [
+  'limit = limit or 100',
+  'limit = limit ?? 100',
+  'limit = 100 if limit is None else limit',
+  'limit = limit if limit else 100',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "python.cheatsheet.19.ripples"
+node        = 19
+title       = "RIPPLES"
+difficulty  = 3
+story       = "Rain floods out from Victoria Park one block at a time; the water reaches the near streets before the far ones, and the map must say how many blocks each took."
+concepts    = ["graphs", "stacks-queues", "matrix"]
+requires    = ["python.cheatsheet.18.zero-is-real"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+BFS on a grid: `dist` must hold the **shortest** number of steps from
+`(sr, sc)`, so cells must be taken out in the order they went in, in
+O(1). Which line goes in the gap?
+
+```
+q = deque([(sr, sc)]); dist[sr][sc] = 0
+while q:
+    # ____
+    for dr, dc in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < n and 0 <= nc < m and dist[nr][nc] == -1:
+            dist[nr][nc] = dist[r][c] + 1
+            q.append((nr, nc))
+```
+'''
+solution    = 'r, c = q.popleft()'
+hints = [
+  "A deque pops from either end in O(1); which end you take decides whether this is a queue or a stack.",
+]
+
+[quest.quiz]
+choices = [
+  'r, c = q.pop()',
+  'r, c = q.popleft()',
+  'r, c = q.pop(0)',
+  'r, c = q.get()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "python.cheatsheet.20.inverse-toll"
+node        = 20
+title       = "THE INVERSE TOLL"
+difficulty  = 4
+story       = "The last gate of the Cross-Harbour Tunnel charges by modular arithmetic, and the booth clerk needs the one number that undoes `a` — and the modulus tonight is not a prime."
+concepts    = ["math", "types"]
+requires    = ["python.cheatsheet.19.ripples"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`m = 1 << 32` — **not** a prime — and `a` is odd, so `gcd(a, m) == 1`
+and an inverse exists. Make `inv` the integer in `range(m)` with
+`(inv * a) % m == 1`, in one call (Python 3.8+).
+'''
+solution    = 'inv = pow(a, -1, m)'
+hints = [
+  "Fermat's little theorem needs a prime modulus. The three-argument builtin accepts a negative exponent, and it does not go through floats.",
+]
+
+[quest.quiz]
+choices = [
+  'inv = pow(a, m - 2, m)',
+  'inv = a ** -1 % m',
+  'inv = pow(a, -1) % m',
+  'inv = pow(a, -1, m)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "python.cheatsheet.21.swap"
+node        = 21
+title       = "TRADE SEATS"
+difficulty  = 1
+story       = "Two stools at the dai pai dong counter on Jardine's Bazaar; the regulars want to trade places, and there is no third stool to park on."
+concepts    = ["bindings", "pattern-matching"]
+requires    = ["python.cheatsheet.20.inverse-toll"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`a = 1` and `b = 2`. Exchange them in one line, with no temporary name,
+so that afterwards `a == 2` and `b == 1`.
+'''
+solution    = 'a, b = b, a'
+hints = [
+  "The whole right-hand side is built before any name on the left changes — and mind that one `=` assigns while two only compare.",
+]
+
+[quest.quiz]
+choices = [
+  'a = b; b = a',
+  'a, b = b, a',
+  'a, b == b, a',
+  'swap(a, b)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "python.cheatsheet.22.append"
+node        = 22
+title       = "ONE MORE ON THE PILE"
+difficulty  = 1
+story       = "The pharmacy on Hennessy Road drops each new prescription on top of the pile, and the pile had better still be there afterwards."
+concepts    = ["slices", "zero-values"]
+requires    = ["python.cheatsheet.21.swap"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`a = [1, 2]` and `x = 3` (an int). Put `x` on the end, so that afterwards
+`a` is still a list and reads `[1, 2, 3]`.
+'''
+solution    = 'a.append(x)'
+hints = [
+  "The method changes the list in place and hands back None — do not keep what it returns, and do not feed an int to `+=`.",
+]
+
+[quest.quiz]
+choices = [
+  'a.append(x)',
+  'a = a.append(x)',
+  'a.push(x)',
+  'a += x',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "python.cheatsheet.23.return"
+node        = 23
+title       = "HAND IT OVER"
+difficulty  = 1
+story       = "The cashier at the Bowrington Road wet market adds two prices on a scrap of paper; unless she hands the paper over, the customer walks off with nothing."
+concepts    = ["functions", "zero-values"]
+requires    = ["python.cheatsheet.22.append"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+Define `add` in one line so that `add(2, 3)` **is** the integer `5` — a
+value the caller can keep, not `None` and not something on the screen.
+'''
+solution    = 'def add(a, b): return a + b'
+hints = [
+  "Computing a value, or printing it, is not the same as giving it back; a function with no explicit return gives back None.",
+]
+
+[quest.quiz]
+choices = [
+  'def add(a, b): a + b',
+  'def add(a, b) -> a + b',
+  'def add(a, b): return a + b',
+  'def add(a, b): print(a + b)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "python.cheatsheet.24.copy"
+node        = 24
+title       = "ITS OWN COPY"
+difficulty  = 2
+story       = "Two stalls on Jardine's Bazaar share one price list on one clipboard; when one scribbles a change, the other's prices change too."
+concepts    = ["slices", "bindings"]
+requires    = ["python.cheatsheet.23.return"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`a = [1, 2, 3]` and nothing is imported. Make `b` a separate list with
+the same three items, so that `b.append(4)` leaves `a` as `[1, 2, 3]`.
+'''
+solution    = 'b = a.copy()'
+hints = [
+  "Assignment never copies — it gives the same list a second name. The list knows how to duplicate itself, under Python's name for it, not Rust's — and no bare function by that name exists without an import.",
+]
+
+[quest.quiz]
+choices = [
+  'b = a.copy()',
+  'b = a',
+  'b = a.clone()',
+  'b = copy(a)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "python.cheatsheet.25.sort-desc"
+node        = 25
+title       = "BIG SPENDER FIRST"
+difficulty  = 2
+story       = "The arcade in Sogo's basement reprints its scoreboard, and the board itself has to change — not a photocopy of it."
+concepts    = ["sorting", "slices"]
+requires    = ["python.cheatsheet.24.copy"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`a = [3, 1, 2]`. After this one line, `a` itself must be the list
+`[3, 2, 1]` — largest first.
+'''
+solution    = 'a.sort(reverse=True)'
+hints = [
+  "One of these builds a new list and throws it away, one throws the old list away, and one only turns it around.",
+]
+
+[quest.quiz]
+choices = [
+  'a = a.sort(reverse=True)',
+  'a.sort(reverse=True)',
+  'sorted(a, reverse=True)',
+  'a.reverse()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "python.cheatsheet.26.bounds"
+node        = 26
+title       = "INSIDE THE FENCE"
+difficulty  = 2
+story       = "Victoria Park's n lamp posts are numbered from zero; the maintenance app has to refuse a number that is off either end."
+concepts    = ["control-flow", "slices"]
+requires    = ["python.cheatsheet.25.sort-desc"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`a` has `n` items, indexed `0 … n-1`. Which `if` line is true exactly
+when `i` is a valid index into `a`?
+'''
+solution    = 'if 0 <= i < n:'
+hints = [
+  "Python chains comparisons, so both bounds fit in one run with no `and` — mind which end is included and which is not.",
+]
+
+[quest.quiz]
+choices = [
+  'if 0 <= i <= n:',
+  'if 0 <= i < n:',
+  'if 0 < i < n:',
+  'if 0 <= i && i < n:',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "python.cheatsheet.27.empty"
+node        = 27
+title       = "NOTHING ON THE SHELF"
+difficulty  = 1
+story       = "The 7-Eleven on Yee Wo Street checks the shelf before restocking; an empty shelf, not a missing one."
+concepts    = ["zero-values", "control-flow"]
+requires    = ["python.cheatsheet.26.bounds"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`a` is always a list — never `None`. Which `if` line runs its body
+exactly when `a` has no items?
+'''
+solution    = 'if not a:'
+hints = [
+  "An empty container is falsy on its own. `is` compares identity, and a fresh `[]` literal is never the same object as `a`.",
+]
+
+[quest.quiz]
+choices = [
+  'if a is []:',
+  'if a is None:',
+  'if a.empty():',
+  'if not a:',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "python.cheatsheet.28.mirror"
+node        = 28
+title       = "MIRROR SIGN"
+difficulty  = 2
+story       = "The neon over the Jaffe Road noodle shop reads from the street; the mirror in the window shows it backwards, as a second sign, and the first is not touched."
+concepts    = ["strings", "slices"]
+requires    = ["python.cheatsheet.27.empty"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`s = "stressed"`. Make `r` the `str` `"desserts"` — `s` reversed —
+leaving `s` as it was.
+'''
+solution    = 'r = s[::-1]'
+hints = [
+  "Strings have no reversing method, and the builtin gives an iterator, not a str. A slice with a negative step walks backwards.",
+]
+
+[quest.quiz]
+choices = [
+  'r = s.reverse()',
+  'r = reversed(s)',
+  'r = s[-1:]',
+  'r = s[::-1]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "python.cheatsheet.29.raise"
+node        = 29
+title       = "SEND IT UP"
+difficulty  = 2
+story       = "The gold shop on Hennessy Road refuses a weight below zero; the clerk does not shrug — she rings the manager, and the sale stops."
+concepts    = ["error-handling", "panics"]
+requires    = ["python.cheatsheet.28.mirror"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`w` is negative. Which line stops the function right here and sends a
+`ValueError` carrying the message `bad weight` up to whoever called?
+'''
+solution    = 'raise ValueError("bad weight")'
+hints = [
+  "The keyword is not the C-family one, the Python 2 comma form no longer parses, and handing an exception object back politely stops nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'raise ValueError, "bad weight"',
+  'throw ValueError("bad weight")',
+  'return ValueError("bad weight")',
+  'raise ValueError("bad weight")',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "python.cheatsheet.30.short-list"
+node        = 30
+title       = "THE SHORT LIST"
+difficulty  = 3
+story       = "The dai pai dong's end-of-night tally: only the dishes that sold get doubled for tomorrow's prep, and the ones that did not sell are left off the list altogether."
+concepts    = ["comprehensions", "iteration", "control-flow"]
+requires    = ["python.cheatsheet.29.raise"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`a = [3, -1, 4, 0]`. Make `b` the list `[6, 8]`: every positive item
+doubled, the non-positive ones **left out** — so `len(b)` is the number
+of positives, not `len(a)`.
+'''
+solution    = 'b = [x * 2 for x in a if x > 0]'
+hints = [
+  "The filter goes at the tail of a comprehension. An if-else at the head is a value, and it keeps every item.",
+]
+
+[quest.quiz]
+choices = [
+  'b = [x * 2 if x > 0 else 0 for x in a]',
+  'b = [x * 2 if x > 0 for x in a]',
+  'b = [x * 2 for x in a if x > 0]',
+  'b = [for x in a if x > 0: x * 2]',
+]
+answer  = 2

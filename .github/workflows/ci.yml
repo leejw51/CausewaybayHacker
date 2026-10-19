@@ -602,6 +602,11 @@ jobs:
           content/zig/advanced.toml content/zig/hacker.toml
           content/lua/verybasic.toml content/lua/basic.toml
           content/lua/advanced.toml content/lua/hacker.toml
+          content/rust/cheatsheet.toml content/go/cheatsheet.toml
+          content/cpp/cheatsheet.toml content/python/cheatsheet.toml
+          content/pytorch/cheatsheet.toml content/typescript/cheatsheet.toml
+          content/zig/cheatsheet.toml content/lua/cheatsheet.toml
+          content/remix/cheatsheet.toml
 
       # A printed zero must be an exact zero. `pytorch.advanced.17.layernorm`
       # prints the mean of a normalised row: zero by construction, `1.49e-08`

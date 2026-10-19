@@ -1,0 +1,650 @@
+# REMIX LAND — CHEATSHEET ADVANCED, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/remix/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code, live in the English
+# pack, and are never translated. Code blocks and identifiers are copied
+# verbatim.
+
+pack   = "remix.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet_advanced.01.handoff-go"
+title = "交過嚟"
+story = "06:50，渣甸坊。Mei 問部 kiosk 攞一個數，而部 kiosk 連整都未整就等佢嚟攞。"
+brief = '''
+喺 **Go**，`main` 有 `ch := make(chan int)` —— **冇 buffer** —— 之後會做
+`x := <-ch`。`compute()` 回傳一個 `int`。放喺嗰兩行之間，邊一行可以將
+`compute()` 嘅結果送入 `x`，而 `main` 唔會 deadlock？
+'''
+hints = [
+  "冇 buffer 嘅 send 會 block 到有人 receive 為止。個 sender 一定要係同 receiver 唔同嘅 goroutine。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet_advanced.02.handoff-rust"
+title = "交過嚟，FERRIS"
+story = "Ferris 將同一個數搬過 Lucky Mac 個櫃台，而個櫃台唔畀佢借個托盤。"
+brief = '''
+喺 **Rust**，`let (tx, rx) = mpsc::channel::<i32>();`，而 `main` 以
+`let v = rx.recv().unwrap();` 結尾。`compute()` 回傳一個 `i32`。放喺兩者之間，
+邊一行開一條 thread 將 `compute()` 嘅結果送到 `v` —— 而且編譯得到？
+'''
+hints = [
+  "spawn 出嚟嘅 closure 可能活得比 main 嘅 stack frame 長，所以佢唔可以借用個 sender；佢一定要擁有佢。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet_advanced.03.handoff-python"
+title = "交過嚟，慢慢嚟"
+story = "街市價錢板嗰條蟒蛇第三次收同一個數，呢次喺一條 thread 上面，而呢次佢真係要開始。"
+brief = '''
+喺 **Python**，`q = queue.Queue()`，而 `main` 以 `v = q.get()` 結尾。
+`compute()` 回傳一個 `int`。放喺兩者之間，邊一行喺一條**新 thread** 上面行
+`compute()` 並且將佢嘅結果送到 `v` —— 令 `q.get()` 會返回而唔係永遠等落去？
+'''
+hints = [
+  "`target` 想要一樣唔使 argument 就呼叫得到嘅嘢，而一個整咗但從來冇 start 嘅 Thread 乜都唔做。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet_advanced.04.counter-go"
+title = "一次一個"
+story = "Lucky Mac Bo 師傅個落單計數器：兩個廚師，每人一千下，而個板一定要寫住啱啱好兩千。"
+brief = '''
+喺 **Go**，
+
+```
+type C struct {
+    mu sync.Mutex
+    n  int
+}
+
+func (c *C) Inc() {
+    // ____
+    c.n++
+}
+```
+
+兩個 goroutine 每個呼叫 `Inc` 1000 次。邊一行令 `c.n` 每次行都啱啱好係 2000，
+喺 `go test -race` 之下乾淨，而且永遠唔會留住個 mutex 唔放？
+'''
+hints = [
+  "個遞增本身一定要喺揸住個鎖嗰陣發生，而個 unlock 一定要排喺個 method 返回嗰陣。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet_advanced.05.counter-rust"
+title = "一次一個，FERRIS"
+story = "四隻蟹，一個總數，怡和街。Ferris 隻鉗揸住個 guard，但仍然加唔到落去。"
+brief = '''
+喺 **Rust**，`let counter = Arc::new(Mutex::new(0));`，而每條 spawn 出嚟嘅
+thread 都揸住 `let c = Arc::clone(&counter);`。喺 thread 個 loop 入面，
+邊一行將共享嗰個數加一 —— 而且編譯得到？
+'''
+hints = [
+  "lock 會畀一個 Result；入面係一個 guard，而做算術之前一定要先 deref 個 guard。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet_advanced.06.counter-python"
+title = "一次一個，GIL 話嘅"
+story = "7-32 室用四條 thread 數夜更飛；GIL 對 `+=` 乜都冇承諾過。"
+brief = '''
+喺 **Python**，`lock = threading.Lock()` 係每條 thread 共用嘅唯一一個鎖，
+而 `n = 0` 係 global：
+
+```
+def work():
+    global n
+    for _ in range(100_000):
+        # ____
+            n += 1
+```
+
+四條 thread 行 `work`。邊一行令 `n` 每次行都啱啱好係 400000 ——
+每條 thread 喺**同一個**鎖上面輪流？
+'''
+hints = [
+  "個 lock 物件本身就係一個 context manager；acquire() 回傳嘅嘢唔係。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet_advanced.07.wait-go"
+title = "四個都返齊"
+story = "四個速遞員離開糖街個倉；道門要等到每一個都簽返到先鎖。"
+brief = '''
+喺 **Go**（1.22，所以 `i` 每次迭代都係新嘅）：
+
+```
+var wg sync.WaitGroup
+for i := 0; i < 4; i++ {
+    wg.Add(1)
+    // ____
+}
+wg.Wait()
+```
+
+邊一行喺自己嘅 goroutine 上面開 `work(i)`，令 `wg.Wait()` 啱啱好喺四個 `work`
+呼叫都**完成**嗰陣返回 —— 冇 deadlock，冇提早返回？
+'''
+hints = [
+  "work 返回之後要有嘢喺做嘢嗰個 goroutine 上面呼叫 Done，而 go 語句需要一個呼叫。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet_advanced.08.wait-rust"
+title = "四個都返齊，FERRIS"
+story = "Ferris 將個檔自己張價目表同時借畀三個幫手，想喺落閘之前攞返，唔使 box。"
+brief = '''
+喺 **Rust**，`let v = vec![1, 2, 3];`，而 `fn work(x: &i32) -> i32`：
+
+```
+thread::scope(|s| {
+    for x in &v {
+        // ____
+    }
+});
+```
+
+邊一行每個元素開一條 thread，直接借用 `v` —— 冇 `Arc`，冇 `'static` ——
+而且喺個 scope 完結嗰陣被 join？
+'''
+hints = [
+  "經個 scope handle spawn，唔係用 free function，而且畀佢一個 closure，唔係一個值。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet_advanced.09.wait-python"
+title = "四個都返齊，按次序"
+story = "條蟒蛇將四份工交畀街市啲搬運工，想啲收據按份工出去嘅次序返嚟。"
+brief = '''
+喺 **Python**，`jobs` 係一個 list，而 `work(j)` 回傳一個 `int`：
+
+```
+with ThreadPoolExecutor(4) as ex:
+    # ____
+print(out[0], len(out))
+```
+
+邊一行喺個 pool 嘅 thread 上面對 `jobs` 行 `work`，並且令 `out` 係一個
+按 job 次序嘅**結果 list**，令個 `print` 行得通？
+'''
+hints = [
+  "executor 自己個 map 保持次序但交返嘅係一個 lazy iterator；submit 交返 future。兩樣都 index 唔到。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet_advanced.10.shape-go"
+title = "邊個係形狀"
+story = "波斯富街嘅 Alex 由時代廣場個平面圖剪咗個正方形出嚟，而 compiler 話佢唔係形狀。"
+brief = '''
+喺 **Go**，
+
+```
+type Shape interface{ Area() float64 }
+
+type Sq struct{ s float64 }
+
+func (q *Sq) Area() float64    { return q.s * q.s }
+func (q *Sq) Scale(k float64)  { q.s *= k }
+```
+
+邊一行將一個 2×2 嘅正方形放入 `s` —— 而且編譯得到？
+'''
+hints = [
+  "睇吓啲 receiver。method set 屬於宣告佢嘅嗰個類型，而一個 Sq 值唔係嗰個類型。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet_advanced.11.shape-rust"
+title = "邊個係形狀，FERRIS"
+story = "Ferris 已經將個 trait 寫咗喺 Lucky Mac 張餐巾紙上面；個正方形淨係需要簽名。"
+brief = '''
+喺 **Rust**，
+
+```
+trait Shape {
+    fn area(&self) -> f64;
+    fn describe(&self) -> String { format!("{:.1}", self.area()) }
+}
+
+struct Sq { s: f64 }
+// ____
+```
+
+邊一行令 `Sq { s: 2.0 }.describe()` 得到 `"4.0"`？
+'''
+hints = [
+  "trait 係套落個類型上面，永遠唔會倒轉，而個 method 嘅 receiver 一定要同 trait 嘅完全一致。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet_advanced.12.shape-python"
+title = "邊個係形狀，佢識叫"
+story = "條蟒蛇唔理個正方形繼承自乜，淨係理佢識唔識應 `area` —— 而 `isinstance` 想呢樣嘢白紙黑字寫明。"
+brief = '''
+喺 **Python** 3.12，`Sq` 係一個普通 class，有一個 `area(self) -> float` method，
+冇 base class：
+
+```
+# ____
+class Shape(Protocol):
+    def area(self) -> float: ...
+```
+
+啲 import 冇顯示。空位填邊一行，令 `isinstance(Sq(2), Shape)` 答 `True`
+而唔係 raise `TypeError`？
+'''
+hints = [
+  "Protocol 係一個靜態嘅承諾，除非你將佢標記做 interpreter 可以喺運行時檢查嘅嘢；個標記住喺 `typing` 入面。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet_advanced.13.generic-go"
+title = "任何兩個之中較大嗰個"
+story = "波斯富街間金舖用同一個 function 比較價錢、重量同兩個客人嘅名。"
+brief = '''
+喺 **Go** 1.22，`Max(3, 7)`、`Max(1.5, 0.5)` 同 `Max("a", "b")` 全部都一定要編譯得到：
+
+```
+// ____
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+邊一行 signature 做到？
+'''
+hints = [
+  "`>` 需要一個承諾有次序嘅 constraint；淨係相等唔夠，而 `any` 乜都冇承諾。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet_advanced.14.generic-rust"
+title = "任何兩個之中較大嗰個，FERRIS"
+story = "Ferris 個版本仲要比較兩個浮點數價錢，而浮點數拒絕被全序排列。"
+brief = '''
+喺 **Rust**，`max(1.5, 2.5)` 同 `max("a", "b")` 兩個都一定要編譯得到：
+
+```
+// ____
+    if a > b { a } else { b }
+}
+```
+
+邊一行 signature 做到？
+'''
+hints = [
+  "`f64` 淨係實現咗偏序嗰個 trait；一個要求全序嘅 bound 會拒絕佢。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet_advanced.15.generic-python"
+title = "任何兩個之中較大嗰個，有 BOUND"
+story = "條蟒蛇個 type checker 想知 `<` 係乜意思，先肯放兩個價錢過去。"
+brief = '''
+喺 **Python** 3.12，`Comparable` 係一個有 `__lt__` 嘅 `Protocol`：
+
+```
+from typing import TypeVar
+
+# ____
+
+def smallest(a: T, b: T) -> T:
+    return a if a < b else b
+```
+
+邊一行宣告 `T`，令淨係 `Comparable` 嘅類型先可以用 —— 而且 import 個 module
+嗰陣唔會 raise？
+'''
+hints = [
+  "TypeVar 先收佢個名；之後，一個上界類型放喺一個 keyword 入面，而光秃秃嘅 positional 類型係 constraint，最少要兩個。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet_advanced.16.closure-go"
+title = "派籌機"
+story = "軒尼詩道間銀行部派籌機：每㩒一下都比上一次大一，而冇人見到個計數。"
+brief = '''
+喺 **Go**，
+
+```
+func counter() func() int {
+    c := 0
+    // ____
+}
+```
+
+`next := counter(); next(); next()` 一定要先畀 1 再畀 2。空位填邊一行？
+'''
+hints = [
+  "個 closure 一定要改外層個 `c`，唔係喺自己嘅 scope 宣告一個新嘅，而 `++` 喺 Go 係語句，唔係值。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet_advanced.17.closure-rust"
+title = "派籌機，FERRIS"
+story = "Ferris 砌同一部機，而 borrow checker 問 `counter` 返回之後個計數屬於邊個。"
+brief = '''
+喺 **Rust**，
+
+```
+fn counter() -> impl FnMut() -> i32 {
+    let mut c = 0;
+    // ____
+}
+```
+
+`let mut next = counter(); next(); next()` 一定要先畀 1 再畀 2。空位填邊一行 ——
+而且編譯得到？
+'''
+hints = [
+  "除非個 closure 攞走 `c`，否則 `c` 會同個 function 嘅 frame 一齊死；而且佢要被改，唔係淨係讀。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet_advanced.18.closure-python"
+title = "派籌機，嵌套版"
+story = "條蟒蛇部機一直印一號籌，因為內層 function 靜靜地整咗一個自己嘅 `c`。"
+brief = '''
+喺 **Python**，
+
+```
+def counter():
+    c = 0
+    def nxt():
+        # ____
+        c += 1
+        return c
+    return nxt
+```
+
+`n = counter(); n(); n()` 一定要先畀 1 再畀 2，冇 module 層級嘅 `c`。
+空位填邊一行？
+'''
+hints = [
+  "賦值會令一個名變成最內層 function 嘅 local，除非你講明佢屬於邊個外層 scope —— 而個 module 唔係嗰個 scope。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet_advanced.19.error-go"
+title = "缺咗邊個 KEY"
+story = "由波斯富街個 cache 上嚟到 Alex 手上嘅 error 已經包咗兩層；佢仍然想要個 key。"
+brief = '''
+喺 **Go**，
+
+```
+type NotFound struct{ Key string }
+
+func (e *NotFound) Error() string { return e.Key + " not found" }
+
+func load(k string) error {
+    return fmt.Errorf("load: %w", &NotFound{Key: k})
+}
+```
+
+`err := load("tea")`。邊一行攞到 `err` 入面嘅 `*NotFound`，令 `nf.Key`
+可以印出嚟 —— 而且唔會 panic？
+'''
+hints = [
+  "普通 type assertion 淨係見到外層個 wrapper。為*類型*而設嗰個拆包 helper 需要一個指住嗰個類型嘅變數嘅指針。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet_advanced.20.error-rust"
+title = "缺咗邊個 KEY，FERRIS"
+story = "Ferris 喺 Lucky Mac 張餐巾紙上面用手寫咗個 error 嘅 Display；`?` 仍然唔肯 box 佢。"
+brief = '''
+喺 **Rust**，淨係 std —— 冇 crate：
+
+```
+#[derive(Debug)]
+struct NotFound(String);
+
+impl fmt::Display for NotFound { /* "<key> not found" */ }
+
+// ____
+
+fn load(k: &str) -> Result<i32, Box<dyn Error>> {
+    Err(Box::new(NotFound(k.into())))
+}
+```
+
+空位填邊一行令 `load` 編譯得到，令呼叫者可以對佢用 `?`？
+'''
+hints = [
+  "Debug 同 Display 都有咗之後，個 error trait 冇其他嘢要求 —— 但佢仍然要被實現，用一個空 body。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet_advanced.21.error-python"
+title = "缺咗邊個 KEY，同埋點解"
+story = "條蟒蛇將街市個 KeyError 重新 raise 做自己嗰個，而個 traceback 仍然一定要顯示佢由邊度開始。"
+brief = '''
+喺 **Python**，`class NotFound(KeyError): pass`，而
+
+```
+def load(k):
+    try:
+        return d[k]
+    except KeyError as e:
+        # ____
+```
+
+呼叫者一定要捕捉到一個 `__cause__` **就係**原本嗰個 `KeyError` 嘅 `NotFound`。
+空位填邊一行？
+'''
+hints = [
+  "喺 except block 入面 raise 會自動記錄一個 context；個 cause 要明確咁點名，而用 `None` 做 cause 會令佢收聲。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet_advanced.22.iter-go"
+title = "啲 KEY，按次序"
+story = "Alex 需要 Bo 師傅個計數入面啲菜名，按字母次序，一行搞掂，而 Go 1.23 啱啱畀咗佢工具。"
+brief = '''
+喺 **Go 1.23**，`m` 係一個 `map[string]int`，而 `maps` 同 `slices` 已經 import 咗。
+邊一行令 `keys` 係個 map 啲 key，一個升序嘅 `[]string` —— 一個表達式，而且編譯得到？
+'''
+hints = [
+  "1.23 開始，maps package 交出嘅係一個 iterator，唔係 slice；slices package 有一個 function 會消耗一個 iterator 然後回傳一個排好序嘅 slice。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet_advanced.23.iter-rust"
+title = "最大嗰個喺邊"
+story = "Ferris 想要波斯富街個板上面最高價錢嘅位置，唔係個價錢 —— 而個 tuple 把戲差啲呃到佢。"
+brief = '''
+喺 **Rust**，`a` 係一個非空、值互不相同嘅 `Vec<i32>`，例如 `[3, 9, 4, 1]`。
+`let i = ____;`，然後 `a[i]` 一定要係最大嘅值 —— 所以呢度 `i` 係 `1`。
+空位填邊個表達式？
+'''
+hints = [
+  "先為啲元素編號，然後*按值*攞最大，唔係按成個 (index, value) 對 —— 啲 pair 先比較 index。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet_advanced.24.iter-python"
+title = "拆平個箱"
+story = "寶靈頓道街市箱入面有箱；條蟒蛇想每一粒荔枝都出嚟，一粒一粒咁，lazy 咁。"
+brief = '''
+喺 **Python**，
+
+```
+def walk(t):
+    for x in t:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+
+邊一行令 `list(walk([1, [2, [3]], 4]))` 得到 `[1, 2, 3, 4]`？
+'''
+hints = [
+  "遞歸呼叫回傳一個 generator；將佢當一個 item yield 出去同將控制權交畀佢係唔同嘅。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet_advanced.25.json-go"
+title = "欄位上面個 TAG"
+story = "銅鑼灣體育館張會員表格：線路上面用細楷 key，而留空咗年齡嘅人就冇年齡嗰行。"
+brief = '''
+喺 **Go**，
+
+```
+type P struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+
+`json.Marshal(P{Name: "Mei", Age: 35})` 一定要得到 `{"name":"Mei","age":35}`，
+而 `json.Marshal(P{Name: "Mei"})` 一定要得到 `{"name":"Mei"}`。空位填邊一行欄位？
+'''
+hints = [
+  "個 key 名同個選項住喺同一對引號入面，用逗號分開；個 key 要串到同佢應該出現嘅樣一模一樣。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet_advanced.26.json-rust"
+title = "大括號，雙份"
+story = "Lucky Mac 部手提電腦冇 crate，所以 Ferris 用手寫 JSON，而個 format string 食咗佢啲大括號。"
+brief = '''
+喺 **Rust**，淨係 std —— 冇 serde。`p.name` 係 `String` `"Mei"`，而 `p.age`
+係 `u32` `35`。邊個表達式砌出 `String` `{"name":"Mei","age":35}` ——
+一個數字，唔係加咗引號嘅數字 —— 而且編譯得到？
+'''
+hints = [
+  "format string 入面一個字面嘅大括號要寫兩次；單一個係開一個 placeholder。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet_advanced.27.json-python"
+title = "嵌套嘅 DATACLASS"
+story = "Mei 個地址係一個 dataclass 入面嘅 dataclass，而 `json` 冇人幫手就拒絕望入任何一個。"
+brief = '''
+喺 **Python**，
+
+```
+@dataclass
+class Addr:
+    street: str
+    floor: int
+
+@dataclass
+class P:
+    name: str
+    addr: Addr
+```
+
+`p = P("Mei", Addr("Jardine's Bazaar", 5))`。邊一行令 `s` 係 JSON 文字
+`{"name": "Mei", "addr": {"street": "Jardine's Bazaar", "floor": 5}}` ——
+雙引號、嵌套物件，全部都要？
+'''
+hints = [
+  "`json` 淨係識 dict 同 list；dataclasses module 有一個會遞歸入嵌套 dataclass 嘅轉換器，而 `vars` 喺第一層就停。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet_advanced.28.match-go"
+title = "一個 CASE 一個類型"
+story = "Alex 為咗慳一行，喺一個 case 入面列咗兩個整數類型，而 `v` 就變返做 interface 嚟整蠱佢。"
+brief = '''
+喺 **Go**，
+
+```
+func describe(x any) string {
+    switch v := x.(type) {
+    // ____
+        return strconv.Itoa(v * 2)
+    case string:
+        return v
+    }
+    return "?"
+}
+```
+
+邊一行 case 令 `describe(21)` 回傳 `"42"` —— 而且編譯得到？
+'''
+hints = [
+  "淨係當個 case 啱啱好寫一個類型，`v` 先會變做嗰個 case 嘅類型；寫兩個嘅話 `v` 仍然係 `any`，乘唔到。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet_advanced.29.match-rust"
+title = "細而且單數，FERRIS"
+story = "Ferris 喺灣仔間廟分幸運數字：一個位、單數，而且佢檢查嗰陣想留住嗰個位。"
+brief = '''
+喺 **Rust**，`x` 係一個 `Option<i32>`：
+
+```
+match x {
+    // ____ "small odd",
+    Some(_) => "other",
+    None => "none",
+}
+```
+
+邊個 arm 開頭匹配一個由 1 到 9（包括在內）而且係**單數**嘅值，並且將個值
+綁定到 `n` 嚟做檢查？
+'''
+hints = [
+  "用 @ 將一個名綁定到 range sub-pattern，然後將算術放入 guard；Rust 嘅 pattern 冇 `in`，亦冇 `as`。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet_advanced.30.match-python"
+title = "大佬：POSITIONAL PATTERN"
+story = "最後一個 node，時代廣場。條蟒蛇個普通 class 唔會按位置匹配，直到佢講明邊啲 attribute 計數，同埋係咩次序。"
+brief = '''
+喺 **Python** 3.12，`Pt` 係一個普通 class —— **唔係** dataclass：
+
+```
+class Pt:
+    # ____
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+冇咗個空位，`case Pt(a, b):` 會 raise
+`TypeError: Pt() accepts 0 positional sub-patterns`。class body 入面邊一行
+令 `case Pt(a, b):` 將 `a` 綁定到 `x`、`b` 綁定到 `y`？
+'''
+hints = [
+  "有一個 dunder 正正做呢樣嘢，而 interpreter 堅持佢係一個 attribute 名嘅 tuple —— dataclass 會幫你寫。",
+]

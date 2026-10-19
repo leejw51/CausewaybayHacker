@@ -1,0 +1,952 @@
+# ZIG LAND — CHEATSHEET. The grammar off the page, asked: thirty of the Zig
+# lines a live-coding test leans on and a hand forgets — print through a
+# writer, parseInt, a for with its index, @divTrunc, std.mem.eql, orelse,
+# append with its allocator, std.mem.sort, catch with a default, a comptime
+# type parameter, a method on *Self, errdefer, then a slice of a slice, a
+# while with its continue expression, a switch over ranges, an error-union
+# signature, an optional unwrapped by capture, an AutoHashMap counted up,
+# an index cast to usize, a labelled break, then a `var` that must say its
+# type, an open range in a for, `and` instead of `&&`, @floatFromInt,
+# @abs, std.mem.reverse, dupe on the allocator, `.items.len`, a named error
+# returned, and @mod against @rem — at the Causeway Bay portal of the
+# Cross-Harbour Tunnel. Four lines, one right. Nothing is
+# typed and nothing is compiled — the pick is the submission, and the server
+# judges it against the quiz (SPEC §0). The three wrong lines are near-misses:
+# another language's spelling, a missing `try`, an allocator left out.
+#
+# The spellings are the land's Zig 0.16 ones (zig/verybasic.toml,
+# zig/basic.toml): an ArrayList is `.empty` and takes `gpa` on every call
+# that may grow it, output goes through a buffered writer `w`.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "zig.cheatsheet"
+land = "zig"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "zig.cheatsheet.01.print"
+node        = 1
+title       = "THE TOLL SIGN"
+difficulty  = 1
+story       = "06:00 at the Cross-Harbour Tunnel portal. The sign over booth 1 shows the fare, if something writes it."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+`w` is a buffered writer over stdout. Print `n` in decimal, then a newline.
+
+```
+const w = &stdout.interface;
+defer w.flush() catch {};
+const n: i64 = 42;
+// ____
+```
+
+Which line is it?
+'''
+solution    = 'try w.print("{d}\n", .{n});'
+hints = [
+  "The arguments go in a tuple, `.{ ... }`, and print can fail, so it is `try`d.",
+]
+
+[quest.quiz]
+choices = [
+  'try w.print("{d}\n", n);',
+  'w.print("{d}\n", .{n});',
+  'try w.print("{d}\n", .{n});',
+  'try w.print("%d\n", .{n});',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "zig.cheatsheet.02.parse-int"
+node        = 2
+title       = "COINS TO NUMBERS"
+difficulty  = 1
+story       = "The coin tray at booth 2 counts in text. The till wants an integer."
+concepts    = ["strings", "error-handling"]
+requires    = ["zig.cheatsheet.01.print"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`tok` is a `[]const u8` holding `"42"`. Make `n` an `i64` in base 10, and
+pass a bad token's error up to the caller.
+'''
+solution    = 'const n = try std.fmt.parseInt(i64, tok, 10);'
+hints = [
+  "The type comes first, then the text, then the base. It returns an error union, so `try` it.",
+]
+
+[quest.quiz]
+choices = [
+  'const n = try std.fmt.parseInt(i64, tok, 10);',
+  'const n = try std.fmt.parseInt(tok, i64, 10);',
+  'const n: i64 = @intCast(tok);',
+  'const n = tok.parseInt(i64);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "zig.cheatsheet.03.for-index"
+node        = 3
+title       = "LANE NUMBERS"
+difficulty  = 1
+story       = "The axle counter logs every car with the lane it came through, counted from zero."
+concepts    = ["iteration", "slices"]
+requires    = ["zig.cheatsheet.02.parse-int"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`xs` is a `[]const i64`. Loop over it with each element as `x` and its
+index as `i`.
+'''
+solution    = 'for (xs, 0..) |x, i| {'
+hints = [
+  "A for loop can walk two things at once: the slice and an open range from 0. One capture each.",
+]
+
+[quest.quiz]
+choices = [
+  'for (xs) |x, i| {',
+  'for (xs, 0..) |x, i| {',
+  'for (i, x in xs) {',
+  'for (xs.enumerate()) |x, i| {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "zig.cheatsheet.04.div-trunc"
+node        = 4
+title       = "SPLIT THE TAKE"
+difficulty  = 1
+story       = "The night's takings are shared across the booths, and the ledger can run negative."
+concepts    = ["types", "math"]
+requires    = ["zig.cheatsheet.03.for-index"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`a` and `b` are runtime `i64`s, either may be negative. Make `q` their
+quotient rounded **toward zero**, the way C does it.
+'''
+solution    = 'const q = @divTrunc(a, b);'
+hints = [
+  "Plain `/` does not compile on signed runtime integers: Zig makes you name the rounding.",
+]
+
+[quest.quiz]
+choices = [
+  'const q = a / b;',
+  'const q = @divFloor(a, b);',
+  'const q = @div(a, b);',
+  'const q = @divTrunc(a, b);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "zig.cheatsheet.05.eql"
+node        = 5
+title       = "SAME PLATE"
+difficulty  = 1
+story       = "The plate reader on the flyover checks each car against the one on the wanted list."
+concepts    = ["strings", "slices"]
+requires    = ["zig.cheatsheet.04.div-trunc"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`a` and `b` are both `[]const u8`. Open an `if` that is true when they hold
+the same bytes.
+'''
+solution    = 'if (std.mem.eql(u8, a, b)) {'
+hints = [
+  "`==` is not defined on slices. The std.mem comparison takes the element type first.",
+]
+
+[quest.quiz]
+choices = [
+  'if (std.mem.eql(u8, a, b)) {',
+  'if (a == b) {',
+  'if (std.mem.eql(a, b)) {',
+  'if (a.equals(b)) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "zig.cheatsheet.06.orelse"
+node        = 6
+title       = "NO RECORD"
+difficulty  = 2
+story       = "A plate the tally has never seen has a count, and the count is zero."
+concepts    = ["hashing", "collections"]
+requires    = ["zig.cheatsheet.05.eql"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`counts` is a `std.StringHashMap(i64)`, and `get` returns `?i64`. Make `c`
+the count for key `k`, or 0 when `k` is not there.
+'''
+solution    = 'const c = counts.get(k) orelse 0;'
+hints = [
+  "An optional is unwrapped with a default by `orelse`; `catch` is for error unions.",
+]
+
+[quest.quiz]
+choices = [
+  'const c = counts.get(k) catch 0;',
+  'const c = counts.get(k) ?? 0;',
+  'const c = counts.get(k) orelse 0;',
+  'const c = counts.get(k) or 0;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "zig.cheatsheet.07.append"
+node        = 7
+title       = "ONE MORE CAR"
+difficulty  = 2
+story       = "The queue at booth 3 grows by one, and every byte of it is paid for."
+concepts    = ["collections", "error-handling"]
+requires    = ["zig.cheatsheet.06.orelse"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+Add `x` to the end of the list.
+
+```
+var xs: std.ArrayList(i64) = .empty;
+defer xs.deinit(gpa);
+// ____
+```
+'''
+solution    = 'try xs.append(gpa, x);'
+hints = [
+  "The list keeps no allocator: hand it `gpa` on every call that may grow it, and `try` the result.",
+]
+
+[quest.quiz]
+choices = [
+  'xs.append(gpa, x);',
+  'try xs.append(gpa, x);',
+  'try xs.append(x);',
+  'xs.push(x);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "zig.cheatsheet.08.sort-desc"
+node        = 8
+title       = "HEAVIEST FIRST"
+difficulty  = 2
+story       = "The weighbridge under Canal Road lists the trucks with the heaviest on top."
+concepts    = ["sorting", "slices"]
+requires    = ["zig.cheatsheet.07.append"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`xs` is a `std.ArrayList(i64)`. Sort its items in **descending** order, in
+place.
+'''
+solution    = 'std.mem.sort(i64, xs.items, {}, std.sort.desc(i64));'
+hints = [
+  "std.mem.sort takes the type, the slice, a context and a comparator; std.sort has one for each direction.",
+]
+
+[quest.quiz]
+choices = [
+  'std.mem.sort(i64, xs.items, {}, std.sort.asc(i64));',
+  'xs.items.sort(.desc);',
+  'std.mem.sort(xs.items, std.sort.desc);',
+  'std.mem.sort(i64, xs.items, {}, std.sort.desc(i64));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "zig.cheatsheet.09.catch-default"
+node        = 9
+title       = "SMUDGED TICKET"
+difficulty  = 2
+story       = "A ticket from the dispenser is smudged. The booth counts it as zero and waves the car through."
+concepts    = ["error-handling", "strings"]
+requires    = ["zig.cheatsheet.08.sort-desc"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`tok` may not be a number. Parse it as a base-10 `i64` into `n`, and use 0
+when parsing fails instead of returning the error.
+'''
+solution    = 'const n = std.fmt.parseInt(i64, tok, 10) catch 0;'
+hints = [
+  "An error union gives way to a default with `catch`; `orelse` is for optionals.",
+]
+
+[quest.quiz]
+choices = [
+  'const n = std.fmt.parseInt(i64, tok, 10) catch 0;',
+  'const n = std.fmt.parseInt(i64, tok, 10) orelse 0;',
+  'const n = std.fmt.parseInt(i64, tok, 10) || 0;',
+  'const n = try std.fmt.parseInt(i64, tok, 10) else 0;',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "zig.cheatsheet.10.comptime-type"
+node        = 10
+title       = "ANY CARGO"
+difficulty  = 3
+story       = "The container stack at the portal holds whatever the truck brings, as long as it is told what at compile time."
+concepts    = ["generics", "types"]
+requires    = ["zig.cheatsheet.09.catch-default"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`Stack` is a function that takes an element type and returns a struct type
+built from it. Which line opens it?
+
+```
+// ____
+    return struct {
+        items: []T,
+    };
+}
+```
+'''
+solution    = 'fn Stack(comptime T: type) type {'
+hints = [
+  "A type is a value known at compile time, so its parameter is marked as such; the function returns `type`.",
+]
+
+[quest.quiz]
+choices = [
+  'fn Stack<T>() type {',
+  'fn Stack(comptime T) type {',
+  'fn Stack(comptime T: type) type {',
+  'generic fn Stack(T: type) type {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "zig.cheatsheet.11.self-ptr"
+node        = 11
+title       = "THE TALLY BOX"
+difficulty  = 3
+story       = "The counter bolted to booth 4 clicks once per car. A copy of it would click alone."
+concepts    = ["structs", "pointers", "mutability"]
+requires    = ["zig.cheatsheet.10.comptime-type"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+A method `inc` that adds one to the counter it is called on:
+
+```
+const Counter = struct {
+    n: i64 = 0,
+    // ____
+        self.n += 1;
+    }
+};
+```
+'''
+solution    = 'pub fn inc(self: *Counter) void {'
+hints = [
+  "A parameter is a constant copy. To change the caller's struct, take a pointer to it.",
+]
+
+[quest.quiz]
+choices = [
+  'pub fn inc(self: Counter) void {',
+  'pub fn inc(&mut self) void {',
+  'pub fn inc() void {',
+  'pub fn inc(self: *Counter) void {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "zig.cheatsheet.12.errdefer"
+node        = 12
+title       = "ONLY IF IT FAILS"
+difficulty  = 3
+story       = "The barrier at the tunnel mouth hands the car on if the toll clears, and takes the ticket back if it does not."
+concepts    = ["error-handling", "raii"]
+requires    = ["zig.cheatsheet.11.self-ptr"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+Free `buf` if `fill` fails, but hand it to the caller untouched when it
+succeeds.
+
+```
+fn load(gpa: std.mem.Allocator, n: usize) ![]u8 {
+    const buf = try gpa.alloc(u8, n);
+    // ____
+    try fill(buf);
+    return buf;
+}
+```
+'''
+solution    = 'errdefer gpa.free(buf);'
+hints = [
+  "A plain `defer` runs on every way out, success included. There is a form that runs only on an error return.",
+]
+
+[quest.quiz]
+choices = [
+  'defer gpa.free(buf);',
+  'errdefer gpa.free(buf);',
+  'catch gpa.free(buf);',
+  'defer if (err) gpa.free(buf);',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "zig.cheatsheet.13.slice"
+node        = 13
+title       = "THE MIDDLE LANES"
+difficulty  = 2
+story       = "Of the five lanes at the portal, the two in the middle are the ones under the camera tonight."
+concepts    = ["slices", "iteration"]
+requires    = ["zig.cheatsheet.12.errdefer"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`xs` is a `[]const i64` of five elements. Make `mid` a view of the
+elements at index 1 and 2 — exactly two of them, no copy.
+'''
+solution    = 'const mid = xs[1..3];'
+hints = [
+  "A sub-slice is `[start..end]` with the end excluded; leave the end off entirely and it runs to `xs.len`.",
+]
+
+[quest.quiz]
+choices = [
+  'const mid = xs[1..2];',
+  'const mid = xs[1:3];',
+  'const mid = xs[1..3];',
+  'const mid = xs[1..=2];',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "zig.cheatsheet.14.while-step"
+node        = 14
+title       = "COUNT THE BOOTHS"
+difficulty  = 2
+story       = "The inspector walks the booths from zero to the last, one step after each check."
+concepts    = ["control-flow", "iteration"]
+requires    = ["zig.cheatsheet.13.slice"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`i` and `n` are `usize`, `i` starts at 0. Open a loop that runs the body
+for `i = 0, 1, …, n-1`, with the step written in the loop header rather
+than at the bottom of the body.
+'''
+solution    = 'while (i < n) : (i += 1) {'
+hints = [
+  "Zig has no C-style `for`: it is a `while` whose continue expression sits after a colon, and there is no `++`.",
+]
+
+[quest.quiz]
+choices = [
+  'while (i < n) : (i += 1) {',
+  'while (i < n) : (i++) {',
+  'while (i < n; i += 1) {',
+  'for (i = 0; i < n; i += 1) {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "zig.cheatsheet.15.switch-range"
+node        = 15
+title       = "WEIGHT CLASS"
+difficulty  = 2
+story       = "The weighbridge sorts every vehicle into a class by the tonnes it reads, and the heaviest class is open-ended."
+concepts    = ["control-flow", "pattern-matching"]
+requires    = ["zig.cheatsheet.14.while-step"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`t` is an `i64`. Which prong makes every value from 0 up to and
+including 9 give `"light"`?
+
+```
+const class = switch (t) {
+    // ____
+    10...99 => "medium",
+    else => "heavy",
+};
+```
+'''
+solution    = '0...9 => "light",'
+hints = [
+  "A switch range is inclusive at both ends and is spelled with one more dot than a slice range.",
+]
+
+[quest.quiz]
+choices = [
+  '0..9 => "light",',
+  '0...9 => "light",',
+  '0..=9 => "light",',
+  'case 0...9: "light",',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "zig.cheatsheet.16.error-union"
+node        = 16
+title       = "MAY FAIL, SAYS SO"
+difficulty  = 3
+story       = "The ticket reader at booth 5 either hands back a number or admits it could not read the ticket, and its label says both."
+concepts    = ["error-handling", "functions"]
+requires    = ["zig.cheatsheet.15.switch-range"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`parse` turns a token into an `i64` and passes a parse failure up to
+its caller. Which line opens it?
+
+```
+// ____
+    return try std.fmt.parseInt(i64, s, 10);
+}
+```
+'''
+solution    = 'fn parse(s: []const u8) !i64 {'
+hints = [
+  "`try` inside a function only compiles when the return type can carry an error; the inferred error set is written with one character before the type.",
+]
+
+[quest.quiz]
+choices = [
+  'fn parse(s: []const u8) i64 {',
+  'fn parse(s: []const u8) ?i64 {',
+  'fn parse(s: []const u8) error!i64 {',
+  'fn parse(s: []const u8) !i64 {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "zig.cheatsheet.17.if-capture"
+node        = 17
+title       = "IF THERE IS A PLATE"
+difficulty  = 2
+story       = "The camera over lane 3 may or may not have read a plate; the tally only moves when it did."
+concepts    = ["error-handling", "control-flow", "zero-values"]
+requires    = ["zig.cheatsheet.16.error-union"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`maybe` is a `?i64`. Open an `if` whose body runs only when `maybe`
+holds a value, with that value bound to `v` inside the body.
+'''
+solution    = 'if (maybe) |v| {'
+hints = [
+  "The condition is the optional itself, not a comparison, and the capture after it is the unwrapped value.",
+]
+
+[quest.quiz]
+choices = [
+  'if (maybe != null) |v| {',
+  'if (maybe) |v| {',
+  'if (let v = maybe) {',
+  'if (maybe.?) |v| {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "zig.cheatsheet.18.hashmap-count"
+node        = 18
+title       = "ONE MORE OF THOSE"
+difficulty  = 3
+story       = "The plate tally in the control room ticks up once for every car, and a plate it has never seen starts from nothing."
+concepts    = ["hashing", "collections", "error-handling"]
+requires    = ["zig.cheatsheet.17.if-capture"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+Add one to the count stored under key `x`, treating a key that is not
+there yet as 0.
+
+```
+var counts: std.AutoHashMap(i64, i64) = .init(gpa);
+defer counts.deinit();
+// ____
+```
+'''
+solution    = 'try counts.put(x, (counts.get(x) orelse 0) + 1);'
+hints = [
+  "`get` returns an optional, so it needs a default before any arithmetic; this map remembers its allocator, so the store call does not take one.",
+]
+
+[quest.quiz]
+choices = [
+  'try counts.put(x, (counts.get(x) catch 0) + 1);',
+  'try counts.put(gpa, x, (counts.get(x) orelse 0) + 1);',
+  'try counts.put(x, counts.get(x) + 1);',
+  'try counts.put(x, (counts.get(x) orelse 0) + 1);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "zig.cheatsheet.19.intcast"
+node        = 19
+title       = "A SIGNED LANE NUMBER"
+difficulty  = 3
+story       = "The lane number came off the wire as a signed integer; the lane table only takes a size."
+concepts    = ["types", "slices"]
+requires    = ["zig.cheatsheet.18.hashmap-count"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`k` is a runtime `i64` known to be non-negative and in range. Make `idx`
+a `usize` holding the same value, so that `xs[idx]` compiles.
+'''
+solution    = 'const idx: usize = @intCast(k);'
+hints = [
+  "The cast takes one argument and its target width comes from the binding it lands in, so the binding must say the type.",
+]
+
+[quest.quiz]
+choices = [
+  'const idx: usize = @intCast(k);',
+  'const idx = @intCast(usize, k);',
+  'const idx = @as(usize, k);',
+  'const idx = @intCast(k);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "zig.cheatsheet.20.labeled-break"
+node        = 20
+title       = "OUT OF BOTH LOOPS"
+difficulty  = 4
+story       = "The search for the one stolen plate runs lane by lane and car by car, and the moment it is found the whole sweep stops."
+concepts    = ["control-flow", "iteration", "matrix"]
+requires    = ["zig.cheatsheet.19.intcast"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`grid` is a slice of rows. When the target is found, leave **both** loops
+at once — the outer loop must not go on to the next row.
+
+```
+outer: for (grid) |row| {
+    for (row) |c| {
+        if (c == target) {
+            found = c;
+            // ____
+        }
+    }
+}
+```
+'''
+solution    = 'break :outer;'
+hints = [
+  "A labelled loop is left by naming its label after the keyword, with a colon in front of the name; the other labelled jump would only skip to the next row.",
+]
+
+[quest.quiz]
+choices = [
+  'break outer;',
+  'continue :outer;',
+  'break :outer;',
+  "break 'outer;",
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "zig.cheatsheet.21.var-typed"
+node        = 21
+title       = "THE RUNNING TOTAL"
+difficulty  = 1
+story       = "The night-shift ledger at booth 1 starts at nothing and takes every fare the loop hands it."
+concepts    = ["bindings", "types", "mutability"]
+requires    = ["zig.cheatsheet.20.labeled-break"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`xs` is a `[]const i64`. Declare `total` as an `i64` starting at 0 so
+that the loop below can add to it.
+
+```
+// ____
+for (xs) |x| total += x;
+```
+'''
+solution    = 'var total: i64 = 0;'
+hints = [
+  "A binding the loop writes to needs the mutable keyword, and a bare integer literal has no runtime type of its own — the declaration has to say one.",
+]
+
+[quest.quiz]
+choices = [
+  'const total: i64 = 0;',
+  'var total = 0;',
+  'var total: i64 = 0;',
+  'let mut total: i64 = 0;',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "zig.cheatsheet.22.range-for"
+node        = 22
+title       = "TEN TIMES ROUND"
+difficulty  = 1
+story       = "The inspector tries each of the ten booths once on her round, booth 10 included."
+concepts    = ["iteration", "control-flow"]
+requires    = ["zig.cheatsheet.21.var-typed"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+Open a `for` that runs its body **ten** times, with `i` taking the values
+1, 2, …, 10 in turn — the last pass must see `i == 10`.
+'''
+solution    = 'for (1..11) |i| {'
+hints = [
+  "A for over a range excludes its upper bound, exactly as a slice `[a..b]` does, so the bound is one past the last value you want.",
+]
+
+[quest.quiz]
+choices = [
+  'for (1..=10) |i| {',
+  'for (1..10) |i| {',
+  'for (1...10) |i| {',
+  'for (1..11) |i| {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "zig.cheatsheet.23.bool-and"
+node        = 23
+title       = "BOTH LIGHTS GREEN"
+difficulty  = 1
+story       = "The barrier at lane 2 lifts only when the ticket has read and the fare has cleared."
+concepts    = ["control-flow", "types"]
+requires    = ["zig.cheatsheet.22.range-for"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`ready` and `valid` are runtime `bool`s. Open an `if` whose body runs
+only when both are true.
+'''
+solution    = 'if (ready and valid) {'
+hints = [
+  "Zig spells its logical operators as keywords, not as doubled symbols — the C spelling is a compile error here — and the condition still needs its parentheses.",
+]
+
+[quest.quiz]
+choices = [
+  'if (ready && valid) {',
+  'if ready and valid {',
+  'if (ready and valid) {',
+  'if (ready andalso valid) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "zig.cheatsheet.24.float-from-int"
+node        = 24
+title       = "HALF A FARE"
+difficulty  = 2
+story       = "Half-price night fares: the toll on the sign is a whole number, and the discount is not."
+concepts    = ["types", "math"]
+requires    = ["zig.cheatsheet.23.bool-and"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`n` is a runtime `i64`. Make `f` an `f64` holding the same value, so
+that `f / 2.0` compiles.
+'''
+solution    = 'const f: f64 = @floatFromInt(n);'
+hints = [
+  "There is no implicit integer-to-float conversion, and the builtin that does it takes only the value — its target type comes from the binding, so the binding must name one.",
+]
+
+[quest.quiz]
+choices = [
+  'const f = @floatFromInt(f64, n);',
+  'const f: f64 = @floatFromInt(n);',
+  'const f = @as(f64, n);',
+  'const f: f64 = n;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "zig.cheatsheet.25.abs"
+node        = 25
+title       = "HOW FAR OFF"
+difficulty  = 2
+story       = "The axle counter at booth 4 drifted overnight; the control room wants to know by how much, not which way."
+concepts    = ["math", "types"]
+requires    = ["zig.cheatsheet.24.float-from-int"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`x` is a runtime `i64` that may be negative. Make `a` its absolute
+value — and remember the result is **unsigned** (`u64`).
+'''
+solution    = 'const a = @abs(x);'
+hints = [
+  "Since 0.12 this is a builtin, not a std.math function, and it hands back the unsigned twin of the input type — a signed binding will not take it.",
+]
+
+[quest.quiz]
+choices = [
+  'const a = std.math.abs(x);',
+  'const a = @absInt(x);',
+  'const a = @abs(x);',
+  'const a: i64 = @abs(x);',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "zig.cheatsheet.26.reverse"
+node        = 26
+title       = "BACK THE WAY THEY CAME"
+difficulty  = 2
+story       = "The tow truck backs the queue out of the tunnel mouth in the opposite order it came in."
+concepts    = ["slices", "iteration"]
+requires    = ["zig.cheatsheet.25.abs"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`xs` is a `std.ArrayList(i64)`. Reverse its items in place.
+'''
+solution    = 'std.mem.reverse(i64, xs.items);'
+hints = [
+  "Slices have no methods; the std.mem helper takes the element type first, the way sort and eql do.",
+]
+
+[quest.quiz]
+choices = [
+  'std.mem.reverse(i64, xs.items);',
+  'xs.items.reverse();',
+  'std.mem.reverse(xs.items);',
+  'std.reverse(i64, xs.items);',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "zig.cheatsheet.27.dupe"
+node        = 27
+title       = "A COPY FOR THE RECORDS"
+difficulty  = 2
+story       = "The shift's plate list goes up to the records office in Causeway Bay, and the office keeps its own copy."
+concepts    = ["slices", "error-handling"]
+requires    = ["zig.cheatsheet.26.reverse"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`xs` is a `[]const i64`. Make `c` an independent heap copy of it, owned
+by `gpa` — the caller frees it later with `gpa.free(c)`.
+'''
+solution    = 'const c = try gpa.dupe(i64, xs);'
+hints = [
+  "The copy is a method on the allocator, not on std.mem, and it is told the element type before the slice. Allocation can fail.",
+]
+
+[quest.quiz]
+choices = [
+  'const c = try std.mem.dupe(gpa, i64, xs);',
+  'const c = xs.clone();',
+  'const c = try gpa.dupe(xs);',
+  'const c = try gpa.dupe(i64, xs);',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "zig.cheatsheet.28.items-len"
+node        = 28
+title       = "HOW LONG IS THE QUEUE"
+difficulty  = 1
+story       = "The sign at the portal shows how many cars are waiting at booth 3."
+concepts    = ["collections", "slices"]
+requires    = ["zig.cheatsheet.27.dupe"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`xs` is a `std.ArrayList(i64)`. Make `n` the number of elements it
+holds.
+'''
+solution    = 'const n = xs.items.len;'
+hints = [
+  "The list has no length of its own; the elements live in a slice field, and a slice's length is a field, not a call.",
+]
+
+[quest.quiz]
+choices = [
+  'const n = xs.len;',
+  'const n = xs.items.len;',
+  'const n = xs.len();',
+  'const n = xs.count();',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "zig.cheatsheet.29.return-error"
+node        = 29
+title       = "SAY WHAT WENT WRONG"
+difficulty  = 2
+story       = "Booth 5 asked for the first car in a queue that had none, and the reader has to say so."
+concepts    = ["error-handling", "functions"]
+requires    = ["zig.cheatsheet.28.items-len"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+Hand the caller an error named `Empty` when the slice has nothing in it.
+
+```
+fn first(xs: []const i64) !i64 {
+    if (xs.len == 0) {
+        // ____
+    }
+    return xs[0];
+}
+```
+'''
+solution    = 'return error.Empty;'
+hints = [
+  "An error is a value, returned like any other; a new one is spelled off a lowercase namespace with a dot — not called like a function — and needs no declaration.",
+]
+
+[quest.quiz]
+choices = [
+  'throw error.Empty;',
+  'return Error.Empty;',
+  'return error("Empty");',
+  'return error.Empty;',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "zig.cheatsheet.30.mod"
+node        = 30
+title       = "WHAT IS LEFT OVER"
+difficulty  = 3
+story       = "The night's takings are shared three ways and the leftover coins go in the tip jar — never a negative handful."
+concepts    = ["math", "types"]
+requires    = ["zig.cheatsheet.29.return-error"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`a` and `b` are runtime `i64`s; `b` is positive and `a` may be negative.
+Make `r` the remainder that is **never negative**: with `a = -7` and
+`b = 3`, `r` must be `2`.
+'''
+solution    = 'const r = @mod(a, b);'
+hints = [
+  "Like `/`, the `%` sign refuses signed runtime operands and makes you pick a builtin: one follows the sign of the dividend, the other the sign of the divisor.",
+]
+
+[quest.quiz]
+choices = [
+  'const r = a % b;',
+  'const r = @rem(a, b);',
+  'const r = a mod b;',
+  'const r = @mod(a, b);',
+]
+answer  = 3

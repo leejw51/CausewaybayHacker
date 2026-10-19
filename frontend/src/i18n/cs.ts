@@ -162,6 +162,10 @@ export const cs: Partial<Catalogue> = {
     "Tabulky, uzávěry, metatabulky, korutiny. Jedna struktura na všechno, a čísluje se od jedničky.",
   "lands.remixBlurb":
     "Go, Rust, Python: tentýž program třikrát. Jedna myšlenka, tři gramatiky, vedle sebe v prstech.",
+  "lands.cheatsheetBlurb":
+    "Tahák, základ. Jádro gramatiky ze stránky jako otázka: čtyři řádky, jeden správný. Vyber ho a uzel je hotový.",
+  "lands.cheatsheetAdvancedBlurb":
+    "Tahák, pokročilý. Traity, kanály, generika, uzávěry — vzory, na kterých stojí živé kódování. Čtyři řádky, jeden správný.",
   "lands.verybasicBlurb":
     "Kvíz. Který řádek je správná gramatika? Vyber jeden ze čtyř a pak ho napiš.",
   "lands.basicBlurb":
@@ -193,6 +197,8 @@ export const cs: Partial<Catalogue> = {
   "map.playground": "HŘIŠTĚ",
   "map.allMapsShort": "MAPY",
   "map.playgroundShort": "HŘIŠTĚ",
+  "map.cheatsheet": "TAHÁK ZÁKLAD",
+  "map.cheatsheet_advanced": "TAHÁK POKROČILÝ",
   "map.verybasic": "ÚPLNÝ ZÁKLAD",
   "map.basic": "ZÁKLAD",
   "map.advanced": "POKROČILÉ",
@@ -233,6 +239,10 @@ export const cs: Partial<Catalogue> = {
   "map.footer": "←→  ULICE   ENTER  DOVNITŘ   TAB  KRAJ   Q/E  KATEGORIE   F1  ORIENTACE",
 
   "quest.loading": "NAČÍTÁM",
+  "quest.sheetPick": "VYBER SPRÁVNÝ ŘÁDEK  (1–4)",
+  "quest.sheetRight": "SPRÁVNĚ",
+  "quest.sheetStreak": "SÉRIE ×{n}",
+  "quest.sheetCombo": "×{n} KOMBO",
   "quest.quizPick": "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",
   "quest.quizRight": "SPRÁVNĚ — TEĎ HO NAPIŠ",
   "quest.job": "ZADÁNÍ",
@@ -310,6 +320,7 @@ export const cs: Partial<Catalogue> = {
   "quest.noFormat": "tento server ještě nemá formátování",
   "quest.formatSilent": "formátovač neodpověděl",
   "quest.briefEnglish": "zadání je anglicky — úlohy zatím nejsou přeložené",
+  "quest.sheetFooter": "1–4  VYBRAT   ESC  MAPA",
   "quest.footer":
     "CTRL+ENTER  SPUSTIT   CTRL+SHIFT+ENTER  ODESLAT   CTRL+SHIFT+F  FORMÁT   PGUP/PGDN  LOG   ESC  MAPA",
   "verdict.accepted": "UKÁZKA PROŠLA",

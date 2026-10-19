@@ -1,0 +1,539 @@
+# RUST LAND — CHEATSHEET ADVANCED, in Cantonese (written colloquially in Traditional
+# characters). A translation pack (SPEC §12.1): the prose of
+# `content/rust/cheatsheet_advanced.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack, and
+# are never translated. Code blocks, identifiers and printed strings are copied
+# verbatim.
+
+pack   = "rust.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet_advanced.01.default-method"
+title = "後備嗰行"
+story = "06:50，渣甸坊樓上。Mei 張單上面每間舖都識講自己個名；佢想全部都識打招呼，但又唔想逐間寫一次。"
+brief = '''
+`Greet` 已經要求實現 `name`。喺個 trait 加入 `hello`，令
+`impl Greet for Shop` **只需要**寫 `name`，而 `Shop.hello()` 仍然編譯得到，
+回傳 `name` 回傳嘅嘢。
+```
+trait Greet {
+    fn name(&self) -> String;
+    // ____
+}
+impl Greet for Shop { fn name(&self) -> String { "Sogo".into() } }
+```
+'''
+hints = [
+  "有 body 嘅 trait method 對實現者嚟講係可選嘅；淨係得 signature 嗰啲就唔係。冇關鍵字可以表達呢樣嘢 —— 個 body 本身就係成個信號。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet_advanced.02.trait-objects"
+title = "乜形狀都得"
+story = "謝斐道間招牌舖，正方形同圓形都落喺同一本訂單簿，而每一個都知自己嘅面積。"
+brief = '''
+`Shape` 係一個有 `fn area(&self) -> f64` 嘅 trait；`Sq` 同 `Ci` 都實現咗佢。
+將 `shapes` 宣告做一個可以增長嘅 list，可以同時裝住一個 `Sq`
+**同埋**一個 `Ci`，每個都喺 heap 上面，令
+`shapes.iter().map(|s| s.area()).sum::<f64>()` 行得到。
+'''
+hints = [
+  "一個 Vec 要裝兩個唔同嘅具體類型，就需要一個指住 trait object 嘅指針；generic 參數會將類型釘死做其中一個，而一個光秃秃嘅 trait 根本唔係類型。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet_advanced.03.where-bound"
+title = "最大嗰個，唔理係乜"
+story = "崇光個價錢板，價錢用 f64 存，存貨數用 i32 存，而 Ferris 想兩樣都搵到最大嗰個，但唔想寫兩個 function。"
+brief = '''
+`largest` 會用喺一個 `&[f64]` **同埋**一個 `&[i32]` 上面。佢用 `>` 嚟比較，
+然後交返一個指住贏家嘅 reference。個 bound 寫喺 `where` 子句入面。
+```
+// ____
+    let mut m = &v[0];
+    for x in v { if x > m { m = x; } }
+    m
+}
+```
+'''
+hints = [
+  "`>` 只需要偏序 (partial order)，唔使更多 —— 一個要求全序或者完整相等嘅 bound 會將浮點數拒諸門外。而且個 body 回傳嘅係 `&T`，唔係 `T`。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet_advanced.04.next-signature"
+title = "FIB 交出嘅嘢"
+story = "軒尼詩道嘅電車號碼一個一個咁出嚟，每一個都係由前兩個加出嚟。"
+brief = '''
+`Fib { a: u64, b: u64 }` 變成一個產出 `u64` 嘅 iterator：
+```
+impl Iterator for Fib {
+    type Item = u64;
+    // ____
+        let r = self.a;
+        self.a = self.b;
+        self.b += r;
+        Some(r)
+    }
+}
+```
+空位嗰個 method，個 trait 要求嘅係邊個 signature？
+'''
+hints = [
+  "個 method 會推進狀態，所以佢需要獨佔借用 `self`；而且佢一定要有辦法話「冇嘢喇」，所以佢回傳包住嘅 item，唔係光秃秃嘅。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet_advanced.05.box-dyn-error"
+title = "兩種麻煩"
+story = "告士打道旁邊條付款路徑，可以喺 parser 度出事，又可以喺賬簿度出事，而 `main` 要用一個 `?` 吞晒兩樣。"
+brief = '''
+`AppError` 係一個自訂錯誤：
+```
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "app: {}", self.0) }
+}
+impl std::error::Error for AppError {}
+```
+佢就淨係得呢啲 impl —— `AppError` **冇**任何 `From` 轉換。
+喺 `main` 入面，`?` 用咗喺一個 `ParseIntError` **同埋**一個 `AppError` 上面。
+`main` 用邊個 signature 先可以令兩樣都編譯得到？
+'''
+hints = [
+  "兩種唔同嘅錯誤類型經過同一個 `?`，需要一個兩者都可以轉換過去嘅回傳類型：一個 trait object，而且要有固定大小 —— 所以佢要坐喺一個指針後面。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet_advanced.06.from-for-question-mark"
+title = "轉換器"
+story = "渣甸坊部收銀機用自己嘅講法報告 parse 失敗；賬簿想用自己個 enum 嚟收，但又唔想每一行都寫個 `map_err`。"
+brief = '''
+`enum AppError { Parse(ParseIntError), Neg }`。下面個 function 要原封不動咁
+編譯得到 —— 由 `?` 負責轉換：
+```
+fn read(s: &str) -> Result<i32, AppError> {
+    let n: i32 = s.trim().parse()?;
+    if n < 0 { return Err(AppError::Neg); }
+    Ok(n)
+}
+```
+邊個 impl header，入面放住 `fn from(e: ParseIntError) -> Self { AppError::Parse(e) }`，
+可以做到？
+'''
+hints = [
+  "`?` 會呼叫一個特定嘅 trait 嚟轉換個錯誤，而佢係喺目標類型上面、為來源類型實現嘅 —— 唔係倒轉，亦都唔係佢個鏡像表親。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet_advanced.07.map-err-chain"
+title = "用佢自己嘅說話"
+story = "7-32 室本賬簿用純文字記錄失敗，所以 parser 個錯誤離開個 function 之前要變做 String。"
+brief = '''
+個 function 回傳 `Result<i32, String>`。`n` 係 `s` parse 出嚟嘅 `i32`，
+而一個壞嘅 `s` 會將 parser 個訊息當 `Err` 回傳，一行搞掂。
+```
+fn read(s: &str) -> Result<i32, String> {
+    // ____
+    Ok(n * 2)
+}
+```
+'''
+hints = [
+  "parser 個錯誤冇內置轉換去 String，所以淨係 `?` 做唔到；先轉換個錯誤，然後先傳播。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet_advanced.08.option-chain"
+title = "可能係個索引"
+story = "銅鑼灣站 `o` 號儲物櫃可能係 None，又可能已經超過最後一個櫃；Mei 想要入面嘅嘢或者 -1，而且唔好 panic。"
+brief = '''
+`v: Vec<i32>`，`o: Option<usize>`。`x` 係一個 `i32`：`v` 喺嗰個索引嘅元素，
+或者當 `o` 係 `None` **或者**索引超出範圍嗰陣係 `-1`。
+無論 `o` 係乜都唔可以 panic。
+'''
+hints = [
+  "一個本身回傳 Option 嘅查找要用 chain，唔係 map，否則你會得到 Option 入面有個 Option。而且個查找交返嘅係 reference —— 取預設值之前先 copy 出嚟。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet_advanced.09.let-else"
+title = "第一個字，唔係就走"
+story = "大牌檔張落單紙可能係空嘅；如果冇第一個字，Mei 就攞住 0 走人。"
+brief = '''
+`w` 一定要係 `s` 用空白分隔嘅第一個字 —— 一個喺下一行用到嘅 `&str`。
+如果冇，個 function 就喺嗰度即刻回傳 `0`。
+```
+fn first_num(s: &str) -> i32 {
+    // ____
+    w.parse().unwrap_or(0)
+}
+```
+'''
+hints = [
+  "`let` 上面一個可以唔匹配嘅 pattern 需要一個 else 分支，而嗰個分支一定要離開 —— return、break、continue 或者 panic；交返一個值唔算離開。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet_advanced.10.binding-and-guard"
+title = "短嘅單數路"
+story = "Alex 喺波斯富街嘅行路指令：行 1 至 5 個街口算短，而 Mei 淨係關心單數嗰啲。"
+brief = '''
+`enum Cmd { Walk(i32), Wait }`。喺 `Cmd::label(&self)` 入面，加一個 arm 畀
+距離喺 1 至 5 之間 —— **包括 5** —— 而且係單數嘅 `Walk`，印出個距離：
+```
+match self {
+    Cmd::Wait => "wait".into(),
+    // ____
+    Cmd::Walk(_) => "walk".into(),
+}
+```
+'''
+hints = [
+  "用 `@` 將一個名綁定到 range pattern 上面，之後個 guard 就可以測試個名。留意邊種 range 寫法包含上限。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet_advanced.11.struct-lifetime"
+title = "嗰行嘅一截"
+story = "怡和街個小食亭張飛係一行字；Mei 留住嘅 token 係佢嘅一截 slice，所以唔可以活得比嗰行字長。"
+brief = '''
+`Token` 持有一個借來嘅 `&str`，指住呼叫者個 string。咁樣宣告佢，令下面編譯得到：
+```
+fn first_word<'a>(s: &'a str) -> Token<'a> {
+    Token { text: s.split_whitespace().next().unwrap_or("") }
+}
+```
+'''
+hints = [
+  "一個持有 reference 嘅 struct 要帶一個 lifetime 參數，而個欄位一定要用同一個參數 —— 宣告咗但唔用係最常見嘅失手。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet_advanced.12.counter-closure"
+title = "看門口嘅計數器"
+story = "駱克道個看更每場活動都整一個新嘅計數器；每㩒一下，入面個數就變。"
+brief = '''
+`counter` 個 body 係 `let mut c = 0; move || { c += 1; c }` —— 冇 box 住。
+呼叫者會做 `let mut next = counter(); next(); next();`。
+`counter` 用邊個 signature 先編譯得到？
+```
+// ____
+    let mut c = 0;
+    move || { c += 1; c }
+}
+```
+'''
+hints = [
+  "個 closure 會改佢捕捉到嘅嘢，所以佢係某一種 closure；佢被呼叫兩次，所以唔係只得一次嗰種；而且個 body 冇嘢將佢包入 Box。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet_advanced.13.longest"
+title = "較長嗰個名"
+story = "兩個街名，一個借自電車站，一個借自一塊就嚟拆嘅招牌；Mei 回傳較長嗰個。"
+brief = '''
+`longest` 回傳 `a` 或者 `b`，邊個長就邊個。邊個 signature 編譯得到？
+```
+// ____
+    if a.len() >= b.len() { a } else { b }
+}
+```
+'''
+hints = [
+  "輸入係兩個 reference，compiler 估唔到輸出借自邊一個；命名一個 lifetime，然後將佢綁到兩個輸入同輸出上面。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet_advanced.14.letter-from-index"
+title = "第 I 個字母"
+story = "維園啲儲物櫃由 a 到 z 咁標字母，而個預訂係用數字嚟嘅。"
+brief = '''
+`i: usize`，而且 `0 <= i < 26`。`c` 係一個 `char`：第 `i` 個小寫 ASCII 字母，
+所以 `0 → 'a'`，`7 → 'h'`，`25 → 'z'`。
+'''
+hints = [
+  "淨係得一種整數闊度可以直接 cast 做 char，就係 byte。加落一個 byte literal 度，然後 cast —— 而 std 嗰個 digit helper 係由 0 數到 9 先至去到字母。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet_advanced.15.filter-map-parse"
+title = "留低 PARSE 到嘅"
+story = "7-Eleven 卷收據一半係數字一半係污漬；Mei 想要啲數字，按次序，其餘嘅唔使理。"
+brief = '''
+`ws: [&str; 4]` 混咗數字同垃圾，例如 `["12", "x", "7", "3.5"]`。
+`v` 裝住可以 parse 做 `i32` 嗰啲，按次序；垃圾靜靜地跳過。
+```
+let v: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "當個 closure 交返一個 Option，有一個 adaptor 可以同時 filter 同 map —— 而 parse 嘅結果喺你將佢變成 Option 之前都唔係 Option。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet_advanced.16.collect-result"
+title = "要就全部，唔係就冇"
+story = "渣甸坊部收銀機只要有一個 token 係壞嘅就拒收成行；冇部分總數呢回事。"
+brief = '''
+喺 `main` 入面（佢回傳 `()`），`ws: [&str; 3]`。`r` 係裝住**全部**數字嘅 `Ok`，
+或者如果有任何 token 係壞嘅，就係第一個 parse 錯誤。
+```
+let r: Result<Vec<i32>, ParseIntError> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "將一個產出 Result 嘅 iterator 收集做一個 Vec 嘅 Result，係一個呼叫加啱嘅目標類型 —— `r` 上面個註解已經寫明咗。唔需要 `?`，而且呢度嘅 `main` 本身都用唔到。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet_advanced.17.zip-into-map"
+title = "兩欄，一個 MAP"
+story = "街市個價錢板係兩個 list —— 左邊名，右邊價錢 —— 而 Mei 想用名嚟查價錢。"
+brief = '''
+`keys: Vec<String>` 同 `vals: Vec<u32>`，長度一樣，而且之後都唔會再用。
+`m` 用一個表達式由佢哋砌出嚟：
+```
+let m: HashMap<String, u32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "將兩個序列配對，然後收集啲對。個 map 想要擁有嘅 String 同普通嘅 u32，所以要按值行過兩個 Vec，唔係按 reference。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet_advanced.18.sort-floats-desc"
+title = "最貴嗰個先"
+story = "銅鑼灣唐樓啲租金係浮點數，而個業主想最貴嗰個排最頂。"
+brief = '''
+`v: Vec<f64>`，冇 NaN。原地排序佢，**降序**。
+'''
+hints = [
+  "浮點數冇全序，所以普通 sort 同按 key 嘅 sort 都拒絕佢哋；畀一個 comparator，用 partial comparison，並且將兩個 operand 調轉。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet_advanced.19.lazy-cache"
+title = "唔中先至計"
+story = "Lucky Mac 個廚房每道菜嘅成本只計一次然後釘上板；已經喺板上面嘅菜，Bo 師傅唔會再計過。"
+brief = '''
+`cache: HashMap<u64, u64>`，而 `fn slow(n: u64) -> u64` 每次行都會印
+`computing n`。喺 `for n in [3, 3, 4]` 入面，`v` 係 `n` 嘅 cached 值，
+而 `slow` 一定要**啱啱好印兩次**。
+'''
+hints = [
+  "entry API 有兩種填窿嘅方法：一種收一個值（每次都已經計好咗），另一種收一個 closure，淨係喺個 key 唔存在嗰陣先行。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet_advanced.20.btree-range"
+title = "十至二十"
+story = "有序賬簿入面嘅電車站係有編號嘅；Mei 想要第 10 至第 20 個站，按次序，但唔想成本簿讀晒。"
+brief = '''
+`m: BTreeMap<u32, &str>`。loop 過 key 由 10 至 20 —— **兩端都包括** —— 嘅項目，
+升序，唔好行晒成個 map。
+```
+// ____
+    print!("{k}{v} ");
+}
+```
+'''
+hints = [
+  "有序 map 可以按 key 交一個子範圍畀你；佢收一個 range 參數，而邊種 range 寫法包含上限就係呢條題目嘅重點。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet_advanced.21.checked-digits"
+title = "唔准靜靜地 WRAP"
+story = "告士打道個結算系統用手 parse 金額；overflow 一定要以 None 返回，絕對唔可以係一個淨係睇落似真嘅數字。"
+brief = '''
+`parse_u64` 回傳 `Option<u64>`：overflow 嗰陣係 `None`（唔係一個 wrap 咗嘅數字），
+而且佢永遠唔會 panic。`d: u32` 係個數字嘅值。
+```
+fn parse_u64(s: &str) -> Option<u64> {
+    let mut acc: u64 = 0;
+    for c in s.chars() {
+        let d = c.to_digit(10)?;
+        // ____
+    }
+    Some(acc)
+}
+```
+'''
+hints = [
+  "嗰啲回傳 Option 嘅算術 method，喺呢個 function 入面每一個後面都可以跟 `?`。普通運算符喺 debug 會 panic，而 wrapping 嗰啲會靜靜地回傳一個錯嘅數字。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet_advanced.22.derive-ord-fields"
+title = "先優先級，後名"
+story = "夜廚啲單先按優先級排，同一個優先級就按菜名排，而個 derive 做嘅正正就係啲欄位話佢知嘅嘢。"
+brief = '''
+`#[derive(PartialEq, Eq, PartialOrd, Ord)]` 呢行放咗喺個 struct 上面。
+`tasks.sort()` 一定要先按 `pri` 排（1 喺 2 前面），而**`pri` 相同嗰陣**
+就按 `name` 排。啲欄位係 `pri: u32` 同 `name: String`。邊個宣告做到？
+'''
+hints = [
+  "derive 出嚟嘅排序會按欄位宣告嘅次序，由上至下逐個比較；第一個唔同嘅欄位決定結果。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet_advanced.23.struct-update"
+title = "淨係個 PORT"
+story = "間 fintech 個 config 有十幾個欄位而 Mei 想改一個；其餘嘅應該係空 config 話係乜就係乜。"
+brief = '''
+`Config` 有欄位 `host: String`、`port: u16`、`retries: u8`、`verbose: bool`，
+而且 derive 咗 `Default`。砌一個 `c`，`port` 設做 `8080`，
+而**其餘每個欄位都係預設值**，唔提任何其他欄位嘅名。
+'''
+hints = [
+  "struct update 語法會用另一個 instance 填返你冇提嘅欄位 —— 兩個點，然後一個產出 `Config` 嘅表達式，唔係一個 trait 名。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet_advanced.24.rc-refcell"
+title = "兩個 HANDLE，一本 LOG"
+story = "Ferris 同 Mei 各自揸住同一本單線程 log 嘅 handle；Ferris 寫，Mei 讀返出嚟。"
+brief = '''
+`log` 係 `Rc<RefCell<Vec<&str>>>`，而且 `let b = Rc::clone(&log);`。
+經 `b` push 個 `"tram"` 入去，令 `log.borrow()` 見到佢。
+'''
+hints = [
+  "`Rc` 永遠只會交出共享存取；入面個 cell 先係令你可以喺運行時可變借用嘅嘢 —— 問佢攞可變借用，唔係共享嗰個。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet_advanced.25.arc-mutex"
+title = "四道門，一個總數"
+story = "崇光地庫遊戲機中心四道門，將入場人數計入同一個總數，而個總數一定要準確。"
+brief = '''
+`hits` 係 `Arc<Mutex<u32>>`。喺四條 spawn 出嚟嘅 thread 每一條入面，`c` 係
+`Arc::clone(&hits)`，而每條 thread 將個數加一 1000 次。
+喺 thread 入面，邊一行係加一？
+```
+hs.push(thread::spawn(move || {
+    for _ in 0..1000 { /* ____ */ }
+}));
+for h in hs { h.join().unwrap(); }
+```
+'''
+hints = [
+  "lock 會回傳一個 Result；unwrap 佢攞到個 guard，然後 deref 個 guard 先掂到個數字。三步 —— 而啲似是而非嘅選項每個都跳咗一步。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet_advanced.26.scoped-thread"
+title = "借一陣"
+story = "時代廣場個扶手電梯計數借咗畀個幫手一陣；唔准 copy，冇共享擁有者，而且幫手做完之後又要用返。"
+brief = '''
+`v: Vec<i32>`。用**借用**嘅方式由另一條 thread 印佢 —— 冇 `Arc`、冇 clone、
+冇 `move` —— 而 `v` 喺緊接住嘅下一行又會再用。
+'''
+hints = [
+  "普通 spawn 嘅 thread 可以活得比個 function 長，所以佢唔可以借用。scoped 嗰種保證喺個 scope 返回之前完結，而佢嘅 spawn 係經個 scope handle 去做。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet_advanced.27.take-n-messages"
+title = "啱啱好四個，唔准 HANG"
+story = "駱克道四個速遞員每人用無線電報一個數字返嚟；調度員自己部無線電仍然開住，但收到四個之後就一定要停止收聽。"
+brief = '''
+`n: usize = 4`。四條 thread 每條都攞咗一個 `tx.clone()`，做完啲嘢之後每條
+send **一個** `u64`。原本嗰個 `tx` **冇** drop，`main` 仲揸住佢。
+`r` 裝住全部四個訊息，而 `main` 唔可以 hang。
+```
+let (tx, rx) = mpsc::channel::<u64>();
+for id in 0..n as u64 {
+    let tx = tx.clone();
+    thread::spawn(move || { work(); tx.send(id * id).unwrap() });
+}
+// ____
+```
+'''
+hints = [
+  "receiver 嗰個會阻塞嘅 iterator 要等到每個 sender 都消失先會完；`main` 仲揸住一個，所以要按數量停。非阻塞嗰個 iterator 回傳嘅係目前為止到咗嘅嘢 —— 可能乜都冇。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet_advanced.28.global-counter"
+title = "成幢樓一個數"
+story = "成個時代廣場一個入場計數器，每道門同時都會㩒佢，而佢最好唔係每隻手一個新副本。"
+brief = '''
+一個全程式、每條 thread 共享嘅計數器，任何地方都冇 `unsafe`。
+`fn hit() { HITS.fetch_add(1, Ordering::Relaxed); }` 由四條 thread 每條
+呼叫 1000 次，join 晒之後 `HITS.load(Ordering::Relaxed)` 一定要係 `4000`。
+喺 module 層級，`HITS` 用邊個宣告做到？
+'''
+hints = [
+  "其中一個錯嘅選項編譯得到而且印 0：`const` 每次用都會 inline 做一個新值，所以每個 `fetch_add` 都係㩒緊一個副本。記憶體入面嗰一個位置要用另一個 item 關鍵字 —— 而佢嘅可變形式係要 `unsafe` 先掂得到。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet_advanced.29.take-the-batch"
+title = "全部交出嚟"
+story = "Bo 師傅將成條單軌交畀走堂，自己留返一條空嘅 —— 唔 copy 啲單，而條軌仍然係佢嘅。"
+brief = '''
+`Batch { items: Vec<String> }`。`flush(&mut self) -> Vec<String>` 交返
+`items` 入面嘅全部嘢，並且令 `self.items` 變**空**，唔准 clone。
+```
+fn flush(&mut self) -> Vec<String> {
+    // ____
+}
+```
+'''
+hints = [
+  "你唔可以由 `&mut self` 後面將一個欄位 move 出嚟，但 `std::mem` 可以將個欄位換做佢嘅預設值然後交舊嗰個畀你 —— 經一個指住個欄位嘅可變 reference。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet_advanced.30.dijkstra-pop"
+title = "最短距離出嚟"
+story = "喺銅鑼灣個網格上面行 Dijkstra：個 heap 裝住包起咗嘅 (distance, node)，令最近嗰個先出嚟，而個 loop 兩層都要拆開。"
+brief = '''
+`heap: BinaryHeap<Reverse<(u64, usize)>>` 裝住 `(distance, node)` 對，
+令**最細嘅距離**先 pop 出嚟。寫個 loop header，一直 pop 到個 heap 空為止，
+並且綁定 `d` 同 `u`：
+```
+heap.push(Reverse((0u64, 0usize)));
+// ____
+    if d > dist[u] { continue; }
+    for &(v, w) in &adj[u] { /* relax */ }
+}
+```
+'''
+hints = [
+  "pop 會畀一個 Option；入面係個 wrapper，而 wrapper 入面先係個 tuple —— 三層，而個 wrapper 啱啱好得一個欄位。",
+]

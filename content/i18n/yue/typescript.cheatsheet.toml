@@ -1,0 +1,368 @@
+# TYPESCRIPT LAND — CHEATSHEET, in Cantonese. A translation pack (SPEC
+# §12.1): the prose of `content/typescript/cheatsheet.toml`, quest by quest,
+# and nothing else. The question is the brief; the four choices are code,
+# live in the English pack, and are never translated. Code blocks,
+# identifiers and printed strings are copied verbatim.
+
+pack   = "typescript.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet.01.read-all"
+title = "成條 feed"
+story = "19:00，時代廣場上面。大電視嘅 feed 一次過嚟晒，佢要晒全部。"
+brief = '''
+喺 Node 度，將標準輸入**全部**當一個 `string` 讀入 `input`。
+'''
+hints = [
+  "file descriptor 0 就係 stdin。唔俾 encoding 嘅話，你攞到嘅係 Buffer，唔係字串。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet.02.lines"
+title = "冇鬼行"
+story = "怡和街個跑馬燈每條訊息都用換行收尾，最後嗰行永遠係吉嘅。"
+brief = '''
+`input` 用換行收尾。將佢拆做 `lines`，尾**唔可以**有個空字串。
+'''
+hints = [
+  "將 `\"a\\nb\\n\"` 用換行拆，會得到三嚿，最後嗰嚿係空嘅。先 trim 咗佢。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet.03.numbers"
+title = "字變數"
+story = "駱克道個六合彩檔，喺一條字度讀出中獎號碼。"
+brief = '''
+`lines[1]` 係 `"3 1 2"`。邊一行可以令 `nums` 變成 `number[]` 嘅 `[3, 1, 2]`？
+'''
+hints = [
+  "`map` 會將 index 當第二個參數傳落去，`parseInt` 就當佢係進制。`Number` 淨係收一個參數。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet.04.to-fixed"
+title = "兩個位"
+story = "軒尼詩道間找換店，每個匯率都啱啱好顯示到小數點後兩個位。"
+brief = '''
+`const x = 3.14159;` 印 `3.14` 出嚟——**小數點後**啱啱好兩個位。
+'''
+hints = [
+  "`toPrecision` 數嘅係有效數字；數小數位嘅係另一個 method。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet.05.floor-div"
+title = "冇半張飛"
+story = "七個電車代幣分俾兩個人。冇人會攞到半個。"
+brief = '''
+`a = 7`，`b = 2`，兩個都係非負整數。`q` 一定要係 `3`——整數除法。
+'''
+hints = [
+  "所有 number 都係浮點數：`/` 會得出 3.5。要向下捨。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet.06.for-of"
+title = "要值唔要 key"
+story = "記利佐治街啲招牌逐塊讀——讀舖名，唔讀門牌。"
+brief = '''
+開一個 loop，行勻 `arr: number[]` 嘅**值**（唔係 index）。
+'''
+hints = [
+  "`in` 行嘅係 key——即係字串形式嘅 index。`of` 先至行值。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet.07.sort"
+title = "10 喺 9 後面"
+story = "崇光櫃位啲籌：唔理字母表點講，10 都係排喺 9 後面。"
+brief = '''
+`arr: number[]` 入面係 `[10, 9, 1]`。將佢**按數值由細到大**就地排好。
+'''
+hints = [
+  "冇比較函數嘅話，`sort` 係當字串咁比，所以 \"10\" < \"9\"。比較函數要俾返個數：負數即係 `a` 留喺前面。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet.08.count"
+title = "點數"
+story = "大排檔逐味餸數單，新嗰味由零計起。"
+brief = '''
+`m: Map<string, number>`。幫 key `w` 嘅數加一；未有嘅話就由 0 開始。`strict` 開咗。
+'''
+hints = [
+  "`get` 俾返 `number | undefined`。用 `??` 幫冇嘅情況俾個預設值。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet.09.grid"
+title = "樓層圖"
+story = "皇室堡，一層一層、一間一間：一張 n×m 嘅圖，每個舖位都吉嘅——而且每層都係獨立嘅。"
+brief = '''
+整一個 `n`×`m` 全零嘅格仔 `g`，寫 `g[0][0] = 1` 嗰陣**淨係**改到嗰一格。
+'''
+hints = [
+  "將 array 交俾 `fill`，每個位擺嘅都係同一個 array。要逐個 index 開一行新嘅。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet.10.heap-parent"
+title = "上面係邊個"
+story = "標準庫冇 heap，所以小巴條隊自己搞一個——用一個普通 array。"
+brief = '''
+一個二叉 heap 擺喺由 0 開始嘅 array `h` 度：index `p` 嘅仔係 `2*p + 1` 同 `2*p + 2`。當 `i > 0`，邊一行計到 `i` 嘅老豆？
+'''
+hints = [
+  "將個仔嘅公式倒返轉：減一，再除二向下捨。用 `i = 2` 試吓。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet.11.char-code"
+title = "A 係零"
+story = "銅鑼灣廣場大堂啲信箱用字母 a 到 z 編號，由零開始。"
+brief = '''
+`s` 全部係細楷。將 index `i` 嗰個字母變做 0..25 之間嘅 `k`，`'a'` 係 0。
+'''
+hints = [
+  "字串唔可以減。先攞個字元嘅編碼做數字；'a' 係 97。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet.12.unknown-catch"
+title = "唔知係乜嘅 throw"
+story = "半夜前嚟嘅 feed 掟咗啲嘢出嚟。冇人應承過佢係一個 Error。"
+brief = '''
+喺 `strict` 底下，`catch (e) { … }` 入面個 `e` 係 `unknown` 類型。用一個 compile 到、又實唔會爆嘅方法印佢個 `message` 出嚟。
+'''
+hints = [
+  "`unknown` 上面讀唔到屬性。先用 runtime 檢查收窄佢。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet.13.map-entries"
+title = "key 同數"
+story = "大排檔數完單；而家老闆逐味餸讀返出嚟，隔籬寫住個數。"
+brief = '''
+`m: Map<string, number>`。開一個 loop，行勻 `m` 入面**每一對**，key 放喺 `k`，value 放喺 `v`。
+'''
+hints = [
+  "Map 係一對一對咁 iterate——逐對解構。`Object.entries` 淨係見到自身屬性，而 Map 一個都冇。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet.14.head-tail"
+title = "頭同尾"
+story = "渣甸坊條巴士隊第一架而家就走；後面所有人一齊等。"
+brief = '''
+`a: number[]` 係 `[5, 6, 7]`。一句宣告入面，整 `first` 做數字 `5`，`rest` 做 `number[]` `[6, 7]`。
+'''
+hints = [
+  "用方括號解構。條尾係用三點收集嘅，唔係兩點，亦唔係星號。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet.15.zero-is-a-value"
+title = "零係一個值"
+story = "希慎廣場 0 樓係真有嗰層。個𨋢掣板唔可以將你送去預設嗰層。"
+brief = '''
+`x: number | undefined`。整 `d`，`x` 有定義嗰陣就等於 `x`——**就算 `x` 係 `0`**——淨係 `x` 係 `undefined` 嗰陣先係 `10`。
+'''
+hints = [
+  "`0` 係 falsy，所以任何問「係咪 truthy？」嘅嘢都會掉走個零。改為問「係咪 null 或者 undefined？」。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet.16.await-all"
+title = "一次過"
+story = "六個外賣車手一齊由糖街出發。廚房等齊六個，唔係一個一個咁等。"
+brief = '''
+喺一個 `async` function 入面，`ps: Promise<number>[]`。整 `rs` 做裝住每個結果嘅 `number[]`，一齊等晒佢哋。
+'''
+hints = [
+  "Await 一個 array 俾返你嘅係同一個 promise array。先將佢哋合成一個 promise，再 await 嗰個。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet.17.param-property"
+title = "一行 class"
+story = "午炮淨係起一次，口徑固定，而炮台以外冇人讀到個設定。"
+brief = '''
+`class P { … }` 個 body 入面除咗一行 constructor 乜都冇。佢收 `x: number`，存做一個 field `x`，呢個 field 係 **private**（喺 class 出面讀 `p.x` 係 compile error）同埋 **read-only**（之後 assign `this.x` 係 compile error）。`strict` 開咗。
+'''
+hints = [
+  "Constructor 參數上面嘅 modifier 會宣告個 field 並且 assign 佢。存取 modifier 要寫喺 read-only 嗰個前面。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet.18.typeof-narrow"
+title = "係咪字串"
+story = "百德新街塊牌有時係個名，有時係個數。淨係個名會用大楷嗌出嚟。"
+brief = '''
+`v: string | number`，`strict` 開咗。開一個 `if`，入面 `v.toUpperCase()` compile 得到。
+'''
+hints = [
+  "Primitive 唔係任何嘢嘅 instance。可以收窄 primitive 嘅 runtime 檢查，係同一個細楷字串比較。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet.19.bigint"
+title = "過咗安全線"
+story = "銅鑼灣避風塘由 1883 年開始數每一個浪。浮點數早就數唔清。"
+brief = '''
+`target` 係 ES2022。整 `big` 做一個 `bigint`，準確裝住 `9223372036854775807`——即係 2 嘅 63 次方減一。
+'''
+hints = [
+  "`number` 係 64 位浮點數：過咗 2^53 就會四捨五入，之後再轉都保留咗嗰個誤差。每個運算元都要有個 `n`。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet.20.toward-zero"
+title = "向零"
+story = "紅隧收費站嘅午夜：八蚊退款分三份，而亭入面個 C programmer 係向零取整嘅。"
+brief = '''
+`a = -8`，`b = 3`，兩個都係整數。`q` 一定要係 `-2`——**向零**取整嘅商，即係 C、Go 同 Rust 入面整數 `/` 嘅做法。
+'''
+hints = [
+  "向下取整同四捨五入喺呢度都會落喺 -3。你要嘅係斬走小數部分，唔理正負。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet.21.push"
+title = "隊尾"
+story = "登龍街小巴隊多咗一個乘客——喺隊尾，乘客加入嘅地方。"
+brief = '''
+`a: number[]`，`x: number`。就地將 `x` 加喺 `a` 嘅**尾**，令之後 `a` 長多一個元素。`strict` 開咗。
+'''
+hints = [
+  "`concat` 會砌一個新 array 而唔掂 `a`。就地嗰個 method return 嘅係新長度，唔係個 array——唔好 assign 返落去。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet.22.inclusive-loop"
+title = "一至十"
+story = "利園部𨋢 1 樓到 10 樓層層停，而 10 樓唔係可以唔停嘅。"
+brief = '''
+開一個 loop，佢個 body 會為 `i = 1, 2, … 10` 行——**十**次，`10` 包括在內。`i` 喺其他地方冇宣告過。`strict` 開咗。
+'''
+hints = [
+  "用一個改得到嘅嘢嚟宣告個計數器，而比較嗰陣要令最後一個值仍然過到關。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet.23.add-function"
+title = "兩個數入嚟"
+story = "軒尼詩道間找換店將兩個銀碼加埋；喺 strict 之下佢仲想知係邊一種銀碼。"
+brief = '''
+定義 `add`，令 `add(2, 3)` 係 `5`，而且個檔案喺 `strict` 之下 compile 到（`noImplicitAny` 開咗）。
+'''
+hints = [
+  "冇寫 type 嘅參數係隱式嘅 `any`，strict 係唔肯收嘅。冇 `return` 嘅 body 俾出嚟嘅係 `undefined`。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet.24.join"
+title = "膠水"
+story = "崇光個司儀大聲讀出得獎檔口：每個名之間一個空格，冇逗號。"
+brief = '''
+`xs: string[]` 係 `["a", "b", "c"]`。印出 `a b c`——啲元素之間用**一個空格**隔開。
+'''
+hints = [
+  "個 method 係喺 array 上面嘅，唔係喺分隔符上面——而唔俾參數咁 call 嘅話，個分隔符係逗號。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet.25.empty-check"
+title = "冇人排隊"
+story = "凌晨三點嘅渣甸坊巴士站。有冇人等緊？空嘅隊仍然係一條隊。"
+brief = '''
+`a: number[]`。開一個 `if`，**淨係**喺 `a` 冇任何元素嗰陣先入去。`strict` 開咗。
+'''
+hints = [
+  "空嘅 array 係 truthy，而兩個 array 永遠唔會互相 `===`。比較嗰個講明有幾多個嘅數。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet.26.max-of-array"
+title = "最高嗰幢"
+story = "告士打道沿路啲大廈，文員想要最高嗰幢——係由一個 list 入面揀，唔係一對。"
+brief = '''
+`arr: number[]` 係 `[3, 9, 2]`（一個短 array）。整 `m` 做數字 `9`。
+'''
+hints = [
+  "`Math.max` 係逐個數咁收嘅，唔係收 array——將個 array 交俾佢係 compile error。將個 array 拆開做一個個獨立嘅參數。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet.27.copy"
+title = "自己嗰份"
+story = "時代廣場張飛名單影印咗一份俾夜更；一張名單上面嘅改動絕對唔可以出現喺另一張度。"
+brief = '''
+`a: number[]`。整 `b` 做一個**獨立**嘅 array，元素一樣，令之後 `b[0] = 9` 唔會改變 `a`。
+'''
+hints = [
+  "Assign 一個 array 係 copy 個 reference，唔係啲元素。`Array(a)` 整嘅係一個以 `a` 做唯一元素嘅新 array。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet.28.reverse-string"
+title = "倒轉"
+story = "波斯富街塊霓虹招牌，由電車上層由尾到頭咁讀。"
+brief = '''
+`s` 係 `"abc"`。整 `r` 做**字串** `"cba"`。
+'''
+hints = [
+  "字串冇 `reverse`；array 有。去一轉 array 再返嚟——仲要留意你乜都唔俾 `join` 嗰陣，佢會喺啲碎片之間放啲乜。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet.29.queue-front"
+title = "隊頭"
+story = "由維園出發嘅 BFS：第一個入隊嘅站第一個出，而且佢會離開條隊。"
+brief = '''
+`q: number[]` 係 `[1, 2, 3]`，當 FIFO 隊列用。**移走**最前嗰件嘢並且放入 `x`——令 `x` 係 `1` 而 `q` 剩低 `[2, 3]`。
+'''
+hints = [
+  "`pop` 係由尾攞嘅，而攞 index 係淨係讀而唔移走。由頭攞嗰個 method 會將其他所有嘢向前移一格。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet.30.wrap-modulo"
+title = "兜圈"
+story = "又係紅隧收費站嘅午夜：差七蚊，三條行車線，而行車線 index 仍然要係 0、1 或者 2。"
+brief = '''
+`b = 3`。`a` 係一個整數，可能係 `-7`、`0` 或者 `4`。整 `r` 做數學上嘅餘數——永遠喺 `0..b-1` 之內，令 `-7` 得出 `2`，`0` 得出 `0`，`4` 得出 `1`。
+'''
+hints = [
+  "`%` 保留左運算元嘅符號，所以一個 `%` 對 -7 會俾 -1。加 `b` 修好啲負數，但整壞咗 `0` 同啲正數；要為呢個做啲嘢。",
+]

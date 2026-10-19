@@ -1,0 +1,503 @@
+# TYPESCRIPT LAND — CHEATSHEET ADVANCED, in Cantonese. A translation pack
+# (SPEC §12.1): the prose of `content/typescript/cheatsheet_advanced.toml`,
+# quest by quest, and nothing else. The question is the brief; the four
+# choices are code, live in the English pack, and are never translated. Code
+# blocks, identifiers and printed strings are copied verbatim.
+
+pack   = "typescript.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet_advanced.01.generic-bound"
+title = "有 ID 嘅乜都得"
+story = "19:10，三十樓個控制室。島上每個螢幕都有個 id；個查找表應該收任何一個佢哋嘅 list，而且唔可以改佢。"
+brief = '''
+`xs` 係一個 `readonly Screen[]`（即係一個 `ReadonlyArray<Screen>`），而
+`Screen` 有 `id: string`。開 generic function `byId`，佢個 body 係
+
+```ts
+return new Map(xs.map(x => [x.id, x] as const));
+```
+
+佢一定要接受 `xs` —— 同埋任何其他帶住 string `id` 嘅嘢嘅唯讀 array ——
+而且令個 body 編譯得到。`strict` 開住。
+'''
+hints = [
+  "光秃秃嘅 `T` 冇 `id`；畀個參數一個 bound。而且要求可變 array 嘅地方，唯讀 array 係過唔到嘅。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet_advanced.02.mapped-draft"
+title = "每個 KEY，或者有"
+story = "希慎廣場一個螢幕 config 嘅草稿可以填一半，仍然可以改。個形狀跟真嗰個，一個 key 一個 key 咁跟。"
+brief = '''
+用手寫 `Draft<T>` —— 唔好用做呢樣嘢嘅內置 utility type：同 `T` 一樣嘅 key，
+每個都係可選，每個保留自己嘅類型，而且仍然可以寫。
+`type Screen = { id: string; w: number }` 嘅話，
+`const d: Draft<Screen> = { w: 3 };` 同 `d.w = 5;` 都編譯得到。
+'''
+hints = [
+  "mapped type 會行過 `keyof T`；方括號後面一個 `?` 令每個 key 變可選（即係用手寫嘅 `Partial<T>`），`-?` 令佢變必填（`Required<T>`），而前面加 `readonly` 就會凍結佢（`Readonly<T>`）。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet_advanced.03.as-const-union"
+title = "三個字，冇 ENUM"
+story = "怡和街啲到站板顯示三種 panel，而冇人想多開一個檔案嚟存個 list。"
+brief = '''
+```ts
+const KINDS = ["ad", "news", "tram"] as const;
+```
+
+由 `KINDS` 推導 `Kind`，令佢啱啱好係嗰三個 string 嘅 union ——
+`const k: Kind = "ad";` 編譯得到，而 `const b: Kind = "bus";` 唔得。
+一個 literal 嘅 union，唔係 enum。
+'''
+hints = [
+  "值唔係類型：先攞個值*嘅*類型，然後用 `number` 去 index 個 tuple，就得到佢啲元素可以係乜。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet_advanced.04.pick-card"
+title = "淨係個面"
+story = "利園個 app 每個螢幕顯示一張卡：id 同 title。個 feed 欄位留喺控制室。"
+brief = '''
+`Screen` 有 `id`、`title`、`feed` 同 `w`。將 `Card` 宣告做**淨係**有 `id` 同
+`title` 嘅物件類型，用 utility type 由 `Screen` 砌出嚟，令 `Screen` 改嗰陣
+佢會跟住改。
+'''
+hints = [
+  "一個 utility 保留點名嘅 key，佢個孖生嘅就丟走佢哋。兩個都係將啲 key 當一個 union 咁收，唔係分開嘅 argument。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet_advanced.05.awaited-return"
+title = "LOAD 交返嘅嘢"
+story = "三十樓個 feed loader 每個 sprint 都改形狀。命名佢結果嘅類型應該跟住佢改，唔係再打多次。"
+brief = '''
+```ts
+async function load() { return { items: [1, 2], at: Date.now() }; }
+```
+
+將 `Feed` 宣告做 `load` resolve 出嚟嘅**拆開咗**嘅物件類型 ——
+`{ items: number[]; at: number }` —— 由 `load` 本身推導，令
+`const f: Feed = { items: [1], at: 0 };` 編譯得到。
+'''
+hints = [
+  "`load` 係一個值，所以你要先攞佢嘅類型。出嚟嘅係一個 `Promise`；再多一個 utility 就可以拆走個 promise。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet_advanced.06.infer-elem"
+title = "個箱入面係乜"
+story = "一箱運去時代廣場螢幕嘅 panel：個標籤應該講一塊 panel 係乜，如果唔係箱就乜都唔講。"
+brief = '''
+寫 `Elem<T>`：對於 array 類型，係佢嘅元素類型（`Elem<string[]>` 係 `string`）；
+對於任何**唔係** array 嘅嘢，係 `never`。
+'''
+hints = [
+  "conditional type 可以為佢匹配到嘅嗰舊嘢起名，但前面一定要有一個關鍵字 —— 而個 array 後綴需要括號。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet_advanced.07.template-id"
+title = "SCREEN 減 數字"
+story = "島上每塊板都叫 screen-乜乜，而嗰個乜乜係一個數字。compiler 可以守住呢條線。"
+brief = '''
+宣告 `ScreenId`，令 `"screen-12"` 可以賦值畀佢，而 `"screen-x"` 同
+`"led-12"` 都唔可以。
+'''
+hints = [
+  "類型可以係 template literal：反引號，加一個類型係 primitive 嘅 placeholder。普通引號整出嚟係一個普通 string literal。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet_advanced.08.satisfies-palette"
+title = "檢查咗，冇放闊"
+story = "LED 牆個調色板會對住合約檢查 —— 但個紅色仍然係一個三元組，因為個 shader 會 index 佢。"
+brief = '''
+`type Palette = Record<string, [number, number, number] | string>`。
+宣告 `p`，有 `r: [255, 0, 0]` 同 `s: "#8cf"`，對住 `Palette` 檢查 ——
+一個形狀錯咗嘅值，例如 `r: [255, 0]`，係編譯錯誤 —— 但之後
+`p.r.map(x => x / 255)` 同 `p.s.toUpperCase()` 都一定要編譯得到：
+`p` 保留個 literal 自己較窄嘅類型。TypeScript 5。
+'''
+hints = [
+  "註解或者 cast 會將個 literal 嘅類型換做 `Palette`，之後每個值都係 `tuple | string`。有一個 operator（4.9+）係淨係檢查。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet_advanced.09.labeled-rest-tuple"
+title = "一個指令同佢啲數字"
+story = "控制室個 console 收一個動詞，然後幾多個數字就睇個動詞需要幾多。`show 1 2 3`、`clear`，永遠唔會係 `1 2`。"
+brief = '''
+開 `run`，一個收**一個** rest 參數 `args` 嘅 function，類型係一個 labeled tuple：
+先一個 `cmd: string`，然後任何數量嘅 `nums: number`。
+`run("show", 1, 2, 3)` 同 `run("clear")` 編譯得到；`run(1, 2)` 唔得。
+'''
+hints = [
+  "label 寫喺個 tuple 入面，而開放式嘅尾巴本身係一個 rest 元素 —— 三個點加一個 array 類型。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet_advanced.10.declaration-merging"
+title = "多一個欄位，同一個名"
+story = "供應商嘅螢幕類型冇亮度，而供應商個檔案係唯讀嘅。控制室今晚每個螢幕都需要亮度。"
+brief = '''
+`interface Screen { id: string }` 宣告喺一個你唔可以改嘅檔案入面。喺你自己
+嘅檔案入面，畀同一個 `Screen` 多一個欄位 `brightness: number`，令
+`{ id: "a", brightness: 3 }` 喺任何地方都係一個 `Screen` —— 唔係一個新名
+（`interface Big extends Screen { … }` 或者 `type Big = Screen & { … }` 都會
+整一個出嚟），而且冇 duplicate-identifier 錯誤。
+'''
+hints = [
+  "同一個 interface 嘅兩個宣告會合併。`type` alias 唔會合併，而 interface 唔可以 extend 自己。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet_advanced.11.hash-private"
+title = "運行時都要收埋"
+story = "電車站個計數器個數唔關任何人事：唔關子類事、唔關 serializer 事、唔關 `Object.keys` 事。"
+brief = '''
+```ts
+abstract class Panel { abstract draw(): string; }
+interface Tally { bump(): void }
+
+class Counter extends Panel implements Tally {
+  // the field goes here
+  protected label = "c";
+  get value(): number { /* returns the field */ }
+  set value(v: number) { /* stores v in the field */ }
+  bump() { /* adds one to the field */ }
+  draw() { return `${this.label}=${this.value}`; }
+}
+```
+
+加上 `count` 欄位，由 `0` 開始，喺**運行時**同編譯時都收埋：`new Counter()`
+之後，`Object.keys(c)` 同 `JSON.stringify(c)` 都唔可以顯示佢。`strict` 開住。
+'''
+hints = [
+  "`private` 關鍵字會同啲類型一齊被擦走；個欄位喺 JavaScript 入面仍然喺度。`#` 名係喺引擎本身私有嘅 —— 而佢唔收 access modifier，而且需要佢嘅 initializer。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet_advanced.12.overload-impl"
+title = "OVERLOAD 下面嗰行"
+story = "到站板上面個 `parse` 兩個方向都行：入 string 出 number，入 number 出 string。兩個承諾，一個 body。"
+brief = '''
+```ts
+function parse(x: string): number;
+function parse(x: number): string;
+```
+
+寫跟喺嗰兩個 overload 後面嘅 implementation 行，body 係
+`return typeof x === "string" ? Number(x) : String(x);` —— 令
+`parse("42")` 係一個 `number`，而 `parse(7)` 係一個 `string`，喺 `strict` 之下。
+'''
+hints = [
+  "implementation signature 一定要闊到涵蓋每一個 overload，一定要有 body，而喺 `strict` 之下佢個參數唔可以唔寫類型。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet_advanced.13.nullish-assign"
+title = "空嘅都係 CACHE 咗"
+story = "希慎牆個字幕 cache：有啲螢幕嘅字幕係故意留空嘅，而每個 frame 都重新 load 佢哋正正就係上個星期二令幅牆死機嘅原因。"
+brief = '''
+`cache: Record<string, string>`；`load(k)` 好貴。淨係當個 key **從來未**設過，
+先用 `load(k)` 填 `cache[k]` —— 一個 cache 咗嘅 `""` 係一個真實、有效嘅值，
+唔可以觸發重新 load。一句。
+'''
+hints = [
+  "`\"\"` 係 falsy。任何問「佢係咪 truthy？」嘅嘢都會重新 load 佢；問「佢係咪 null 或者 undefined？」嘅賦值 operator 就唔會。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet_advanced.14.find-last-chain"
+title = "最後一個廣告，如果有"
+story = "時代廣場輪播入面最新嘅廣告係 list 最後嗰個，而今晚有一個係故意零像素闊。"
+brief = '''
+`xs: S[]` 係 `feeds.flatMap(f => f.panels)`，`S` 有 `kind: string` 同
+`width: number`。將 `w` 整做 kind 係 `"ad"` 嘅**最後**一個元素嘅闊度，
+冇就係 `-1`。闊度係 `0` 一定要以 `0` 出到嚟。唔准用 non-null assertion；
+`strict` 開住。Node 22。
+'''
+hints = [
+  "有一個由尾開始嘅搜尋（Node 18+）；`xs.at(-1)` 只係最後一個*元素*，唔係最後一個匹配。佢嘅結果可能係 `undefined`，所以讀屬性要用 optional chain —— 而個預設值唔可以吞咗一個零。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet_advanced.15.destructure-rename"
+title = "WIDTH，叫做 W"
+story = "謝斐道間招牌舖由 feed 讀一個螢幕嘅規格：kind 照舊，闊度用一個短名，而冇人填嗰陣就係一百。"
+brief = '''
+`screen: { kind: string; width?: number }`。用一個 destructuring 宣告，綁定
+`kind`，並且將 `width` 綁定到一個**新名** `w`，當 `width` 唔存在嗰陣預設值係 `100`。
+'''
+hints = [
+  "喺 object pattern 入面，屬性名先行，新綁定喺冒號後面 —— 同佢睇落嘅相反 —— 而預設值用 `=` 跟喺個綁定後面。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet_advanced.16.range-from-length"
+title = "零到 N 減一"
+story = "希慎牆五塊 panel，由零開始編號。喺任何一塊亮起之前就需要佢哋嘅號碼 list。"
+brief = '''
+`n: number`。用一個表達式將 `ix: number[]` 整做 `[0, 1, …, n - 1]` 呢個 list，
+每個元素都真係喺度 —— iterate `ix` 一定要行過 `n` 個數字。
+'''
+hints = [
+  "`Array(n)` 係 `n` 個窿，而 `map` 會跳過啲窿。由一個有 `length` 嘅 array-like 砌起，而個 mapper 嘅**第二個** argument 係 index。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet_advanced.17.sorted-two-keys"
+title = "最多嘅先，然後按名"
+story = "時代廣場螢幕上面個排行榜：最多 hit 嘅先，打和就按名 —— 而個 feed 自己個 list 唔可以喺其他螢幕底下被重新排序。"
+brief = '''
+`rs: { id: string; n: number }[]` 係由一個 `Record<string, number>` 嘅 tally 用
+`Object.entries(tally).map(([id, n]) => ({ id, n }))` 砌出嚟 —— 啲 entry 係
+`[string, number][]`。`top` 嘅表達式：啲 row 按 `n` **降序**排，打和就按
+`id` 用 locale 嘅 string 次序升序 —— 而 `rs` 本身一定要原封不動。
+Node 22，`strict` 開住。
+'''
+hints = [
+  "Node 20+ 有一個會回傳副本嘅 sort。comparator 一定要回傳一個 number，所以 string 嘅打和唔可以用 `<` —— string 有一個 method 會比較並且回傳一個 number。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet_advanced.18.map-group-push"
+title = "入啱個桶"
+story = "怡和街嘅午夜：每塊 panel 按 kind 分入一個桶。經典嘅 bug 係 push 落一個冇人保存嘅桶。"
+brief = '''
+`m: Map<string, string[]>`，起初係空嘅。喺 `for (const [k, v] of pairs)` 入面，
+將 `v` 加入存喺 `k` 下面嘅 list，第一次見到 `k` 嗰陣就建立嗰個 list ——
+用**一**句，令之後 `m` 真係裝住每一個值。`strict` 開住。
+'''
+hints = [
+  "`get` 回傳個 list 或者 `undefined`；`?? []` 畀你一樣嘢去 push，但一個新嘅 `[]` 除非你放佢入去，否則唔會喺個 map 入面（`has` 然後 `set` 會係兩句）。Map 冇 `[k]`，而 `get` 唔收預設值 —— 而當佢以 JSON 離開嗰陣，`Object.fromEntries(m)` 就係出路。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet_advanced.19.deep-copy"
+title = "真係副本嘅副本"
+story = "希慎牆嘅綵排 feed 一定要係今晚嗰個嘅真副本 —— 一個 id 嘅 Set、一行行數字 —— 令綵排可以喺上面塗鴉。"
+brief = '''
+`feed` 係 `{ ids: Set<string>; rows: number[][] }`。將 `copy` 整做一個**深**副本：
+`copy.ids.add("c")` 同 `copy.rows[0].push(9)` 一定要令 `feed` 原封不動 ——
+而 `copy.ids` 一定仍然係一個有 `add` 嘅 `Set`。Node 22。
+'''
+hints = [
+  "spread 同 `Object.assign` 淨係 copy 一層。JSON 來回一次會冇咗個 Set（佢會變成 `{}`）。Node 17+ 有平台自己嘅深 copy。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet_advanced.20.bigint-sum"
+title = "櫃台唔准溝埋"
+story = "避風塘嘅浪數已經過咗 2 嘅 63 次方；今晚多嗰七個浪係一個普通 number，而個總和一定要精確。"
+brief = '''
+`big` 係一個大過 2 嘅 63 次方嘅 `bigint`，而 `n` 係一個 `number` ——
+`today.reduce<number>((s, w) => s + w, 0)` —— 裝住一個細嘅整數
+（`Number.isInteger(n)` 係 true）。將 `total` 整做佢哋嘅**精確**總和。
+`number` 過咗 2 嘅 53 次方就會四捨五入，而 `|0` 會喺 32 bit wrap。
+'''
+hints = [
+  "兩個 operand 一定要係同一種，而 cast 唔係轉換。將細嗰個轉上去 —— 用個 function，唔係 `n` 後綴，嗰個淨係對 literal 有效。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet_advanced.21.named-groups"
+title = "嗰行入面每一個年份"
+story = "午炮下面個牌匾 feed：建成、翻新、到期。入面每個四位數年份都要上板。"
+brief = '''
+`s` 係 `"built 1998, refit 2015, due 2031"`，而 `ys: string[]` 係空嘅
+（每個年份之後會以 `y.slice(-2).padStart(2, "0")` 顯示）。開一個 loop，
+行過一個四位數字嘅 named group `y` 嘅**每一個**匹配，令呢個 body 收集每個年份：
+
+```ts
+  ys.push(m.groups?.y ?? "");
+```
+
+Node 22，TypeScript 5。
+'''
+hints = [
+  "有一個 method 回傳每個匹配連埋佢啲 group —— 而除非個 pattern 帶住 global flag，否則運行時會 throw。named group 係 `(?<name>…)`；Python 嘅 `P` 喺呢度係 syntax error。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet_advanced.22.loop-closure"
+title = "每一個都有自己個數"
+story = "希慎牆三塊 panel 準備好遲啲亮起，每塊有自己個號碼。三塊都話係 3 嗰個 bug，係 Skynet 第一樣建議過嘅嘢。"
+brief = '''
+```ts
+class Board {
+  q: (() => void)[] = [];
+  show(i: number) { /* lights panel i */ }
+  arm(n: number) {
+    // the loop goes here
+  }
+}
+```
+
+喺 `arm(n)` 入面，將 `n` 個 closure push 上 `this.q`。第 k 個**遲啲**被呼叫嗰陣，
+一定要用佢自己個 `k` 呼叫 `this.show(k)` —— `arm(3)` 之後全部行一次會亮起
+`0, 1, 2`，唔係 `3, 3, 3`。`strict` 開住。
+'''
+hints = [
+  "`var` 係成個 loop 一個變數；block-scoped 嘅綁定每一轉都係新嘅。而 `function () {}` 有自己嘅 `this`，strict mode 拒絕估佢係乜。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet_advanced.23.type-only-import"
+title = "唔留痕跡嘅 IMPORT"
+story = "個螢幕 module 一 load 就向控制室 log。個 app 淨係想要佢嘅類型，而冇人想 build 嗰陣見到嗰個 log。"
+brief = '''
+`screen.ts` 有 `export interface Screen { … }` —— 一個 **named** export，冇
+default —— 同一個頂層 `console.log`，個 module 一 load 就會行。
+`verbatimModuleSyntax` 開住。import `Screen` 用喺一個類型註解度，令
+emit 出嚟嘅 JavaScript 入面**乜嘢**都唔剩低：個 log 唔可以觸發。
+'''
+hints = [
+  "喺 `verbatimModuleSyntax` 之下，普通咁 import 一個類型係錯誤，而大括號*入面*嘅 `type` modifier 仍然會留低一個會 load 個 module 嘅 `import {}`。將個 modifier 放喺成句上面。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet_advanced.24.error-cause"
+title = "留住原本嗰個"
+story = "個 feed fetch 喺三層樓下面因為一個 TypeError 失敗咗。控制室想自己個 error 擺喺上面，而真正嗰個仍然掛喺下面。"
+brief = '''
+喺 `catch (e: unknown)` 入面，throw 一個**新**嘅 `Error`，訊息係
+`"feed failed"`，並且將 `e` 掛住做佢嘅原始 cause（ES2022），令呼叫者
+仍然可以對掛住嗰個行 `instanceof TypeError`。`strict` 開住。
+'''
+hints = [
+  "`Error` 收第二個 argument —— 一個 options 物件，唔係個 error 本身。而 `e` 係 `unknown`：唔 narrow 嘅話你讀唔到佢嘅 `.message`。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet_advanced.25.all-settled"
+title = "數吓到咗幾多個"
+story = "六個車手離開糖街；一個被雨截停咗。廚房加總到咗嘅，唔會因為一個冇到就掉咗成晚。"
+brief = '''
+`ps: Promise<number>[]`，而 `rs = await Promise.allSettled(ps)`。喺
+`for (const r of rs)` 入面，將每個**成功**嘅 promise 嘅值加落 `total`，
+跳過失敗嗰啲 —— 一行，喺 `strict` 之下編譯得到。
+'''
+hints = [
+  "每個結果係一個以 `status` 區分嘅 union；淨係成功嗰個分支有 `value`。兩個 status string 係 spec 用嗰兩個，唔係 \"resolved\"，亦唔係 `ok`。（`Promise.all` 會喺第一個失敗就 throw，而 `Promise.race` 淨係交返一個。）",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet_advanced.26.for-await"
+title = "每個到嗰陣"
+story = "怡和街啲板嘅 tick feed 一個一個咁嚟，每個都要等一陣。個總和係隨住佢哋到而增長，唔係等全部到齊先。"
+brief = '''
+`ticks()` 回傳一個 `AsyncGenerator<number>`。喺一個 `async` function 入面，
+開個 loop，每個 `t` 一到就收到，令 body `sum += t;` 喺 `strict` 之下編譯得到。
+'''
+hints = [
+  "async iterable 冇 `[Symbol.iterator]`，所以普通 `for…of` 會被拒絕 —— 而 await 個 generator 物件亦冇幫助。個 `await` 係屬於個 `for` 嘅。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet_advanced.27.iterable-stack"
+title = "SPREAD 個 STACK"
+story = "控制室個 undo stack 應該可以 spread 做 array，又可以好似樓面其他嘢咁用 `for…of` 行。"
+brief = '''
+```ts
+class Stack<T> {
+  #items: T[] = [];
+  push(x: T) { this.#items.push(x); }
+  pop(): T | undefined { return this.#items.pop(); }
+  // one more method goes here
+}
+```
+
+加上嗰一個 method，令 `s.push(1); s.push(2)` 之後 `[...s]` 得到 `[1, 2]`，
+而且令 `for (const x of s)` 編譯得到。`strict` 開住。
+'''
+hints = [
+  "個 method 嘅名係方括號入面一個 well-known symbol，佢一定要係 generator（個星），而用 `yield*` 委託畀個 array 會一個一個咁交出啲 item —— 普通 `yield` 會將成個 array 當一個 item 交出去。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet_advanced.28.exhaustive-never"
+title = "第四種會整死個 BUILD"
+story = "今日兩種 panel。下個 sprint 有人加第三種嗰陣，個 build 一定要喺呢個 switch 度失敗 —— 唔係時代廣場個螢幕喺 19:00 失敗。"
+brief = '''
+`Shape` 係 `{ kind: "ad"; w: number } | { kind: "news"; len: number }`，而
+`area(s: Shape): number` 對 `s.kind` 做 switch。喺 `case "ad"` 同 `case "news"`
+各自 `return` 之後，寫個 `default`，令個 function 今日編譯得到，**而且**
+喺 `Shape` 加入第三種嗰日就停止編譯。`strict` 開住。
+'''
+hints = [
+  "每個 case 都 return 咗之後，`s` 係 bottom type。將佢賦值畀一個嗰個類型嘅變數今日係免費嘅，而一有一種剩低就即刻係 type error。cast 或者 `any` 乜都唔檢查；`throw` 要到 19:00 先發現。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet_advanced.29.type-guard"
+title = "由線路落嚟嘅係乜"
+story = "JSON 去到三十樓，啲類型冇晒。要有一個 function 喺運行時望吓佢，然後話畀 compiler 知佢見到乜。"
+brief = '''
+`data: unknown` 由 `JSON.parse` 嚟，而 `Screen` 係 `{ id: string; w: number }`。
+開 function `isScreen`，body 係
+
+```ts
+return typeof x === "object" && x !== null && "id" in x && "w" in x;
+```
+
+令 `if (isScreen(data)) console.log(data.id.toUpperCase());` 編譯得到 ——
+喺個 `if` 入面，`data` 係一個 `Screen`。`strict` 開住。
+'''
+hints = [
+  "回傳 `boolean` 對 compiler 嚟講關於 `x` 乜都冇講。return 位置上面嘅 type predicate 就有 —— 參數名、嗰個字、個類型。個參數一定要接受 `unknown`，而 assertion signature 唔可以坐喺 `if` 入面。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet_advanced.30.asserts-defined"
+title = "個 ASSERTION"
+story = "午夜。島上啲螢幕熄滅之前最後一次查找：個值喺度，或者今晚以一個 throw 出嚟嘅 Error 結束，而嗰行之後 compiler 一定要信佢講嘅嘢。"
+brief = '''
+個 body 係 `if (x === undefined || x === null) throw new Error("missing");`。
+開 generic function `must`，令
+
+```ts
+const v = m.get("a");   // m: Map<string, number>, so v: number | undefined
+must(v);
+```
+
+之後 `v + 1` 呢行編譯得到 —— `must` 向 compiler 承諾由嗰刻起 `v` 既唔係
+`null` 亦唔係 `undefined`。`strict` 開住。
+'''
+hints = [
+  "乜都唔回傳嘅 function 唔可以係 type predicate；佢可以係 assertion signature。而 assert `x is T` 乜都 narrow 唔到 —— 要 assert 嘅係嗰個將 `null` 同 `undefined` 由類型度剝走嘅 utility。",
+]

@@ -7793,3 +7793,128 @@ import`, and the boot report and `doctor` say how to warm it.
 back — the browser's category row draws the words alone, the LÖVE client
 draws nothing where the band would be — so the road is playable without them;
 the prompts belong in `art/prompts.toml` when the pipeline next runs.
+
+## 2026-10-18 — Every land gets a CHEATSHEET road, judged without a compiler
+
+The live-coding cheatsheets (~/vivid/Cheatsheet: Rust, Go, Python, and the
+three side by side) become one more road on every land — the fifth, Rust's
+sixth — walked first: one question per section, four lines, one right. The ask was "very simple", so it
+is simpler than VERY BASIC — a pick, not a pick and then a typed line.
+
+The pick is a `quest.submit` whose `source` is the chosen line. `submit.rs`
+sees `category = 'cheatsheet'`, skips the runner and compares the line with
+the quiz's right choice, then goes down the same path as every verdict:
+attempt row, `bump_attempt`, `record_clear`, XP, `progress.update`. So a
+wrong pick costs a star exactly as a failed submit does, the map stamps it,
+and stats and drills see it — no new message type, no second ledger. The
+alternative, a `quest.answer` message with its own handler, would have
+duplicated that block and let the two drift.
+
+A cheatsheet quest has no `tests` (the importer refuses one that does: a
+case nothing runs is a promise nothing keeps), its `solution` is the right
+choice verbatim, and `verify_pack.py` and `content_solutions.rs` skip it
+rather than build it. The cheatsheet lines do not compile on their own —
+the Cheatsheet repo's own importer says so — which is why this road does not
+reuse VERY BASIC's swap-the-wrong-choice-in-and-run check.
+
+**Every section, not a sample.** The first cut was twelve questions a land,
+which left eleven of the Rust sheet's twenty-three sections — iterators,
+slices, strings, traits, channels, the worker pool, serde, the algorithm
+templates — unasked, and the road is there to drill exactly those. Each
+sheet land now has a question per section (Rust 24 nodes, Go 20, Python 20,
+Remix 20 with the three languages rotating), and the five lands without a
+sheet (C++, TypeScript, Zig, Lua, PyTorch) were brought to twenty on the
+same section list, so the drill is the same shape everywhere. Because the
+road compiles nothing, every writer ran every right line and every "does not
+compile" distractor through the real toolchain before keeping it, and a
+separate pass read each question as a sceptical candidate would; the three
+ambiguities that pass found (a `parseInt` that works in plain JS, a brief
+that named its own answer, an import clause that gave the trick away) were
+fixed before import.
+
+**On screen, the road is the game's second headline.** On the lands screen
+CHEATSHEET sits directly under CODE PLAYGROUND, framed in the tile's gold,
+and the land's record strip moved under the roads to make that true. On the
+quest itself the WebGL particle layer the editor's typing uses
+(`ui/codefx.ts`, `engine/burst.ts`) has the question to itself: a wrong line
+breaks into red brick and falls, the right one gets gold stars run round it,
+the street-cleared firework and coins up to the header, a line lights along
+its length as the pointer reaches it, and neon dust drifts over the brief
+while the player reads. The verdict screen waits a second for the fireworks.
+The LÖVE client has the brief-only layout but none of this yet.
+
+## 2026-10-19 — CHEATSHEET splits in two: BASIC, the core grammar; ADVANCED, the patterns
+
+One road of twenty questions a land cannot be both "almost every core
+construct" and "the patterns an interviewer uses to tell a fluent candidate
+from one who knows the basics". So the sheet road is two roads, walked first
+on every land, with the same shape — four lines, one right, the pick is the
+submission, nothing compiled: `cheatsheet` (CHEATSHEET BASIC on screen) and
+`cheatsheet_advanced` (CHEATSHEET ADVANCED). The existing category keeps its
+id: 184 quest ids, 920 translations, the e2e specs and every player's
+progress rows key on `cheatsheet`, and renaming it to add a sibling would
+have been churn with no reader. Only its label changed. The new id is one
+more name in `quests.category`'s CHECK (0026, the same rebuild 0025 did),
+and everything that asked `category == "cheatsheet"` now asks `is_sheet` /
+`isSheet` / `Land.is_sheet`, so the two roads cannot drift apart in the
+judge, the importer, the verifier or either client.
+
+**What goes where.** BASIC grew from twenty to thirty a land (Rust from
+twenty-four): the hand-written drills of the Cheatsheet repo's own game
+(`~/vivid/Cheatsheet/game/quizzes`, 114 of them) were folded in where they
+asked something the sheet-section questions did not, rewritten in the house
+voice with hints that nudge rather than the drills' explanations that
+state, and the rest of the ten closed the core-grammar gaps — casting,
+formatting, integer division, the off-by-one, the sorted copy. ADVANCED is
+thirty a land from scratch on a spine the task named per language: traits,
+`dyn` and `impl`, lifetimes, `Rc<RefCell>` and `Arc<Mutex>`, `mpsc`,
+iterator adaptors, `BinaryHeap` with `Reverse` for Rust; goroutines,
+buffered channels, `select`, `context`, `WaitGroup`, worker pools,
+generics with constraints, `errors.Is`/`As`, `%w` for Go; generators,
+decorators, dataclasses, `itertools`, `functools`, `asyncio`, `match` for
+Python; templates, concepts, smart pointers, move, ranges, `variant`,
+threads and condition variables for C++; mapped and conditional types,
+discriminated unions, guards, `satisfies`, `Promise.all` for TypeScript;
+`comptime`, error unions, tagged unions, allocators, `std.Thread` for Zig;
+metatables, closures, coroutines, patterns, `bit`, `ffi` for Lua; autograd,
+modules, losses and their shapes, DataLoader, autocast, DDP for PyTorch;
+and for REMIX ten trios — the same idea in Go, then Rust, then Python,
+side by side. Difficulty 3–5 on ADVANCED; the XP weight stays 1 for both
+sheet roads, because one picked line is one picked line and the difficulty
+already pays the harder road more. Every writer ran every right line and
+every distractor through the real toolchain before keeping it.
+
+**The game of it.** The user asked for the achievement of a game — tweening,
+particles, light trails, in the three.js layer — and the sheet roads are
+where the layer has the page to itself. So `engine/burst.ts` gained four
+more closed-form plans and the quest scene plays them: the four lines deal
+themselves in from the right, one after another, on the panel tween; the
+pointer leaves a **light trail** (`lightTrailPlan`: a body in the road's
+colour with the shader's ghosts for a tail, a hot core, sparks off the side
+when it moves fast — cyan and gold on BASIC, violet and pink on ADVANCED);
+a wrong pick jolts the page (the scene shakes its own panels, because
+`app.shake` sits out while the DOM overlay holds anything and the particle
+canvas lives there), flashes the frame red for a beat and crumbles the line
+into red brick as before; a right pick sweeps a **beam** down each line of
+the choice (`beamPlan`), throws a **shockwave** out of the finger
+(`shockPlan`), runs the gold loop, the firework and the coins as before,
+and — for first-try picks in a row — a **fountain** (`comboPlan`), a "×N
+COMBO" zooming in over the line on the same curve the verdict screen's XP
+uses, a STREAK counter beside the label that swells as it grows and goes
+pink past five, and from three a gold flash. The streak lives in a
+module-level map keyed by land and road, so it survives from one node to
+the next within a session and resets on a miss. All of it is a function of
+age under an injected rng, like the plans before it, and
+`tests/burst-sheet.test.ts` pins the shape: the trail runs against the
+motion and burns whiter with speed, the beam sweeps left to right in order
+and closes at the far end, the fountain grows with the streak and stops at
+the cap.
+
+**The place.** ADVANCED has its own plate, `bg_cheatsheet_pro` and its
+portrait twin: the floor above the print shop, after hours — three monitors
+of coloured blocks, a server rack blinking cyan and violet, the advanced
+sheets pinned up, rain on the window — generated with Grok through the same
+`art/tools/gen.sh` as every other plate, prompt recorded in
+`art/prompts.toml`, no text anywhere in the picture. The LÖVE client knows
+the road (lists, labels, blurbs, background, the brief-only layout) but has
+none of the effects yet, by the user's call.

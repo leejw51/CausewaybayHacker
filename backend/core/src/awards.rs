@@ -50,7 +50,9 @@ pub fn category_weight(category: &str) -> i64 {
         // FRAMEWORKS is ADVANCED's shape — a brief, a whole program, hidden
         // cases — with a crate in it, and untimed; it pays the same.
         "advanced" | "frameworks" => 2,
-        // `basic` and `verybasic` alike: one typed line is one typed line.
+        // `basic` and `verybasic` alike: one typed line is one typed line —
+        // and the two sheet roads, one picked line, are worth no more than
+        // that: CHEATSHEET ADVANCED pays through its difficulty, not a weight.
         _ => 1,
     }
 }

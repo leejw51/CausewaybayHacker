@@ -1,0 +1,980 @@
+# PYTORCH LAND — CHEATSHEET ADVANCED. The lines that tell a fluent PyTorch
+# candidate from one who knows the basics, asked the same way: four lines,
+# one right, nothing typed and nothing run — the pick is the submission and
+# the server judges it against the quiz (SPEC §0). The questions are the
+# ones an interviewer reaches for after the warm-up: the functional gradient
+# API, in-place writes on a leaf, what registers with a module and what does
+# not, the shapes each loss insists on, decoupled weight decay, the scaler's
+# three calls, loading a CUDA checkpoint on a laptop, samplers on a multi-GPU
+# box, strides that break `view`, splitting `qkv`, gathering a log-prob,
+# the two spellings of a causal mask, einsum, activation checkpointing, and
+# the one attention module whose boolean mask means the opposite. The three
+# wrong lines are near-misses: a keyword that does not exist, the method
+# that works on a tensor but not on a module, the call that runs and gives
+# the wrong shape, the tuple nobody unpacked.
+#
+# Checked against torch 2.14.1 (CPU). The answer is never in the brief.
+# `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack     = "pytorch.cheatsheet_advanced"
+land     = "pytorch"
+category = "cheatsheet_advanced"
+version  = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.01.autograd-grad"
+node        = 1
+title       = "THE SLOPE, WITHOUT THE PAPERWORK"
+difficulty  = 3
+story       = "Back in the basement of the Chow Yei Ching Building. The console on the trolley wants a derivative, not a side effect."
+concepts    = ["autograd", "tensors"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+```
+x = torch.tensor([1.0, 2.0], requires_grad=True)
+y = (x ** 3).sum()
+```
+
+Make `g` the gradient dy/dx as a **tensor** of shape `(2,)` — and
+`x.grad` must still be `None` afterwards.
+'''
+solution    = 'g, = torch.autograd.grad(y, x)'
+hints = [
+  "The functional API returns one gradient per input, packed in a tuple, so unpack it; the method on `y` writes into `.grad` instead of returning anything.",
+]
+
+[quest.quiz]
+choices = [
+  'g = torch.autograd.grad(y, x)',
+  'y.backward(); g = x.grad',
+  'g, = torch.autograd.grad(y, x)',
+  'g = torch.autograd.grad(x, y)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.02.detach-clone"
+node        = 2
+title       = "A COPY THAT OWES NOTHING"
+difficulty  = 3
+story       = "The rack aisle keeps a scratch copy of every weight. Scribbling on it must never reach the original."
+concepts    = ["autograd", "tensors"]
+requires    = ["pytorch.cheatsheet_advanced.01.autograd-grad"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`x` is a float tensor of shape `(3,)` with `requires_grad=True`, sitting
+on the graph. Make `y` a copy that **shares no memory** with `x` and is
+**cut from the graph**, so that a later `y.add_(1.0)` changes neither `x`
+nor anything `x` will backpropagate.
+'''
+solution    = 'y = x.detach().clone()'
+hints = [
+  "Two methods, one job each: one cuts the graph but keeps the storage, the other copies the storage but keeps the graph. You need both, in that order.",
+]
+
+[quest.quiz]
+choices = [
+  'y = x.detach().clone()',
+  'y = x.detach()',
+  'y = x.clone()',
+  'y = x.item()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.03.inplace-leaf"
+node        = 3
+title       = "TOUCH IT WHILE NOBODY IS WATCHING"
+difficulty  = 4
+story       = "Between two runs the operator nudges a dial on the fan wall. The recorder has to be off while she does it."
+concepts    = ["autograd", "tensors", "training-loop"]
+requires    = ["pytorch.cheatsheet_advanced.02.detach-clone"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`w` is a leaf tensor with `requires_grad=True`. Between two experiments,
+nudge it by `+1.0` **in place** — same storage, still a leaf, still
+tracked for the next run — and autograd must not raise.
+'''
+solution    = 'with torch.no_grad(): w.add_(1.0)'
+hints = [
+  "An in-place write on a tracked leaf is refused while recording is on; switch recording off for just that one statement, and the leaf stays a leaf.",
+]
+
+[quest.quiz]
+choices = [
+  'w.add_(1.0)',
+  'w += 1.0',
+  'w = w.add(1.0)',
+  'with torch.no_grad(): w.add_(1.0)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.04.set-grad-enabled"
+node        = 4
+title       = "ONE SWITCH, BOTH WAYS"
+difficulty  = 3
+story       = "The same console script runs the training pass and the validation pass. One flag decides whether the tape is rolling."
+concepts    = ["autograd", "inference"]
+requires    = ["pytorch.cheatsheet_advanced.03.inplace-leaf"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`train` is a Python `bool`. One block runs the forward pass for both
+phases, and a graph must be recorded **only when `train` is `True`**.
+Which line opens the block?
+
+```
+# ____
+    out = model(xb)
+```
+'''
+solution    = 'with torch.set_grad_enabled(train):'
+hints = [
+  "One context takes the flag itself as its argument. The no-grad one takes no argument at all, and the inference one takes a flag that means the opposite.",
+]
+
+[quest.quiz]
+choices = [
+  'with torch.no_grad(train):',
+  'with torch.set_grad_enabled(train):',
+  'with torch.inference_mode(train):',
+  'with torch.grad_enabled(train):',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.05.modulelist"
+node        = 5
+title       = "ON THE REGISTER"
+difficulty  = 3
+story       = "A tower of identical floors above Jardine's Bazaar. The landlord only collects rent from floors on the register."
+concepts    = ["modules", "structs"]
+requires    = ["pytorch.cheatsheet_advanced.04.set-grad-enabled"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+```
+class Tower(nn.Module):
+    def __init__(self, depth):
+        super().__init__()
+        blocks = [nn.Linear(64, 64) for _ in range(depth)]
+        # ____
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = torch.relu(layer(x))
+        return x
+```
+
+Fill the blank so that every layer's weights show up in
+`model.parameters()` and in `model.state_dict()`.
+'''
+solution    = 'self.layers = nn.ModuleList(blocks)'
+hints = [
+  "A plain Python container hides its contents from the module registry. The registering container takes the list whole; Sequential wants the layers unpacked, not a list.",
+]
+
+[quest.quiz]
+choices = [
+  'self.layers = nn.ModuleList(blocks)',
+  'self.layers = blocks',
+  'self.layers = nn.Sequential(blocks)',
+  'self.layers = tuple(blocks)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.06.parameter"
+node        = 6
+title       = "A DIAL THE OPTIMISER CAN TURN"
+difficulty  = 3
+story       = "One scalar on the console sets how sharp the softmax is. It should learn, like everything else in the rack."
+concepts    = ["modules", "initialization"]
+requires    = ["pytorch.cheatsheet_advanced.05.modulelist"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+Inside `__init__`, after `super().__init__()`: give the module a
+**learnable** scalar `self.temperature`, initial value `1.0`, that appears
+in `model.parameters()` so the optimiser updates it.
+'''
+solution    = 'self.temperature = nn.Parameter(torch.tensor(1.0))'
+hints = [
+  "Wrapping a tensor in the parameter class is what makes the module register it; a bare tensor with gradients on is invisible to the optimiser, and the wrapper wants a tensor, not a float.",
+]
+
+[quest.quiz]
+choices = [
+  'self.temperature = torch.tensor(1.0, requires_grad=True)',
+  'self.register_buffer("temperature", torch.tensor(1.0))',
+  'self.temperature = nn.Parameter(torch.tensor(1.0))',
+  'self.temperature = nn.Parameter(1.0)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.07.register-buffer"
+node        = 7
+title       = "TRAVELS WITH THE RACK, LEARNS NOTHING"
+difficulty  = 4
+story       = "The causal mask rides along when the model moves to the card and gets saved with it. Nobody trains a triangle."
+concepts    = ["modules", "attention"]
+requires    = ["pytorch.cheatsheet_advanced.06.parameter"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+Inside `__init__`, after `super().__init__()`: store a `T` by `T` causal
+mask — ones on and **below** the diagonal, zeros above — as `self.mask`.
+It must move with `model.to(device)` and be saved in `state_dict()`, but
+must **never** receive a gradient or appear in `model.parameters()`.
+'''
+solution    = 'self.register_buffer("mask", torch.tril(torch.ones(T, T)))'
+hints = [
+  "There is a registry for state that is not a parameter: it travels and saves with the module. The lower-triangular helper builds the mask; its upper-triangular sibling builds the wrong one.",
+]
+
+[quest.quiz]
+choices = [
+  'self.mask = torch.tril(torch.ones(T, T))',
+  'self.register_buffer("mask", torch.tril(torch.ones(T, T)))',
+  'self.mask = nn.Parameter(torch.tril(torch.ones(T, T)))',
+  'self.register_parameter("mask", torch.tril(torch.ones(T, T)))',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.08.param-count"
+node        = 8
+title       = "FOURTEEN THOUSAND, GIVE OR TAKE"
+difficulty  = 3
+story       = "The sign on the rack says fourteen thousand parameters. The interviewer wants the number from the model, not the sign."
+concepts    = ["modules", "tensors"]
+requires    = ["pytorch.cheatsheet_advanced.07.register-buffer"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`model` is an `nn.Module` and every parameter in it is trainable. Which
+line gives `n`, the **total number of scalar weights** in the model, as a
+plain `int`?
+'''
+solution    = 'n = sum(p.numel() for p in model.parameters())'
+hints = [
+  "Each parameter tensor knows its own element count; add those up. The length of the iterator is the number of tensors, and a shape does not add to an int.",
+]
+
+[quest.quiz]
+choices = [
+  'n = len(list(model.parameters()))',
+  'n = model.parameters().numel()',
+  'n = sum(p.size() for p in model.parameters())',
+  'n = sum(p.numel() for p in model.parameters())',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.09.freeze-backbone"
+node        = 9
+title       = "FREEZE THE FLOORS BELOW"
+difficulty  = 3
+story       = "The pretrained trunk came down from the teaching cluster. Only the new head on top is allowed to move."
+concepts    = ["modules", "optimizers"]
+requires    = ["pytorch.cheatsheet_advanced.08.param-count"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`model.backbone` and `model.head` are submodules. In **one line**, freeze
+every weight of the backbone — gradient tracking off for all of them, so
+the optimiser's step leaves them untouched — and nothing else.
+'''
+solution    = 'model.backbone.requires_grad_(False)'
+hints = [
+  "Modules have an in-place method, trailing underscore, that walks every parameter underneath. Setting a plain attribute on the module registers nothing, and eval mode is about dropout, not gradients.",
+]
+
+[quest.quiz]
+choices = [
+  'model.backbone.requires_grad_(False)',
+  'model.backbone.requires_grad = False',
+  'model.backbone.parameters().requires_grad = False',
+  'model.backbone.eval()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.10.kaiming"
+node        = 10
+title       = "HE SAID NORMAL"
+difficulty  = 3
+story       = "A fresh layer in the rack starts with whatever the constructor chose. The ReLU tower wants the variance set by hand."
+concepts    = ["initialization", "modules"]
+requires    = ["pytorch.cheatsheet_advanced.09.freeze-backbone"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+```
+self.fc = nn.Linear(256, 256)
+# ____
+```
+
+Fill the blank so the layer's weight is re-initialised **in place** with
+He (Kaiming) normal initialisation, the kind a ReLU stack wants.
+'''
+solution    = 'nn.init.kaiming_normal_(self.fc.weight)'
+hints = [
+  "The initialisers take the tensor itself and mutate it — the trailing underscore says so. A module or a shape is not a tensor, and assigning a bare tensor over a parameter is refused.",
+]
+
+[quest.quiz]
+choices = [
+  'nn.init.kaiming_normal_(self.fc)',
+  'self.fc.weight = torch.randn_like(self.fc.weight)',
+  'nn.init.kaiming_normal_(self.fc.weight)',
+  'nn.init.kaiming_normal_(self.fc.weight.shape)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.11.functional-dropout"
+node        = 11
+title       = "DROPOUT THAT KNOWS WHAT TIME IT IS"
+difficulty  = 4
+story       = "The functional dropout on the console drops units at validation too, unless someone tells it the model has gone quiet."
+concepts    = ["modules", "inference", "training-loop"]
+requires    = ["pytorch.cheatsheet_advanced.10.kaiming"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+```
+def forward(self, x):
+    x = torch.relu(self.fc1(x))
+    # ____
+    return self.fc2(x)
+```
+
+`F` is `torch.nn.functional`. Fill the blank with **functional** dropout
+at `p=0.1` that drops units while training and **stops dropping** once
+`model.eval()` has been called.
+'''
+solution    = 'x = F.dropout(x, p=0.1, training=self.training)'
+hints = [
+  "The functional form has no idea which mode the module is in unless you pass the module's own boolean flag; its default is to drop. A layer built fresh inside forward is always in training mode.",
+]
+
+[quest.quiz]
+choices = [
+  'x = F.dropout(x, p=0.1)',
+  'x = nn.Dropout(0.1)(x)',
+  'x = F.dropout(x, p=0.1, training=self.eval)',
+  'x = F.dropout(x, p=0.1, training=self.training)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.12.bce-with-logits"
+node        = 12
+title       = "YES OR NO, SAME SHAPE PLEASE"
+difficulty  = 3
+story       = "The gate detector at the basement door says one number per frame. The target is a column of zeros and ones."
+concepts    = ["loss-functions", "tensors", "types"]
+requires    = ["pytorch.cheatsheet_advanced.11.functional-dropout"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`logits` has shape `(N, 1)` — raw float scores from a one-unit head — and
+`target` has shape `(N,)` and dtype `int64`, holding `0` or `1`. Which
+line is the right **binary** loss, applying the sigmoid itself?
+'''
+solution    = 'loss = nn.BCEWithLogitsLoss()(logits.squeeze(1), target.float())'
+hints = [
+  "The binary losses want input and target of the same shape and the same float dtype. The plain BCE wants probabilities, and the multi-class loss reads the column count as the number of classes.",
+]
+
+[quest.quiz]
+choices = [
+  'loss = nn.BCEWithLogitsLoss()(logits, target.float())',
+  'loss = nn.BCEWithLogitsLoss()(logits.squeeze(1), target.float())',
+  'loss = nn.BCELoss()(logits.squeeze(1), target.float())',
+  'loss = nn.CrossEntropyLoss()(logits, target)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.13.token-loss"
+node        = 13
+title       = "EVERY TOKEN BUT THE PADDING"
+difficulty  = 4
+story       = "The sequence model in the rack scores every position of every batch row. The padding at the end of short rows must not count."
+concepts    = ["loss-functions", "tensors", "embeddings"]
+requires    = ["pytorch.cheatsheet_advanced.12.bce-with-logits"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`lg` has shape `(B, T, V)` — logits for every position — and `y` has
+shape `(B, T)`, `int64` token ids. Token id `0` is **padding** and must
+not contribute to the loss. `F` is `torch.nn.functional`. Which line is
+the right token-level cross-entropy?
+'''
+solution    = 'loss = F.cross_entropy(lg.view(-1, V), y.view(-1), ignore_index=0)'
+hints = [
+  "Flatten both to `(N, V)` and `(N,)` — the loss accepts exactly those — and tell it by keyword which class index to skip; without that keyword the padding is scored like any other token.",
+]
+
+[quest.quiz]
+choices = [
+  'loss = F.cross_entropy(lg.view(-1, V), y.view(-1), ignore_index=0)',
+  'loss = F.cross_entropy(lg, y, ignore_index=0)',
+  'loss = F.cross_entropy(lg.view(-1, V), y, ignore_index=0)',
+  'loss = F.cross_entropy(lg.view(-1, V), y.view(-1))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.14.adamw"
+node        = 14
+title       = "DECAY, DECOUPLED"
+difficulty  = 3
+story       = "The interviewer in Room 7-32 asks for weight decay that is not just L2 folded into the gradient. There is a class for that."
+concepts    = ["optimizers", "training-loop"]
+requires    = ["pytorch.cheatsheet_advanced.13.token-loss"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`params = model.parameters()`. Build `opt` with learning rate `3e-4` and
+**decoupled** weight decay of `0.01` — the decay applied to the weights
+directly, not added to the gradient as an L2 term.
+'''
+solution    = 'opt = torch.optim.AdamW(params, lr=3e-4, weight_decay=0.01)'
+hints = [
+  "Adam's `weight_decay` is L2 folded into the gradient; the decoupled kind is its own optimiser class. Both want the parameter iterable, not the module, and the keyword is spelled out in full.",
+]
+
+[quest.quiz]
+choices = [
+  'opt = torch.optim.AdamW(model, lr=3e-4, weight_decay=0.01)',
+  'opt = torch.optim.Adam(params, lr=3e-4, weight_decay=0.01)',
+  'opt = torch.optim.AdamW(params, lr=3e-4, weight_decay=0.01)',
+  'opt = torch.optim.AdamW(params, lr=3e-4, wd=0.01)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.15.scheduler-step"
+node        = 15
+title       = "COOL DOWN ONCE A LAP"
+difficulty  = 3
+story       = "Cosine annealing on the rack: the learning rate eases off a little every epoch, after the optimiser has had its turn."
+concepts    = ["optimizers", "training-loop"]
+requires    = ["pytorch.cheatsheet_advanced.14.adamw"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+```
+sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+for epoch in range(epochs):
+    for xb, yb in loader:
+        opt.zero_grad()
+        loss = loss_fn(model(xb), yb)
+        loss.backward()
+        opt.step()
+    # ____
+```
+
+Fill the blank so the learning-rate schedule **advances once per epoch**.
+'''
+solution    = 'sched.step()'
+hints = [
+  "The scheduler has a step of its own, called after the optimiser's — here once per epoch. Reading the current rate advances nothing, and the optimiser does not own the scheduler.",
+]
+
+[quest.quiz]
+choices = [
+  'opt.step()',
+  'sched.step()',
+  'sched.get_last_lr()',
+  'opt.sched.step()',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.16.grad-scaler"
+node        = 16
+title       = "SCALE, STEP, UPDATE"
+difficulty  = 4
+story       = "Half precision on the card in rack 3: the small gradients underflow unless the loss is blown up first and the step knows it."
+concepts    = ["training-loop", "optimizers", "types"]
+requires    = ["pytorch.cheatsheet_advanced.15.scheduler-step"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+```
+scaler = torch.amp.GradScaler("cuda")
+for xb, yb in loader:
+    opt.zero_grad(set_to_none=True)
+    with torch.autocast(device_type="cuda", dtype=torch.float16):
+        loss = loss_fn(model(xb), yb)
+    # ____
+```
+
+Mixed precision in `float16` on CUDA. Fill the blank with the three calls
+of one training step, so that backward runs on a loss the scaler has
+grown, the optimiser **never applies still-scaled gradients** (and a step
+whose gradients hold an inf is skipped), and the scale factor is
+adjusted only after that step.
+'''
+solution    = 'scaler.scale(loss).backward(); scaler.step(opt); scaler.update()'
+hints = [
+  "All three calls go through the scaler. Stepping the optimiser directly leaves the gradients scaled; the scaler refuses to step a loss it never scaled, and refuses to update before it has stepped.",
+]
+
+[quest.quiz]
+choices = [
+  'loss.backward(); scaler.step(opt); scaler.update()',
+  'scaler.scale(loss).backward(); opt.step(); scaler.update()',
+  'scaler.scale(loss).backward(); scaler.update(); scaler.step(opt)',
+  'scaler.scale(loss).backward(); scaler.step(opt); scaler.update()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.17.map-location"
+node        = 17
+title       = "THE CARD IS NOT HERE"
+difficulty  = 3
+story       = "The checkpoint was written on the cluster's GPU. It is being read on a laptop at the Lucky Mac with no card at all."
+concepts    = ["serialization", "modules"]
+requires    = ["pytorch.cheatsheet_advanced.16.grad-scaler"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`p` names a file written on a CUDA machine with
+`torch.save(model.state_dict(), p)` — the file holds the state dict
+itself. Load it on this **CPU-only** laptop as a dict `sd`, with the
+loader **refusing to unpickle arbitrary objects**.
+'''
+solution    = 'sd = torch.load(p, map_location="cpu", weights_only=True)'
+hints = [
+  "The device remap is a keyword on the loader, not a method on what comes back, and the safe-unpickling switch is another keyword. The result is the dict itself, with no key around it.",
+]
+
+[quest.quiz]
+choices = [
+  'sd = torch.load(p, device="cpu")',
+  'sd = torch.load(p, map_location="cpu", weights_only=True)',
+  'sd = torch.load(p).cpu()',
+  'sd = torch.load(p, map_location="cpu")["state_dict"]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.18.random-split"
+node        = 18
+title       = "EIGHTY-TWENTY, SAME CUT EVERY TIME"
+difficulty  = 3
+story       = "A thousand labelled frames from the basement camera. The validation fifth has to be the same fifth tomorrow."
+concepts    = ["datasets", "initialization"]
+requires    = ["pytorch.cheatsheet_advanced.17.map-location"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`ds` is a map-style `Dataset` (it defines `__len__` and `__getitem__`)
+with 1000 items, `random_split` is imported from `torch.utils.data`, and
+`g = torch.Generator().manual_seed(0)`. Split it **randomly** 80/20 into
+two `Dataset` objects, reproducibly from `g`.
+'''
+solution    = 'tr, va = random_split(ds, [0.8, 0.2], generator=g)'
+hints = [
+  "The splitter takes a list of fractions (or lengths) and the generator object by keyword — not a seed, not a single float. Slicing a dataset is neither random nor a dataset.",
+]
+
+[quest.quiz]
+choices = [
+  'tr, va = random_split(ds, [0.8, 0.2], generator=g)',
+  'tr, va = random_split(ds, 0.8, generator=g)',
+  'tr, va = ds[:800], ds[800:]',
+  'tr, va = random_split(ds, [0.8, 0.2], seed=0)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.19.collate-fn"
+node        = 19
+title       = "RAGGED ROWS, ONE TENSOR"
+difficulty  = 3
+story       = "Sentences from the Central Library terminals come in every length. The loader's default stacker wants them all equal."
+concepts    = ["datasets", "tensors"]
+requires    = ["pytorch.cheatsheet_advanced.18.random-split"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+Every item of `ds` is a 1-d `int64` tensor of a **different** length, so
+the loader's default stacking fails. `pad_batch(samples)` is already
+written: it takes a list of items and returns one padded `(B, T_max)`
+tensor. Build `loader` with batches of 16 that uses it (worker count is
+not the question).
+'''
+solution    = 'loader = DataLoader(ds, batch_size=16, collate_fn=pad_batch)'
+hints = [
+  "The default collate stacks, and ragged tensors do not stack. Hand the loader your own collate function under its full keyword name; a Python `map` has no length and is not a dataset.",
+]
+
+[quest.quiz]
+choices = [
+  'loader = DataLoader(ds, batch_size=16)',
+  'loader = DataLoader(ds, batch_size=16, collate=pad_batch)',
+  'loader = DataLoader(ds, batch_size=16, collate_fn=pad_batch)',
+  'loader = DataLoader(map(pad_batch, ds), batch_size=16)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.20.distributed-sampler"
+node        = 20
+title       = "EVERY RANK ITS OWN SLICE"
+difficulty  = 4
+story       = "Four cards in the rack, one process each. If every process reads the whole dataset, the cluster has four times the work and none of the speed."
+concepts    = ["datasets", "training-loop", "concurrency"]
+requires    = ["pytorch.cheatsheet_advanced.19.collate-fn"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+Multi-GPU, one process per card:
+
+```
+dist.init_process_group("nccl")
+rank = dist.get_rank()
+model = DistributedDataParallel(model.to(rank), device_ids=[rank])
+sampler = DistributedSampler(ds)
+```
+
+Build `loader` with batches of 32 so that each rank sees its **own
+disjoint shard** of `ds`, shuffled by the sampler (`sampler.set_epoch`
+is called every epoch).
+'''
+solution    = 'loader = DataLoader(ds, batch_size=32, sampler=sampler)'
+hints = [
+  "A sampler replaces the loader's own shuffling, and the two keywords are mutually exclusive — the loader raises if you pass both. The dataset is still the first argument.",
+]
+
+[quest.quiz]
+choices = [
+  'loader = DataLoader(ds, batch_size=32, shuffle=True)',
+  'loader = DataLoader(ds, batch_size=32, sampler=sampler, shuffle=True)',
+  'loader = DataLoader(sampler, batch_size=32)',
+  'loader = DataLoader(ds, batch_size=32, sampler=sampler)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.21.compile"
+node        = 21
+title       = "FUSE IT"
+difficulty  = 4
+story       = "The forward pass on the rack is a thousand tiny kernels. The 2.x compiler can weld them into a few, if it is asked the right way."
+concepts    = ["modules", "complexity"]
+requires    = ["pytorch.cheatsheet_advanced.20.distributed-sampler"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`model` is an `nn.Module`. Rebind `model` to a version whose forward pass
+is traced and fused by the PyTorch 2.x compiler, in its **default** mode.
+'''
+solution    = 'model = torch.compile(model)'
+hints = [
+  "The compiler is a top-level torch function that takes the module object — not its output — and returns a wrapped one. Its modes are named default, reduce-overhead and max-autotune; the JIT package has nothing by this name.",
+]
+
+[quest.quiz]
+choices = [
+  'model = torch.compile(model)',
+  'model = torch.jit.compile(model)',
+  'model = torch.compile(model, mode="fast")',
+  'model = torch.compile(model())',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.22.expand"
+node        = 22
+title       = "SAME MEMORY, MORE ROWS"
+difficulty  = 4
+story       = "One positional table for every row in the batch. Copying it per row would fill the card for nothing."
+concepts    = ["broadcasting", "tensors", "embeddings"]
+requires    = ["pytorch.cheatsheet_advanced.21.compile"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`pos` is a positional table of shape `(T, D)` and `x` has shape
+`(B, T, D)`. Make `pe` of shape `(B, T, D)` that **shares memory** with
+`pos` — a view, no copy — so that `x + pe` adds the same table to every
+row.
+'''
+solution    = 'pe = pos.unsqueeze(0).expand(B, -1, -1)'
+hints = [
+  "One method materialises copies, the other strides over the same memory. `-1` means keep that size, and only the striding one accepts it; the copying one wants a positive count on every axis.",
+]
+
+[quest.quiz]
+choices = [
+  'pe = pos.unsqueeze(0).repeat(B, -1, -1)',
+  'pe = pos.unsqueeze(0).repeat(B, 1, 1)',
+  'pe = pos.unsqueeze(0).expand(B, -1, -1)',
+  'pe = pos.expand(B)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.23.permute-contiguous"
+node        = 23
+title       = "STRIDES DO NOT LIE"
+difficulty  = 4
+story       = "Channels-first off the rack, time-first into the head. The view refuses until the memory is laid out the way the shape says."
+concepts    = ["tensors", "matrix"]
+requires    = ["pytorch.cheatsheet_advanced.22.expand"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`x` has shape `(B, C, T)` and is contiguous. Make `y` of shape
+`(B, T*C)` in which, within each row, **time runs slowest** — all `C`
+channels of step 0, then all `C` of step 1, and so on — using `view`.
+'''
+solution    = 'y = x.permute(0, 2, 1).contiguous().view(B, -1)'
+hints = [
+  "After a permute the strides no longer match memory and `view` refuses; a copy into fresh memory first makes the view legal. A view straight off `x` keeps channels slowest, and the row count must be `B`.",
+]
+
+[quest.quiz]
+choices = [
+  'y = x.permute(0, 2, 1).view(B, -1)',
+  'y = x.permute(0, 2, 1).contiguous().view(B, -1)',
+  'y = x.view(B, -1)',
+  'y = x.permute(0, 2, 1).contiguous().view(-1, B)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.24.chunk-qkv"
+node        = 24
+title       = "THREE FROM ONE PROJECTION"
+difficulty  = 4
+story       = "One Linear in the rack produces query, key and value side by side. The attention block needs them apart."
+concepts    = ["tensors", "attention"]
+requires    = ["pytorch.cheatsheet_advanced.23.permute-contiguous"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`qkv` has shape `(B, T, 3*D)` with `B = 8` and `D = 64`: the query, key
+and value projections concatenated along the **last** axis. Which line
+gives `q`, `k`, `v`, each of shape `(B, T, D)`?
+'''
+solution    = 'q, k, v = qkv.chunk(3, dim=-1)'
+hints = [
+  "One of the two splitters counts pieces, the other counts the size of each piece — and the axis defaults to the first one, where eight rows cut three ways gives the wrong shapes without an error.",
+]
+
+[quest.quiz]
+choices = [
+  'q, k, v = qkv.split(3, dim=-1)',
+  'q, k, v = qkv.chunk(3)',
+  'q, k, v = torch.chunk(qkv, dim=-1)',
+  'q, k, v = qkv.chunk(3, dim=-1)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.25.gather"
+node        = 25
+title       = "PICK ONE PER ROW"
+difficulty  = 4
+story       = "Sixty-four rows of log-probabilities, ten classes. The loss by hand needs exactly one number per row: the true class's."
+concepts    = ["tensors", "loss-functions"]
+requires    = ["pytorch.cheatsheet_advanced.24.chunk-qkv"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`logp` has shape `(N, C)` with `N = 64`, `C = 10` — log-probabilities,
+`log_softmax` already applied along dim 1 — and `y` has shape `(N,)`,
+`int64` class indices. Make `lp` of shape `(N,)`: for each row, the
+log-probability of that row's **true** class.
+'''
+solution    = 'lp = logp.gather(1, y[:, None]).squeeze(1)'
+hints = [
+  "The index tensor must have as many dims as the source — give it a trailing axis — and the pick runs along the class axis, not the row axis. Indexing with `y` alone selects whole rows.",
+]
+
+[quest.quiz]
+choices = [
+  'lp = logp.gather(1, y[:, None]).squeeze(1)',
+  'lp = logp.gather(1, y)',
+  'lp = logp[y]',
+  'lp = logp.gather(0, y[:, None])',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.26.masked-fill"
+node        = 26
+title       = "MINUS INFINITY FOR THE FUTURE"
+difficulty  = 4
+story       = "The block in the basement must not read ahead. Every score above the diagonal goes to minus infinity before the softmax sees it."
+concepts    = ["attention", "tensors", "broadcasting"]
+requires    = ["pytorch.cheatsheet_advanced.25.gather"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`scores` has shape `(B, T, T)` and `mask = torch.tril(torch.ones(T, T))`
+— a **float** tensor, `1.` where attending is allowed, `0.` above the
+diagonal. Which line replaces every forbidden score with minus infinity,
+so the softmax that follows gives those positions zero weight?
+'''
+solution    = 'scores = scores.masked_fill(mask == 0, float("-inf"))'
+hints = [
+  "The fill wants a boolean mask that is True where the hole goes — compare the float mask to get one — and a Python float for minus infinity. `where` on a tensor keeps the values where its condition is True.",
+]
+
+[quest.quiz]
+choices = [
+  'scores = scores.masked_fill(mask, float("-inf"))',
+  'scores = scores.where(mask == 0, float("-inf"))',
+  'scores = scores.masked_fill(mask == 0, float("-inf"))',
+  'scores = scores.masked_fill(mask == 0, -inf)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.27.sdpa"
+node        = 27
+title       = "ONE CALL, NO PEEKING"
+difficulty  = 4
+story       = "The fused attention kernel on the card does the scores, the mask and the softmax in one pass — if the flag is spelled right."
+concepts    = ["attention", "tensors"]
+requires    = ["pytorch.cheatsheet_advanced.26.masked-fill"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`q`, `k`, `v` each have shape `(B, H, T, Dh)` and `F` is
+`torch.nn.functional`. Which line computes attention with the **fused**
+kernel so that each position attends only to itself and the past?
+'''
+solution    = 'out = F.scaled_dot_product_attention(q, k, v, is_causal=True)'
+hints = [
+  "The fused call has a boolean keyword for the causal mask, and it is not spelled plain `causal`. Masking the output afterwards masks the wrong tensor; leaving the flag off attends everywhere.",
+]
+
+[quest.quiz]
+choices = [
+  'out = F.scaled_dot_product_attention(q, k, v)',
+  'out = F.scaled_dot_product_attention(q, k, v, causal=True)',
+  'out = F.scaled_dot_product_attention(q, k, v).tril()',
+  'out = F.scaled_dot_product_attention(q, k, v, is_causal=True)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.28.einsum"
+node        = 28
+title       = "LETTERS FOR AXES"
+difficulty  = 5
+story       = "The interviewer in Room 7-32 writes the product as subscripts on the whiteboard and waits for the batch letter to survive."
+concepts    = ["matrix", "tensors", "broadcasting"]
+requires    = ["pytorch.cheatsheet_advanced.27.sdpa"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`a` has shape `(B, 3, 4)` and `b` has shape `(B, 4, 5)`. Using `einsum`,
+make `c` of shape `(B, 3, 5)`: the **batched matrix product**, one
+`(3, 4) @ (4, 5)` per batch row.
+'''
+solution    = 'c = torch.einsum("bij,bjk->bik", a, b)'
+hints = [
+  "Every input axis gets a letter, the shared letter is summed away, and the batch letter has to appear in the output or it is summed too. Letters are read in axis order, so swapping two of them changes which sizes must agree.",
+]
+
+[quest.quiz]
+choices = [
+  'c = torch.einsum("bij,bjk->ik", a, b)',
+  'c = torch.einsum("bij,bjk->bik", a, b)',
+  'c = torch.einsum("bij,bkj->bik", a, b)',
+  'c = torch.einsum("ij,jk->ik", a, b)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.29.checkpoint"
+node        = 29
+title       = "FORGET NOW, RECOMPUTE LATER"
+difficulty  = 5
+story       = "Fourteen thousand parameters fit on the laptop; the activations of every block do not. Trade compute for memory, block by block."
+concepts    = ["autograd", "modules", "complexity"]
+requires    = ["pytorch.cheatsheet_advanced.28.einsum"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+```
+from torch.utils.checkpoint import checkpoint
+
+def forward(self, h):
+    for block in self.blocks:
+        # ____
+    return h
+```
+
+Fill the blank so each block's activations are **not stored** in the
+forward pass but recomputed during backward — the **non-reentrant**
+variant.
+'''
+solution    = 'h = checkpoint(block, h, use_reentrant=False)'
+hints = [
+  "The checkpoint function takes the callable and its inputs as separate arguments and calls it for you. Passing the block's output means the forward already ran, and the module is not callable.",
+]
+
+[quest.quiz]
+choices = [
+  'h = checkpoint(block(h), use_reentrant=False)',
+  'h = checkpoint(block, h, use_reentrant=False)',
+  'h = torch.utils.checkpoint(block, h)',
+  'h = checkpoint(block, use_reentrant=False)(h)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "pytorch.cheatsheet_advanced.30.multihead-attention"
+node        = 30
+title       = "THE MASK THAT MEANS THE OPPOSITE"
+difficulty  = 5
+story       = "The last block in the basement is the library's own attention module, and its boolean mask reads True as forbidden. Mei checks the sign twice."
+concepts    = ["attention", "modules"]
+requires    = ["pytorch.cheatsheet_advanced.29.checkpoint"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+```
+attn = nn.MultiheadAttention(embed_dim=64, num_heads=4, batch_first=True)
+causal = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+```
+
+`x` has shape `(B, T, 64)`. In this module a boolean `attn_mask` is
+`True` where attention is **forbidden**, and `causal` is `True` strictly
+above the diagonal. Which line gives `out`, the self-attention output of
+shape `(B, T, 64)`, with no token reading ahead?
+'''
+solution    = 'out, _ = attn(x, x, x, attn_mask=causal)'
+hints = [
+  "The module wants query, key and value as three positional tensors and returns a pair — unpack it. The mask is passed exactly as built, since True already means blocked here; inverting it lets every token read only the future.",
+]
+
+[quest.quiz]
+choices = [
+  'out, _ = attn(x, x, x, attn_mask=causal)',
+  'out = attn(x, x, x, attn_mask=causal)',
+  'out, _ = attn(x, x, x, attn_mask=~causal)',
+  'out, _ = attn(q=x, k=x, v=x, attn_mask=causal)',
+]
+answer  = 0

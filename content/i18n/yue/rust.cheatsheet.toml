@@ -1,0 +1,449 @@
+# RUST LAND — CHEATSHEET, in Cantonese (written colloquially in Traditional characters).
+# A translation pack (SPEC §12.1): the prose of `content/rust/cheatsheet.toml`, quest
+# by quest, and nothing else. The question is the brief; the four choices are code,
+# live in the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "rust.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "rust.cheatsheet.01.read-all"
+title = "成卷帶"
+story = "06:30，渣甸坊。個報攤嘅輸入一次過全部嚟到，而佢要晒佢哋。"
+brief = '''
+用一次呼叫，將 stdin **全部**內容讀入 `s`。
+
+```
+use std::io::{self, Read};
+let mut s = String::new();
+// ____
+```
+
+係邊一行？
+'''
+hints = [
+  "`read_to_string` 收一個 `&mut String` 然後填滿佢；佢回傳 Result，所以要 unwrap。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "rust.cheatsheet.02.read-line"
+title = "換行仲喺度"
+story = "訂單寫住 42。收銀機讀嗰陣，換行仲黐住喺度。"
+brief = '''
+`read_line` 喺 `line` 入面留低咗 `"42\n"`。邊一行可以唔 panic 就將佢變成 `usize`？
+'''
+hints = [
+  "`read_line` 會保留 `\\n`。parse 見到佢就失敗，所以要先 trim。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "rust.cheatsheet.03.width"
+title = "靠右對齊"
+story = "街市嘅價錢牌將每個數字都靠右對齊。"
+brief = '''
+將 `x` 喺五個字闊嘅欄入面靠右對齊印出嚟。
+'''
+hints = [
+  "喺大括號入面，對齊寫喺闊度前面：`<` 靠左，`^` 置中，`>` 靠右。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "rust.cheatsheet.04.usize"
+title = "索引係 usize"
+story = "銅鑼灣站嘅 7 號儲物櫃。個號碼係以 i32 嚟嘅。"
+brief = '''
+`i` 係 `i32`，`v` 係 `Vec<u8>`。邊一行讀第 `i` 個元素？
+'''
+hints = [
+  "Vec 淨係可以用 `usize` 做索引。`as` 就係轉型。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "rust.cheatsheet.05.inclusive"
+title = "一至十"
+story = "電車站編號由 1 去到 10，而最尾嗰個最易俾人唔記得。"
+brief = '''
+迴圈行 1, 2, … 10，包括 10。
+'''
+hints = [
+  "`a..b` 喺 `b` 之前就停；`a..=b` 就包括 `b`。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "rust.cheatsheet.06.guard"
+title = "守衛"
+story = "駱克道個保安除咗名單上嘅名，仲要多查一樣嘢。"
+brief = '''
+喺 `match x { … }` 入面，接住任何負數嘅分支：
+
+```
+match x {
+    0 => "zero",
+    // ____
+    _ => "pos",
+}
+```
+'''
+hints = [
+  "守衛嘅寫法係 `pattern if condition =>`。先將個值綁定落一個名度。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "rust.cheatsheet.07.fnmut"
+title = "計數器"
+story = "門童手上個計數器：每撳一下，佢記住嗰個數就變一次。"
+brief = '''
+`let mut cnt = 0;` — 寫一個 closure `inc`，每次呼叫都將 `cnt` 加一，等 `inc(); inc();` 可以編譯到。
+'''
+hints = [
+  "會改所捕獲嘢嘅 closure 係 `FnMut`，而呼叫佢需要一個 `mut` 綁定。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "rust.cheatsheet.08.desc"
+title = "大嘅排先"
+story = "崇光地庫遊戲機中心嘅排行榜：最高分排頭位。"
+brief = '''
+將 `v: Vec<i32>` 按**降序**原地排序。
+'''
+hints = [
+  "`sort_by` 收一個比較函數。將兩個運算元對調，次序就反轉。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "rust.cheatsheet.09.count"
+title = "數數"
+story = "大排檔按菜式數單，新菜式由零開始。"
+brief = '''
+`m: HashMap<String, i32>`。將 key `k` 嘅次數加一，如果仲未有就由 0 開始。
+'''
+hints = [
+  "`entry(k).or_insert(0)` 會交返一個 `&mut i32`；解引用之後先加。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "rust.cheatsheet.10.min-heap"
+title = "最細嘅喺面"
+story = "小巴隊伍先載路程最短嗰個。BinaryHeap 只識得將最大嗰個放喺面。"
+brief = '''
+`h` 係一個 `BinaryHeap<i32>`。push `x`，等 `h.pop()` 先俾出**最細**嗰個。
+'''
+hints = [
+  "BinaryHeap 係最大堆。將個值包一層，等佢嘅次序反轉。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "rust.cheatsheet.11.clone"
+title = "兩份副本"
+story = "時代廣場辦公室部影印機。原稿留喺玻璃板上面。"
+brief = '''
+`let a = String::from("x");` — 令 `b` 變成一個屬於佢自己嘅 `String`，咁之後 `a` 仲用得。
+'''
+hints = [
+  "`let b = a;` 會搬走個 String。深拷貝要明明白白寫出嚟。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "rust.cheatsheet.12.ok-or"
+title = "缺咗嗰行"
+story = "7-32 號房本帳簿有一處空缺。回傳 Result 嘅函數一定要講明原因。"
+brief = '''
+喺 `fn … -> Result<i32, &'static str>` 入面，`o` 係一個 `Option<i32>`。攞出個值，否則回傳錯誤 `"missing"`。
+'''
+hints = [
+  "喺回傳 Result 嘅函數入面，對 Option 用 `?` 行唔通。先將 Option 變成 Result。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "rust.cheatsheet.13.filter-map-sum"
+title = "先篩，再平方"
+story = "維園跑道啲計步器，電池弱嗰陣會記個負數；Mei 想要真正嗰啲圈數嘅平方，加埋一齊。"
+brief = '''
+`v: Vec<i64>` 入面有正數**同負數**。`s` 係淨係正數嗰啲嘅平方之和。
+
+```
+let s: i64 = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "平方之前先掉走啲負數 —— 平方係冇正負嘅。喺 `.iter()` 上面，filter 嘅 closure 見到嘅係 `&&i64`。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "rust.cheatsheet.14.iter-mut"
+title = "就地改"
+story = "怡和街間 7-Eleven 將架上每個價錢都加一蚊，之後個架仲要喺度。"
+brief = '''
+`let mut v: Vec<i32> = …;` —— 將 **`v` 本身嘅每一個元素**加一，而下一行仲會用到 `v`。
+'''
+hints = [
+  "行一個 Vec 有三種方法：借佢、獨佔咁借佢、或者攞走佢。得一種可以經 `x` 寫入去，又留得住 `v`。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "rust.cheatsheet.15.windows"
+title = "隔籬"
+story = "軒尼詩道落去嘅電車時間表：Mei 想要每個站同下一個站之間嘅差。"
+brief = '''
+`v: Vec<i64>` 至少有三個元素。`d` 裝住每一個 `i` 嘅 `v[i+1] - v[i]`，所以佢啱啱好比 `v` 短一個。
+
+```
+let d: Vec<i64> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "係重疊嘅一對對，唔係唔重疊嘅 —— 而且每一對嚟到嗰陣係一個 slice，唔係 tuple。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "rust.cheatsheet.16.reverse-string"
+title = "由尾到頭"
+story = "抹窗嗰個由另一頭讀波斯富街嘅霓虹燈；Mei 想要佢嗰個次序嘅字母。"
+brief = '''
+`s: &str` 可能有非 ASCII 字元。`r` 係一個新嘅 `String`，入面係 `s` 嘅字元倒轉次序。
+'''
+hints = [
+  "行啲字元（唔係 byte —— 多 byte 嘅字元會爛），將個行程掉轉頭，再收集做一個 String。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "rust.cheatsheet.17.concat"
+title = "駁埋，唔係搬走"
+story = "時代廣場扶手電梯腳有兩條隊併埋；兩條隊嘅名單係借俾 Mei 嘅，唔係送俾佢。"
+brief = '''
+`a: Vec<i32>` 同 `b: Vec<i32>`。`c` 係一個**新嘅** `Vec<i32>`，入面係 `a` 嘅元素跟住 `b` 嘅 —— 而且之後 `a` 同 `b` 都仲要用。
+'''
+hints = [
+  "按值將兩個 Vec 駁埋會 move 咗佢哋。改為駁兩個借嚟嘅 slice。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "rust.cheatsheet.18.derive-hash"
+title = "入得 set"
+story = "Ferris 將銅鑼灣格仔地圖上面每個行過嘅街口釘入一個 set，而 compiler 想知兩粒釘係點樣比較嘅。"
+brief = '''
+`struct P { x: i32, y: i32 }` 要放入 `HashSet<P>`。struct 上面邊一行 derive **足夠**令 `set.insert(p)` compile 到？
+'''
+hints = [
+  "hash set 要 hash 到個值，又要比較到兩個值係咪完全相等 —— 而完全相等係建基於部分相等之上嘅。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "rust.cheatsheet.19.drop-tx"
+title = "最後一個走"
+story = "駱克道四個速遞員用同一部對講機報到，而調度員要知道最後一個幾時收線。"
+brief = '''
+四個 producer，一個 consumer。四個訊息到齊之後，個 `for` loop 一定要完結。
+
+```
+let (tx, rx) = mpsc::channel();
+for id in 0..4 {
+    let tx = tx.clone();
+    thread::spawn(move || tx.send(id).unwrap());
+}
+// ____
+for m in rx { println!("{m}"); }
+```
+
+空位應該填邊一行？
+'''
+hints = [
+  "個 loop 要等所有 sender 都冇咗先會完。四個 clone 跟住佢哋條 thread 走咗 —— 仲有一個 sender 坐喺 `main` 度。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "rust.cheatsheet.20.shared-receiver"
+title = "一條單軌，四個廚師"
+story = "Lucky Mac 嘅夜更廚房：一條落單軌，四個廚師，一次淨係得一個可以睇佢。"
+brief = '''
+`rx: Receiver<u64>` 係工作隊列。四條 worker thread 各自用 `move` spawn 出嚟，全部都要由呢**一個** receiver 攞工作。邊一行包住 `rx`，令每個 worker 都 clone 到一個 handle？
+'''
+hints = [
+  "Receiver 唔係 Sync，所以跨 thread 共用佢要一把鎖 —— 而把鎖要一個 thread-safe 嘅擁有者，唔係單 thread 嗰種。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "rust.cheatsheet.21.from-str"
+title = "落咗線"
+story = "告士打道間金融科技公司經網絡傳落一個客戶紀錄，係 JSON，Mei 想要佢做 struct。"
+brief = '''
+`s: &str` 裝住一個 JSON object。`User` derive 咗 `Deserialize`，有一個 `name: String` field。填個空位，令呢段 compile 到：
+
+```
+fn name_of(s: &str) -> Result<String, serde_json::Error> {
+    // ____
+    Ok(u.name)
+}
+```
+'''
+hints = [
+  "下一行嘅 `u.name` 定唔到任何嘢：serde 估唔到目標類型，所以要喺綁定嗰度寫明。輸入係文字，唔係 `Value`。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "rust.cheatsheet.22.lower-bound"
+title = "第一個唔細過"
+story = "崇光塊價錢牌係排好嘅；Mei 想知第一件價錢至少係 `t` 嘅貨由邊度開始。"
+brief = '''
+`v: Vec<i64>` 升序排好，可能有重複；`t: i64` 可能喺入面，可能唔喺。`i` 係**第一個 ≥ `t` 嘅元素**嘅 index（冇嘅話就係 `v.len()`）—— 經典嘅 lower bound，O(log n)，唔 panic。
+'''
+hints = [
+  "個 slice 分做謂詞成立嘅部分同唔成立嘅部分；回傳嘅 index 係佢唔再成立嘅第一個元素。揀一個對所有*細過* `t` 嘅值都係 true 嘅謂詞。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "rust.cheatsheet.23.pow"
+title = "幾次方"
+story = "銅鑼灣唐樓嘅複息租金：底數嘅幾次方，而個指數嚟到嗰陣闊度唔啱。"
+brief = '''
+`x: u64` 同 `e: u64`，結果裝得落。`p` 係 `x` 嘅 `e` 次方。
+'''
+hints = [
+  "`^` 係 XOR，唔係次方。整數次方嗰個 method 收嘅指數係一個固定闊度，而佢唔係 `u64`。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "rust.cheatsheet.24.read-vec"
+title = "成行"
+story = "渣甸坊最後一部收銀機交出一行用空格分開嘅數字，連換行都有；上游所有嘢都靠呢一次 parse。"
+brief = '''
+`line` 係由 `read_line` 嚟嘅，所以個 `\n` 仲喺度，而且啲數字之間可能**唔止一個空格**。將佢變做 `Vec<i64>`，遇到格式正確嘅一行唔可以 panic。
+
+```
+let v: Vec<i64> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "按一段段空白嚟拆（咁亦會食埋個換行），每個 token parse 完 unwrap，再收集 —— Vec<i64> 係唔可以由 Result 收集出嚟嘅。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "rust.cheatsheet.25.let-mut"
+title = "計數器由十開始"
+story = "渣甸坊間雞蛋仔檔要記住落單嘅累計數，而個數一定要改得到。"
+brief = '''
+將 `y` 宣告做一個裝住 10 嘅**無符號 64 位**整數，令下一行 compile 到：
+
+```
+// ____
+y += 1;
+```
+
+係邊一行？
+'''
+hints = [
+  "兩樣嘢要搞啱：個綁定一定要改得到，而且綁定係用一個 `=` 嚟設嘅，唔係比較嗰個。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "rust.cheatsheet.26.fn-add"
+title = "最後一個字"
+story = "Mei 喺渣甸坊樓上部收銀機度寫一個最細嘅 function，而 compiler 同佢爭拗最後一個字元。"
+brief = '''
+一個 function `add`，收兩個 `i32` 值然後回傳佢哋嘅和，令 `println!("{}", add(2, 3));`
+印出 `5`。成個 function 寫喺一行。
+'''
+hints = [
+  "參數要寫 type，return type 寫喺箭咀後面，而以分號結尾嘅 body 回傳嘅係 `()`。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "rust.cheatsheet.27.sub-slice"
+title = "中間嗰兩個"
+story = "波斯富街隔籬個車廠泊住五架電車；Mei 淨係想睇第二同第三架，而車廠五架都留住。"
+brief = '''
+`v: Vec<i32>` 至少有四個元素。`w` 係一個 `&[i32]`，**啱啱好**借住 index 1 同 2 嘅元素
+—— 兩個元素，唔 copy。
+
+```
+let w: &[i32] = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "對 Vec 用 range index 會得到一個 slice，而 slice 要借住先揸得住。`a..b` 唔包括結尾；`a..=b` 就包括。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "rust.cheatsheet.28.unwrap-or"
+title = "有就有，冇就零"
+story = "銅鑼灣站個儲物櫃板可能冇某個號碼嘅記錄，而個顯示屏仍然要顯示啲嘢。"
+brief = '''
+`o: Option<i32>`。`n` 係一個 `i32`：`o` 入面嘅值，`o` 係 `None` 嘅話就係 0 —— 而且呢一行
+**絕對唔可以 panic**。
+'''
+hints = [
+  "有個 method 係帶後備值咁 unwrap 嘅；個後備值係內層 type 嘅一個普通值，唔係另一個 Option。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "rust.cheatsheet.29.pop-front"
+title = "下一個"
+story = "銅鑼灣格仔地圖上面嘅 BFS 按搵到嘅先後次序攞站 —— 係怡和街嘅小巴隊，唔係一疊碟。"
+brief = '''
+`q: VecDeque<usize>` 係條隊列。個 loop 每一輪**移走**最前嗰個元素，隊列空咗就完結：
+
+```
+while let Some(u) = ____ {
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "VecDeque 有兩頭，而佢啲 method 名會講明係邊一頭。淨係望住個頭而唔攞走佢，就會永遠轉落去。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "rust.cheatsheet.30.char-count"
+title = "數霓虹燈"
+story = "駱克道上面塊招牌寫住銅鑼灣三個字，而 Mei 第一次數出嚟個數大得離譜。"
+brief = '''
+`s: &str` 裝住中文字。`n` 係 `s` 入面**字元**嘅數目 —— 所以 `"銅鑼灣"` 係 3，唔係 9。
+
+```
+let n = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "`&str` 係用 byte 嚟量自己嘅，而一個中文字係三個 byte。量字元，唔係量 byte —— 而且字元 iterator 一早報唔到自己有幾長，淨係知行咗幾多步。",
+]

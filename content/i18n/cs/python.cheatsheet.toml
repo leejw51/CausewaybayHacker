@@ -1,0 +1,438 @@
+# PYTHON LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the
+# prose of `content/python/cheatsheet.toml`, quest by quest, and nothing else.
+# The four choices are code, live in the English pack, and are never
+# translated. Code blocks, identifiers and printed strings are copied verbatim.
+
+pack   = "python.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "python.cheatsheet.01.fast-input"
+title = "RYCHLÝ KOHOUTEK"
+story = "06:30, Jardine's Bazaar. U kiosku čeká milion čísel a input() je pije po doušcích."
+brief = '''
+Po `import sys`: který řádek zařídí, že každé další volání `input()` přečte
+jeden řádek rovnou z bufferu stdin — tou rychlou cestou?
+'''
+hints = [
+  "Přeřaďte jméno na samotnou funkci — nevolejte ji.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "python.cheatsheet.02.star-unpack"
+title = "PUSH, NEBO POP"
+story = "Objednávková obrazovka v dai pai dong dostává z jednoho pageru push 5 i pop."
+brief = '''
+Každý řádek dotazu je buď `push 5`, nebo `pop`. Rozdělte ho na příkaz `cmd` a
+seznam `args` se vším, co následuje (pro `pop` prázdný).
+'''
+hints = [
+  "Jméno s hvězdičkou vlevo nasaje zbytek do seznamu, i když je zbytek prázdný.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "python.cheatsheet.03.precision"
+title = "TŘI MÍSTA"
+story = "Zlatnictví na Hennessy Road udává váhu na tři desetinná místa, ani víc, ani míň."
+brief = '''
+`x = 3.14159`. Vypište `3.142` — přesně tři číslice za desetinnou tečkou.
+'''
+hints = [
+  "Přesnost následuje za tečkou; typ `f` zajistí, že počítá místa za tečkou, ne platné číslice.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "python.cheatsheet.04.reverse-range"
+title = "ODPOČET"
+story = "Silvestr před Times Square: čísla běží dolů a musí dopadnout na nulu."
+brief = '''
+Projděte s `i` hodnoty `n-1, n-2, … 1, 0` — včetně nuly.
+'''
+hints = [
+  "Konec rozsahu se nezahrnuje, takže když jdete dolů k 0, zastavte se o krok za ní.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "python.cheatsheet.05.trunc-div"
+title = "PODLAHA JE NÍŽ"
+story = "Vrácení minus sedmi dolarů na dva. Stará pokladna v C říká -3, pythonovský floor říká něco jiného."
+brief = '''
+`a = -7` a `b = 2`. Ať je `q` celé číslo `-3`: vydělte a usekněte směrem k
+nule, jako to dělá C.
+'''
+hints = [
+  "`//` zaokrouhluje dolů, takže záporná čísla klesnou na -4. `int()` z floatu zahodí desetiny směrem k nule.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "python.cheatsheet.06.grid"
+title = "ODDĚLENÁ PATRA"
+story = "Garáže pod World Trade Centre mají n pater po m místech. Zaparkujete v jednom a zaplní se všechna."
+brief = '''
+Vytvořte `g`, mřížku nul o `n` řádcích a `m` sloupcích, kde změna `g[0][0]`
+změní jen tu jednu buňku.
+'''
+hints = [
+  "Násobení seznamu seznamů opakuje tentýž vnitřní seznam. Každý řádek vytvořte nový.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "python.cheatsheet.07.count"
+title = "ČÁRKOVÁNÍ"
+story = "Dai pai dong počítá objednávky podle jídla a nové jídlo začíná na nule."
+brief = '''
+`d` je obyčejný `dict`. Přičtěte jedničku k počtu pro klíč `k`, a pokud tam
+ještě není, začněte od 0.
+'''
+hints = [
+  "Indexování chybějícího klíče vyhodí KeyError. `get` bere výchozí hodnotu.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "python.cheatsheet.08.two-keys"
+title = "NEJVYŠŠÍ PRVNÍ, PAK PODLE ABECEDY"
+story = "Žebříček v herně v suterénu Soga: nejvyšší skóre nahoře, při shodě podle jména."
+brief = '''
+`a` je seznam n-tic `(name, score)`. Seřaďte ho na místě: skóre **sestupně**
+a při stejném skóre jméno **vzestupně**.
+'''
+hints = [
+  "Negace čísla obrátí jen ten jeden klíč; `reverse=True` obrátí všechny klíče najednou.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "python.cheatsheet.09.tuple-key"
+title = "UŽ JSEM TU BYL"
+story = "Křídové značky na zdech schodiště činžáku na Lockhart Road: tohle odpočívadlo je prohledané."
+brief = '''
+`seen = set()`. Označte buňku mřížky v řádku `r` a sloupci `c` jako navštívenou.
+'''
+hints = [
+  "Prvky množiny musí být hashovatelné: n-tice je, seznam není. `add` bere jeden prvek.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "python.cheatsheet.10.max-heap"
+title = "NEJVĚTŠÍ NAHOŘE"
+story = "VIP fronta klubu v Causeway Bay pouští dovnitř nejdřív toho, kdo nejvíc utrácí. heapq umí dát nahoru jen to nejmenší."
+brief = '''
+`h` je obyčejný seznam používaný přes `heapq` a hodnoty se čtou zpět pomocí
+`-heapq.heappop(h)`. Vložte číslo `x` tak, aby **největší** vyšlo první.
+'''
+hints = [
+  "heapq je min-halda. Uložte hodnotu se záporným znaménkem a při vyjmutí ji znovu otočte.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "python.cheatsheet.11.nonlocal"
+title = "POČITADLO"
+story = "Vrátného ruční počitadlo: každé stisknutí změní číslo, které drží o jeden rozsah vně."
+brief = '''
+`inc` musí přičíst jedničku k `cnt`, které patří `outer`. Který řádek patří
+do mezery?
+
+```
+def outer():
+    cnt = 0
+    def inc():
+        # ____
+        cnt += 1
+```
+'''
+hints = [
+  "Přiřazení do jména z něj udělá lokální proměnnou, pokud není deklarováno jinak. Obklopující funkce není modul.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "python.cheatsheet.12.sentinels"
+title = "KAŽDÉMU JEDEN"
+story = "Čtyři kurýři čekají v zadní místnosti na Percival Street na balíky. Až je práce hotová, každému zvlášť se musí říct, že může jít domů."
+brief = '''
+Čtyři pracovní vlákna každé opakují `j = q.get()` a udělají `break`, když
+`j is None`. Který řádek po vložení všech úloh producentem zastaví **všechna**
+vlákna, aby se joiny vrátily?
+
+```
+for i in range(20): q.put(i)
+# ____
+for t in ts: t.join()
+```
+'''
+hints = [
+  "Jednu zarážku si vezme právě jeden worker. Spočítejte workery.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "python.cheatsheet.13.parse-ints"
+title = "ŘÁDEK Z ÚČTENKY"
+story = "Jedna role z pokladny na mokré tržnici na Bowrington Road: ceny v řadě, oddělené mezerami, a součet je splatný, než stánek zavře."
+brief = '''
+`s = "3 1 4 1 5"`. Udělejte z `a` skutečný `list` těch pěti celých čísel, aby na něm
+fungovalo `len(a)`, `a[-1]` i `sum(a)`.
+'''
+hints = [
+  "Nejdřív rozdělte podle bílých znaků, pak každý kousek převeďte — a pamatujte, že `map` je líný, není to seznam.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "python.cheatsheet.14.new-sign"
+title = "NOVÝ NÁPIS"
+story = "Neon nad nudlovým bistrem na Jaffe Road hlásá HELLO; majitel chce JELLO a neonová trubice se na místě ohnout nedá."
+brief = '''
+`s = "hello"`. Po tomto řádku musí být `s` rovno `"jello"`: první písmeno
+vyměněné za `"j"`, zbytek zachovaný.
+'''
+hints = [
+  "`str` se na místě změnit nedá — postavte nový a jméno znovu navažte. Volání, které vrací nový řetězec, nedělá nic, pokud si výsledek nenecháte.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "python.cheatsheet.15.glue"
+title = "JEDNA DLOUHÁ STUHA"
+story = "Tiskárna v lékárně na Hennessy Road chrlí sto tisíc malých štítků; zákazník je chce jako jeden pás, bez mezer."
+brief = '''
+Smyčka provedla `parts.append(piece)` stotisíckrát, takže `parts` je
+dlouhý seznam řetězců. Po smyčce udělejte z `s` všechny slepené
+dohromady bez čehokoli mezi nimi, v lineárním čase.
+'''
+hints = [
+  "Metodu vlastní oddělovací řetězec a bere celý seznam jako svůj jediný argument.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "python.cheatsheet.16.prefix-sums"
+title = "PRŮBĚŽNÝ SOUČET"
+story = "Průvodčí tramvaje na Yee Wo Street vede průběžný součet jízdného od vozovny, s nulou zapsanou před první zastávkou."
+brief = '''
+`from itertools import accumulate` je provedeno a `a = [1, 2, 3]`. Udělejte z
+`pre` seznam `[0, 1, 3, 6]` — prefixové součty s nulou na začátku, aby
+platilo `sum(a[l:r]) == pre[r] - pre[l]`.
+'''
+hints = [
+  "`accumulate` vydává líně — není to seznam, dokud z něj seznam neuděláte — a počáteční nulu musíte přidat sami.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "python.cheatsheet.17.orderable"
+title = "KDO JDE PRVNÍ"
+story = "Kuchyně cha chaan tengu v Causeway Bay drží objednávky v haldě; lístek s nejbližším termínem musí vyplout nahoru sám."
+brief = '''
+Objekty `Job` se vkládají do seznamu `heapq` přímo, nezabalené do
+n-tic. Který řádek dekorátoru udělá dvě úlohy porovnatelné přes `<`,
+první pole napřed, aby nejmenší `due` skončilo na `h[0]`?
+
+```
+# ____
+class Job:
+    due: int
+    name: str
+
+h = []
+heapq.heappush(h, Job(3, "tea"))
+heapq.heappush(h, Job(1, "rice"))
+```
+'''
+hints = [
+  "Holý dekorátor vám dá `__init__`, `__repr__` a `__eq__` — porovnávací metody jsou schované za přepínačem.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "python.cheatsheet.18.zero-is-real"
+title = "NULA JE ODPOVĚĎ"
+story = "V dai pai dongu je \"nula chilli\" objednávka, ne pokrčení ramen — jen prázdný lístek znamená, co dává kuchyně standardně."
+brief = '''
+`limit` je parametr, který může být libovolné celé číslo, **včetně `0`**, a ta
+musí zůstat `0`. Jen když je `None`, má se z něj stát `100`. Který řádek
+to udělá?
+'''
+hints = [
+  "`0`, `\"\"` i `[]` jsou všechno falsy, takže test pravdivosti nulu od chybějící hodnoty nerozezná. Na `None` se ptejte identitou.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "python.cheatsheet.19.ripples"
+title = "VLNKY"
+story = "Déšť se valí z Victoria Parku blok po bloku; voda dorazí do blízkých ulic dřív než do vzdálených a mapa musí říct, kolik bloků to každé trvalo."
+brief = '''
+BFS v mřížce: `dist` musí obsahovat **nejkratší** počet kroků od
+`(sr, sc)`, takže buňky se musí vybírat v pořadí, v jakém přišly, v
+O(1). Který řádek patří do mezery?
+
+```
+q = deque([(sr, sc)]); dist[sr][sc] = 0
+while q:
+    # ____
+    for dr, dc in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < n and 0 <= nc < m and dist[nr][nc] == -1:
+            dist[nr][nc] = dist[r][c] + 1
+            q.append((nr, nc))
+```
+'''
+hints = [
+  "Deque odebírá z obou konců v O(1); který konec vezmete, rozhoduje, zda je to fronta, nebo zásobník.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "python.cheatsheet.20.inverse-toll"
+title = "INVERZNÍ MÝTNÉ"
+story = "Poslední brána Cross-Harbour Tunnelu účtuje modulární aritmetikou a úředník v budce potřebuje to jediné číslo, které `a` vrátí zpět — a modul dnes v noci není prvočíslo."
+brief = '''
+`m = 1 << 32` — **není** prvočíslo — a `a` je liché, takže `gcd(a, m) == 1`
+a inverze existuje. Udělejte z `inv` celé číslo v `range(m)`, pro které
+`(inv * a) % m == 1`, jediným voláním (Python 3.8+).
+'''
+hints = [
+  "Malá Fermatova věta potřebuje prvočíselný modul. Vestavěná funkce se třemi argumenty přijme záporný exponent a nejde přes floaty.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "python.cheatsheet.21.swap"
+title = "VÝMĚNA MÍST"
+story = "Dvě stoličky u pultu dai pai dong na Jardine's Bazaar; štamgasti si chtějí vyměnit místa a třetí stolička, na kterou by se dalo odskočit, není."
+brief = '''
+`a = 1` a `b = 2`. Vyměňte je na jednom řádku, bez pomocného jména,
+aby potom `a == 2` a `b == 1`.
+'''
+hints = [
+  "Celá pravá strana se sestaví dřív, než se změní kterékoli jméno vlevo — a pozor, jedno `=` přiřazuje, zatímco dvě jen porovnávají.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "python.cheatsheet.22.append"
+title = "JEŠTĚ JEDEN NA HROMADU"
+story = "Lékárna na Hennessy Road hází každý nový recept navrch hromady a hromada by tam potom měla pořád být."
+brief = '''
+`a = [1, 2]` a `x = 3` (int). Dejte `x` na konec, aby potom
+`a` byl pořád seznam a četl `[1, 2, 3]`.
+'''
+hints = [
+  "Metoda mění seznam na místě a vrací None — nenechávejte si, co vrátí, a nekrmte `+=` intem.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "python.cheatsheet.23.return"
+title = "PŘEDEJTE TO"
+story = "Pokladní na mokrém trhu na Bowrington Road sčítá dvě ceny na útržku papíru; dokud papír nepředá, zákazník odejde s ničím."
+brief = '''
+Definujte `add` na jednom řádku tak, aby `add(2, 3)` **bylo** celé číslo `5` —
+hodnota, kterou si volající může nechat, ne `None` a ne něco na obrazovce.
+'''
+hints = [
+  "Spočítat hodnotu nebo ji vypsat není totéž co ji vrátit; funkce bez výslovného return vrací None.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "python.cheatsheet.24.copy"
+title = "VLASTNÍ KOPIE"
+story = "Dva stánky na Jardine's Bazaar sdílejí jeden ceník na jednom clipboardu; když jeden načmárá změnu, změní se i ceny druhého."
+brief = '''
+`a = [1, 2, 3]` a nic není importované. Udělejte z `b` samostatný seznam
+se stejnými třemi položkami, aby `b.append(4)` nechalo `a` jako `[1, 2, 3]`.
+'''
+hints = [
+  "Přiřazení nikdy nekopíruje — dá témuž seznamu druhé jméno. Seznam se umí sám duplikovat, pod pythonovským jménem, ne rustovým — a bez importu žádná samostatná funkce toho jména neexistuje.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "python.cheatsheet.25.sort-desc"
+title = "NEJVĚTŠÍ ÚTRATA PRVNÍ"
+story = "Herna v suterénu Soga znovu tiskne svou tabuli skóre a změnit se musí tabule sama — ne její fotokopie."
+brief = '''
+`a = [3, 1, 2]`. Po tomto jednom řádku musí být `a` samo seznamem
+`[3, 2, 1]` — největší první.
+'''
+hints = [
+  "Jeden z nich postaví nový seznam a zahodí ho, jeden zahodí starý seznam a jeden ho jen otočí.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "python.cheatsheet.26.bounds"
+title = "UVNITŘ PLOTU"
+story = "n lamp ve Victoria Parku je číslováno od nuly; aplikace údržby musí odmítnout číslo, které přečuhuje na kterémkoli konci."
+brief = '''
+`a` má `n` položek, indexovaných `0 … n-1`. Který řádek s `if` je pravdivý přesně
+tehdy, když je `i` platný index do `a`?
+'''
+hints = [
+  "Python řetězí porovnání, takže obě meze se vejdou do jednoho zápisu bez `and` — pozor, který konec se počítá a který ne.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "python.cheatsheet.27.empty"
+title = "NIC NA POLICI"
+story = "7-Eleven na Yee Wo Street kontroluje polici, než doplní zboží; prázdná police, ne chybějící."
+brief = '''
+`a` je vždy seznam — nikdy `None`. Který řádek s `if` spustí své tělo
+přesně tehdy, když `a` nemá žádné položky?
+'''
+hints = [
+  "Prázdný kontejner je sám o sobě nepravdivý. `is` porovnává identitu a čerstvý literál `[]` nikdy není tentýž objekt jako `a`.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "python.cheatsheet.28.mirror"
+title = "ZRCADLOVÝ NÁPIS"
+story = "Neon nad nudlovým bistrem na Jaffe Road se čte z ulice; zrcadlo ve výloze ho ukazuje pozpátku jako druhý nápis a ten první zůstává nedotčený."
+brief = '''
+`s = "stressed"`. Udělejte z `r` `str` `"desserts"` — `s` pozpátku —
+a `s` nechte, jak bylo.
+'''
+hints = [
+  "Řetězce nemají metodu na otočení a vestavěná funkce dá iterátor, ne str. Řez se záporným krokem jde pozpátku.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "python.cheatsheet.29.raise"
+title = "POŠLETE TO NAHORU"
+story = "Zlatnictví na Hennessy Road odmítá váhu pod nulou; prodavačka nepokrčí rameny — zavolá vedoucího a prodej se zastaví."
+brief = '''
+`w` je záporné. Který řádek zastaví funkci právě tady a pošle
+`ValueError` se zprávou `bad weight` nahoru tomu, kdo volal?
+'''
+hints = [
+  "To klíčové slovo není to z rodiny C, podoba s čárkou z Pythonu 2 se už neparsuje a zdvořilé vrácení objektu výjimky nic nezastaví.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "python.cheatsheet.30.short-list"
+title = "KRÁTKÝ SEZNAM"
+story = "Závěrečné sčítání dai pai dong: jen jídla, která se prodala, se zdvojnásobí na zítřejší přípravu, a ta, která se neprodala, se ze seznamu úplně vynechají."
+brief = '''
+`a = [3, -1, 4, 0]`. Udělejte z `b` seznam `[6, 8]`: každá kladná položka
+zdvojnásobená, nekladné **vynechané** — takže `len(b)` je počet
+kladných, ne `len(a)`.
+'''
+hints = [
+  "Filtr jde na konec komprehenze. If-else na začátku je hodnota a ponechá každou položku.",
+]

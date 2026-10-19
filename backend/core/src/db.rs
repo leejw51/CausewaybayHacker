@@ -126,6 +126,16 @@ pub const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0024_frameworks",
         include_str!("../migrations/0024_frameworks.sql"),
     ),
+    (
+        25,
+        "0025_cheatsheet",
+        include_str!("../migrations/0025_cheatsheet.sql"),
+    ),
+    (
+        26,
+        "0026_cheatsheet_advanced",
+        include_str!("../migrations/0026_cheatsheet_advanced.sql"),
+    ),
 ];
 
 pub fn latest_version() -> i64 {

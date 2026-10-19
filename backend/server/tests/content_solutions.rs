@@ -78,6 +78,10 @@ fn check_land(land: &str) {
         }
         let pack: Pack = toml::from_str(&std::fs::read_to_string(&path).unwrap())
             .unwrap_or_else(|e| panic!("{} is not a pack: {e}", path.display()));
+        if cwbhacker_core::ids::is_sheet(&pack.category) {
+            // Nothing on the sheet roads is compiled: the pick is the answer.
+            continue;
+        }
         for quest in &pack.quests {
             checked += 1;
             let tests = serde_json::to_value(&quest.tests).unwrap();

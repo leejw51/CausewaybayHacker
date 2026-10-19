@@ -60,7 +60,9 @@ SCRATCH = pathlib.Path(
 )
 CACHE = pathlib.Path(os.environ.get("CWBHACKER_CI_CACHE", _root / "cache"))
 
-ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix|zig|lua)\.(verybasic|basic|advanced|hacker|frameworks)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
+# The two sheet roads (SPEC §0): the quiz is the quest, nothing is compiled.
+SHEETS = ("cheatsheet", "cheatsheet_advanced")
+ID_RE = re.compile(r"^(rust|go|cpp|python|pytorch|typescript|remix|zig|lua)\.(cheatsheet|cheatsheet_advanced|verybasic|basic|advanced|hacker|frameworks)\.(\d{2})\.([a-z0-9]+(?:-[a-z0-9]+)*)$")
 
 # The crate shelf (SPEC §5.1): `backend/runner/shelf/Cargo.toml` names every
 # crate a Rust quest may `use`, pinned, and the lockfile beside it is copied
@@ -549,6 +551,15 @@ def structural(pack, path, vocab):
         if mp.get("kind") not in ("quest", "boss", "gate"):
             errs.append(f"{qid}: map.kind {mp.get('kind')!r} invalid")
         pts.append((mp["x"], mp["y"]))
+        if cat in SHEETS:
+            errs += cheatsheet_quiz(q)
+            if land == "remix" and q.get("lang") not in REMIX_LANGS:
+                errs.append(f"{qid}: a remix quest needs lang = go | rust | python, "
+                            f"got {q.get('lang')!r}")
+            elif land != "remix" and "lang" in q and q["lang"] != land:
+                errs.append(f"{qid}: lang {q['lang']!r} in the {land} land; only remix "
+                            f"quests name a language of their own")
+            continue
         t = q["tests"]
         if t.get("harness", "stdio") not in ("stdio", "cargo", "gotest"):
             errs.append(f"{qid}: bad harness")
@@ -650,7 +661,7 @@ def structural(pack, path, vocab):
         elif "lang" in q and q["lang"] != land:
             errs.append(f"{qid}: lang {q['lang']!r} in the {land} land; only remix "
                         f"quests name a language of their own")
-    if land == "remix":
+    if land == "remix" and cat not in SHEETS:
         errs += remix_trios(quests)
     # map layout: not a straight line, no two nodes on top of each other
     for i in range(len(pts)):
@@ -673,6 +684,37 @@ def structural(pack, path, vocab):
     if turns < len(pts) // 2:
         errs.append(f"map: only {turns} direction changes over {len(pts)} nodes — too straight")
     return errs, turns
+
+
+def cheatsheet_quiz(q):
+    """CHEATSHEET: the quiz is the quest. Four distinct choices, the answer
+    one of them and the solution that answer, the answer not given away in
+    the brief, and no tests and no clock — nothing on this road is compiled;
+    the server judges the pick against the choice."""
+    qid = q["id"]
+    errs = []
+    quiz = q.get("quiz")
+    if not quiz:
+        return [f"{qid}: a cheatsheet quest needs [quest.quiz]"]
+    choices = quiz.get("choices", [])
+    answer = quiz.get("answer", -1)
+    if len(choices) != 4:
+        errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
+    if not isinstance(answer, int) or not 0 <= answer < len(choices):
+        return errs + [f"{qid}: quiz.answer {answer!r} out of range"]
+    stripped = [c.strip() for c in choices]
+    if len(set(stripped)) != len(stripped) or "" in stripped:
+        errs.append(f"{qid}: empty or duplicate choices")
+    right = stripped[answer]
+    if q.get("solution", "").strip() != right:
+        errs.append(f"{qid}: solution is not the right choice {right!r}")
+    if right in q["brief"]:
+        errs.append(f"{qid}: the answer is given away in the brief")
+    if q.get("tests"):
+        errs.append(f"{qid}: a cheatsheet quest has no tests; nothing runs on that road")
+    if q.get("time_limit_s"):
+        errs.append(f"{qid}: non-hacker quest with time_limit_s")
+    return errs
 
 
 def remix_trios(quests):
@@ -913,6 +955,13 @@ def main(argv):
         print(f"  {'node':>4} {'id':<34} {'sol':<10} {'cases':>7} "
               f"{'starter':<14} {'vis':>3} {'concepts'}")
         for q in pack["quest"]:
+            if pack["category"] in SHEETS:
+                # Nothing to build: the pick is judged against the quiz,
+                # and `structural` has already checked the quiz.
+                for c in q.get("concepts", []):
+                    concept_use.setdefault(c, set()).add(q["id"])
+                print(f"  {q['node']:>4} {q['id']:<34} {'QUIZ':<10}")
+                continue
             wd_s = SCRATCH / f"{q['id']}.sol"
             wd_t = SCRATCH / f"{q['id']}.start"
             lang = quest_lang(pack, q)

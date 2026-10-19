@@ -1,0 +1,659 @@
+# REMIX LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/remix/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "remix.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "remix.cheatsheet_advanced.01.handoff-go"
+title = "PŘEDEJ TO DÁL"
+story = "06:50, Jardine's Bazaar. Mei chce po kiosku jedno číslo a kiosek čeká, až si ho vezme, dřív než ho vůbec spočítal."
+brief = '''
+V **Go** má `main` `ch := make(chan int)` — **bez bufferu** — a později
+udělá `x := <-ch`. `compute()` vrací `int`. Který řádek, vložený mezi tyto
+dva, doručí výsledek `compute()` do `x`, aniž by `main` uvázl v deadlocku?
+'''
+hints = [
+  "Odeslání do kanálu bez bufferu blokuje, dokud někdo nepřijímá. Odesílatel musí být jiná goroutine než příjemce.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "remix.cheatsheet_advanced.02.handoff-rust"
+title = "PŘEDEJ TO DÁL, FERRISI"
+story = "Ferris nese totéž číslo přes pult Lucky Macu a pult mu nedovolí si tác jen půjčit."
+brief = '''
+V **Rustu** je `let (tx, rx) = mpsc::channel::<i32>();` a `main` končí
+řádkem `let v = rx.recv().unwrap();`. `compute()` vrací `i32`. Který řádek,
+vložený mezi ty dva, spustí vlákno, které doručí výsledek `compute()` do `v`
+— a zkompiluje se?
+'''
+hints = [
+  "Spuštěný uzávěr může přežít rámec zásobníku main, takže si odesílatele nemůže vypůjčit; musí ho vlastnit.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "remix.cheatsheet_advanced.03.handoff-python"
+title = "PŘEDEJ TO DÁL, POMALU"
+story = "Python u cenové tabule na mokrém trhu dostává totéž číslo potřetí, tentokrát na vlákně, a to vlákno se musí doopravdy spustit."
+brief = '''
+V **Pythonu** je `q = queue.Queue()` a `main` končí řádkem `v = q.get()`.
+`compute()` vrací `int`. Který řádek, vložený mezi ty dva, spustí `compute()`
+na **novém vlákně** a doručí jeho výsledek do `v` — takže `q.get()` vrátí
+hodnotu, místo aby čekal navěky?
+'''
+hints = [
+  "`target` chce něco volatelného bez argumentů, a Thread, který je vytvořen, ale nikdy nespuštěn, nedělá nic.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "remix.cheatsheet_advanced.04.counter-go"
+title = "PO JEDNOM"
+story = "Počítadlo objednávek šéfkuchaře Bo v Lucky Macu: dva kuchaři, tisíc čárek každý, a na tabuli musí být přesně dva tisíce."
+brief = '''
+V **Go**,
+
+```
+type C struct {
+    mu sync.Mutex
+    n  int
+}
+
+func (c *C) Inc() {
+    // ____
+    c.n++
+}
+```
+
+Dvě goroutines volají `Inc` každá 1000krát. Který řádek zajistí, že `c.n`
+bude při každém běhu přesně 2000, projde čistě pod `go test -race` a nikdy
+nenechá mutex zamčený?
+'''
+hints = [
+  "Samotná inkrementace musí proběhnout pod drženým zámkem a odemknutí musí být naplánované na chvíli, kdy metoda skončí.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "remix.cheatsheet_advanced.05.counter-rust"
+title = "PO JEDNOM, FERRISI"
+story = "Čtyři krabi, jedno počítadlo, Yee Wo Street. Ferris drží strážce v klepetu, a stejně k němu nemůže nic přičíst."
+brief = '''
+V **Rustu** je `let counter = Arc::new(Mutex::new(0));` a každé spuštěné
+vlákno drží `let c = Arc::clone(&counter);`. Který řádek uvnitř smyčky
+vlákna přičte ke sdílenému číslu jedničku — a zkompiluje se?
+'''
+hints = [
+  "Zamknutí vrací Result; uvnitř je strážce a ten se před aritmetikou musí dereferencovat.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "remix.cheatsheet_advanced.06.counter-python"
+title = "PO JEDNOM, ŘEKL GIL"
+story = "Místnost 7-32 počítá lístky noční směny na čtyřech vláknech; GIL o `+=` neslibuje vůbec nic."
+brief = '''
+V **Pythonu** je `lock = threading.Lock()` jediný zámek, který sdílejí
+všechna vlákna, a `n = 0` je globální:
+
+```
+def work():
+    global n
+    for _ in range(100_000):
+        # ____
+            n += 1
+```
+
+Čtyři vlákna spouštějí `work`. Který řádek zajistí, že `n` bude při každém
+běhu přesně 400000 — každé vlákno se střídá na **tomtéž** zámku?
+'''
+hints = [
+  "Objekt zámku je sám o sobě kontextový manažer; to, co vrací acquire(), kontextový manažer není.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "remix.cheatsheet_advanced.07.wait-go"
+title = "VŠICHNI ČTYŘI ZPÁTKY"
+story = "Čtyři kurýři vyrážejí z depa na Sugar Street; dveře se zamknou, až když se každý z nich zapíše zpět."
+brief = '''
+V **Go** (1.22, takže `i` je v každé iteraci nové):
+
+```
+var wg sync.WaitGroup
+for i := 0; i < 4; i++ {
+    wg.Add(1)
+    // ____
+}
+wg.Wait()
+```
+
+Který řádek spustí `work(i)` na vlastní goroutine tak, aby se `wg.Wait()`
+vrátilo přesně tehdy, když všechna čtyři volání `work` **doběhla** — bez
+deadlocku, bez předčasného návratu?
+'''
+hints = [
+  "Něco musí zavolat Done poté, co work skončí, na té goroutine, která práci dělala, a příkaz go potřebuje volání.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "remix.cheatsheet_advanced.08.wait-rust"
+title = "VŠICHNI ČTYŘI ZPÁTKY, FERRISI"
+story = "Ferris půjčuje vlastní ceník stánku třem pomocníkům naráz a chce ho zpátky, bez boxování, než se stáhne roleta."
+brief = '''
+V **Rustu** je `let v = vec![1, 2, 3];` a `fn work(x: &i32) -> i32`:
+
+```
+thread::scope(|s| {
+    for x in &v {
+        // ____
+    }
+});
+```
+
+Který řádek spustí jedno vlákno na prvek, které si `v` vypůjčí přímo — bez
+`Arc`, bez `'static` — a je připojeno (joined), když scope skončí?
+'''
+hints = [
+  "Spouštěj přes handle scope, ne přes volnou funkci, a dej mu uzávěr, ne hodnotu.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "remix.cheatsheet_advanced.09.wait-python"
+title = "VŠICHNI ČTYŘI ZPÁTKY, V POŘADÍ"
+story = "Python rozdá čtyři úkoly nosičům na trhu a chce účtenky zpátky v tom pořadí, v jakém úkoly odešly."
+brief = '''
+V **Pythonu** je `jobs` seznam a `work(j)` vrací `int`:
+
+```
+with ThreadPoolExecutor(4) as ex:
+    # ____
+print(out[0], len(out))
+```
+
+Který řádek spustí `work` nad `jobs` na vláknech poolu a nechá v `out`
+**seznam výsledků** v pořadí úkolů, takže `print` funguje?
+'''
+hints = [
+  "Vlastní map executoru zachovává pořadí, ale vrací líný iterátor; submit vrací futures. Ani jedno nejde indexovat.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "remix.cheatsheet_advanced.10.shape-go"
+title = "KDO JE TVAR"
+story = "Alex na Percival Street vystřihl z půdorysu Times Square čtverec a kompilátor tvrdí, že to není tvar."
+brief = '''
+V **Go**,
+
+```
+type Shape interface{ Area() float64 }
+
+type Sq struct{ s float64 }
+
+func (q *Sq) Area() float64    { return q.s * q.s }
+func (q *Sq) Scale(k float64)  { q.s *= k }
+```
+
+Který řádek vloží čtverec 2×2 do `s` — a zkompiluje se?
+'''
+hints = [
+  "Podívej se na receivery. Množina metod patří typu, na kterém byly deklarované, a hodnota Sq tím typem není.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "remix.cheatsheet_advanced.11.shape-rust"
+title = "KDO JE TVAR, FERRISI"
+story = "Ferris má trait napsaný na ubrousku z Lucky Macu; čtverec ho jen musí podepsat."
+brief = '''
+V **Rustu**,
+
+```
+trait Shape {
+    fn area(&self) -> f64;
+    fn describe(&self) -> String { format!("{:.1}", self.area()) }
+}
+
+struct Sq { s: f64 }
+// ____
+```
+
+Který řádek zajistí, že `Sq { s: 2.0 }.describe()` dá `"4.0"`?
+'''
+hints = [
+  "Trait se implementuje pro typ, nikdy naopak, a receiver metody se musí přesně shodovat s tím v traitu.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "remix.cheatsheet_advanced.12.shape-python"
+title = "KDO JE TVAR, KVÁKÁ TO"
+story = "Pythonovi je jedno, z čeho čtverec dědí, jen aby odpovídal na `area` — a `isinstance` to chce písemně."
+brief = '''
+V **Pythonu** 3.12 je `Sq` obyčejná třída s metodou `area(self) -> float`
+a bez základních tříd:
+
+```
+# ____
+class Shape(Protocol):
+    def area(self) -> float: ...
+```
+
+Importy nejsou ukázány. Který řádek patří do díry, aby
+`isinstance(Sq(2), Shape)` odpovědělo `True`, místo aby vyhodilo `TypeError`?
+'''
+hints = [
+  "Protocol je statický slib, dokud ho neoznačíš jako něco, co smí interpret kontrolovat za běhu; to označení bydlí v `typing`.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "remix.cheatsheet_advanced.13.generic-go"
+title = "VĚTŠÍ Z LIBOVOLNÝCH DVOU"
+story = "Zlatnictví na Percival Street porovnává ceny, váhy i jména dvou zákazníků jedinou funkcí."
+brief = '''
+V **Go** 1.22 se musí zkompilovat `Max(3, 7)`, `Max(1.5, 0.5)` i
+`Max("a", "b")`:
+
+```
+// ____
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+Který řádek se signaturou to zajistí?
+'''
+hints = [
+  "`>` potřebuje omezení, které slibuje uspořádání; samotná rovnost nestačí a `any` neslibuje nic.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "remix.cheatsheet_advanced.14.generic-rust"
+title = "VĚTŠÍ Z LIBOVOLNÝCH DVOU, FERRISI"
+story = "Ferrisova verze musí porovnat i dvě ceny s plovoucí čárkou, a floaty se odmítají nechat úplně uspořádat."
+brief = '''
+V **Rustu** se musí zkompilovat `max(1.5, 2.5)` i `max("a", "b")`:
+
+```
+// ____
+    if a > b { a } else { b }
+}
+```
+
+Který řádek se signaturou to zajistí?
+'''
+hints = [
+  "`f64` implementuje jen trait částečného uspořádání; bound, který vyžaduje úplné uspořádání, ho odmítne.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "remix.cheatsheet_advanced.15.generic-python"
+title = "VĚTŠÍ Z LIBOVOLNÝCH DVOU, S BOUNDEM"
+story = "Pythonův typový checker chce vědět, co znamená `<`, než pustí dvě ceny dál."
+brief = '''
+V **Pythonu** 3.12 je `Comparable` `Protocol` s `__lt__`:
+
+```
+from typing import TypeVar
+
+# ____
+
+def smallest(a: T, b: T) -> T:
+    return a if a < b else b
+```
+
+Který řádek deklaruje `T` tak, aby se směly použít jen typy, které jsou
+`Comparable` — a nevyhodí výjimku při importu modulu?
+'''
+hints = [
+  "TypeVar bere nejdřív svoje jméno; potom jde jeden horní typ do pojmenovaného argumentu, zatímco holé poziční typy jsou constraints a musí být aspoň dva.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "remix.cheatsheet_advanced.16.closure-go"
+title = "LÍSTKOVÝ AUTOMAT"
+story = "Automat na pořadová čísla v bance na Hennessy Road: každé stisknutí je o jedna víc než to minulé a počet nikdo jiný nevidí."
+brief = '''
+V **Go**,
+
+```
+func counter() func() int {
+    c := 0
+    // ____
+}
+```
+
+`next := counter(); next(); next()` musí dát 1 a pak 2. Který řádek patří
+do díry?
+'''
+hints = [
+  "Uzávěr musí měnit vnější `c`, ne deklarovat nové ve vlastním rozsahu, a `++` je v Go příkaz, ne hodnota.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "remix.cheatsheet_advanced.17.closure-rust"
+title = "LÍSTKOVÝ AUTOMAT, FERRISI"
+story = "Ferris staví tentýž automat a borrow checker se ptá, kdo vlastní počet, jakmile se `counter` vrátí."
+brief = '''
+V **Rustu**,
+
+```
+fn counter() -> impl FnMut() -> i32 {
+    let mut c = 0;
+    // ____
+}
+```
+
+`let mut next = counter(); next(); next()` musí dát 1 a pak 2. Který řádek
+patří do díry — a zkompiluje se?
+'''
+hints = [
+  "`c` umírá s rámcem funkce, pokud si ho uzávěr nevezme; a musí se měnit, ne jen číst.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "remix.cheatsheet_advanced.18.closure-python"
+title = "LÍSTKOVÝ AUTOMAT, VNOŘENÝ"
+story = "Pythonův automat pořád tiskne lístek číslo jedna, protože vnitřní funkce si potichu udělala vlastní `c`."
+brief = '''
+V **Pythonu**,
+
+```
+def counter():
+    c = 0
+    def nxt():
+        # ____
+        c += 1
+        return c
+    return nxt
+```
+
+`n = counter(); n(); n()` musí dát 1 a pak 2, bez žádného `c` na úrovni
+modulu. Který řádek patří do díry?
+'''
+hints = [
+  "Přiřazení udělá jméno lokálním pro nejvnitřnější funkci, pokud neřekneš, do kterého obklopujícího rozsahu patří — a modul tím rozsahem není.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "remix.cheatsheet_advanced.19.error-go"
+title = "KTERÝ KLÍČ CHYBĚL"
+story = "Chyba, která dorazí k Alexovi, byla cestou nahoru z cache na Percival Street dvakrát zabalená; on pořád chce ten klíč."
+brief = '''
+V **Go**,
+
+```
+type NotFound struct{ Key string }
+
+func (e *NotFound) Error() string { return e.Key + " not found" }
+
+func load(k string) error {
+    return fmt.Errorf("load: %w", &NotFound{Key: k})
+}
+```
+
+`err := load("tea")`. Který řádek se dostane k `*NotFound` uvnitř `err`
+tak, aby šlo vypsat `nf.Key` — bez paniky?
+'''
+hints = [
+  "Obyčejná typová aserce vidí jen vnější obal. Pomocník pro rozbalení podle *typu* potřebuje ukazatel na proměnnou toho typu.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "remix.cheatsheet_advanced.20.error-rust"
+title = "KTERÝ KLÍČ CHYBĚL, FERRISI"
+story = "Ferris napsal Display chyby ručně na ubrousek z Lucky Macu; `?` ji pořád nechce zaboxovat."
+brief = '''
+V **Rustu**, jen std — žádné crates:
+
+```
+#[derive(Debug)]
+struct NotFound(String);
+
+impl fmt::Display for NotFound { /* "<key> not found" */ }
+
+// ____
+
+fn load(k: &str) -> Result<i32, Box<dyn Error>> {
+    Err(Box::new(NotFound(k.into())))
+}
+```
+
+Který řádek v díře zajistí, že se `load` zkompiluje, takže na něj volající
+mohou použít `?`?
+'''
+hints = [
+  "Když jsou Debug a Display hotové, trait pro chyby už nemá co chtít — ale pořád se musí implementovat, s prázdným tělem.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "remix.cheatsheet_advanced.21.error-python"
+title = "KTERÝ KLÍČ CHYBĚL, A PROČ"
+story = "Python znovu vyhazuje KeyError z trhu jako svou vlastní chybu a traceback musí pořád ukazovat, kde to začalo."
+brief = '''
+V **Pythonu** je `class NotFound(KeyError): pass` a
+
+```
+def load(k):
+    try:
+        return d[k]
+    except KeyError as e:
+        # ____
+```
+
+Volající musí zachytit `NotFound`, jehož `__cause__` **je** ten původní
+`KeyError`. Který řádek patří do díry?
+'''
+hints = [
+  "Vyhození uvnitř bloku except zaznamená kontext automaticky; příčina se musí pojmenovat výslovně a `None` jako příčina ji umlčí.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "remix.cheatsheet_advanced.22.iter-go"
+title = "KLÍČE, SEŘAZENÉ"
+story = "Alex potřebuje názvy jídel z počítadla šéfkuchaře Bo v abecedním pořadí, na jeden řádek, a Go 1.23 mu k tomu právě dalo nástroje."
+brief = '''
+V **Go 1.23** je `m` typu `map[string]int` a `maps` i `slices` jsou
+naimportované. Který řádek dá do `keys` klíče mapy jako `[]string` ve
+vzestupném pořadí — jediným výrazem, a zkompiluje se?
+'''
+hints = [
+  "Od 1.23 balíček maps vrací iterátor, ne slice; balíček slices má funkci, která iterátor spotřebuje a vrátí seřazený slice.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "remix.cheatsheet_advanced.23.iter-rust"
+title = "KDE JE TEN NEJVĚTŠÍ"
+story = "Ferris chce pozici nejvyšší ceny na tabuli na Percival Street, ne tu cenu — a trik s n-ticí ho málem napálí."
+brief = '''
+V **Rustu** je `a` neprázdný `Vec<i32>` s navzájem různými hodnotami,
+třeba `[3, 9, 4, 1]`. `let i = ____;` a pak `a[i]` musí být největší
+hodnota — takže `i` je tady `1`. Který výraz patří do díry?
+'''
+hints = [
+  "Očísluj prvky a pak vezmi maximum *podle hodnoty*, ne podle celé dvojice (index, hodnota) — dvojice se porovnávají nejdřív podle indexu.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "remix.cheatsheet_advanced.24.iter-python"
+title = "VYSYPAT BEDNU"
+story = "Bedny v bednách na trhu na Bowrington Road; python chce každé liči ven, jedno po druhém, líně."
+brief = '''
+V **Pythonu**,
+
+```
+def walk(t):
+    for x in t:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+
+Který řádek zajistí, že `list(walk([1, [2, [3]], 4]))` dá `[1, 2, 3, 4]`?
+'''
+hints = [
+  "Rekurzivní volání vrací generátor; yieldnout ho jako jednu položku není totéž jako předat mu řízení.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "remix.cheatsheet_advanced.25.json-go"
+title = "TAG NA POLÍČKU"
+story = "Členská přihláška ve sportovním centru v Causeway Bay: na drátě malá písmena v klíčích a žádný řádek s věkem pro toho, kdo ho nechal prázdný."
+brief = '''
+V **Go**,
+
+```
+type P struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+
+`json.Marshal(P{Name: "Mei", Age: 35})` musí dát `{"name":"Mei","age":35}`
+a `json.Marshal(P{Name: "Mei"})` musí dát `{"name":"Mei"}`. Který řádek
+s políčkem patří do díry?
+'''
+hints = [
+  "Název klíče a volba bydlí v týchž uvozovkách, oddělené čárkou; klíč je napsaný přesně tak, jak se má objevit.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "remix.cheatsheet_advanced.26.json-rust"
+title = "ZÁVORKY, ZDVOJENÉ"
+story = "Na notebooku v Lucky Macu žádné crates, takže Ferris píše JSON ručně a formátovací řetězec mu žere složené závorky."
+brief = '''
+V **Rustu**, jen std — žádné serde. `p.name` je `String` `"Mei"` a
+`p.age` je `u32` `35`. Který výraz sestaví `String`
+`{"name":"Mei","age":35}` — číslo, ne číslo v uvozovkách — a zkompiluje se?
+'''
+hints = [
+  "Doslovná složená závorka se ve formátovacím řetězci píše dvakrát; jedna otevírá zástupný symbol.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "remix.cheatsheet_advanced.27.json-python"
+title = "VNOŘENÁ DATACLASS"
+story = "Adresa Mei je dataclass uvnitř dataclass a `json` odmítá nahlédnout do kterékoli z nich bez pomoci."
+brief = '''
+V **Pythonu**,
+
+```
+@dataclass
+class Addr:
+    street: str
+    floor: int
+
+@dataclass
+class P:
+    name: str
+    addr: Addr
+```
+
+`p = P("Mei", Addr("Jardine's Bazaar", 5))`. Který řádek dá do `s` text
+JSON `{"name": "Mei", "addr": {"street": "Jardine's Bazaar", "floor": 5}}`
+— dvojité uvozovky, vnořený objekt a všechno?
+'''
+hints = [
+  "`json` zná jen dicty a listy; modul dataclasses má převodník, který rekurzivně prochází vnořené dataclasses, zatímco `vars` se zastaví na první úrovni.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "remix.cheatsheet_advanced.28.match-go"
+title = "JEDEN TYP NA CASE"
+story = "Alex napíše dva celočíselné typy do jednoho case, aby ušetřil řádek, a `v` se mu zpátky promění v interface."
+brief = '''
+V **Go**,
+
+```
+func describe(x any) string {
+    switch v := x.(type) {
+    // ____
+        return strconv.Itoa(v * 2)
+    case string:
+        return v
+    }
+    return "?"
+}
+```
+
+Který řádek s case zajistí, že `describe(21)` vrátí `"42"` — a zkompiluje
+se?
+'''
+hints = [
+  "`v` dostane typ case jen tehdy, když case jmenuje přesně jeden typ; jmenuj dva a `v` je pořád `any`, které se nedá násobit.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "remix.cheatsheet_advanced.29.match-rust"
+title = "MALÉ A LICHÉ, FERRISI"
+story = "Ferris třídí šťastná čísla v chrámu ve Wan Chai: jedna číslice, lichá, a chce si tu číslici podržet, zatímco ji kontroluje."
+brief = '''
+V **Rustu** je `x` typu `Option<i32>`:
+
+```
+match x {
+    // ____ "small odd",
+    Some(_) => "other",
+    None => "none",
+}
+```
+
+Která hlavička větve odpovídá hodnotě od 1 do 9 včetně, která je **lichá**,
+s hodnotou navázanou na `n` pro tu kontrolu?
+'''
+hints = [
+  "Naváž jméno na rozsahový podvzor zavináčem a aritmetiku dej do guardu; Rust nemá ve vzorech žádné `in` ani `as`.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "remix.cheatsheet_advanced.30.match-python"
+title = "BOSS: POZIČNÍ VZORY"
+story = "Poslední uzel, Times Square. Pythonova obyčejná třída nebude odpovídat podle pozice, dokud neřekne, které atributy se počítají a v jakém pořadí."
+brief = '''
+V **Pythonu** 3.12 je `Pt` obyčejná třída — **ne** dataclass:
+
+```
+class Pt:
+    # ____
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+Bez díry vyhodí `case Pt(a, b):`
+`TypeError: Pt() accepts 0 positional sub-patterns`. Který řádek v těle
+třídy zajistí, že `case Pt(a, b):` naváže `a` na `x` a `b` na `y`?
+'''
+hints = [
+  "Přesně na tohle existuje dunder a interpret trvá na tom, že je to n-tice názvů atributů — dataclass ti ho napíše sama.",
+]

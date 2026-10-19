@@ -1,0 +1,498 @@
+# TYPESCRIPT LAND — CHEATSHEET ADVANCED, in Simplified Chinese. A translation pack (SPEC §12.1):
+# the prose of `content/typescript/cheatsheet_advanced.toml`, quest by quest, and nothing else.
+# The question is the brief; the four choices are code and stay English. Code
+# blocks and identifiers are copied verbatim, never translated.
+
+pack   = "typescript.cheatsheet_advanced"
+locale = "zh"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "typescript.cheatsheet_advanced.01.generic-bound"
+title = "凡是有 ID 的"
+story = "19:10，三十楼的控制室。岛上每块屏幕都有一个 id；查找表应该接收任何一份它们的清单，而且不许改动它。"
+brief = '''
+`xs` 是一个 `readonly Screen[]`（也就是 `ReadonlyArray<Screen>`），而 `Screen`
+有 `id: string`。写出泛型函数 `byId` 的开头，它的函数体是
+
+```ts
+return new Map(xs.map(x => [x.id, x] as const));
+```
+
+它必须接受 `xs` —— 以及任何其他元素带有字符串 `id` 的只读数组 —— 并让那个
+函数体能编译。`strict` 已开启。
+'''
+hints = [
+  "光秃秃的 `T` 没有 `id`；给参数一个约束。而且只读数组在要求可变数组的地方过不去。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "typescript.cheatsheet_advanced.02.mapped-draft"
+title = "每个键，也许"
+story = "希慎广场一份屏幕配置的草稿可以只填一半，而且还能继续编辑。它的形状跟着正式的那份走，一个键对一个键。"
+brief = '''
+手写 `Draft<T>` —— 不用做这件事的内置工具类型：和 `T` 一样的键，每个都是可选的，
+各自保留自己的类型，而且仍然可写。对于 `type Screen = { id: string; w: number }`，
+`const d: Draft<Screen> = { w: 3 };` 和 `d.w = 5;` 都能编译。
+'''
+hints = [
+  "映射类型遍历 `keyof T`；方括号后面的 `?` 让每个键可选（也就是手写的 `Partial<T>`），`-?` 让它必填（`Required<T>`），而前面的 `readonly` 把它冻结（`Readonly<T>`）。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "typescript.cheatsheet_advanced.03.as-const-union"
+title = "三个词，不用 ENUM"
+story = "怡和街的到站板显示三种面板，没有人想要第四个文件来保存这份清单。"
+brief = '''
+```ts
+const KINDS = ["ad", "news", "tram"] as const;
+```
+
+从 `KINDS` 推导出 `Kind`，使它恰好是那三个字符串的联合 —— `const k: Kind = "ad";`
+能编译而 `const b: Kind = "bus";` 不能。字面量的联合，不是 enum。
+'''
+hints = [
+  "值不是类型：先要那个值*的*类型，再用 `number` 给元组取下标，得到它的元素可以是什么。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "typescript.cheatsheet_advanced.04.pick-card"
+title = "只要正面"
+story = "利园的 app 每块屏幕显示一张卡片：id 和标题。feed 字段留在控制室里。"
+brief = '''
+`Screen` 有 `id`、`title`、`feed` 和 `w`。把 `Card` 声明为**只有** `id` 和 `title`
+的对象类型，用一个工具类型从 `Screen` 构建，这样它跟随 `Screen`，在 `Screen`
+变化时一起变。
+'''
+hints = [
+  "一个工具保留指定的键，它的孪生兄弟则去掉它们。两者都把键作为一个联合接收，而不是分开的参数。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "typescript.cheatsheet_advanced.05.awaited-return"
+title = "LOAD 交回来的东西"
+story = "三十楼的 feed 加载器每个 sprint 都换形状。给它的结果命名的类型应该跟着变，而不是再敲一遍。"
+brief = '''
+```ts
+async function load() { return { items: [1, 2], at: Date.now() }; }
+```
+
+把 `Feed` 声明为 `load` 所 resolve 到的、**解包后**的对象类型 ——
+`{ items: number[]; at: number }` —— 从 `load` 本身推导出来，使
+`const f: Feed = { items: [1], at: 0 };` 能编译。
+'''
+hints = [
+  "`load` 是一个值，所以你得先要它的类型。出来的是一个 `Promise`；再用一个工具把 promise 剥掉。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "typescript.cheatsheet_advanced.06.infer-elem"
+title = "箱子里是什么"
+story = "给时代广场屏幕的一箱面板：标签应该说明一块面板是什么，而如果它根本不是箱子就什么也别说。"
+brief = '''
+写出 `Elem<T>`：对数组类型，是它的元素类型（`Elem<string[]>` 是 `string`）；
+对任何**不是**数组的东西，是 `never`。
+'''
+hints = [
+  "条件类型可以给它匹配到的那一部分起名，但前面得有一个关键字 —— 而数组后缀需要括号。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "typescript.cheatsheet_advanced.07.template-id"
+title = "SCREEN 横杠数字"
+story = "岛上每块板子都叫 screen-某某，而某某是一个数字。编译器守得住这条线。"
+brief = '''
+声明 `ScreenId`，使 `"screen-12"` 可以赋给它，而 `"screen-x"` 和 `"led-12"`
+都不行。
+'''
+hints = [
+  "类型可以是模板字面量：反引号，里面的占位符类型是一个原始类型。普通引号只是一个普通的字符串字面量。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "typescript.cheatsheet_advanced.08.satisfies-palette"
+title = "检查过，但没放宽"
+story = "LED 墙的调色板要对照合同检查 —— 但红色仍然是一个三元组，因为着色器要给它取下标。"
+brief = '''
+`type Palette = Record<string, [number, number, number] | string>`。
+声明 `p`，带 `r: [255, 0, 0]` 和 `s: "#8cf"`，对照 `Palette` 检查 —— 形状错误的值，
+比如 `r: [255, 0]`，是编译错误 —— 然而之后 `p.r.map(x => x / 255)` 和
+`p.s.toUpperCase()` 必须能编译：`p` 保留字面量自己更窄的类型。
+TypeScript 5。
+'''
+hints = [
+  "类型标注或类型断言会把字面量的类型换成 `Palette`，于是每个值都变成 `tuple | string`。有一个运算符（4.9+）只做检查。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "typescript.cheatsheet_advanced.09.labeled-rest-tuple"
+title = "一个命令和它的数字"
+story = "控制室的控制台接收一个动词，再接收这个动词需要的任意多个数字。`show 1 2 3`、`clear`，绝不是 `1 2`。"
+brief = '''
+写出 `run` 的开头：一个只接收**一个** rest 参数 `args` 的函数，类型为带标签的元组：
+先是一个 `cmd: string`，然后是任意数量的 `nums: number`。
+`run("show", 1, 2, 3)` 和 `run("clear")` 能编译；`run(1, 2)` 不能。
+'''
+hints = [
+  "标签写在元组里面，而不定长的尾部本身就是一个 rest 元素 —— 三个点加一个数组类型。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "typescript.cheatsheet_advanced.10.declaration-merging"
+title = "再加一个字段，同一个名字"
+story = "供应商的屏幕类型没有亮度，而供应商的文件是只读的。控制室今晚需要每块屏幕都有亮度。"
+brief = '''
+`interface Screen { id: string }` 声明在一个你不能编辑的文件里。
+在你自己的文件里，给那同一个 `Screen` 再加一个字段 `brightness: number`，
+使 `{ id: "a", brightness: 3 }` 在任何地方都是一个 `Screen` —— 不是一个新名字
+（`interface Big extends Screen { … }` 或 `type Big = Screen & { … }` 都会造一个），
+而且没有重复标识符的错误。
+'''
+hints = [
+  "同一个 interface 的两个声明会合并。`type` 别名不会合并，而 interface 不能 extends 它自己。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "typescript.cheatsheet_advanced.11.hash-private"
+title = "运行时也藏起来"
+story = "电车站计数器的计数与任何人无关：子类无关，序列化器无关，`Object.keys` 也无关。"
+brief = '''
+```ts
+abstract class Panel { abstract draw(): string; }
+interface Tally { bump(): void }
+
+class Counter extends Panel implements Tally {
+  // the field goes here
+  protected label = "c";
+  get value(): number { /* returns the field */ }
+  set value(v: number) { /* stores v in the field */ }
+  bump() { /* adds one to the field */ }
+  draw() { return `${this.label}=${this.value}`; }
+}
+```
+
+添加 `count` 字段，从 `0` 开始，在**运行时**和编译时都隐藏：`new Counter()` 之后，
+`Object.keys(c)` 和 `JSON.stringify(c)` 都不能显示它。`strict` 已开启。
+'''
+hints = [
+  "`private` 关键字会随类型一起被擦除；字段在 JavaScript 里仍然在那里。`#` 名字在引擎本身里就是私有的 —— 它不接受访问修饰符，而且需要初始化式。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "typescript.cheatsheet_advanced.12.overload-impl"
+title = "重载下面那一行"
+story = "到站板上的 `parse` 两个方向都通：传入字符串得到数字，传入数字得到字符串。两个承诺，一个函数体。"
+brief = '''
+```ts
+function parse(x: string): number;
+function parse(x: number): string;
+```
+
+写出跟在这两个重载之后的实现行，函数体是
+`return typeof x === "string" ? Number(x) : String(x);` —— 使 `parse("42")`
+是 `number` 而 `parse(7)` 是 `string`，在 `strict` 之下。
+'''
+hints = [
+  "实现签名必须宽到能覆盖每一个重载，它必须有函数体，而在 `strict` 之下它的参数不能不写类型。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "typescript.cheatsheet_advanced.13.nullish-assign"
+title = "空的也算缓存"
+story = "希慎墙的字幕缓存：有些屏幕的字幕是故意为空的，而每一帧都重新加载它们正是上周二冻住整面墙的原因。"
+brief = '''
+`cache: Record<string, string>`；`load(k)` 很昂贵。只在这个键**从未**被设置过时
+用 `load(k)` 填充 `cache[k]` —— 缓存里的 `""` 是一个真实、有效的值，不能触发
+重新加载。一条语句。
+'''
+hints = [
+  "`\"\"` 是假值。任何问“它是真值吗？”的东西都会重新加载它；问“它是 null 或 undefined 吗？”的那个赋值运算符则不会。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "typescript.cheatsheet_advanced.14.find-last-chain"
+title = "最后一条广告，如果有的话"
+story = "时代广场轮播里最新的广告是清单里的最后一条，而今晚其中一条是故意零像素宽的。"
+brief = '''
+`xs: S[]` 是 `feeds.flatMap(f => f.panels)`，其中 `S` 有 `kind: string` 和
+`width: number`。让 `w` 成为 kind 为 `"ad"` 的**最后一个**元素的宽度，没有的话
+就是 `-1`。宽度 `0` 必须原样作为 `0` 传出来。不用非空断言；`strict` 已开启。Node 22。
+'''
+hints = [
+  "有一个从末尾开始的查找（Node 18+）；`xs.at(-1)` 只是最后一个*元素*，不是最后一个匹配。它的结果可能是 `undefined`，所以属性读取需要可选链 —— 而默认值不能把零吞掉。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "typescript.cheatsheet_advanced.15.destructure-rename"
+title = "WIDTH，叫 W"
+story = "谢斐道的招牌店从 feed 里读一块屏幕的规格：kind 原样，宽度用一个短名字，没人填的时候就是一百。"
+brief = '''
+`screen: { kind: string; width?: number }`。在一个解构声明里，绑定 `kind`，
+并把 `width` 绑定到一个**新名字** `w`，在 `width` 缺失时以 `100` 为默认值。
+'''
+hints = [
+  "在对象模式里属性名在前，新绑定在冒号之后 —— 和看起来的正相反 —— 而默认值用 `=` 跟在绑定后面。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "typescript.cheatsheet_advanced.16.range-from-length"
+title = "零到 N 减一"
+story = "希慎墙上的五块面板，从零开始编号。在任何一块点亮之前就需要它们编号的清单。"
+brief = '''
+`n: number`。用一个表达式让 `ix: number[]` 成为清单 `[0, 1, …, n - 1]`，
+每个元素都真实存在 —— 遍历 `ix` 必须访问到 `n` 个数字。
+'''
+hints = [
+  "`Array(n)` 是 `n` 个空洞，而 `map` 会跳过空洞。从一个带 `length` 的类数组构建，而映射函数的**第二个**参数是下标。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "typescript.cheatsheet_advanced.17.sorted-two-keys"
+title = "最多的在前，再按名字"
+story = "时代广场屏幕上的排行榜：点击最多的在前，并列的按名字 —— 而 feed 自己的清单不能在其他屏幕底下被重新排序。"
+brief = '''
+`rs: { id: string; n: number }[]` 是从一个 `Record<string, number>` 的计数用
+`Object.entries(tally).map(([id, n]) => ({ id, n }))` 构建的 —— 条目是
+`[string, number][]`。`top` 的表达式：各行按 `n` **降序**，并列的按 `id` 以
+本地化字符串顺序升序 —— 而 `rs` 本身必须保持原样。Node 22，`strict` 已开启。
+'''
+hints = [
+  "Node 20+ 有一个返回副本的排序。比较器必须返回数字，所以字符串上的决胜不能用 `<` —— 字符串有一个做比较并返回数字的方法。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "typescript.cheatsheet_advanced.18.map-group-push"
+title = "放进正确的桶"
+story = "怡和街的午夜：每块面板按 kind 分进一个桶。那个经典的 bug 是往一个没人留着的桶里 push。"
+brief = '''
+`m: Map<string, string[]>`，一开始为空。在 `for (const [k, v] of pairs)` 里，
+把 `v` 加到存在 `k` 下面的列表里，第一次见到 `k` 时创建那个列表 —— 用**一条**语句，
+使得之后 `m` 真的装着每一个值。`strict` 已开启。
+'''
+hints = [
+  "`get` 返回列表或 `undefined`；`?? []` 给你一个可以 push 的东西，但一个新的 `[]` 除非你放进去，否则不在 map 里（先 `has` 再 `set` 是两条语句）。Map 没有 `[k]`，`get` 也不接受默认值 —— 而它要以 JSON 出去时，`Object.fromEntries(m)` 是出路。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "typescript.cheatsheet_advanced.19.deep-copy"
+title = "真正是副本的副本"
+story = "希慎墙的彩排 feed 必须是今晚那份的真正副本 —— 一个 id 的 Set，几行数字 —— 这样彩排才能在上面乱涂。"
+brief = '''
+`feed` 是 `{ ids: Set<string>; rows: number[][] }`。让 `copy` 成为一份**深**拷贝：
+`copy.ids.add("c")` 和 `copy.rows[0].push(9)` 必须让 `feed` 原封不动 —— 而
+`copy.ids` 必须仍然是一个带 `add` 的 `Set`。Node 22。
+'''
+hints = [
+  "展开和 `Object.assign` 只复制一层。JSON 来回一趟会丢掉 Set（它变成 `{}`）。Node 17+ 有平台自带的深拷贝。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "typescript.cheatsheet_advanced.20.bigint-sum"
+title = "柜台上不许混用"
+story = "避风塘的浪数已经超过 2 的 63 次方；今晚再来的七个浪是一个普通的 number，而总和必须精确。"
+brief = '''
+`big` 是一个超过 2 的 63 次方的 `bigint`，而 `n` 是一个 `number` ——
+`today.reduce<number>((s, w) => s + w, 0)` —— 装着一个小的整数
+（`Number.isInteger(n)` 为 true）。让 `total` 成为它们**精确**的和。`number`
+在超过 2 的 53 次方后会舍入，而 `|0` 会在 32 位处回绕。
+'''
+hints = [
+  "操作数必须是同一种类型，而类型断言不是转换。把小的那个向上转换 —— 用函数，不是 `n` 后缀，后缀只对字面量有效。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "typescript.cheatsheet_advanced.21.named-groups"
+title = "那一行里的每个年份"
+story = "午炮下面的铭牌 feed：建成、翻新、到期。里面每一个四位数的年份都要上板。"
+brief = '''
+`s` 是 `"built 1998, refit 2015, due 2031"`，而 `ys: string[]` 为空
+（每个年份之后会显示为 `y.slice(-2).padStart(2, "0")`）。写出一个循环的开头，
+遍历一个四位数字的命名分组 `y` 的**每一个**匹配，使这个循环体收集每个年份：
+
+```ts
+  ys.push(m.groups?.y ?? "");
+```
+
+Node 22，TypeScript 5。
+'''
+hints = [
+  "有一个方法返回带分组的每一个匹配 —— 而除非模式带有 global 标志，否则它在运行时抛异常。命名分组是 `(?<name>…)`；Python 的 `P` 在这里是语法错误。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "typescript.cheatsheet_advanced.22.loop-closure"
+title = "每一块自己的数字"
+story = "希慎墙上的三块面板被设定稍后点亮，每块有自己的数字。三块全说 3 的那个 bug 是 Skynet 提出的第一个建议。"
+brief = '''
+```ts
+class Board {
+  q: (() => void)[] = [];
+  show(i: number) { /* lights panel i */ }
+  arm(n: number) {
+    // the loop goes here
+  }
+}
+```
+
+在 `arm(n)` 里，往 `this.q` 上 push `n` 个闭包。第 k 个在**稍后**被调用时必须用
+它自己的 `k` 调用 `this.show(k)` —— 在 `arm(3)` 之后把它们全部运行会点亮 `0, 1, 2`，
+而不是 `3, 3, 3`。`strict` 已开启。
+'''
+hints = [
+  "`var` 是整个循环共用的一个变量；块级作用域的绑定每一轮都是新的。而 `function () {}` 有自己的 `this`，strict 模式拒绝去猜。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "typescript.cheatsheet_advanced.23.type-only-import"
+title = "不留痕迹的导入"
+story = "屏幕模块一加载就往控制室写日志。app 只想要它的类型，没有人想在构建时看到那条日志。"
+brief = '''
+`screen.ts` 有 `export interface Screen { … }` —— 一个**具名**导出，没有默认导出 ——
+还有一个每当模块被加载就运行的顶层 `console.log`。`verbatimModuleSyntax` 已开启。
+导入 `Screen` 用在类型标注里，使导入在生成的 JavaScript 里**什么都**不剩：
+那条日志不能触发。
+'''
+hints = [
+  "在 `verbatimModuleSyntax` 之下，对类型的普通导入是错误，而花括号*里面*的 `type` 修饰符仍然会留下一个加载模块的 `import {}`。把修饰符放在整条语句上。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "typescript.cheatsheet_advanced.24.error-cause"
+title = "留着原来的"
+story = "feed 抓取在三层楼下以一个 TypeError 失败了。控制室想在上面放自己的错误，而真正的那个仍然挂在下面。"
+brief = '''
+在 `catch (e: unknown)` 里，抛出一个**新的** `Error`，消息是 `"feed failed"`，
+并把 `e` 作为它的原始原因挂上（ES2022），这样调用者仍然能对挂着的那个运行
+`instanceof TypeError`。`strict` 已开启。
+'''
+hints = [
+  "`Error` 接收第二个参数 —— 一个选项对象，不是错误本身。而 `e` 是 `unknown`：不收窄就不能读它的 `.message`。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "typescript.cheatsheet_advanced.25.all-settled"
+title = "数一数到达的"
+story = "六个骑手离开糖街；一个被雨淋退了。厨房把到达的加起来，不为没到的那一个把整晚扔掉。"
+brief = '''
+`ps: Promise<number>[]`，而 `rs = await Promise.allSettled(ps)`。在
+`for (const r of rs)` 里，把每个**成功的** promise 的值加到 `total` 上，
+跳过失败的 —— 用一行能在 `strict` 之下编译的代码。
+'''
+hints = [
+  "每个结果都是以 `status` 为判别的联合；只有成功的分支有 `value`。两个状态字符串是规范里用的那两个，不是 \"resolved\" 也不是 `ok`。（`Promise.all` 会在第一个失败时抛出，而 `Promise.race` 只交回一个。）",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "typescript.cheatsheet_advanced.26.for-await"
+title = "每一个到达时"
+story = "怡和街板子的 tick feed 一次来一个，每个都要等一会儿。总和随着它们到来而增长，而不是等全部到齐之后。"
+brief = '''
+`ticks()` 返回一个 `AsyncGenerator<number>`。在一个 `async` 函数里，写出那个在
+每个 `t` 到达时接收它的循环的开头，使循环体 `sum += t;` 在 `strict` 之下能编译。
+'''
+hints = [
+  "异步可迭代对象没有 `[Symbol.iterator]`，所以普通的 `for…of` 会被拒绝 —— 而 await 生成器对象也没有用。`await` 属于 `for`。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "typescript.cheatsheet_advanced.27.iterable-stack"
+title = "展开这个栈"
+story = "控制室的撤销栈应该能展开成数组，也能像楼层上的其他东西一样在 `for…of` 里走。"
+brief = '''
+```ts
+class Stack<T> {
+  #items: T[] = [];
+  push(x: T) { this.#items.push(x); }
+  pop(): T | undefined { return this.#items.pop(); }
+  // one more method goes here
+}
+```
+
+添加那一个方法，使 `s.push(1); s.push(2)` 之后 `[...s]` 给出 `[1, 2]`，
+并让 `for (const x of s)` 能编译。`strict` 已开启。
+'''
+hints = [
+  "方法名是方括号里的一个 well-known symbol，它必须是生成器（星号），而用 `yield*` 委托给数组会把元素一个一个交出 —— 普通的 `yield` 把整个数组当作一个元素交出。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "typescript.cheatsheet_advanced.28.exhaustive-never"
+title = "第四种会弄坏构建"
+story = "今天有两种面板。下个 sprint 有人加第三种时，构建必须在这个 switch 上失败 —— 而不是 19:00 的时代广场屏幕。"
+brief = '''
+`Shape` 是 `{ kind: "ad"; w: number } | { kind: "news"; len: number }`，而
+`area(s: Shape): number` 对 `s.kind` 做 switch。在 `case "ad"` 和 `case "news"`
+各自 `return` 之后，写出 `default`，使函数今天能编译，**并且**在第三种 kind 加进
+`Shape` 的那天停止编译。`strict` 已开启。
+'''
+hints = [
+  "每个 case 都返回之后，`s` 是底类型。把它赋给那个类型的变量今天不费吹灰之力，而一旦有一种漏掉了就是类型错误。类型断言或 `any` 什么都不检查；`throw` 要到 19:00 才发现。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "typescript.cheatsheet_advanced.29.type-guard"
+title = "线路上下来的是什么"
+story = "JSON 到了三十楼，类型没了。得有一个函数在运行时看一眼，再告诉编译器它看到了什么。"
+brief = '''
+`data: unknown` 来自 `JSON.parse`，而 `Screen` 是 `{ id: string; w: number }`。
+写出函数 `isScreen` 的开头，函数体是
+
+```ts
+return typeof x === "object" && x !== null && "id" in x && "w" in x;
+```
+
+使 `if (isScreen(data)) console.log(data.id.toUpperCase());` 能编译 —— 在 `if`
+里面，`data` 是一个 `Screen`。`strict` 已开启。
+'''
+hints = [
+  "返回 `boolean` 不会告诉编译器关于 `x` 的任何事。返回位置上的类型谓词会 —— 参数名、那个词、类型。参数必须接受 `unknown`，而断言签名不能放在 `if` 里。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "typescript.cheatsheet_advanced.30.asserts-defined"
+title = "断言"
+story = "午夜。岛上屏幕熄灭前的最后一次查找：值要么在那里，要么今晚以一个抛出的 Error 告终，而在那一行之后编译器必须相信她的话。"
+brief = '''
+函数体是 `if (x === undefined || x === null) throw new Error("missing");`。
+写出泛型函数 `must` 的开头，使得在
+
+```ts
+const v = m.get("a");   // m: Map<string, number>, so v: number | undefined
+must(v);
+```
+
+之后，`v + 1` 这一行能编译 —— `must` 向编译器承诺从此以后 `v` 既不是 `null`
+也不是 `undefined`。`strict` 已开启。
+'''
+hints = [
+  "什么都不返回的函数不能是类型谓词；它可以是断言签名。而断言 `x is T` 什么都收窄不了 —— 要断言的是那个从类型里剥掉 `null` 和 `undefined` 的工具类型。",
+]

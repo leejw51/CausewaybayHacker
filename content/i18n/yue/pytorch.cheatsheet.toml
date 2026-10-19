@@ -1,0 +1,404 @@
+# PYTORCH LAND — CHEATSHEET, in Cantonese (colloquial written Cantonese,
+# traditional characters). A translation pack (SPEC §12.1): the prose of
+# `content/pytorch/cheatsheet.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack,
+# and are never translated. Code blocks and identifiers are copied verbatim.
+
+pack   = "pytorch.cheatsheet"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "pytorch.cheatsheet.01.zeros"
+title = "一塊白板"
+story = "23:00，周亦卿樓地庫嘅機房。今晚第一個 tensor 全部係零。"
+brief = '''
+`import torch` 已經做咗，整一個 `x`，係形狀 `(2, 3)`、全部係零嘅 **torch** tensor。
+'''
+hints = [
+  "大小放喺個 call 嘅參數度；NumPy 嗰個 function 會俾你一個 ndarray，唔係 tensor。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "pytorch.cheatsheet.02.to-device"
+title = "變 float，上張卡"
+story = "啲 label 係以整數嘅形式喺 CPU 度入嚟。3 號機架嗰張 GPU 要 float。"
+brief = '''
+`x = torch.tensor([1, 2, 3])` 係喺 CPU 度嘅 `int64`，而
+`device = "cuda" if torch.cuda.is_available() else "cpu"`。邊一行會令 `x` 變成喺 `device` 上面嘅 `float32` tensor？
+'''
+hints = [
+  "`.to` 會 return 一個新嘅 tensor，舊嗰個唔郁，所以要keep住佢 return 嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "pytorch.cheatsheet.03.eval-mode"
+title = "熄燈"
+story = "中央圖書館啲終端機嘅考試夜。試卷係真嘅時候，Dropout 就唔再亂估。"
+brief = '''
+`model` 有 `Dropout` 同 `BatchNorm` 層。喺幫測試集計分之前，邊一行會將嗰啲層轉做推論模式？
+'''
+hints = [
+  "每個 nn.Module 都有個 training 旗；叫一個 method 就可以幫個 module 同佢所有子 module 關咗佢。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "pytorch.cheatsheet.04.view"
+title = "三行，每行四個"
+story = "糖街個倉有十二件包裹排成一條線，個架得三層。"
+brief = '''
+`x = torch.arange(12)` 嘅形狀係 `(12,)`。整一個 `y`，係同一堆數，但係**3 行 4 列**。
+'''
+hints = [
+  "新嘅大小係行先寫，而且佢哋相乘一定要等於元素嘅數目。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "pytorch.cheatsheet.05.argmax"
+title = "贏咗嘅類別"
+story = "天后電車站個數字識別器每行幫十個類別計分。每行要有一個數贏。"
+brief = '''
+`logits` 嘅形狀係 `(batch, classes)`。邊一行會俾到 `pred`，即係每一行最好嗰個類別嘅 index，形狀係 `(batch,)`？
+'''
+hints = [
+  "`dim` 講嘅係邊條軸會被減走。類別係沿住 dim 1 排。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "pytorch.cheatsheet.06.unsqueeze"
+title = "一條直行，唔係橫行"
+story = "羅素街三間舖嘅租，四個月嘅雜費。每一對都要配埋。"
+brief = '''
+`x` 嘅形狀係 `(3,)`，`y` 嘅形狀係 `(4,)`。邊一行會將 `x` 變形，令 `x + y` broadcast 做形狀 `(3, 4)`？
+'''
+hints = [
+  "Broadcasting 係由右邊開始對齊形狀。`x` 要喺佢自己條軸後面加一條大小係 1 嘅新軸。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "pytorch.cheatsheet.07.backward"
+title = "個斜率"
+story = "上利舞臺嗰條扶手電梯有個斜度。個 graph 知道，但要有人問。"
+brief = '''
+```
+w = torch.tensor(2.0, requires_grad=True)
+y = w * w
+```
+
+邊一行會將 dy/dw，即係 4，填入 `w.grad`？
+'''
+hints = [
+  "梯度係由輸出向後流，所以個 call 係對住個結果叫，唔係對住個 leaf。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "pytorch.cheatsheet.08.no-grad"
+title = "今晚唔畫 graph"
+story = "夜更淨係抄錶。冇人需要記低啲數係點樣嚟。"
+brief = '''
+喺**唔幫 autograd 記錄 graph** 嘅情況下，用個 model 行 validation batch。邊一行開個 block？
+
+```
+# ____
+    out = model(xb)
+```
+'''
+hints = [
+  "佢係一個 context manager：喺佢下面縮排嗰個 block 會喺關咗梯度追蹤嘅情況下行。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "pytorch.cheatsheet.09.step-order"
+title = "做嘢嘅次序"
+story = "抹乾淨個檯面、秤貨、然後找錢。街市嘅次序從來唔變。"
+brief = '''
+`loss` 啱啱由呢個 batch 計出嚟，`opt` 係個 optimiser。三個 call 用邊個次序先係正確嘅一步訓練？
+'''
+hints = [
+  "梯度會累積，所以先清走舊嘅；然後計新嘅；然後先用佢哋。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "pytorch.cheatsheet.10.super-init"
+title = "老豆行先"
+story = "銅鑼灣一個新檔口要攞到業主啲文件，先可以掛招牌。"
+brief = '''
+```
+class Net(nn.Module):
+    def __init__(self):
+        # ____
+        self.fc = nn.Linear(4, 2)
+
+    def forward(self, x):
+        return self.fc(x)
+```
+
+`__init__` 入面邊一行一定要寫喺最前，唔係 assign `self.fc` 就會失敗？
+'''
+hints = [
+  "nn.Module 喺佢自己個 constructor 度設定好啲層嘅登記冊；加任何層之前都要先行咗佢。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "pytorch.cheatsheet.11.cross-entropy"
+title = "原始分數"
+story = "地庫個分類器俾嘅係原始分數，唔係機率。做判官嘅要知係邊樣。"
+brief = '''
+`logits` 嘅形狀係 `(B, C)` —— 原始、未正規化嘅分數 —— 而 `target` 嘅形狀係 `(B,)`，入面係類別 index。邊一行先係啱嘅分類 loss？
+'''
+hints = [
+  "呢啲 loss 入面有一個會自己做 log-softmax。直接餵原始分數俾佢，唔好先軟化。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "pytorch.cheatsheet.12.dataloader"
+title = "洗過嘅牌"
+story = "禮頓道間麻雀館每舖都洗牌。個 trainer 都應該咁做。"
+brief = '''
+`ds` 係一個 `TensorDataset`，而 `DataLoader` 已經由 `torch.utils.data` import 咗。邊一行會令 `loader` 每次 32 個咁出 batch，而且**每個 epoch 都係新嘅隨機次序**？
+'''
+hints = [
+  "唔講明就唔會洗，而且 batch size 嗰個 keyword 要寫齊全。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "pytorch.cheatsheet.13.stack"
+title = "新一層"
+story = "時代廣場兩層樓，每層都係同一個舖位格仔，一層疊喺另一層上面。"
+brief = '''
+`a` 同 `b` 嘅形狀都係 `(3, 4)`。邊一行整到 `z`，形狀係 `(2, 3, 4)`，而 `z[0]` 係 `a`、`z[1]` 係 `b`？
+'''
+hints = [
+  "一個 function 係沿住已經存在嘅軸駁埋；另一個係將啲嘢沿住一條全新嘅軸擺，預設擺喺最前。數吓結果有幾多個 dim。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "pytorch.cheatsheet.14.matmul"
+title = "行遇到列"
+story = "兩個檔口乘三種貨，三種貨乘四日：渣甸坊嘅營業額表。"
+brief = '''
+`a` 嘅形狀係 `(2, 3)`，`b` 嘅形狀係 `(3, 4)`。邊一行俾到 `c`，即係**矩陣乘積**，形狀係 `(2, 4)`？
+'''
+hints = [
+  "`*` 係逐個元素相乘，而且要兩個形狀 broadcast 得到；矩陣乘積有自己嘅中綴運算子，同 NumPy 用嗰個一樣。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "pytorch.cheatsheet.15.long"
+title = "要整數，唔該"
+story = "香港大球場個售票處數嘅係座位，從來唔會數半個。"
+brief = '''
+`target = torch.tensor([0., 2., 1.])` 嚟到嗰陣係 `float32`，而 `nn.CrossEntropyLoss` 唔收佢：類別 index 一定要係 **`int64`**。邊一行可以修好 `target`？
+'''
+hints = [
+  "轉型會 return 一個新 tensor，唔係改呢一個；而對 tensor 用 `int()` 係 32 位嗰種 —— 唔係個 loss 想要嗰種。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "pytorch.cheatsheet.16.manual-seed"
+title = "同一粒骰"
+story = "利舞臺每一次綵排都由同一個 cue 開始，唔係咁冇人知改咗啲乜。"
+brief = '''
+面試官想要可以重現嘅運行：`nn.Linear(4, 2)` 每次 script 開始都要出到**同一組隨機權重**。邊一行放喺最頂、起個 model 之前？
+'''
+hints = [
+  "Torch 有自己嘅隨機數產生器；幫 NumPy 或者 Python 嘅 `random` 落 seed 係去唔到佢度嘅，而個 setter 收個 seed 做參數。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "pytorch.cheatsheet.17.item"
+title = "淨係個數"
+story = "維園個記分牌顯示一個數字，唔係佢係點樣計出嚟嘅成段歷史。"
+brief = '''
+`loss` 係一個 0 維 tensor，仲連住 autograd graph。成個 array 你會寫 `.detach().cpu().numpy()`；得一個數嘅話有條短啲嘅路。邊一行俾到 `v`，一個普通 Python `float`，用嚟寫 log？
+'''
+hints = [
+  "一個單元素 tensor 有個 method 會將入面個數交返出嚟，個 graph 就留低；對 0 維 tensor 攞 index 係 error。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "pytorch.cheatsheet.18.load-state-dict"
+title = "權重返屋企"
+story = "個 checkpoint 喺灣仔一個儲物櫃入面嘅 USB 手指度過咗一晚。朝早：放返入一個同樣形狀嘅網絡。"
+brief = '''
+啲權重係用 `torch.save(model.state_dict(), p)` 存嘅。而家已經起咗一個新嘅 `model = Net()`。邊一行將嗰啲權重放返入去，而 `model` 仍然係一個 `nn.Module`？
+'''
+hints = [
+  "一行做兩步：由硬碟讀個 dictionary，再將個 dictionary 交俾 module 嘅 loader。淨係讀個檔案俾你嘅係 dict，唔係 model。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "pytorch.cheatsheet.19.keepdim"
+title = "每行歸一"
+story = "寶靈頓道五個檔口，三更嘅營業額：每個檔口各更嘅份額加埋要係一。"
+brief = '''
+`x` 嘅形狀係 `(5, 3)`。Broadcasting 係由右邊開始對齊形狀，所以 `(5, 1)` 會逐行除一個 `(5, 3)`。邊一行整到 `s`，即係每行嘅總和，形狀係 `(5, 1)`，令 `x / s` 將每一行正規化？
+'''
+hints = [
+  "Reduction 通常會掉走佢加總嗰條軸；叫佢將嗰條軸保留做大小 1。一個淨係 `(5,)` 對住 `(5, 3)` 係對唔齊嘅。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "pytorch.cheatsheet.20.clip-grad"
+title = "斷路器"
+story = "怡和街啲燈一浪湧，個斷路器就喺踏出嗰一步之前跳掣 —— 永遠唔會喺之後。"
+brief = '''
+啲梯度爆緊。填個空位，令 `model` 嘅**梯度總範數**喺更新之前封頂喺 `1.0`：
+
+```
+opt.zero_grad()
+loss.backward()
+# ____
+opt.step()
+```
+'''
+hints = [
+  "個 clipper 要嘅係參數嘅 iterable，唔係 module 本身，而且封頂嘅係範數 —— 有個姊妹 function 係逐個值封頂嘅。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "pytorch.cheatsheet.21.randn"
+title = "鐘形曲線"
+story = "銅鑼灣地鐵閘機個車費預測器嘅全新權重：平均零，散佈一，未學過任何嘢之前。"
+brief = '''
+整 `w`，一個形狀係 `(3, 4)`、由**標準正態**分佈 —— 平均 0，標準差 1 —— 抽出嚟嘅 tensor，用 torch 自己嘅產生器。
+'''
+hints = [
+  "有兩個 torch function 係將大小當普通參數咁收然後填滿隨機數嘅；名短啲嗰個係 [0, 1) 上面嘅均勻分佈，而 NumPy 嗰個俾你嘅係 ndarray。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "pytorch.cheatsheet.22.shape"
+title = "數吓有幾多欄"
+story = "天后個數字辨認器出咗一批分數表。冇人講過有幾多個類別，咁就問個 tensor。"
+brief = '''
+`logits` 有兩個維度：每個樣本一行，每個類別一欄。邊一行俾到 `c`，即係**類別嘅數目**，一個普通嘅 `int`？
+'''
+hints = [
+  "形狀係一個好似 tuple 咁可以攞 index 嘅值，唔係一個要 call 嘅 method；其中一個選項數嘅係樣本數，另一個係一個從來冇 call 過嘅 method。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "pytorch.cheatsheet.23.column"
+title = "一欄，全部行"
+story = "羅素街嘅租金表：舖位落直行，月份橫住排。業主淨係想要二月。"
+brief = '''
+`x` 形狀係 `(5, 4)`：五間舖，四個月。邊一行俾到 `feb`，即係每間舖嘅**第二欄**，形狀係 `(5,)`？
+'''
+hints = [
+  "每條軸一個 index，用逗號分開，而一個淨係冒號就係嗰條軸上面嘅每一個元素。其中三個選項揀出嚟嘅係一行。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "pytorch.cheatsheet.24.mask"
+title = "淨係贏家"
+story = "渣甸坊一晚嘅營業額，有啲檔口係蝕嘅。會計想要啲正數放喺一個 list 度，其他乜都唔要。"
+brief = '''
+`x = torch.tensor([-1., 2., -3., 4.])`。邊一行俾到 `p`，一個**裝住正數值嘅一維 tensor** —— 喺呢度係 `tensor([2., 4.])`？
+'''
+hints = [
+  "一個比較會整出一個同 `x` 形狀一樣嘅布林 tensor；將嗰個 tensor 放入方括號入面。其中一個選項停咗喺布林嗰步，另一個俾你嘅係位置。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "pytorch.cheatsheet.25.clamp"
+title = "零以下冇得落"
+story = "希慎廣場地底機房個恆溫器唔可以設到零以下，但個掣係去到四十嘅。"
+brief = '''
+`x` 裝住喺 `-40.` 同 `40.` 之間任何位置嘅值。邊一行整到 `y`，令每一個**負數**項變做 `0.`，而其他每一項都**原封不動**咁保留？
+'''
+hints = [
+  "有一個 tensor method 係將值釘喺一個範圍入面嘅；淨係俾佢個下限。其中一個選項連上限都俾埋，一個將 Python int 交俾一個要 tensor 嘅 function，一個從來冇 call 過個 method。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "pytorch.cheatsheet.26.max-values"
+title = "最高分，唔係佢個位"
+story = "維園棋枱嘅裁判貼出每個棋手嘅最高分。係由邊一塊棋盤嚟嘅，就係另一欄嘅事。"
+brief = '''
+`logits` 形狀係 `(B, C)`。邊一行俾到 `best`，即係**每一行入面最大嘅分數**，形狀係 `(B,)` 嘅 tensor —— 係啲分數本身，唔係佢哋坐喺邊一欄？
+'''
+hints = [
+  "俾咗 `dim` 嘅話，個 max method 交返嘅係一對 —— 啲值同佢哋嘅位置 —— 所以按名揀你要嗰一半。冇 `dim` 嘅話你會得到成個 tensor 一個數。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "pytorch.cheatsheet.27.sequential"
+title = "中間嗰層"
+story = "時代廣場扶手電梯行三層：上，一個平台，再上。個平台係一樣你企得上去嘅嘢，唔係佢嘅圖則。"
+brief = '''
+填個空位，令 `model` 係一個兩層嘅網絡，兩層之間有一個 ReLU，用 `nn.Sequential` 砌：
+
+```
+model = nn.Sequential(
+    nn.Linear(4, 8),
+    # ____
+    nn.Linear(8, 2),
+)
+```
+'''
+hints = [
+  "Sequential 淨係收 module —— 係 instance，唔係 class，亦唔係淨係一個 function。其中兩個選項講咗個 activation 嘅名但冇整一個出嚟；一個係一個冇咗輸入嘅 function。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "pytorch.cheatsheet.28.linear"
+title = "先入後出"
+story = "香港大球場每張 28 乘 28 嘅飛尾都攤平做 784 個數，而個閘有十個轉閘。"
+brief = '''
+`xb` 形狀係 `(B, 784)`，而且有 10 個類別。邊一行整到 `fc`，一個全連接層，令 `fc(xb)` 形狀係 `(B, 10)`？
+'''
+hints = [
+  "個 constructor 收兩個普通整數：入嚟嘅大小，然後係出去嘅大小。其中一個選項寫反咗，一個用 tuple 包住佢哋，一個係 Keras 嘅寫法。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "pytorch.cheatsheet.29.optimizer"
+title = "交出條鎖匙"
+story = "糖街貨倉個速遞員淨係可以搬人哋交俾佢嗰啲包裹 —— 唔係成幢樓。"
+brief = '''
+`model` 係一個 `nn.Module`。邊一行起到 `opt`，一個對住個 model 嘅可訓練 tensor、學習率係 `1e-3` 嘅 **Adam** optimiser？
+'''
+hints = [
+  "optimiser 要嘅係一個 tensor 嘅 iterable，唔係個 module，亦唔係一個 method object —— 所以要 call 個 accessor。而且完全冇參數係起唔到佢嘅。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "pytorch.cheatsheet.30.accuracy"
+title = "牌上面個分數"
+story = "中央圖書館嘅考試夜完咗。Mei 想要一個分數寫落 log 行：成批入面個網絡答啱咗幾多。"
+brief = '''
+`pred` 同 `yb` 都係形狀 `(B,)` 嘅 `int64` tensor —— 每個樣本嘅預測類別同真實類別。邊一行俾到 `acc`，即係預測正確嘅樣本**比例**，一個 0 維嘅 float tensor？
+'''
+hints = [
+  "個比較俾你布林值，而布林值係攞唔到平均嘅 —— 先轉佢哋嘅 type。總和係一個數目，唔係比例，仲要留意啲括號喺邊度閂。",
+]

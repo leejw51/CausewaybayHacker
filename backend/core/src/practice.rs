@@ -79,9 +79,9 @@ pub fn next_with(
           WHERE q.land = ?2
           GROUP BY q.id
           ORDER BY CASE q.category
-                     WHEN 'verybasic' THEN 0 WHEN 'basic' THEN 1
-                     WHEN 'advanced' THEN 2 WHEN 'hacker' THEN 3
-                     WHEN 'frameworks' THEN 4 ELSE 5 END,
+                     WHEN 'cheatsheet' THEN 0 WHEN 'cheatsheet_advanced' THEN 1
+                     WHEN 'verybasic' THEN 2 WHEN 'basic' THEN 3 WHEN 'advanced' THEN 4
+                     WHEN 'hacker' THEN 5 WHEN 'frameworks' THEN 6 ELSE 7 END,
                    q.node",
     )?;
     let rows: Vec<Row> = stmt

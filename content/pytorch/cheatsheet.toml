@@ -1,0 +1,901 @@
+# PYTORCH LAND — CHEATSHEET. The lines a machine-learning live coding test
+# expects from memory, asked: a tensor, its dtype and device, its shape, a
+# broadcast, a gradient, the optimiser's order, a module, a loss, a loader —
+# four lines, one right. Nothing is typed and nothing is run — the pick is the
+# submission, and the server judges it against the quiz (SPEC §0). The three
+# wrong lines are near-misses: NumPy's spelling, the wrong `dim`, a call whose
+# result is thrown away, a method that does not exist.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "pytorch.cheatsheet"
+land = "pytorch"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "pytorch.cheatsheet.01.zeros"
+node        = 1
+title       = "A BLANK SLATE"
+difficulty  = 1
+story       = "23:00 in the machine room under the Chow Yei Ching Building. The first tensor of the night is all zeros."
+concepts    = ["tensors", "types"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+With `import torch` done, make `x`, a **torch** tensor of zeros with shape
+`(2, 3)`.
+'''
+solution    = 'x = torch.zeros(2, 3)'
+hints = [
+  "The size goes in the call's arguments; NumPy's function would give you an ndarray, not a tensor.",
+]
+
+[quest.quiz]
+choices = [
+  'x = torch.zeros[2, 3]',
+  'x = torch.zeros(2, 3)',
+  'x = np.zeros((2, 3))',
+  'x = torch.tensor(2, 3)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "pytorch.cheatsheet.02.to-device"
+node        = 2
+title       = "FLOAT, ON THE CARD"
+difficulty  = 1
+story       = "The labels came in as whole numbers on the CPU. The GPU in rack 3 wants floats."
+concepts    = ["tensors", "types"]
+requires    = ["pytorch.cheatsheet.01.zeros"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`x = torch.tensor([1, 2, 3])` is `int64` on the CPU, and
+`device = "cuda" if torch.cuda.is_available() else "cpu"`. Which line makes
+`x` a `float32` tensor on `device`?
+'''
+solution    = 'x = x.to(device, dtype=torch.float32)'
+hints = [
+  "`.to` returns a new tensor and leaves the old one alone, so keep what it returns.",
+]
+
+[quest.quiz]
+choices = [
+  'x.to(device, dtype=torch.float32)',
+  'x = x.to(device).int()',
+  'x = x.to(device, dtype=torch.float32)',
+  'x = torch.float32(x, device)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "pytorch.cheatsheet.03.eval-mode"
+node        = 3
+title       = "LIGHTS DOWN"
+difficulty  = 1
+story       = "Exam night at the Central Library terminals. Dropout stops guessing when the paper is real."
+concepts    = ["modules", "testing"]
+requires    = ["pytorch.cheatsheet.02.to-device"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`model` has `Dropout` and `BatchNorm` layers. Before scoring the test set,
+which line switches those layers to their inference behaviour?
+'''
+solution    = 'model.eval()'
+hints = [
+  "Every nn.Module carries a training flag; one method call turns it off for the module and all its children.",
+]
+
+[quest.quiz]
+choices = [
+  'model.train()',
+  'model.eval = True',
+  'model.requires_grad_(False)',
+  'model.eval()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "pytorch.cheatsheet.04.view"
+node        = 4
+title       = "THREE ROWS OF FOUR"
+difficulty  = 1
+story       = "Twelve parcels in a line at the Sugar Street depot, and the shelf has three rows."
+concepts    = ["tensors", "matrix"]
+requires    = ["pytorch.cheatsheet.03.eval-mode"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+`x = torch.arange(12)` has shape `(12,)`. Make `y` the same numbers with
+**3 rows and 4 columns**.
+'''
+solution    = 'y = x.view(3, 4)'
+hints = [
+  "The new sizes are listed rows first, and their product must be the element count.",
+]
+
+[quest.quiz]
+choices = [
+  'y = x.view(3, 4)',
+  'y = x.view(4, 3)',
+  'y = x.shape(3, 4)',
+  'y = x.reshape(3, 5)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "pytorch.cheatsheet.05.argmax"
+node        = 5
+title       = "THE WINNING CLASS"
+difficulty  = 1
+story       = "The digit reader at the Tin Hau tram stop scores ten classes per row. One number per row has to win."
+concepts    = ["tensors", "loss-functions"]
+requires    = ["pytorch.cheatsheet.04.view"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`logits` has shape `(batch, classes)`. Which line gives `pred`, the index of
+the best class for each row, with shape `(batch,)`?
+'''
+solution    = 'pred = logits.argmax(dim=1)'
+hints = [
+  "`dim` names the axis that gets reduced away. The classes run along dim 1.",
+]
+
+[quest.quiz]
+choices = [
+  'pred = logits.argmax(dim=0)',
+  'pred = logits.argmax()',
+  'pred = logits.argmax(dim=1)',
+  'pred = logits.max(dim=1)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "pytorch.cheatsheet.06.unsqueeze"
+node        = 6
+title       = "A COLUMN, NOT A ROW"
+difficulty  = 2
+story       = "Three shop rents on Russell Street, four months of fees. Every pair has to meet."
+concepts    = ["broadcasting", "tensors"]
+requires    = ["pytorch.cheatsheet.05.argmax"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`x` has shape `(3,)` and `y` has shape `(4,)`. Which line reshapes `x` so
+that `x + y` broadcasts to shape `(3, 4)`?
+'''
+solution    = 'x = x.unsqueeze(1)'
+hints = [
+  "Broadcasting lines shapes up from the right. `x` needs a new size-1 axis after its own.",
+]
+
+[quest.quiz]
+choices = [
+  'x = x.unsqueeze(1)',
+  'x = x.unsqueeze(0)',
+  'x = x.squeeze(1)',
+  'x = x.T',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "pytorch.cheatsheet.07.backward"
+node        = 7
+title       = "THE SLOPE"
+difficulty  = 2
+story       = "The escalator up to Lee Theatre has a slope. The graph knows it; someone has to ask."
+concepts    = ["autograd", "tensors"]
+requires    = ["pytorch.cheatsheet.06.unsqueeze"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+```
+w = torch.tensor(2.0, requires_grad=True)
+y = w * w
+```
+
+Which line fills `w.grad` with dy/dw, which is 4?
+'''
+solution    = 'y.backward()'
+hints = [
+  "Gradients flow backwards from the output, so the call is made on the result, not the leaf.",
+]
+
+[quest.quiz]
+choices = [
+  'w.backward()',
+  'y.grad()',
+  'torch.grad(y)',
+  'y.backward()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "pytorch.cheatsheet.08.no-grad"
+node        = 8
+title       = "NO GRAPH TONIGHT"
+difficulty  = 2
+story       = "The night shift only reads the meters. Nobody needs a record of how the numbers were made."
+concepts    = ["autograd", "complexity"]
+requires    = ["pytorch.cheatsheet.07.backward"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+Run the model on the validation batch **without recording a graph** for
+autograd. Which line opens the block?
+
+```
+# ____
+    out = model(xb)
+```
+'''
+solution    = 'with torch.no_grad():'
+hints = [
+  "It is a context manager: the indented block under it runs with gradient tracking off.",
+]
+
+[quest.quiz]
+choices = [
+  'torch.no_grad()',
+  'with torch.no_grad():',
+  'with torch.nograd():',
+  'with model.eval():',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "pytorch.cheatsheet.09.step-order"
+node        = 9
+title       = "THE ORDER OF THINGS"
+difficulty  = 2
+story       = "Clear the counter, weigh the goods, then hand over the change. The wet-market order never varies."
+concepts    = ["optimizers", "autograd"]
+requires    = ["pytorch.cheatsheet.08.no-grad"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+`loss` was just computed from this batch and `opt` is the optimiser. Which
+order of three calls is one correct training step?
+'''
+solution    = 'opt.zero_grad(); loss.backward(); opt.step()'
+hints = [
+  "Gradients accumulate, so clear the old ones; then compute the new ones; then use them.",
+]
+
+[quest.quiz]
+choices = [
+  'opt.zero_grad(); loss.backward(); opt.step()',
+  'opt.step(); loss.backward(); opt.zero_grad()',
+  'loss.backward(); opt.zero_grad(); opt.step()',
+  'opt.zero_grad(); opt.step(); loss.backward()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "pytorch.cheatsheet.10.super-init"
+node        = 10
+title       = "THE PARENT FIRST"
+difficulty  = 3
+story       = "A new stall in Causeway Bay needs the landlord's papers before it can hang a sign."
+concepts    = ["modules", "structs"]
+requires    = ["pytorch.cheatsheet.09.step-order"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+```
+class Net(nn.Module):
+    def __init__(self):
+        # ____
+        self.fc = nn.Linear(4, 2)
+
+    def forward(self, x):
+        return self.fc(x)
+```
+
+Which line must come first in `__init__`, or assigning `self.fc` fails?
+'''
+solution    = 'super().__init__()'
+hints = [
+  "nn.Module sets up its registry of layers in its own constructor; run it before adding any.",
+]
+
+[quest.quiz]
+choices = [
+  'nn.Module.__init__()',
+  'self.__init__()',
+  'super().forward()',
+  'super().__init__()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "pytorch.cheatsheet.11.cross-entropy"
+node        = 11
+title       = "RAW SCORES"
+difficulty  = 3
+story       = "The classifier in the basement gives raw scores, not odds. The judge has to know which."
+concepts    = ["loss-functions", "modules"]
+requires    = ["pytorch.cheatsheet.10.super-init"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+`logits` has shape `(B, C)` — raw, unnormalised scores — and `target` has
+shape `(B,)` holding class indices. Which line is the right classification
+loss?
+'''
+solution    = 'loss = nn.CrossEntropyLoss()(logits, target)'
+hints = [
+  "One of these losses applies log-softmax itself. Feed it the raw scores, unsoftened.",
+]
+
+[quest.quiz]
+choices = [
+  'loss = nn.NLLLoss()(logits, target)',
+  'loss = nn.CrossEntropyLoss()(logits, target)',
+  'loss = nn.CrossEntropyLoss()(logits.softmax(dim=1), target)',
+  'loss = nn.MSELoss()(logits, target)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "pytorch.cheatsheet.12.dataloader"
+node        = 12
+title       = "THE SHUFFLED DECK"
+difficulty  = 3
+story       = "The mahjong parlour on Leighton Road shuffles the tiles before every hand. The trainer should too."
+concepts    = ["tensors", "iteration", "optimizers"]
+requires    = ["pytorch.cheatsheet.11.cross-entropy"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+`ds` is a `TensorDataset` and `DataLoader` is imported from
+`torch.utils.data`. Which line makes `loader` yield batches of 32 in a
+**new random order every epoch**?
+'''
+solution    = 'loader = DataLoader(ds, batch_size=32, shuffle=True)'
+hints = [
+  "Shuffling is off unless you ask for it, and the batch size keyword is spelled out in full.",
+]
+
+[quest.quiz]
+choices = [
+  'loader = DataLoader(ds, 32)',
+  'loader = DataLoader(ds, batch=32, shuffle=True)',
+  'loader = DataLoader(ds, batch_size=32, shuffle=True)',
+  'loader = DataLoader(ds, batch_size=32, shuffle=False)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "pytorch.cheatsheet.13.stack"
+node        = 13
+title       = "A NEW FLOOR"
+difficulty  = 2
+story       = "Two floors of Times Square, each the same grid of shops, one laid on top of the other."
+concepts    = ["tensors", "matrix"]
+requires    = ["pytorch.cheatsheet.12.dataloader"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`a` and `b` each have shape `(3, 4)`. Which line makes `z` with shape
+`(2, 3, 4)`, where `z[0]` is `a` and `z[1]` is `b`?
+'''
+solution    = 'z = torch.stack([a, b])'
+hints = [
+  "One function joins along an axis that already exists; the other puts the pieces along a brand-new axis, in front by default. Count the dims of the result.",
+]
+
+[quest.quiz]
+choices = [
+  'z = torch.cat([a, b])',
+  'z = torch.stack([a, b])',
+  'z = torch.stack([a, b], dim=1)',
+  'z = torch.stack(a, b)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "pytorch.cheatsheet.14.matmul"
+node        = 14
+title       = "ROWS MEET COLUMNS"
+difficulty  = 2
+story       = "Two stalls by three goods, three goods by four days: the takings table at Jardine's Bazaar."
+concepts    = ["tensors", "matrix", "broadcasting"]
+requires    = ["pytorch.cheatsheet.13.stack"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`a` has shape `(2, 3)` and `b` has shape `(3, 4)`. Which line gives `c`,
+the **matrix product**, with shape `(2, 4)`?
+'''
+solution    = 'c = a @ b'
+hints = [
+  "`*` multiplies element by element and would need the two shapes to broadcast; the matrix product has its own infix operator, the same one NumPy uses.",
+]
+
+[quest.quiz]
+choices = [
+  'c = a * b',
+  'c = torch.dot(a, b)',
+  'c = b @ a',
+  'c = a @ b',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "pytorch.cheatsheet.15.long"
+node        = 15
+title       = "WHOLE NUMBERS, PLEASE"
+difficulty  = 2
+story       = "The ticket booth at Hong Kong Stadium counts seats, never fractions of one."
+concepts    = ["tensors", "types", "loss-functions"]
+requires    = ["pytorch.cheatsheet.14.matmul"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+`target = torch.tensor([0., 2., 1.])` came in as `float32`, and
+`nn.CrossEntropyLoss` refuses it: class indices must be **`int64`**. Which
+line fixes `target`?
+'''
+solution    = 'target = target.long()'
+hints = [
+  "Casts return a new tensor rather than changing this one, and `int()` on a tensor is the 32-bit kind — not the one the loss wants.",
+]
+
+[quest.quiz]
+choices = [
+  'target = target.long()',
+  'target.long()',
+  'target = target.int()',
+  'target = int(target)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "pytorch.cheatsheet.16.manual-seed"
+node        = 16
+title       = "THE SAME DICE"
+difficulty  = 2
+story       = "Every rehearsal at the Lee Theatre starts from the same cue, or nobody can tell what changed."
+concepts    = ["initialization", "testing"]
+requires    = ["pytorch.cheatsheet.15.long"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+The interviewer wants the run to be reproducible: `nn.Linear(4, 2)` must
+come out with the **same random weights** every time the script starts.
+Which line goes at the top, before the model is built?
+'''
+solution    = 'torch.manual_seed(0)'
+hints = [
+  "Torch has its own random generator; seeding NumPy or Python's `random` does not reach it, and the setter takes the seed as its argument.",
+]
+
+[quest.quiz]
+choices = [
+  'torch.seed(0)',
+  'np.random.seed(0)',
+  'torch.manual_seed(0)',
+  'random.seed(0)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "pytorch.cheatsheet.17.item"
+node        = 17
+title       = "JUST THE NUMBER"
+difficulty  = 2
+story       = "The scoreboard at Victoria Park shows one figure, not the whole history of how it was reached."
+concepts    = ["tensors", "autograd", "types"]
+requires    = ["pytorch.cheatsheet.16.manual-seed"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+`loss` is a 0-d tensor, still attached to the autograd graph. For a whole
+array you would write `.detach().cpu().numpy()`; for one number there is a
+shorter way. Which line gives `v`, a plain Python `float`, for the log line?
+'''
+solution    = 'v = loss.item()'
+hints = [
+  "A one-element tensor has a method that hands back the number inside it, with the graph left behind; indexing a 0-d tensor is an error.",
+]
+
+[quest.quiz]
+choices = [
+  'v = loss.numpy()',
+  'v = loss.item()',
+  'v = loss.detach()',
+  'v = loss[0]',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "pytorch.cheatsheet.18.load-state-dict"
+node        = 18
+title       = "THE WEIGHTS COME HOME"
+difficulty  = 3
+story       = "The checkpoint spent the night on a USB stick in a Wan Chai locker. Morning: back into a net of the same shape."
+concepts    = ["modules", "serialization"]
+requires    = ["pytorch.cheatsheet.17.item"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+The weights were saved with `torch.save(model.state_dict(), p)`. Now a
+fresh `model = Net()` has been built. Which line puts those weights back
+into it, leaving `model` an `nn.Module`?
+'''
+solution    = 'model.load_state_dict(torch.load(p))'
+hints = [
+  "Two steps in one line: read the dictionary off disk, then hand that dictionary to the module's loader. Reading the file alone gives you a dict, not a model.",
+]
+
+[quest.quiz]
+choices = [
+  'model = torch.load(p)',
+  'model.load_state_dict(p)',
+  'model.state_dict() = torch.load(p)',
+  'model.load_state_dict(torch.load(p))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "pytorch.cheatsheet.19.keepdim"
+node        = 19
+title       = "EVERY ROW TO ONE"
+difficulty  = 3
+story       = "Five stalls on Bowrington Road, three shifts of takings: each stall's shares by shift must add up to one."
+concepts    = ["broadcasting", "tensors"]
+requires    = ["pytorch.cheatsheet.18.load-state-dict"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+`x` has shape `(5, 3)`. Broadcasting lines shapes up from the right, so a
+`(5, 1)` divides a `(5, 3)` row by row. Which line makes `s`, the row sums,
+with shape `(5, 1)`, so that `x / s` normalises each row?
+'''
+solution    = 's = x.sum(dim=1, keepdim=True)'
+hints = [
+  "A reduction normally drops the axis it sums over; ask it to keep that axis as size 1 instead. A plain `(5,)` against `(5, 3)` does not line up.",
+]
+
+[quest.quiz]
+choices = [
+  's = x.sum(dim=1, keepdim=True)',
+  's = x.sum(dim=1)',
+  's = x.sum(dim=0, keepdim=True)',
+  's = x.sum(dim=1).unsqueeze(0)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "pytorch.cheatsheet.20.clip-grad"
+node        = 20
+title       = "THE CIRCUIT BREAKER"
+difficulty  = 4
+story       = "When the lights on Yee Wo Street surge, the breaker trips before the step is taken — never after."
+concepts    = ["optimizers", "training-loop", "autograd"]
+requires    = ["pytorch.cheatsheet.19.keepdim"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+The gradients are exploding. Fill the blank so that the **total gradient
+norm** of `model` is capped at `1.0` before the update:
+
+```
+opt.zero_grad()
+loss.backward()
+# ____
+opt.step()
+```
+'''
+solution    = 'torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)'
+hints = [
+  "The clipper wants the iterable of parameters, not the module itself, and it is the norm that gets capped — a sister function caps each value instead.",
+]
+
+[quest.quiz]
+choices = [
+  'torch.nn.utils.clip_grad_value_(model.parameters(), 1.0)',
+  'torch.nn.utils.clip_grad_norm_(model, 1.0)',
+  'torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)',
+  'loss = loss.clamp(max=1.0)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "pytorch.cheatsheet.21.randn"
+node        = 21
+title       = "THE BELL CURVE"
+difficulty  = 1
+story       = "Fresh weights for the fare predictor at the Causeway Bay MTR gate: mean zero, spread one, before anything is learned."
+concepts    = ["tensors", "initialization"]
+requires    = ["pytorch.cheatsheet.20.clip-grad"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+Make `w`, a tensor of shape `(3, 4)` drawn from the **standard normal**
+distribution — mean 0, standard deviation 1 — using torch's own generator.
+'''
+solution    = 'w = torch.randn(3, 4)'
+hints = [
+  "Two torch functions take the sizes as plain arguments and fill with random numbers; the one with the shorter name is uniform on [0, 1), and NumPy's gives an ndarray.",
+]
+
+[quest.quiz]
+choices = [
+  'w = torch.rand(3, 4)',
+  'w = np.random.randn(3, 4)',
+  'w = torch.randn(3, 4)',
+  'w = torch.random(3, 4)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "pytorch.cheatsheet.22.shape"
+node        = 22
+title       = "COUNT THE COLUMNS"
+difficulty  = 1
+story       = "A batch of score sheets from the Tin Hau digit reader. Nobody said how many classes, so ask the tensor."
+concepts    = ["tensors", "types"]
+requires    = ["pytorch.cheatsheet.21.randn"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`logits` has two dims: one row per sample, one column per class. Which line
+gives `c`, the **number of classes**, as a plain `int`?
+'''
+solution    = 'c = logits.shape[1]'
+hints = [
+  "The shape is a tuple-like value you index, not a method you call; one of the choices counts the samples instead, and one is a method that was never called.",
+]
+
+[quest.quiz]
+choices = [
+  'c = logits.shape[1]',
+  'c = len(logits)',
+  'c = logits.shape(1)',
+  'c = logits.size',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "pytorch.cheatsheet.23.column"
+node        = 23
+title       = "ONE COLUMN, ALL ROWS"
+difficulty  = 1
+story       = "The rent table for Russell Street: shops down the side, months across. The landlord only wants February."
+concepts    = ["tensors", "slices"]
+requires    = ["pytorch.cheatsheet.22.shape"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`x` has shape `(5, 4)`: five shops, four months. Which line gives `feb`,
+the **second column** for every shop, with shape `(5,)`?
+'''
+solution    = 'feb = x[:, 1]'
+hints = [
+  "One index per axis, separated by a comma, and a bare colon means every element along that axis. Three of these pick out a row.",
+]
+
+[quest.quiz]
+choices = [
+  'feb = x[1]',
+  'feb = x[1, :]',
+  'feb = x[:][1]',
+  'feb = x[:, 1]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "pytorch.cheatsheet.24.mask"
+node        = 24
+title       = "ONLY THE WINNERS"
+difficulty  = 2
+story       = "A night of takings at Jardine's Bazaar, some stalls in the red. The accountant wants the positive ones in a list, nothing else."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.cheatsheet.23.column"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+`x = torch.tensor([-1., 2., -3., 4.])`. Which line gives `p`, a **1-d
+tensor of the positive values** — here `tensor([2., 4.])`?
+'''
+solution    = 'p = x[x > 0]'
+hints = [
+  "A comparison makes a tensor of booleans the same shape as `x`; put that tensor between the square brackets. One choice stops at the booleans, one gives positions.",
+]
+
+[quest.quiz]
+choices = [
+  'p = x > 0',
+  'p = x[x > 0]',
+  'p = torch.where(x > 0)',
+  'p = x.filter(x > 0)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "pytorch.cheatsheet.25.clamp"
+node        = 25
+title       = "NOTHING BELOW ZERO"
+difficulty  = 2
+story       = "The thermostat in the server room under Hysan Place cannot be set below zero, but the dial goes to forty."
+concepts    = ["tensors", "broadcasting"]
+requires    = ["pytorch.cheatsheet.24.mask"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`x` holds values anywhere between `-40.` and `40.`. Which line makes `y`,
+where every **negative** entry becomes `0.` and every other entry is kept
+**exactly as it is**?
+'''
+solution    = 'y = x.clamp(min=0)'
+hints = [
+  "There is a tensor method that pins values to a range; give it only the floor. One choice gives it a ceiling too, one hands a Python int to a function that wants a tensor, and one never calls the method.",
+]
+
+[quest.quiz]
+choices = [
+  'y = x.clamp(min=0)',
+  'y = x.clamp(0, 1)',
+  'y = torch.maximum(x, 0)',
+  'y = x.relu',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "pytorch.cheatsheet.26.max-values"
+node        = 26
+title       = "THE BEST SCORE, NOT ITS SEAT"
+difficulty  = 2
+story       = "The judges at the Victoria Park chess tables post each player's top score. Which board it came from is another column."
+concepts    = ["tensors", "loss-functions"]
+requires    = ["pytorch.cheatsheet.25.clamp"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`logits` has shape `(B, C)`. Which line gives `best`, the **largest score
+in each row**, as a tensor of shape `(B,)` — the scores themselves, not
+which column they sat in?
+'''
+solution    = 'best = logits.max(dim=1).values'
+hints = [
+  "With a `dim`, the max method hands back a pair — the values and where they were — so pick the half you want by name. Without a `dim` you get one number for the whole tensor.",
+]
+
+[quest.quiz]
+choices = [
+  'best = logits.max()',
+  'best = logits.max(dim=1)',
+  'best = logits.max(dim=0).values',
+  'best = logits.max(dim=1).values',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "pytorch.cheatsheet.27.sequential"
+node        = 27
+title       = "THE MIDDLE FLOOR"
+difficulty  = 2
+story       = "Three floors of a Times Square escalator run: up, a landing, up again. The landing is a thing you stand on, not a blueprint of one."
+concepts    = ["modules", "structs"]
+requires    = ["pytorch.cheatsheet.26.max-values"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+Fill the blank so that `model` is a two-layer net with a ReLU between the
+layers, built with `nn.Sequential`:
+
+```
+model = nn.Sequential(
+    nn.Linear(4, 8),
+    # ____
+    nn.Linear(8, 2),
+)
+```
+'''
+solution    = 'nn.ReLU(),'
+hints = [
+  "Sequential only accepts modules — instances, not classes and not bare functions. Two of these name the activation without making one; one is a function missing its input.",
+]
+
+[quest.quiz]
+choices = [
+  'nn.ReLU,',
+  'nn.ReLU(),',
+  'torch.relu,',
+  'F.relu(),',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "pytorch.cheatsheet.28.linear"
+node        = 28
+title       = "IN BEFORE OUT"
+difficulty  = 2
+story       = "Every 28-by-28 ticket stub from Hong Kong Stadium is flattened to 784 numbers, and the gate has ten turnstiles."
+concepts    = ["modules", "matrix"]
+requires    = ["pytorch.cheatsheet.27.sequential"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`xb` has shape `(B, 784)` and there are 10 classes. Which line makes
+`fc`, a fully connected layer so that `fc(xb)` has shape `(B, 10)`?
+'''
+solution    = 'fc = nn.Linear(784, 10)'
+hints = [
+  "The constructor takes two plain integers: the size of what comes in, then the size of what goes out. One choice has them backwards, one wraps them in a tuple, and one is spelled the Keras way.",
+]
+
+[quest.quiz]
+choices = [
+  'fc = nn.Linear(10, 784)',
+  'fc = nn.Dense(784, 10)',
+  'fc = nn.Linear(784, 10)',
+  'fc = nn.Linear((784, 10))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "pytorch.cheatsheet.29.optimizer"
+node        = 29
+title       = "HAND OVER THE KEYS"
+difficulty  = 3
+story       = "The courier at the Sugar Street depot can only move the parcels she is handed — not the whole building."
+concepts    = ["optimizers", "modules", "training-loop"]
+requires    = ["pytorch.cheatsheet.28.linear"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`model` is an `nn.Module`. Which line builds `opt`, an **Adam** optimiser
+over the model's trainable tensors with a learning rate of `1e-3`?
+'''
+solution    = 'opt = torch.optim.Adam(model.parameters(), lr=1e-3)'
+hints = [
+  "An optimiser wants an iterable of tensors, not the module and not a method object — so call the accessor. And it cannot be built with no parameters at all.",
+]
+
+[quest.quiz]
+choices = [
+  'opt = torch.optim.Adam(model, lr=1e-3)',
+  'opt = torch.optim.Adam(model.parameters(), lr=1e-3)',
+  'opt = torch.optim.Adam(model.parameters, lr=1e-3)',
+  'opt = torch.optim.Adam(lr=1e-3)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "pytorch.cheatsheet.30.accuracy"
+node        = 30
+title       = "THE SCORE ON THE BOARD"
+difficulty  = 3
+story       = "Exam night at the Central Library is over. Mei wants one fraction for the log line: how many the net got right, out of the batch."
+concepts    = ["training-loop", "tensors", "types", "testing"]
+requires    = ["pytorch.cheatsheet.29.optimizer"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`pred` and `yb` are both `int64` tensors of shape `(B,)` — the predicted
+and true class per sample. Which line gives `acc`, the **fraction** of
+samples predicted correctly, as a 0-d float tensor?
+'''
+solution    = 'acc = (pred == yb).float().mean()'
+hints = [
+  "The comparison gives booleans, and a mean cannot be taken over booleans — change their type first. A sum is a count, not a fraction, and watch where the parentheses close.",
+]
+
+[quest.quiz]
+choices = [
+  'acc = (pred == yb).mean()',
+  'acc = (pred == yb).sum()',
+  'acc = pred == yb.float().mean()',
+  'acc = (pred == yb).float().mean()',
+]
+answer  = 3

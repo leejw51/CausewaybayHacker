@@ -1,0 +1,914 @@
+# GO LAND — CHEATSHEET. The grammar off the page, asked: one question per
+# section of the Go live-coding cheatsheet (~/vivid/Cheatsheet,
+# go_cheatsheet.html), four lines, one right. Nothing is typed and nothing
+# is compiled — the pick is the submission, and the server judges it against
+# the quiz (SPEC §0). The three wrong lines are near-misses: another
+# language's spelling, a result thrown away, a copy where a pointer was meant.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "go.cheatsheet"
+land = "go"
+category = "cheatsheet"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "go.cheatsheet.01.flush"
+node        = 1
+title       = "FLUSH OR NOTHING"
+difficulty  = 1
+story       = "06:30, Jardine's Bazaar. The kiosk printed all night into a buffer, and nobody ever saw a line."
+concepts    = ["io", "strings"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+Output goes through a buffered writer. Which line makes sure everything
+written to `out` actually reaches the screen when `main` returns?
+
+```
+out := bufio.NewWriter(os.Stdout)
+// ____
+fmt.Fprintln(out, ans)
+```
+'''
+solution    = 'defer out.Flush()'
+hints = [
+  "A `bufio.Writer` holds bytes until it is flushed, and `defer` needs a call, with the parentheses.",
+]
+
+[quest.quiz]
+choices = [
+  'defer out.Close()',
+  'defer out.Flush',
+  'defer out.Flush()',
+  'defer os.Stdout.Sync()',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "go.cheatsheet.02.fields"
+node        = 2
+title       = "LOOSE SPACES"
+difficulty  = 1
+story       = "The order slip from the cha chaan teng says \"3   5\", typed by a waiter in a hurry."
+concepts    = ["io", "strings"]
+requires    = ["go.cheatsheet.01.flush"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+`sc.Scan()` just read the line `"3   5"` (several spaces between). Which
+line turns it into the two tokens `["3", "5"]`?
+'''
+solution    = 'f := strings.Fields(sc.Text())'
+hints = [
+  "Splitting on one space leaves empty strings between the runs. There is a function that splits on any run of whitespace.",
+]
+
+[quest.quiz]
+choices = [
+  'f := strings.Fields(sc.Text())',
+  'f := strings.Split(sc.Text(), " ")',
+  'f := sc.Text().split()',
+  'f := strings.Fields(sc.Text)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "go.cheatsheet.03.zero-pad"
+node        = 3
+title       = "FIVE DIGITS"
+difficulty  = 1
+story       = "Ticket numbers at the Hysan Place counter are always five digits, zeros in front."
+concepts    = ["io", "strings"]
+requires    = ["go.cheatsheet.02.fields"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+`n` is `42`. Print it as `00042`, then a newline.
+'''
+solution    = 'fmt.Printf("%05d\n", n)'
+hints = [
+  "A `0` before the width pads with zeros instead of spaces.",
+]
+
+[quest.quiz]
+choices = [
+  'fmt.Printf("%5d\n", n)',
+  'fmt.Printf("%-5d\n", n)',
+  'fmt.Printf("{:05}\n", n)',
+  'fmt.Printf("%05d\n", n)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "go.cheatsheet.04.inclusive"
+node        = 4
+title       = "ONE TO TEN"
+difficulty  = 1
+story       = "The tram stops are numbered 1 to 10, and the last one is the one people forget."
+concepts    = ["control-flow", "iteration"]
+requires    = ["go.cheatsheet.03.zero-pad"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+Loop over 1, 2, … 10 — ten included.
+'''
+solution    = 'for i := 1; i <= 10; i++ {'
+hints = [
+  "Go has one loop keyword and no parentheses around its clauses. `range 10` counts from 0.",
+]
+
+[quest.quiz]
+choices = [
+  'for i := range 10 {',
+  'for i := 1; i <= 10; i++ {',
+  'for i in 1..=10 {',
+  'for (i := 1; i <= 10; i++) {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "go.cheatsheet.05.float-div"
+node        = 5
+title       = "HALF A BOWL"
+difficulty  = 1
+story       = "Seven bowls of wonton noodles split two ways. The till insists each person gets three."
+concepts    = ["types", "math"]
+requires    = ["go.cheatsheet.04.inclusive"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+`n := 7` and `m := 2` are `int`s. Make `f` the `float64` value `3.5`.
+'''
+solution    = 'f := float64(n) / float64(m)'
+hints = [
+  "`int / int` truncates before any conversion happens. Convert each side first.",
+]
+
+[quest.quiz]
+choices = [
+  'f := float64(n / m)',
+  'f := n / m as float64',
+  'f := float64(n) / float64(m)',
+  'f := (float64)n / m',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "go.cheatsheet.06.append"
+node        = 6
+title       = "ALWAYS REASSIGN"
+difficulty  = 2
+story       = "The queue outside the Sogo lift grows by one. The list on the clipboard has to say so."
+concepts    = ["slices", "collections"]
+requires    = ["go.cheatsheet.05.float-div"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+`s` is a `[]int`. Add `x` to its end.
+'''
+solution    = 's = append(s, x)'
+hints = [
+  "`append` returns the slice — possibly a new backing array — and does not change `s` by itself.",
+]
+
+[quest.quiz]
+choices = [
+  's = append(s, x)',
+  'append(s, x)',
+  's.append(x)',
+  's.push(x)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "go.cheatsheet.07.comma-ok"
+node        = 7
+title       = "ZERO IS STILL THERE"
+difficulty  = 2
+story       = "The stall on Paterson Street sold zero egg tarts today. That is not the same as having no stall."
+concepts    = ["hashing", "collections"]
+requires    = ["go.cheatsheet.06.append"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+`m` is a `map[string]int`. Enter the block only if the key `k` is
+present — a stored `0` counts as present.
+'''
+solution    = 'if _, ok := m[k]; ok {'
+hints = [
+  "A missing key reads as the zero value. Ask the map for its second result.",
+]
+
+[quest.quiz]
+choices = [
+  'if m[k] != 0 {',
+  'if k in m {',
+  'if m.has(k) {',
+  'if _, ok := m[k]; ok {',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "go.cheatsheet.08.rune"
+node        = 8
+title       = "TWO BYTES, ONE LETTER"
+difficulty  = 2
+story       = "The café sign on Lee Garden Road has an accent on it, and the byte counter got the second letter wrong."
+concepts    = ["strings", "types"]
+requires    = ["go.cheatsheet.07.comma-ok"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+`s := "héllo"`. Make `r` the second character, `'é'`, as a `rune`.
+'''
+solution    = 'r := []rune(s)[1]'
+hints = [
+  "Indexing a string gives a byte, and `é` is two bytes in UTF-8. Convert to runes first.",
+]
+
+[quest.quiz]
+choices = [
+  'r := s[1]',
+  'r := []rune(s)[1]',
+  'r := rune(s[1])',
+  'r := s.charAt(1)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "go.cheatsheet.09.rec-closure"
+node        = 9
+title       = "NAME IT FIRST"
+difficulty  = 2
+story       = "The alleys behind Yiu Wa Street fold back on themselves. The walker has to know its own name to keep going."
+concepts    = ["closures", "recursion"]
+requires    = ["go.cheatsheet.08.rune"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+Inside `main`, a closure `dfs` that calls itself. Which first line
+compiles?
+
+```
+// ____
+    vis[u] = true
+    for _, v := range adj[u] { if !vis[v] { dfs(v) } }
+}
+```
+'''
+solution    = 'var dfs func(u int); dfs = func(u int) {'
+hints = [
+  "A variable is not in scope inside its own initializer. Declare it, then assign.",
+]
+
+[quest.quiz]
+choices = [
+  'dfs := func(u int) {',
+  'var dfs = func(u int) {',
+  'var dfs func(u int); dfs = func(u int) {',
+  'func dfs(u int) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "go.cheatsheet.10.ptr-receiver"
+node        = 10
+title       = "MOVE THE REAL ONE"
+difficulty  = 3
+story       = "The pin on the Times Square map should move one block east. Moving a photocopy of the map does nothing."
+concepts    = ["structs", "pointers"]
+requires    = ["go.cheatsheet.09.rec-closure"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+`type P struct{ X, Y int }`. Write the method `Shift` so that after
+`p.Shift(1)` the caller's `p.X` really has grown by one.
+'''
+solution    = 'func (p *P) Shift(d int) { p.X += d }'
+hints = [
+  "A value receiver works on a copy. Field access through a pointer is automatic.",
+]
+
+[quest.quiz]
+choices = [
+  'func (p P) Shift(d int) { p.X += d }',
+  'func (p &P) Shift(d int) { p.X += d }',
+  'func (p *P) Shift(d int) { *p.X += d }',
+  'func (p *P) Shift(d int) { p.X += d }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "go.cheatsheet.11.wrap"
+node        = 11
+title       = "KEEP THE CAUSE"
+difficulty  = 3
+story       = "The complaint form at the Causeway Bay post office has a box for your note, and the original letter is stapled behind it."
+concepts    = ["error-handling", "strings"]
+requires    = ["go.cheatsheet.10.ptr-receiver"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+Inside a `func parse(s string) (int, error)`. Return the error with some
+context added, so that a caller's `errors.Is(err, strconv.ErrSyntax)`
+still matches.
+
+```
+n, err := strconv.Atoi(s)
+if err != nil {
+    // ____
+}
+```
+'''
+solution    = 'return 0, fmt.Errorf("parse %q: %w", s, err)'
+hints = [
+  "Only one formatting verb wraps the error so `errors.Is` can see through it.",
+]
+
+[quest.quiz]
+choices = [
+  'return 0, fmt.Errorf("parse %q: %w", s, err)',
+  'return 0, fmt.Errorf("parse %q: %v", s, err)',
+  'return 0, errors.New("parse: " + err)',
+  'return 0, errors.Wrap(err, "parse")',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "go.cheatsheet.12.close-results"
+node        = 12
+title       = "LAST ONE OUT"
+difficulty  = 3
+story       = "Four couriers work the night out of a Percival Street back room. Someone has to lock the door after the last one is back, and not before."
+concepts    = ["concurrency", "channels"]
+requires    = ["go.cheatsheet.11.wrap"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+A worker pool. Each worker calls `wg.Done()` when `jobs` runs dry, and
+`jobs` is closed by the producer. Which line makes the final `range`
+end once every worker is finished — with no deadlock and no panic?
+
+```
+results := make(chan int) // unbuffered
+for w := 0; w < 4; w++ { wg.Add(1); go worker(jobs, results, &wg) }
+// ____
+for r := range results { fmt.Println(r) }
+```
+'''
+solution    = 'go func() { wg.Wait(); close(results) }()'
+hints = [
+  "The waiting has to happen beside the reader, not before it: the workers block on an unbuffered send until `main` reads.",
+]
+
+[quest.quiz]
+choices = [
+  'wg.Wait(); close(results)',
+  'go func() { wg.Wait(); close(results) }()',
+  'close(results)',
+  'defer close(results)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "go.cheatsheet.13.concat"
+node        = 13
+title       = "FRESH BACKING"
+difficulty  = 2
+story       = "Two queues merge at the Sogo crossing, and the marshal wants a brand-new list — not one scribbled over the first queue's clipboard."
+concepts    = ["slices", "collections"]
+requires    = ["go.cheatsheet.12.close-results"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+`a` and `b` are `[]int`. Make `c` one slice holding `a`'s elements
+followed by `b`'s, such that a later `c[0] = 9` leaves `a` untouched —
+even when `a` has spare capacity.
+'''
+solution    = 'c := slices.Concat(a, b)'
+hints = [
+  "`append` reuses the first argument's backing array when it has room. Go 1.22 added a function that always allocates a new one.",
+]
+
+[quest.quiz]
+choices = [
+  'c := append(a, b...)',
+  'c := slices.Concat(a, b)',
+  'c := append(a, b)',
+  'c := copy(a, b)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "go.cheatsheet.14.sort-desc"
+node        = 14
+title       = "BEST ON TOP"
+difficulty  = 2
+story       = "The egg-tart league table goes up on the wall of the Tai Hang bakery tonight, best score at the top."
+concepts    = ["sorting", "closures", "structs"]
+requires    = ["go.cheatsheet.13.concat"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+`type P struct{ N string; S int }` and `ps` is a `[]P`. Sort `ps` in
+place so the highest `S` comes first.
+'''
+solution    = 'sort.Slice(ps, func(i, j int) bool { return ps[i].S > ps[j].S })'
+hints = [
+  "The index-based comparator answers \"should `i` come before `j`?\" — for highest-first, the bigger one comes first.",
+]
+
+[quest.quiz]
+choices = [
+  'sort.Slice(ps, func(i, j int) bool { return ps[i].S < ps[j].S })',
+  'slices.SortFunc(ps, func(a, b P) int { return a.S - b.S })',
+  'sort.Slice(ps, func(i, j int) bool { return ps[i].S > ps[j].S })',
+  'sort.Slice(ps, func(a, b P) bool { return a.S > b.S })',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "go.cheatsheet.15.nil-map"
+node        = 15
+title       = "NO PAGES YET"
+difficulty  = 2
+story       = "The new tally book at the Jardine's Crescent stall has no pages in it yet; the first tick tears straight through the cover."
+concepts    = ["zero-values", "collections", "panics"]
+requires    = ["go.cheatsheet.14.sort-desc"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+All three lines sit together in `main`, in the same block. Which line
+goes in the blank so the increment does not panic?
+
+```
+var m map[string]int
+// ____
+m["a"]++
+```
+'''
+solution    = 'm = make(map[string]int)'
+hints = [
+  "A declared-but-never-made map is nil: reads give the zero value, writes panic. And `:=` cannot redeclare `m` in the same block.",
+]
+
+[quest.quiz]
+choices = [
+  'm = make(map[string]int)',
+  'm := map[string]int{}',
+  'm = new(map[string]int)',
+  'm = map[string]int(nil)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "go.cheatsheet.16.recv-ok"
+node        = 16
+title       = "ZERO IS A PARCEL COUNT"
+difficulty  = 2
+story       = "The Hoi Ping Road courier radios in parcel counts, and zero parcels is a real report. Only the shutter coming down means the day is over."
+concepts    = ["channels", "concurrency", "zero-values"]
+requires    = ["go.cheatsheet.15.nil-map"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+`ch` is a `chan int`. The sender may well send `0` as a real value, and
+it closes `ch` when it is done. Receive into `v`, and make `ok` false
+only once `ch` is closed and drained.
+'''
+solution    = 'v, ok := <-ch'
+hints = [
+  "The receive expression has a two-value form, like a map lookup.",
+]
+
+[quest.quiz]
+choices = [
+  'v, ok := ch.recv()',
+  'v := <-ch; ok := v != 0',
+  'v, ok := <-ch, true',
+  'v, ok := <-ch',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "go.cheatsheet.17.cancel-send"
+node        = 17
+title       = "CALL TIME"
+difficulty  = 3
+story       = "The night kitchen on Matheson Street passes plates down a line. When the manager calls time, the cook puts the plate down — even with nobody there to take it."
+concepts    = ["channels", "cancellation", "concurrency"]
+requires    = ["go.cheatsheet.16.recv-ok"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+Inside a pipeline stage,
+`func send(ctx context.Context, out chan<- int, v int) error`.
+Send `v` on `out`, but give up and return the context's error the
+moment `ctx` is cancelled — even if nobody is reading `out`.
+'''
+solution    = 'select { case out <- v: case <-ctx.Done(): return ctx.Err() }'
+hints = [
+  "Only `select` waits on two things at once, and each of its cases must be a send or a receive — `Done()` gives you a channel.",
+]
+
+[quest.quiz]
+choices = [
+  'select { case out <- v: case <-ctx.Done(): return ctx.Err() }',
+  'out <- v; if ctx.Err() != nil { return ctx.Err() }',
+  'select { case out <- v: case ctx.Done(): return ctx.Err() }',
+  'select { case out <- v: default: return ctx.Err() }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "go.cheatsheet.18.unmarshal"
+node        = 18
+title       = "FILL THE REAL FORM"
+difficulty  = 3
+story       = "A booking reaches the Lee Garden hotel desk as JSON. The form on the counter has to be filled in — not a photocopy of it."
+concepts    = ["serialization", "pointers", "error-handling"]
+requires    = ["go.cheatsheet.17.cancel-send"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+`s` is a `string` holding JSON, and `var u User` is a plain value.
+Fill `u` from `s`, keeping the error in `err`.
+'''
+solution    = 'err := json.Unmarshal([]byte(s), &u)'
+hints = [
+  "The decoder takes bytes, and it has to be able to write into `u` itself, not into a copy of it.",
+]
+
+[quest.quiz]
+choices = [
+  'err := json.Unmarshal(s, &u)',
+  'err := json.Unmarshal([]byte(s), u)',
+  'err := json.Unmarshal([]byte(s), &u)',
+  'u, err := json.Decode([]byte(s))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "go.cheatsheet.19.bfs-queue"
+node        = 19
+title       = "OLDEST FIRST"
+difficulty  = 3
+story       = "Rainwater spreads through the car park under Times Square one bay at a time, outward from the drain."
+concepts    = ["graphs", "slices", "stacks-queues"]
+requires    = ["go.cheatsheet.18.unmarshal"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+Grid BFS. Which line takes the next point off the queue so the search
+stays breadth-first — and the loop actually ends?
+
+```
+q := []pt{{sr, sc}}
+for len(q) > 0 {
+    // ____
+    for _, d := range dirs {
+        nr, nc := cur.r+d.r, cur.c+d.c
+        if !okCell(nr, nc) { continue }
+        q = append(q, pt{nr, nc})
+    }
+}
+```
+'''
+solution    = 'cur := q[0]; q = q[1:]'
+hints = [
+  "Breadth-first means the oldest entry goes first. Inside the loop body, `:=` makes a new `q`, and the outer one never shrinks.",
+]
+
+[quest.quiz]
+choices = [
+  'cur := q[len(q)-1]; q = q[:len(q)-1]',
+  'cur := q[0]; q = q[1:]',
+  'cur, q := q[0], q[1:]',
+  'cur := q.pop(0)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "go.cheatsheet.20.itoa"
+node        = 20
+title       = "DIGITS, PLEASE"
+difficulty  = 4
+story       = "The ticket machine at Causeway Bay MTR shows gate 65. The printer across the hall hands out a single letter instead."
+concepts    = ["strings", "types", "io"]
+requires    = ["go.cheatsheet.19.bfs-queue"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+`n := 65` is an `int`. Make `s` the string `65` — two characters, the
+digits.
+'''
+solution    = 's := strconv.Itoa(n)'
+hints = [
+  "Converting an integer to `string` gives the character with that code point, not its digits. Look in `strconv`, and mind the argument type.",
+]
+
+[quest.quiz]
+choices = [
+  's := string(n)',
+  's := strconv.FormatInt(n, 10)',
+  's := string(rune(n))',
+  's := strconv.Itoa(n)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "go.cheatsheet.21.both"
+node        = 21
+title       = "BOTH LIGHTS GREEN"
+difficulty  = 1
+story       = "The crossing at Yee Wo Street only clears when the green man and the beeper agree, and the beeper has opinions."
+concepts    = ["control-flow", "types"]
+requires    = ["go.cheatsheet.20.itoa"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+`ready` and `valid` are both `bool`. Write the condition that is true
+only when the two of them are true.
+'''
+solution    = 'ready && valid'
+hints = [
+  "Go spells its logical operators the C way, and the one-character form is not defined on `bool` at all.",
+]
+
+[quest.quiz]
+choices = [
+  'ready and valid',
+  'ready && valid',
+  'ready & valid',
+  '!(!ready || valid)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "go.cheatsheet.22.last"
+node        = 22
+title       = "END OF THE LINE"
+difficulty  = 1
+story       = "The inspector boards the last tram of the night at the Causeway Bay terminus, and the depot numbers its trams from zero."
+concepts    = ["slices", "bindings"]
+requires    = ["go.cheatsheet.21.both"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+`a` is a non-empty `[]int`. Make `x` its last element.
+'''
+solution    = 'x := a[len(a)-1]'
+hints = [
+  "Go has no indexing from the end — a negative constant index does not even compile — and the length is one past the last index.",
+]
+
+[quest.quiz]
+choices = [
+  'x := a[-1]',
+  'x := a[len(a)]',
+  'x := a.last()',
+  'x := a[len(a)-1]',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "go.cheatsheet.23.empty"
+node        = 23
+title       = "STILL A TRAY"
+difficulty  = 1
+story       = "Some afternoons the dim sum trolley on Lockhart Road rolls out with nothing on it, and it is still a trolley with twelve slots."
+concepts    = ["slices", "zero-values"]
+requires    = ["go.cheatsheet.22.last"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+`s` is a `[]int` that may well be non-nil with room to spare — made
+with `make([]int, 0, 16)`, say, or cut back to `s[:0]`. Enter the
+block only when it holds no elements.
+'''
+solution    = 'if len(s) == 0 {'
+hints = [
+  "An empty slice need not be nil, and capacity is room, not contents.",
+]
+
+[quest.quiz]
+choices = [
+  'if s == nil {',
+  'if cap(s) == 0 {',
+  'if len(s) == 0 {',
+  'if s.isEmpty() {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "go.cheatsheet.24.func-add"
+node        = 24
+title       = "TYPES AFTER NAMES"
+difficulty  = 1
+story       = "Alex on Percival Street writes the till's adding routine the Go way; the new hire keeps writing it the C way and wondering why the build is red."
+concepts    = ["functions", "types"]
+requires    = ["go.cheatsheet.23.empty"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+Declare `add`, taking two `int`s and returning their sum as an `int`,
+so that `fmt.Println(add(1, 2))` prints `3`.
+'''
+solution    = 'func add(a, b int) int { return a + b }'
+hints = [
+  "Names first, then the type, and the result type sits after the parameter list — a function declared without one cannot return anything.",
+]
+
+[quest.quiz]
+choices = [
+  'func add(a, b int) int { return a + b }',
+  'func add(a, b int) { return a + b }',
+  'func add(int a, int b) int { return a + b }',
+  'func add(a, b int) -> int { return a + b }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "go.cheatsheet.25.sort-asc"
+node        = 25
+title       = "SMALLEST FIRST"
+difficulty  = 2
+story       = "The ticket stubs from the Sugar Street tram stop land on the clerk's desk in any order, and the clerk wants the lowest number on top."
+concepts    = ["sorting", "slices"]
+requires    = ["go.cheatsheet.24.func-add"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+`a` is a `[]int`, and `slices` is imported (Go 1.21+). Sort `a` in
+place, ascending, in one call.
+'''
+solution    = 'slices.Sort(a)'
+hints = [
+  "The generic package takes one argument — the slice itself, not its address. The old `sort` package wants an `Interface` or a comparator.",
+]
+
+[quest.quiz]
+choices = [
+  'sort.Slice(a)',
+  'slices.Sort(a)',
+  'sort.Sort(a)',
+  'slices.Sort(&a)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "go.cheatsheet.26.reverse"
+node        = 26
+title       = "BACK TO FRONT"
+difficulty  = 2
+story       = "After the Noon Day Gun the crowd files out of the harbour-front gate in exactly the reverse order it came in."
+concepts    = ["slices", "iteration"]
+requires    = ["go.cheatsheet.25.sort-asc"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+`a` is a `[]int`, and `slices` is imported (Go 1.21+). Reverse `a` in
+place, in one line, and keep using `a` afterwards.
+'''
+solution    = 'slices.Reverse(a)'
+hints = [
+  "It works on the slice it is handed and returns nothing, so there is nothing to assign — and `sort`'s function of the same name is for an `Interface`.",
+]
+
+[quest.quiz]
+choices = [
+  'a = slices.Reverse(a)',
+  'sort.Reverse(a)',
+  'slices.Reverse(&a)',
+  'slices.Reverse(a)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "go.cheatsheet.27.clone"
+node        = 27
+title       = "YOUR OWN COPY"
+difficulty  = 2
+story       = "The Fashion Walk sign-up sheet gets photocopied for the second shop, and a tick on the copy must not show up on the original."
+concepts    = ["slices", "collections"]
+requires    = ["go.cheatsheet.26.reverse"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+`s` is a `[]int`, and `slices` is imported (Go 1.21+). Make `c` a copy
+of `s` such that a later `c[0] = 9` leaves `s` untouched.
+'''
+solution    = 'c := slices.Clone(s)'
+hints = [
+  "Assignment and re-slicing hand out the same backing array, and the builtin that copies wants a destination you have already made.",
+]
+
+[quest.quiz]
+choices = [
+  'c := s[:]',
+  'c := s',
+  'c := slices.Clone(s)',
+  'c := copy(s)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "go.cheatsheet.28.switch"
+node        = 28
+title       = "ONE OR TWO"
+difficulty  = 2
+story       = "The Lucky Mac on Russell Street calls a table of one or two \"small\", and the host is tired of writing the rule out twice."
+concepts    = ["control-flow", "bindings"]
+requires    = ["go.cheatsheet.27.clone"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+`x` is an `int`. Fill the blank so `s` becomes `"small"` when `x` is
+1 or 2 — and the other cases keep doing what they do.
+
+```
+switch x {
+case 0:
+    s = "zero"
+// ____
+default:
+    s = "big"
+}
+```
+'''
+solution    = 'case 1, 2: s = "small"'
+hints = [
+  "A Go case ends where the next one begins — nothing falls through on its own — and one case can name more than one value.",
+]
+
+[quest.quiz]
+choices = [
+  'case 1, 2: s = "small"',
+  'case 1: case 2: s = "small"',
+  'case 1 || 2: s = "small"',
+  'case 1, 2 => s = "small"',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "go.cheatsheet.29.abs"
+node        = 29
+title       = "THREE TILES SHORT"
+difficulty  = 2
+story       = "Under the Canal Road flyover a slipper that lands three tiles short scores the same as one that lands three tiles long."
+concepts    = ["math", "types"]
+requires    = ["go.cheatsheet.28.switch"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+`x` is an `int` that may be negative (and small enough that `-x`
+cannot overflow). Make `a` its absolute value — Go 1.21+, no extra
+imports.
+'''
+solution    = 'a := max(x, -x)'
+hints = [
+  "The standard library has no integer absolute value, and `math`'s takes a `float64`. Two builtins that compare arrived in 1.21.",
+]
+
+[quest.quiz]
+choices = [
+  'a := math.Abs(x)',
+  'a := abs(x)',
+  'a := x.Abs()',
+  'a := max(x, -x)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "go.cheatsheet.30.mod"
+node        = 30
+title       = "WRAP THE CLOCK"
+difficulty  = 3
+story       = "Seven stops back from the Victoria Park terminus on a three-stop loop, and the board must still show a stop number, not a minus sign."
+concepts    = ["math", "types"]
+requires    = ["go.cheatsheet.29.abs"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+`x` and `m` are `int`s, `m > 0`, and `x` may be negative — further
+below zero than `-m`, as in `x = -7`, `m = 3`. Make `r` the remainder
+in `0 .. m-1`, so that pair gives `2`.
+'''
+solution    = 'r := ((x % m) + m) % m'
+hints = [
+  "In Go the sign of `%` follows the dividend, and a single add only rescues values down to `-m`.",
+]
+
+[quest.quiz]
+choices = [
+  'r := x % m',
+  'r := ((x % m) + m) % m',
+  'r := (x + m) % m',
+  'r := math.Mod(x, m)',
+]
+answer  = 1

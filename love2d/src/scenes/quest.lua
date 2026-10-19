@@ -123,6 +123,16 @@ function Quest.backdrop(land, category)
   if category == "hacker" then
     return Assets.pick("bg_room732", "bg_flat", "bg_night")
   end
+  if category == "cheatsheet" then
+    -- CHEATSHEET is the print shop on every land: the sheets on the cork
+    -- board are the ones the questions come from. The browser draws the
+    -- same plate (frontend/src/scenes/quest.ts).
+    return Assets.pick("bg_cheatsheet", "bg_street", "bg_flat")
+  end
+  if category == "cheatsheet_advanced" then
+    -- ADVANCED is the floor above the print shop, after hours.
+    return Assets.pick("bg_cheatsheet_pro", "bg_cheatsheet", "bg_street", "bg_flat")
+  end
   if category == "frameworks" then
     -- FRAMEWORKS (Rust Land only) is the job: the payment path off
     -- Gloucester Road, the settlement on the machines in the back room. The
@@ -410,6 +420,12 @@ function Quest:refresh()
     self.quest = payload.quest
     -- The quiz comes first on VERY BASIC; a cleared quest is past it.
     self.quiz_right = not (self.quest.quiz and self.quest.state ~= "cleared")
+    -- CHEATSHEET is the quiz and nothing after it: the pick is the
+    -- submission, so a cleared node can be answered again.
+    if self:cheatsheet() then
+      self.quiz_right = false
+      self.focus = "brief"
+    end
     self.quiz_wrong = nil
     -- §4.8b: the clock arrives with the quest. `opened_at` and `deadline_at`
     -- are the server's and are the *same pair* on every later `quest.get`, so
@@ -467,8 +483,10 @@ end
 
 --- One path for both, because §4.9b gave them the same payload shape on
 --- purpose.
-function Quest:execute(mode)
+function Quest:execute(mode, picked)
   if self.running_mode or not self.quest then return end
+  -- Nothing on CHEATSHEET is compiled; only a pick is sent there.
+  if self:cheatsheet() and not picked then return end
   if mode == "quest.run" and self.run_unsupported then SFX.play("locked"); return end
   if self.quest.state == "locked" then SFX.play("locked"); return end
 
@@ -481,7 +499,8 @@ function Quest:execute(mode)
   self.elapsed_ms = 0
   self.log = nil
   self.log_follow = true
-  self.show_log = true
+  -- A pick has no build log to show; a run or a submit does.
+  self.show_log = not picked
   -- The note row holds one thing at a time, and what SOLVE said belongs to
   -- the buffer as it was before this ran.
   self.solve_note = nil
@@ -492,19 +511,21 @@ function Quest:execute(mode)
   -- The stack gets a step at the two moments the buffer already leaves this
   -- machine. A run or a submit is the clearest "I meant that" a player ever
   -- gives an editor, and the server's duplicate check makes a redundant one
-  -- free.
-  self:edit_push()
+  -- free. A pick is not the buffer and pushes nothing.
+  if not picked then self:edit_push() end
 
   self.app.session:request(mode, {
     quest_id = self.quest.id,
     -- §4.9: `lang` must match the quest's language — its own `lang` in
     -- REMIX LAND, its land everywhere else.
     lang = Land.lang_of(self.quest, self.app.land),
-    source = self.editor:text(),
+    source = picked or self.editor:text(),
   }, function(ok, payload, why)
     self.running_mode = nil
     self.stage = nil
     if not ok then
+      -- A pick that reached no verdict is not taken: the four are open again.
+      if picked then self.quiz_right = false end
       SFX.play("rejected")
       self.error = why.player
       -- §4.9b is newer than some servers. `not_found` on a run means the
@@ -528,6 +549,13 @@ function Quest:execute(mode)
 
     local attempt = payload.attempt
     if attempt.verdict == "accepted" then SFX.play("accepted") else SFX.play("rejected") end
+    if picked and attempt.verdict ~= "accepted" then
+      -- A wrong pick is recorded (it costs a star) and the four stay up —
+      -- whatever this client made of the line, the server's word is final.
+      self.quiz_right = false
+      self.app.session:apply_xp(payload.xp)
+      return
+    end
 
     if is_run then
       -- Stay here. A run is an iteration, not an outcome, and bouncing the
@@ -701,6 +729,9 @@ end
 
 function Quest:take_hint()
   if not self.quest then return end
+  -- CHEATSHEET's hints are authored but the road has no bench to open them
+  -- from, and a key must not buy one into a screen that cannot show it.
+  if self:cheatsheet() then SFX.play("locked"); return end
   local index = self.quest.hints_used or 0
   if index >= (self.quest.hints_total or 0) then
     self.app:toast(I18n.t("no more hints"))
@@ -1625,7 +1656,7 @@ function Quest:solve()
   -- greyed control says it will not do is worse than either behaviour on its
   -- own. (`Quest:format` still has that gap; it is not this round's to close.)
   if not self.quest or self.solving or self.solve_unsupported
-    or self.running_mode then
+    or self.running_mode or self:cheatsheet() then
     if self.solve_unsupported then SFX.play("locked") end
     return
   end
@@ -1978,6 +2009,12 @@ function Quest:panes()
   local top = self:header_h()
   local bottom = math.max(56, UI.footerHeight() + UI.lineHeight(9) + 14)
   local pad = 10
+  -- CHEATSHEET: the question and its four lines are the whole screen.
+  -- There is no editor to share it with, so the brief takes it and the
+  -- code pane is nil — `draw` skips the well and `mousepressed` its bench.
+  if self:cheatsheet() then
+    return { x = pad, y = top, w = vw - pad * 2, h = vh - top - bottom }, nil
+  end
   if Layout.isPortrait() then
     local brief_h = math.floor((vh - top - bottom) * 0.32)
     return
@@ -2219,7 +2256,7 @@ function Quest:draw()
 
   local brief, code = self:panes()
   self:draw_brief(brief, tint)
-  self:draw_editor(code, tint)
+  if code then self:draw_editor(code, tint) end
 
   if self:console_open() then
     self:draw_run_overlay(self.console_rect_drawn)
@@ -2233,7 +2270,8 @@ function Quest:draw()
   -- in portrait once the display controls took the right-hand end of the
   -- strip. What is left is exactly the keys the screen does not otherwise
   -- say out loud.
-  self.app:footer(I18n.t("F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"))
+  self.app:footer(I18n.t(self:cheatsheet() and "PICK THE RIGHT LINE  (1–4)"
+    or "F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"))
 end
 
 --- The clock (PROTOCOL §4.8b), on the header band.
@@ -2320,10 +2358,30 @@ function Quest.choice_boxes(x, y, w, heights, gap)
   return out
 end
 
+--- Whether this is a sheet quest (SPEC §0) — CHEATSHEET BASIC or ADVANCED —
+--- where the pick is the answer.
+function Quest:cheatsheet()
+  return self.quest ~= nil and Land.is_sheet(self.quest.category)
+end
+
 --- One of the four, chosen.
 function Quest:pick(i)
   local result = self.quest and Quest.pick_result(self.quest.quiz, i)
   if not result or self.quiz_right then return end
+  if self:cheatsheet() then
+    -- The pick is the submission: the server judges it and records it, and
+    -- the right one goes to the verdict screen like any clear.
+    if self.running_mode then return end
+    if result == "right" then
+      self.quiz_right = true
+      self.quiz_wrong = nil
+    else
+      self.quiz_wrong = i
+      self.quiz_wrong_at = Anim.now()
+    end
+    self:execute("quest.submit", self.quest.quiz.choices[i])
+    return
+  end
   if result == "right" then
     self.quiz_right = true
     self.quiz_wrong = nil
@@ -2342,8 +2400,13 @@ function Quest:draw_choices(x, y, column, clip)
   local quiz = self.quest and self.quest.quiz
   self.choice_hits = {}
   if not quiz or not quiz.choices then return y end
-  local head = self.quiz_right and I18n.t("RIGHT — NOW TYPE IT")
-    or I18n.t("PICK THE LINE, THEN TYPE IT  (1–4)")
+  local head
+  if self:cheatsheet() then
+    head = self.quiz_right and I18n.t("RIGHT") or I18n.t("PICK THE RIGHT LINE  (1–4)")
+  else
+    head = self.quiz_right and I18n.t("RIGHT — NOW TYPE IT")
+      or I18n.t("PICK THE LINE, THEN TYPE IT  (1–4)")
+  end
   for _, line in ipairs(UI.wrap(head, column, 8)) do
     y = y + UI.text(line, x, y, 8, self.quiz_right and Theme.admit or Theme.coin) + 3
   end
@@ -3479,6 +3542,19 @@ function Quest:keypressed(key, mods)
     SFX.play("back")
     return true
   end
+  -- CHEATSHEET has no editor: the keys that drive one (run, submit, reset,
+  -- format, hint, solve, log, $EDITOR, the stack, the pane switch) do
+  -- nothing here, and say so rather than fall through to a hidden buffer.
+  if self:cheatsheet() then
+    local fkey = key == "f2" or key == "f5" or key == "f6" or key == "f7"
+      or key == "f8" or key == "f9" or key == "f10"
+    local chord = (mods.ctrl or mods.gui) and (key == "return" or key == "kpenter"
+      or key == "f" or key == "z" or key == "tab")
+    if fkey or chord or key == "tab" then
+      SFX.play("locked")
+      return true
+    end
+  end
   -- RUN keeps F5, the reflex key. SUBMIT is F10 — far enough away on the
   -- keyboard that neither is a slip of the other — and ctrl-shift-Enter for
   -- anyone whose hands already know that idiom.
@@ -3642,6 +3718,15 @@ function Quest:mousepressed(x, y, button)
   -- fire on the press and not the release, which is what makes a drag that
   -- started in the text and ended over SUBMIT harmless: the release does
   -- nothing at all.
+  if self:cheatsheet() then
+    -- No bench and no editor on this road: the four lines and the brief
+    -- are all there is to press.
+    for i, r in pairs(self.choice_hits or {}) do
+      if inside(r) then self:pick(i); return end
+    end
+    self.focus = "brief"
+    return
+  end
   if inside(self.solve_rect) then self:solve(); return end
   if inside(self.format_rect) then self:format(); return end
   if inside(self.answer_rect) then self:toggle_answer(); return end

@@ -148,6 +148,10 @@ export const ja: Partial<Catalogue> = {
     "テーブル、クロージャ、メタテーブル、コルーチン。すべてがひとつの構造で、番号は 1 から始まる。",
   "lands.remixBlurb":
     "Go、Rust、Python：同じプログラムを三回。ひとつの概念、三つの文法を指に並べて。",
+  "lands.cheatsheetBlurb":
+    "チートシート基礎。紙の上の核心文法を問う。四行のうち正しいのは一つ。選べばクリア。",
+  "lands.cheatsheetAdvancedBlurb":
+    "チートシート応用。トレイト、チャネル、ジェネリクス、クロージャ——ライブコーディングの勝負どころのパターン。四行のうち正しいのは一つ。",
   "lands.verybasicBlurb": "クイズ。どの行が正しい文法か。四つから一つ選び、その行を打つ。",
   "lands.basicBlurb":
     "朝の散歩。文法をひとつずつ読んで、一行から四行だけ書く — ライブコーディングの画面が指に馴染んでいると決めてかかる、その文法。",
@@ -178,6 +182,8 @@ export const ja: Partial<Catalogue> = {
   "map.playground": "プレイグラウンド",
   "map.allMapsShort": "マップ",
   "map.playgroundShort": "練習",
+  "map.cheatsheet": "チートシート基礎",
+  "map.cheatsheet_advanced": "チートシート応用",
   "map.verybasic": "超基礎",
   "map.basic": "ベーシック",
   "map.advanced": "アドバンス",
@@ -218,6 +224,10 @@ export const ja: Partial<Catalogue> = {
   "map.footer": "←→  ストリート   ENTER  入る   TAB  ランド   Q/E  カテゴリ   F1  画面の向き",
 
   "quest.loading": "読み込み中",
+  "quest.sheetPick": "正しい行を選ぶ  (1–4)",
+  "quest.sheetRight": "正解",
+  "quest.sheetStreak": "連続 ×{n}",
+  "quest.sheetCombo": "×{n} コンボ",
   "quest.quizPick": "正しい行を選んで、その行を打つ  (1–4)",
   "quest.quizRight": "正解 — その行を打とう",
   "quest.job": "今回の課題",
@@ -295,6 +305,7 @@ export const ja: Partial<Catalogue> = {
   "quest.noFormat": "このサーバーにはまだ整形がありません",
   "quest.formatSilent": "フォーマッタが応答しませんでした",
   "quest.briefEnglish": "課題文は英語です — 問題文はまだ翻訳されていません",
+  "quest.sheetFooter": "1–4  選ぶ   ESC  マップ",
   "quest.footer":
     "CTRL+ENTER  実行   CTRL+SHIFT+ENTER  提出   CTRL+SHIFT+F  整形   PGUP/PGDN  ログ   ESC  マップ",
   "verdict.accepted": "サンプルは通りました",

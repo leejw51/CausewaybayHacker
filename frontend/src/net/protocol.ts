@@ -186,37 +186,65 @@ export function nextLand(lands: readonly Land[], current: Land): Land {
   if (lands.length === 0) return current;
   return lands[(lands.indexOf(current) + 1) % lands.length];
 }
-export type Category = "verybasic" | "basic" | "advanced" | "hacker" | "frameworks";
+export type Category =
+  | "cheatsheet"
+  | "cheatsheet_advanced"
+  | "verybasic"
+  | "basic"
+  | "advanced"
+  | "hacker"
+  | "frameworks";
 /**
- * SPEC §0's roads, in the order they are walked. The first four are every
- * language land's; FRAMEWORKS — the crates road, the job after the
- * interview — is Rust Land's alone, and comes last.
+ * The two sheet roads (SPEC §0): CHEATSHEET BASIC, the core grammar, and
+ * CHEATSHEET ADVANCED, the patterns — traits, channels, generics, closures.
+ * On both the quiz is the quest: four lines, one right, the pick sent as the
+ * submission and judged without a compiler.
+ */
+export function isSheet(category: string): boolean {
+  return category === "cheatsheet" || category === "cheatsheet_advanced";
+}
+/**
+ * SPEC §0's roads, in the order they are walked. The two sheet roads —
+ * CHEATSHEET BASIC and CHEATSHEET ADVANCED, four lines and one right — are
+ * every land's and come first; the next four are every language land's;
+ * FRAMEWORKS — the crates road, the job after the interview — is Rust
+ * Land's alone, and comes last.
  */
 export const CATEGORIES: readonly Category[] = [
+  "cheatsheet",
+  "cheatsheet_advanced",
   "verybasic",
   "basic",
   "advanced",
   "hacker",
   "frameworks",
 ];
-/** The four roads every language land has. */
-export const LANGUAGE_ROADS: readonly Category[] = ["verybasic", "basic", "advanced", "hacker"];
+/** The six roads every language land has. */
+export const LANGUAGE_ROADS: readonly Category[] = [
+  "cheatsheet",
+  "cheatsheet_advanced",
+  "verybasic",
+  "basic",
+  "advanced",
+  "hacker",
+];
 /**
- * The roads a land has (SPEC §0). Every language land has the four; RUST has
- * FRAMEWORKS as a fifth; REMIX LAND has the two grammar roads only, and a
- * switcher that offered it an ADVANCED or a HACKER would be offering a map
- * with nothing on it.
+ * The roads a land has (SPEC §0). Every language land has the six; RUST has
+ * FRAMEWORKS as a seventh; REMIX LAND has the two sheet roads and the two
+ * grammar roads only, and a switcher that offered it an ADVANCED or a HACKER
+ * would be offering a map with nothing on it.
  */
 export function roadsOf(land: Land | string): readonly Category[] {
-  if (land === "remix") return ["verybasic", "basic"];
+  if (land === "remix") return ["cheatsheet", "cheatsheet_advanced", "verybasic", "basic"];
   if (land === "rust") return CATEGORIES;
   return LANGUAGE_ROADS;
 }
 
 /**
- * §5.3. VERY BASIC only: the grammar asked as a question first. Four choices,
- * `answer` the index of the one that is the line the quest wants typed. The
- * question is the brief. Absent on every other road.
+ * §5.3. VERY BASIC and CHEATSHEET: the grammar asked as a question. Four
+ * choices, `answer` the index of the right one. The question is the brief.
+ * On VERY BASIC the right line is then typed; on CHEATSHEET the pick is the
+ * submission. Absent on every other road.
  */
 export interface Quiz {
   choices: string[];

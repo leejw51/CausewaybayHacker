@@ -1,0 +1,405 @@
+# C++ LAND — CHEATSHEET, in Czech. A translation pack (SPEC §12.1): the prose
+# of `content/cpp/cheatsheet.toml`, quest by quest, and nothing else. The
+# question is the brief; the four choices are code, live in the English pack,
+# and are never translated. Code blocks, identifiers and printed strings are
+# copied verbatim.
+
+pack   = "cpp.cheatsheet"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "cpp.cheatsheet.01.fast-io"
+title = "OTEVŘI STAVIDLA"
+story = "06:00, tajfunový přístav. Milion řádků s cenami ryb dorazí naráz a výchozí proudy jsou na to příliš zdvořilé."
+brief = '''
+Hned na začátku `main`, před jakýmkoli vstupem a výstupem: vypněte synchronizaci `cin`/`cout` se stdio jazyka C a odvažte `cin` od `cout`, aby čtení nevyprazdňovalo výstup.
+
+Který řádek to je?
+'''
+hints = [
+  "Synchronizace se vypíná hodnotou `false`; `tie` bere ukazatel na proud, který se má vyprázdnit, a `nullptr` znamená žádný.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "cpp.cheatsheet.02.getline"
+title = "I S MEZERAMI"
+story = "Adresa na dodacím lístku je 'Flat 7, 32 Percival Street' — a záleží na každé mezeře."
+brief = '''
+`std::string line;` — načtěte do ní **celý řádek** vstupu, včetně mezer.
+'''
+hints = [
+  "`>>` se zastaví na první mezeře. Volná funkce bere nejdřív proud, potom řetězec.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "cpp.cheatsheet.03.fixed"
+title = "DVĚ MÍSTA"
+story = "Směnárna na Hennessy Road ukazuje každý kurz přesně na dvě desetinná místa."
+brief = '''
+`double x = 3.14159;` a `<iomanip>` je vložené. Vypište `3.14` — přesně dvě číslice **za desetinnou tečkou**.
+'''
+hints = [
+  "Samotné `setprecision` počítá platné číslice. Až `std::fixed` ho přiměje počítat desetinná místa.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "cpp.cheatsheet.04.long-long"
+title = "ŠIROKÝ SOUČIN"
+story = "Dvě miliardové nabídky v aukční síni v Causeway Bay, vynásobené. Do intu se výsledek nevejde."
+brief = '''
+`int a, b;`, každé až 10^9. Uložte `a` krát `b` do `p` bez přetečení.
+'''
+hints = [
+  "Násobení probíhá v typu svých operandů. Rozšiřte jeden z nich před `*`, ne až potom.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "cpp.cheatsheet.05.range-for"
+title = "ZAPIŠ TO ZPÁTKY"
+story = "Večer dvojnásobných bodů v herně v Sogu. Změnit se má každé skóre na tabuli, ne jeho kopie."
+brief = '''
+Zdvojnásobte každý prvek `std::vector<int> v` **na místě**.
+'''
+hints = [
+  "`auto x` je kopie každého prvku. Chcete-li měnit samotný vektor, navažte referenci.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "cpp.cheatsheet.06.grid"
+title = "PŮDORYS"
+story = "Windsor House, patro po patře, obchod po obchodu: plán n krát m a každá jednotka prázdná."
+brief = '''
+`n` a `m` se načtou za běhu. Vytvořte `g`, mřížku `n` krát `m` typu `int`, každou buňku `0`, přístupnou jako `g[i][j]`.
+'''
+hints = [
+  "Druhý argument konstruktoru je hodnota, kterou začíná každý z `n` řádků — takže mu dejte celý řádek.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "cpp.cheatsheet.07.desc"
+title = "NEJVĚTŠÍ NAPŘED"
+story = "Tabule nájmů na Paterson Street dává nejdražší obchod úplně nahoru."
+brief = '''
+`std::vector<int> v` obsahuje čísla v libovolném pořadí. Seřaďte ho **sestupně**.
+'''
+hints = [
+  "Výchozí je vzestupně; třetí argument `sort` pořadí otočí — obracet pole až potom je průchod navíc.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "cpp.cheatsheet.08.count"
+title = "ČÁRKOVÁNÍ"
+story = "Cha chaan teng počítá mléčné čaje po stolech a nový stůl začíná od nuly."
+brief = '''
+`std::unordered_map<std::string, int> cnt;` — přičtěte jedničku k počtu slova `w`. Slovo, které ještě nebylo vidět, začíná na 0.
+'''
+hints = [
+  "`operator[]` vloží chybějící klíč s hodnotově inicializovaným `int`, tedy 0. `at` místo toho vyhodí výjimku.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "cpp.cheatsheet.09.find"
+title = "JEN SE DÍVÁM"
+story = "Strážný v hale Lee Garden kontroluje seznam návštěv. Psát do něj nesmí."
+brief = '''
+`m` je `std::map<std::string, int>`. Zjistěte, zda je klíč `k` přítomen — **aniž** byste ho do mapy přidali.
+'''
+hints = [
+  "`m[k]` při chybějícím klíči vloží výchozí hodnotu. `find` místo toho vrátí `end()`.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "cpp.cheatsheet.10.min-heap"
+title = "NEJMENŠÍ NAHOŘE"
+story = "Stanoviště minibusů na Tang Lung Street posílá nejkratší jízdu jako první. priority_queue umí dát nahoru jen to největší."
+brief = '''
+`std::priority_queue` ve výchozím stavu vybírá jako první **největší** prvek. Deklarujte `pq` tak, aby `pq.top()` byl **nejmenší** `int`.
+'''
+hints = [
+  "Šablona bere tři argumenty: typ, kontejner, a teprve potom komparátor. Ten prostřední nejde vynechat.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "cpp.cheatsheet.11.erase-remove"
+title = "VYMEŤ NULY"
+story = "Zavírací doba stánků na Jardine's Crescent. Prázdné bedny jdou pryč a řada se zkrátí."
+brief = '''
+Smažte každou `0` z `std::vector<int> v` tak, aby se `v.size()` zmenšilo.
+'''
+hints = [
+  "`std::remove` jen přesune ponechané prvky dopředu a vrátí nový konec; rozsah odtud do starého konce pak smažte pomocí `erase`.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "cpp.cheatsheet.12.stoi"
+title = "ŠPATNÉ ČÍSLO"
+story = "V účetní knize v místnosti 7-32 je buňka, kde stojí 'abc'. Parser vyhodí výjimku a někdo ji musí chytit."
+brief = '''
+`std::string s` může být `"abc"` a `std::stoi` na tom vyhodí výjimku. Nastavte `int n` na načtenou hodnotu, nebo na `-1`, když `s` není číslo.
+'''
+hints = [
+  "`catch` zachytí jen typ, který byl vyhozen. `stoi` vyhazuje `std::invalid_argument`, když tam žádné číslo není.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "cpp.cheatsheet.13.words"
+title = "SLOVO PO SLOVU"
+story = "Řádek v deníku Polední salvy zní 'fired   12:00  Jardine' — a mezery mezi slovy nejsou vždy široké jen jeden znak."
+brief = '''
+`std::string line` obsahuje slova oddělená **jednou nebo více** mezerami.
+`<sstream>` je vložený a `std::string w;` a
+`std::vector<std::string> words;` jsou deklarované. Vložte každé slovo do
+`words`, v pořadí, bez jediného prázdného řetězce mezi nimi.
+'''
+hints = [
+  "`>>` na string streamu přeskočí před každým slovem libovolný sled bílých znaků a zastaví se u dalšího — čtení podle oddělovače nepřeskakuje nic.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "cpp.cheatsheet.14.capture"
+title = "PRŮBĚŽNÝ SOUČET"
+story = "Sampanový přívoz v tajfunovém přístavišti má jednu kasičku na jízdné a každé nastoupení musí skončit v té kasičce — ne v její fotokopii."
+brief = '''
+`int total = 0;` je lokální proměnná v `main`. Definujte `add` tak, aby `add(5);` přičetlo
+`5` k **právě tomuto `total`** — potom `total` dává `5`.
+'''
+hints = [
+  "Lambda zvenčí nevidí nic, dokud to hranaté závorky neřeknou, a zachycení kopií je jen pro čtení, pokud si neřeknete jinak — a i pak je to jen kopie.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "cpp.cheatsheet.15.bindings"
+title = "KLÍČ A HODNOTA, JMÉNEM"
+story = "Revize nájmů na Yee Wo Street: každému obchodu v knize se zvedá o jedna a změnit se musí ta kniha samotná."
+brief = '''
+`std::map<std::string, int> m;` — přičtěte `1` ke **každé hodnotě uložené v `m`**,
+přičemž klíč pojmenujete `k` a hodnotu `v` přímo v hlavičce smyčky (žádné `.first`
+ani `.second`).
+'''
+hints = [
+  "Hranaté závorky rozbalí každou dvojici do dvou jmen. Zda ta jména odkazují na vlastní dvojici mapy, nebo na její kopii, záleží na tom, co stojí před nimi.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "cpp.cheatsheet.16.sort-by"
+title = "DRUHÝ PRVNÍ"
+story = "Deník navijáku na skluzu v Jachtklubu páruje každé číslo trupu se jménem kapitána a správce přístavu to chce podle abecedy kapitánů."
+brief = '''
+`std::vector<std::pair<int, std::string>> v;` — řádky níže jsou
+třetí argument pro `std::sort(v.begin(), v.end(), …)`. Vyberte ten, který
+seřadí `v` podle **řetězce**, od A do Z.
+'''
+hints = [
+  "Komparátor odpovídá na jedinou otázku — jde `a` před `b`? — o členu, na kterém vám záleží, ostrým `<`.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "cpp.cheatsheet.17.ordering"
+title = "MÍSTO V MNOŽINĚ"
+story = "Každý sampan v tajfunovém přístavišti je kotviště (řádek, sloupec) a přístavní kancelář je drží v std::set — který odmítne cokoli, co neumí seřadit."
+brief = '''
+```cpp
+struct Pt { int r, c; };
+std::set<Pt> taken;
+```
+
+Tohle se zatím nepřeloží. Přidejte do `Pt` **jeden člen** tak, aby `taken`
+fungovalo a řadilo podle `r` a při shodě podle `c`. C++20, `<tuple>` je
+vložený.
+'''
+hints = [
+  "Množina porovnává `const` prvky a lexikografické pořadí znamená, že druhé pole hraje roli jen tehdy, když je první shodné.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "cpp.cheatsheet.18.optional"
+title = "MOŽNÁ ČÍSLO"
+story = "Strojovna čerpadel pod fontánou ve Victoria Parku hlásí údaj o tlaku, nebo vůbec nic, když je senzor odpojený — a displej se na tom nic nesmí nikdy zhroutit."
+brief = '''
+`std::optional<int> r = read_sensor();` — nastavte `int n` na načtený údaj, nebo na
+`-1`, když `r` nic neobsahuje. Nic nesmí vyhodit výjimku.
+'''
+hints = [
+  "Optional není číslo, takže nemůže stát v `?:` vedle čísla. Jeden z jeho členů bere náhradní hodnotu jako argument.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "cpp.cheatsheet.19.lower-bound"
+title = "KAM BY PATŘIL"
+story = "Tabule na tramvajové zastávce na Yee Wo Street vypisuje minuty odjezdů v pořadí a otázka zní, které místo zabere příští tramvaj."
+brief = '''
+`std::vector<int> v` je seřazený vzestupně a `int x` je dáno. Nastavte `int i` na
+index **prvního prvku, který není menší než** `x` — takže `i` se rovná
+`v.size()`, když je každý prvek menší, a když se `x` vyskytuje, je to
+první index `x`.
+'''
+hints = [
+  "Algoritmus vrací iterátor, ne číslo; iterátor minus začátek je vzdálenost. A pozor na to, která mez: ta druhá přeskočí každé `x`.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "cpp.cheatsheet.20.wide-sum"
+title = "SOUČET, KTERÝ PŘETEKL"
+story = "Poledne, salva vystřelí a pokladna tunelového mýta sčítá dvě stě tisíc jízdných až po miliardě každé — součet, jaký žádný int nikdy nepojal."
+brief = '''
+`std::vector<int> v` má 2·10^5 prvků, každý až 10^9, a `<numeric>`
+je vložený. Uložte **přesný** součet do `long long s`.
+'''
+hints = [
+  "Průběžný součet má typ počáteční hodnoty, ne typ `s` — každé sčítání proběhne v tomto typu, než se cokoli uloží.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "cpp.cheatsheet.21.push-back"
+title = "JEŠTĚ JEDNA NA HROMADU"
+story = "Na konec stánku na Jardine's Crescent dorazí nová bedna a řada beden je vektor, který musí narůst o jednu."
+brief = '''
+`std::vector<int> v;` a `int x;` — přidejte `x` na **konec** `v`, aby
+`v.size()` narostlo o jedna a `v.back()` bylo `x`.
+'''
+hints = [
+  "Vektor roste jen na jednom konci a člen, který to dělá, říká ve svém jménu na kterém — `append` a `push` samotné jsou slova jiných jazyků.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "cpp.cheatsheet.22.queue-pop"
+title = "DALŠÍ NA ŘADĚ"
+story = "Fronta na minibus na Tang Lung Street: ten vepředu nastoupí a řada je o jednoho kratší."
+brief = '''
+`std::queue<int> q;` není prázdná. Uložte **přední** prvek do `int x`
+**a odstraňte ho** z `q`, aby `q.size()` kleslo o jedna.
+'''
+hints = [
+  "Ve standardních kontejnerech jsou odstranění a čtení dva různé členy — ten, který odstraňuje, nic nevrací.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "cpp.cheatsheet.23.reverse"
+title = "ODZADU DOPŘEDU"
+story = "Tramvaj se otáčí na konečné Causeway Bay a seznam zastávek, které právě projela, se musí číst obráceně."
+brief = '''
+`std::vector<int> v` obsahuje `3, 1, 2`. Obraťte ho **na místě**, aby četl
+`2, 1, 3`. `<algorithm>` je vložený.
+'''
+hints = [
+  "`vector` na to člen nemá; algoritmus bere dvojici iterátorů. A řazení přes reverzní iterátory řadí — pořadí neotočí.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "cpp.cheatsheet.24.copy"
+title = "KOPIE, NE OKNO"
+story = "Vestibul Lee Garden tiskne druhý seznam návštěvníků pro nočního hlídače a co si na něj načmárá, se nikdy nesmí objevit na tom denní směny."
+brief = '''
+`std::vector<int> a{1, 2};` — udělejte z `b` **nezávislou** kopii `a`, aby
+po `b.push_back(3);` měl vektor `a` pořád 2 prvky a `b`
+3.
+'''
+hints = [
+  "Vektor se kopíruje obyčejným přiřazením. `&` v deklaraci udělá druhé jméno pro tentýž vektor a `std::move` vyprázdní ten, ze kterého přesouváte.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "cpp.cheatsheet.25.digit"
+title = "ČÍSLICE ZA ZNAKEM"
+story = "Číslo obchodu namalované na dveřích Windsor House je '7' a ovladač výtahu chce číslo sedm, ne kód glyfu."
+brief = '''
+`char c = '7';` — nastavte `int d` na číslo `7` (ne `55`, což je kód
+znaku).
+'''
+hints = [
+  "Char už je malé celé číslo, takže přetypování kód jen přejmenuje. Číslice sedí v tabulce vedle sebe — odečtěte tu, kterou začínají.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "cpp.cheatsheet.26.real-division"
+title = "PŮL DOLARU"
+story = "Sedm dolarů dělených mezi dva u směnárny na Hennessy Road je tři padesát — pokud pokladna nedělí jako int."
+brief = '''
+`int a = 7, b = 2;` — nastavte `double q` na `3.5`.
+'''
+hints = [
+  "Dělení probíhá v typu svých operandů, dřív než se cokoli uloží nebo převede. Rozšiřte operand, ne výsledek.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "cpp.cheatsheet.27.max-mixed"
+title = "VĚTŠÍ ZE DVOU DRUHŮ"
+story = "Tabule nájmů na Paterson Street uvádí jeden obchod v celých dolarech a další s půlkou — a chce vyšší z té dvojice."
+brief = '''
+`int a = 2; double b = 2.5;` — nastavte `double m` na větší z obou, aby
+`m` bylo `2.5`. `<algorithm>` je vložený.
+'''
+hints = [
+  "`std::max` je šablona s jedním typovým parametrem a odmítá hádat, když se oba argumenty neshodnou. Řekněte jí typ — ten, který si půlku ponechá.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "cpp.cheatsheet.28.enum-class"
+title = "KTERÁ LINKA"
+story = "Tabule MTR na stanici Causeway Bay pojmenovává své linky a kód nástupiště se chce na jednu z nich zeptat, aniž by ji psal jako číslo."
+brief = '''
+```cpp
+enum class Line { Island, TsuenWan };
+Line l = read_line();
+```
+
+Otevřete `if`, do kterého se vstoupí přesně tehdy, když je `l` první případ výčtu.
+'''
+hints = [
+  "Výčet s rozsahem drží svá jména uvnitř výčtu a sám od sebe se nepromění v `int` ani v řetězec.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "cpp.cheatsheet.29.substr"
+title = "PROSTŘEDNÍ SLOVO"
+story = "Adresa na dodacím lístku zní 'Causeway Bay, HK' a kurýr chce jen slovo, které začíná desátým znakem."
+brief = '''
+`std::string s = "Causeway Bay, HK";` — nastavte `std::string t` na `"Bay"`,
+tři znaky počínaje indexem `9`.
+'''
+hints = [
+  "Druhý argument není místo, kde kus končí. Dejte mu koncový index a dostanete všechno až na konec věty.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "cpp.cheatsheet.30.positive-mod"
+title = "PŘETOČENÍ, KTERÉ ŠLO DO MÍNUSU"
+story = "Kruhový buffer polední salvy má tři sloty a krok o sedm zpět ze slotu nula musí dopadnout na slot dva — ne na slot mínus jedna, na kterém celé dopoledne sedí ptakopysk."
+brief = '''
+`int x, m;` s `m > 0`; `x` může být **jakýkoli** `int`, včetně `-7` nebo
+`-100`. Nastavte `int r` na zbytek `x` děleného `m` v rozsahu
+`0..m-1` — pro `x = -7, m = 3` to je `2`.
+'''
+hints = [
+  "V C++ znaménko `%` následuje dělenec, takže záporné `x` dá záporný zbytek — o krok vedle správného slotu. Jednou přičíst `m` nestačí pro každé `x`; přičtěte ho a pak znovu zredukujte.",
+]

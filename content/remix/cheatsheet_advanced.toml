@@ -1,0 +1,1156 @@
+# REMIX LAND — CHEATSHEET ADVANCED. The sharp end of the Go · Rust · Python
+# live-coding cheatsheet (~/vivid/Cheatsheet, go_rust_python_cheatsheet.html),
+# asked the same way as the BASIC road: four lines, one right, nothing typed
+# and nothing compiled — the pick is the submission, and the server judges it
+# against the quiz (SPEC §0). The road walks ten ideas three times each, one
+# language per node, so neighbouring nodes ask the SAME thing in Go, then
+# Rust, then Python: a channel handoff, a mutex-guarded counter, waiting for
+# N workers, interface / trait / Protocol, a bounded generic, a closure that
+# keeps state, custom errors and wrapping, iterators and generators, JSON in
+# and out of a struct, and pattern matching. Each quest names its language in
+# the brief and in `lang`; the wrong lines are the near-miss in the right
+# language (a missing `move`, a lock released a line early, a list where a
+# tuple is wanted) and the other two languages' spellings of the same idea.
+#
+# Toolchains: Go 1.22+ (1.23 where the brief says so), Rust stable 2024
+# edition with std only, Python 3.12 with std only. Every right line was run,
+# and the wrong lines were checked against the real toolchain.
+#
+# The answer is never in the brief. `solution` is the right choice, verbatim.
+#
+# Story bible: docs/story.md. Concept vocabulary: docs/concepts.md.
+# Format: SPEC §12. Checked by tests/content/verify_pack.py (no build).
+
+pack = "remix.cheatsheet_advanced"
+land = "remix"
+category = "cheatsheet_advanced"
+version = 1
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id          = "remix.cheatsheet_advanced.01.handoff-go"
+node        = 1
+title       = "HAND IT OVER"
+difficulty  = 3
+lang        = "go"
+story       = "06:50, Jardine's Bazaar. Mei asks the kiosk for one number and the kiosk waits for her to take it before it has even made it."
+concepts    = ["channels", "concurrency", "deadlock"]
+requires    = []
+map         = { x = 0.10, y = 0.14, kind = "quest" }
+brief       = '''
+In **Go**, `main` has `ch := make(chan int)` — **unbuffered** — and later
+does `x := <-ch`. `compute()` returns an `int`. Which line, placed between
+those two, delivers `compute()`'s result into `x` without `main` deadlocking?
+'''
+solution    = 'go func() { ch <- compute() }()'
+hints = [
+  "An unbuffered send blocks until someone receives. The sender has to be a different goroutine from the receiver.",
+]
+
+[quest.quiz]
+choices = [
+  'go func() { ch <- compute() }()',
+  'ch <- compute()',
+  'go ch <- compute()',
+  'go func() { compute() <- ch }()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id          = "remix.cheatsheet_advanced.02.handoff-rust"
+node        = 2
+title       = "HAND IT OVER, FERRIS"
+difficulty  = 3
+lang        = "rust"
+story       = "Ferris carries the same number across the Lucky Mac counter, and the counter does not let him borrow the tray."
+concepts    = ["channels", "concurrency", "closures"]
+requires    = ["remix.cheatsheet_advanced.01.handoff-go"]
+map         = { x = 0.24, y = 0.10, kind = "quest" }
+brief       = '''
+In **Rust**, `let (tx, rx) = mpsc::channel::<i32>();` and `main` ends with
+`let v = rx.recv().unwrap();`. `compute()` returns an `i32`. Which line,
+between the two, starts a thread that delivers `compute()`'s result to `v`
+— and compiles?
+'''
+solution    = 'thread::spawn(move || tx.send(compute()).unwrap());'
+hints = [
+  "A spawned closure may outlive main's stack frame, so it cannot borrow the sender; it has to own it.",
+]
+
+[quest.quiz]
+choices = [
+  'thread::spawn(|| tx.send(compute()).unwrap());',
+  'thread::spawn(move || rx.send(compute()).unwrap());',
+  'thread::spawn(move || tx.send(compute()).unwrap());',
+  'go func() { ch <- compute() }()',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id          = "remix.cheatsheet_advanced.03.handoff-python"
+node        = 3
+title       = "HAND IT OVER, SLOWLY"
+difficulty  = 3
+lang        = "python"
+story       = "The python at the wet market price board gets the same number a third time, on a thread, and this time it has to actually start."
+concepts    = ["channels", "concurrency"]
+requires    = ["remix.cheatsheet_advanced.02.handoff-rust"]
+map         = { x = 0.42, y = 0.11, kind = "quest" }
+brief       = '''
+In **Python**, `q = queue.Queue()` and `main` ends with `v = q.get()`.
+`compute()` returns an `int`. Which line, between the two, runs `compute()`
+on a **new thread** and delivers its result to `v` — so `q.get()` returns
+instead of waiting forever?
+'''
+solution    = 'threading.Thread(target=lambda: q.put(compute())).start()'
+hints = [
+  "`target` wants something callable with no arguments, and a Thread that is built but never started does nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'threading.Thread(target=lambda: q.put(compute()))',
+  'threading.Thread(target=lambda: q.put(compute())).start()',
+  'threading.Thread(target=q.put, args=compute()).start()',
+  'thread::spawn(move || tx.send(compute()).unwrap());',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id          = "remix.cheatsheet_advanced.04.counter-go"
+node        = 4
+title       = "ONE AT A TIME"
+difficulty  = 3
+lang        = "go"
+story       = "Chef Bo's order counter at Lucky Mac: two cooks, a thousand ticks each, and the board must say exactly two thousand."
+concepts    = ["shared-state", "functions", "data-races"]
+requires    = ["remix.cheatsheet_advanced.03.handoff-python"]
+map         = { x = 0.60, y = 0.10, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+type C struct {
+    mu sync.Mutex
+    n  int
+}
+
+func (c *C) Inc() {
+    // ____
+    c.n++
+}
+```
+
+Two goroutines each call `Inc` 1000 times. Which line makes `c.n` exactly
+2000 on every run, clean under `go test -race`, and never leaves the mutex
+held?
+'''
+solution    = 'c.mu.Lock(); defer c.mu.Unlock()'
+hints = [
+  "The increment itself has to happen while the lock is held, and the unlock has to be scheduled for when the method returns.",
+]
+
+[quest.quiz]
+choices = [
+  'c.mu.Lock(); c.mu.Unlock()',
+  'defer c.mu.Lock(); c.mu.Unlock()',
+  '*c.lock().unwrap() += 1;',
+  'c.mu.Lock(); defer c.mu.Unlock()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id          = "remix.cheatsheet_advanced.05.counter-rust"
+node        = 5
+title       = "ONE AT A TIME, FERRIS"
+difficulty  = 3
+lang        = "rust"
+story       = "Four crabs, one tally, Yee Wo Street. Ferris has the guard in his claw and still cannot add to it."
+concepts    = ["shared-state", "interior-mutability", "smart-pointers"]
+requires    = ["remix.cheatsheet_advanced.04.counter-go"]
+map         = { x = 0.75, y = 0.13, kind = "quest" }
+brief       = '''
+In **Rust**, `let counter = Arc::new(Mutex::new(0));` and every spawned
+thread holds `let c = Arc::clone(&counter);`. Inside the thread's loop,
+which line adds one to the shared number — and compiles?
+'''
+solution    = '*c.lock().unwrap() += 1;'
+hints = [
+  "Locking gives a Result; inside it is a guard, and the guard has to be dereferenced before arithmetic.",
+]
+
+[quest.quiz]
+choices = [
+  'c.lock().unwrap() += 1;',
+  '*c.lock().unwrap() += 1;',
+  '*c.lock() += 1;',
+  'c.n++',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id          = "remix.cheatsheet_advanced.06.counter-python"
+node        = 6
+title       = "ONE AT A TIME, THE GIL SAID"
+difficulty  = 3
+lang        = "python"
+story       = "Room 7-32 counts night-shift tickets on four threads; the GIL promises nothing about `+=`."
+concepts    = ["shared-state", "data-races"]
+requires    = ["remix.cheatsheet_advanced.05.counter-rust"]
+map         = { x = 0.95, y = 0.12, kind = "quest" }
+brief       = '''
+In **Python**, `lock = threading.Lock()` is the one lock every thread shares
+and `n = 0` is global:
+
+```
+def work():
+    global n
+    for _ in range(100_000):
+        # ____
+            n += 1
+```
+
+Four threads run `work`. Which line makes `n` exactly 400000 on every run —
+every thread taking turns on the **same** lock?
+'''
+solution    = 'with lock:'
+hints = [
+  "The lock object is its own context manager; what acquire() returns is not one.",
+]
+
+[quest.quiz]
+choices = [
+  'with lock:',
+  'with lock.acquire():',
+  'with threading.Lock():',
+  'c.mu.Lock(); defer c.mu.Unlock()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id          = "remix.cheatsheet_advanced.07.wait-go"
+node        = 7
+title       = "ALL FOUR BACK"
+difficulty  = 3
+lang        = "go"
+story       = "Four couriers leave the Sugar Street depot; the door locks only when every one of them has signed back in."
+concepts    = ["concurrency", "deadlock", "closures"]
+requires    = ["remix.cheatsheet_advanced.06.counter-python"]
+map         = { x = 0.90, y = 0.33, kind = "quest" }
+brief       = '''
+In **Go** (1.22, so `i` is fresh each iteration):
+
+```
+var wg sync.WaitGroup
+for i := 0; i < 4; i++ {
+    wg.Add(1)
+    // ____
+}
+wg.Wait()
+```
+
+Which line starts `work(i)` on its own goroutine so that `wg.Wait()` returns
+exactly when all four `work` calls have **finished** — no deadlock, no early
+return?
+'''
+solution    = 'go func() { defer wg.Done(); work(i) }()'
+hints = [
+  "Something has to call Done after work returns, on the goroutine that did the work, and a go statement needs a call.",
+]
+
+[quest.quiz]
+choices = [
+  'go work(i)',
+  'go func() { work(i); wg.Done() }',
+  'go func() { defer wg.Done(); work(i) }()',
+  'go func() { wg.Done(); work(i) }()',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id          = "remix.cheatsheet_advanced.08.wait-rust"
+node        = 8
+title       = "ALL FOUR BACK, FERRIS"
+difficulty  = 4
+lang        = "rust"
+story       = "Ferris lends out the stall's own price list to three helpers at once and wants it back, unboxed, before the shutter comes down."
+concepts    = ["concurrency", "lifetimes", "borrowing"]
+requires    = ["remix.cheatsheet_advanced.07.wait-go"]
+map         = { x = 0.76, y = 0.29, kind = "quest" }
+brief       = '''
+In **Rust**, `let v = vec![1, 2, 3];` and `fn work(x: &i32) -> i32`:
+
+```
+thread::scope(|s| {
+    for x in &v {
+        // ____
+    }
+});
+```
+
+Which line starts one thread per element that borrows `v` directly — no
+`Arc`, no `'static` — and is joined when the scope ends?
+'''
+solution    = 's.spawn(move || work(x));'
+hints = [
+  "Spawn through the scope handle, not the free function, and give it a closure, not a value.",
+]
+
+[quest.quiz]
+choices = [
+  'thread::spawn(move || work(x));',
+  's.spawn(work(x));',
+  'go func(x int) { defer wg.Done(); work(x) }(x)',
+  's.spawn(move || work(x));',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id          = "remix.cheatsheet_advanced.09.wait-python"
+node        = 9
+title       = "ALL FOUR BACK, IN ORDER"
+difficulty  = 3
+lang        = "python"
+story       = "The python hands four jobs to the market porters and wants the receipts back in the order the jobs went out."
+concepts    = ["concurrency", "iteration"]
+requires    = ["remix.cheatsheet_advanced.08.wait-rust"]
+map         = { x = 0.61, y = 0.35, kind = "quest" }
+brief       = '''
+In **Python**, `jobs` is a list and `work(j)` returns an `int`:
+
+```
+with ThreadPoolExecutor(4) as ex:
+    # ____
+print(out[0], len(out))
+```
+
+Which line runs `work` over `jobs` on the pool's threads and leaves `out` a
+**list of results** in job order, so the `print` works?
+'''
+solution    = 'out = list(ex.map(work, jobs))'
+hints = [
+  "The executor's own map keeps order but hands back a lazy iterator; submit hands back futures. Neither is indexable.",
+]
+
+[quest.quiz]
+choices = [
+  'out = list(ex.map(work, jobs))',
+  'out = ex.map(work, jobs)',
+  'out = [ex.submit(work, j) for j in jobs]',
+  'wg.Wait()',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id          = "remix.cheatsheet_advanced.10.shape-go"
+node        = 10
+title       = "WHO IS A SHAPE"
+difficulty  = 4
+lang        = "go"
+story       = "Alex on Percival Street cut a square out of the Times Square floor plan and the compiler says it is not a shape."
+concepts    = ["interfaces", "structs", "functions"]
+requires    = ["remix.cheatsheet_advanced.09.wait-python"]
+map         = { x = 0.44, y = 0.35, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+type Shape interface{ Area() float64 }
+
+type Sq struct{ s float64 }
+
+func (q *Sq) Area() float64    { return q.s * q.s }
+func (q *Sq) Scale(k float64)  { q.s *= k }
+```
+
+Which line puts a 2×2 square into `s` — and compiles?
+'''
+solution    = 'var s Shape = &Sq{s: 2}'
+hints = [
+  "Look at the receivers. A method set belongs to the type it was declared on, and a value of Sq is not that type.",
+]
+
+[quest.quiz]
+choices = [
+  'var s Shape = Sq{s: 2}',
+  'var s Shape = &Sq{s: 2}',
+  'var s Shape = *Sq{s: 2}',
+  'let s: Box<dyn Shape> = Box::new(Sq { s: 2.0 });',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id          = "remix.cheatsheet_advanced.11.shape-rust"
+node        = 11
+title       = "WHO IS A SHAPE, FERRIS"
+difficulty  = 3
+lang        = "rust"
+story       = "Ferris has the trait written on the Lucky Mac napkin; the square just needs to sign it."
+concepts    = ["traits", "structs"]
+requires    = ["remix.cheatsheet_advanced.10.shape-go"]
+map         = { x = 0.23, y = 0.33, kind = "quest" }
+brief       = '''
+In **Rust**,
+
+```
+trait Shape {
+    fn area(&self) -> f64;
+    fn describe(&self) -> String { format!("{:.1}", self.area()) }
+}
+
+struct Sq { s: f64 }
+// ____
+```
+
+Which line makes `Sq { s: 2.0 }.describe()` give `"4.0"`?
+'''
+solution    = 'impl Shape for Sq { fn area(&self) -> f64 { self.s.powi(2) } }'
+hints = [
+  "The trait goes on the type, never the other way round, and the method's receiver has to match the trait's exactly.",
+]
+
+[quest.quiz]
+choices = [
+  'impl Sq for Shape { fn area(&self) -> f64 { self.s.powi(2) } }',
+  'impl Shape for Sq { fn area(self) -> f64 { self.s.powi(2) } }',
+  'func (q Sq) Area() float64 { return q.s * q.s }',
+  'impl Shape for Sq { fn area(&self) -> f64 { self.s.powi(2) } }',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id          = "remix.cheatsheet_advanced.12.shape-python"
+node        = 12
+title       = "WHO IS A SHAPE, IT QUACKS"
+difficulty  = 4
+lang        = "python"
+story       = "The python does not care what the square inherits from, only that it answers to `area` — and `isinstance` wants that in writing."
+concepts    = ["duck-typing", "decorators", "structs"]
+requires    = ["remix.cheatsheet_advanced.11.shape-rust"]
+map         = { x = 0.11, y = 0.33, kind = "quest" }
+brief       = '''
+In **Python** 3.12, `Sq` is a plain class with an `area(self) -> float`
+method and no base classes:
+
+```
+# ____
+class Shape(Protocol):
+    def area(self) -> float: ...
+```
+
+Imports are not shown. Which line goes in the hole so that
+`isinstance(Sq(2), Shape)` answers `True` instead of raising `TypeError`?
+'''
+solution    = '@runtime_checkable'
+hints = [
+  "A Protocol is a static promise unless you mark it as something the interpreter may check at run time; the mark lives in `typing`.",
+]
+
+[quest.quiz]
+choices = [
+  '@abstractmethod',
+  '@dataclass(frozen=True)',
+  '@runtime_checkable',
+  'type Shape interface{ Area() float64 }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id          = "remix.cheatsheet_advanced.13.generic-go"
+node        = 13
+title       = "THE BIGGER OF ANY TWO"
+difficulty  = 3
+lang        = "go"
+story       = "The gold shop on Percival Street compares prices, weights and the names of two customers with the one function."
+concepts    = ["generics", "types"]
+requires    = ["remix.cheatsheet_advanced.12.shape-python"]
+map         = { x = 0.08, y = 0.46, kind = "quest" }
+brief       = '''
+In **Go** 1.22, `Max(3, 7)`, `Max(1.5, 0.5)` and `Max("a", "b")` must all
+compile:
+
+```
+// ____
+    if a > b {
+        return a
+    }
+    return b
+}
+```
+
+Which signature line makes it so?
+'''
+solution    = 'func Max[T cmp.Ordered](a, b T) T {'
+hints = [
+  "`>` needs a constraint that promises ordering; equality alone is not enough, and `any` promises nothing.",
+]
+
+[quest.quiz]
+choices = [
+  'func Max[T cmp.Ordered](a, b T) T {',
+  'func Max[T any](a, b T) T {',
+  'func Max[T comparable](a, b T) T {',
+  'fn max<T: PartialOrd>(a: T, b: T) -> T {',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id          = "remix.cheatsheet_advanced.14.generic-rust"
+node        = 14
+title       = "THE BIGGER OF ANY TWO, FERRIS"
+difficulty  = 4
+lang        = "rust"
+story       = "Ferris's version has to compare the two floating-point prices too, and floats refuse to be totally ordered."
+concepts    = ["generics", "traits", "types"]
+requires    = ["remix.cheatsheet_advanced.13.generic-go"]
+map         = { x = 0.24, y = 0.51, kind = "quest" }
+brief       = '''
+In **Rust**, `max(1.5, 2.5)` and `max("a", "b")` must both compile:
+
+```
+// ____
+    if a > b { a } else { b }
+}
+```
+
+Which signature line makes it so?
+'''
+solution    = 'fn max<T: PartialOrd>(a: T, b: T) -> T {'
+hints = [
+  "`f64` implements only the partial ordering trait; a bound that demands a total order rejects it.",
+]
+
+[quest.quiz]
+choices = [
+  'fn max<T: Ord>(a: T, b: T) -> T {',
+  'fn max<T: PartialOrd>(a: T, b: T) -> T {',
+  'fn max<T>(a: T, b: T) -> T {',
+  'func Max[T cmp.Ordered](a, b T) T {',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id          = "remix.cheatsheet_advanced.15.generic-python"
+node        = 15
+title       = "THE BIGGER OF ANY TWO, WITH A BOUND"
+difficulty  = 4
+lang        = "python"
+story       = "The python's type checker wants to know what `<` means before it lets two prices through."
+concepts    = ["generics", "duck-typing", "types"]
+requires    = ["remix.cheatsheet_advanced.14.generic-rust"]
+map         = { x = 0.44, y = 0.54, kind = "quest" }
+brief       = '''
+In **Python** 3.12, `Comparable` is a `Protocol` with `__lt__`:
+
+```
+from typing import TypeVar
+
+# ____
+
+def smallest(a: T, b: T) -> T:
+    return a if a < b else b
+```
+
+Which line declares `T` so that only types that are `Comparable` may be
+used — and does not raise when the module is imported?
+'''
+solution    = 'T = TypeVar("T", bound=Comparable)'
+hints = [
+  "A TypeVar takes its name first; after that, one upper type goes in a keyword, while bare positional types are constraints and need at least two.",
+]
+
+[quest.quiz]
+choices = [
+  'T = TypeVar("T", Comparable)',
+  'T = TypeVar(bound=Comparable)',
+  'fn smallest<T: PartialOrd>(a: T, b: T) -> T {',
+  'T = TypeVar("T", bound=Comparable)',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id          = "remix.cheatsheet_advanced.16.closure-go"
+node        = 16
+title       = "THE TICKET MACHINE"
+difficulty  = 3
+lang        = "go"
+story       = "The queue ticket machine at the Hennessy Road bank: every press is one more than the last, and nobody else can see the count."
+concepts    = ["closures", "bindings", "functions"]
+requires    = ["remix.cheatsheet_advanced.15.generic-python"]
+map         = { x = 0.58, y = 0.53, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+func counter() func() int {
+    c := 0
+    // ____
+}
+```
+
+`next := counter(); next(); next()` must give 1 then 2. Which line goes in
+the hole?
+'''
+solution    = 'return func() int { c++; return c }'
+hints = [
+  "The closure must change the outer `c`, not declare a new one in its own scope, and `++` is a statement in Go, not a value.",
+]
+
+[quest.quiz]
+choices = [
+  'return func() int { c := c + 1; return c }',
+  'return func() int { return c++ }',
+  'return func() int { c++; return c }',
+  'move || { c += 1; c }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id          = "remix.cheatsheet_advanced.17.closure-rust"
+node        = 17
+title       = "THE TICKET MACHINE, FERRIS"
+difficulty  = 4
+lang        = "rust"
+story       = "Ferris builds the same machine and the borrow checker asks who owns the count once `counter` has returned."
+concepts    = ["closures", "ownership", "mutability"]
+requires    = ["remix.cheatsheet_advanced.16.closure-go"]
+map         = { x = 0.74, y = 0.53, kind = "quest" }
+brief       = '''
+In **Rust**,
+
+```
+fn counter() -> impl FnMut() -> i32 {
+    let mut c = 0;
+    // ____
+}
+```
+
+`let mut next = counter(); next(); next()` must give 1 then 2. Which line
+goes in the hole — and compiles?
+'''
+solution    = 'move || { c += 1; c }'
+hints = [
+  "`c` dies with the function's frame unless the closure takes it; and it has to be changed, not just read.",
+]
+
+[quest.quiz]
+choices = [
+  'move || { c += 1; c }',
+  '|| { c += 1; c }',
+  'move || c + 1',
+  'return func() int { c++; return c }',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id          = "remix.cheatsheet_advanced.18.closure-python"
+node        = 18
+title       = "THE TICKET MACHINE, NESTED"
+difficulty  = 3
+lang        = "python"
+story       = "The python's machine keeps printing ticket number one, because the inner function has quietly made a `c` of its own."
+concepts    = ["closures", "bindings"]
+requires    = ["remix.cheatsheet_advanced.17.closure-rust"]
+map         = { x = 0.92, y = 0.46, kind = "quest" }
+brief       = '''
+In **Python**,
+
+```
+def counter():
+    c = 0
+    def nxt():
+        # ____
+        c += 1
+        return c
+    return nxt
+```
+
+`n = counter(); n(); n()` must give 1 then 2, with no module-level `c`.
+Which line goes in the hole?
+'''
+solution    = 'nonlocal c'
+hints = [
+  "Assignment makes a name local to the innermost function unless you say which enclosing scope it belongs to — and the module is not that scope.",
+]
+
+[quest.quiz]
+choices = [
+  'global c',
+  'nonlocal c',
+  'c = 0',
+  'let mut c = 0;',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id          = "remix.cheatsheet_advanced.19.error-go"
+node        = 19
+title       = "WHICH KEY WAS MISSING"
+difficulty  = 4
+lang        = "go"
+story       = "The error that reaches Alex has been wrapped twice on its way up from the Percival Street cache; he still wants the key."
+concepts    = ["error-handling", "interfaces", "types"]
+requires    = ["remix.cheatsheet_advanced.18.closure-python"]
+map         = { x = 0.94, y = 0.68, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+type NotFound struct{ Key string }
+
+func (e *NotFound) Error() string { return e.Key + " not found" }
+
+func load(k string) error {
+    return fmt.Errorf("load: %w", &NotFound{Key: k})
+}
+```
+
+`err := load("tea")`. Which line gets at the `*NotFound` inside `err` so
+that `nf.Key` can be printed — without a panic?
+'''
+solution    = 'var nf *NotFound; if errors.As(err, &nf) {'
+hints = [
+  "A plain type assertion sees only the outer wrapper. The unwrapping helper for a *type* needs a pointer to a variable of that type.",
+]
+
+[quest.quiz]
+choices = [
+  'if nf, ok := err.(*NotFound); ok {',
+  'var nf *NotFound; if errors.As(err, nf) {',
+  'var nf *NotFound; if errors.As(err, &nf) {',
+  'if errors.Is(err, &NotFound{}) {',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id          = "remix.cheatsheet_advanced.20.error-rust"
+node        = 20
+title       = "WHICH KEY WAS MISSING, FERRIS"
+difficulty  = 4
+lang        = "rust"
+story       = "Ferris wrote the error's Display by hand on the Lucky Mac napkin; `?` still will not box it."
+concepts    = ["error-handling", "traits", "dispatch"]
+requires    = ["remix.cheatsheet_advanced.19.error-go"]
+map         = { x = 0.77, y = 0.71, kind = "quest" }
+brief       = '''
+In **Rust**, std only — no crates:
+
+```
+#[derive(Debug)]
+struct NotFound(String);
+
+impl fmt::Display for NotFound { /* "<key> not found" */ }
+
+// ____
+
+fn load(k: &str) -> Result<i32, Box<dyn Error>> {
+    Err(Box::new(NotFound(k.into())))
+}
+```
+
+Which line in the hole makes `load` compile, so callers can use `?` on it?
+'''
+solution    = 'impl std::error::Error for NotFound {}'
+hints = [
+  "With Debug and Display in place, the error trait has nothing left to ask for — but it still has to be implemented, with an empty body.",
+]
+
+[quest.quiz]
+choices = [
+  '#[derive(Debug, Error)]',
+  'impl std::error::Error for NotFound;',
+  'func (e *NotFound) Error() string { return e.Key }',
+  'impl std::error::Error for NotFound {}',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id          = "remix.cheatsheet_advanced.21.error-python"
+node        = 21
+title       = "WHICH KEY WAS MISSING, AND WHY"
+difficulty  = 3
+lang        = "python"
+story       = "The python re-raises the market's KeyError as its own, and the traceback must still show where it began."
+concepts    = ["error-handling", "structs"]
+requires    = ["remix.cheatsheet_advanced.20.error-rust"]
+map         = { x = 0.55, y = 0.69, kind = "quest" }
+brief       = '''
+In **Python**, `class NotFound(KeyError): pass` and
+
+```
+def load(k):
+    try:
+        return d[k]
+    except KeyError as e:
+        # ____
+```
+
+The caller must catch a `NotFound` whose `__cause__` **is** the original
+`KeyError`. Which line goes in the hole?
+'''
+solution    = 'raise NotFound(k) from e'
+hints = [
+  "Raising inside an except block records a context automatically; the cause has to be named explicitly, and `None` as the cause silences it.",
+]
+
+[quest.quiz]
+choices = [
+  'raise NotFound(k) from e',
+  'raise NotFound(k)',
+  'raise NotFound(k) from None',
+  'return fmt.Errorf("load: %w", err)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id          = "remix.cheatsheet_advanced.22.iter-go"
+node        = 22
+title       = "THE KEYS, IN ORDER"
+difficulty  = 4
+lang        = "go"
+story       = "Alex needs the dish names off Chef Bo's tally in alphabetical order, in one line, and Go 1.23 just gave him the tools."
+concepts    = ["iteration", "collections", "sorting"]
+requires    = ["remix.cheatsheet_advanced.21.error-python"]
+map         = { x = 0.44, y = 0.67, kind = "quest" }
+brief       = '''
+In **Go 1.23**, `m` is a `map[string]int`, and `maps` and `slices` are
+imported. Which line gives `keys` the map's keys as a `[]string` in
+ascending order — in one expression, and compiles?
+'''
+solution    = 'keys := slices.Sorted(maps.Keys(m))'
+hints = [
+  "Since 1.23 the maps package hands out an iterator, not a slice; the slices package has a function that consumes an iterator and returns a sorted slice.",
+]
+
+[quest.quiz]
+choices = [
+  'keys := slices.Sort(maps.Keys(m))',
+  'keys := slices.Sorted(maps.Keys(m))',
+  'keys := sort.Strings(maps.Keys(m))',
+  'keys = sorted(m)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id          = "remix.cheatsheet_advanced.23.iter-rust"
+node        = 23
+title       = "WHERE THE BIGGEST ONE IS"
+difficulty  = 4
+lang        = "rust"
+story       = "Ferris wants the position of the highest price on the Percival Street board, not the price — and the tuple trick almost fools him."
+concepts    = ["iteration", "closures", "slices"]
+requires    = ["remix.cheatsheet_advanced.22.iter-go"]
+map         = { x = 0.24, y = 0.72, kind = "quest" }
+brief       = '''
+In **Rust**, `a` is a non-empty `Vec<i32>` with distinct values, say
+`[3, 9, 4, 1]`. `let i = ____;` and then `a[i]` must be the largest value —
+so `i` is `1` here. Which expression goes in the hole?
+'''
+solution    = 'a.iter().enumerate().max_by_key(|&(_, x)| x).unwrap().0'
+hints = [
+  "Number the elements, then take the maximum *by the value*, not by the whole (index, value) pair — pairs compare on the index first.",
+]
+
+[quest.quiz]
+choices = [
+  'a.iter().enumerate().max().unwrap().0',
+  'a.iter().max().unwrap()',
+  'a.iter().position(a.iter().max())',
+  'a.iter().enumerate().max_by_key(|&(_, x)| x).unwrap().0',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id          = "remix.cheatsheet_advanced.24.iter-python"
+node        = 24
+title       = "FLATTEN THE CRATE"
+difficulty  = 4
+lang        = "python"
+story       = "Crates inside crates at the Bowrington Road market; the python wants every lychee out, one at a time, lazily."
+concepts    = ["generators", "recursion", "iteration"]
+requires    = ["remix.cheatsheet_advanced.23.iter-rust"]
+map         = { x = 0.06, y = 0.70, kind = "quest" }
+brief       = '''
+In **Python**,
+
+```
+def walk(t):
+    for x in t:
+        if isinstance(x, list):
+            # ____
+        else:
+            yield x
+```
+
+Which line makes `list(walk([1, [2, [3]], 4]))` give `[1, 2, 3, 4]`?
+'''
+solution    = 'yield from walk(x)'
+hints = [
+  "The recursive call returns a generator; yielding it as one item is not the same as handing control to it.",
+]
+
+[quest.quiz]
+choices = [
+  'yield walk(x)',
+  'return walk(x)',
+  'yield from walk(x)',
+  'for v := range walk(x) { yield(v) }',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id          = "remix.cheatsheet_advanced.25.json-go"
+node        = 25
+title       = "THE TAG ON THE FIELD"
+difficulty  = 4
+lang        = "go"
+story       = "The membership form at the Causeway Bay sports centre: lowercase keys on the wire, and no age line for anyone who left it blank."
+concepts    = ["serialization", "structs", "zero-values"]
+requires    = ["remix.cheatsheet_advanced.24.iter-python"]
+map         = { x = 0.06, y = 0.92, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+type P struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+
+`json.Marshal(P{Name: "Mei", Age: 35})` must give `{"name":"Mei","age":35}`
+and `json.Marshal(P{Name: "Mei"})` must give `{"name":"Mei"}`. Which field
+line goes in the hole?
+'''
+solution    = 'Age int `json:"age,omitempty"`'
+hints = [
+  "The key name and the option live inside the same quotes, separated by a comma; the key is spelled exactly as it should appear.",
+]
+
+[quest.quiz]
+choices = [
+  'Age int `json:"age",omitempty`',
+  'Age int `json:"age,omitempty"`',
+  'Age int `json:"Age,omitempty"`',
+  'Age int `json:"age;omitempty"`',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id          = "remix.cheatsheet_advanced.26.json-rust"
+node        = 26
+title       = "THE BRACES, DOUBLED"
+difficulty  = 4
+lang        = "rust"
+story       = "No crates on the Lucky Mac laptop, so Ferris writes the JSON by hand, and the format string eats his braces."
+concepts    = ["serialization", "strings", "io"]
+requires    = ["remix.cheatsheet_advanced.25.json-go"]
+map         = { x = 0.27, y = 0.88, kind = "quest" }
+brief       = '''
+In **Rust**, std only — no serde. `p.name` is the `String` `"Mei"` and
+`p.age` is the `u32` `35`. Which expression builds the `String`
+`{"name":"Mei","age":35}` — a number, not a quoted number — and compiles?
+'''
+solution    = 'format!("{{\"name\":\"{}\",\"age\":{}}}", p.name, p.age)'
+hints = [
+  "A literal brace in a format string is written twice; a single one opens a placeholder.",
+]
+
+[quest.quiz]
+choices = [
+  'format!("{{\"name\":\"{}\",\"age\":{}}}", p.name, p.age)',
+  'format!("{\"name\":\"{}\",\"age\":{}}", p.name, p.age)',
+  'format!("{{\"name\":\"{}\",\"age\":\"{}\"}}", p.name, p.age)',
+  'b, _ := json.Marshal(p)',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id          = "remix.cheatsheet_advanced.27.json-python"
+node        = 27
+title       = "THE NESTED DATACLASS"
+difficulty  = 4
+lang        = "python"
+story       = "Mei's address is a dataclass inside a dataclass, and `json` refuses to look inside either without help."
+concepts    = ["serialization", "structs", "collections"]
+requires    = ["remix.cheatsheet_advanced.26.json-rust"]
+map         = { x = 0.39, y = 0.86, kind = "quest" }
+brief       = '''
+In **Python**,
+
+```
+@dataclass
+class Addr:
+    street: str
+    floor: int
+
+@dataclass
+class P:
+    name: str
+    addr: Addr
+```
+
+`p = P("Mei", Addr("Jardine's Bazaar", 5))`. Which line gives `s` the JSON
+text `{"name": "Mei", "addr": {"street": "Jardine's Bazaar", "floor": 5}}`
+— double quotes, nested object and all?
+'''
+solution    = 's = json.dumps(asdict(p))'
+hints = [
+  "`json` only knows dicts and lists; the dataclasses module has a converter that recurses into nested dataclasses, where `vars` stops at the first level.",
+]
+
+[quest.quiz]
+choices = [
+  's = json.dumps(p)',
+  's = json.dumps(vars(p))',
+  's = str(asdict(p))',
+  's = json.dumps(asdict(p))',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id          = "remix.cheatsheet_advanced.28.match-go"
+node        = 28
+title       = "ONE TYPE PER CASE"
+difficulty  = 5
+lang        = "go"
+story       = "Alex lists two integer types in one case to save a line, and `v` turns back into an interface on him."
+concepts    = ["pattern-matching", "interfaces", "types"]
+requires    = ["remix.cheatsheet_advanced.27.json-python"]
+map         = { x = 0.58, y = 0.92, kind = "quest" }
+brief       = '''
+In **Go**,
+
+```
+func describe(x any) string {
+    switch v := x.(type) {
+    // ____
+        return strconv.Itoa(v * 2)
+    case string:
+        return v
+    }
+    return "?"
+}
+```
+
+Which case line makes `describe(21)` return `"42"` — and compiles?
+'''
+solution    = 'case int:'
+hints = [
+  "`v` takes the case's type only when the case names exactly one type; name two and `v` is still `any`, which cannot be multiplied.",
+]
+
+[quest.quiz]
+choices = [
+  'case int, int64:',
+  'case any:',
+  'case int:',
+  'case 21:',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id          = "remix.cheatsheet_advanced.29.match-rust"
+node        = 29
+title       = "SMALL AND ODD, FERRIS"
+difficulty  = 5
+lang        = "rust"
+story       = "Ferris sorts lucky numbers at the Wan Chai temple: one digit, odd, and he wants to keep the digit while he checks."
+concepts    = ["pattern-matching", "enums", "control-flow"]
+requires    = ["remix.cheatsheet_advanced.28.match-go"]
+map         = { x = 0.72, y = 0.88, kind = "quest" }
+brief       = '''
+In **Rust**, `x` is an `Option<i32>`:
+
+```
+match x {
+    // ____ "small odd",
+    Some(_) => "other",
+    None => "none",
+}
+```
+
+Which arm head matches a value from 1 to 9 inclusive that is **odd**, with
+the value bound to `n` for the check?
+'''
+solution    = 'Some(n @ 1..=9) if n % 2 == 1 =>'
+hints = [
+  "Bind a name to a range sub-pattern with the at-sign, then put the arithmetic in a guard; Rust has no `in` and no `as` for patterns.",
+]
+
+[quest.quiz]
+choices = [
+  'Some(n @ 1..=9) if n % 2 == 1 =>',
+  'Some(1..=9 as n) if n % 2 == 1 =>',
+  'Some(n) if n in 1..=9 && n % 2 == 1 =>',
+  'case int(n) if 1 <= n <= 9 and n % 2:',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id          = "remix.cheatsheet_advanced.30.match-python"
+node        = 30
+title       = "THE BOSS: POSITIONAL PATTERNS"
+difficulty  = 5
+lang        = "python"
+story       = "Last node, Times Square. The python's plain class will not match by position until it says which attributes count, and in what order."
+concepts    = ["pattern-matching", "structs", "dispatch"]
+requires    = ["remix.cheatsheet_advanced.29.match-rust"]
+map         = { x = 0.93, y = 0.88, kind = "boss" }
+brief       = '''
+In **Python** 3.12, `Pt` is a plain class — **not** a dataclass:
+
+```
+class Pt:
+    # ____
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+Without the hole, `case Pt(a, b):` raises
+`TypeError: Pt() accepts 0 positional sub-patterns`. Which line in the
+class body makes `case Pt(a, b):` bind `a` to `x` and `b` to `y`?
+'''
+solution    = '__match_args__ = ("x", "y")'
+hints = [
+  "There is a dunder for exactly this, and the interpreter insists it is a tuple of attribute names — a dataclass writes it for you.",
+]
+
+[quest.quiz]
+choices = [
+  '__match_args__ = ["x", "y"]',
+  '__match_args__ = ("x", "y")',
+  '__slots__ = ("x", "y")',
+  'match_args = ("x", "y")',
+]
+answer  = 1

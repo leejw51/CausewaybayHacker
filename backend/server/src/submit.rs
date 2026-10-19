@@ -19,7 +19,7 @@ use std::time::Instant;
 use cwbhacker_core::attempts::Mode;
 use cwbhacker_core::error::{bad_request, unavailable, Result};
 use cwbhacker_core::{attempts, ids, mistakes, progress, quests, snapshot, world};
-use cwbhacker_runner::{Event, Submission, TestSpec, Verdict};
+use cwbhacker_runner::{Event, Report, Submission, TestSpec, Verdict};
 use serde_json::json;
 
 use crate::proto::{opt_str_field, send, str_field, Out, ServerFrame};
@@ -119,6 +119,32 @@ impl Streamer {
     }
 }
 
+/// The line a CHEATSHEET quest is answered with, or `None` for every quest
+/// that is compiled and run.
+fn cheatsheet_answer(quest: &quests::Quest) -> Option<String> {
+    if !ids::is_sheet(&quest.category) {
+        return None;
+    }
+    let quiz = quest.quiz.as_ref()?;
+    let answer = quiz.get("answer")?.as_u64()? as usize;
+    Some(quiz.get("choices")?.get(answer)?.as_str()?.to_string())
+}
+
+/// A pick, judged: the right line or not, as the one case of a report.
+fn judge_pick(source: &str, right: &str) -> Report {
+    let accepted = source.trim() == right.trim();
+    let mut report = Report::internal("");
+    report.verdict = if accepted {
+        Verdict::Accepted
+    } else {
+        Verdict::WrongAnswer
+    };
+    report.runtime_stderr = String::new();
+    report.tests_passed = i64::from(accepted);
+    report.tests_total = 1;
+    report
+}
+
 /// Blocking. Call it from `spawn_blocking`.
 pub fn run(
     state: &Shared,
@@ -154,26 +180,38 @@ pub fn run(
             quest.lang
         )));
     }
-    let full_spec = TestSpec::parse(&quest.tests)?;
-    // A run never sees the hidden cases — not "sees them and hides the
-    // result", never receives them. Nothing to leak (PROTOCOL §4.9b).
-    let spec = match mode {
-        Mode::Run => full_spec.visible_only(),
-        Mode::Submit => full_spec,
-    };
-
-    // Refused before anything is written. A submission this build cannot judge
-    // must leave no attempt row behind: an attempt carries a verdict, a
-    // verdict carries mistakes, and `mistake_stats` is what the drills teach
-    // from (SPEC §7). A fabricated verdict there teaches the player to fix
-    // something they never did, and there is no way to tell it afterwards
-    // from something they really got wrong.
-    let home = state.store.home();
-    if let Some(reason) = cwbhacker_runner::unsupported(&lang, &spec, &home.build_lang_dir(&lang)) {
-        return Err(unavailable(reason, 2));
-    }
-
     let attempt_id = ids::attempt_id();
+    // CHEATSHEET (SPEC §0) is the one road nothing is compiled on: the quest
+    // is a question and four lines, and the submission is the line picked.
+    // It is judged here, against the right choice, and then goes down the
+    // same path as every verdict — attempt row, stars, XP, the map — so a
+    // clear on it is a clear like any other.
+    let quiz_answer = cheatsheet_answer(&quest);
+    let home = state.store.home();
+    let spec = match quiz_answer {
+        Some(_) => None,
+        None => {
+            let full_spec = TestSpec::parse(&quest.tests)?;
+            // A run never sees the hidden cases — not "sees them and hides the
+            // result", never receives them. Nothing to leak (PROTOCOL §4.9b).
+            let spec = match mode {
+                Mode::Run => full_spec.visible_only(),
+                Mode::Submit => full_spec,
+            };
+            // Refused before anything is written. A submission this build
+            // cannot judge must leave no attempt row behind: an attempt carries
+            // a verdict, a verdict carries mistakes, and `mistake_stats` is what
+            // the drills teach from (SPEC §7). A fabricated verdict there
+            // teaches the player to fix something they never did, and there is
+            // no way to tell it afterwards from something they really got wrong.
+            if let Some(reason) =
+                cwbhacker_runner::unsupported(&lang, &spec, &home.build_lang_dir(&lang))
+            {
+                return Err(unavailable(reason, 2));
+            }
+            Some(spec)
+        }
+    };
     if mode.is_submit() {
         // A node's `attempts` is the record of what was submitted. Iterating
         // with RUN must not read as failing repeatedly.
@@ -181,33 +219,39 @@ pub fn run(
         progress::bump_attempt(&conn, address, &quest_id)?;
     }
 
-    let queued = state.running.fetch_add(1, Ordering::SeqCst);
-    let streamer = Arc::new(Streamer {
-        attempt_id: attempt_id.clone(),
-        out: out.clone(),
-        started: Instant::now(),
-        seqs: Mutex::new(Vec::new()),
-        streamed: AtomicUsize::new(0),
-        truncated: AtomicUsize::new(0),
-    });
-    streamer.stage("queued", queued);
+    let report = match spec {
+        None => judge_pick(&source, quiz_answer.as_deref().unwrap_or_default()),
+        Some(spec) => {
+            let queued = state.running.fetch_add(1, Ordering::SeqCst);
+            let streamer = Arc::new(Streamer {
+                attempt_id: attempt_id.clone(),
+                out: out.clone(),
+                started: Instant::now(),
+                seqs: Mutex::new(Vec::new()),
+                streamed: AtomicUsize::new(0),
+                truncated: AtomicUsize::new(0),
+            });
+            streamer.stage("queued", queued);
 
-    let events = streamer.clone();
-    let submission = Submission {
-        attempt_id: &attempt_id,
-        lang: &lang,
-        source: &source,
-        spec: &spec,
-        workdir: home.attempt_build_dir(&lang, &attempt_id),
-        cache_root: home.build_lang_dir(&lang),
-        events: Arc::new(move |event| match event {
-            Event::Stage(stage) => events.stage(stage, 0),
-            Event::Log { stream, chunk } => events.log(&stream, &chunk),
-        }),
+            let events = streamer.clone();
+            let submission = Submission {
+                attempt_id: &attempt_id,
+                lang: &lang,
+                source: &source,
+                spec: &spec,
+                workdir: home.attempt_build_dir(&lang, &attempt_id),
+                cache_root: home.build_lang_dir(&lang),
+                events: Arc::new(move |event| match event {
+                    Event::Stage(stage) => events.stage(stage, 0),
+                    Event::Log { stream, chunk } => events.log(&stream, &chunk),
+                }),
+            };
+
+            let report = cwbhacker_runner::run(&submission);
+            state.running.fetch_sub(1, Ordering::SeqCst);
+            report
+        }
     };
-
-    let report = cwbhacker_runner::run(&submission);
-    state.running.fetch_sub(1, Ordering::SeqCst);
 
     // SPEC §7.1, always — not only on a compile error. `unused_variables` and
     // `unused_imports` are warnings on a build that succeeded, and dropping
@@ -218,6 +262,7 @@ pub fn run(
         report.verdict.as_str(),
         match report.verdict {
             Verdict::Timeout => "the program ran out of time",
+            _ if quiz_answer.is_some() => "the line picked was not the right one",
             _ => "the output did not match",
         },
     ) {

@@ -1,0 +1,555 @@
+# GO LAND — CHEATSHEET ADVANCED, in Cantonese (colloquial written). A translation
+# pack (SPEC §12.1): the prose of `content/go/cheatsheet_advanced.toml`, quest by
+# quest, and nothing else. The four choices are code, live in the English pack,
+# and are never translated. Code blocks, identifiers and printed strings are
+# copied verbatim.
+
+pack   = "go.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.cheatsheet_advanced.01.buffered"
+title = "一個位"
+story = "Lucky Mac 個出餐窗口，12:30：個廚師揸住個托盤伸出去，冇人接，成個廚房喺佢後面停晒。"
+brief = '''
+呢三行喺 `main` 入面行，冇其他 goroutine 生存。邊個宣告可以令個 send 通過，
+令個 receive 印到 `1`？
+
+```
+// ____
+ch <- 1
+fmt.Println(<-ch)
+```
+'''
+hints = [
+  "冇 buffer 嘅 send 會等一個 receiver，而呢度個 receiver 係同一個 goroutine，下一行先出現。畀條 channel 一個擺個值嘅地方。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.cheatsheet_advanced.02.wg-launch"
+title = "出發前先數"
+story = "四十個車手同時離開 Lucky Mac，而個調度員連邊個出咗去嘅名單都未寫就閂舖。"
+brief = '''
+`go.mod` 寫住 `go 1.22`，所以每次迭代都有自己嘅 `i`。為每個 `i` 用一個 goroutine
+開 `work(i)`，並且確保最後個 `Wait` 真係等晒全部 `n` 個 —— 唔可以有嘢同個計數器 race。
+
+```
+var wg sync.WaitGroup
+for i := range n {
+    // ____
+}
+wg.Wait()
+```
+'''
+hints = [
+  "個計數器係喺會呼叫 `Wait` 嘅嗰個 goroutine 入面、喺 `go` 之前加上去；喺新嗰個入面 defer 住減返，而 `defer` 需要一個呼叫。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.cheatsheet_advanced.03.close-range"
+title = "最後一碟，落閘"
+story = "出餐口送出午市最後一碟，個走堂仲企喺度，因為冇人同佢講廚房收工喇。"
+brief = '''
+`main` 入面個消費者 loop `for v := range ch { ... }`，然後印 `done`。
+producer 最尾邊一行可以令嗰個 loop 完結，每個值都送到，而且冇 goroutine 留低等緊？
+
+```
+func produce(ch chan<- int) {
+    for i := range 3 {
+        ch <- i
+    }
+    // ____
+}
+```
+'''
+hints = [
+  "對 channel 嘅 range 淨係喺條 channel close 咗而且抽乾咗先會完。一個哨兵值只係多一個值；個 loop 會繼續等。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.cheatsheet_advanced.04.worker-sig"
+title = "一邊入，一邊出"
+story = "Lucky Mac 條生產線四個廚師由一條軌攞單，將碟放上另一條軌；新嚟嗰個一路將啲單放返上條軌度。"
+brief = '''
+一個 worker pool：`main` 將 `jobs` 同 `results` 整做普通 `chan int`，
+開四個 worker，send 九個 job，close `jobs`，然後用 `<-results` 收九個結果。
+邊個 signature 配呢個 body 編譯得到 —— 而且令 compiler 拒絕喺 worker 入面
+向 `jobs` send 或者由 `results` receive？
+
+```
+// ____
+    for j := range jobs {
+        results <- j * j
+    }
+}
+```
+'''
+hints = [
+  "支箭放喺數據流動嗰一邊：喺 `chan` 前面係淨係攞出嚟，喺 `chan` 後面係淨係放入去。雙向 channel 可以轉做任何一種。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.cheatsheet_advanced.05.try-send"
+title = "掉咗佢，唔好等"
+story = "天后個到站板將聽到嘅每班車都記低；當個 log 滿咗，個板本身唔可以死機。"
+brief = '''
+`ch` 係一個容量係 2 嘅 `chan string`，有幾個 goroutine 向佢 send。
+喺 `log(v)` 入面，有位就將 `v` 交畀條 channel，冇位就掉咗佢 ——
+呼叫者永遠唔可以 block，亦都唔可以有 goroutine 留喺個 send 度等。
+'''
+hints = [
+  "有後備分支嘅 `select` 永遠唔會 block；嗰個後備分支一定要乜都唔做，唔係另一個 send。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.cheatsheet_advanced.06.timeout-case"
+title = "兩秒，然後放棄"
+story = "銅鑼灣個月台顯示屏等緊下一班車嘅訊號。佢等兩秒，或者等到永遠 —— 個 firmware 都唔肯定係邊樣。"
+brief = '''
+`ch` 係一個 `<-chan int`，`ctx` 係一個 `context.Context`。填第三個 case，
+令個 function 喺兩秒內乜都冇到就放棄。
+
+```
+select {
+case v := <-ch:
+    use(v)
+    return nil
+case <-ctx.Done():
+    return ctx.Err()
+// ____
+    return errTimeout
+}
+```
+'''
+hints = [
+  "select 嘅 case 一定要係一個 send 或者 receive。`time` 有一個 function 會回傳一條喺某個 `Duration` 之後觸發嘅 channel，而一個光秃秃嘅 `2` 係兩納秒。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.cheatsheet_advanced.07.defer-cancel"
+title = "出門嗰陣放手"
+story = "金鐘每次查車費都開一個三秒嘅計時器，而冇人停過佢；到晚市繁忙時間，個閘機揸住一萬個計時器。"
+brief = '''
+`fetch(ctx)` 一定要喺三秒限制仍然生效嗰陣行，而無論 `get` 點樣返回 ——
+提早返回、出錯、或者成功 —— 計時器嘅資源都一定要釋放。（`WithCancel` 交返嘅係同一對嘢。）
+
+```
+func get() error {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    // ____
+    return fetch(ctx)
+}
+```
+'''
+hints = [
+  "而家就呼叫個 cancel function，會喺 `fetch` 見到 `ctx` 之前就 cancel 咗佢。將個呼叫排到 `get` 返回嗰陣 —— 而 `defer` 要一個呼叫，括號都要。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.cheatsheet_advanced.08.mutex-inc"
+title = "寫鎖，唔係讀鎖"
+story = "銅鑼灣轉車站五十個閘機將乘客計入同一個數，而個數出嚟總係少咗一截，冇人重現到。"
+brief = '''
+五十個 goroutine 每個呼叫 `Inc` 一千次；之後 `Get` 一定要回傳 `50000`。
+
+```
+type Ctr struct {
+    mu sync.RWMutex
+    n  int
+}
+func (c *Ctr) Get() int { c.mu.RLock(); defer c.mu.RUnlock(); return c.n }
+// ____
+```
+'''
+hints = [
+  "寫入需要獨佔鎖，唔係共享鎖；value receiver 會 copy 成個 struct，連個鎖都 copy 埋，所以真正嗰個 `n` 永遠唔郁。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.cheatsheet_advanced.09.once"
+title = "淨係熱身一次"
+story = "二十個車手喺同一秒開 Lucky Mac 個 app，個 backend 開咗二十條數據庫連線，一人一條，全部都叫做第一條。"
+brief = '''
+`initDB()` 係一個會設定 package 層級 `db` 嘅 `func()`。`conn()` 同時由二十個
+goroutine 呼叫；`initDB` 一定要啱啱好行一次，而每個呼叫者都一定要見到完成咗嘅 `db`。
+
+```
+var once sync.Once
+func conn() *DB {
+    // ____
+    return db
+}
+```
+'''
+hints = [
+  "`Once` 收嘅係個 function 本身，唔係呼叫佢嘅結果 —— 而 closure 入面一個光秃秃嘅名係一個冇用到嘅值，編譯唔過。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.cheatsheet_advanced.10.atomic-add"
+title = "一下，唔使鎖"
+story = "港島綫狀態頁個點擊計數器喺高負載下會漏數，而為咗一個整數加個 mutex，Alex 覺得太大陣仗。"
+brief = '''
+`var hits atomic.Int64` 由一百個 goroutine 遞增，每個一萬次。邊一行可以
+每一下都計到，令 `hits.Load()` 最後係 `1000000`？
+'''
+hints = [
+  "有類型嘅 atomic 有 method；一個 load 跟住一個 store 係兩個操作，中間有一個空隙。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.cheatsheet_advanced.11.fan-in"
+title = "幾條綫，一個月台"
+story = "荃灣綫同觀塘綫嘅車都入金鐘同一個月台；個合併一直好地地，直到夜晚最後一班車，個月台就永遠清唔到。"
+brief = '''
+Fan-in。`go.mod` 寫住 `go 1.22`，所以每次迭代都有自己嘅 `c`。
+為每個輸入開一個轉發器，將佢 copy 入 `out`，然後報告自己完成，
+令下面個 closer 可以 close `out`。
+
+```
+func merge(ins ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+    wg.Add(len(ins))
+    for _, c := range ins {
+        // ____
+    }
+    go func() { wg.Wait(); close(out) }()
+    return out
+}
+```
+'''
+hints = [
+  "佢一定要喺自己嘅 goroutine 入面行（`go` 關鍵字加埋尾嗰個呼叫），而且佢完成嗰陣一定要話畀個 group 知 —— 否則 `Wait` 永遠唔返，`out` 永遠唔 close。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.cheatsheet_advanced.12.defer-args"
+title = "幾時讀嘅？"
+story = "天后售票處出門嗰陣印收銀機總數，而佢印嘅係更次開始嗰一刻嘅總數。"
+brief = '''
+印 `2` —— `main` 返回嗰陣 `x` 嘅值。
+
+```
+func main() {
+    x := 1
+    // ____
+    x = 2
+}
+```
+'''
+hints = [
+  "defer 嘅呼叫，啲 argument 係喺 `defer` 嗰陣求值，唔係行嗰陣。淨係一個自己讀 `x` 嘅 closure 先見到後面嗰次寫入。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.cheatsheet_advanced.13.recover"
+title = "跌落嚟嗰陣接住"
+story = "Lucky Mac 條生產線一張壞單掟咗支木羹，成個廚房熄晒燈，而唔係淨係嗰一碟標住失敗返返嚟。"
+brief = '''
+`f` 可能會 panic。`safe` 一定要吞咗個 panic，改為回傳 `errPanic`；
+一個乖嘅 `f` 就回傳 `nil`。
+
+```
+func safe(f func()) (err error) {
+    // ____
+    f()
+    return nil
+}
+```
+'''
+hints = [
+  "佢淨係喺 defer 嘅 function 入面先有用 —— 直接 defer 個 builtin 本身乜都唔做 —— 而唯一嘅出路係賦值畀個有名嘅回傳值。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.cheatsheet_advanced.14.errors-as"
+title = "錯嘅係邊一種"
+story = "一個車手 id 由 Lucky Mac 嘅查找返返嚟，包住三層 context，而櫃台想要嘅係搵唔到嘅嗰個 key，唔係成句說話。"
+brief = '''
+`err` 係用 `fmt.Errorf("lookup: %w", &NotFound{Key: k})` 砌出嚟嘅；
+普通嘅 `errors.Is` 淨係答到係或者唔係。開一個 `if`，佢個 body 可以印
+`nf.Key` —— 唔會 panic。
+
+```
+type NotFound struct{ Key string }
+func (e *NotFound) Error() string { return e.Key + " not found" }
+```
+'''
+hints = [
+  "直接嘅 type assertion 穿唔透啲包裝。個 target 係一個指針，指住一個類型實現咗 `error` 嘅變數 —— 而呢度嗰個類型係指針類型。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.cheatsheet_advanced.15.assert-ok"
+title = "佢識講嘢嗎？"
+story = "天后個公告板叫 feed 上面每個物件自我介紹，而第一個普通整數就令成個板死咗。"
+brief = '''
+`x` 係一個 `any`。`Stop` 有一個 `String() string` method，所以唔使宣告都
+滿足 `fmt.Stringer`；`42` 就唔係。綁定 `s` 同 `ok`，令下一行可以係
+`if !ok { return "plain" }` —— 兩種輸入都得，唔會死機。
+（type switch 都做到，不過要多幾行。）
+'''
+hints = [
+  "assertion 嘅兩值形式會報告而唔係 panic；個 interface 嘅全名住喺 `fmt` 入面。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.cheatsheet_advanced.16.promoted"
+title = "借嚟嘅聲"
+story = "銅鑼灣站個狀態 server 入面載住一個 logger，而被交畀 server 嘅 logging 嘅走堂，印出嚟乜前綴都冇。"
+brief = '''
+`run` 想要一個 `func(string)`。將 `srv` 嘅 logging 交畀佢，綁定喺 `srv` 上面，
+令佢印 `[mtr] up`。
+
+```
+type Logger struct{ prefix string }
+func (l Logger) Log(s string) { fmt.Println(l.prefix, s) }
+type Server struct {
+    Logger
+    addr string
+}
+func run(log func(string)) { log("up") }
+srv := Server{Logger{"[mtr]"}, ":8080"}
+```
+'''
+hints = [
+  "embedded 欄位嘅 method 會提升到外層 struct 上面，而寫個 method 名但唔呼叫佢，就會得到一個 receiver 已經綁定咗嘅 function 值。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.cheatsheet_advanced.17.generic-map"
+title = "乜都入得，乜都出得"
+story = "怡和街個到站板收到嘅車號係 `[]int`，想要 `[]string`；Alex 拒絕第三次寫同一個四行 loop。"
+brief = '''
+宣告一個有兩個類型參數嘅 generic `Map`，令
+`Map([]int{1, 2, 3}, strconv.Itoa)` 得到 `[]string{"1", "2", "3"}`。
+
+```
+// ____
+    out := make([]U, 0, len(xs))
+    for _, x := range xs {
+        out = append(out, f(x))
+    }
+    return out
+}
+```
+'''
+hints = [
+  "每個類型參數都要有一個 constraint，而共用一個 constraint 嘅參數可以好似 `a, b int` 咁共用佢。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.cheatsheet_advanced.18.ordered"
+title = "有大於號嘅都得"
+story = "金鐘個月台溫度計用 `Celsius`（一個有名嘅整數類型）報數，而為普通 int 寫嘅 generic 比較拒絕佢。"
+brief = '''
+`type Celsius int`。三個呼叫都一定要編譯得到：
+`Max(3, 5)`、`Max(2.5, 1.0)` 同 `Max(Celsius(30), Celsius(28))`。
+個 body 用 builtin `max`，佢需要一個 `<` 行得通嘅類型。
+'''
+hints = [
+  "一個列出 `int` 但冇波浪號嘅 constraint 會拒絕每一個由 int *衍生*出嚟嘅類型。標準庫有一個 constraint，涵蓋所有 `<` 行得通嘅嘢。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.cheatsheet_advanced.19.generic-stack"
+title = "PUSH 咗要留得住"
+story = "港島綫廣播員後面個站名 stack 接受每一次 push，而每次有人望佢都係空嘅。"
+brief = '''
+`type Stack[T any] struct{ items []T }`。喺 `var s Stack[string]`、
+`s.Push("Tin Hau")` 同 `s.Push("Causeway Bay")` 之後，`len(s.items)` 一定要係 `2`。
+'''
+hints = [
+  "generic 類型嘅 receiver 要重複個類型參數，而會改嘢嘅 method 需要指針形式，否則佢改嘅係副本。`append` 回傳新嘅 slice；要有嘢留住佢。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.cheatsheet_advanced.20.sort-desc-safe"
+title = "最大嘅先，唔准 WRAP"
+story = "銅鑼灣個車費餘額排行榜，一個戶口喺 `int` 最頂，一個喺最底，而個排序將佢哋擺錯咗位。"
+brief = '''
+`xs` 係一個 `[]int`，同時包含 `math.MaxInt` 同 `math.MinInt`。
+原地排序佢，最大嘅先 —— 嗰兩個都要排啱。
+'''
+hints = [
+  "兩個相距好遠嘅 int 相減會 overflow 然後反轉正負；`cmp` 入面有一個三路比較。而 `sort.Slice` 個 function 收嘅係 index，唔係元素。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.cheatsheet_advanced.21.bisect"
+title = "一開二"
+story = "港島綫控制室嗰個排好序嘅車號 list 有一千萬個項目，而每次查找都行晒全部。"
+brief = '''
+`xs` 係一個升序排好嘅 `[]int`。用一行、O(log n)，將 `i` 設做 `7` 喺嘅位置
+（或者應該插入嘅位置），將 `found` 設做佢喺唔喺度。
+'''
+hints = [
+  "`slices` package 有一個搜尋會同時回傳位置同一個 bool；`sort.SearchInts` 淨係回傳位置，而 `Index` 會行晒成個 slice。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.cheatsheet_advanced.22.omitempty"
+title = "空嘅唔好要"
+story = "Lucky Mac 個 app 送出嘅車手資料，每個行路嘅人都有個空嘅 `bike` 欄位，而個 dashboard 畫咗四十架空單車。"
+brief = '''
+`json.Marshal(Rider{Name: "Alex"})` 一定要得到 `{"name":"Alex"}`，而
+`json.Marshal(Rider{Name: "Alex", Bike: "e-7"})` 一定要得到
+`{"name":"Alex","bike":"e-7"}`。邊個欄位宣告做到？
+
+```
+type Rider struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+'''
+hints = [
+  "個選項放喺同個名同一對引號入面，用逗號分開 —— 而一個未 export 嘅欄位永遠都唔會被 marshal。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.cheatsheet_advanced.23.scanner-buffer"
+title = "比一行仲長"
+story = "港島綫閘機 log 嘅夜間匯出係一行 100,000 個字，而個 reader 乜都冇交返，亦冇人印出任何錯誤。"
+brief = '''
+`sc := bufio.NewScanner(os.Stdin)`；下一行輸入有 100,000 byte 長。
+邊一行放喺第一個 `sc.Scan()` 之前，可以令嗰次 scan 成功？
+'''
+hints = [
+  "預設嘅 token 上限係 64 KiB。個 scanner 有一個 method 收一個初始 byte slice 同一個最大尺寸 —— 兩個 argument，唔係一個 —— 而 split function 同呢件事無關。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.cheatsheet_advanced.24.stable"
+title = "打和嘅唔郁"
+story = "金鐘兩百個閘機職員按年資分組排更，而年資一樣嘅人每次打印都喺度互換位置。"
+brief = '''
+`ps` 係一個有兩百個項目嘅 `[]P`，而且
+`less := func(i, j int) bool { return ps[i].S < ps[j].S }`。按 `S` 排序 `ps`，
+令 `S` 相同嘅項目保證保持原本嘅相對次序。
+'''
+hints = [
+  "`less` 收 index，所以佢配 `sort` package 嘅 slice function，唔係 `slices` 嗰啲 —— 而兩個 slice sort 入面淨係得一個承諾打和嘅唔郁。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.cheatsheet_advanced.25.duration"
+title = "毫秒，唔係納秒"
+story = "銅鑼灣嘅停站時間以文字 `250` 嚟到，而啲門開咗之後二百五十納秒就閂。"
+brief = '''
+`s` 係 `"250"`，一個毫秒數。喺 `n, err := strconv.ParseInt(s, 10, 64)`
+（冇錯誤）之後，將 `d` 整做一個印出嚟係 `250ms` 嘅 `time.Duration`。
+'''
+hints = [
+  "一個 `int64` 變數唔可以乘一個 `Duration` —— 淨係無類型常數先可以。先轉換個數字，然後用個單位乘大佢。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.cheatsheet_advanced.26.struct-key"
+title = "同一格，同一桶"
+story = "車手按佢哋等緊嘅網格格仔分組；怡和街同一個街角第二個車手會抹走第一個。"
+brief = '''
+`type pt struct{ r, c int }`，而 `m` 係一個 `map[pt][]int`（欄位可比較嘅
+struct 做 key 冇問題）。將車手 `id` 加入格仔 `(r, c)` 下面，保留已經喺度嘅 id ——
+包括個 key 從來未見過嗰陣。
+'''
+hints = [
+  "唔存在嘅 key 讀出嚟係 nil slice，而向 nil slice append 冇問題；結果一定要存返落同一個值 key 下面。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.cheatsheet_advanced.27.builder-ptr"
+title = "唔好 COPY 個 BUILDER"
+story = "港島綫個廣播一截一截咁砌，而加最後一截嗰個 helper 死機，訊息話有一個非法嘅 copy。"
+brief = '''
+`sb` 係一個已經裝住 `"Island"` 嘅 `strings.Builder`。宣告 `add`，令
+`add(…, " Line")` —— 用個 signature 需要嘅 argument 嚟呼叫 —— 之後
+`sb.String()` 係 `"Island Line"`，冇 panic。
+'''
+hints = [
+  "一個非零值嘅 `Builder` 按值傳遞會被 copy，而第一次寫入個副本就會 panic。個 builder 冇 `+=`；佢有一個回傳兩個值嘅 method，忽略佢哋冇問題，但 deref 就唔得。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.cheatsheet_advanced.28.heap-pop"
+title = "HEAP 嘅頂"
+story = "Lucky Mac 個調度員嘅優先清單派出最急嘅單，而佢派出嘅第三張單係最遲先到期嗰張。"
+brief = '''
+`IntHeap` 實現咗 `heap.Interface`，`Less` 寫做 `h[i] > h[j]`，而 `h` 係一個
+已經用 `heap.Init(h)` 初始化咗嘅 `*IntHeap`。將最大嘅值攞出嚟放入 `x`
+（一個 `int`），並且令個 heap 對下一次攞仍然有效。
+'''
+hints = [
+  "你喺個類型上面寫嗰個 method 淨係移除最後一個元素；package 嗰個 function 先係將個 root 搬走再重新整 heap 嘅嘢。佢回傳 `any`。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.cheatsheet_advanced.29.iota"
+title = "零、一、二"
+story = "金鐘個板上面三條港鐵綫全部編做零，而個顏色查找將每一條都髹成港島綫藍。"
+brief = '''
+`type Line int` 有一個 `String()` method，會索引一個三元素嘅 array。
+將 `Island`、`TsuenWan` 同 `KwunTong` 宣告做 `0`、`1`、`2` —— 全部係 `Line` 類型。
+'''
+hints = [
+  "喺 `const` block 入面，一個冇表達式嘅常數會重複上一行成個表達式 —— 連類型都重複。淨係得一個表達式會向上數。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.cheatsheet_advanced.30.errc"
+title = "第一個壞消息"
+story = "港島綫八個站同時被 ping；一有一個報告落咗線，控制室就去做第二樣嘢，而七個 ping 嘅仲企喺一個永遠冇人開嘅窗口前面。"
+brief = '''
+呢度冇 `errgroup` —— 淨係 std。`n` 個 goroutine 每個喺 `errc` 上面 send
+啱啱好一個 `error`（經常係 `nil`）。`checkAll` 回傳第一個非 nil 嘅錯誤，
+唔等其餘嘅，而之後唔可以有 goroutine 留喺佢個 send 度 block 住。宣告 `errc`。
+
+```
+func checkAll(n int) error {
+    // ____
+    for i := range n {
+        go func() { errc <- check(i) }()
+    }
+    for range n {
+        if err := <-errc; err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+'''
+hints = [
+  "`checkAll` 返回咗之後，就冇人再 receive。每個 sender 都一定要可以喺冇 receiver 嘅情況下完成佢嗰一次 send —— 個 buffer 要大到裝得晒全部。",
+]

@@ -1,0 +1,581 @@
+# ZIG LAND — CHEATSHEET ADVANCED, in Cantonese. A translation pack (SPEC
+# §12.1): the prose of `content/zig/cheatsheet_advanced.toml`, quest by quest,
+# and nothing else. The question is the brief; the four choices are code, live
+# in the English pack, and are never translated. Code blocks and identifiers
+# are copied verbatim.
+#
+# Register: colloquial written Cantonese in traditional characters, technical
+# nouns as Hong Kong developers actually say them (frontend/src/i18n/yue.ts).
+
+pack   = "zig.cheatsheet_advanced"
+locale = "yue"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "zig.cheatsheet_advanced.01.generic-fn"
+title = "任何兩個之中較大嗰個"
+story = "22:00，喺個入口。控制室比較兩個車費、兩個重量、兩個時間戳，想將個比較淨係寫一次。"
+brief = '''
+`max` 回傳同一類型兩個值之中較大嗰個，呼叫嗰陣會將個類型寫明：
+`max(i64, 3, 7)`、`max(f64, 2.5, 1.0)`。邊一行開頭？
+
+```
+// ____
+    return if (a > b) a else b;
+}
+```
+'''
+hints = [
+  "個類型係第一個 argument，編譯時已知，而其餘兩個參數同回傳都係用佢嚟寫。",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "zig.cheatsheet_advanced.02.this"
+title = "仲未有名嘅類型"
+story = "個貨櫃 stack 乜貨都收。喺入面，啲 method 需要一個名嚟指住佢哋正喺度寫緊嘅 struct。"
+brief = '''
+喺 `Stack` 回傳嘅 struct 入面，將 `Self` 綁定到嗰個 struct 自己嘅類型，
+令 `push` 可以收 `self: *Self`。
+
+```
+fn Stack(comptime T: type) type {
+    return struct {
+        // ____
+        items: std.ArrayList(T) = .empty,
+        pub fn push(self: *Self, gpa: std.mem.Allocator, v: T) !void {
+            try self.items.append(gpa, v);
+        }
+    };
+}
+```
+'''
+hints = [
+  "匿名 struct 冇名可以指返自己；有一個 builtin 會交返最內層正喺度定義緊嘅 struct、enum 或者 union。",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "zig.cheatsheet_advanced.03.fn-pointer"
+title = "今晚用邊條規矩"
+story = "2 號亭個收費規矩喺午夜換：之前係雙倍，之後係負數。個亭將條規矩放喺一個變數度然後呼叫佢。"
+brief = '''
+`double` 同 `negate` 都係 `fn (i32) i32`。宣告一個**運行時變數** `f`，
+開頭係 `double`，之後可以重新賦值做 `negate`，而且用 `f(3)` 嚟呼叫。
+'''
+hints = [
+  "光秃秃嘅 `fn` 類型係 comptime-only，唔可以住喺 `var` 入面；運行時嘅 function 值係一個指住佢嘅指針，而 function 係 `const` 嘅。",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "zig.cheatsheet_advanced.04.inline-for-fields"
+title = "每個欄位，按名"
+story = "夜間審計將交畀佢嘅每個紀錄嘅每個欄位都印出嚟，唔理係邊個 struct，亦唔使人話佢知啲欄位名。"
+brief = '''
+`dump` 為任何交畀佢嘅 struct 印出每個欄位嘅名同值。開個行過啲欄位嘅 loop，
+令 `f.name` 可以用喺 `@field` 入面（Zig 0.16：type-info 個 tag 係細楷）。
+
+```
+fn dump(v: anytype) void {
+    const T = @TypeOf(v);
+    if (@typeInfo(T) != .@"struct") @compileError("not a struct: " ++ @typeName(T));
+    // ____
+        std.debug.print("{s}: {any}\n", .{ f.name, @field(v, f.name) });
+    }
+}
+```
+'''
+hints = [
+  "個欄位 list 係編譯時數據，所以普通 loop index 唔到佢；個 loop 一定要展開，而 `struct` 係關鍵字，做欄位名要加引號。",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "zig.cheatsheet_advanced.05.has-field"
+title = "佢有冇車牌"
+story = "車有車牌，單車冇。同一個 label function 兩樣都會收到，而且編譯時就要知自己揸住嘅係邊樣。"
+brief = '''
+`label` 會用一個 `Car`（有一個欄位 `plate`）同一個 `Bike`（冇欄位 `plate`，
+亦冇嗰個名嘅 declaration）嚟呼叫。開個 `if`，佢個分支對 `Car` 會行、對 `Bike`
+會剪走，令 `v.plate` 淨係喺佢存在嘅地方先編譯。
+
+```
+fn label(v: anytype) []const u8 {
+    const T = @TypeOf(v);
+    // ____
+        return v.plate;
+    } else return "no plate";
+}
+```
+'''
+hints = [
+  "有一個 builtin 會問一個類型有冇某個名（以 string 畀）嘅欄位；問 declaration 嗰個對欄位會答冇。",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "zig.cheatsheet_advanced.06.comptime-var"
+title = "BUILD 之前已經數好"
+story = "五個行車線平方表喺個程式行之前就填好；填佢哋嗰個 loop 係由 compiler 展開嘅。"
+brief = '''
+喺一個**運行時** function 入面，宣告 loop 計數器 `i`，令下面個 `inline while`
+會展開，而 `i` 喺每次迭代都係編譯時已知。
+
+```
+fn squares() [5]u32 {
+    var out: [5]u32 = undefined;
+    // ____
+    inline while (i < 5) : (i += 1) {
+        out[i] = @intCast(i * i);
+    }
+    return out;
+}
+```
+'''
+hints = [
+  "運行時嘅 `var` 推唔郁一個 inline loop，`const` 又唔可以步進；強制一個可變編譯時值嘅關鍵字放喺 `var` 前面。",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "zig.cheatsheet_advanced.07.error-merge"
+title = "兩張失敗方式嘅清單"
+story = "parse 一張飛可以兩種方式失敗，收費就係第三種。收費嗰個 function 用一個 set 寫晒三種。"
+brief = '''
+`ParseError` 係 `error{ Empty, BadDigit }`。將 `TollError` 定義做裝住嗰兩個
+error **加埋** `Overdrawn` 嘅 set，令 `fn charge(s: []const u8) TollError!i64`
+可以回傳三個之中任何一個。
+'''
+hints = [
+  "error set 係用一個兩個字元嘅 operator 嚟合併；單一條直線係 bitwise or，唔收類型。",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "zig.cheatsheet_advanced.08.switch-on-error"
+title = "佢係點樣失敗"
+story = "一張污糟咗嘅飛一文不值；一張位數太多嘅飛值最大值。個亭按佢捉到嘅 error 嚟決定。"
+brief = '''
+`std.fmt.parseInt(i64, tok, 10)` 會以 `InvalidCharacter` 或者 `Overflow` 失敗。
+個 error 被 catch 住然後 switch。邊個 prong 對壞字元畀 0？
+
+```
+return std.fmt.parseInt(i64, tok, 10) catch |e| switch (e) {
+    // ____
+    error.Overflow => std.math.maxInt(i64),
+};
+```
+'''
+hints = [
+  "對 error set 做 switch，每個 case 都用 `error.` 前綴嚟命名；enum-literal 嗰種點嘅寫法係另一個類型。",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "zig.cheatsheet_advanced.09.walk-optional"
+title = "沿住條鏈落去"
+story = "今晚啲收據係一條 linked chain，每個 node 指住下一個或者乜都冇。審計行到尾然後加總。"
+brief = '''
+`Node` 係 `struct { v: i64, next: ?*Node }`，而 `cur` 係一個類型 `?*Node` 嘅 `var`。
+開一個 loop，將 `node` 逐個綁定到每個 node 然後行 body，去到 `null` 就停，
+而去下一個 node 嗰步係寫喺 loop header 而唔係 body 入面。
+
+```
+var total: i64 = 0;
+var cur = head;
+// ____
+    total += node.v;
+}
+```
+'''
+hints = [
+  "個條件係個 optional 本身，capture 係拆開咗嘅指針，而冒號後面個 continue expression 推進嘅係個 optional，唔係個 capture。",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "zig.cheatsheet_advanced.10.union-payload"
+title = "佢哋點樣畀錢"
+story = "一架車用硬幣畀、用八達通畀、或者揮手放行。總數將硬幣按面值加，八達通就雙倍。"
+brief = '''
+`Pay` 係 `union(enum) { coin: i64, octopus: i64, waved: void }`，而 `p` 係一個
+`Pay`。邊個 prong 將 coin 個 payload 加落 `t`？
+
+```
+switch (p) {
+    // ____
+    .octopus => |amount| t += amount * 2,
+    .waved => {},
+}
+```
+'''
+hints = [
+  "payload 係由箭嘴後面嘅 capture 綁定，同對 optional 做 `if` 嗰對直線一樣；普通 capture 係個值，`|*x|` 係指住佢嘅指針。",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "zig.cheatsheet_advanced.11.enum-from-int"
+title = "由線路落嚟嘅一個數"
+story = "車軸感應器以一個 byte 送一個行車線類別。收費表係用個 enum 做 key，而個 enum 知自己嘅收費。"
+brief = '''
+`n` 係一個運行時 `u8`，裝住一個有效嘅 tag 值。將 `lane` 整做對應嘅 `Lane`，
+令 `lane.fee()` 編譯得到。
+
+```
+const Lane = enum(u8) {
+    car, van, truck, bus,
+    pub fn fee(self: Lane) i64 {
+        return switch (self) { .car, .van => 10, .truck => 20, .bus => 15 };
+    }
+};
+// ____
+return lane.fee();
+```
+'''
+hints = [
+  "個 builtin 淨係收個整數；佢變成嘅 enum 係結果類型，所以個綁定一定要寫明佢。反方向係 `@intFromEnum`。",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "zig.cheatsheet_advanced.12.labeled-block"
+title = "第一個重嘅"
+story = "掃描地磅 log 搵第一個超過一百噸嘅讀數；答案係一個值，唔係跳出個 function。"
+brief = '''
+`xs` 保證有一個超過 100 嘅值。`found` 一定要變成第一個咁樣嘅 `x`，然後個
+function 繼續用 `found`。邊一行將 `x` 由個 block 交出嚟？
+
+```
+const found = blk: {
+    for (xs) |x| {
+        if (x > 100) // ____
+    }
+    unreachable;
+};
+return found * 2;
+```
+'''
+hints = [
+  "有 label 嘅 block 係用一個 break 嚟交出佢嘅值，個 break 前面加冒號寫明個 label，並且帶住個值；`return` 會帶住錯嘅數字離開個 function，而個 label 就冇用到。",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "zig.cheatsheet_advanced.13.span"
+title = "C 嗰邊嚟嘅 STRING"
+story = "車牌攝影機個 driver 係 C。佢以一個以零 byte 結尾嘅指針交一個名過嚟，而 Zig 嗰邊想要一個有長度嘅 slice。"
+brief = '''
+`c_name` 係一個 `[*:0]const u8` —— 一個冇長度、以 0 結尾嘅 many-item pointer。
+將 `s` 整做一個覆蓋佢啲 byte 直到（唔包括）結尾符嘅 `[]const u8`，唔 copy。
+'''
+hints = [
+  "many-pointer 唔會自動變做 slice：要有嘢行到個 sentinel 先搵到長度。有一個 std.mem function 正正做呢樣嘢，而且淨係收個指針。",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "zig.cheatsheet_advanced.14.to-owned-slice"
+title = "將個 LIST 交出去"
+story = "雙數行車線收集入一個 list，而呼叫者想要光秃秃嘅 slice，用完用 gpa.free 釋放。"
+brief = '''
+`list` 係一個用 `gpa` 填滿嘅 `std.ArrayList(i64)`。將佢嘅內容以一個 `[]i64`
+回傳，由呼叫者用 `gpa.free` 釋放，`list` 唔剩低任何嘢要釋放，而且乜都唔 copy
+（Zig 0.16：個 list 唔持有 allocator）。
+
+```
+fn evens(gpa: std.mem.Allocator, xs: []const i64) ![]i64 {
+    var list: std.ArrayList(i64) = .empty;
+    errdefer list.deinit(gpa);
+    for (xs) |x| if (@rem(x, 2) == 0) try list.append(gpa, x);
+    // ____
+}
+```
+'''
+hints = [
+  "`.items` 仍然係個 list 擁有嘅，會被釋放兩次或者永遠唔釋放；轉移擁有權嗰個呼叫會縮到啱啱好，所以佢可以失敗，而且收個 allocator。",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "zig.cheatsheet_advanced.15.get-or-put"
+title = "查一次，唔係兩次"
+story = "控制室個車牌計數每架車加一次，而夜更拒絕將同一個車牌 hash 兩次。"
+brief = '''
+`counts` 係一個 `std.AutoHashMap(i64, i64)`。用一次查找計 `x`：第一次見到
+嘅 key 遞增之前由 0 開始，已經喺度嘅 key 保留佢嘅計數。
+
+```
+const gop = try counts.getOrPut(x);
+// ____
+gop.value_ptr.* += 1;
+```
+'''
+hints = [
+  "個結果帶住一個 flag 講個 key 係咪本來已經喺度，同一個指住個 slot 嘅指針；一個新 slot 喺你寫入之前係 undefined。",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "zig.cheatsheet_advanced.16.dupe-key"
+title = "活得比嗰行長嘅 KEY"
+story = "車牌一行一個咁入同一個 buffer。今晚見過嘅車牌 set 唔可以指住一個就嚟被覆寫嘅 buffer。"
+brief = '''
+`seen` 係一個用 `gpa` 整嘅 `std.StringHashMap(void)`，而 `word` 係一個指入
+line buffer 嘅 `[]const u8` slice，嗰個 buffer 下一次讀就會被覆寫。將 `word`
+當 key 插入，而個 key 喺 buffer 改變之後仍然有效。啲 key 最後會逐個釋放。
+'''
+hints = [
+  "string map 存嘅係你畀佢嘅 slice，唔係啲 byte；先用 allocator copy 佢哋，而個 copy 都可以失敗。",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "zig.cheatsheet_advanced.17.debug-allocator"
+title = "會篤你背脊嘅 ALLOCATOR"
+story = "夜間 build 用嗰個會報告每一個冇交返嘅 byte 嘅 allocator。佢個名喺 0.16 改咗，舊嗰個編譯唔過。"
+brief = '''
+Zig 0.16。宣告會檢查 leak 嘅 general-purpose allocator `dbg`，令下面兩行
+編譯得到 —— `deinit` 會改佢並且報告 leak。
+
+```
+// ____
+defer _ = dbg.deinit();
+const gpa = dbg.allocator();
+```
+'''
+hints = [
+  "`GeneralPurposeAllocator` 喺 0.16 嘅 std.heap 已經冇咗；個類型收一個 config tuple，而且係由 decl literal 初始化，唔係呼叫。",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "zig.cheatsheet_advanced.18.arena"
+title = "最後一次過畀"
+story = "一個 request 嘅草稿 node 同 string 喺個 request 完結嗰陣一齊死。冇人會逐個釋放佢哋。"
+brief = '''
+`page` 係 `std.heap.page_allocator`。將 `arena` 整做佢上面嘅一個 arena，
+令下面嘅 `a.create(Node)` 同 `std.fmt.allocPrint(a, ...)` 全部由嗰一個 `deinit` 釋放。
+
+```
+// ____
+defer arena.deinit();
+const a = arena.allocator();
+```
+'''
+hints = [
+  "arena 係砌喺一個 child allocator 上面，佢當唯一 argument 收；佢唔係 generic 類型，亦冇 config tuple。",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "zig.cheatsheet_advanced.19.defer-order"
+title = "後入先出"
+story = "出亭嗰陣蓋三個印，其中兩個係 defer 嘅。賬簿顯示佢哋落嘅次序。"
+brief = '''
+呢個 function 完整印出乜嘢？
+
+```
+fn stamp() void {
+    defer std.debug.print("1", .{});
+    defer std.debug.print("2", .{});
+    std.debug.print("3", .{});
+}
+```
+'''
+hints = [
+  "defer 嘅語句喺離開 scope 嗰陣按 defer 嘅相反次序執行：最後登記嗰個最先行。",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "zig.cheatsheet_advanced.20.split-keeps-empties"
+title = "空欄都計"
+story = "收費匯出係逗號分隔，而缺咗嘅欄係一個空欄位，唔係一個從來冇存在過嘅欄位。`a,,b` 係三欄。"
+brief = '''
+`line` 係一個 `[]const u8`。將 `it` 整做一個行過 `line` 嘅逗號分隔欄位嘅 iterator，
+令 `while (it.next()) |f| n += 1;` 將 `"a,,b"` 數做 **3** 個欄位，`"a"` 數做 1 個。
+'''
+hints = [
+  "有兩個 std.mem iterator 收單一 byte 嘅分隔符；tokenizer 會吞咗連續嘅分隔符，會數做兩個，而 splitter 會產出中間嗰個空欄位。",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "zig.cheatsheet_advanced.21.sort-context"
+title = "按第二個人嘅數字排"
+story = "行車線 index 按另一張表入面嘅重量重新排。Zig 冇 closure 可以捕捉張表，所以將張表交畀個 sort。"
+brief = '''
+`idx` 係一個 `[]usize`，`keys` 係一個 `[]const i64`。用呢個 comparator 將 `idx`
+按 `keys[i]` 升序排：
+
+```
+fn byKey(keys: []const i64, a: usize, b: usize) bool {
+    return keys[a] < keys[b];
+}
+```
+'''
+hints = [
+  "第三個 argument 係個 comparator 當第一個參數收嘅 context；comparator 嘅類型一定要同佢完全一致，所以 `{}` 淨係配 `void` context。",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "zig.cheatsheet_advanced.22.truncate"
+title = "淨係低位嗰個 BYTE"
+story = "車軸感應器將四個讀數塞入一個 u32。個亭想要最低嗰個 byte，而其餘嗰啲唔係零嗰陣唔可以 panic。"
+brief = '''
+`x` 係一個裝住 `0x1234` 嘅運行時 `u32`。將 `lo` 整做一個裝住 `0x34` 嘅 `u8` ——
+低八個 bit —— 喺 Debug mode 唔會有 safety panic。
+'''
+hints = [
+  "檢查個值放唔放得落嘅 cast 對 0x1234 會 panic；丟走高位 bit 嗰個收一個 argument，而且由個綁定攞佢嘅闊度。",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "zig.cheatsheet_advanced.23.wrapping"
+title = "轉圈，唔好停"
+story = "車牌 hash 係故意 overflow 嘅，一晚幾千次。喺 Debug mode，冇要求過嘅 overflow 係一個 panic 同一道閂咗嘅閘。"
+brief = '''
+`h` 係一個由接近 `std.math.maxInt(u32)` 開始嘅 `u32`，而 `c` 係一個 `u8`。
+寫 hash 嗰步 `h = h * 31 + c`，令佢以 2^32 為模**轉圈** —— 唔係 panic，
+亦唔係釘喺最大值。
+'''
+hints = [
+  "普通 operator 喺 Debug overflow 會 panic，而事後先套一個 mask 已經太遲 —— 個乘法已經 overflow 咗。Zig 有兩族帶後綴嘅 operator：一族會喺最大值飽和，另一族會轉圈。",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "zig.cheatsheet_advanced.24.expect-equal"
+title = "證明個車費"
+story = "面試官行之前，考生先對收費表同平均數行 `zig test`，而個 test 講明佢期望乜。"
+brief = '''
+`fare(3)` 回傳一個應該係 7 嘅 `i64`。喺 test block 入面 assert 佢 ——
+個值錯嗰陣個 test 一定要失敗，而且一定要編譯得到。
+
+```
+fn avg(sum: i64, n: i64) f64 {
+    return @as(f64, @floatFromInt(sum)) / @as(f64, @floatFromInt(n));
+}
+
+test "fare" {
+    // ____
+    try std.testing.expect(avg(5, 2) == 2.5);
+}
+```
+'''
+hints = [
+  "個比較回傳一個 error union，所以一定要 `try`，否則 compiler 拒絕忽略佢；一個 argument 嘅 `expect` 收一個 bool。",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "zig.cheatsheet_advanced.25.main-init"
+title = "RUNTIME 由邊度入嚟"
+story = "Zig 0.16 用一個 struct 將 I/O runtime 同 allocator 交畀 main。舊嘅 signature 淨係喺兩樣都唔用嗰陣先仍然編譯得到。"
+brief = '''
+Zig 0.16。開 `main`，令下面個 body 編譯得到：佢由個參數讀 `io` 同 `gpa`，
+而且用 `try`。
+
+```
+// ____
+    const io = init.io;
+    const gpa = init.gpa;
+    var in_buf: [4096]u8 = undefined;
+    var stdin = std.Io.File.stdin().readerStreaming(io, &in_buf);
+    const input = try stdin.interface.allocRemaining(gpa, .unlimited);
+    defer gpa.free(input);
+}
+```
+'''
+hints = [
+  "entry point 一定要係 `pub`，為咗個 `try` 一定要可以回傳 error，而且收一個 std.process 嗰個類型嘅參數，個 body 由佢度讀欄位。",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "zig.cheatsheet_advanced.26.stdin-lines"
+title = "一次一行"
+story = "車牌 feed 無止境，而控制室經 0.16 個 reader 一行一行咁讀，直到個 feed 閂咗。"
+brief = '''
+Zig 0.16。`r` 係 `&stdin.interface`，一個喺 buffered stdin 上面嘅 `*std.Io.Reader`。
+開一個 loop，將每一行（唔連換行）綁定到 `line`，讀取失敗就向上交畀呼叫者，
+而且喺輸入結尾乾淨咁完結。
+'''
+hints = [
+  "0.16 個 reader 有一個 take-up-to-delimiter 呼叫，回傳一個包住 optional slice 嘅 error union：stream 結尾係 null，所以先 `try` 再 capture；佢個 Exclusive 兄弟唔係 optional，去到尾會 error。",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "zig.cheatsheet_advanced.27.spawn"
+title = "一個亭自己一條 THREAD"
+story = "5 號亭喺自己一條 thread 上面將佢嘅計數平方，然後將答案寫入控制室個 slot；控制室讀之前先 join 佢。"
+brief = '''
+`fn worker(out: *i64, n: i64) void`，而 `total` 係一個 `var i64`。用 `&total`
+同 `5` 喺一條新 thread 上面開 `worker`，將個 handle 保留做 `t`，令下一行
+`t.join();` 編譯得到。
+'''
+hints = [
+  "Spawn 收一個 config、個 function，同埋佢啲 argument 做一個 tuple；佢可以失敗，而個 handle 要拆走個 error 之後先存在。",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "zig.cheatsheet_advanced.28.io-mutex"
+title = "一個托盤，兩隻手"
+story = "兩個亭加落同一個現金總數。圍住佢嘅鎖喺 0.16 屬於 I/O runtime，而 std.Thread.Mutex 已經冇咗。"
+brief = '''
+Zig 0.16。`m` 係一個 `*std.Io.Mutex`，`io` 係一個 `std.Io`。加之前先攞個鎖；
+下面個 `defer` 會交返佢。`add` 回傳 `void`，唔可以傳播 error。
+
+```
+fn add(io: std.Io, m: *std.Io.Mutex, total: *i64, value: i64) void {
+    // ____
+    defer m.unlock(io);
+    total.* += value;
+}
+```
+'''
+hints = [
+  "0.16 個 mutex 嘅普通 `lock` 收 `io` 而且可以回傳 `error.Canceled`，一個 `void` function 冇得 `try`；佢個唔可以 cancel 嘅兄弟乜都唔回傳。",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "zig.cheatsheet_advanced.29.atomic"
+title = "一個 WORD，冇鎖"
+story = "天橋下面個 hit 計數器係一個機器 word，每條行車線同時都會㩒佢，而冇人想為一個加法加個 mutex。"
+brief = '''
+`hits` 係一個由幾條 thread 共用嘅 `*std.atomic.Value(u32)`。喺一個唔需要
+舊值嘅 `void` function 入面，用 relaxed (monotonic) ordering 原子地加 1。
+'''
+hints = [
+  "read-modify-write 會回傳之前嘅值，而 Zig 唔會畀一個非 void 嘅結果靜靜地丟走；0.16 嘅 ordering 係一個細楷嘅 enum literal。",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "zig.cheatsheet_advanced.30.packed-bitcast"
+title = "一個 BYTE 八個 FLAG"
+story = "個閘機控制器每架車收一個 byte：畀咗錢、被標記、三個 bit 嘅行車線、三個 bit 備用。個 struct 逐個 bit 排好，然後以嗰個 byte 送出去。"
+brief = '''
+`Flags` 係一個 `packed struct(u8)` —— `@sizeOf(Flags)` 係 1，唔似
+`extern struct` 咁用 C 嘅方式排。`f` 係一個 `Flags`。將 `bits` 整做 bit pattern
+同 `f` 一樣嘅 `u8`，令佢可以送上線路。
+
+```
+const Flags = packed struct(u8) {
+    paid: bool,
+    flagged: bool,
+    lane: u3,
+    _pad: u3 = 0,
+};
+```
+'''
+hints = [
+  "啲整數 cast 想要一個整數入去；packed struct 係由嗰個收一個 argument、由個綁定攞目標嘅 cast 逐個 bit 重新解釋。",
+]

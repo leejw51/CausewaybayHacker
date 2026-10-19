@@ -1,0 +1,573 @@
+# GO LAND — CHEATSHEET ADVANCED, in Czech. A translation pack (SPEC §12.1):
+# the prose of `content/go/cheatsheet_advanced.toml`, quest by quest, and
+# nothing else. The question is the brief; the four choices are code, live in
+# the English pack, and are never translated. Code blocks, identifiers and
+# printed strings are copied verbatim.
+
+pack   = "go.cheatsheet_advanced"
+locale = "cs"
+
+# ---------------------------------------------------------------- 01
+[[quest]]
+id    = "go.cheatsheet_advanced.01.buffered"
+title = "MÍSTO PRO JEDNOHO"
+story = "Výdejní okénko Lucky Mac ve 12:30: kuchař drží tác v natažené ruce, nikdo si ho nebere a celá kuchyně za ním stojí."
+brief = '''
+Tyto tři řádky běží v `main` a žádná jiná gorutina nežije. Která
+deklarace nechá odeslání projít, aby příjem vypsal `1`?
+
+```
+// ____
+ch <- 1
+fmt.Println(<-ch)
+```
+'''
+hints = [
+  "Nebufferované odeslání čeká na příjemce a příjemce je tady tatáž gorutina, o řádek dál. Dejte kanálu místo, kam hodnotu odložit.",
+]
+
+# ---------------------------------------------------------------- 02
+[[quest]]
+id    = "go.cheatsheet_advanced.02.wg-launch"
+title = "NAPOČÍTEJ, NEŽ VYRAZÍŠ"
+story = "Čtyřicet kurýrů vyjíždí z Lucky Mac najednou a dispečer zavírá krám dřív, než je seznam, kdo vyjel, vůbec napsaný."
+brief = '''
+`go.mod` říká `go 1.22`, takže každá iterace má vlastní `i`. Spusťte
+`work(i)` pro každé `i` v gorutině a zajistěte, aby závěrečný `Wait`
+opravdu počkal na všech `n` — nic nesmí závodit s počítadlem.
+
+```
+var wg sync.WaitGroup
+for i := range n {
+    // ____
+}
+wg.Wait()
+```
+'''
+hints = [
+  "Počítadlo jde nahoru v gorutině, která bude volat `Wait`, ještě před `go`; dolů jde uvnitř té nové, odloženě, a `defer` potřebuje volání.",
+]
+
+# ---------------------------------------------------------------- 03
+[[quest]]
+id    = "go.cheatsheet_advanced.03.close-range"
+title = "POSLEDNÍ TALÍŘ, ROLETA DOLŮ"
+story = "Z výdeje odchází poslední talíř obědového návalu a runner tam dál stojí, protože mu nikdo neřekl, že kuchyně skončila."
+brief = '''
+Konzument v `main` prochází `for v := range ch { ... }` a pak vypíše
+`done`. Který řádek na konci producenta tu smyčku ukončí, se všemi
+hodnotami doručenými a bez gorutiny, která by zůstala čekat?
+
+```
+func produce(ch chan<- int) {
+    for i := range 3 {
+        ch <- i
+    }
+    // ____
+}
+```
+'''
+hints = [
+  "Range přes kanál končí, až když je kanál zavřený a vyprázdněný. Zarážková hodnota je jen další hodnota; smyčka čeká dál.",
+]
+
+# ---------------------------------------------------------------- 04
+[[quest]]
+id    = "go.cheatsheet_advanced.04.worker-sig"
+title = "JEDNA CESTA DOVNITŘ, JEDNA VEN"
+story = "Čtyři kuchaři na lince Lucky Mac berou objednávky z jedné lišty a staví talíře na druhou; nováček pořád vrací objednávky zpátky na lištu."
+brief = '''
+Worker pool: `main` vytvoří `jobs` a `results` jako obyčejné `chan int`,
+spustí čtyři workery, pošle devět úloh, zavře `jobs` a pak posbírá devět
+výsledků přes `<-results`. Která signatura se s tímhle tělem zkompiluje —
+a přiměje kompilátor odmítnout odeslání na `jobs` nebo příjem z `results`
+uvnitř workeru?
+
+```
+// ____
+    for j := range jobs {
+        results <- j * j
+    }
+}
+```
+'''
+hints = [
+  "Šipka stojí na straně, kam data tečou: před `chan` jen pro vybírání, za `chan` jen pro vkládání. Obousměrný kanál se převede na obojí.",
+]
+
+# ---------------------------------------------------------------- 05
+[[quest]]
+id    = "go.cheatsheet_advanced.05.try-send"
+title = "ZAHOĎ, NEČEKEJ"
+story = "Tabule příjezdů v Tin Hau loguje každý vlak, o kterém se doslechne; když se log zaplní, tabule sama nesmí zamrznout."
+brief = '''
+`ch` je `chan string` s kapacitou 2 a posílá na něj několik gorutin.
+V `log(v)` předejte `v` kanálu, pokud je místo, jinak ho zahoďte —
+volající nesmí nikdy blokovat a žádná gorutina nesmí zůstat čekat
+na odeslání.
+'''
+hints = [
+  "`select` se záložní větví nikdy neblokuje; záložní větev nesmí dělat vůbec nic, ne další odeslání.",
+]
+
+# ---------------------------------------------------------------- 06
+[[quest]]
+id    = "go.cheatsheet_advanced.06.timeout-case"
+title = "DVĚ SEKUNDY, PAK KONEC"
+story = "Obrazovka na nástupišti v Causeway Bay čeká na signál dalšího vlaku. Čeká dvě sekundy, nebo čeká navždy — firmware si nebyl jistý, co z toho."
+brief = '''
+`ch` je `<-chan int` a `ctx` je `context.Context`. Doplňte třetí case
+tak, aby to funkce po dvou sekundách, kdy nic nedorazí, vzdala.
+
+```
+select {
+case v := <-ch:
+    use(v)
+    return nil
+case <-ctx.Done():
+    return ctx.Err()
+// ____
+    return errTimeout
+}
+```
+'''
+hints = [
+  "Case v select musí být odeslání nebo příjem. V `time` je funkce, která vrací kanál, jenž vystřelí po uplynutí `Duration`, a holé `2` jsou dvě nanosekundy.",
+]
+
+# ---------------------------------------------------------------- 07
+[[quest]]
+id    = "go.cheatsheet_advanced.07.defer-cancel"
+title = "PUSŤ TO CESTOU VEN"
+story = "Každé vyhledání jízdného v Admiralty otevře třísekundový časovač a nikdo ho nikdy nezastaví; do večerní špičky drží brána deset tisíc časovačů."
+brief = '''
+`fetch(ctx)` musí běžet s ještě živým třísekundovým limitem a prostředky
+časovače se musí uvolnit, ať už se `get` vrátí jakkoli — předčasným
+návratem, chybou nebo úspěchem. (`WithCancel` vrací stejnou dvojici.)
+
+```
+func get() error {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    // ____
+    return fetch(ctx)
+}
+```
+'''
+hints = [
+  "Zavolat funkci cancel hned by `ctx` zrušilo dřív, než ho `fetch` uvidí. Naplánujte volání na chvíli, kdy se `get` vrací — a `defer` chce volání, včetně závorek.",
+]
+
+# ---------------------------------------------------------------- 08
+[[quest]]
+id    = "go.cheatsheet_advanced.08.mutex-inc"
+title = "ZÁMEK PRO ZÁPIS, NE PRO ČTENÍ"
+story = "Padesát turniketů v přestupní stanici Causeway Bay počítá cestující do jednoho čísla a to číslo vychází o kousek méně, který nikdo nedokáže zopakovat."
+brief = '''
+Padesát gorutin volá `Inc` tisíckrát každá; potom musí `Get`
+vrátit `50000`.
+
+```
+type Ctr struct {
+    mu sync.RWMutex
+    n  int
+}
+func (c *Ctr) Get() int { c.mu.RLock(); defer c.mu.RUnlock(); return c.n }
+// ____
+```
+'''
+hints = [
+  "Zápis potřebuje výhradní zámek, ne sdílený; hodnotový příjemce kopíruje strukturu i se zámkem, takže skutečné `n` se nikdy nepohne.",
+]
+
+# ---------------------------------------------------------------- 09
+[[quest]]
+id    = "go.cheatsheet_advanced.09.once"
+title = "JEN JEDNO ZAHŘÁTÍ"
+story = "Dvacet kurýrů otevře aplikaci Lucky Mac v tutéž sekundu a backend otevře dvacet databázových spojení, každému jedno, a všechna se jmenují první."
+brief = '''
+`initDB()` je `func()`, která nastaví `db` na úrovni balíčku. `conn()` se
+volá z dvaceti gorutin najednou; `initDB` musí proběhnout přesně jednou
+a každý volající musí vidět hotové `db`.
+
+```
+var once sync.Once
+func conn() *DB {
+    // ____
+    return db
+}
+```
+'''
+hints = [
+  "`Once` bere funkci samotnou, ne výsledek jejího zavolání — a holé jméno uvnitř closure je nevyužitá hodnota, což se nezkompiluje.",
+]
+
+# ---------------------------------------------------------------- 10
+[[quest]]
+id    = "go.cheatsheet_advanced.10.atomic-add"
+title = "JEDEN TIK, ŽÁDNÝ ZÁMEK"
+story = "Počítadlo přístupů na stavové stránce Island Line pod zátěží ztrácí tiky a mutex kolem jediného integeru připadá Alexovi jako kanón na vrabce."
+brief = '''
+`var hits atomic.Int64` se inkrementuje ze sta gorutin, desettisíckrát
+z každé. Který řádek napočítá všechny, aby `hits.Load()` skončilo
+na `1000000`?
+'''
+hints = [
+  "Typovaný atomic má metody; load následovaný store jsou dvě operace a mezi nimi je mezera.",
+]
+
+# ---------------------------------------------------------------- 11
+[[quest]]
+id    = "go.cheatsheet_advanced.11.fan-in"
+title = "MNOHO LINEK, JEDNO NÁSTUPIŠTĚ"
+story = "Vlaky z Tsuen Wan a Kwun Tong se sjíždějí na jedno nástupiště v Admiralty; sloučení funguje až do posledního nočního vlaku, kdy se nástupiště nikdy nevyprázdní."
+brief = '''
+Fan-in. `go.mod` říká `go 1.22`, takže každá iterace má vlastní `c`.
+Spusťte pro každý vstup přeposílač, který ho zkopíruje do `out` a pak
+se odhlásí jako hotový, aby zavírač níže mohl `out` zavřít.
+
+```
+func merge(ins ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+    wg.Add(len(ins))
+    for _, c := range ins {
+        // ____
+    }
+    go func() { wg.Wait(); close(out) }()
+    return out
+}
+```
+'''
+hints = [
+  "Musí to běžet ve vlastní gorutině (klíčové slovo `go` a volání na konci) a musí to skupině oznámit, až to skončí — jinak se `Wait` nikdy nevrátí a `out` se nikdy nezavře.",
+]
+
+# ---------------------------------------------------------------- 12
+[[quest]]
+id    = "go.cheatsheet_advanced.12.defer-args"
+title = "KDY SE TO PŘEČETLO?"
+story = "Pokladna v Tin Hau tiskne cestou ven celkovou tržbu a tiskne tu z okamžiku, kdy směna začala."
+brief = '''
+Vypište `2` — hodnotu, kterou `x` má, když se `main` vrací.
+
+```
+func main() {
+    x := 1
+    // ____
+    x = 2
+}
+```
+'''
+hints = [
+  "Argumenty odloženého volání se vyhodnotí při `defer`, ne až když běží. Pozdější zápis uvidí jen closure, která `x` čte sama.",
+]
+
+# ---------------------------------------------------------------- 13
+[[quest]]
+id    = "go.cheatsheet_advanced.13.recover"
+title = "CHYŤ TO PŘI PÁDU"
+story = "Jedna špatná objednávka na lince Lucky Mac hodí vařečkou a celá kuchyně zhasne, místo aby se ten jeden talíř vrátil označený jako neúspěch."
+brief = '''
+`f` může zpanikařit. `safe` musí paniku spolknout a místo ní vrátit
+`errPanic`; slušné `f` vrací `nil`.
+
+```
+func safe(f func()) (err error) {
+    // ____
+    f()
+    return nil
+}
+```
+'''
+hints = [
+  "Funguje to jen zevnitř odložené funkce — odložit samotný builtin nedělá nic — a jediná cesta ven je přiřadit do pojmenovaného výsledku.",
+]
+
+# ---------------------------------------------------------------- 14
+[[quest]]
+id    = "go.cheatsheet_advanced.14.errors-as"
+title = "KTERÝ DRUH ŠPATNĚ"
+story = "Id kurýra se z vyhledávání Lucky Mac vrací zabalené ve třech vrstvách kontextu a přepážka potřebuje klíč, který chyběl, ne větu."
+brief = '''
+`err` vzniklo jako `fmt.Errorf("lookup: %w", &NotFound{Key: k})`; obyčejné
+`errors.Is` by řeklo jen ano, nebo ne. Otevřete `if`, v jehož těle lze
+vypsat `nf.Key` — bez paniky.
+
+```
+type NotFound struct{ Key string }
+func (e *NotFound) Error() string { return e.Key + " not found" }
+```
+'''
+hints = [
+  "Přímá aserce přes obalení nevidí. Cíl je ukazatel na proměnnou, jejíž typ implementuje `error` — a tím typem je tady ukazatelový typ.",
+]
+
+# ---------------------------------------------------------------- 15
+[[quest]]
+id    = "go.cheatsheet_advanced.15.assert-ok"
+title = "UMÍ TO MLUVIT?"
+story = "Informační tabule v Tin Hau žádá každý objekt na feedu, aby se popsal, a první obyčejný integer tabuli položí."
+brief = '''
+`x` je `any`. `Stop` má metodu `String() string`, a tak splňuje
+`fmt.Stringer`, aniž by to říkal; `42` ne. Navažte `s` a `ok` tak, aby
+další řádek mohl být `if !ok { return "plain" }` — pro oba vstupy,
+bez pádu. (Typový switch by to zvládl také, ale na víc řádků.)
+'''
+hints = [
+  "Dvouhodnotová podoba aserce hlásí, místo aby panikařila; plné jméno rozhraní žije ve `fmt`.",
+]
+
+# ---------------------------------------------------------------- 16
+[[quest]]
+id    = "go.cheatsheet_advanced.16.promoted"
+title = "VYPŮJČENÝ HLAS"
+story = "Stavový server stanice Causeway Bay v sobě nese logger a runner, kterému předali serverovo logování, tiskne úplně bez prefixu."
+brief = '''
+`run` chce `func(string)`. Předejte mu logování `srv`, navázané na `srv`,
+aby vypsalo `[mtr] up`.
+
+```
+type Logger struct{ prefix string }
+func (l Logger) Log(s string) { fmt.Println(l.prefix, s) }
+type Server struct {
+    Logger
+    addr string
+}
+func run(log func(string)) { log("up") }
+srv := Server{Logger{"[mtr]"}, ":8080"}
+```
+'''
+hints = [
+  "Metody vnořeného pole se povyšují na vnější strukturu a jméno metody bez zavolání dává funkční hodnotu s už navázaným příjemcem.",
+]
+
+# ---------------------------------------------------------------- 17
+[[quest]]
+id    = "go.cheatsheet_advanced.17.generic-map"
+title = "COKOLI DOVNITŘ, COKOLI VEN"
+story = "Tabule příjezdů na Yee Wo Street dostává čísla vlaků jako `[]int` a chce `[]string`; Alex odmítá psát tutéž čtyřřádkovou smyčku potřetí."
+brief = '''
+Deklarujte generický `Map` nad dvěma typovými parametry tak, aby
+`Map([]int{1, 2, 3}, strconv.Itoa)` dalo `[]string{"1", "2", "3"}`.
+
+```
+// ____
+    out := make([]U, 0, len(xs))
+    for _, x := range xs {
+        out = append(out, f(x))
+    }
+    return out
+}
+```
+'''
+hints = [
+  "Každý typový parametr potřebuje omezení a parametry, které ho sdílejí, ho mohou sdílet stejně jako `a, b int`.",
+]
+
+# ---------------------------------------------------------------- 18
+[[quest]]
+id    = "go.cheatsheet_advanced.18.ordered"
+title = "COKOLI S VĚTŠÍTKEM"
+story = "Teploměr na nástupišti v Admiralty hlásí v `Celsius`, pojmenovaném celočíselném typu, a generické porovnání napsané pro obyčejné inty ho odmítá."
+brief = '''
+`type Celsius int`. Všechna tři volání se musí zkompilovat:
+`Max(3, 5)`, `Max(2.5, 1.0)` a `Max(Celsius(30), Celsius(28))`.
+Tělo používá vestavěné `max`, které potřebuje typ, na kterém funguje `<`.
+'''
+hints = [
+  "Omezení, které vyjmenuje `int` bez vlnovky, odmítne každý typ *odvozený* od int. Standardní knihovna má jedno omezení pro všechno, na čem funguje `<`.",
+]
+
+# ---------------------------------------------------------------- 19
+[[quest]]
+id    = "go.cheatsheet_advanced.19.generic-stack"
+title = "PUSH, KTERÝ DRŽÍ"
+story = "Zásobník názvů stanic za hlasatelem Island Line přijme každý push a je prázdný pokaždé, když se do něj někdo podívá."
+brief = '''
+`type Stack[T any] struct{ items []T }`. Po `var s Stack[string]`,
+`s.Push("Tin Hau")` a `s.Push("Causeway Bay")` musí být `len(s.items)`
+rovno `2`.
+'''
+hints = [
+  "Příjemce generického typu opakuje typový parametr a metoda, která mění, potřebuje ukazatelovou podobu, jinak upravuje kopii. `append` vrací nový slice; něco si ho musí nechat.",
+]
+
+# ---------------------------------------------------------------- 20
+[[quest]]
+id    = "go.cheatsheet_advanced.20.sort-desc-safe"
+title = "NEJVĚTŠÍ PRVNÍ, BEZ PŘETEČENÍ"
+story = "Žebříček zůstatků jízdného v Causeway Bay má jeden účet na úplném vrcholu `int` a jeden na úplném dně a řazení je dá ve špatném pořadí."
+brief = '''
+`xs` je `[]int`, který obsahuje jak `math.MaxInt`, tak `math.MinInt`.
+Seřaďte ho na místě, největší první — správně i pro ty dva.
+'''
+hints = [
+  "Odečtení dvou hodně vzdálených intů přeteče a otočí znaménko; v `cmp` je trojcestné porovnání. A funkce pro `sort.Slice` dostává indexy, ne prvky.",
+]
+
+# ---------------------------------------------------------------- 21
+[[quest]]
+id    = "go.cheatsheet_advanced.21.bisect"
+title = "ROZPŮLIT"
+story = "Seřazený seznam id vlaků v řídicím středisku Island Line má deset milionů položek a vyhledávání je projde všechny, pokaždé."
+brief = '''
+`xs` je `[]int` seřazený vzestupně. Na jednom řádku a v O(log n) nastavte
+`i` na místo, kde `7` je (nebo kam by se vložila), a `found` na to, jestli
+tam je.
+'''
+hints = [
+  "Balíček `slices` má hledání, které vrací pozici i bool; `sort.SearchInts` vrací jen pozici a `Index` projde slice celý.",
+]
+
+# ---------------------------------------------------------------- 22
+[[quest]]
+id    = "go.cheatsheet_advanced.22.omitempty"
+title = "PRÁZDNÉ VYNECHAT"
+story = "Profil kurýra, který aplikace Lucky Mac posílá ven, má u každého pěšáka prázdné pole `bike` a dashboard vykreslí čtyřicet prázdných kol."
+brief = '''
+`json.Marshal(Rider{Name: "Alex"})` musí dát `{"name":"Alex"}` a
+`json.Marshal(Rider{Name: "Alex", Bike: "e-7"})` musí dát
+`{"name":"Alex","bike":"e-7"}`. Která deklarace pole to dokáže?
+
+```
+type Rider struct {
+    Name string `json:"name"`
+    // ____
+}
+```
+'''
+hints = [
+  "Volba jde do téže uvozované hodnoty jako jméno, oddělená čárkou — a neexportované pole se neserializuje vůbec.",
+]
+
+# ---------------------------------------------------------------- 23
+[[quest]]
+id    = "go.cheatsheet_advanced.23.scanner-buffer"
+title = "DELŠÍ NEŽ ŘÁDEK"
+story = "Noční export logů turniketů Island Line je jeden řádek o 100 000 znacích a čtečka vrací nic a žádnou chybu, kterou by někdo vypsal."
+brief = '''
+`sc := bufio.NewScanner(os.Stdin)`; další vstupní řádek je dlouhý
+100 000 bajtů. Který řádek, umístěný před první `sc.Scan()`, nechá ten
+scan uspět?
+'''
+hints = [
+  "Výchozí limit tokenu je 64 KiB. Scanner má metodu, která bere počáteční slice bajtů a maximální velikost — dva argumenty, ne jeden — a split funkce s tím nemá nic společného.",
+]
+
+# ---------------------------------------------------------------- 24
+[[quest]]
+id    = "go.cheatsheet_advanced.24.stable"
+title = "REMÍZY ZŮSTÁVAJÍ"
+story = "Dvě stě pracovníků turniketů v Admiralty se pro rozpis seskupuje podle seniority a lidé se stejnou senioritou si mezi jedním tiskem a druhým pořád vyměňují místa."
+brief = '''
+`ps` je `[]P` se dvěma sty položkami a
+`less := func(i, j int) bool { return ps[i].S < ps[j].S }`. Seřaďte `ps`
+podle `S` tak, aby položky se stejným `S` zaručeně zachovaly původní
+vzájemné pořadí.
+'''
+hints = [
+  "`less` bere indexy, takže sedí na slicové funkce balíčku `sort`, ne na ty ze `slices` — a jen jedno z těch dvou řazení slice slibuje, že remízy nechá na místě.",
+]
+
+# ---------------------------------------------------------------- 25
+[[quest]]
+id    = "go.cheatsheet_advanced.25.duration"
+title = "MILISEKUNDY, NE NANOSEKUNDY"
+story = "Doba stání v Causeway Bay dorazí jako text `250` a dveře se zavřou dvě stě padesát nanosekund po otevření."
+brief = '''
+`s` je `"250"`, počet milisekund. Po
+`n, err := strconv.ParseInt(s, 10, 64)` (bez chyby) udělejte z `d`
+`time.Duration`, která se vypíše jako `250ms`.
+'''
+hints = [
+  "Proměnnou `int64` nelze násobit `Duration` — to umí jen netypovaná konstanta. Nejdřív číslo převeďte, pak ho vynásobte jednotkou.",
+]
+
+# ---------------------------------------------------------------- 26
+[[quest]]
+id    = "go.cheatsheet_advanced.26.struct-key"
+title = "STEJNÁ BUŇKA, STEJNÝ KOŠ"
+story = "Kurýři se seskupují podle buňky mřížky, ve které čekají; druhý kurýr na stejném rohu Yee Wo Street vymaže toho prvního."
+brief = '''
+`type pt struct{ r, c int }` a `m` je `map[pt][]int` (struktury
+z porovnatelných polí jsou jako klíče v pořádku). Přidejte kurýra `id`
+pod buňku `(r, c)` a zachovejte id, která tam už jsou — i když klíč
+ještě nikdy nebyl viděn.
+'''
+hints = [
+  "Chybějící klíč se čte jako nil slice a append do nil slice je v pořádku; výsledek se musí uložit zpátky pod tentýž hodnotový klíč.",
+]
+
+# ---------------------------------------------------------------- 27
+[[quest]]
+id    = "go.cheatsheet_advanced.27.builder-ptr"
+title = "BUILDER NEKOPÍROVAT"
+story = "Hlášení pro Island Line se skládá kousek po kousku a pomocná funkce, která přidává poslední kousek, padá s hláškou o nedovolené kopii."
+brief = '''
+`sb` je `strings.Builder`, který už drží `"Island"`. Deklarujte
+`add` tak, aby po `add(…, " Line")` — zavolaném s takovým argumentem,
+jaký signatura potřebuje — bylo `sb.String()` rovno `"Island Line"`,
+bez paniky.
+'''
+hints = [
+  "Nenulový `Builder` předaný hodnotou se zkopíruje a první zápis do kopie zpanikaří. Builder nemá `+=`; má metodu, která vrací dvě hodnoty — ty je v pořádku ignorovat, ale ne dereferencovat.",
+]
+
+# ---------------------------------------------------------------- 28
+[[quest]]
+id    = "go.cheatsheet_advanced.28.heap-pop"
+title = "VRCHOL HALDY"
+story = "Dispečerův prioritní seznam v Lucky Mac vydává nejnaléhavější objednávku a třetí, kterou vydá, je ta, která měla být poslední."
+brief = '''
+`IntHeap` implementuje `heap.Interface` s `Less` napsaným jako
+`h[i] > h[j]` a `h` je `*IntHeap`, už inicializovaný pomocí
+`heap.Init(h)`. Vyjměte největší hodnotu do `x`, což je `int`, a nechte
+haldu platnou pro další výběr.
+'''
+hints = [
+  "Metoda, kterou jste napsali na typu, jen odebere poslední prvek; teprve funkce balíčku přesune kořen ven a haldu znovu srovná. Vrací `any`.",
+]
+
+# ---------------------------------------------------------------- 29
+[[quest]]
+id    = "go.cheatsheet_advanced.29.iota"
+title = "NULA, JEDNA, DVĚ"
+story = "Tři linky MTR na tabuli v Admiralty mají všechny číslo nula a vyhledání barvy namaluje každou z nich modrou Island Line."
+brief = '''
+`type Line int` má metodu `String()`, která indexuje tříprvkové pole.
+Deklarujte `Island`, `TsuenWan` a `KwunTong` jako `0`, `1`, `2` —
+všechny typu `Line`.
+'''
+hints = [
+  "Uvnitř bloku `const` konstanta bez výrazu opakuje celý výraz předchozího řádku — včetně typu. Jen jeden výraz počítá směrem nahoru.",
+]
+
+# ---------------------------------------------------------------- 30
+[[quest]]
+id    = "go.cheatsheet_advanced.30.errc"
+title = "PRVNÍ ŠPATNÁ ZPRÁVA"
+story = "Osm stanic Island Line se pinguje najednou; ve chvíli, kdy jedna ohlásí výpadek, řídicí středisko jde dál a sedm pingerů dál stojí u okénka, které už nikdo nikdy neotevře."
+brief = '''
+Žádný `errgroup` — jen std. Každá z `n` gorutin pošle na `errc` přesně
+jednu `error` (často `nil`). `checkAll` vrátí první nenulovou chybu, aniž
+by čekal na ostatní, a žádná gorutina nesmí potom zůstat zablokovaná na
+svém odeslání. Deklarujte `errc`.
+
+```
+func checkAll(n int) error {
+    // ____
+    for i := range n {
+        go func() { errc <- check(i) }()
+    }
+    for range n {
+        if err := <-errc; err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+'''
+hints = [
+  "Jakmile se `checkAll` vrátí, už nikdo nepřijímá. Každý odesílatel musí být schopen své jedno odeslání dokončit bez příjemce — nadimenzujte buffer pro všechny.",
+]

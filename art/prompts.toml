@@ -1695,3 +1695,43 @@ generated = "2026-09-28"
 rerolls = 1
 prompt = """\
 16-bit SNES overworld world map in the exact style of the Super Mario World world map screen, TALL PORTRAIT composition: three-quarter top-down bird's eye view of a dense toy diorama, chunky hard-edged pixels, heavy dithering, strong dark outlines, flat blocks of colour, no anti-aliasing, no soft gradients, no drop shadow. Absolutely no text, no letters, no words, no numbers, no logos, no markers, no dots and no circles on the roads. Painted 16-bit console game art, not 3D rendered, not photographic. ABSOLUTE COMPOSITION RULE: this is a top-down map with NO SKY, NO HORIZON and NO OPEN WATER anywhere in it. Solid built-up ground covers all four corners and all four edges, with buildings and streets right up to the very edge of the picture. There is no empty area, no blank patch, no flat expanse of one colour anywhere. An old Hong Kong hillside district beside a big park on a lantern festival night, shrunk to a miniature, lit by lanterns and moonlight: the ground is dark indigo and violet paving and dark green lawns with warm red and gold lantern light pooled on it, clearly lit, never black and never empty. Packed densely across every part of the map: narrow lanes of low tenement houses strung with red and gold paper lanterns, small temples with curved roofs and red pillars, a long glowing orange straw fire dragon studded with incense sparks winding through the lanes carried by tiny figures, drum stands, food stalls with striped awnings, a green double-decker tram on a curving track, a big park of round trees hung with strings of small lights and giant glowing lantern sculptures of a rabbit and a moon and a lotus, rooftop water tanks. The TOP-LEFT is quiet: one small lane with one red lantern. The festival grows brighter going down the map, and the BOTTOM-RIGHT is the brightest place: the park lawn where the fire dragon coils under a giant glowing moon lantern. A wide winding PALE CREAM paved walkway snakes the full height of the map from the top left down to the bottom right in smooth S-bends, bright against the darker ground and unbroken."""
+
+[[asset]]
+name = "bg_cheatsheet"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-18"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. A cramped twenty-four-hour photocopy and print shop on an upper floor in Causeway Bay, Hong Kong, late at night, seen straight on: a big cream photocopier with its lid up and green light glowing under the glass, a fresh warm sheet sliding out of the tray, a cork board crowded with pinned printed reference sheets in neat coloured columns, a desk lamp pooling amber light over a laminating machine, a guillotine paper cutter, stacks of paper reams in pastel wrappers, a pot of highlighter pens in yellow green and orange, a sleepy shop cat on the counter, through the window behind a slice of neon street with red and jade sign boxes and a passing double-decker tram. Warm amber and cream inside against cool cobalt and neon outside. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster, page or slip of paper — every sheet of paper is covered only in abstract coloured bars and blocks, never characters. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_cheatsheet_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-18"
+rerolls = 1
+prompt = """\
+16-bit SNES pixel art painted background. TALL PORTRAIT composition. A cramped twenty-four-hour photocopy and print shop on an upper floor in Causeway Bay, Hong Kong, late at night, seen straight on: a big cream photocopier with its lid up and green light glowing under the glass, a fresh warm sheet sliding out of the tray, a cork board crowded with pinned printed reference sheets in neat coloured columns, a desk lamp pooling amber light over a laminating machine, a guillotine paper cutter, stacks of paper reams in pastel wrappers, a pot of highlighter pens in yellow green and orange, a sleepy shop cat on the counter, through the window behind a slice of neon street whose signs are plain glowing red and jade rectangles with nothing at all inside them and a passing double-decker tram. Warm amber and cream inside against cool cobalt and neon outside. The cork board of pinned sheets fills the upper half of the tall frame; the lower half holds the photocopier, the counter and the cat. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster, page or slip of paper — every sheet of paper is covered only in abstract coloured bars and blocks, never characters. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_cheatsheet_pro"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-19"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. The floor above a photocopy shop in Causeway Bay, Hong Kong, after hours: a narrow night studio where the advanced sheets are pinned up, seen straight on. A long desk with three glowing monitors showing only abstract coloured blocks and bars, a tall server rack at the side blinking with tiny cyan and violet lights, a whiteboard on the wall covered only in abstract coloured boxes joined by arrows, a cork wall crowded with pinned reference sheets made of coloured bars, a desk lamp pooling amber light over a mechanical keyboard and a mug, a kettle on a filing cabinet, a sleepy cat curled on top of the server rack, rain streaking the big window and through it a slice of neon street whose sign boxes are plain glowing violet, cyan and red rectangles with nothing inside them, and a passing double-decker tram. Cool violet and cyan inside against a warm amber lamp. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster, page or slip of paper — every sheet of paper and every screen is covered only in abstract coloured bars and blocks, never characters. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_cheatsheet_pro_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-19"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background. TALL PORTRAIT composition. The floor above a photocopy shop in Causeway Bay, Hong Kong, after hours: a narrow night studio where the advanced sheets are pinned up, seen straight on. The upper half of the tall frame is a cork wall crowded with pinned reference sheets made only of coloured bars, and a whiteboard covered only in abstract coloured boxes joined by arrows; the lower half holds a desk with three glowing monitors showing only abstract coloured blocks, a tall server rack blinking with tiny cyan and violet lights, a desk lamp pooling amber light over a mechanical keyboard and a mug, and a sleepy cat curled on top of the rack. Rain streaks a window at the side and through it a slice of neon street whose sign boxes are plain glowing violet, cyan and red rectangles with nothing inside them. Cool violet and cyan inside against a warm amber lamp. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster, page or slip of paper — every sheet of paper and every screen is covered only in abstract coloured bars and blocks, never characters. Painted 16-bit console game art, not 3D rendered, not photographic."""
