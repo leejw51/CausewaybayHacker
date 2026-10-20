@@ -42,8 +42,7 @@ Skynet's plan all along — and takes it back one street at a time.
   in Go, Rust and Python, and every quest of it carries a `lang` of its own
   (§12) naming which of the three judges it. A land is a place on the lands
   screen; a language is what compiles. In eight lands they are the same word.
-* Four **categories** per land (six with the two sheet roads, below): `verybasic` (the quiz: four lines, one right,
-  pick it then type it), `basic` (grammar activation: a construct
+* Four **categories** per land (six with the two sheet roads, below): `verybasic` (the quiz: four lines, one right), `basic` (grammar activation: a construct
   shown, one to four lines to type — in Rust Land the language's own
   grammar: ownership, borrows, lifetimes, threads, channels), `advanced`
   (the live coding test, untimed: whole programs on that grammar —
@@ -70,10 +69,24 @@ Skynet's plan all along — and takes it back one street at a time.
   failed attempt like any other. The order the roads are walked is
   `cheatsheet`, `cheatsheet_advanced`, `verybasic`, `basic`, `advanced`,
   `hacker`, `frameworks`.
+* **Every road is picked, not typed.** What the sheet roads do, every road
+  now does: a quest is four choices and one right, the pick is the
+  submission's `source`, and the server judges it against the quiz rather
+  than the runner. Off the sheet roads the choices fill a hole in a program:
+  the right one is a run of the quest's own `solution` lines, the importer
+  cuts it out, and the player is shown the rest as `quiz.program` with `____`
+  where it stood — the line the BASIC drill is about, the crux of an
+  ADVANCED program, the recurrence of a HACKER one. The roads keep their
+  shapes otherwise (HACKER keeps its clock), and the quest's `starter` and
+  `tests` stay in the pack, because they are how CI proves the quiz honest:
+  every wrong choice is swapped into the hole and run, and must fail (§12).
+  The editor, RUN and the console live on in the playground, where nothing
+  is a quiz.
 * Each category is a **map** — a Super Mario World overworld of numbered nodes
   joined by paths. Clear a node and it is stamped `CLEARED`, for good.
-* A node holds one **quest**. A quest is code the player writes, that the server
-  compiles and runs against hidden tests.
+* A node holds one **quest**: a program with a hole and four choices for it,
+  one right. The reference program behind it is compiled and run against
+  hidden tests by CI, which is what makes the one right choice right.
 * Everything the player types is kept. The mistakes are the point: the server
   classifies them by the compiler's own error identity and the **AI mode**
   feeds them back until they stop happening.
@@ -1550,6 +1563,15 @@ hints = [
   "The string is exact: lowercase, one comma, one space.",
 ]
 
+[quest.quiz]
+choices = [
+  'println("hello, causewaybay");',
+  'println!("hello, causewaybay");',
+  'print!("hello, causewaybay")',
+  'println!(hello, causewaybay);',
+]
+answer  = 1
+
 [quest.tests]
 harness      = "stdio"
 timeout_ms   = 5000
@@ -1617,6 +1639,19 @@ Rules:
   `hacker` quest must additionally carry at least one hidden case.
 * `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
   working reference answer does not get imported.
+* `[quest.quiz]` is mandatory on every road (§0): four distinct choices of at
+  most eight lines each, and `answer` the 0-based index of the right one. On
+  the sheet roads `solution` is the right choice itself and there are no
+  `tests`. Everywhere else the right choice must be a run of `solution`'s
+  lines — compared with each line's indentation stripped — that stands in it
+  **exactly once**; the importer cuts that run out and serves the rest as
+  `quiz.program`, with `____` at the indentation the run began at, so neither
+  the solution nor a choice may contain `____`. Write a multi-line choice
+  dedented, as `'''…'''`. `verify_pack.py` swaps each wrong
+  choice into the hole and runs the cases: a wrong choice that passes has
+  made the quiz two right answers, and the pack fails. `quiz.program` is the
+  solution less one span, by design; what is never sent before a clear is
+  that span.
 
 ### 12.1 Translations
 

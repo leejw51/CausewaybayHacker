@@ -116,6 +116,15 @@ hints = [
   'print returns an error union, and Zig will not let one be ignored: the try in front is not optional.',
 ]
 
+[quest.quiz]
+choices = [
+  'try w.print("hello, causewaybay\n");',
+  'try w.print("hello, causewaybay\n", .{});',
+  'w.print("hello, causewaybay\n", .{});',
+  'try w.print("Hello, Causewaybay\n", .{});',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -206,6 +215,15 @@ hints = [
   'try w.print("{d}\n", .{n * n}); — the same shape as the line above it, with n * n in the tuple.',
   'i64 holds 3000000000 squared; an i32 would overflow, and in Debug an overflow is a panic, which is why the slate says i64.',
 ]
+
+[quest.quiz]
+choices = [
+  'try w.print("{d}\n", .{n ^ 2});',
+  'try w.print("{d}\n", .{n + n});',
+  'try w.print("{d}\n", .{n * n});',
+  'try w.print("{d}\n", n * n);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -308,6 +326,15 @@ hints = [
   'Both operands need the conversion: Zig does not divide an f64 by an i64, and @floatFromInt needs @as to know which float to make.',
 ]
 
+[quest.quiz]
+choices = [
+  'try w.print("{d:.2}\n", .{a / b});',
+  'try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(@divTrunc(a, b)))});',
+  'try w.print("{d:.1}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});',
+  'try w.print("{d:.2}\n", .{@as(f64, @floatFromInt(a)) / @as(f64, @floatFromInt(b))});',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -405,6 +432,15 @@ hints = [
   'std.math.maxInt(u64) is 18446744073709551615; the i32 line above it is the same call with the other type.',
   'The starter does not compile while a is unused: Zig refuses a name nothing reads, and that refusal points at the hole.',
 ]
+
+[quest.quiz]
+choices = [
+  'const b: u64 = @intCast(a);',
+  'const b: u64 = a;',
+  'const b: u64 = @bitCast(a);',
+  'const b: u64 = @floatFromInt(a);',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -506,6 +542,15 @@ hints = [
   'v >> @intCast(8 * i) slides byte i to the bottom; @truncate throws the rest away. Without the shift every slot gets the same lowest byte.',
 ]
 
+[quest.quiz]
+choices = [
+  'buf[31 - i] = @truncate(v >> @intCast(8 * i));',
+  'buf[i] = @truncate(v >> @intCast(8 * i));',
+  'buf[32 - i] = @truncate(v >> @intCast(8 * i));',
+  'buf[31 - i] = @truncate(v << @intCast(8 * i));',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -605,6 +650,23 @@ hints = [
   'const x = try std.fmt.parseFloat(f64, s); — text to f64; it can fail, so it is tried.',
   'const y: f32 = @floatCast(x); — the narrowing is spelled out, and the width comes from the binding; y prints with fewer true digits.',
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const x = try std.fmt.parseFloat(f32, s);
+const y: f32 = @floatCast(x);''',
+  '''
+const x = try std.fmt.parseFloat(f64, s);
+const y: f32 = x;''',
+  '''
+const x = try std.fmt.parseFloat(f64, s);
+const y: f32 = @floatCast(x);''',
+  '''
+const x = std.fmt.parseFloat(f64, s);
+const y: f32 = @floatCast(x);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -716,6 +778,15 @@ hints = [
   'std.mem.reverse(u8, rev); — in place, nothing returned; it works because rev is a []u8 you own, not the []const u8 the input is.',
 ]
 
+[quest.quiz]
+choices = [
+  'for (upper) |c| c = std.ascii.toUpper(c);',
+  'for (upper) |*c| c.* = std.ascii.toUpper(c.*);',
+  'for (upper) |*c| c = std.ascii.toUpper(c.*);',
+  'for (upper) |*c| c.* = std.ascii.toLower(c.*);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -815,6 +886,23 @@ hints = [
   'try t.appendSlice(gpa, s[0..4]); — start at 0, stop before 4; the list copies the four bytes in.',
   'try t.appendSlice(gpa, "..."); — a string literal is a slice too, and the same call appends it.',
 ]
+
+[quest.quiz]
+choices = [
+  '''
+try t.appendSlice(gpa, s[0..3]);
+try t.appendSlice(gpa, "...");''',
+  '''
+try t.append(gpa, s[0..4]);
+try t.append(gpa, "...");''',
+  '''
+try t.appendSlice(gpa, s[1..5]);
+try t.appendSlice(gpa, "...");''',
+  '''
+try t.appendSlice(gpa, s[0..4]);
+try t.appendSlice(gpa, "...");''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -927,6 +1015,23 @@ hints = [
   'try part.appendSlice(gpa, v.items); — the whole slice, appended after the two.',
 ]
 
+[quest.quiz]
+choices = [
+  '''
+try part.appendSlice(gpa, v.items[1..3]);
+try part.appendSlice(gpa, v.items);''',
+  '''
+try part.appendSlice(gpa, v.items[1..2]);
+try part.appendSlice(gpa, v.items);''',
+  '''
+try part.appendSlice(gpa, v.items[0..3]);
+try part.appendSlice(gpa, v.items);''',
+  '''
+try part.appendSlice(gpa, v.items);
+try part.appendSlice(gpa, v.items[1..3]);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1030,6 +1135,23 @@ hints = [
   'try head.appendSlice(gpa, bytes[0..3]); — three bytes, copied into the list.',
   'try head.appendSlice(gpa, bytes[bytes.len - 2 ..]); — from two before the end, to the end; nothing after the .. means the end.',
 ]
+
+[quest.quiz]
+choices = [
+  '''
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 2]);''',
+  '''
+try head.appendSlice(gpa, bytes[0..2]);
+try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);''',
+  '''
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 2 ..]);''',
+  '''
+try head.appendSlice(gpa, bytes[0..3]);
+try head.appendSlice(gpa, bytes[bytes.len - 3 ..]);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1138,6 +1260,15 @@ hints = [
   '<= n, not < n: the count includes the n-th axle.',
 ]
 
+[quest.quiz]
+choices = [
+  'while (i < n) : (i += 1) {',
+  'while (i <= n) : (i += 1) {',
+  'while (i <= n) {',
+  'while (i <= n) : (i + 1) {',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1237,6 +1368,23 @@ hints = [
   'Ten rides at 5 is 50, and every ride past the tenth adds 3 on top of that.',
   'Delete the return rides; — with two returns above it the compiler calls it unreachable code and stops.',
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (rides <= 10) return rides * 5;
+return 50 + rides * 3;''',
+  '''
+if (rides <= 10) return rides * 5;
+return (rides - 10) * 3;''',
+  '''
+if (rides <= 10) return rides * 3;
+return 50 + (rides - 10) * 5;''',
+  '''
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1356,6 +1504,15 @@ hints = [
   'return self.price * self.qty; inside total(), and const s = Stall{ .name = name, .price = price, .qty = qty }; in main.',
   'Every field is named with a leading dot: .name = name. There is no order to get wrong, only a name to leave out.',
 ]
+
+[quest.quiz]
+choices = [
+  'return self.price * self.qty;',
+  'return price * qty;',
+  'self.price * self.qty;',
+  'return self.price + self.qty;',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1480,6 +1637,23 @@ hints = [
   'Delete the else => "", — once all three are named the compiler reports an unreachable else prong and stops.',
 ]
 
+[quest.quiz]
+choices = [
+  '''
+.tsuen_wan => "green",
+.kwun_tong => "red",''',
+  '''
+.tsuen_wan => "red",
+.kwun_tong => "green",''',
+  '''
+.tsuen_wan => "red",
+.tsuen_wan => "green",''',
+  '''
+.TsuenWan => "red",
+.KwunTong => "green",''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1600,6 +1774,15 @@ hints = [
   'append can fail (it may allocate), so it is tried; orderedRemove returns the element, so it is assigned to _; the sort takes the slice, xs.items, not the list.',
 ]
 
+[quest.quiz]
+choices = [
+  '_ = xs.swapRemove(0);',
+  'xs.orderedRemove(0);',
+  '_ = xs.orderedRemove(0);',
+  '_ = xs.pop();',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1716,6 +1899,15 @@ hints = [
   'try l.insert(gpa, 0, 0); _ = l.pop(); l.items[0] = 99; std.mem.sort(i64, l.items, {}, std.sort.asc(i64)); — one line each, in that order.',
   'insert takes the allocator, the index, then the value; pop returns ?i64 and the _ = says you do not want it.',
 ]
+
+[quest.quiz]
+choices = [
+  'try l.append(gpa, 0);',
+  'try l.insert(gpa, 0, 0);',
+  'try l.insert(gpa, 0);',
+  'try l.insert(0, 0);',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1854,6 +2046,15 @@ hints = [
   'try counts.put("crab", 1); _ = counts.remove("rice"); counts.getPtr("fish").?.* = 9; — add, remove, edit.',
   'put creates a missing key; getPtr refuses to, and hands back null instead. Use getPtr when the key must already be there — the .? is the promise that it is.',
 ]
+
+[quest.quiz]
+choices = [
+  'counts.get("fish").? = 9;',
+  'counts.getPtr("fish").* = 9;',
+  'counts.getPtr("fish").? = 9;',
+  'counts.getPtr("fish").?.* = 9;',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1997,6 +2198,15 @@ hints = [
   'The table has no order of its own: the keys are copied out for you; sorting them with lessStr is the fourth line, before the print.',
 ]
 
+[quest.quiz]
+choices = [
+  'try counts.put(gpa, "gun", 12);',
+  'try counts.put("gun", 12);',
+  'counts.put(gpa, "gun", 12);',
+  'try counts.put(gpa, "gun", 21);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2123,6 +2333,15 @@ hints = [
   'try seen.put(100, {}); _ = seen.remove(3); _ = seen.remove(1); try seen.put(-1, {}); — the last two calls share a line.',
   'remove(3) on a set without a 3 returns false and changes nothing, and put(-1, {}) when -1 is already there overwrites void with void: both are safe.',
 ]
+
+[quest.quiz]
+choices = [
+  '_ = seen.remove(-1); try seen.put(1, {});',
+  'seen.remove(1); try seen.put(-1, {});',
+  '_ = seen.remove(1); try seen.put(-1, {});',
+  '_ = seen.remove(1); try seen.put(-1);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2258,6 +2477,15 @@ hints = [
   'items.len - 1 is the top, so assigning there changes the element the next pop() would hand back.',
 ]
 
+[quest.quiz]
+choices = [
+  'st.items[st.items.len] = 99;',
+  'st.items[0] = 99;',
+  'st.items[st.items.len - 1] == 99;',
+  'st.items[st.items.len - 1] = 99;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2368,6 +2596,15 @@ hints = [
   'std.mem.sort(i64, v.items, {}, std.sort.asc(i64)); then std.mem.sort(i64, v.items, {}, std.sort.desc(i64));',
   'std.mem.sort takes a slice, not a list: v.items, never v.',
 ]
+
+[quest.quiz]
+choices = [
+  'std.mem.sort(i64, v.items, {}, std.sort.desc(i64));',
+  'std.mem.sort(i64, v.items, {}, std.sort.asc(i64));',
+  'std.mem.sort(i64, v.items, std.sort.desc(i64));',
+  'std.mem.sort(v.items, {}, std.sort.desc(i64));',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2488,6 +2725,23 @@ hints = [
   'std.mem.reverse(i64, v.items); — in place; nothing is returned.',
   'var rit = std.mem.reverseIterator(s); then while (rit.next()) |c| try w.writeByte(c); — the iterator is a var because next() moves it.',
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.writeByte(c);''',
+  '''
+var rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.writeByte(c);''',
+  '''
+var rit = std.mem.reverseIterator(s);
+while (rit.next()) |c| try w.print("{d}", .{c});''',
+  '''
+var rit = std.mem.reverseIterator(s);
+if (rit.next()) |c| try w.writeByte(c);''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2623,6 +2877,23 @@ hints = [
   'The context parameter is _: void because there is no context; the sort passes {} for it.',
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (a.score != b.score) return a.score < b.score;
+return std.mem.lessThan(u8, a.name, b.name);''',
+  '''
+if (a.score != b.score) return a.score > b.score;
+return std.mem.lessThan(u8, b.name, a.name);''',
+  '''
+if (a.score != b.score) return a.score > b.score;
+return std.mem.lessThan(u8, a.name, b.name);''',
+  '''
+if (a.score != b.score) return a.score > b.score;
+return a.name < b.name;''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2741,6 +3012,15 @@ hints = [
   'return v + self.k; in call, and const add = Adder{ .k = k }; in main.',
   'The struct is the capture: k goes in as a field once, and every call reads it back through self.',
 ]
+
+[quest.quiz]
+choices = [
+  'return v + k;',
+  'return v + self.k;',
+  'return v * self.k;',
+  'return self.k;',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2863,6 +3143,15 @@ hints = [
   'return if (@rem(v, 2) == 0) acc + v * v else acc; in evenSquare, and const total = fold(xs.items, 0, evenSquare); in main.',
   'The step gets the running total and one element and returns the new total; @rem(v, 2) == 0 is true for -2 as well as 2.',
 ]
+
+[quest.quiz]
+choices = [
+  'return if (@rem(v, 2) == 1) acc + v * v else acc;',
+  'return if (@rem(v, 2) == 0) v * v else acc;',
+  'return if (v % 2 == 0) acc + v * v else acc;',
+  'return if (@rem(v, 2) == 0) acc + v * v else acc;',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2998,6 +3287,15 @@ hints = [
   'spawn can fail and so can append, so there are two trys on one line; the .{} first is the spawn config, the .{ x, &results[i] } is the argument tuple.',
   'A thread not joined is a thread whose slot may still be empty when results is printed; join them all before the print.',
 ]
+
+[quest.quiz]
+choices = [
+  'try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, &results[i] }));',
+  'try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ x, results[i] }));',
+  'try threads.append(gpa, try std.Thread.spawn(square, .{ x, &results[i] }));',
+  'try threads.append(gpa, try std.Thread.spawn(.{}, square, .{ &results[i], x }));',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3180,6 +3478,15 @@ hints = [
   'Store the result back: the child may have been null, and the new node is what insert returns. insert can fail to allocate, so the call is tried.',
   'The placeholder unwraps the child with .? before anything has been hung there — that is the panic. The real line hands the null to insert, whose orelse is the check.',
 ]
+
+[quest.quiz]
+choices = [
+  'cur.left = try insert(gpa, cur.right, v);',
+  'cur.left = insert(gpa, cur.left, v);',
+  'cur.left = try insert(gpa, cur.left, v);',
+  '_ = try insert(gpa, cur.left, v);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"

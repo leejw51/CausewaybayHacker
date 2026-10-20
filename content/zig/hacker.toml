@@ -155,6 +155,15 @@ hints = [
   "Print and return the moment you find it — the first hit as you scan is already the smallest second index. The deferred flush still runs on that early return.",
 ]
 
+[quest.quiz]
+choices = [
+  'if (seen.get(v - target)) |i| {',
+  'if (seen.get(target - v)) |i| {',
+  'if (seen.get(target)) |i| {',
+  'if (seen.contains(target - v)) |i| {',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -278,6 +287,15 @@ hints = [
   "A repeat only matters if its last position is inside the current window — that is the previous >= start test, inside the if that unwraps the optional.",
   "Record the best length and where it started, or you cannot print the run at the end; a slice of text does the rest.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (previous <= start) start = previous + 1;',
+  'if (previous > start) start = previous + 1;',
+  'if (previous >= start) start = previous;',
+  'if (previous >= start) start = previous + 1;',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -416,6 +434,27 @@ hints = [
   "Extend the last merged interval when the new start is <= its end; otherwise append a new one. A pointer into merged.items lets you write the end in place.",
   "Extend to @max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (merged.items.len > 0 and s.start <= merged.items[merged.items.len - 1].end) {
+    const last = &merged.items[merged.items.len - 1];
+    last.end = @max(last.end, s.end);''',
+  '''
+if (merged.items.len > 0 and s.start < merged.items[merged.items.len - 1].end) {
+    const last = &merged.items[merged.items.len - 1];
+    last.end = @max(last.end, s.end);''',
+  '''
+if (merged.items.len > 0 and s.start <= merged.items[merged.items.len - 1].end) {
+    const last = &merged.items[merged.items.len - 1];
+    last.end = @min(last.end, s.end);''',
+  '''
+if (merged.items.len > 0 and s.start <= merged.items[merged.items.len - 1].end) {
+    var last = merged.items[merged.items.len - 1];
+    last.end = @max(last.end, s.end);''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -574,6 +613,31 @@ hints = [
   "Two small arrays of the four offsets beat four copies of the body. Do the bounds check in i64 before you @intCast: at r == 0 the neighbour above is -1, and a usize that tries to hold -1 is a panic, not a wrap.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (grid[ur][uc] != '.' or dist[next] > 0) continue;
+dist[next] = dist[at] + 1;
+reached += 1;
+try queue.append(gpa, next);''',
+  '''
+if (grid[ur][uc] != '.' or dist[next] >= 0) continue;
+dist[next] = dist[at];
+reached += 1;
+try queue.append(gpa, next);''',
+  '''
+if (grid[ur][uc] != '.' or dist[next] >= 0) continue;
+dist[next] = dist[at] + 1;
+reached += 1;
+try queue.append(gpa, next);''',
+  '''
+if (grid[ur][uc] != '.' and dist[next] >= 0) continue;
+dist[next] = dist[at] + 1;
+reached += 1;
+try queue.append(gpa, next);''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -731,6 +795,35 @@ hints = [
   "low + @divTrunc(high - low, 2), and move high down to mid on success so you keep the smallest capacity that worked.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (daysNeeded(weights, mid) >= days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (daysNeeded(weights, mid) <= days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (daysNeeded(weights, mid) < days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (daysNeeded(weights, mid) <= days) {
+    high = mid;
+} else {
+    low = mid;
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -873,6 +966,27 @@ hints = [
   "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
   "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (pending.items.len > 0 and nums[pending.items[pending.items.len - 1]] < v) {
+    const resolved = pending.pop().?;
+    answer[resolved] = v;''',
+  '''
+while (pending.items.len > 0 and nums[pending.items[pending.items.len - 1]] > v) {
+    const resolved = pending.pop().?;
+    answer[resolved] = v;''',
+  '''
+while (pending.items.len > 0 and nums[pending.items[pending.items.len - 1]] < v) {
+    const resolved = pending.pop().?;
+    answer[resolved] = @intCast(i);''',
+  '''
+while (pending.items.len > 0 and nums[pending.items[pending.items.len - 1]] < v) {
+    const resolved = pending.pop().?;
+    answer[resolved] = v;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1017,6 +1131,27 @@ hints = [
   "Guard against reading a never cell before you add one to it — maxInt(i64) + 1 is a panic in Debug, and the program stops there.",
   "REACH is just how many cells of the finished table are not still marked never.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (coin <= amount and best[amount - coin] != never) {
+    const candidate = best[amount - coin] + 1;
+    if (candidate < best[amount]) best[amount] = candidate;''',
+  '''
+if (coin <= amount) {
+    const candidate = best[amount - coin] + 1;
+    if (candidate < best[amount]) best[amount] = candidate;''',
+  '''
+if (coin <= amount and best[amount - coin] != never) {
+    const candidate = best[amount - coin] + 1;
+    if (candidate > best[amount]) best[amount] = candidate;''',
+  '''
+if (coin < amount and best[amount - coin] != never) {
+    const candidate = best[amount - coin] + 1;
+    if (candidate < best[amount]) best[amount] = candidate;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1167,6 +1302,23 @@ hints = [
   "The comparator returns a.count > b.count when the counts differ, and std.mem.lessThan(u8, a.word, b.word) when they do not — a total order, so the map's slot order cannot show.",
   "@min(k, ranked.items.len) is what makes k-too-big safe; slicing past the end of a slice is a panic here, not a silent read.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (a.count != b.count) return a.count < b.count;
+return std.mem.lessThan(u8, a.word, b.word);''',
+  '''
+if (a.count != b.count) return a.count > b.count;
+return std.mem.lessThan(u8, b.word, a.word);''',
+  '''
+if (a.count != b.count) return a.count > b.count;
+return std.mem.lessThan(u8, a.word, b.word);''',
+  '''
+if (a.count != b.count) return a.count > b.count;
+return a.word < b.word;''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1345,6 +1497,31 @@ hints = [
   "Nothing frees a node for you. After printing, walk the reversed list and gpa.destroy each node; in a Debug build the allocator reports every one you miss.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+while (head) |node| {
+    node.next = reversed;
+    head = node.next;
+    reversed = node;''',
+  '''
+while (head) |node| {
+    head = node.next;
+    node.next = reversed;
+    reversed = node;''',
+  '''
+while (head) |node| {
+    head = node.next;
+    node.next = head;
+    reversed = node;''',
+  '''
+while (head) |node| {
+    head = node.next;
+    reversed = node;
+    node.next = reversed;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1509,6 +1686,35 @@ hints = [
   "The base case is both conditions at once: past the end of the slice, or sitting on a -1 — and it has to be checked before the index is used, because an index past the end is a panic here.",
   "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (order == 0) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 1, order, out, gpa);
+if (order == 2) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 2, order, out, gpa);
+if (order == 1) try out.append(gpa, tree[i]);''',
+  '''
+if (order == 0) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i, order, out, gpa);
+if (order == 1) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 1, order, out, gpa);
+if (order == 2) try out.append(gpa, tree[i]);''',
+  '''
+if (order == 0) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 2, order, out, gpa);
+if (order == 1) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 1, order, out, gpa);
+if (order == 2) try out.append(gpa, tree[i]);''',
+  '''
+if (order == 0) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 1, order, out, gpa);
+if (order == 1) try out.append(gpa, tree[i]);
+try walk(tree, 2 * i + 2, order, out, gpa);
+if (order == 2) try out.append(gpa, tree[i]);''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1677,6 +1883,23 @@ hints = [
   "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (value <= low or value >= high) return false;
+return valid(tree, 2 * i + 1, low, value) and valid(tree, 2 * i + 2, value, high);''',
+  '''
+if (value <= low or value >= high) return true;
+return valid(tree, 2 * i + 1, low, value) and valid(tree, 2 * i + 2, value, high);''',
+  '''
+if (value <= low or value >= high) return false;
+return valid(tree, 2 * i + 1, value, high) and valid(tree, 2 * i + 2, low, value);''',
+  '''
+if (value <= low or value >= high) return false;
+return valid(tree, 2 * i + 1, low, high) and valid(tree, 2 * i + 2, low, high);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1834,6 +2057,27 @@ hints = [
   "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (top.at + 1 <= lists[top.which].len) {
+    try heap.push(gpa, .{ .value = lists[top.which][top.at + 1], .which = top.which, .at = top.at + 1 });
+}''',
+  '''
+if (top.at + 1 < lists[top.which].len) {
+    try heap.push(gpa, .{ .value = lists[top.which][top.at + 1], .which = top.which, .at = top.at });
+}''',
+  '''
+if (top.at + 1 < lists[top.which].len) {
+    try heap.push(gpa, .{ .value = lists[top.which][top.at + 1], .which = top.which, .at = top.at + 1 });
+}''',
+  '''
+if (top.at + 1 < lists[top.which].len) {
+    try heap.push(gpa, .{ .value = lists[top.which][top.at], .which = top.which, .at = top.at + 1 });
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1986,6 +2230,27 @@ hints = [
   "_ = chosen.pop(); goes between the two calls. That is the undo in try-recurse-undo, and the _ = is because pop returns a ?i64 you are choosing to ignore.",
   "The base case is at == nums.len, and the empty selection there is the empty subset, which still counts.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+try chosen.append(gpa, nums[at]);
+try build(nums, at + 1, chosen, gpa, w, count);
+_ = chosen.orderedRemove(0); // the undo in try-recurse-undo''',
+  '''
+try chosen.append(gpa, nums[at]);
+try build(nums, at + 1, chosen, gpa, w, count);
+_ = chosen.pop(); // the undo in try-recurse-undo''',
+  '''
+try chosen.append(gpa, nums[at]);
+try build(nums, at, chosen, gpa, w, count);
+_ = chosen.pop(); // the undo in try-recurse-undo''',
+  '''
+try chosen.append(gpa, nums[at]);
+try build(nums, at + 1, chosen, gpa, w, count);
+chosen.pop(); // the undo in try-recurse-undo''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2152,6 +2417,23 @@ hints = [
   "The success base case is at + 1 == word.len — checked after matching this cell, not before.",
   "Chain the four directions with `or` rather than four ifs and a found flag: `or` already stops at the first branch that succeeds. The r > 0 and c > 0 guards go first, because r - 1 on a usize of 0 is a panic.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (grid[r][c] != word[at]) return false;
+if (at == word.len) return true;''',
+  '''
+if (at + 1 == word.len) return true;
+if (grid[r][c] != word[at]) return false;''',
+  '''
+if (grid[r][c] == word[at]) return false;
+if (at + 1 == word.len) return true;''',
+  '''
+if (grid[r][c] != word[at]) return false;
+if (at + 1 == word.len) return true;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2323,6 +2605,31 @@ hints = [
   "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
   "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for (after[task].items) |next| {
+    waiting[next] -= 1;
+    if (waiting[next] == 0) try ready.push(gpa, next);
+}''',
+  '''
+for (after[task].items) |next| {
+    waiting[next] -= 1;
+    try ready.push(gpa, next);
+}''',
+  '''
+for (after[task].items) |next| {
+    waiting[next] -= 1;
+    if (waiting[next] == 1) try ready.push(gpa, next);
+}''',
+  '''
+for (after[task].items) |next| {
+    waiting[task] -= 1;
+    if (waiting[next] == 0) try ready.push(gpa, next);
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2496,6 +2803,27 @@ hints = [
   "An edge whose two ends already have the same root is the redundant one — count it and move on.",
   "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (size[a] < size[b]) std.mem.swap(usize, &a, &b);
+parent[a] = b;
+size[a] += size[b];''',
+  '''
+if (size[a] < size[b]) std.mem.swap(usize, &a, &b);
+parent[b] = a;
+size[b] += size[a];''',
+  '''
+if (size[a] < size[b]) std.mem.swap(usize, &a, &b);
+parent[b] = a;
+size[a] += size[b];''',
+  '''
+if (size[a] < size[b]) std.mem.swap(usize, a, b);
+parent[b] = a;
+size[a] += size[b];''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2678,6 +3006,35 @@ hints = [
   "If the big case times out, nothing is wrong with your answer — the shape of your loop is the answer here. Two nested loops over 200000 values is 2 x 10^10 comparisons.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const slot = std.sort.lowerBound(i64, tails.items, value, orderI64);
+if (slot == tails.items.len) {
+    try tails.append(gpa, value);
+} else {
+    tails.items[slot - 1] = value;''',
+  '''
+const slot = std.sort.lowerBound(i64, tails.items, value, orderI64);
+if (slot == tails.items.len) {
+    try tails.append(gpa, value);
+} else {
+    tails.items[slot] = value;''',
+  '''
+const slot = std.sort.lowerBound(i64, tails.items, value, orderI64);
+if (slot <= tails.items.len) {
+    try tails.append(gpa, value);
+} else {
+    tails.items[slot] = value;''',
+  '''
+const slot = std.sort.lowerBound(i64, tails.items, value, orderI64);
+if (slot == tails.items.len - 1) {
+    try tails.append(gpa, value);
+} else {
+    tails.items[slot] = value;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2821,6 +3178,31 @@ hints = [
   "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours — two nested @min calls take all three.",
   "LCS is the same walk with @max instead of @min, and no diagonal step on a mismatch.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const replace = edit[(i - 1) * width + (j - 1)];
+const delete = edit[(i - 1) * width + j];
+const insert = edit[i * width + (j - 1)];
+edit[i * width + j] = @min(replace, @min(delete, insert));''',
+  '''
+const replace = edit[(i - 1) * width + (j - 1)];
+const delete = edit[(i - 1) * width + j];
+const insert = edit[i * width + j];
+edit[i * width + j] = 1 + @min(replace, @min(delete, insert));''',
+  '''
+const replace = edit[(i - 1) * width + (j - 1)];
+const delete = edit[(i - 1) * width + j];
+const insert = edit[i * width + (j - 1)];
+edit[i * width + j] = 1 + @max(replace, @max(delete, insert));''',
+  '''
+const replace = edit[(i - 1) * width + (j - 1)];
+const delete = edit[(i - 1) * width + j];
+const insert = edit[i * width + (j - 1)];
+edit[i * width + j] = 1 + @min(replace, @min(delete, insert));''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2979,6 +3361,31 @@ hints = [
   "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+var room = cap;
+while (room >= item.weight) : (room -= 1) {
+    best[room] = @max(best[room], best[room - item.weight] + item.value);
+    if (room == 0) break;''',
+  '''
+var room = item.weight;
+while (room <= cap) : (room += 1) {
+    best[room] = @max(best[room], best[room - item.weight] + item.value);
+    if (room == 0) break;''',
+  '''
+var room = cap;
+while (room >= item.weight) : (room -= 1) {
+    best[room] = @max(best[room], best[room - item.weight]);
+    if (room == 0) break;''',
+  '''
+var room = cap;
+while (room > item.weight) : (room -= 1) {
+    best[room] = @max(best[room], best[room - item.weight] + item.value);
+    if (room == 0) break;''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3109,6 +3516,15 @@ hints = [
   "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width. @popCount is the builtin one-liner.",
   "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand, or its x -% 1 wraps to every bit set.",
 ]
+
+[quest.quiz]
+choices = [
+  'while (walk != 0) : (walk >>= 1) bits += 1;',
+  'while (walk != 0) : (walk ^= walk -% 1) bits += 1;',
+  'while (walk != 0) : (walk &= walk -% 1) bits += 1;',
+  'while (walk != 0) : (walk -%= 1) bits += 1;',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3263,6 +3679,15 @@ hints = [
   "The spiral wants the original grid, so gpa.dupe a copy before you rotate in place.",
   "The two if guards inside the spiral loop are what stop a single middle row or column being walked twice — and the bounds are i64 because right and bottom legitimately reach -1.",
 ]
+
+[quest.quiz]
+choices = [
+  'for (0..n) |c| std.mem.swap(i64, &grid[r * n + c], &grid[c * n + r]);',
+  'for (r + 1..n) |c| std.mem.swap(i64, &grid[r * n + c], &grid[c * n + r]);',
+  'for (r + 1..n) |c| std.mem.swap(i64, grid[r * n + c], grid[c * n + r]);',
+  'for (r + 1..n) |c| std.mem.swap(i64, &grid[r * n + c], &grid[c * n + c]);',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3449,6 +3874,23 @@ hints = [
   "A query that falls off the trie leaves at == -1, and -1 answers NO and 0 without a special case.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+try nodes.append(gpa, .{});
+nodes.items[at].children[slot] = @intCast(nodes.items.len);''',
+  '''
+try nodes.append(gpa, .{});
+nodes.items[at].children[slot] = @intCast(at + 1);''',
+  '''
+try nodes.append(gpa, .{});
+nodes.items[at].children[slot] = @intCast(slot);''',
+  '''
+try nodes.append(gpa, .{});
+nodes.items[at].children[slot] = @intCast(nodes.items.len - 1);''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3583,6 +4025,15 @@ hints = [
   "seen.put(0, 1) up front is what lets a run that starts at index 0 be found at all.",
   "The final prefix is the total, so the second line costs nothing extra.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (seen.get(prefix - k)) |earlier| runs += earlier;',
+  'if (seen.get(k - prefix)) |earlier| runs += earlier;',
+  'if (seen.get(prefix - k)) |earlier| runs += 1;',
+  'if (seen.get(prefix + k)) |earlier| runs += earlier;',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3774,6 +4225,15 @@ hints = [
   "A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room; merge sort is less code under a clock.",
 ]
 
+[quest.quiz]
+choices = [
+  'inversions += 1;',
+  'inversions += mid - left + 1;',
+  'inversions += mid - left;',
+  'inversions += right - mid;',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3940,6 +4400,34 @@ hints = [
   "Guard with count() < 2 first: with fewer than two keys the second-largest is still minInt, and printing that is the wrong kind of right.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (key.* > largest) {
+    largest = key.*;
+    second = largest;
+} else if (key.* > second) {
+    second = key.*;''',
+  '''
+if (key.* > largest) {
+    second = largest;
+    largest = key.*;
+} else if (key.* > second) {
+    second = key.*;''',
+  '''
+if (key.* > largest) {
+    largest = key.*;
+} else if (key.* > second) {
+    second = key.*;''',
+  '''
+if (key.* > largest) {
+    second = largest;
+    largest = key.*;
+} else if (key.* < second) {
+    second = key.*;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4075,6 +4563,31 @@ hints = [
   "Population variance is the mean of the squared deviations — divide the sum by n.",
   "For an even count the median is the average of values[n/2 - 1] and values[n/2], and that subtraction is where the off-by-one lives.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const median: f64 = if (n % 2 == 0)
+    @floatFromInt(values[middle])
+else
+    (@as(f64, @floatFromInt(values[middle - 1])) + @as(f64, @floatFromInt(values[middle]))) / 2.0;''',
+  '''
+const median: f64 = if (n % 2 == 1)
+    @floatFromInt(values[middle])
+else
+    @floatFromInt((values[middle - 1] + values[middle]) / 2);''',
+  '''
+const median: f64 = if (n % 2 == 1)
+    @floatFromInt(values[middle])
+else
+    (@as(f64, @floatFromInt(values[middle])) + @as(f64, @floatFromInt(values[middle + 1]))) / 2.0;''',
+  '''
+const median: f64 = if (n % 2 == 1)
+    @floatFromInt(values[middle])
+else
+    (@as(f64, @floatFromInt(values[middle - 1])) + @as(f64, @floatFromInt(values[middle]))) / 2.0;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4221,6 +4734,15 @@ hints = [
   "Pull the ADD argument inside the ADD branch, from the same tokenizer. The loop counter counts commands, not tokens.",
   "pop() hands back a ?i64. On an empty list that is null, and _ = items.pop(); is the whole guard — the .? you did not write is the panic you did not get.",
 ]
+
+[quest.quiz]
+choices = [
+  '_ = items.pop();',
+  'items.pop();',
+  '_ = items.pop().?;',
+  '_ = items.orderedRemove(0);',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -4569,6 +5091,31 @@ hints = [
   "The spanning-tree half of the generator guarantees every node is reachable, so the filter on inf never actually removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const nd = top.d + graph.weight[k];
+if (nd > dist[v]) {
+    dist[v] = nd;
+    try heap.push(gpa, .{ .d = nd, .u = v });''',
+  '''
+const nd = graph.weight[k];
+if (nd < dist[v]) {
+    dist[v] = nd;
+    try heap.push(gpa, .{ .d = nd, .u = v });''',
+  '''
+const nd = top.d + graph.weight[k];
+if (nd < dist[v]) {
+    dist[v] = nd;
+    try heap.push(gpa, .{ .d = nd, .u = v });''',
+  '''
+const nd = top.d + graph.weight[k];
+if (nd < dist[v]) {
+    dist[v] = nd;
+    try heap.push(gpa, .{ .d = top.d, .u = v });''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4789,6 +5336,15 @@ hints = [
   "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
 ]
 
+[quest.quiz]
+choices = [
+  'while (i < self.tree.len) : (i += 1) {',
+  'while (i < self.tree.len) : (i += i & (~i + 1)) {',
+  'while (i <= self.tree.len) : (i += i & (~i + 1)) {',
+  'while (i < self.tree.len) : (i += i) {',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4997,6 +5553,15 @@ hints = [
   "Check that s[left] == s[right] before you widen, so the even call can bail out on a gap between two different bytes; then widen while i > 0 and j + 1 < len and the next pair matches.",
   "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
 ]
+
+[quest.quiz]
+choices = [
+  'while (i > 0 and j + 1 < s.len and s[i - 1] == s[j + 1]) {',
+  'while (i >= 0 and j + 1 < s.len and s[i - 1] == s[j + 1]) {',
+  'while (i > 0 and j < s.len and s[i - 1] == s[j + 1]) {',
+  'while (i > 0 and j + 1 < s.len and s[i] == s[j]) {',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -5215,6 +5780,15 @@ hints = [
   "inverse(v) is power(v, P - 2), and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
   "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two power() calls per query. Not needed to pass, and worth saying out loud.",
 ]
+
+[quest.quiz]
+choices = [
+  'const value = factorial[a] / (factorial[b] * factorial[a - b]) % P;',
+  'const value = factorial[a] * inverse(factorial[b]) * inverse(factorial[a - b]) % P;',
+  'const value = factorial[a] * inverse(factorial[a - b]) % P;',
+  'const value = factorial[a] * inverse(factorial[b]) % P * inverse(factorial[a - b]) % P;',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -5438,6 +6012,31 @@ hints = [
   "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (i > 0 and open[at - cols]) {
+    routes = @mod(routes + ways[at - 1], P);
+    cheapest = @min(cheapest, best[at - 1]);
+}''',
+  '''
+if (i > 0 and open[at - cols]) {
+    routes = @mod(routes + ways[at - cols], P);
+    cheapest = @max(cheapest, best[at - cols]);
+}''',
+  '''
+if (i > 0 and open[at - cols]) {
+    routes = @mod(routes + ways[at - cols], P);
+    cheapest = @min(cheapest, best[at - cols]);
+}''',
+  '''
+if (open[at - cols]) {
+    routes = @mod(routes + ways[at - cols], P);
+    cheapest = @min(cheapest, best[at - cols]);
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5622,6 +6221,15 @@ hints = [
   "The other answer keeps sortUnstable and compares (score descending, then index ascending) — a total order, so there are no ties left to be unstable about.",
   "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
 ]
+
+[quest.quiz]
+choices = [
+  'std.mem.sort(Rider, riders, {}, byScore);',
+  'std.mem.sortUnstable(Rider, riders, {}, byScore);',
+  'std.sort.heap(Rider, riders, {}, byScore);',
+  'std.mem.sort(Rider, riders, {}, std.sort.desc(Rider));',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -5905,6 +6513,27 @@ hints = [
   "Overwriting a key that is already present is not an eviction — check the map before you decide the cache is full.",
   "Eviction: pop() the last node, @fieldParentPtr back to the entry, remove its key from the map, then gpa.destroy it. After destroy the pointer the map held is a freed address, so the map slot has to go first.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const oldest = recent.popFirst().?;
+const entry: *Entry = @fieldParentPtr("node", oldest);
+_ = where.remove(entry.key);''',
+  '''
+const oldest = recent.pop().?;
+const entry: *Entry = @fieldParentPtr("node", oldest);
+_ = where.remove(entry.key);''',
+  '''
+const oldest = recent.pop().?;
+const entry: *Entry = @fieldParentPtr("node", oldest);
+_ = where.remove(key);''',
+  '''
+const oldest = recent.pop().?;
+const entry: *Entry = @fieldParentPtr("next", oldest);
+_ = where.remove(entry.key);''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

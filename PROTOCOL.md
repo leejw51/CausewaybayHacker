@@ -1433,8 +1433,12 @@ type Quest = {
     hidden_count: number;                    // count only, never the data
   };
   solution?: string;                     // present only once cleared
-  quiz?: { choices: string[]; answer: number };  // VERY BASIC only: four lines,
-                                                  // `answer` the index of the one to type
+  quiz?: {                               // every road (SPEC §0): the pick is the
+    choices: string[];                   //   submission's `source`, judged against
+    answer: number;                      //   `choices[answer]`; nothing is compiled
+    program?: string;                    // off the sheet roads: the solution with
+  };                                     //   the right choice cut out and `____` in
+                                         //   its place — never the cut lines
 };
 ```
 

@@ -139,6 +139,23 @@ hints = [
   "A line with only a name gives 0 0 with no special case: the while loop simply never runs.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+var fields = std.mem.tokenizeAny(u8, input, " \r\t");
+const name = fields.next() orelse "";''',
+  '''
+const fields = std.mem.tokenizeAny(u8, line, " \r\t");
+const name = fields.next() orelse "";''',
+  '''
+var fields = std.mem.tokenizeAny(u8, line, " \r\t");
+const name = fields.next() orelse "";''',
+  '''
+var fields = std.mem.tokenizeAny(u8, line, " \r\t");
+const name = line;''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -302,6 +319,23 @@ hints = [
   "&sheet.items[0] is the address of the first element and only makes sense when there is one; if (first) |p| unwraps the optional, and p.* is the value behind it.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+fn load(sheet: *std.ArrayList(i64), gpa: std.mem.Allocator, value: i64) !void {
+    try sheet.append(gpa, value);''',
+  '''
+fn load(sheet: std.ArrayList(i64), gpa: std.mem.Allocator, value: i64) !void {
+    try sheet.append(gpa, value);''',
+  '''
+fn load(sheet: *const std.ArrayList(i64), gpa: std.mem.Allocator, value: i64) !void {
+    try sheet.append(gpa, value);''',
+  '''
+fn load(sheet: *std.ArrayList(i64), gpa: std.mem.Allocator, value: i64) void {
+    try sheet.append(gpa, value);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -420,6 +454,15 @@ hints = [
   "With one or two values that range is empty or backwards, and a backwards slice is a panic in Debug — guard it with an if on nums.len before you write it.",
   "The middle is an i64: the wide case sums two values of three thousand million, and an i32 accumulator would panic with integer overflow.",
 ]
+
+[quest.quiz]
+choices = [
+  'for (nums[1..nums.len]) |v| {',
+  'for (nums[0 .. nums.len - 1]) |v| {',
+  'for (nums[1 .. nums.len - 2]) |v| {',
+  'for (nums[1 .. nums.len - 1]) |v| {',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -546,6 +589,15 @@ hints = [
   "Collect the start index of every character in a std.ArrayList(usize); its length is the character count without decoding anything.",
   "Walk the start indices backwards and appendSlice each character's bytes — line[from..to] — onto a std.ArrayList(u8), then print its .items with {s}.",
 ]
+
+[quest.quiz]
+choices = [
+  'return (c & 0xC0) != 0xC0;',
+  'return (c & 0xC0) != 0x80;',
+  'return (c & 0xC0) == 0x80;',
+  'return c < 0x80;',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -742,6 +794,23 @@ hints = [
   "The item names are slices of input, so the ledger costs nothing to fill and input has to outlive it — which the defer order in main already guarantees.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+fn add(self: Ledger, gpa: std.mem.Allocator, name: []const u8, cents: i64) !void {
+    try self.items.append(gpa, .{ .name = name, .cents = cents });''',
+  '''
+fn add(self: *const Ledger, gpa: std.mem.Allocator, name: []const u8, cents: i64) !void {
+    try self.items.append(gpa, .{ .name = name, .cents = cents });''',
+  '''
+fn add(self: *Ledger, gpa: std.mem.Allocator, name: []const u8, cents: i64) !void {
+    try self.items.append(gpa, .{ .name = name, .cents = cents });''',
+  '''
+fn add(self: *Ledger, gpa: std.mem.Allocator, name: []const u8, cents: i64) void {
+    try self.items.append(gpa, .{ .name = name, .cents = cents });''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -900,6 +969,26 @@ hints = [
   "@divTrunc(base, 2) is integer division spelled out; a plain / on signed integers does not compile when the result could be inexact.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+.crew => try w.print("{d}\n", .{@divTrunc(base, 2)}),
+.junior => try w.print("200\n", .{}),
+.other => |raw| try w.print("UNKNOWN {s}\n", .{raw}),''',
+  '''
+.crew => try w.print("{d}\n", .{@divTrunc(base, 2)}),
+.other => |raw| try w.print("UNKNOWN {s}\n", .{raw}),''',
+  '''
+.crew => try w.print("200\n", .{}),
+.junior => try w.print("{d}\n", .{@divTrunc(base, 2)}),
+.other => |raw| try w.print("UNKNOWN {s}\n", .{raw}),''',
+  '''
+.crew => try w.print("{d}\n", .{@divTrunc(base, 2)}),
+.junior => try w.print("200\n", .{}),
+.other => try w.print("UNKNOWN {s}\n", .{raw}),''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1030,6 +1119,27 @@ hints = [
   "counts.iterator() walks the entries; each has key_ptr and value_ptr. Append a Row per entry to a std.ArrayList(Row).",
   "The comparator is fn byRank(_: void, a: Row, b: Row) bool — count descending first, then std.mem.order(u8, a.word, b.word) == .lt — and std.mem.sort(Row, rows.items, {}, byRank) applies it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const slot = try counts.getOrPut(word);
+if (slot.found_existing) slot.value_ptr.* = 0;
+slot.value_ptr.* += 1;''',
+  '''
+const slot = try counts.getOrPut(word);
+if (!slot.found_existing) slot.value_ptr.* = 0;
+slot.value_ptr.* = 1;''',
+  '''
+const slot = counts.getOrPut(word);
+if (!slot.found_existing) slot.value_ptr.* = 0;
+slot.value_ptr.* += 1;''',
+  '''
+const slot = try counts.getOrPut(word);
+if (!slot.found_existing) slot.value_ptr.* = 0;
+slot.value_ptr.* += 1;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1172,6 +1282,31 @@ hints = [
   "found_existing is false exactly once per name — on the insert — and that is the moment to append the name to the order list.",
   "Print by walking the list and asking the map for each count with count.get(name).?, never by walking the map.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (!slot.found_existing) {
+    slot.value_ptr.* = 0;
+}
+try order.append(gpa, name);''',
+  '''
+if (!slot.found_existing) {
+    slot.value_ptr.* = 0;
+    try order.append(gpa, name);
+}''',
+  '''
+if (slot.found_existing) {
+    slot.value_ptr.* = 0;
+    try order.append(gpa, name);
+}''',
+  '''
+if (!slot.found_existing) {
+    slot.value_ptr.* = 1;
+    try order.append(gpa, name);
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1326,6 +1461,23 @@ hints = [
   "Only the lines the set let through go into the list, so the list's length is DISTINCT and n minus it is DUPES.",
   "The comparator sorts by berth first and by std.mem.order(u8, a.name, b.name) == .lt on a tie; std.mem.sort(Mooring, moorings.items, {}, byBerthThenName) applies it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const slot = try seen.getOrPut(line);
+if (!slot.found_existing) continue; // a duplicate: the set refuses it''',
+  '''
+const slot = try seen.getOrPut(line);
+if (slot.found_existing) break; // a duplicate: the set refuses it''',
+  '''
+const slot = try seen.getOrPut(line);
+if (slot.found_existing) continue; // a duplicate: the set refuses it''',
+  '''
+const slot = seen.getOrPut(line);
+if (slot.found_existing) continue; // a duplicate: the set refuses it''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1527,6 +1679,15 @@ hints = [
   "indexOfFirst returns ?usize; if (indexOfFirst(...)) |i| prints the hit, and the else branch prints -1.",
 ]
 
+[quest.quiz]
+choices = [
+  'if (keep(x)) acc += 1;',
+  'if (!keep(x)) acc += x;',
+  'if (keep) acc += x;',
+  'if (keep(x)) acc += x;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1707,6 +1868,31 @@ hints = [
   "fn Pair(comptime T: type) type { return struct { ... }; } — inside, const Self = @This() names the struct being built, and Pair(i64){ .a = ..., .b = ... } builds one.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const bigger = if (comptime T == []const u8)
+    std.mem.order(u8, x, best) == .gt
+else
+    x > best;''',
+  '''
+const bigger = if (comptime T == []const u8)
+    std.mem.order(u8, x, best) == .gt
+else
+    x < best;''',
+  '''
+const bigger = if (comptime T == []const u8)
+    std.mem.order(u8, x, best) == .lt
+else
+    x > best;''',
+  '''
+const bigger = if (comptime T == []const u8)
+    std.mem.order(u8, best, x) == .gt
+else
+    x > best;''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1882,6 +2068,31 @@ hints = [
   "fn countIf(items: []const []const u8, comptime pred: fn ([]const u8) bool) usize walks the slice and counts the items pred accepts; pass isIn by name.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+self.total += delta;
+if (delta < 0) {
+    self.total = 0;
+}''',
+  '''
+self.total += delta;
+if (self.total < 0) {
+    self.total = 0;
+}''',
+  '''
+if (self.total < 0) {
+    self.total = 0;
+}
+self.total += delta;''',
+  '''
+self.total -= delta;
+if (self.total < 0) {
+    self.total = 0;
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2040,6 +2251,15 @@ hints = [
   "An optional unwraps with if (parse(text)) |value|; the else path is the null, and that is where the .bad case is built.",
   "Returning .{ .value = v } or .{ .bad = text } from the same function is legal because the return type is a union that holds either; the switch in main picks the branch, with the payload captured in |v| or |text|.",
 ]
+
+[quest.quiz]
+choices = [
+  'return std.fmt.parseInt(i64, text, 10) catch 0;',
+  'return try std.fmt.parseInt(i64, text, 10);',
+  'return std.fmt.parseInt(i64, text, 10) catch return null;',
+  'return std.fmt.parseInt(i64, text, 10) orelse null;',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2203,6 +2423,27 @@ hints = [
   "An error that reaches the top of main prints error: <Name> and a trace and exits 1. That is what the starter does on line two, and it is the good outcome — the program said where it stopped.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (fare(text)) |cents| {
+    try w.print("{d}\n", .{cents});
+} else switch (e) {''',
+  '''
+if (fare(text) catch null) |cents| {
+    try w.print("{d}\n", .{cents});
+} else |e| switch (e) {''',
+  '''
+if (try fare(text)) |cents| {
+    try w.print("{d}\n", .{cents});
+} else |e| switch (e) {''',
+  '''
+if (fare(text)) |cents| {
+    try w.print("{d}\n", .{cents});
+} else |e| switch (e) {''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2365,6 +2606,34 @@ hints = [
   "next returns null when left is 0; otherwise it remembers the current value, advances, counts down, and returns what it remembered.",
   "The loop variable must be var — var walk = stops.iter() — or next cannot take its address; total builds its own with a second stops.iter().",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (self.left == 0) return null;
+const current = self.value;
+self.value += self.step;
+self.left -= 1;
+return current;''',
+  '''
+if (self.left == 0) return null;
+self.value += self.step;
+self.left -= 1;
+return self.value;''',
+  '''
+if (self.left < 0) return null;
+const current = self.value;
+self.value += self.step;
+self.left -= 1;
+return current;''',
+  '''
+if (self.left == 0) return null;
+const current = self.value;
+self.value += self.step;
+self.left += 1;
+return current;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2543,6 +2812,15 @@ hints = [
   "Defers run in reverse, always, which is why second goes before first — and why the flush, deferred first, runs after both of them.",
   "tally.report reads the tally at the moment the defer runs, not the moment it was written: a defer is a statement postponed, and the arguments it names are evaluated then.",
 ]
+
+[quest.quiz]
+choices = [
+  'tally.report(w);',
+  'defer tally.report(w);',
+  'errdefer tally.report(w);',
+  'defer tally.report();',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2731,6 +3009,15 @@ hints = [
   "A panic prints the message and a stack trace on stderr and exits 134; the judge reads stdout, so everything printed before the panic is still there and still wrong.",
 ]
 
+[quest.quiz]
+choices = [
+  'while (lookup(table, name)) |shell| {',
+  'if (lookup(table, name).?) |shell| {',
+  'if (lookup(table, name)) |shell| {',
+  'if (lookup(table, name) != null) |shell| {',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2872,6 +3159,15 @@ hints = [
   "for (threads, 0..) |*t, i| walks the handle slots with their index; t.* = try std.Thread.spawn(...) fills each one.",
   "Join every thread before you read out. join() blocks until that thread has finished, and after it the writes are visible.",
 ]
+
+[quest.quiz]
+choices = [
+  't = try std.Thread.spawn(.{}, square, .{ nums, out, i });',
+  't.* = try std.Thread.spawn(.{}, square, .{ nums, out, 0 });',
+  't.* = try std.Thread.spawn(.{}, square, .{ out, nums, i });',
+  't.* = try std.Thread.spawn(.{}, square, .{ nums, out, i });',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3017,6 +3313,15 @@ hints = [
   "Keep the handles in a slice of std.Thread the size of n; for (threads) |t| t.join(); before anything is printed.",
   "Spawn them all first, then join them all. A join inside the spawn loop also passes here — and runs the threads one at a time, which is not what a thread is for.",
 ]
+
+[quest.quiz]
+choices = [
+  't.* = try std.Thread.spawn(.{}, upper, .{lines[i]});',
+  't.* = try std.Thread.spawn(.{}, upper, lines[i]);',
+  't.* = std.Thread.spawn(.{}, upper, .{lines[i]});',
+  't.* = try std.Thread.spawn(.{}, upper, .{lines});',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3164,6 +3469,27 @@ hints = [
   "var total_mutex: std.Io.Mutex = .init; in main, &total_mutex in the tuple, and in the worker m.lockUncancelable(io); defer m.unlock(io); before the add.",
   "Reading total after every join is safe without the lock: join() is a synchronisation point, and no thread is left to write.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+m.lockUncancelable(io);
+// locked from here to the end of the function, whatever happens in between
+m.lockUncancelable(io);''',
+  '''
+m.lock(io);
+// locked from here to the end of the function, whatever happens in between
+defer m.unlock(io);''',
+  '''
+m.lockUncancelable(io);
+// locked from here to the end of the function, whatever happens in between
+defer m.unlock(io);''',
+  '''
+m.lockUncancelable(io);
+// locked from here to the end of the function, whatever happens in between
+errdefer m.unlock(io);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3351,6 +3677,15 @@ hints = [
   "Counter.add is an ordinary function whose first parameter is *Counter, so std.Thread.spawn(.{}, Counter.add, .{ &counter, io, value }) is how a thread calls a method.",
 ]
 
+[quest.quiz]
+choices = [
+  't.* = try std.Thread.spawn(.{}, Counter.add, .{ counter, io, nums[i] });',
+  't.* = try std.Thread.spawn(.{}, Counter.add, .{ &counter, io, nums[i] });',
+  't.* = try std.Thread.spawn(.{}, counter.add, .{ io, nums[i] });',
+  't.* = try std.Thread.spawn(.{}, Counter.add, .{ io, &counter, nums[i] });',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3527,6 +3862,31 @@ hints = [
   "Two defers release in reverse: b's lock goes back first, then a's. That is the order a C++ scoped_lock would have used, and the rule is the same — every thread agrees on the order.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+a.mutex.lockUncancelable(io);
+defer a.mutex.unlock(io);
+a.mutex.lockUncancelable(io);
+defer a.mutex.unlock(io);''',
+  '''
+a.mutex.lock(io);
+defer a.mutex.unlock(io);
+b.mutex.lock(io);
+defer b.mutex.unlock(io);''',
+  '''
+a.mutex.lockUncancelable(io);
+defer a.mutex.unlock(io);
+b.mutex.lockUncancelable(io);
+defer a.mutex.unlock(io);''',
+  '''
+a.mutex.lockUncancelable(io);
+defer a.mutex.unlock(io);
+b.mutex.lockUncancelable(io);
+defer b.mutex.unlock(io);''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3693,6 +4053,15 @@ hints = [
   "The consumer is the only thing printing while it runs, and main prints CONSUMED only after taking.await(io) — that ordering is what keeps the writer safe without a lock.",
 ]
 
+[quest.quiz]
+choices = [
+  'hatch.close(io);',
+  'hatch.close();',
+  'defer hatch.close(io);',
+  'try hatch.close(io);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3842,6 +4211,23 @@ hints = [
   "fetchAdd returns the previous value and applies the addition atomically; the _ = discards the return, and there is no lock and no defer.",
   "total.raw += value would compile and would be the race; fetchAdd is the one instruction that is not.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+total.fetchAdd(value, .monotonic);
+hits.fetchAdd(1, .monotonic);''',
+  '''
+_ = total.fetchAdd(value, .monotonic);
+_ = hits.fetchAdd(value, .monotonic);''',
+  '''
+_ = total.fetchAdd(value, .monotonic);
+_ = hits.fetchAdd(1, .monotonic);''',
+  '''
+_ = total.fetchAdd(1, .monotonic);
+_ = hits.fetchAdd(value, .monotonic);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3996,6 +4382,23 @@ hints = [
   "A local sum inside the thread and one write to slot.* at the end keeps the shared slice touched exactly once per thread.",
   "k > n makes some chunks empty — begin == end — and nums[begin..end] is an empty slice whose for loop simply does not run. No special case.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const begin = i * (n / k);
+const end = (i + 1) * (n / k);''',
+  '''
+const begin = i * n / k;
+const end = (i + 1) * n / k;''',
+  '''
+const begin = i * n / k;
+const end = (i + 1) * n / k - 1;''',
+  '''
+const begin = i * n / k;
+const end = begin + n / k + 1;''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4154,6 +4557,15 @@ hints = [
   "f.await(io) can be called exactly once per future and blocks until the value is there; walking the list in order gives you the output in order.",
   "The reporter thread gets &ready and n; ready.getOneUncancelable(io) in main blocks until the put has happened. Join the thread before main returns.",
 ]
+
+[quest.quiz]
+choices = [
+  'try squares.append(gpa, try io.async(square, .{v}));',
+  'try squares.append(gpa, square(v));',
+  'try squares.append(gpa, try io.concurrent(square, v));',
+  'try squares.append(gpa, try io.concurrent(square, .{v}));',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4352,6 +4764,23 @@ hints = [
   "defer freeChain(gpa, head) right after head is declared: a defer reads head when it runs, at the end of main, when the chain is complete.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const node = chain orelse return 0;
+return node.cents + sum(node.next);''',
+  '''
+const node = chain.?;
+return node.cents + sum(node.next);''',
+  '''
+const node = chain orelse return 0;
+return node.cents + sum(node);''',
+  '''
+const node = chain orelse return 0;
+return node.cents;''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4527,6 +4956,23 @@ hints = [
   "release() drops the count and, only when it hits zero, frees the slice and sets items to null — that null is what alive() reads.",
   "Release both handles; the first release alone frees nothing, and the second one does. Say why out loud: that is the question this quest is really asking.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+self.refs += 1;
+if (self.refs == 0) {''',
+  '''
+self.refs -= 2;
+if (self.refs == 0) {''',
+  '''
+self.refs -= 1;
+if (self.refs == 0) {''',
+  '''
+self.refs -= 1;
+if (self.refs == 2) {''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4742,6 +5188,27 @@ hints = [
   "The pile's deinit loop still runs over every docket; after take each one holds an empty slice, and deinit skips the free for an empty one. Nothing is freed twice.",
   "sent.append(gpa, d.*) would compile and print COPIES 0 MOVES 0 — and then both lists would free the same bytes at the end of main. The counters exist so that the honest hand-over and the double free do not look the same.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+self.text = &.{};
+const moved = Docket{ .text = self.text };
+return moved;''',
+  '''
+const moved = Docket{ .text = self.text };
+self.text = &.{};
+return moved;''',
+  '''
+const moved = Docket{ .text = self.text };
+self.text = &.{};
+return self.*;''',
+  '''
+var moved = Docket{ .text = self.text };
+moved.text = &.{};
+return moved;''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4969,6 +5436,23 @@ hints = [
   "fn printRing(w, comptime T: type, ring: *const Ring(T)) walks the iterator; if (comptime T == []const u8) picks {s} over {d}, and the other branch is never analysed for that T.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const oldest = (it.ring.head - it.ring.count) % cap;
+const item = it.ring.slots[(oldest + it.offset) % cap];''',
+  '''
+const oldest = (it.ring.head + cap - it.ring.count) % cap;
+const item = it.ring.slots[oldest + it.offset];''',
+  '''
+const oldest = (it.ring.head + cap - it.ring.count) % cap;
+const item = it.ring.slots[(oldest + it.offset + 1) % cap];''',
+  '''
+const oldest = (it.ring.head + cap - it.ring.count) % cap;
+const item = it.ring.slots[(oldest + it.offset) % cap];''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5122,6 +5606,38 @@ hints = [
   "Walking backwards from the end is the other correct answer — a remove at i never disturbs the slots below it — and it is the one to give when they ask for the version without the branch.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (moorings.items[i] < threshold) {
+    _ = moorings.orderedRemove(i);
+    removed += 1;
+} else {
+    i += 1;
+}''',
+  '''
+if (moorings.items[i] < threshold) {
+    _ = moorings.orderedRemove(i);
+    removed += 1;
+}
+i += 1;''',
+  '''
+if (moorings.items[i] < threshold) {
+    _ = moorings.swapRemove(i);
+    removed += 1;
+} else {
+    i += 1;
+}''',
+  '''
+if (moorings.items[i] <= threshold) {
+    _ = moorings.orderedRemove(i);
+    removed += 1;
+} else {
+    i += 1;
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5259,6 +5775,15 @@ hints = [
   "Record only the first index that leaves the range — an ?usize that is set once — because a later value may bring the total back inside, and the question asked where it first left.",
   "If you must add two i32s and want to know whether it is safe: @addWithOverflow(a, b) returns the wrapped sum and a carry bit, defined in every build mode. That is the check; the sign of a plain sum is the thing the optimiser deletes.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (overflow_at == null and (v < low or v > high)) {',
+  'if (overflow_at == null and total > high) {',
+  'if (overflow_at == null and (total < low or total > high)) {',
+  'if (overflow_at == null and (total < high or total > low)) {',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -5438,6 +5963,23 @@ hints = [
   "Spawn the lane before you set the flag, and join it after. A flag set before the thread starts is fine — it stops on its first check — but a join without the store never returns.",
   ".release on the store and .acquire on the load are the pair that makes what happened before the store visible after the load; .monotonic would also pass here, and the interviewer will ask why.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+night.join();
+stop.store(true, .release);''',
+  '''
+stop.store(true, .release);
+night.join();''',
+  '''
+stop.store(false, .release);
+night.join();''',
+  '''
+stop.store(true);
+night.join();''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -5721,6 +6263,15 @@ hints = [
   "pump's own release moves to a defer at the top of pump, so it runs after the joins — after the readings have been read — and it is the handle main gave away that it is releasing.",
   "partial is handed to the lanes by slot, and that is correct: pump owns it, pump joins before returning it, and each lane writes only its own slot. If main had kept a share, FREED would be no — the readings would be alive because main was still holding them, and that is the other answer this boss accepts you being able to explain.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (self.refs.fetchSub(1, .acq_rel) == 0) {',
+  'if (self.refs.fetchSub(1) == 1) {',
+  'if (self.refs.load(.acquire) == 1) {',
+  'if (self.refs.fetchSub(1, .acq_rel) == 1) {',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
