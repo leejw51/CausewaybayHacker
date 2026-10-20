@@ -13,11 +13,8 @@
 --
 --   for each step in 1, 2, 4 and each orientation:
 --     lands → categories (gutter fits the widest name)
---           → map → quest: paste a Go program with a syntax error, RUN,
---             and assert the verdict is `compile_error`, the compiler's
---             line reached the log, and the console, the outcome strip
---             and the four buttons are all inside the well and none of
---             them overlaps another
+--           → map → quest: every quest is picked, so the four choices
+--             are on the screen and none of them overlaps another
 --
 -- It signs in with BIP-39's published test vector, so it needs the server
 -- and a Go toolchain on the machine the server runs on. A `--home` of its
@@ -28,8 +25,6 @@ local Layout = require("src.layout")
 local MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon "
   .. "abandon abandon abandon about"
 
--- Rust syntax in a Go file: a compile error on every toolchain, forever.
-local BROKEN_GO = 'package main\n\nfunc main() {\n\t// your code here\n\tprintln!("hi");\n}\n'
 
 local function scene(name)
   return function(app) return app.scene_name == name end
@@ -125,63 +120,31 @@ for _, step in ipairs({ 1, 2, 4 }) do
     add({ key = "return" })
     add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end,
           note = "quest " .. tag, timeout = 10 })
-    add({ until_ = function(app)
-          app.scene.editor:set_text(BROKEN_GO)
-          return true
-        end, note = "a Go program with a syntax error", timeout = 2 })
-    add({ key = "f5" })
-    add({ until_ = function(app) return app.scene.run_attempt ~= nil end,
-          note = "the run came back", timeout = 60 })
-    add({ wait = 0.4 })
+    -- Every quest is picked, not typed (SPEC §0): no editor, no RUN. What
+    -- the type step can break here is the four choices — wrapped off the
+    -- screen, or drawn on top of each other.
+    add({ wait = 0.6 })
     add({ until_ = function(app)
           local q = app.scene
-          local a = q.run_attempt
-          print(("run %s: verdict=%s tests=%s/%s"):format(tag, tostring(a.verdict),
-            tostring(a.tests_passed), tostring(a.tests_total)))
-          check(a.verdict == "compile_error",
-            ("run %s: a syntax error was judged %s, not compile_error"):format(tag, tostring(a.verdict)))
-          -- The compiler's own line reached the console.
-          local seen = false
-          if q.log then
-            for _, name in ipairs(q.log.order) do
-              local lines = q.log:lines(name)
-              for _, line in ipairs(lines) do
-                if line:find("syntax error", 1, true) then seen = true end
-              end
-            end
+          check(q.quest.quiz ~= nil, ("quest %s: the quest has no quiz"):format(tag))
+          check(q:cheatsheet(), ("quest %s: a quest with a quiz still offers an editor"):format(tag))
+          local hits = {}
+          for i = 1, 4 do
+            if q.choice_hits and q.choice_hits[i] then hits[#hits + 1] = q.choice_hits[i] end
           end
-          check(seen, ("run %s: the compiler's 'syntax error' line never reached the log"):format(tag))
-
-          -- Geometry: console and outcome inside the well, buttons untouched.
-          local well = q.editor_rect
-          local console = q.console_rect_drawn
-          check(console ~= nil, ("run %s: no console was laid out"):format(tag))
-          if console then
-            print(("run %s: well=%s console=%s outcome=%s run=%s solve=%s"):format(
-              tag, rect_s(well), rect_s(console), rect_s(q.outcome_rect), rect_s(q.run_rect), rect_s(q.solve_rect)))
-            check(inside(console, well), ("run %s: the console %s is not inside the well %s"):format(tag, rect_s(console), rect_s(well)))
-            check(q.outcome_rect and inside(q.outcome_rect, console, 1),
-              ("run %s: the outcome strip %s is not inside the console"):format(tag, rect_s(q.outcome_rect)))
-            for _, name in ipairs({ "run_rect", "submit_rect", "solve_rect", "format_rect" }) do
-              local r = q[name]
-              check(r and disjoint(console, r),
-                ("run %s: the console %s overlaps %s %s"):format(tag, rect_s(console), name, rect_s(r)))
-              check(r and inside(r, well), ("run %s: %s %s is outside the well"):format(tag, name, rect_s(r)))
+          print(("quest %s: %d of 4 choices on screen"):format(tag, #hits))
+          check(#hits >= 1, ("quest %s: no choice is on screen"):format(tag))
+          local screen = { x = 0, y = 0, w = Layout.vw, h = Layout.vh }
+          for i, r in ipairs(hits) do
+            check(inside(r, screen, 1), ("quest %s: choice %d %s is off the screen"):format(tag, i, rect_s(r)))
+            for j = i + 1, #hits do
+              check(disjoint(r, hits[j]),
+                ("quest %s: choices %d and %d overlap"):format(tag, i, j))
             end
-            -- And the console still shows at least one log row — the one
-            -- with the compiler's line on it.
-            check((q.console_log_rows or 0) >= 1,
-              ("run %s: the console (%d px) has no log row under the outcome"):format(tag, console.h))
           end
           return true
         end, timeout = 3 })
-    add({ shot = ("T-%s-quest-run.png"):format(tag) })
-    add({ key = "f8" })
-    add({ wait = 0.2 })
-    add({ until_ = function(app)
-          check(app.scene.console_rect_drawn == nil, ("run %s: F8 did not hide the console"):format(tag))
-          return true
-        end, timeout = 2 })
+    add({ shot = ("T-%s-quest.png"):format(tag) })
 
     add({ key = "escape" })
     add({ until_ = scene("map"), timeout = 10 })
@@ -200,8 +163,7 @@ add({ until_ = function()
         return true
       end
       print("PASS: every type step in both orientations — names fit their column, "
-        .. "a syntax error is a compile error with its line in the log, and the "
-        .. "console never touches a button")
+        .. "and a quest's four choices are on the screen, apart")
       return true
     end, timeout = 3 })
 add({ quit = true })
