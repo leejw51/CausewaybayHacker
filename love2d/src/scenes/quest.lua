@@ -2562,12 +2562,19 @@ function Quest:draw_brief(rect, tint)
     -- cream rather than dimmed or flagged: an English specification under a
     -- Korean interface is what a Korean programmer's editor looks like, and
     -- `refresh` asks again the moment the language changes (see `update`).
-    if self.quest.story and self.quest.story ~= "" then
-      for _, line in ipairs(UI.wrap(self.quest.story, column, prose)) do
-        y = y + UI.text(line, x, y, prose, Theme.withAlpha(Theme.coin, 0.9)) + 3
+    -- The story line is scenery. On a picked quest it goes under the
+    -- choices, so the question and its four answers come first — at the
+    -- largest type step the story alone was most of the panel.
+    local function story()
+      if self.quest.story and self.quest.story ~= "" then
+        for _, line in ipairs(UI.wrap(self.quest.story, column, prose)) do
+          y = y + UI.text(line, x, y, prose, Theme.withAlpha(Theme.coin, 0.9)) + 3
+        end
+        y = y + 8
       end
-      y = y + 8
     end
+    local picked = self:cheatsheet()
+    if not picked then story() end
     for _, line in ipairs(UI.wrap(self.quest.brief or "", column, prose)) do
       y = y + UI.text(line, x, y, prose, Theme.cream) + 3
     end
@@ -2576,6 +2583,7 @@ function Quest:draw_brief(rect, tint)
     -- the four things that might go in it.
     y = self:draw_program(x, y, column)
     y = self:draw_choices(x, y, column, rect)
+    if picked then story() end
 
     if self.quest.concepts and #self.quest.concepts > 0 then
       y = y + UI.text(I18n.t("CONCEPTS"), x, y, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4

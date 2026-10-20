@@ -124,6 +124,15 @@ for _, step in ipairs({ 1, 2, 4 }) do
     -- the type step can break here is the four choices — wrapped off the
     -- screen, or drawn on top of each other.
     add({ wait = 0.6 })
+    -- At the largest step the question can fill the panel: scroll the
+    -- brief, as a player would, until a choice comes into view.
+    add({ until_ = function(app)
+          local q = app.scene
+          if q.choice_hits and next(q.choice_hits) then return true end
+          q.brief_scroll = q.brief_scroll + 40
+          return false
+        end, note = "a choice in view " .. tag, timeout = 10 })
+    add({ wait = 0.2 })
     add({ until_ = function(app)
           local q = app.scene
           check(q.quest.quiz ~= nil, ("quest %s: the quest has no quiz"):format(tag))
