@@ -128,9 +128,12 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
   local title_size = math.max(TITLE_FLOOR, TITLE_SIZE - title_step)
   local name_size = math.max(SIZE_FLOOR, NAME_SIZE - step)
   local count_size = math.max(SIZE_FLOOR, COUNT_SIZE - step)
-  local title_y = 22
+  -- Tight, the title moves up and the rows start closer under it: the
+  -- room seven roads need at the largest step comes from the top margin,
+  -- not from inside the rows.
+  local title_y = tight and 10 or 22
   local title_h = UI.lineHeight(title_size)
-  local y0 = title_y + title_h + 18
+  local y0 = title_y + title_h + (tight and 8 or 18)
   local pad = Layout.isPortrait() and 12 or 60
   -- Seven roads (RUST, with the two sheet roads) at the largest type in a
   -- 720-tall window do not fit in one column at any size: the last resort
@@ -139,9 +142,8 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
 
   local name_h, blurb_h = UI.lineHeight(name_size), UI.lineHeight(BLURB_SIZE)
   local plate_h = name_h + 8
-  -- The counts plate: the number, the bar under it, and air below. Tight,
-  -- the air goes — seven roads at the largest step in a 720-tall window
-  -- were thirteen pixels over the band, and this is where they came from.
+  -- The counts plate: the number, the bar under it, and air below; tight,
+  -- less air.
   local count_h = UI.lineHeight(count_size) + 4 + 7 + (tight and 5 or 10)
   -- The name as it is drawn — `VERY BASIC`, in the player's language — not
   -- the id: `VERYBASIC` is a space narrower, and the gutter sized from it
@@ -177,7 +179,7 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
   -- plate instead. Five roads (RUST's FRAMEWORKS) at the largest type in a
   -- 720-tall window did not fit any other way.
   if tight then
-    need = math.max(12 + name_h + 8, 4 + math.max(plate_h, count_h) + 2)
+    need = math.max(12 + name_h + 14, 4 + math.max(plate_h, count_h) + 2)
   end
   if stacked then need = math.max(need, count_y + count_h + 10) end
   local avail = math.floor((bottom - y0) / n) - 12
