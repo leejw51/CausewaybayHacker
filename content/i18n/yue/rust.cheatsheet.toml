@@ -447,3 +447,312 @@ let n = ____;
 hints = [
   "`&str` 係用 byte 嚟量自己嘅，而一個中文字係三個 byte。量字元，唔係量 byte —— 而且字元 iterator 一早報唔到自己有幾長，淨係知行咗幾多步。",
 ]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.cheatsheet.31.option-map"
+title = "雙倍，定係乜都冇"
+story = "茶餐廳 happy hour 會將積分卡個印花加倍——前提係你有卡。冇卡就冇印花，收銀機都唔可以因此死機。"
+brief = '''
+`o: Option<i32>`。`d` 係 `o` 入面個值乘二之後嘅結果，仲係包住嘅：
+`Some(21)` 變做 `Some(42)`，`None` 就保持 `None`，唔會 panic。
+
+```
+let d: Option<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "有一個 method 淨係改 Option 入面嘅嘢，個盒就原封不動：closure 攞到嘅係普通值，返嘅都係普通值，而 `None` 根本唔會去到 closure 度。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.cheatsheet.32.and-then"
+title = "一個盒，唔係兩個"
+story = "張落單紙可能係空白嘅；就算唔係，Alex 都可能喺枱號嗰格寫咗 \"tea\"。"
+brief = '''
+`s: Option<&str>`。`n` 係 `s` 入面寫住嘅數字：`Some("42")` 得出 `Some(42)`，
+`Some("tea")` 同 `None` 都係得出 `None`。parse 本身都可能失敗，所以 closure 會
+整出佢自己嘅 Option。
+
+```
+let n: Option<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "當 closure 本身已經返一個 Option，淨係轉換入面嘅值就會剩低一個 `Option<Option<i32>>`。你要嘅係令 closure 自己個 Option 直接變成結果嘅嗰個 method——而且 closure 一定要返 Option，唔係 Result。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.cheatsheet.33.option-filter"
+title = "淨係要大枱"
+story = "時代廣場美食廣場樓上，淨係張單過咗一百蚊先送一杯免費檸檬茶。"
+brief = '''
+`t: Option<i32>` 係一張單。`big` 淨係喺張單**過咗 100** 嗰陣先保留佢：
+`Some(150)` 仲係 `Some(150)`，`Some(20)` 變做 `None`，`None` 仲係 `None`。
+
+```
+let big: Option<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "Option 都可以好似 iterator 咁，用一個條件嚟決定留定唔留。條件攞到嘅係個值嘅 reference，所以同數字比較之前要拆開佢先。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "rust.cheatsheet.34.unwrap-or-else"
+title = "唔好打去廚房"
+story = "餐牌板 cache 住今日特餐。打去邊寧頓街個廚房要成分鐘，所以 Mei 淨係喺餐牌板空咗先打。"
+brief = '''
+`cache: Option<String>`，而 `fn fetch() -> String` 好慢。`s` 係 cache 住嘅字串；
+`cache` 係 `None` 嗰陣就係 `fetch()` 嘅結果——而 `cache` 有值嗰陣，`fetch`
+**完全唔可以行**。
+
+```
+let s: String = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "參數喺 method 被 call 之前就已經計咗，唔理個 method 用唔用佢。想後備值慳返先計，就交一個計佢嘅 closure 出去；個 method 淨係喺 `None` 嗰陣先 call 佢。",
+]
+
+# ---------------------------------------------------------------- 35
+[[quest]]
+id    = "rust.cheatsheet.35.unwrap-or-default"
+title = "一個空托盤"
+story = "就算 9 號枱冇人落單，點心車推過嗰陣都係一個空托盤，唔係一個窿。"
+brief = '''
+`o: Option<Vec<i32>>`。`v` 係 `o` 入面個 Vec；`o` 係 `None` 嗰陣就係個型別自己嘅
+預設值——空 Vec——而且唔使自己寫出個預設值。
+
+```
+let v: Vec<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "每個 `Default` 型別都知道自己個空值，而 Option 有一個專門問佢攞嘅 unwrap：佢唔收參數。你可能記得嘅 `or_default` 係喺 HashMap 嘅 entry API 度，唔係喺 Option 度。",
+]
+
+# ---------------------------------------------------------------- 36
+[[quest]]
+id    = "rust.cheatsheet.36.map-or"
+title = "名牌闊度"
+story = "希慎廣場櫃位部名牌印機會跟住個名嚟定名牌幾闊，冇名就印一張闊度係零嘅名牌。"
+brief = '''
+`o: Option<&str>`。`n` 係入面字串嘅長度，`None` 就係 `0`——預設值同轉換
+喺**一次** call 入面搞掂：`Some("Mei")` 得出 3。
+
+```
+let n: usize = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "有一個 method 就係 map 加埋有後備值嘅 unwrap。佢個預設值擺先，係一個普通值；有 `_else` 嗰個兄弟就要個預設值係 closure。",
+]
+
+# ---------------------------------------------------------------- 37
+[[quest]]
+id    = "rust.cheatsheet.37.then-some"
+title = "會員減十蚊"
+story = "崇光收銀員俾持卡會員減十蚊。其他人乜都冇，唔係零，係冇。"
+brief = '''
+`vip: bool`。`vip` 係 true 嗰陣 `discount` 係 `Some(10)`，false 就係 `None`，
+用一次喺 bool 上面嘅 call 寫出嚟。
+
+```
+let discount: Option<u32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "bool 可以變成 Option。一個 method 收個值本身再包起佢；名短啲嗰個孿生兄弟就要一個 closure。無論邊個，你傳入去嘅都係入面嘅值，唔係一個 Option。",
+]
+
+# ---------------------------------------------------------------- 38
+[[quest]]
+id    = "rust.cheatsheet.38.bool-then"
+title = "開門先至得"
+story = "怡和街大排檔印一份成本餐牌要好耐。收咗舖之後，Alex 唔想部印機郁都唔好郁。"
+brief = '''
+`open: bool`，而 `fn menu() -> Vec<String>` 好慢。`open` 係 true 嗰陣 `m` 係
+`Some(menu())`，false 就係 `None`——而且 `open` 係 false 嗰陣 `menu`
+**唔可以行**。
+
+```
+let m: Option<Vec<String>> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "傳一個值，即係每次都要計咗佢先。收 closure 嗰個 bool method 淨係喺 bool 係 true 嗰陣先 call 佢。",
+]
+
+# ---------------------------------------------------------------- 39
+[[quest]]
+id    = "rust.cheatsheet.39.filter-map-parse"
+title = "化咗嘅字跳過佢"
+story = "落雨打濕咗波斯富街電車站塊告示板，有幾個到站分鐘化咗做字母。數字留低，其餘唔要。"
+brief = '''
+`words: Vec<&str>` 係 `["3", "x", "7"]`。`nums` 裝住所有 parse 到做數字嘅字，
+parse 唔到嘅就直接**跳過**：`[3, 7]`。
+
+```
+let nums: Vec<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "普通嘅 map 每個輸入都留一個輸出，所以壞字會變成 `None`（或者一次 panic）。有一個 adapter 將每樣嘢 map 做 Option，淨係留低拆開咗嘅 `Some`。",
+]
+
+# ---------------------------------------------------------------- 40
+[[quest]]
+id    = "rust.cheatsheet.40.filter-map-then-some"
+title = "雙數位，雙倍分"
+story = "凌晨兩點去旺角嘅小巴，今晚淨係雙數號碼嘅位先儲到分，仲要係雙倍。"
+brief = '''
+`v: Vec<i32>` 係 `[1, 2, 3, 4]`。`d` 淨係為**雙數** `x` 裝入 `x * 2`——`[4, 8]`
+——揀同轉換喺同一個 adapter 入面做。
+
+```
+let d: Vec<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "用收普通值嗰個 bool method 將個判斷變成 Option，再由會掉走 `None` 嘅 adapter 嚟揀。filter 要返一個 bool，普通 map 就會將啲 Option 本身收埋。",
+]
+
+# ---------------------------------------------------------------- 41
+[[quest]]
+id    = "rust.cheatsheet.41.find"
+title = "第一個豪客"
+story = "利園收銀機卷單一路轆過。Mei 要嘅係第一張過五十蚊嘅單，淨係嗰一張。"
+brief = '''
+`v: Vec<i32>` 係 `[12, 64, 30, 90]`。`f` 係**第一個**大過 50 嘅元素嘅
+reference，冇就係 `None`：呢度係 `Some(&64)`。
+
+```
+let f: Option<&i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "喺第一個符合嘅位停低嘅 adapter 返嘅係 Option，唔係另一個 iterator，亦唔係 bool。佢個 closure 攞到嘅係元素嘅 reference，而喺 `.iter()` 上面元素本身已經係 reference——要剝兩層。",
+]
+
+# ---------------------------------------------------------------- 42
+[[quest]]
+id    = "rust.cheatsheet.42.position"
+title = "第幾個站？"
+story = "港島綫個顯示屏要著啱嗰粒燈，所以佢要嘅係銅鑼灣喺條綫上面嘅位置，唔係佢個名。"
+brief = '''
+`stops: Vec<&str>` 係 `["Admiralty", "Wan Chai", "Causeway Bay", "Tin Hau"]`。
+`i` 係 `"Causeway Bay"` 嘅 **index**，搵唔到就係 `None`：呢度係 `Some(2)`。
+
+```
+let i: Option<usize> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "搵到個元素，你攞到嘅係個元素；你要嘅係佢企喺邊。有一個 method 淨係返 index，而佢個 closure 攞到嘅係元素本身，唔係元素嘅 reference。",
+]
+
+# ---------------------------------------------------------------- 43
+[[quest]]
+id    = "rust.cheatsheet.43.find-map"
+title = "第一個真數字"
+story = "駱克道變電站啲電錶讀數一開頭全部係破折號同 n/a。工程師要嘅係第一個真正嘅數字。"
+brief = '''
+`cells: Vec<&str>` 係 `["--", "n/a", "42", "7"]`。`first` 係**第一格** parse 到做
+數字嘅，而且已經 parse 好——`Some(42)`——一格都冇就係 `None`。
+
+```
+let first: Option<i32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "find 返嘅係原本嘅元素，唔係 parse 咗嘅值；淨係睇第一個元素就會停喺 `\"--\"`。有一個 method 將每樣嘢 map 做 Option，喺第一個 `Some` 停低——佢個 closure 一定要返 Option，唔係 Result。",
+]
+
+# ---------------------------------------------------------------- 44
+[[quest]]
+id    = "rust.cheatsheet.44.flat-map"
+title = "單上面每個字"
+story = "金華櫃面啲落單紙一行一行釘住。點貨要將所有單上面嘅每個字擺入一張清單。"
+brief = '''
+`lines: Vec<&str>` 係 `["milk tea", "pineapple bun x2"]`。`words` 係每一行嘅
+每個字砌成嘅一張平嘅清單：
+`["milk", "tea", "pineapple", "bun", "x2"]`。
+
+```
+let words: Vec<&str> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "每一行都會變成一個字嘅 iterator，普通 map 會交俾你一個 iterator 嘅 iterator。有一個 adapter 一路 map 一路將入面啲 iterator 頭接尾駁埋——佢即係 map 之後再 `flatten`，同將一串 Option 淨係留低 Some 嗰個係同一個 `flatten`。",
+]
+
+# ---------------------------------------------------------------- 45
+[[quest]]
+id    = "rust.cheatsheet.45.all"
+title = "全部夠凍"
+story = "時代廣場士多部奶茶雪櫃，要成日每一次讀數都低過四十度先至過到檢查。"
+brief = '''
+`temps: Vec<i32>`。**每一個**讀數都低過 40 嗰陣 `ok` 係 true：
+`[30, 35]` 得出 `true`，`[30, 45]` 得出 `false`。
+
+```
+let ok: bool = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "一個 method 只要有一樣過到就係 true，另一個要冇一樣唔過先係 true。揀嚴格嗰個，同記住 `.iter()` 交俾 closure 嘅係 reference。",
+]
+
+# ---------------------------------------------------------------- 46
+[[quest]]
+id    = "rust.cheatsheet.46.map-err"
+title = "用你自己嘅講法"
+story = "銅鑼灣診所部攞籌機會印籌號。掃描出嚟係亂碼嗰陣，個畫面應該顯示 \"bad ticket\"，而唔係 ParseIntError。"
+brief = '''
+喺 `fn ticket(s: &str) -> Result<u32, String>` 入面，用 `?` parse `s`。
+`s` 唔啱嗰陣個 function 一定要返 `Err("bad ticket".to_string())`
+——`ParseIntError` 本身唔會轉做 `String`。
+
+```
+let n: u32 = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "淨係改 Result 錯誤嗰邊，Ok 嗰邊唔郁，`?` 就可以將佢帶出去。用 `.ok()` 掉咗個錯誤會變成 Option，如果你淨係理成唔成功嗰個就啱——但喺返 Result 嘅 function 入面，唔可以對 Option 用 `?`。",
+]

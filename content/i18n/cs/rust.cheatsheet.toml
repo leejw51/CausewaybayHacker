@@ -467,3 +467,315 @@ Který výraz patří do mezery?
 hints = [
   "`&str` se měří v bajtech a čínský znak jsou tři. Měř znaky, ne bajty — a iterátor znaků svou délku předem ohlásit neumí, jen kolik kroků udělal.",
 ]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.cheatsheet.31.option-map"
+title = "DVOJNÁSOBEK, NEBO NIC"
+story = "Ve šťastnou hodinu v cha chaan teng se razítko na věrnostní kartě zdvojnásobí, pokud karta je. Bez karty není razítko a pokladna nesmí spadnout."
+brief = '''
+`o: Option<i32>`. `d` je hodnota uvnitř `o` zdvojnásobená a pořád zabalená:
+z `Some(21)` je `Some(42)` a `None` zůstane `None`, bez paniky.
+
+```
+let d: Option<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Jedna metoda změní, co je uvnitř Option, a krabici nechá být: uzávěra dostane holou hodnotu a vrací holou hodnotu, a `None` se k ní vůbec nedostane.",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.cheatsheet.32.and-then"
+title = "JEDNA KRABICE, NE DVĚ"
+story = "Objednávkový lístek může být prázdný, a když není, mohl Alex na místo čísla stolu napsat \"tea\"."
+brief = '''
+`s: Option<&str>`. `n` je číslo zapsané v `s`: ze `Some("42")` je `Some(42)`,
+ze `Some("tea")` i z `None` je `None`. Samotné parsování může selhat, takže
+uzávěra vyrobí vlastní Option.
+
+```
+let n: Option<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Když uzávěra už sama vrací Option, prostá transformace vnitřku by nechala `Option<Option<i32>>`. Chceš metodu, která nechá Option z uzávěry stát se výsledkem — a uzávěra musí vrátit Option, ne Result.",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.cheatsheet.33.option-filter"
+title = "JEN VELKÉ STOLY"
+story = "Nahoře ve food courtu v Times Square dostanou citronový čaj zdarma jen účty nad sto dolarů."
+brief = '''
+`t: Option<i32>` je účet. `big` si účet ponechá jen tehdy, když je **nad
+100**: `Some(150)` zůstane `Some(150)`, ze `Some(20)` je `None` a `None`
+zůstane `None`.
+
+```
+let big: Option<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Option jde podle predikátu ponechat nebo zahodit stejně jako iterátor. Predikát dostane referenci na hodnotu, takže ji před porovnáním s číslem rozlož.",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "rust.cheatsheet.34.unwrap-or-else"
+title = "NEVOLEJ DO KUCHYNĚ"
+story = "Tabule s menu si pamatuje dnešní specialitu. Telefonát do kuchyně na Pennington Street trvá minutu, takže Mei volá, jen když je tabule prázdná."
+brief = '''
+`cache: Option<String>` a `fn fetch() -> String` je pomalá. `s` je řetězec
+z cache, nebo výsledek `fetch()`, když je `cache` `None` — a když `cache`
+hodnotu má, `fetch` se **nesmí spustit vůbec**.
+
+```
+let s: String = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Argument se vyhodnotí před voláním metody, ať ho metoda potřebuje, nebo ne. Aby byla náhradní hodnota líná, předej uzávěru, která ji spočítá; metoda ji zavolá jen u `None`.",
+]
+
+# ---------------------------------------------------------------- 35
+[[quest]]
+id    = "rust.cheatsheet.35.unwrap-or-default"
+title = "PRÁZDNÝ TÁC"
+story = "I když u stolu 9 nikdo nic neobjednal, vozík s dim sum projede kolem s prázdným tácem, ne s dírou."
+brief = '''
+`o: Option<Vec<i32>>`. `v` je Vec uvnitř `o`, nebo vlastní výchozí hodnota
+typu — prázdný Vec — když je `o` `None`, aniž bys výchozí hodnotu napsal.
+
+```
+let v: Vec<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Každý typ s `Default` zná svou prázdnou hodnotu a Option má unwrap, který si o ni řekne: nebere žádný argument. `or_default`, který si možná pamatuješ, patří k entry API HashMapy, ne k Option.",
+]
+
+# ---------------------------------------------------------------- 36
+[[quest]]
+id    = "rust.cheatsheet.36.map-or"
+title = "ŠÍŘKA JMENOVKY"
+story = "Tiskárna jmenovek u pultu v Hysan Place určuje velikost podle jména a chybějící jméno dostane jmenovku široké nula."
+brief = '''
+`o: Option<&str>`. `n` je délka řetězce uvnitř, nebo `0` pro `None` —
+výchozí hodnota a transformace v **jednom** volání: `Some("Mei")` dá 3.
+
+```
+let n: usize = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Existuje jediná metoda, která je map plus unwrap s náhradou. Výchozí hodnota jde první a je to holá hodnota; její sourozenec s `_else` chce místo ní uzávěru.",
+]
+
+# ---------------------------------------------------------------- 37
+[[quest]]
+id    = "rust.cheatsheet.37.then-some"
+title = "ČLENOVÉ MAJÍ DESET"
+story = "Pokladní v SOGO odečte členům s kartou deset dolarů. Ostatní nedostanou nic — ne nulu, ale nic."
+brief = '''
+`vip: bool`. `discount` je `Some(10)`, když je `vip` true, a `None`, když
+je false, napsáno jedním voláním na boolu.
+
+```
+let discount: Option<u32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Bool se může stát Option. Jedna metoda bere samotnou hodnotu a zabalí ji; její dvojče s kratším jménem chce místo toho uzávěru. Tak či tak předáváš vnitřní hodnotu, ne Option.",
+]
+
+# ---------------------------------------------------------------- 38
+[[quest]]
+id    = "rust.cheatsheet.38.bool-then"
+title = "JEN KDYŽ MÁME OTEVŘENO"
+story = "Tisk celého menu v dai pai dong na Yee Wo Street chvíli trvá. Po zavírací době Alex nechce, aby se tiskárna vůbec rozjela."
+brief = '''
+`open: bool` a `fn menu() -> Vec<String>` je pomalá. `m` je `Some(menu())`,
+když je `open` true, a `None`, když je false — a když je `open` false,
+`menu` se **nesmí spustit**.
+
+```
+let m: Option<Vec<String>> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Předat hodnotu znamená ji pokaždé nejdřív spočítat. Metoda boolu, která bere uzávěru, ji zavolá jen tehdy, když je bool true.",
+]
+
+# ---------------------------------------------------------------- 39
+[[quest]]
+id    = "rust.cheatsheet.39.filter-map-parse"
+title = "ROZMAZANÉ PŘESKOČ"
+story = "Déšť na tabuli tramvajové zastávky v Percival Street rozmazal některé minuty příjezdu na písmena. Čísla nech, zbytek zahoď."
+brief = '''
+`words: Vec<&str>` je `["3", "x", "7"]`. `nums` obsahuje každé slovo, které
+jde naparsovat jako číslo, a ta ostatní prostě **přeskočí**: `[3, 7]`.
+
+```
+let nums: Vec<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Prostý map drží jeden výstup na každý vstup, takže špatná slova by vyšla jako `None` (nebo jako panika). Jeden adaptér mapuje na Option a ponechá jen `Some`, rozbalené.",
+]
+
+# ---------------------------------------------------------------- 40
+[[quest]]
+id    = "rust.cheatsheet.40.filter-map-then-some"
+title = "SUDÁ SEDADLA, DVOJNÉ BODY"
+story = "V minibusu do Mong Koku ve dvě ráno dnes sbírají body jen sudá sedadla, a to dvojnásobné."
+brief = '''
+`v: Vec<i32>` je `[1, 2, 3, 4]`. `d` obsahuje `x * 2` jen pro **sudá** `x`
+— `[4, 8]` — výběr i transformace v jediném adaptéru.
+
+```
+let d: Vec<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Udělej z testu Option metodou boolu, která bere holou hodnotu, a výběr nech na adaptéru, který zahazuje `None`. Filtr chce zpátky bool a prostý map by posbíral samotné Option.",
+]
+
+# ---------------------------------------------------------------- 41
+[[quest]]
+id    = "rust.cheatsheet.41.find"
+title = "PRVNÍ VELKÝ ÚTRATNÍK"
+story = "Páska z pokladny v Lee Garden ubíhá. Mei chce první účtenku nad padesát dolarů, a jen tu jednu."
+brief = '''
+`v: Vec<i32>` je `[12, 64, 30, 90]`. `f` je reference na **první** prvek
+nad 50, nebo `None`, když žádný není: tady `Some(&64)`.
+
+```
+let f: Option<&i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Adaptér, který se zastaví na první shodě, vrací Option, ne další iterátor ani bool. Jeho uzávěra dostane referenci na položku a nad `.iter()` je položka už sama referencí — dvě vrstvy k sloupnutí.",
+]
+
+# ---------------------------------------------------------------- 42
+[[quest]]
+id    = "rust.cheatsheet.42.position"
+title = "KTERÁ STANICE?"
+story = "Displej Island Line musí rozsvítit správnou tečku, takže chce místo Causeway Bay na trati, ne její jméno."
+brief = '''
+`stops: Vec<&str>` je `["Admiralty", "Wan Chai", "Causeway Bay", "Tin Hau"]`.
+`i` je **index** `"Causeway Bay"`, nebo `None`, když chybí: tady
+`Some(2)`.
+
+```
+let i: Option<usize> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Když položku najdeš, dostaneš položku; ty chceš, kde stojí. Jedna metoda vrací jen index a její uzávěra dostane položku samotnou, ne referenci na ni.",
+]
+
+# ---------------------------------------------------------------- 43
+[[quest]]
+id    = "rust.cheatsheet.43.find-map"
+title = "PRVNÍ SKUTEČNÉ ČÍSLO"
+story = "Záznamy elektroměrů z rozvodny na Lockhart Road začínají pomlčkami a n/a. Technik chce první skutečné číslo."
+brief = '''
+`cells: Vec<&str>` je `["--", "n/a", "42", "7"]`. `first` je **první**
+buňka, která jde naparsovat jako číslo, už naparsovaná — `Some(42)` — nebo
+`None`, když žádná nejde.
+
+```
+let first: Option<i32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Find vrací původní položku, ne naparsovanou hodnotu, a pohled jen na první položku skončí u `\"--\"`. Jedna metoda mapuje každou položku na Option a zastaví se na prvním `Some` — její uzávěra musí vrátit Option, ne Result.",
+]
+
+# ---------------------------------------------------------------- 44
+[[quest]]
+id    = "rust.cheatsheet.44.flat-map"
+title = "KAŽDÉ SLOVO Z LÍSTKŮ"
+story = "Objednávkové lístky visí na pultu v Kam Wah řádek po řádku. Inventura chce každé slovo ze všech v jednom seznamu."
+brief = '''
+`lines: Vec<&str>` je `["milk tea", "pineapple bun x2"]`. `words` je každé
+slovo každého řádku v jednom plochém seznamu:
+`["milk", "tea", "pineapple", "bun", "x2"]`.
+
+```
+let words: Vec<&str> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Každý řádek se změní v iterátor slov a prostý map by ti dal iterátor iterátorů. Jeden adaptér mapuje a vnitřní iterátory spojí za sebe — je to map a pak `flatten`, tentýž `flatten`, který z řady Option udělá jen ty Some.",
+]
+
+# ---------------------------------------------------------------- 45
+[[quest]]
+id    = "rust.cheatsheet.45.all"
+title = "VŠECHNO STUDENÉ"
+story = "Lednice s mléčným čajem u stánku v Times Square projde kontrolou, jen když každé měření za den zůstalo pod čtyřicet."
+brief = '''
+`temps: Vec<i32>`. `ok` je true, když je **každé** měření pod 40:
+`[30, 35]` dá `true`, `[30, 45]` dá `false`.
+
+```
+let ok: bool = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Jedna metoda je true, když projde aspoň jedna položka, druhá jen tehdy, když žádná neselže. Vyber tu přísnou a pamatuj, že `.iter()` dává uzávěře referenci.",
+]
+
+# ---------------------------------------------------------------- 46
+[[quest]]
+id    = "rust.cheatsheet.46.map-err"
+title = "ŘEKNI TO PO SVÉM"
+story = "Pořadník na klinice v Causeway Bay tiskne číslo lístku. Když je sken nesmysl, obrazovka má hlásit \"bad ticket\", ne ParseIntError."
+brief = '''
+Uvnitř `fn ticket(s: &str) -> Result<u32, String>` naparsuj `s` s `?`.
+Špatné `s` musí funkci přimět vrátit `Err("bad ticket".to_string())`
+— samotná `ParseIntError` se na `String` nepřevede.
+
+```
+let n: u32 = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Změň chybovou stranu Result a stranu Ok nech být, pak ji `?` vynese ven. Zahození chyby přes `.ok()` dá Option, což je správně, když tě zajímá jen to, jestli se to povedlo — ale `?` na Option ve funkci, která vrací Result, nefunguje.",
+]
