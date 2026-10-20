@@ -2,8 +2,7 @@
 # first; BASIC then drills the grammar that is Rust's own. Every node shows a
 # program with one hole and four lines that might fill it; three are
 # near-misses that do not compile, do the wrong thing or are another
-# language's spelling. Pick the right one, then
-# type it. Types, containers, a stack, a queue, a heap, structs, closures, a
+# language's spelling. Pick the right one; the pick is the answer. Types, containers, a stack, a queue, a heap, structs, closures, a
 # thread, a mutex, and THE AUTOCOMPLETE over a tree at the end — the grammar
 # a HackerRank-style live coding test leans on.
 #
@@ -33,7 +32,7 @@ brief       = '''
 Read one line, a name. Print `hello, ` and the name on one line.
 `println!` is the macro that prints a line; `{}` is where a value goes.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  mei
@@ -101,7 +100,7 @@ brief       = '''
 Read one non-negative integer `a` as an `i32`. Make `b`, the same value as a `u64`, and the program prints `b + 1`.
 `as` converts between integer widths.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  12
@@ -171,7 +170,7 @@ brief       = '''
 Read one decimal number into `x` as an `f64` — the wide float — and the program prints it with ten decimals.
 `parse` reads a number out of text; `trim` takes the newline off first.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3.14159265
@@ -239,7 +238,7 @@ brief       = '''
 Read one line and print it in capitals.
 A `String` has a method that returns an uppercase copy.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  jardines bazaar
@@ -309,7 +308,7 @@ brief       = '''
 Read an integer `n`. Set `even` to a `bool` that is true when `n` is even; the program prints `even` or `odd` from it.
 `%` is the remainder, `==` the comparison.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -387,7 +386,7 @@ brief       = '''
 Read `n`. Add every integer from 1 to `n` inclusive into `total`; the program prints it.
 A `for` over a range does it; `..=` includes the end.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -459,7 +458,7 @@ brief       = '''
 Write `double`: a function that takes an `i64` and returns twice it. The program reads `n` and prints `double(n)`.
 A function's last expression, without a semicolon, is its return value.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -532,7 +531,7 @@ brief       = '''
 Declare `Stall`: a struct with a `name` that is a `String` and a `price` that is an `i64`. The program reads both, builds one and prints it.
 `struct` names the type and lists the fields with their types.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 38
@@ -610,7 +609,7 @@ brief       = '''
 Give `Stall` a method `total` that returns `price * qty`. The program calls `stall.total()`.
 Methods live in an `impl` block and take `&self`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  38 3
@@ -694,7 +693,7 @@ brief       = '''
 The `match` over `Line` has an arm for `Island` and `KwunTong`. Add the arm for `TsuenWan`, whose colour is `red`.
 An arm is `Type::Variant => value,`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tsuenwan
@@ -792,7 +791,7 @@ brief       = '''
 Make `v`: an empty, growable vector of `i64` that the loop can push into. The program prints its length and sum.
 A vector is made with `Vec::new()` and must be `mut` to grow.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -868,7 +867,7 @@ brief       = '''
 `v` holds the line's integers. Remove the value at index 0; the program prints what is left.
 A vector removes by index.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4 5 6 7
@@ -940,7 +939,7 @@ brief       = '''
 `list` is a `LinkedList<i64>`. Put each `x` at the FRONT, so the program prints the values in reverse order.
 A linked list can push at either end.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1018,7 +1017,7 @@ brief       = '''
 `count` is a `BTreeMap<String, i64>`. For each word `w`, add one to its count — a new word starts at zero. The program prints `word count` per line, sorted.
 `entry` finds or makes the slot, `or_insert` gives it a start value.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  siu mai har gau siu mai
@@ -1099,7 +1098,7 @@ brief       = '''
 `counts` is a `HashMap`, which walks its keys in no fixed order. `keys` holds those keys in a `Vec`. Sort `keys` so the tally prints the same every time.
 A `Vec` sorts in place.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  f e d c b a f
@@ -1186,7 +1185,7 @@ brief       = '''
 `seen` is a `BTreeSet<i64>`. Add each `x` to it; a value already in the set is not added twice. The program prints how many distinct values there are and the values in order.
 A set inserts.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 3 2 1
@@ -1267,7 +1266,7 @@ brief       = '''
 `stack` is a `Vec<i64>` used as a stack. Pop values off it until it is empty, pushing each onto `out`; the program prints them — last in, first out.
 `pop` gives an `Option`, so `while let` is the loop.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1339,7 +1338,7 @@ brief       = '''
 `queue` is a `VecDeque<i64>`. Take the FIRST value off the front into `first`; the program then takes the second and prints both.
 A deque pops at either end.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1411,7 +1410,7 @@ brief       = '''
 `heap` is a `BinaryHeap<Reverse<i64>>` — a max-heap turned into a min-heap by wrapping every value in `Reverse`. Push each `x` into it; the program pops them out smallest first.
 What goes in must be wrapped.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 1 4 2 3
@@ -1495,7 +1494,7 @@ brief       = '''
 `v` holds the line's integers. Sort it ascending, in place; the program prints it.
 A `Vec` has a method for that.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 1 4 2 3
@@ -1567,7 +1566,7 @@ brief       = '''
 `rows` is a `Vec<(String, i64)>` of name and score. Sort it by score descending, then by name ascending; the program prints `name score` per line.
 `sort_by_key` sorts by a key; `Reverse` flips one part of it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -1658,7 +1657,7 @@ brief       = '''
 Read one line. Make `rev`, the same text with its characters in reverse order; the program prints it.
 Characters come from `chars()`, an iterator can run backwards, and an iterator of chars collects into a `String`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  kwan lee
@@ -1728,7 +1727,7 @@ brief       = '''
 Read `k`, then a line of integers. Make `add`: a closure that takes an `i64` and returns it plus `k`. The program applies it to every number.
 A closure is `|args| body`, and it can use `k` from outside.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -1805,7 +1804,7 @@ brief       = '''
 `nums` holds the line's integers. Make `total`: the sum of the squares of the even ones, as one iterator chain.
 `filter` keeps, `map` transforms, `sum` adds.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -1875,7 +1874,7 @@ brief       = '''
 For each `x`, spawn a thread that computes `x * x`, and push its handle onto `handles`. The program joins them in order and prints the squares.
 `thread::spawn` takes a closure; `move` gives the thread its own copy of `x`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1961,7 +1960,7 @@ brief       = '''
 `c` is a clone of an `Arc<Mutex<i64>>` inside each thread. Add `x` to the number inside the mutex. The program joins every thread and prints the total.
 `lock()` gives a guard; `*` reaches the number.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -2056,7 +2055,7 @@ brief       = '''
 `insert` puts `value` into the tree under `n`: smaller values go into the left subtree, larger into the right, and the subtree is assigned back. Write that one line. The program prints the inorder walk and the height.
 `take()` lifts a child out so it can be handed to the recursive call.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4

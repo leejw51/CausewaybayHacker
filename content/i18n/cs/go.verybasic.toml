@@ -14,7 +14,7 @@ story = "Tin Hau, 06:00, roleta napůl nahoře. Obrazovka na automatu na lístky
 brief = '''
 Program, který říká jednu věc, potřebuje jedno volání z `fmt`: to, které vypíše svůj argument a ukončí řádek.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  
@@ -34,7 +34,7 @@ story = "Čtečka Octopus v Tin Hau počítá přiložení v int32 a denní sou�
 brief = '''
 `n` je `int32`. Vynásobit ho čtyřmi miliardami chce nejdřív širší typ: převeď `n` na `int64` a pak násob.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  7
@@ -54,7 +54,7 @@ story = "Jízdné na tabuli je text. Čtečka ho potřebuje jako float64, než h
 brief = '''
 `s` je jízdné jako řetězec. `strconv` z něj udělá `float64` jedním voláním, které vrátí číslo a chybu; číslo si nech, chybu zahoď.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  0.1
@@ -75,7 +75,7 @@ story = "Cedule na nástupišti v Tin Hau chce název stanice velkými písmeny 
 brief = '''
 `line` je jeden řádek textu. Balíček `strings` má funkci, která ho vrátí velkými písmeny.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tin hau
@@ -96,7 +96,7 @@ story = "Vozy se sudými čísly staví u širokého nástupiště; displej si k
 brief = '''
 `n` je číslo vozu. Program vypíše `even`, když se `n` dělí dvěma beze zbytku, jinak `odd`. Řádek s `if` potřebuje test zbytku.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -116,7 +116,7 @@ story = "Linka má n zastávek a tabule je sčítá od 1 do n; smyčka, kterou s
 brief = '''
 `n` je přečteno. Smyčka musí proběhnout `i` od 1 až po `n` včetně a každé `i` přičíst do `sum`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -136,7 +136,7 @@ story = "Každá rozvážka platí pět plus tříkorunový bonus jednou za noc.
 brief = '''
 `fare` bere počet jízd a musí vrátit pět za jízdu plus tři. Napiš její řádek s `return`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -156,7 +156,7 @@ story = "Karta stánku v Lucky Macu má jméno a cenu a objednávková obrazovka
 brief = '''
 `Stall` má pole `Name` a `Price`. Sestav jeden z `name` a `price` pomocí struktury s pojmenovanými poli.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  noodles 12
@@ -176,7 +176,7 @@ story = "Stánek zná svou cenu i množství; jeho metoda Total vrací pro každ
 brief = '''
 `Total` je metoda na `Stall`. Její řádek s `return` musí dát cenu krát množství, přečtené přes receiver `s`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 4
@@ -196,7 +196,7 @@ story = "Cedule na přestupu čísluje své linky 0, 1, 2 a číslo převádí z
 brief = '''
 `Line` je typ s `iota` a hodnotami `Island`, `TsuenWan`, `KwunTong`. Proměň celé číslo `n` na `Line`, aby ho `switch` níže mohl porovnat.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  2
@@ -216,7 +216,7 @@ story = "Každé číslo vozu, které přijde po drátě, má jít na konec sezn
 brief = '''
 `xs` je slice intů. Uvnitř smyčky dej každé `v` na jeho konec vestavěnou funkcí, která slice zvětší.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -237,7 +237,7 @@ story = "Vůz dva se odpojí od vlaku. Seznam vyhodí špatný, nebo nevyhodí n
 brief = '''
 `xs` drží celá čísla z řádku, nejméně čtyři. Odstraň prvek na indexu 1 spojením slice před ním se slicem za ním.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -257,7 +257,7 @@ story = "Kurýři se hlásí jeden po druhém a spojový seznam u dveří si nen
 brief = '''
 `l` je `container/list`. Dej každé `v` na jeho konec; průchod od `Front` je vypíše v pořadí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4 5 6
@@ -277,7 +277,7 @@ story = "Každé jídlo objednané v Lucky Macu má přičíst jedničku ke své
 brief = '''
 `counts` je `map[string]int`. Uvnitř smyčky přičti jedničku k počtu pro `w` — chybějící klíč se čte jako nula, takže to zvládne jeden výraz.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  rice tea rice bun
@@ -299,7 +299,7 @@ story = "Rejstřík kurýrů mapuje jméno na číslo v konstantním čase a vyh
 brief = '''
 `table` je `map[string]int` — hashovací tabulka v Go. V první smyčce ulož každé `name` s jeho indexem `i`; vyhledávání níže používají tvar čárka-ok.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  alex mei kit
@@ -322,7 +322,7 @@ story = "Čtyřicet jízd, osm kurýrů. Množina, která má počítat různé 
 brief = '''
 `seen` je `map[int]struct{}` — množina. Zaznamenej do ní každé `v`; prázdná struktura je hodnota, která nic nestojí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  8 3 8 5 3 8
@@ -342,7 +342,7 @@ story = "Talíře se skládají u výdeje a berou se z vrchu; pokladna přečte 
 brief = '''
 `stack` je slice použitý jako zásobník. `top` se čte z jeho konce; řádek za tím musí ten poslední prvek zahodit přeřezáním.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -364,7 +364,7 @@ story = "Zákazníci stojí frontu u pokladny a odcházejí z čela; obrazovka o
 brief = '''
 `queue` je slice použitý jako fronta. `front` je jeho první prvek; řádek za tím musí ten prvek zahodit přeřezáním od indexu 1.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -386,7 +386,7 @@ story = "Objednávky se vydávají od nejmenšího čísla. Halda, která je má
 brief = '''
 `h` je `*IntHeap`, který implementuje `heap.Interface`. Vlož každé `v` přes balíček `heap`, aby se pořadí udrželo; výběry níže vycházejí od nejmenšího.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 1 4 2
@@ -406,7 +406,7 @@ story = "Tabule vypisuje příjezdy v pořadí, v jakém byly napsány. Chce je 
 brief = '''
 `xs` je slice intů. Jedno volání z balíčku `sort` ho srovná vzestupně, na místě.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -426,7 +426,7 @@ story = "Žebříček má jména a skóre a vypisuje je v pořadí, v jakém se 
 brief = '''
 `rows` je slice `Row{Name, Score}`. Seřaď ho podle `Score`, nejvyšší první, pomocí `sort.Slice` a funkce less přes indexy.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -451,7 +451,7 @@ story = "Poslední vlak projíždí stanice v opačném pořadí a tabule je po�
 brief = '''
 `xs` je slice intů. Balíček `slices` ho jedním voláním obrátí na místě.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -471,7 +471,7 @@ story = "Každé jízdné na noční tabuli dostane stejnou přirážku; funkce,
 brief = '''
 `k` se čte první. `add` musí být funkční literál, který vezme int a vrátí ho plus `k` — closure nad `k`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -492,7 +492,7 @@ story = "Model nástupiště chce každé číslo dveří na druhou a pomocná f
 brief = '''
 `apply` bere slice a funkci a vrací zmapovaný slice. Zavolej ji na `xs` s funkčním literálem, který umocní svůj argument na druhou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -512,7 +512,7 @@ story = "Osm objednávek opouští kuchyni na osmi kolech najednou a tabule na �
 brief = '''
 Jedna goroutina na číslo: každá umocní své `x` do `results[i]` a po dokončení dá signál `WaitGroup`. Spusť ji klíčovým slovem `go` a předej dovnitř `i` a `x`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -533,7 +533,7 @@ story = "Každý kurýr přičítá své jízdné k jednomu součtu najednou a s
 brief = '''
 `total` sdílí každá goroutina. Řádek, který k němu přičítá `x`, musí být sevřený mezi `mu.Lock()` a `mu.Unlock()` — tady všechny tři na jednom řádku.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -553,7 +553,7 @@ story = "Přední pokladna v Lucky Macu v 11:55 zakládá každou objednávku do
 brief = '''
 `insert` vloží `v` do podstromu s kořenem `n` a vrátí kořen toho podstromu. Větev `if` řeší menší `v`: rekurzivně vejdi do levého dítěte a ulož, co se vrátí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 4

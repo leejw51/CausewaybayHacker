@@ -1,8 +1,7 @@
 # GO LAND — VERY BASIC. The grammar asked as a question first. Tin Hau at
 # 06:00, before the Island Line opens: every node shows a whole program with
 # one hole and four lines that might fill it — one right, three that will not
-# compile, will crash, or will print the wrong thing. Pick the line, then type
-# it. Types, containers, a stack, a queue, a heap, a struct, a goroutine, a
+# compile, will crash, or will print the wrong thing. Pick the line; the pick is the answer. Types, containers, a stack, a queue, a heap, a struct, a goroutine, a
 # mutex, and a binary search tree at the boss: the grammar a live coding test
 # leans on, one line at a time. Nothing here is timed; verify_pack refuses a
 # very-basic solution that adds more than one line, and it swaps every wrong
@@ -30,7 +29,7 @@ map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 A program that says one thing needs one call from `fmt`: the one that prints its argument and ends the line.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  
@@ -96,7 +95,7 @@ map          = { x = 0.247, y = 0.058, kind = "quest" }
 brief       = '''
 `n` is an `int32`. Multiplying it by four billion needs a wider type first: convert `n` to `int64`, then multiply.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7
@@ -168,7 +167,7 @@ map          = { x = 0.333, y = 0.132, kind = "quest" }
 brief       = '''
 `s` is the fare as a string. `strconv` turns it into a `float64` with one call that returns the number and an error; keep the number, drop the error.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  0.1
@@ -251,7 +250,7 @@ map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
 `line` is one line of text. The `strings` package has a function that returns it in upper case.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tin hau
@@ -340,7 +339,7 @@ map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
 `n` is a carriage number. The program prints `even` when `n` divides by two with nothing left, `odd` otherwise. The `if` line needs the remainder test.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -418,7 +417,7 @@ map          = { x = 0.822, y = 0.054, kind = "quest" }
 brief       = '''
 `n` is read. The loop must run `i` from 1 up to and including `n`, adding each `i` to `sum`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -496,7 +495,7 @@ map          = { x = 0.898, y = 0.144, kind = "quest" }
 brief       = '''
 `fare` takes the number of rides and must return five per ride plus three. Write its `return` line.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -574,7 +573,7 @@ map          = { x = 0.953, y = 0.263, kind = "quest" }
 brief       = '''
 `Stall` has fields `Name` and `Price`. Build one from `name` and `price` using a keyed struct literal.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  noodles 12
@@ -658,7 +657,7 @@ map          = { x = 0.753, y = 0.338, kind = "quest" }
 brief       = '''
 `Total` is a method on `Stall`. Its `return` line must give price times quantity, read through the receiver `s`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 4
@@ -748,7 +747,7 @@ map          = { x = 0.671, y = 0.280, kind = "quest" }
 brief       = '''
 `Line` is an `iota` type with `Island`, `TsuenWan`, `KwunTong`. Turn the integer `n` into a `Line` so the `switch` below can compare it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  2
@@ -850,7 +849,7 @@ map          = { x = 0.474, y = 0.314, kind = "quest" }
 brief       = '''
 `xs` is a slice of ints. Inside the loop, put each `v` on its end with the built-in that grows a slice.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -949,7 +948,7 @@ map          = { x = 0.396, y = 0.276, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers, at least four. Remove the element at index 1 by joining the slice before it to the slice after it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1047,7 +1046,7 @@ map          = { x = 0.185, y = 0.313, kind = "quest" }
 brief       = '''
 `l` is a `container/list`. Put each `v` at the back of it; the walk from `Front` prints them in order.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4 5 6
@@ -1145,7 +1144,7 @@ map          = { x = 0.119, y = 0.272, kind = "quest" }
 brief       = '''
 `counts` is a `map[string]int`. Inside the loop, add one to the count for `w` — a missing key reads as zero, so one expression does it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  rice tea rice bun
@@ -1249,7 +1248,7 @@ map          = { x = 0.055, y = 0.556, kind = "quest" }
 brief       = '''
 `table` is a `map[string]int` — Go's hash table. In the first loop, store each `name` with its index `i`; the lookups below use the comma-ok form.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  alex mei kit
@@ -1358,7 +1357,7 @@ map          = { x = 0.255, y = 0.468, kind = "quest" }
 brief       = '''
 `seen` is a `map[int]struct{}` — a set. Record each `v` in it; the empty struct is the value that costs nothing.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  8 3 8 5 3 8
@@ -1440,7 +1439,7 @@ map          = { x = 0.327, y = 0.554, kind = "quest" }
 brief       = '''
 `stack` is a slice used as a stack. `top` is read from its end; the line after must drop that last element by reslicing.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1534,7 +1533,7 @@ map          = { x = 0.529, y = 0.468, kind = "quest" }
 brief       = '''
 `queue` is a slice used as a queue. `front` is its first element; the line after must drop that element by reslicing from index 1.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1628,7 +1627,7 @@ map          = { x = 0.619, y = 0.533, kind = "quest" }
 brief       = '''
 `h` is a `*IntHeap`, which implements `heap.Interface`. Push each `v` through the `heap` package so the order is kept; the pops below come out smallest first.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 1 4 2
@@ -1756,7 +1755,7 @@ map          = { x = 0.801, y = 0.447, kind = "quest" }
 brief       = '''
 `xs` is a slice of ints. One call from the `sort` package puts it in ascending order, in place.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1858,7 +1857,7 @@ map          = { x = 0.901, y = 0.543, kind = "quest" }
 brief       = '''
 `rows` is a slice of `Row{Name, Score}`. Sort it by `Score`, highest first, with `sort.Slice` and a less function over the indexes.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -1965,7 +1964,7 @@ map          = { x = 0.953, y = 0.667, kind = "quest" }
 brief       = '''
 `xs` is a slice of ints. The `slices` package reverses it in place with one call.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -2067,7 +2066,7 @@ map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief       = '''
 `k` is read first. `add` must be a function literal that takes an int and returns it plus `k` — a closure over `k`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -2170,7 +2169,7 @@ map          = { x = 0.666, y = 0.676, kind = "quest" }
 brief       = '''
 `apply` takes a slice and a function and returns the mapped slice. Call it on `xs` with a function literal that squares its argument.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -2284,7 +2283,7 @@ map          = { x = 0.472, y = 0.739, kind = "quest" }
 brief       = '''
 One goroutine per number: each squares its `x` into `results[i]` and signals the `WaitGroup` when done. Start it with the `go` keyword, passing `i` and `x` in.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -2403,7 +2402,7 @@ map          = { x = 0.394, y = 0.686, kind = "quest" }
 brief       = '''
 `total` is shared by every goroutine. The line that adds `x` to it must be held between `mu.Lock()` and `mu.Unlock()` — all three on one line here.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -2513,7 +2512,7 @@ map          = { x = 0.818, y = 0.870, kind = "boss" }
 brief       = '''
 `insert` puts `v` into the subtree rooted at `n` and returns that subtree's root. The `if` branch handles a smaller `v`: recurse into the left child and store what comes back.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4

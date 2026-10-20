@@ -1,5 +1,4 @@
-# PYTHON LAND — VERY BASIC. The grammar as a question first: four lines, one
-# of them right, and then that line typed. Types, containers, a stack, a
+# PYTHON LAND — VERY BASIC. The grammar as a question first: four lines, one of them right, and the pick is the answer. Types, containers, a stack, a
 # queue, a heap, a struct, a thread, a mutex — the constructs a HackerRank-
 # style live coding test leans on, one per node, at Bowrington Road wet
 # market from the 06:00 shutters to the price board. Every quest carries a
@@ -31,7 +30,7 @@ map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 The program must print exactly `hello, causewaybay` on one line. One built-in writes a line to standard output.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 output: hello, causewaybay
@@ -83,7 +82,7 @@ map          = { x = 0.247, y = 0.058, kind = "quest" }
 brief       = '''
 `a` and `b` are integers. The program must print the whole-number quotient and the remainder on one line, separated by a space. Python has one operator for each.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  7 2
@@ -132,7 +131,7 @@ map          = { x = 0.333, y = 0.132, kind = "quest" }
 brief       = '''
 `x` and `y` are floats. The program must print `x / y` with exactly two digits after the point. An f-string carries a format spec after a colon.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  7 2
@@ -181,7 +180,7 @@ map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
 `s` is one line of text. After its length, the program must print `s` in upper case. A string method returns a copy with every letter capitalised.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  kwan lee
@@ -233,7 +232,7 @@ map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
 `n` is a positive integer. The program must print `even` when `n` is divisible by two and `odd` otherwise. The condition is an `if` header comparing the remainder to zero.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  4
@@ -288,7 +287,7 @@ map          = { x = 0.822, y = 0.054, kind = "quest" }
 brief       = '''
 `n` is a positive integer. The loop must visit every integer from 1 up to and including `n`, adding each to `total`. `range` takes a start and a stop, and the stop is not included.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  4
@@ -343,7 +342,7 @@ map          = { x = 0.898, y = 0.144, kind = "quest" }
 brief       = '''
 `fare(rides)` must return the pay: the first ten rides at 5 each, every ride after the tenth at 3. A function hands a value back with one keyword.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3
@@ -400,7 +399,7 @@ map          = { x = 0.953, y = 0.263, kind = "quest" }
 brief       = '''
 `Stall.__init__` receives `name` and `price`. It must store `price` on the object the same way `name` is stored, so `s.price` reads it back.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tofu 12
@@ -463,7 +462,7 @@ map          = { x = 0.753, y = 0.338, kind = "quest" }
 brief       = '''
 `Stall.total(self)` must return price times quantity. Inside a method, the object's fields are reached through `self`.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tofu 12 3
@@ -534,7 +533,7 @@ map          = { x = 0.671, y = 0.280, kind = "quest" }
 brief       = '''
 `word` is one of `island`, `tsuenwan`, `kwuntong`. The program must turn it into the matching `Line` member. An Enum class can be indexed by a member's name.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tsuenwan
@@ -605,7 +604,7 @@ map          = { x = 0.474, y = 0.314, kind = "quest" }
 brief       = '''
 `xs` starts empty. Each integer `x` read in the loop must be added at the end, keeping the input's order. A list has one method for that.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -663,7 +662,7 @@ map          = { x = 0.396, y = 0.276, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. The program must remove the element at index 0 so the rest shift down. One statement deletes by index.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -714,7 +713,7 @@ map          = { x = 0.185, y = 0.313, kind = "quest" }
 brief       = '''
 `chain` is a `deque`. Each `x` read in the loop must be added at the FRONT, so the last one read ends up first. A deque has a method for that end.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3
@@ -773,7 +772,7 @@ map          = { x = 0.119, y = 0.272, kind = "quest" }
 brief       = '''
 `counts` is a dict. For each word `w` the program must add one to its count, starting from zero the first time. `get` reads with a default.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  siu mai har gau siu mai
@@ -831,7 +830,7 @@ map          = { x = 0.055, y = 0.556, kind = "quest" }
 brief       = '''
 `table` maps names to stall numbers. For the word `w` the program must print its number, or `-1` when `w` is not in the table. A dict method reads with a default.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  2
@@ -893,7 +892,7 @@ map          = { x = 0.255, y = 0.468, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. The program must print how many DISTINCT values there are. A set keeps one of each.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3 5 3 8 5 3
@@ -942,7 +941,7 @@ map          = { x = 0.327, y = 0.554, kind = "quest" }
 brief       = '''
 `stack` is a list used as a stack. The program must take the TOP (last) element off into `top`. One list method removes and returns the last item.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -996,7 +995,7 @@ map          = { x = 0.529, y = 0.468, kind = "quest" }
 brief       = '''
 `q` is a `deque` holding the tickets in order. The program must take the FIRST one off into `first`. A deque removes from the front with one method.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1054,7 +1053,7 @@ map          = { x = 0.619, y = 0.533, kind = "quest" }
 brief       = '''
 `heap` starts as an empty list. Each `x` must be pushed so that `heapq.heappop` later returns the smallest first. `heapq` has a push that keeps the heap order.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  5 1 4 2 3
@@ -1119,7 +1118,7 @@ map          = { x = 0.801, y = 0.447, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. The program must sort `xs` in place, ascending, before it is printed. A list has a method that does it.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1170,7 +1169,7 @@ map          = { x = 0.901, y = 0.543, kind = "quest" }
 brief       = '''
 `rows` is a list of `(name, score)` pairs. It must be sorted by score descending, then by name ascending. `sort` takes a `key` function returning a tuple.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3
@@ -1236,7 +1235,7 @@ map          = { x = 0.953, y = 0.667, kind = "quest" }
 brief       = '''
 `s` is one line of text. The program must print it reversed. A slice with a step of -1 walks a string backwards.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  kwan lee
@@ -1285,7 +1284,7 @@ map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief       = '''
 `make_adder(k)` defines an inner function `add` that returns `x + k`. It must hand back that inner function itself, so `add(x)` can be called later with `k` remembered.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  5
@@ -1351,7 +1350,7 @@ map          = { x = 0.666, y = 0.676, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. `total` must be the sum of the squares of the EVEN values, built with `map` and `filter` and two lambdas.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -1402,7 +1401,7 @@ map          = { x = 0.472, y = 0.739, kind = "quest" }
 brief       = '''
 Every thread in `threads` has been started. Before the results are printed, the main thread must WAIT for each one to finish. A thread has one method for that.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1492,7 +1491,7 @@ map          = { x = 0.394, y = 0.686, kind = "quest" }
 brief       = '''
 `lock` is a `threading.Lock`. Before `counter += 1` each worker must TAKE the lock; the release is already written after the write. One method acquires it.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1000
@@ -1579,7 +1578,7 @@ map          = { x = 0.818, y = 0.870, kind = "boss" }
 brief       = '''
 `insert(n, v)` returns the root of the tree with `v` in it; the empty case and the right-hand side are written. For a smaller `v` the left child must be replaced by the result of inserting into it, so a `None` child becomes a node.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  5 3 8 1 4

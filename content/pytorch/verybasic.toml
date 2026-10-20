@@ -1,5 +1,5 @@
 # PYTORCH LAND — VERY BASIC. The grammar of a tensor asked as a question
-# first: four lines, one of them right, and then that line typed. A shape, a
+# first: four lines, one of them right, and the pick is the answer. A shape, a
 # dtype, an index, a broadcast, a matmul, a gradient, a layer, a loss, a step
 # — the constructs a live coding test on a machine-learning team leans on,
 # one per node, in the basement of the Chow Yei Ching Building from the
@@ -34,7 +34,7 @@ map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 A tensor is the one value this land is built out of. `torch.tensor` builds one from a Python list, keeping the order it was given.
 
-Pick the line that builds the tensor `1 2 3`, then type it where the `# FILL` comment is.
+Pick the line that builds the tensor `1 2 3`. It goes where the `# FILL` comment is.
 
 ```
 output: [1, 2, 3]
@@ -214,7 +214,7 @@ map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
 `torch.zeros` takes the sizes as separate arguments — one per dimension — and fills the tensor with zeros.
 
-Pick the line that makes three rows of four, then type it.
+Pick the line that makes three rows of four.
 
 ```
 output: (3, 4) 0.0
@@ -274,7 +274,7 @@ map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
 `torch.arange(n)` is `range(n)` as a tensor: `0` up to but not including `n`.
 
-Pick the line that counts zero to five, then type it.
+Pick the line that counts zero to five.
 
 ```
 output: [0, 1, 2, 3, 4, 5]

@@ -119,12 +119,10 @@ impl Streamer {
     }
 }
 
-/// The line a CHEATSHEET quest is answered with, or `None` for every quest
-/// that is compiled and run.
-fn cheatsheet_answer(quest: &quests::Quest) -> Option<String> {
-    if !ids::is_sheet(&quest.category) {
-        return None;
-    }
+/// The choice a quest is answered with, or `None` for a quest that is
+/// compiled and run. Every road is picked (SPEC §0); a quest with no quiz is
+/// one a pack has not reached yet, and it is judged the old way.
+fn quiz_answer(quest: &quests::Quest) -> Option<String> {
     let quiz = quest.quiz.as_ref()?;
     let answer = quiz.get("answer")?.as_u64()? as usize;
     Some(quiz.get("choices")?.get(answer)?.as_str()?.to_string())
@@ -181,12 +179,12 @@ pub fn run(
         )));
     }
     let attempt_id = ids::attempt_id();
-    // CHEATSHEET (SPEC §0) is the one road nothing is compiled on: the quest
-    // is a question and four lines, and the submission is the line picked.
-    // It is judged here, against the right choice, and then goes down the
-    // same path as every verdict — attempt row, stars, XP, the map — so a
-    // clear on it is a clear like any other.
-    let quiz_answer = cheatsheet_answer(&quest);
+    // Nothing a quiz answers is compiled (SPEC §0): the quest is a question
+    // and four choices, and the submission is the choice picked. It is judged
+    // here, against the right one, and then goes down the same path as every
+    // verdict — attempt row, stars, XP, the map — so a clear on it is a clear
+    // like any other.
+    let quiz_answer = quiz_answer(&quest);
     let home = state.store.home();
     let spec = match quiz_answer {
         Some(_) => None,

@@ -101,6 +101,32 @@ hints = [
   "Divisible by 3 and 5 is the same as divisible by 15.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+case i%3 == 0:
+	fmt.Println("TRAM")
+case i%15 == 0:
+	fmt.Println("TRAMMTR")''',
+  '''
+case i%15 == 0:
+	fmt.Println("TRAMMTR")
+case i%3 == 1:
+	fmt.Println("TRAM")''',
+  '''
+case i%15 == 0:
+	fmt.Println("TRAMMTR")
+case i%3 == 0:
+	fmt.Println("TRAM")''',
+  '''
+case i%15 == 0:
+	fmt.Println("TRAMMTR")
+	fallthrough
+case i%3 == 0:
+	fmt.Println("TRAM")''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -195,6 +221,35 @@ hints = [
   "With one or two values that slice expression is empty or invalid; guard it with an if.",
   "range over a slice gives you index and value; blank the index with _.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if len(nums) > 2 {
+	for _, v := range nums[1 : len(nums)-1] {
+		middle += v
+	}
+}''',
+  '''
+if len(nums) > 2 {
+	for _, v := range nums[1 : len(nums)] {
+		middle += v
+	}
+}''',
+  '''
+if len(nums) > 2 {
+	for v := range nums[1 : len(nums)-1] {
+		middle += v
+	}
+}''',
+  '''
+if len(nums) > 2 {
+	for _, v := range nums[0 : len(nums)-1] {
+		middle += v
+	}
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -302,6 +357,39 @@ hints = [
   "The tie-break is a second comparison inside that same function.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+sort.Slice(rows, func(i, j int) bool {
+	if rows[i].count != rows[j].count {
+		return rows[i].count < rows[j].count
+	}
+	return rows[i].word < rows[j].word
+})''',
+  '''
+sort.Slice(rows, func(i, j int) bool {
+	if rows[i].count != rows[j].count {
+		return rows[i].word < rows[j].word
+	}
+	return rows[i].count > rows[j].count
+})''',
+  '''
+sort.Slice(rows, func(i, j int) bool {
+	if rows[i].word != rows[j].word {
+		return rows[i].word < rows[j].word
+	}
+	return rows[i].count > rows[j].count
+})''',
+  '''
+sort.Slice(rows, func(i, j int) bool {
+	if rows[i].count != rows[j].count {
+		return rows[i].count > rows[j].count
+	}
+	return rows[i].word < rows[j].word
+})''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -394,6 +482,23 @@ hints = [
   "Reversing the byte slice would cut a multi-byte character in half.",
   "Two indices walking towards each other, swapping as they go, is the whole reversal.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+runes := []byte(line)
+fmt.Println(len(runes))''',
+  '''
+runes := []rune(line)
+fmt.Println(len(runes))''',
+  '''
+runes := []rune(line)
+fmt.Println(len(line))''',
+  '''
+runes := strings.Split(line, "")
+fmt.Println(len(runes))''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -535,6 +640,27 @@ hints = [
   "till.Add(...) still works unchanged; Go takes the address for you because till is addressable.",
   "Total only reads, but keep the receivers consistent on one type.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+func (t *Till) Add(name string, cents int64) {
+	t.Items = append(t.Items, Item{Name: name, Cents: cents})
+}''',
+  '''
+func (t Till) Add(name string, cents int64) {
+	t.Items = append(t.Items, Item{Name: name, Cents: cents})
+}''',
+  '''
+func (t *Till) Add(name string, cents int64) {
+	append(t.Items, Item{Name: name, Cents: cents})
+}''',
+  '''
+func (t *Till) Add(name string, cents int64) {
+	t.Items = append(t.Items, Item{Name: name})
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -698,6 +824,27 @@ hints = [
   "switch sign.(type) { case Shop: } is the type switch; the value form is switch v := sign.(type).",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+func (s *Shop) Render() string {
+	return fmt.Sprintf("%s / F%d", s.Name, s.Floor)
+}''',
+  '''
+func (s Shop) String() string {
+	return fmt.Sprintf("%s / F%d", s.Name, s.Floor)
+}''',
+  '''
+func (s Shop) Render() string {
+	return fmt.Sprintf("%s / F%d", s.Name, s.Floor)
+}''',
+  '''
+func (s Shop) Render() string {
+	return fmt.Sprintf("%s / %d", s.Name, s.Floor)
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -825,6 +972,15 @@ hints = [
   "errors.Is walks the wrap chain, so it still matches after the message was decorated.",
 ]
 
+[quest.quiz]
+choices = [
+  'if err == ErrNotANumber {',
+  'if errors.As(err, ErrNotANumber) {',
+  'if errors.Is(ErrNotANumber, err) {',
+  'if errors.Is(err, ErrNotANumber) {',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -950,6 +1106,23 @@ hints = [
   "defer func(){ ... }() runs at return, and the closure reads `last` then — not when the defer was written.",
   "A defer that took an argument would capture the value at defer time instead. Try both and watch it change.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+return func(delta int) int {
+	total := 0''',
+  '''
+total := 0
+return func(delta int) int {''',
+  '''
+total := 0
+return func(delta int) {''',
+  '''
+total := 1
+return func(delta int) int {''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1106,6 +1279,23 @@ hints = [
   "~int64 means int64 and anything whose underlying type is int64, which is what lets a named type through.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+func Sum[T Number](xs []T) T {
+	var total T''',
+  '''
+func Sum[T any](xs []T) T {
+	var total T''',
+  '''
+func Sum[T comparable](xs []T) T {
+	var total T''',
+  '''
+func Sum[T Number](xs []T) T {
+	total := 0''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1239,6 +1429,35 @@ hints = [
   "recover() returns nil when there was no panic, so the if is how you tell the two paths apart.",
   "The deferred closure in main reads `done` when it runs, not when it was written, so it sees the final count.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+func() {
+	if r := recover(); r != nil {
+		out = fmt.Sprintf("RECOVERED %v", r)
+	}
+}()''',
+  '''
+defer func() {
+	if r := recover(); r != nil {
+		return fmt.Sprintf("RECOVERED %v", r)
+	}
+}()''',
+  '''
+defer func() {
+	if r := recover(); r != nil {
+		out = fmt.Sprintf("RECOVERED %v", r)
+	}
+}()''',
+  '''
+defer func() {
+	if r := recover(); r == nil {
+		out = fmt.Sprintf("RECOVERED %v", r)
+	}
+}()''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1382,6 +1601,31 @@ hints = [
   "append handles a nil slice: it allocates the first backing array for you, which is why you never need make() just to start.",
   "The write has to happen inside a function with a deferred recover, or the panic ends the program before line four.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+list := make([]string, len(words))
+for _, word := range words {
+	list = append(list, word)
+}''',
+  '''
+var list [n]string
+for _, word := range words {
+	list = append(list, word)
+}''',
+  '''
+var list []string
+for _, word := range words {
+	list[len(list)] = word
+}''',
+  '''
+var list []string
+for _, word := range words {
+	list = append(list, word)
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1543,6 +1787,15 @@ hints = [
   "d.(Terminus) with the comma-ok form is the type assertion; a type switch does the same job when there are more than two.",
 ]
 
+[quest.quiz]
+choices = [
+  'return fmt.Sprintf("%s (%d lines)", t.Describe(), t.Lines)',
+  'return fmt.Sprintf("%s (%d lines)", t.Stop.Describe(), t.Lines)',
+  'return fmt.Sprintf("%s (%d lines)", t.Name(), t.Lines)',
+  'return fmt.Sprintf("%s (%d lines)", t.Stop, t.Lines)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1672,6 +1925,15 @@ hints = [
   "With no arguments values is nil, and len(nil slice) is 0 — no guard needed.",
 ]
 
+[quest.quiz]
+choices = [
+  'sum, count := total(list)',
+  'sum, count := total(list[1:]...)',
+  'sum, count := total(list...)',
+  'sum, count := total(...list)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1799,6 +2061,23 @@ hints = [
   "Unmarshal takes a pointer to the destination — &orders, not orders — or it has nothing to fill in.",
   "Check the error from Unmarshal. On bad input orders is left empty and a program that ignores the error prints a cheerful zero summary.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+var orders []Order
+if err := json.Unmarshal([]byte(line), &orders); err != nil {''',
+  '''
+var orders []Order
+if err := json.Unmarshal([]byte(line), orders); err != nil {''',
+  '''
+var orders []Order
+if err := json.Unmarshal(line, &orders); err != nil {''',
+  '''
+var orders Order
+if err := json.Unmarshal([]byte(line), &orders); err != nil {''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1942,6 +2221,23 @@ hints = [
   "Three of the four cases fail and the one that passes is km = 0, which is exactly why one test case proves nothing.",
   "In a package this is func TestFare(t *testing.T) with t.Run(c.name, func(t *testing.T){ ... }) so a failure names itself.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+got := fare(km)
+if got == c.want {''',
+  '''
+got := fare(c.km)
+if got != c.want {''',
+  '''
+got := fare(c.want)
+if got == c.want {''',
+  '''
+got := fare(c.km)
+if got == c.want {''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2091,6 +2387,31 @@ hints = [
   "Descending is the > in the less function; the tie-break is a second comparison after it.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if order == nil {
+	missing++
+	continue
+}''',
+  '''
+if order != nil {
+	missing++
+	continue
+}''',
+  '''
+if order == nil {
+	missing++
+	break
+}''',
+  '''
+if order.Name == "" {
+	missing++
+	continue
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2219,6 +2540,27 @@ hints = [
   "sort.Slice on the index restores the order the scheduler took away.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+go func(index int, value int64) {
+	ch <- result{index: index, value: value * value}
+}()''',
+  '''
+go func(index int, value int64) {
+	ch <- result{index: index, value: value * value}
+}(i, v)''',
+  '''
+go func(index int, value int64) {
+	ch <- result{index: index, value: value + value}
+}(i, v)''',
+  '''
+go func(index int, value int64) {
+	ch <- result{index: index + 1, value: value * value}
+}(i, v)''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2331,6 +2673,27 @@ hints = [
   "defer wg.Done() as the first line of the goroutine, so a panic still releases the wait.",
   "wg.Add(1) goes in the loop, before the go statement — not inside the goroutine.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+wg.Add(n)
+go func(index int, w string) {
+	defer wg.Done()''',
+  '''
+wg.Add(1)
+go func(index int, w string) {
+	defer wg.Wait()''',
+  '''
+wg.Add(1)
+go func(index int, w string) {
+	defer wg.Done''',
+  '''
+wg.Add(1)
+go func(index int, w string) {
+	defer wg.Done()''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2454,6 +2817,38 @@ hints = [
   "defer close(ch) at the top of the goroutine does the same job and survives an early return.",
   "Closing from the receiving side would make the sender panic on send — that is why the rule is the sender closes.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+go func() {
+	for _, v := range nums {
+		ch <- v * 10
+	}
+	close(ch)
+}()''',
+  '''
+go func() {
+	for _, v := range nums {
+		ch <- v * 10
+	}
+}()''',
+  '''
+go func() {
+	for _, v := range nums {
+		ch <- v * 10
+		close(ch)
+	}
+}()''',
+  '''
+func() {
+	for _, v := range nums {
+		ch <- v * 10
+	}
+	close(ch)
+}()''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2597,6 +2992,38 @@ hints = [
   "Setting the channel variable to nil disables that case. A nil channel never becomes ready.",
   "The loop condition is `tramCh != nil || mtrCh != nil`, so it ends when both arms are off.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+case _, ok := <-tramCh:
+	if ok {
+		tramCh = nil
+		continue
+	}
+	tram++''',
+  '''
+case _, ok := <-tramCh:
+	if !ok {
+		continue
+	}
+	tram++''',
+  '''
+case _, ok := <-tramCh:
+	if !ok {
+		tramCh = nil
+		continue
+	}
+	tram++''',
+  '''
+case _, ok := <-tramCh:
+	if !ok {
+		close(tramCh)
+		continue
+	}
+	tram++''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2748,6 +3175,27 @@ hints = [
   "Both methods need a pointer receiver, or each call locks a copy of the mutex and guards nothing.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+c.mu.Lock()
+defer c.mu.Lock()
+c.total += v''',
+  '''
+c.mu.Lock()
+defer c.mu.Unlock()
+c.total += v''',
+  '''
+c.mu.Unlock()
+defer c.mu.Lock()
+c.total += v''',
+  '''
+c.mu.Lock()
+defer c.mu.Unlock()
+c.total = v''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2882,6 +3330,23 @@ hints = [
   "INIT always lands before TOTAL because the printing happens inside the goroutines and TOTAL happens after Wait.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+total.Store(value)
+count.Add(1)''',
+  '''
+total.Add(value)
+count.Store(1)''',
+  '''
+total += value
+count++''',
+  '''
+total.Add(value)
+count.Add(1)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3006,6 +3471,26 @@ hints = [
   "The producer must report on both paths: the cancelled return and the end of the loop.",
   "defer cancel() in main is not optional even when you call cancel yourself — it is what releases the context.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+case <-ctx.Done():
+	return''',
+  '''
+case <-ctx.Done:
+	sent <- count
+	return''',
+  '''
+case <-ctx.Done():
+	sent <- count
+	return''',
+  '''
+case ctx.Done():
+	sent <- count
+	return''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3157,6 +3642,30 @@ hints = [
   "That is what the extra goroutine is for: wg.Wait() then close(results), while main is still draining.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+go func() {
+	wg.Wait()
+	close(results)
+}()''',
+  '''
+func() {
+	wg.Wait()
+	close(results)
+}()''',
+  '''
+go func() {
+	wg.Wait()
+}()''',
+  '''
+go func() {
+	wg.Wait()
+	close(jobs)
+}()''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3305,6 +3814,26 @@ hints = [
   "Send even when the parse failed — main is counting exactly n receives and will hang one short otherwise.",
   "Sort by index before you print, or the output is whatever the scheduler decided.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+ch <- parsed{index: index, line: text, value: value * 2}''',
+  '''
+value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+ch <- parsed{index: index, line: text, value: value * 2, err: err}''',
+  '''
+value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+ch <- parsed{index: index, line: text, value: value, err: err}''',
+  '''
+value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+if err != nil {
+	return
+}
+ch <- parsed{index: index, line: text, value: value * 2, err: err}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3459,6 +3988,35 @@ hints = [
   "Cancel the parent before you start collecting, or the even children are still waiting when you block on the channel.",
   "ctx.Err() is context.Canceled or context.DeadlineExceeded, and errors.Is is how you tell them apart rather than comparing the strings.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if i%2 == 0 {
+	child, stop = context.WithCancel(context.Background())
+} else {
+	child, stop = context.WithDeadline(parent, time.Now().Add(-time.Hour))
+}''',
+  '''
+if i%2 == 0 {
+	child, stop = context.WithCancel(parent)
+} else {
+	child, stop = context.WithDeadline(parent, time.Now().Add(time.Hour))
+}''',
+  '''
+if i%2 == 0 {
+	child, stop := context.WithCancel(parent)
+} else {
+	child, stop := context.WithDeadline(parent, time.Now().Add(-time.Hour))
+}''',
+  '''
+if i%2 == 0 {
+	child, stop = context.WithCancel(parent)
+} else {
+	child, stop = context.WithDeadline(parent, time.Now().Add(-time.Hour))
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3651,6 +4209,27 @@ hints = [
   "The comma-ok form of a map read is what separates `missing` from `present and zero`.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+d.mu.RLock()
+defer d.mu.RUnlock()
+index, ok := d.slots[word]''',
+  '''
+d.mu.RLock()
+defer d.mu.Unlock()
+index, ok := d.slots[word]''',
+  '''
+d.mu.Lock()
+defer d.mu.RUnlock()
+index, ok := d.slots[word]''',
+  '''
+d.mu.RLock()
+defer d.mu.RUnlock()
+index, _ := d.slots[word]''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3781,6 +4360,15 @@ hints = [
   "range over a closed, drained channel ends — which is why produce closing it is what lets consume return at all.",
 ]
 
+[quest.quiz]
+choices = [
+  'ch := make(chan int)',
+  'ch := make(chan int, n)',
+  'ch := make(chan int, b)',
+  'ch := make(chan<- int, b)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3907,6 +4495,37 @@ hints = [
   "Drain with the same shape: receive while a value is ready, and let default end the loop.",
   "Do not close the channel to test emptiness — a receive on a closed channel is always ready and would report `no`.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+select {
+case ch <- i:
+	sent++
+}''',
+  '''
+select {
+case ch <- i:
+	sent++
+default:
+	dropped++
+}''',
+  '''
+select {
+case ch <- i:
+	dropped++
+default:
+	sent++
+}''',
+  '''
+select {
+case <-ch:
+	sent++
+default:
+	dropped++
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4071,6 +4690,27 @@ hints = [
   "runs++ inside once.Do needs no lock of its own — Once already guarantees it happens exactly once and before every other Do returns.",
   "Each goroutine owns one slot, so no two ever touch the same memory; the only edge needed is the Wait before reading them all.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+mu.Lock()
+counter++
+mu.Lock()''',
+  '''
+mu.Unlock()
+counter++
+mu.Lock()''',
+  '''
+mu.Lock()
+counter++
+mu.Unlock()''',
+  '''
+mu.Lock()
+defer counter++
+mu.Unlock()''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4256,6 +4896,15 @@ hints = [
   "map[T]struct{} needs T to be comparable, which is exactly the constraint, and struct{} is the zero-width value that says `set, not map`.",
 ]
 
+[quest.quiz]
+choices = [
+  'if i == 0 || x > best {',
+  'if i == 0 || x < best {',
+  'if i == 0 && x > best {',
+  'if i > 0 || x > best {',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4421,6 +5070,23 @@ hints = [
   "boxed holds (*Thing, nil). Comparing it against nil compares the pair, and the type half is not nil.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+b := a[:2:2]
+b = append(b, 99)''',
+  '''
+b := a[:2]
+append(b, 99)''',
+  '''
+b := a[:3]
+b = append(b, 99)''',
+  '''
+b := a[:2]
+b = append(b, 99)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4563,6 +5229,35 @@ hints = [
   "A sync.Mutex around both counters also works and is slower; taking it once per increment is the honest comparison.",
   "Read both counters after Wait, not during — a snapshot taken mid-flight is a different kind of wrong.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if c.dir == "IN" {
+	in.Add(int64(c.k))
+} else {
+	out.Add(int64(c.k))
+}''',
+  '''
+if c.dir == "IN" {
+	in.Add(1)
+} else {
+	out.Add(1)
+}''',
+  '''
+if c.dir == "IN" {
+	in.Add(1)
+} else {
+	out.Add(-1)
+}''',
+  '''
+if c.dir == "OUT" {
+	in.Add(1)
+} else {
+	out.Add(1)
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

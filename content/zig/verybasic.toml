@@ -2,8 +2,7 @@
 # question first: each node is one construct — a type, a string, a loop, a
 # function, a struct, an enum, an ArrayList, a linked list, a hash map, a
 # set, a stack, a queue, a heap, a sort, a comparator, a thread, a mutex, a
-# tree — with four candidate lines, one right. Pick it, then type it where
-# the `// FILL` comment is. One line, every time; the answer is given away
+# tree — with four candidate lines, one right. Pick it: it goes where the `// FILL` comment is, and the pick is the answer. One line, every time; the answer is given away
 # nowhere but the quiz, and verify_pack swaps every wrong choice into the
 # solution to prove it fails. Nothing here hides: a wrong choice is as often
 # a compile error (an unused value, an ignored error, an optional read as a
@@ -44,7 +43,7 @@ the buffered stdout writer; its `print` takes a format string and a tuple
 of arguments — an empty tuple, `.{}`, when there are none — and it can
 fail, so the call has to be `try`'d.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  (nothing)
@@ -117,7 +116,7 @@ does the arithmetic in the type of its operands and, in `-O Debug`, stops
 with `panic: integer overflow` when it does not fit; so `a` has to be
 widened to `i64` before the multiplication, not after.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -209,7 +208,7 @@ divided are an integer, and `@floatFromInt` turns an integer into a float
 only when it is told which float, with `@as(f64, ...)` around it.
 The print with `{d:.2}` is written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7 2
@@ -301,7 +300,7 @@ brief       = '''
 slice of bytes. The program must print how many bytes it holds. A slice
 carries its length as a field, not a method.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  kwan lee
@@ -389,7 +388,7 @@ Read `n`, an `i64`. The program needs `even`, a `bool` that is true when
 the `%` operator — the sign of a remainder is ambiguous — and asks for
 `@mod` or `@rem` by name.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -480,7 +479,7 @@ loop is written; the `for` header that walks `i` from 1 to `n` is the
 hole. A `for` over a range `a..b` starts at `a` and stops before `b`, and
 the value is captured with `|i|` after the parentheses.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  10
@@ -578,7 +577,7 @@ brief       = '''
 Its return is the hole; `main` reads `x` and prints `square(x)`. Every
 statement in Zig ends in a semicolon, and `^` is not a power.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7
@@ -675,7 +674,7 @@ brief       = '''
 every field named with a dot, `.field = value`; a field left out is a
 compile error, not a zero.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40
@@ -779,7 +778,7 @@ declared inside the struct whose first parameter is the struct itself,
 and the fields are reached through that parameter — there is no implicit
 `this`. The return is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40 3
@@ -897,7 +896,7 @@ Zig `if` is an expression, so it can sit on the right of a declaration,
 and two slices are compared with `std.mem.eql`, never `==`. With the type
 declared, an enum value can be written as just `.island`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tsuenwan
@@ -999,7 +998,7 @@ Read a line of integers. Each value `x` must be appended to the
 written. An ArrayList owns no allocator: every call that may grow it is
 handed `gpa`, and it can fail, so it is `try`'d.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1107,7 +1106,7 @@ order of what is left and one that fills the gap with the last element;
 either returns the removed value, and a value Zig is not allowed to drop
 on the floor — it has to be assigned, to `_` if nobody wants it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1209,7 +1208,7 @@ Read a line of integers. Each `item` must be linked at the FRONT of the
 is intrusive: it links the `node` field embedded in each `Item`, by
 pointer, and the walk that prints them is written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1343,7 +1342,7 @@ Read a line of words. For each `word` the count in `counts`, a
 `null` for a word not seen yet, which `orelse` turns into a zero — and
 `put` stores the new count. The loop and the sorted print-out are written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish crab fish
@@ -1461,7 +1460,7 @@ brief       = '''
 a number until it has been unwrapped — `orelse` gives the default,
 `.?` panics on `null`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40 crab 120
@@ -1568,7 +1567,7 @@ has no set type; a hash map whose value type is `void` is one, and a
 `void` value is written `{}`. The print-out of the count and the sorted
 values is written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 3 2 1
@@ -1686,7 +1685,7 @@ time, printing the values last-in first. `pop` returns an optional —
 the top, or `null` once the stack is empty — and a `while` can unwrap
 one per pass and stop on the `null`. The loop header is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1791,7 +1790,7 @@ Read a line of integers. Each `x` must be pushed onto the BACK of `q`, a
 they came. Like an ArrayList, a Deque is handed `gpa` on every call that
 may grow it.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1902,7 +1901,7 @@ smallest first. The queue's order is the function it was declared with:
 `byValue` answers `std.math.Order` for two elements, and the element it
 calls less comes out first. Its return is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 2
@@ -2015,7 +2014,7 @@ in place. The sort in `std.mem` takes the element type, the slice, a
 context (`{}` when there is none) and the ordering — `std.sort` is a
 namespace, not a function, and it is where `asc` and `desc` live.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 2
@@ -2118,7 +2117,7 @@ function, `byScoreDesc`, passed to `std.mem.sort` by name, and it answers
 `true` when `a` goes before `b`. Its return is the hole. Scores are
 distinct.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -2249,7 +2248,7 @@ brief       = '''
 place — a function in `std.mem` over the whole slice, given the element
 type first. An ArrayList has no reverse of its own.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -2352,7 +2351,7 @@ locals around it — so the nearest thing is written here: `Adder`, a
 struct that carries `k` in a field, with a method `call` that reaches it
 through `self`. The method's return is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -2473,7 +2472,7 @@ predicate — a function pointer, `*const fn (i64) bool`. Zig's answer to a
 lambda is a function declared inside an anonymous struct and picked out
 of it by name, all on one line: `struct { fn f(...) ... }.f`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 6
@@ -2588,7 +2587,7 @@ brief       = '''
 `std.Thread.spawn` takes a config (`.{}` for the defaults), the function,
 and its arguments as a tuple, and it can fail.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -2705,7 +2704,7 @@ in hand — `lock` can be cancelled and returns an error union, and the
 plain, uncancelable form returns nothing. Unlocking a mutex nobody holds
 is `unreachable`, and in `-O Debug` that is a panic.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  (nothing)
@@ -2815,7 +2814,7 @@ call allocates, so it is `try`'d. A child is `?*Node`, and it is passed
 down as it is — never unwrapped with `.?` before anyone has looked.
 Inorder traversal then prints ascending.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4

@@ -14,7 +14,7 @@ story = "21:00 na Wun Sha Street. Tabule s lampiony nad dračí kůlnou je tmav�
 brief = '''
 Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna vestavěná funkce zapíše své argumenty a konec řádku na standardní výstup.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 output: hello, causewaybay
@@ -33,7 +33,7 @@ story = "Svazky vonných tyčinek se u brány Lin Fa Kung dělí mezi články d
 brief = '''
 `a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené JEDNOU mezerou. LuaJIT má jediný číselný typ a žádný operátor celočíselného dělení: `/` dá zlomek, `math.floor` ho zahodí a `%` je zbytek. `print` dává mezi své argumenty TABULÁTOR, takže se ty dvě hodnoty nejdřív spojí do jednoho řetězce pomocí `..`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  7 2
@@ -53,7 +53,7 @@ story = "Váha u kůlny na School Street ukazuje váhu draka na jednoho nosiče 
 brief = '''
 `x` a `y` jsou čísla. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. `string.format` bere specifikaci ve stylu C: `f` je číslo s pevnou desetinnou čárkou a číslice za tečkou říká, kolik desetinných míst.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  7 2
@@ -73,7 +73,7 @@ story = "Směrová cedule na začátku Lily Street je namalovaná velkými písm
 brief = '''
 `s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Řetězcová metoda vrátí kopii s každým písmenem velkým a metoda se volá s dvojtečkou, aby řetězec předal sám sebe.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  kwan lee
@@ -94,7 +94,7 @@ story = "Články draka nesou nalevo sudá čísla a napravo lichá; nosič na W
 brief = '''
 `n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je hlavička `if`, která porovná zbytek s nulou, a končí slovem `then`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  4
@@ -114,7 +114,7 @@ story = "Počet vonných tyčinek na tuhle noc je jedna plus dvě plus tři až 
 brief = '''
 `n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst k `total`. Číselný `for` bere začátek a konec a konec JE zahrnutý.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  4
@@ -134,7 +134,7 @@ story = "Prvních deset kol po Wun Sha Street platí nosiči pět za kolo a kaž
 brief = '''
 `pay(laps)` musí vrátit výplatu: prvních deset kol po 5, každé kolo po desátém po 3. Funkce vrací hodnotu jedním klíčovým slovem; funkce, která jen vypisuje, vrací `nil`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3
@@ -154,7 +154,7 @@ story = "Každý stánek na lampionovém jarmarku ve Victoria Park má na kartě
 brief = '''
 `Stall.new(name, price)` sestaví tabulku, jejíž metatabulka je `Stall` — třída v Lua. Musí uložit `price` na objekt stejně, jako je uložené `name`, aby ho `s.price` přečetlo zpátky. Pole se zapisuje na `self`; holé jméno je lokální proměnná.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  tofu 12
@@ -174,7 +174,7 @@ story = "Cena krát množství je jeden řádek každé objednávky u stánku s 
 brief = '''
 `Stall:total()` musí vrátit cenu krát množství. Metoda deklarovaná s dvojtečkou má skrytý první parametr `self` a na pole objektu se sahá přes něj; samotné `price` je globální proměnná, kterou nikdo nenastavil.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  tofu 12 3
@@ -194,7 +194,7 @@ story = "Mapa MTR u východu Tin Hau jmenuje tři linky; posádka má slovo a po
 brief = '''
 `word` je jedno z `island`, `tsuenwan`, `kwuntong`. Lua nemá enum: `Line` je tabulka pojmenovaných čísel, to nejbližší, a `COLOUR` je klíčovaný těmi čísly. Program musí převést `word` na odpovídající člen `Line`. Tabulka se indexuje klíčem a klíče jsou tady velkými písmeny; tabulka se volat nedá a `Line.word` hledá klíč, který se píše `word`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  tsuenwan
@@ -214,7 +214,7 @@ story = "Každý článek, který sjede z náklaďáku na Tai Hang Road, jde na 
 brief = '''
 `xs` začíná jako prázdná tabulka a seznam v Lua je tabulka s klíči 1, 2, 3, ... Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, v pořadí ze vstupu. Knihovna `table` na to má funkci; se dvěma argumenty přidává na konec, se třemi je prostřední pozice.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3 1 4 1
@@ -235,7 +235,7 @@ story = "První článek na seznamu je hlava a hlava se nese na vlastní tyči; 
 brief = '''
 `xs` drží celá čísla z řádku, od indexu 1. Program musí odebrat prvek na indexu 1, aby se zbytek posunul dolů. `table.remove` bere pozici a posune, co následuje; nastavit pozici na `nil` nechá díru, ne kratší seznam.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3 1 4 1
@@ -255,7 +255,7 @@ story = "Řetěz lampionů visí po celé délce Wun Sha Street a nejnovější 
 brief = '''
 `chain` je tabulka používaná jako seznam. Lua nemá deque; `table.insert` s pozicí je to nejbližší a všechno za tou pozicí posune o jedno nahoru. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, takže poslední přečtené skončí první.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1 2 3
@@ -275,7 +275,7 @@ story = "Jeden sešit na ulici, jeden řádek na každou věc, kterou posádka s
 brief = '''
 `counts` je tabulka klíčovaná slovem. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. Chybějící klíč se čte jako `nil` a k `nil` se přičítat nedá; `or` dodá výchozí hodnotu a váže volněji než `+`, takže výchozí hodnota potřebuje vlastní závorky.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  siu mai har gau siu mai
@@ -298,7 +298,7 @@ story = "Tabulka stánků na lampionovém jarmarku mapuje jméno na číslo a do
 brief = '''
 `stalls` mapuje jména na čísla stánků. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. Chybějící klíč je `nil`, ne chyba, a `or` udělá z `nil` výchozí hodnotu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  2
@@ -321,7 +321,7 @@ story = "Šest stánků s lampiony, tři různé ceny. Tabule chce, kolik různ�
 brief = '''
 `xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. Lua nemá množinu: tabulka, jejíž KLÍČE jsou ty hodnoty, je to nejbližší — klíč uložený dvakrát je jeden klíč — a počítací smyčka už klíče prochází přes `pairs`, protože `#` počítá jen pozice od 1. Každé `x` se musí označit v `seen` jako klíč.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3 5 3 8 5 3
@@ -341,7 +341,7 @@ story = "Svazky vonných tyčinek jdou na hromadu u dveří kůlny a berou se z 
 brief = '''
 `stack` je tabulka používaná jako zásobník. Program musí sundat VRCHNÍ (poslední) prvek do `top`. `table.remove` odebere a vrátí prvek a bez pozice vezme ten poslední.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1 2 3 4
@@ -362,7 +362,7 @@ story = "Nosiči se volají k drakovi v pořadí, v jakém se zapsali v kůlně;
 brief = '''
 `q` je tabulka, která drží nosiče v pořadí. Lua nemá deque; `table.remove` s pozicí je to nejbližší a všechno za tou pozicí se posune dolů. Program musí sundat PRVNÍHO do `first`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1 2 3 4
@@ -383,7 +383,7 @@ story = "Čísla článků přicházejí z uliček v libovolném pořadí a poř
 brief = '''
 Standardní knihovna Lua nemá haldu, takže starter nese malou třídu `MinHeap`: `push` přidá hodnotu a probublá ji nahoru, `pop` vezme nejmenší. Každé `x` musí jít dovnitř vlastní metodou haldy, zavolanou s dvojtečkou, aby halda předala sama sebe, a `pop` pak vracelo nejmenší jako první. Zápis přímo do `items` probublání přeskočí a rozbije pořadí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  5 1 4 2 3
@@ -403,7 +403,7 @@ story = "Ceny lampionů na tabuli jarmarku jsou v pořadí, v jakém stánky ote
 brief = '''
 `xs` drží celá čísla z řádku. Program musí seřadit `xs` na místě, vzestupně, než se vypíše. Knihovna `table` má funkci, která to udělá, ve výchozím stavu vzestupně; druhý argument by byla porovnávací funkce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3 1 4 1
@@ -423,7 +423,7 @@ story = "Tabule nosičů na stěně kůlny je podle kol od nejvíc po nejmíň a
 brief = '''
 `rows` je seznam tabulek s `name` a `score`. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. `table.sort` bere porovnávací funkci, která odpovídá, jestli `a` jde před `b`; rozhoduje skóre, pokud se ty dvě nerovnají, a pak rozhoduje jméno.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  3
@@ -448,7 +448,7 @@ story = "Jméno draka je na ocasním praporu namalované pozpátku, aby se z dru
 brief = '''
 `s` je jeden řádek textu. Program ho musí vypsat obráceně. Řetězcová knihovna má metodu přesně na to, volanou s dvojtečkou; `sub` vyřízne kus a neotočí ho.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  kwan lee
@@ -468,7 +468,7 @@ story = "Stánek s lampiony přidává ke každé velkoobchodní ceně stejnou p
 brief = '''
 `make_adder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Musí vrátit přímo tu vnitřní funkci — funkce je hodnota jako každá jiná — aby šlo `add(x)` zavolat později a `k` zůstalo zapamatované.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  5
@@ -489,7 +489,7 @@ story = "Sudé články platí druhou mocninu svého čísla a liché neplatí n
 brief = '''
 `xs` drží celá čísla z řádku. Lua nemá vestavěné `map` ani `filter`, takže starter nese `map(f, xs)`, `filter(f, xs)` a `sum(xs)`. `total` musí být součet druhých mocnin SUDÝCH hodnot, sestavený z těch tří a dvou anonymních funkcí — `function(x) ... end` je lambda v Lua.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1 2 3 4 5 6
@@ -509,7 +509,7 @@ story = "Běžec každého článku umocňuje svůj počet na vlastní korutině
 brief = '''
 Vlákna tu nejsou: korutina je to nejbližší, funkce, která běží, jen dokud je obnovená, a řízení vrací přes `yield`. Každý worker ve `workers` byl spuštěný — jednou obnovený, až po první yield — a žádný nezapsal svůj výsledek. Než se výsledky vypíšou, hlavní program musí každou `co` doběhnout do konce. Jedna funkce knihovny `coroutine` pokračuje v korutině tam, kde udělala yield.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1 2 3
@@ -530,7 +530,7 @@ story = "Čtyři běžci s tyčinkami přičítají k jednomu počítadlu napsan
 brief = '''
 Běží vždy jedna korutina, a přesto je tu souběh: každý worker přečte `counter`, udělá yield a zapíše ho zpátky, a ostatní tři v té mezeře proběhnou. Lua nemá mutex; `lock` je malý kooperativní zámek a jeho `acquire` dělá yield, dokud není volný, a pak si ho vezme. Před čtením si každý worker musí zámek VZÍT touto metodou — s dvojtečkou, aby zámek předal sám sebe; uvolnění je už napsané za zápisem.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  1000
@@ -550,7 +550,7 @@ story = "21:00 u hlavy draka na Wun Sha Street: čísla článků jdou do stromu
 brief = '''
 Čísla článků se načtou do `segments`, který začíná od 1 jako každý seznam v Lua — `segments[0]` je `nil`, a stejně tak dítě, které tam ještě není; ani jedno není chyba, dokud se po něm nejde. `insert(n, v)` vrací kořen stromu s `v` uvnitř; případ `nil` a pravá strana jsou napsané. Pro menší `v` se levé dítě musí nahradit výsledkem vložení do něj, aby se z dítěte `nil` stal uzel.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `-- FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `-- FILL`.
 
 ```
 input:  5 3 8 1 4

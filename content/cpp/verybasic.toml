@@ -2,8 +2,7 @@
 # asked as a question first: each node is one construct — a type, a string,
 # a loop, a function, a struct, an enum, a vector, a list, a map, a hash
 # table, a set, a stack, a queue, a heap, a sort, a lambda, a thread, a
-# mutex, a tree — with four candidate lines, one right. Pick it, then type it
-# where the `// FILL` comment is. One line, every time; the answer is given
+# mutex, a tree — with four candidate lines, one right. Pick it: it goes where the `// FILL` comment is, and the pick is the answer. One line, every time; the answer is given
 # away nowhere but the quiz, and verify_pack swaps every wrong choice into the
 # solution to prove it fails. The road for the grammar a live coding test
 # leans on.
@@ -31,7 +30,7 @@ brief       = '''
 The program must print exactly `hello, causewaybay` and a newline. In C++
 that is one statement sent to the standard output stream.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  (nothing)
@@ -94,7 +93,7 @@ brief       = '''
 Read `a`. The program needs `big`, a 64-bit integer holding `a` times one
 billion — a value an `int` cannot hold once `a` is more than 2.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -163,7 +162,7 @@ Read two positive integers `a` and `b`. The program needs `q`, the quotient
 as a `double` — one integer divided by another is an integer unless one of
 them is converted first.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7 2
@@ -233,7 +232,7 @@ brief       = '''
 Read one line into `s`. The program must print how many characters it
 holds — a `std::string` knows its own length.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  kwan lee
@@ -302,7 +301,7 @@ brief       = '''
 Read `n`. The program needs `even`, a `bool` that is true when `n` divides
 by two with nothing left over.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  4
@@ -370,7 +369,7 @@ brief       = '''
 Read `n`. The program must add `1 + 2 + … + n` into `sum`. The body of the
 loop is written; the `for` header that walks `i` from 1 to `n` is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  10
@@ -446,7 +445,7 @@ brief       = '''
 `square` takes a number and must return that number multiplied by itself.
 Its body is the hole; `main` reads `x` and prints `square(x)`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7
@@ -523,7 +522,7 @@ brief       = '''
 `s`, a `Stall` built from them — an aggregate is initialised with braces,
 fields in order.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40
@@ -605,7 +604,7 @@ brief       = '''
 `Stall::total` must return `price` times `qty`. Inside a member function
 the fields are used by name. The body is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40 3
@@ -694,7 +693,7 @@ Read one word, `island` or `tsuenwan`. The program needs `line`, a `Line`
 enumerator chosen by the word; the `switch` that prints the colour is
 written. An `enum class` enumerator is always written with its type.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tsuenwan
@@ -774,7 +773,7 @@ brief       = '''
 Read a line of integers. Each value `x` must be appended to the vector
 `xs` as it is read; the loop and the print-out are written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -866,7 +865,7 @@ brief       = '''
 `v` holds the line's integers. The program must remove the first element —
 `erase` takes an iterator to the element to drop — and print the rest.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -956,7 +955,7 @@ Read a line of integers. Each `x` must be pushed onto the FRONT of the
 `std::list` `l`, so the last one read prints first. The loop and the
 print-out are written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1052,7 +1051,7 @@ Read a line of words. For each word `w` the count in `counts` must go up
 by one — a `std::map` makes a missing key with a zero the first time it
 is indexed. The loop and the sorted print-out are written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish crab fish
@@ -1143,7 +1142,7 @@ brief       = '''
 name `q`. The program needs `price`: the table's value when the key is
 there, `-1` when it is not — and `[]` would quietly insert a zero.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  fish 40 crab 120
@@ -1233,7 +1232,7 @@ Read a line of integers. Each `x` must go into the `std::set` `seen`,
 which keeps one copy of each value in ascending order. The print-out of
 the size and the values is written.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 1 3 2 1
@@ -1331,7 +1330,7 @@ brief       = '''
 Read a line of integers. Each `x` must be pushed onto the `std::stack`
 `st`; the program then pops everything, printing the values last-in first.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1428,7 +1427,7 @@ brief       = '''
 Read a line of integers. Each `x` must be pushed onto the `std::queue`
 `q`; the program then takes them off the front in the order they came.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1527,7 +1526,7 @@ them one by one, and they must come out smallest first. A
 `std::priority_queue` is a max-heap unless it is declared with `std::greater`
 as its comparator; the declaration of `pq` is the hole.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 2
@@ -1625,7 +1624,7 @@ brief       = '''
 `v` holds the line's integers. The program must sort them ascending in
 place — the algorithm takes the pair of iterators that bounds the range.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 2
@@ -1717,7 +1716,7 @@ brief       = '''
 `score`, highest first — `std::sort` with a comparator lambda that says
 when `a` goes before `b`. Scores are distinct.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3
@@ -1811,7 +1810,7 @@ brief       = '''
 `v` holds the line's integers. The program must reverse them in place —
 the algorithm from `<algorithm>` over the whole range.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1903,7 +1902,7 @@ Read `k`, then a line of integers. The program needs `add`, a lambda that
 captures `k` and returns its argument plus `k`; it is applied to every
 value and the results are printed.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5
@@ -1997,7 +1996,7 @@ brief       = '''
 them are even, counted by `std::count_if` with a lambda that says which
 values to count.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 6
@@ -2085,7 +2084,7 @@ needs `t`, a `std::thread` running a lambda that stores `sum_of(v)` into
 `result`; `main` joins it and prints. The lambda must capture by reference
 to reach `v` and `result`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -2189,7 +2188,7 @@ pass through the loop must hold the mutex `mu` while it adds — and release
 it at the end of the pass. The placeholder locks and never unlocks, so the
 second pass waits forever; a lock guard releases when it goes out of scope.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  (nothing)
@@ -2287,7 +2286,7 @@ written and makes a new node. The hole is the one line that sends `v` down
 the correct side — left when it is smaller than `n->val`, right otherwise —
 storing what the recursion returns. Inorder traversal then prints ascending.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4

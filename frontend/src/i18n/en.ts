@@ -246,8 +246,6 @@ export const en = {
   "quest.sheetRight": "RIGHT",
   "quest.sheetStreak": "STREAK ×{n}",
   "quest.sheetCombo": "×{n} COMBO",
-  "quest.quizPick": "PICK THE LINE, THEN TYPE IT  (1–4)",
-  "quest.quizRight": "RIGHT — NOW TYPE IT",
   "quest.sample": "SAMPLE · {name}",
   "quest.in": "in",
   "quest.out": "out",

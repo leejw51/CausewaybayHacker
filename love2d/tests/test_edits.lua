@@ -673,4 +673,30 @@ return function()
     end
     T.eq(typed, answer, "the drill, played out, is the answer")
   end)
+
+  T.section("the quiz's program — every road is picked")
+
+  T.case("a quest with a quiz is picked, whatever its road", function()
+    local Quest = require("src.scenes.quest")
+    local q = Quest.new({ session = { authed = true }, land = "go", category = "hacker" })
+    q.quest = { id = "x", category = "hacker", quiz = { choices = { "a", "b", "c", "d" }, answer = 1 } }
+    T.eq(q:cheatsheet(), true, "a hacker quest with a quiz has no editor")
+    q.quest = { id = "y", category = "hacker" }
+    T.eq(q:cheatsheet(), false, "and one a pack has not reached keeps it")
+  end)
+
+  T.case("the program is whole when short and cut around the hole when long", function()
+    local Quest = require("src.scenes.quest")
+    local short = Quest.program_lines("a\n\t____\nb\n")
+    T.eq(#short, 3)
+    T.eq(short[2].kind, "hole")
+    T.eq(short[2].text, "\t____")
+    local body = {}
+    for i = 0, 99 do body[#body + 1] = i == 60 and "  ____" or ("line " .. i) end
+    local long = Quest.program_lines(table.concat(body, "\n"), 5, 3)
+    T.eq(long[1].kind, "cut")
+    T.eq(long[#long].kind, "cut")
+    T.eq(long[2].text, "line 55")
+    T.eq(long[#long - 1].text, "line 63")
+  end)
 end

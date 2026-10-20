@@ -480,6 +480,74 @@ def added_lines(starter, solution):
     return out
 
 
+# ---------------------------------------------------------------- the hole
+# Off the sheet roads the right choice is lines of the solution, compared
+# line by line with the indentation stripped, and it must be there exactly
+# once: the server cuts it out (backend/core/src/content.rs `hole_program`)
+# and the player sees the rest of the program around a `____`.
+HOLE = "____"
+MAX_CHOICE_LINES = 8
+
+
+def choice_lines(text):
+    """A choice's lines, dedented, without blank lines at either end."""
+    lines = text.split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    pad = min((len(l) - len(l.lstrip()) for l in lines if l.strip()), default=0)
+    return [l[pad:].rstrip() for l in lines]
+
+
+def hole_spans(solution, right):
+    """Every place `right` stands in `solution`, as (first line, end)."""
+    want = [l.strip() for l in choice_lines(right)]
+    have = [l.strip() for l in solution.split("\n")]
+    k = len(want)
+    if k == 0:
+        return []
+    return [(i, i + k) for i in range(len(have) - k + 1) if have[i:i + k] == want]
+
+
+def fill_hole(solution, span, choice):
+    """The solution with `span` replaced by `choice`, at the hole's indent."""
+    lines = solution.split("\n")
+    first = lines[span[0]]
+    indent = first[: len(first) - len(first.lstrip())]
+    body = [indent + l if l else l for l in choice_lines(choice)]
+    return "\n".join(lines[: span[0]] + body + lines[span[1]:])
+
+
+def hole_quiz(q, cat):
+    qid = q["id"]
+    quiz = q.get("quiz")
+    if not quiz:
+        return [f"{qid}: a {cat} quest needs [quest.quiz] — every road is picked, not typed"]
+    errs = []
+    choices = quiz.get("choices", [])
+    answer = quiz.get("answer", -1)
+    if len(choices) != 4:
+        errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
+    if not isinstance(answer, int) or not 0 <= answer < len(choices):
+        return errs + [f"{qid}: quiz.answer {answer!r} out of range"]
+    norm_ = ["\n".join(l.strip() for l in choice_lines(c)) for c in choices]
+    if len(set(norm_)) != len(norm_) or "" in norm_:
+        errs.append(f"{qid}: empty or duplicate choices")
+    for k, c in enumerate(choices):
+        if len(choice_lines(c)) > MAX_CHOICE_LINES:
+            errs.append(f"{qid}: choice {k} is {len(choice_lines(c))} lines (> {MAX_CHOICE_LINES})")
+        if HOLE in c:
+            errs.append(f"{qid}: choice {k} contains the hole marker {HOLE!r}")
+    spans = hole_spans(q["solution"], choices[answer])
+    if len(spans) != 1:
+        errs.append(f"{qid}: the right choice stands {len(spans)} times in the solution; "
+                    f"it must be a run of its lines exactly once")
+    if HOLE in q["solution"]:
+        errs.append(f"{qid}: the solution contains the hole marker {HOLE!r}")
+    return errs
+
+
 def structural(pack, path, vocab):
     errs = []
     land, cat = pack["land"], pack["category"]
@@ -619,38 +687,28 @@ def structural(pack, path, vocab):
                 errs.append(f"{qid}: solution adds {len(added)} lines over its "
                             f"starter (> {MAX_ADDED[cat]}) — a {cat} quest is a "
                             f"grammar drill; the scaffolding belongs in the starter")
-        # VERY BASIC: the quiz. Four choices, one of which is exactly the line
-        # the solution adds; the answer given away nowhere in the starter or
-        # the brief; and (checked by `main`, since it compiles) each wrong
-        # choice must fail when swapped into the solution — otherwise the quiz
-        # has two right answers and the player who picked the other was
-        # right too.
-        if cat == "verybasic":
-            quiz = q.get("quiz")
+        # The quiz, on every road (SPEC §0): four choices, one right, and the
+        # pick is the submission. Off the sheet roads the right choice is a
+        # run of the solution's own lines — the server cuts it out of the
+        # solution and shows the rest as the program with a hole — and (checked
+        # by `main`, since it compiles) each wrong choice swapped into that
+        # hole must fail, or the quiz has two right answers.
+        errs += hole_quiz(q, cat)
+        # VERY BASIC: the hole is the one line the solution adds, and it is
+        # given away nowhere in the starter or the brief.
+        quiz = q.get("quiz")
+        if cat == "verybasic" and quiz:
             added = added_lines(q["starter"], q["solution"])
-            if not quiz:
-                errs.append(f"{qid}: a verybasic quest needs [quest.quiz]")
-            else:
-                choices = quiz.get("choices", [])
-                answer = quiz.get("answer", -1)
-                if len(choices) != 4:
-                    errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
-                if not (isinstance(answer, int) and 0 <= answer < len(choices)):
-                    errs.append(f"{qid}: quiz.answer {answer!r} out of range")
-                elif len(added) != 1:
+            choices = quiz.get("choices", [])
+            answer = quiz.get("answer", -1)
+            if isinstance(answer, int) and 0 <= answer < len(choices):
+                right = choices[answer].strip()
+                if len(added) != 1:
                     errs.append(f"{qid}: a verybasic solution adds {len(added)} lines; the quiz is about one")
-                else:
-                    right = choices[answer].strip()
-                    if right != added[0]:
-                        errs.append(f"{qid}: quiz answer {right!r} is not the line the solution adds {added[0]!r}")
-                    if sum(1 for c in choices if c.strip() == right) != 1:
-                        errs.append(f"{qid}: the right answer appears more than once among the choices")
-                    if right in q["starter"] or right in q["brief"]:
-                        errs.append(f"{qid}: the answer line is given away in the starter or the brief")
-                if len(set(c.strip() for c in choices)) != len(choices):
-                    errs.append(f"{qid}: duplicate choices")
-        elif "quiz" in q:
-            errs.append(f"{qid}: only verybasic quests carry a quiz")
+                elif right != added[0]:
+                    errs.append(f"{qid}: quiz answer {right!r} is not the line the solution adds {added[0]!r}")
+                if right in q["starter"] or right in q["brief"]:
+                    errs.append(f"{qid}: the answer line is given away in the starter or the brief")
         # `lang` is REMIX LAND's field: required there, one of its three, and
         # refused everywhere else, where a `lang` that disagreed with the land
         # would send a Go program to rustc.
@@ -970,24 +1028,17 @@ def main(argv):
             vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
             sol_ok = sv == "accepted" and sp == st
             start_ok = not (tv == "accepted" and tp == tt)
-            # VERY BASIC: every wrong choice, swapped in for the answer line,
+            # Every wrong choice, swapped into the hole the right one leaves,
             # must not pass. Three more judges per quest; the quiz is honest.
             quiz_ok = True
             quiz = q.get("quiz")
-            if pack["category"] == "verybasic" and quiz and len(quiz.get("choices", [])) == 4:
-                right = quiz["choices"][quiz["answer"]].strip()
+            spans = hole_spans(q["solution"], quiz["choices"][quiz["answer"]]) if quiz else []
+            if quiz and len(quiz.get("choices", [])) == 4 and len(spans) == 1:
                 for k, wrong in enumerate(quiz["choices"]):
                     if k == quiz["answer"]:
                         continue
-                    lines = q["solution"].split("\n")
-                    swapped = []
-                    for line in lines:
-                        if line.strip() == right:
-                            indent = line[: len(line) - len(line.lstrip())]
-                            swapped.append(indent + wrong.strip())
-                        else:
-                            swapped.append(line)
-                    wv, wp, wt, _ = judge(lang, "\n".join(swapped), q, SCRATCH / f"{q['id']}.wrong{k}")
+                    swapped = fill_hole(q["solution"], spans[0], wrong)
+                    wv, wp, wt, _ = judge(lang, swapped, q, SCRATCH / f"{q['id']}.wrong{k}")
                     if wv == "accepted" and wp == wt:
                         quiz_ok = False
                         print(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")

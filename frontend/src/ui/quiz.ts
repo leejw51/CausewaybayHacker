@@ -36,3 +36,42 @@ export function visibleBox(
   if (bottom <= top) return null;
   return [box[0], top, box[2], bottom - top];
 }
+
+/** What stands in a quiz's program where the right choice was cut out. */
+export const HOLE = "____";
+
+/** The longest program shown whole; past it, a window around the hole. */
+export const PROGRAM_WHOLE = 40;
+
+/** One line of the program as drawn: code, the hole, or a cut. */
+export type ProgramLine = { kind: "code" | "hole" | "cut"; text: string };
+
+/**
+ * The program around a quiz's hole, as the brief draws it (SPEC §0: every
+ * road is picked). A short one is shown whole. A long one — a HACKER
+ * solution runs to eighty lines — is cut to `before` lines above the hole and
+ * `after` below it, with a `⋮` where lines were left out: the four choices
+ * sit under it, and a program the player must scroll past to reach them is a
+ * quiz nobody answers.
+ */
+export function programLines(
+  program: string,
+  before = 22,
+  after = 14,
+  whole = PROGRAM_WHOLE,
+): ProgramLine[] {
+  const lines = program.replace(/^\n+|\n+$/g, "").split("\n");
+  const hole = lines.findIndex((l) => l.trim() === HOLE);
+  const as = (l: string, i: number): ProgramLine => ({
+    kind: i === hole ? "hole" : "code",
+    text: l,
+  });
+  if (lines.length <= whole || hole < 0) return lines.map(as);
+  const from = Math.max(0, hole - before);
+  const to = Math.min(lines.length, hole + after + 1);
+  const out: ProgramLine[] = [];
+  if (from > 0) out.push({ kind: "cut", text: "⋮" });
+  for (let i = from; i < to; i++) out.push(as(lines[i], i));
+  if (to < lines.length) out.push({ kind: "cut", text: "⋮" });
+  return out;
+}

@@ -112,10 +112,10 @@ import type {
   Quest,
   RunStage,
 } from "../net/protocol";
-import { isSheet, questLang } from "../net/protocol";
+import { questLang } from "../net/protocol";
 import { LogBuffer } from "../net/logbuf";
 import { blocks } from "../ui/markdown";
-import { quizPick, startsLocked, visibleBox } from "../ui/quiz";
+import { programLines, quizPick, startsLocked, visibleBox } from "../ui/quiz";
 import { clipMessage, copyText, readText } from "../ui/clip";
 import { AUTO_RUN_KEY, STDERR_KEY, readEnumPref, readPref, writePref } from "../ui/prefs";
 import { LandsScene } from "./lands";
@@ -3153,9 +3153,13 @@ export class QuestScene implements Scene {
     this.tools.draw(g, [x, y, filterW, Math.max(layout.minTouchH(), f.height + 20)], f);
   }
 
-  /** Whether this is a CHEATSHEET quest, where the pick is the answer. */
+  /**
+   * Whether the pick is the answer — on every road now (SPEC §0), the sheet
+   * roads and the rest alike: a quest with a quiz has no editor, and nothing
+   * is typed. The name is the road it started on.
+   */
   private cheatsheet(): boolean {
-    return isSheet(this.quest?.category ?? "");
+    return !!this.quest?.quiz;
   }
 
   /**
@@ -3337,6 +3341,50 @@ export class QuestScene implements Scene {
    * the right one stays green once found, and the rest are plain wells with
    * their number, so a keyboard player sees which key is which.
    */
+  /**
+   * The program a quiz's choices fill, with its hole lit: every road off
+   * the sheets is a program and a `____` (SPEC §0), and the four choices
+   * under it are the four things that might go there. Nothing on a sheet
+   * road — its brief carries its own snippet.
+   */
+  private drawProgram(
+    g: Ctx,
+    x: number,
+    y: number,
+    w: number,
+    fonts: ReturnType<typeof ensureFonts>,
+    s: number,
+  ): number {
+    const program = this.quest?.quiz?.program;
+    if (!program) return 0;
+    const pad = Math.round(6 * s);
+    const rows: { kind: string; text: string }[] = [];
+    for (const line of programLines(program)) {
+      // Tabs are a Go program's indentation; the code face draws them as
+      // nothing, so they go in as four spaces.
+      const text = line.text.replace(/\t/g, "    ");
+      for (const piece of wrap(fonts.code, text || " ", w - 2 * pad)) {
+        rows.push({ kind: line.kind, text: piece });
+      }
+    }
+    const h = rows.length * fonts.code.height + 2 * Math.round(4 * s);
+    fill(g, Theme.ink, x, y, w, h, 0.6);
+    let cy = y + Math.round(4 * s);
+    for (const row of rows) {
+      if (row.kind === "hole") {
+        // The hole is the question: lit, and right where the answer goes.
+        const pulse = this.quizRight ? 0.45 : 0.25 + 0.12 * Math.sin(this.t * 4);
+        fill(g, this.quizRight ? Theme.admit : Theme.coin, x + 2, cy, w - 4, fonts.code.height, pulse);
+        g.fillStyle = css(this.quizRight ? Theme.admit : Theme.coin);
+      } else {
+        g.fillStyle = css(row.kind === "cut" ? Theme.dim : Theme.grass);
+      }
+      printf(g, fonts.code, row.text, x + pad, cy, w - 2 * pad, "left");
+      cy += fonts.code.height;
+    }
+    return h + Math.round(8 * s);
+  }
+
   private drawChoices(
     g: Ctx,
     x: number,
@@ -3354,13 +3402,7 @@ export class QuestScene implements Scene {
     printf(
       g,
       fonts.stationSm,
-      this.cheatsheet()
-        ? this.quizRight
-          ? t("quest.sheetRight")
-          : t("quest.sheetPick")
-        : this.quizRight
-          ? t("quest.quizRight")
-          : t("quest.quizPick"),
+      this.quizRight ? t("quest.sheetRight") : t("quest.sheetPick"),
       x,
       yy,
       w,
@@ -3386,7 +3428,8 @@ export class QuestScene implements Scene {
     yy += fonts.stationSm.height + Math.round(6 * s);
     const gap = Math.round(6 * s);
     for (let i = 0; i < quiz.choices.length; i++) {
-      const text = quiz.choices[i];
+      // A choice can be several lines of a program; Go's tabs go in as spaces.
+      const text = quiz.choices[i].replace(/^\n+|\n+$/g, "").replace(/\t/g, "    ");
       const lines = wrap(fonts.code, text, w - Math.round(34 * s));
       const h = Math.max(layout.minTouchH(), lines.length * fonts.code.height + Math.round(12 * s));
       const right = this.quizRight && i === quiz.answer;
@@ -3506,32 +3549,58 @@ export class QuestScene implements Scene {
       // before the worked example: on a phone the example pushed them under
       // the fold, and a quiz whose answers need a scroll is a quiz nobody
       // sees. The example still follows, for the output format.
+      //
+      // Wide and landscape, with a program to show, the panel is two
+      // columns: the question and the program on the left, the four choices
+      // at the top of the right with everything else under them. One column
+      // put the fourth choice under the fold on a ten-line program, and a
+      // HACKER program is eighty.
+      const twoCol =
+        !!this.quest!.quiz?.program && !this.app.layout.isPortrait() && textW >= Math.round(620 * s);
+      const gutter = Math.round(16 * s);
+      const leftW = twoCol ? Math.floor((textW - gutter) * 0.58) : textW;
+      let cx = inner[0];
+      let cw = leftW;
+      const colTop = yy;
+      let leftEnd = 0;
+      const pickUp = (): void => {
+        yy += this.drawProgram(g, cx, yy, cw, fonts, s);
+        if (twoCol) {
+          leftEnd = yy;
+          cx = inner[0] + leftW + gutter;
+          cw = textW - leftW - gutter;
+          yy = colTop;
+        }
+        yy += this.drawChoices(g, cx, yy, cw, inner, fonts, s);
+        choicesDrawn = true;
+      };
       let choicesDrawn = false;
       for (const b of blocks(this.quest!.brief)) {
-        if (b.kind === "code" && !choicesDrawn && this.quest!.quiz) {
-          yy += this.drawChoices(g, inner[0], yy, textW, inner, fonts, s);
-          choicesDrawn = true;
+        // A sheet question's choices go before its first fence; a program's
+        // go after the whole brief, whose fences are the task's own output.
+        if (b.kind === "code" && !choicesDrawn && this.quest!.quiz && !this.quest!.quiz.program) {
+          pickUp();
         }
         if (b.kind === "code") {
-          const lines = wrap(fonts.code, b.text, textW - Math.round(10 * s));
+          const lines = wrap(fonts.code, b.text, cw - Math.round(10 * s));
           const h = lines.length * fonts.code.height + Math.round(8 * s);
-          fill(g, Theme.ink, inner[0], yy, textW, h, 0.45);
+          fill(g, Theme.ink, cx, yy, cw, h, 0.45);
           g.fillStyle = css(Theme.grass);
           let cy = yy + Math.round(4 * s);
           for (const line of lines) {
-            printf(g, fonts.code, line, inner[0] + Math.round(6 * s), cy, textW, "left");
+            printf(g, fonts.code, line, cx + Math.round(6 * s), cy, cw, "left");
             cy += fonts.code.height;
           }
           yy += h + Math.round(6 * s);
         } else {
           g.fillStyle = css(Theme.cream);
-          yy += printf(g, fonts.small, b.text, inner[0], yy, textW, "left") * fonts.small.height;
+          yy += printf(g, fonts.small, b.text, cx, yy, cw, "left") * fonts.small.height;
           yy += Math.round(6 * s);
         }
       }
 
       // VERY BASIC with no example fence in the brief: the answers go last.
-      if (!choicesDrawn) yy += this.drawChoices(g, inner[0], yy, textW, inner, fonts, s);
+      if (!choicesDrawn && this.quest!.quiz) pickUp();
 
       // SPEC §5.2 and §12: at least one case is `visible` precisely so "a
       // player is never guessing blind about the output format". It was the
@@ -3540,9 +3609,9 @@ export class QuestScene implements Scene {
       for (const c of tests.visible) {
         const rows = (c.stdin ? 1 : 0) + 1;
         const wellH = fonts.stationSm.height + rows * fonts.code.height + Math.round(20 * s);
-        well(g, inner[0], yy, textW, wellH);
-        const tx = inner[0] + Math.round(8 * s);
-        const tw = textW - Math.round(16 * s);
+        well(g, cx, yy, cw, wellH);
+        const tx = cx + Math.round(8 * s);
+        const tw = cw - Math.round(16 * s);
         let ty = yy + Math.round(8 * s);
         g.fillStyle = css(Theme.cyan);
         printf(g, fonts.stationSm, t("quest.sample", { name: c.name }), tx, ty, tw, "left");
@@ -3571,9 +3640,9 @@ export class QuestScene implements Scene {
           g,
           fonts.stationSm,
           tn("quest.hiddenCount", tests.hidden_count),
-          inner[0],
+          cx,
           yy,
-          textW,
+          cw,
           "left",
         );
         yy += fonts.stationSm.height + Math.round(8 * s);
@@ -3582,7 +3651,7 @@ export class QuestScene implements Scene {
       for (const h of this.hints) {
         g.fillStyle = css(Theme.coin);
         yy +=
-          printf(g, fonts.small, t("quest.hint", { text: h }), inner[0], yy, textW, "left") *
+          printf(g, fonts.small, t("quest.hint", { text: h }), cx, yy, cw, "left") *
           fonts.small.height;
         yy += Math.round(6 * s);
       }
@@ -3590,14 +3659,15 @@ export class QuestScene implements Scene {
       if (this.quest!.story) {
         // Set apart by a rule, not by size.
         yy += Math.round(6 * s);
-        fill(g, Theme.dim, inner[0], yy, textW, 1, 0.5);
+        fill(g, Theme.dim, cx, yy, cw, 1, 0.5);
         yy += Math.round(8 * s);
         g.fillStyle = css(Theme.cyan, 0.62);
         yy +=
-          printf(g, fonts.codeSm, `“${this.quest!.story}”`, inner[0], yy, textW, "left") *
+          printf(g, fonts.codeSm, `“${this.quest!.story}”`, cx, yy, cw, "left") *
           fonts.codeSm.height;
         yy += Math.round(6 * s);
       }
+          yy = Math.max(yy, leftEnd);
     });
 
     this.briefOverflow = Math.max(0, yy - top - inner[3]);

@@ -229,8 +229,6 @@ export const ko: Partial<Catalogue> = {
   "quest.sheetRight": "정답",
   "quest.sheetStreak": "연속 ×{n}",
   "quest.sheetCombo": "×{n} 콤보",
-  "quest.quizPick": "맞는 줄을 고르고, 그 줄을 치세요  (1–4)",
-  "quest.quizRight": "정답 — 이제 그 줄을 치세요",
   "quest.job": "오늘의 과제",
   "quest.sample": "예시 · {name}",
   "quest.in": "입력",

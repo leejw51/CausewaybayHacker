@@ -243,8 +243,6 @@ export const cs: Partial<Catalogue> = {
   "quest.sheetRight": "SPRÁVNĚ",
   "quest.sheetStreak": "SÉRIE ×{n}",
   "quest.sheetCombo": "×{n} KOMBO",
-  "quest.quizPick": "VYBER SPRÁVNÝ ŘÁDEK A NAPIŠ HO  (1–4)",
-  "quest.quizRight": "SPRÁVNĚ — TEĎ HO NAPIŠ",
   "quest.job": "ZADÁNÍ",
   "quest.sample": "UKÁZKA · {name}",
   "quest.in": "vstup",

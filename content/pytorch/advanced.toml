@@ -85,6 +85,15 @@ hints = [
   "A transpose changes strides, not memory — which is exactly what view cannot tolerate.",
 ]
 
+[quest.quiz]
+choices = [
+  'b = x.view(6)',
+  'b = x.contiguous().view(6)',
+  'b = x.contiguous().view(3, 2)',
+  'b = x.t().contiguous().view(6)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -167,6 +176,23 @@ hints = [
   "Adding a constant does not change the gradient — d(2w + 1)/dw is still 2.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+y = w + 2
+y = y * 1''',
+  '''
+y = w * 2
+y = y * y''',
+  '''
+y = w * 2
+y = y + 1''',
+  '''
+y = w.mul_(2)
+y = y + 1''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -239,6 +265,15 @@ hints = [
   "detach shares the same memory, so writing to it writes to the original too.",
 ]
 
+[quest.quiz]
+choices = [
+  'c = x.detach().clone()',
+  'c = x.clone()',
+  'c = x.detach()',
+  'c = x.data',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -305,6 +340,15 @@ hints = [
   "A float32 tensor cannot hold an exact large int64; promotion is a decision, not a convenience.",
 ]
 
+[quest.quiz]
+choices = [
+  'floor_div = n / 2',
+  'floor_div = n // 2.0',
+  'floor_div = torch.floor(n / 2)',
+  'floor_div = n // 2',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -364,6 +408,15 @@ hints = [
   "probs.gather(1, want.unsqueeze(1)).squeeze(1) — dim 1 is the class axis.",
   "probs[want] indexes rows, not columns, and gives the wrong three rows entirely.",
 ]
+
+[quest.quiz]
+choices = [
+  'picked = probs.gather(0, want.unsqueeze(1)).squeeze(1)',
+  'picked = probs.gather(1, want.unsqueeze(1)).squeeze(1)',
+  'picked = probs.gather(1, want.unsqueeze(0)).squeeze(0)',
+  'picked = probs[:, want]',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -428,6 +481,15 @@ hints = [
   "scores.masked_fill(keep_out, float(\"-inf\")) — fill where the mask is True.",
   "The masked entry had the largest score; masking after the softmax would have left it dominating.",
 ]
+
+[quest.quiz]
+choices = [
+  'masked = scores.masked_fill(keep_out, 0.0)',
+  'masked = scores.masked_fill(~keep_out, float("-inf"))',
+  'masked = scores.masked_fill(keep_out, float("-inf"))',
+  'masked = scores.masked_fill(keep_out, float("inf"))',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -494,6 +556,15 @@ hints = [
   "x.max(dim=1).values and x.max(dim=1, keepdim=True).values — max returns a named tuple, not a tensor.",
   "This exact subtraction is the first line of a numerically stable softmax.",
 ]
+
+[quest.quiz]
+choices = [
+  'kept = x.max(dim=1, keepdim=True).values',
+  'kept = x.max(dim=1).values',
+  'kept = x.max(dim=0, keepdim=True).values',
+  'kept = x.max(dim=1, keepdim=True).indices',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -563,6 +634,15 @@ hints = [
   "k.t() only works on a 2-D tensor and raises on a 4-D one.",
 ]
 
+[quest.quiz]
+choices = [
+  'att = q @ k.transpose(1, 2)',
+  'att = k @ q.transpose(-2, -1)',
+  'att = q.transpose(-2, -1) @ k',
+  'att = q @ k.transpose(-2, -1)',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -626,6 +706,15 @@ hints = [
   "target = b.detach() — the target is a number now, not a thing to be learned.",
   "Without the detach, b.grad is filled too and the target drifts towards the prediction.",
 ]
+
+[quest.quiz]
+choices = [
+  'target = b',
+  'target = b.detach()',
+  'target = b.clone()',
+  'target = b * 1.0',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -713,6 +802,23 @@ hints = [
   "The gradients accumulate, so the printed number is the sum of the two derivatives.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+first.backward()
+first.backward()''',
+  '''
+first.backward(retain_graph=True)
+first.backward()''',
+  '''
+first.backward(retain_graph=True)
+second.backward()''',
+  '''
+(first + second).backward(retain_graph=True)
+second.backward()''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -795,6 +901,27 @@ hints = [
   "model.parameters() still yields the frozen tensors; only the optimiser's list is shorter.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for p in model[2].parameters():
+    p.requires_grad = False
+trainable = [p for p in model.parameters() if p.requires_grad]''',
+  '''
+for p in model[0].parameters():
+    p.requires_grad = False
+trainable = list(model.parameters())''',
+  '''
+for p in model.parameters():
+    p.requires_grad = False
+trainable = [p for p in model.parameters() if p.requires_grad]''',
+  '''
+for p in model[0].parameters():
+    p.requires_grad = False
+trainable = [p for p in model.parameters() if p.requires_grad]''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -864,6 +991,15 @@ hints = [
   "nn.utils.clip_grad_norm_([w], max_norm=1.0) — the trailing underscore, because it edits .grad in place.",
   "It returns the norm before clipping, which is the number worth logging.",
 ]
+
+[quest.quiz]
+choices = [
+  'seen = nn.utils.clip_grad_norm_([w], max_norm=1.0)',
+  'seen = nn.utils.clip_grad_value_([w], clip_value=1.0)',
+  'seen = nn.utils.clip_grad_norm_([w], max_norm=5.0)',
+  'seen = nn.utils.clip_grad_norm_([w], max_norm=1.0, norm_type=1)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -945,6 +1081,15 @@ hints = [
   "The function is invoked with .apply(x), never by calling forward directly.",
 ]
 
+[quest.quiz]
+choices = [
+  'return -g',
+  'return torch.zeros_like(g)',
+  'return g',
+  'return g.sum()',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1008,6 +1153,15 @@ hints = [
   "torch.log_softmax(big, dim=0) — one call, and it never takes the log of an underflowed number.",
   "The trick inside is subtracting the row max before exponentiating; keepdim is what makes that broadcast.",
 ]
+
+[quest.quiz]
+choices = [
+  'stable = torch.log(torch.softmax(big, dim=0) + 1e-9)',
+  'stable = torch.log_softmax(big, dim=0)',
+  'stable = torch.softmax(big, dim=0).log()',
+  'stable = torch.log_softmax(-big, dim=0)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1082,6 +1236,15 @@ hints = [
   "The init functions all end in an underscore: they write into the tensor they are given.",
 ]
 
+[quest.quiz]
+choices = [
+  'nn.init.constant_(layer.weight, 0.5)',
+  'nn.init.kaiming_normal_(layer.bias, nonlinearity="relu")',
+  'nn.init.zeros_(layer.weight)',
+  'nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1153,6 +1316,15 @@ hints = [
   "bn.eval() — in train mode a batch of one has zero variance and BatchNorm1d raises.",
   "running_mean is a buffer, not a parameter: it is in the state dict and gets no gradient.",
 ]
+
+[quest.quiz]
+choices = [
+  'bn.train()',
+  'bn.requires_grad_(False)',
+  'bn.eval()',
+  'bn.eval',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1226,6 +1398,23 @@ hints = [
   "dim=-1 with keepdim=True, and unbiased=False on the variance — LayerNorm divides by n, not n-1.",
   "The eps is 1e-5 by default and goes inside the square root, not outside.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+mine = (x - x.mean(dim=-1, keepdim=True)) / torch.sqrt(
+    x.var(dim=-1, keepdim=True, unbiased=True) + 1e-5)''',
+  '''
+mine = (x - x.mean(dim=-1, keepdim=True)) / torch.sqrt(
+    x.var(dim=-1, keepdim=True, unbiased=False) + 1e-5)''',
+  '''
+mine = (x - x.mean(dim=0, keepdim=True)) / torch.sqrt(
+    x.var(dim=0, keepdim=True, unbiased=False) + 1e-5)''',
+  '''
+mine = (x - x.mean(dim=-1)) / torch.sqrt(
+    x.var(dim=-1, unbiased=False) + 1e-5)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1301,6 +1490,15 @@ hints = [
   "The current rate is readable at opt.param_groups[0][\"lr\"]; the scheduler writes into exactly that.",
 ]
 
+[quest.quiz]
+choices = [
+  'sched = torch.optim.lr_scheduler.StepLR(opt, step_size=1, gamma=0.1)',
+  'sched = torch.optim.lr_scheduler.StepLR(opt, step_size=2, gamma=0.01)',
+  'sched = torch.optim.lr_scheduler.StepLR(opt, step_size=3, gamma=0.1)',
+  'sched = torch.optim.lr_scheduler.StepLR(opt, step_size=2, gamma=0.1)',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1364,6 +1562,15 @@ hints = [
   "torch.optim.SGD([w], lr=0.1, weight_decay=0.5) — decay is an optimiser argument, not a loss term.",
   "Biases and normalisation parameters are usually excluded from decay, which needs two param groups.",
 ]
+
+[quest.quiz]
+choices = [
+  'opt = torch.optim.SGD([w], lr=0.1, weight_decay=0.5)',
+  'opt = torch.optim.SGD([w], lr=0.1, momentum=0.5)',
+  'opt = torch.optim.SGD([w], lr=0.1, weight_decay=5.0)',
+  'opt = torch.optim.SGD([w], lr=0.01, weight_decay=0.5)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1442,6 +1649,23 @@ hints = [
   "Torch's first step uses the raw gradient as the initial velocity, which is what v starting at 0 gives.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+v = 0.9 * (v + 1.0)
+mine = mine - 0.1 * v''',
+  '''
+v = 0.9 * v + 1.0
+mine = mine - 0.1 * v''',
+  '''
+mine = mine - 0.1 * v
+v = 0.9 * v + 1.0''',
+  '''
+v = 0.1 * v + 1.0
+mine = mine - 0.1 * v''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1505,6 +1729,15 @@ hints = [
   "Reset the bad counter on every improvement; break when it goes past patience.",
   "best_epoch is 2 here — 0.7 is never beaten — and the run stops at epoch 5.",
 ]
+
+[quest.quiz]
+choices = [
+  'if bad >= patience:',
+  'if bad > patience + 1:',
+  'if v > best + patience:',
+  'if bad > patience:',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1613,6 +1846,23 @@ hints = [
   "The optimiser must already hold the right parameters before its state is loaded into it.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+resumed.load_state_dict(uninterrupted.state_dict())
+resumed_opt.load_state_dict(ckpt["opt"])''',
+  '''
+resumed_opt.load_state_dict(ckpt["model"])
+resumed.load_state_dict(ckpt["opt"])''',
+  '''
+resumed.load_state_dict(ckpt["model"])
+resumed_opt.load_state_dict(ckpt["opt"])''',
+  '''
+resumed.load_state_dict(ckpt)
+resumed_opt.load_state_dict(ckpt["opt"])''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1685,6 +1935,15 @@ hints = [
   "DataLoader takes a generator= too, which is how a shuffle is made reproducible.",
 ]
 
+[quest.quiz]
+choices = [
+  'g.manual_seed(1234)',
+  'torch.manual_seed(1234)',
+  'g = torch.Generator()',
+  'g.manual_seed(4321)',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1752,6 +2011,15 @@ hints = [
   "torch.tensor([1.0, 9.0]) — one weight per class, floats, in class order.",
   "With the default reduction the weights also divide the total, so reduction=\"sum\" is what shows the factor plainly.",
 ]
+
+[quest.quiz]
+choices = [
+  'weighted = nn.CrossEntropyLoss(weight=w)(logits, rare)',
+  'weighted = nn.CrossEntropyLoss(weight=w, reduction="sum")(logits, rare)',
+  'weighted = nn.CrossEntropyLoss(reduction="sum")(logits * w, rare)',
+  'weighted = nn.CrossEntropyLoss(weight=w.flip(0), reduction="sum")(logits, rare)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1830,6 +2098,15 @@ hints = [
   "tuple(x.shape) — and the channel axis is the second one, not the last.",
   "Labels for cross-entropy have to be int64; randint gives that already.",
 ]
+
+[quest.quiz]
+choices = [
+  'x = torch.zeros(n, 28, 28, 1)',
+  'x = torch.zeros(n, 28, 28)',
+  'x = torch.zeros(1, n, 28, 28)',
+  'x = torch.zeros(n, 1, 28, 28)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1937,6 +2214,15 @@ hints = [
   "784 is 1 * 28 * 28; Flatten keeps axis 0 and folds everything after it.",
 ]
 
+[quest.quiz]
+choices = [
+  'model = nn.Sequential(nn.Flatten(), nn.Linear(784, 64), nn.ReLU(), nn.Linear(64, 10))',
+  'model = nn.Sequential(nn.Linear(784, 64), nn.ReLU(), nn.Linear(64, 10))',
+  'model = nn.Sequential(nn.Flatten(), nn.Linear(784, 64), nn.ReLU(), nn.Linear(64, 1))',
+  'model = nn.Sequential(nn.Flatten(), nn.Linear(28, 64), nn.ReLU(), nn.Linear(64, 10))',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 60000
@@ -2005,6 +2291,27 @@ hints = [
   "(28 + 2 - 3)/1 + 1 = 28, (28 - 5)/1 + 1 = 24, floor((28 + 2 - 3)/2) + 1 = 14.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+same = nn.Conv2d(1, 8, 3)
+valid = nn.Conv2d(1, 16, 5)
+strided = nn.Conv2d(1, 8, 3, stride=2, padding=1)''',
+  '''
+same = nn.Conv2d(1, 8, 3, padding=1)
+valid = nn.Conv2d(1, 16, 5, padding=2)
+strided = nn.Conv2d(1, 8, 3, stride=2, padding=1)''',
+  '''
+same = nn.Conv2d(1, 8, 3, padding=1)
+valid = nn.Conv2d(1, 16, 5)
+strided = nn.Conv2d(1, 8, 3, stride=2, padding=1)''',
+  '''
+same = nn.Conv2d(1, 8, 3, padding=1)
+valid = nn.Conv2d(1, 16, 5)
+strided = nn.Conv2d(1, 8, 3, stride=2)''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 30000
@@ -2070,6 +2377,15 @@ hints = [
   "feats = body(x).shape[1] — run one dummy batch through and read the number off.",
   "Deriving it beats arithmetic: change a kernel and the derived version keeps working.",
 ]
+
+[quest.quiz]
+choices = [
+  'feats = body(x).shape[0]',
+  'feats = body(x).shape[1]',
+  'feats = body(x).numel()',
+  'feats = 8 * 28 * 28',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2176,6 +2492,23 @@ hints = [
   "8 * 14 * 14 is the flattened size after one 3x3 same-convolution and one 2x2 pool.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for i in range(0, len(xtr), 64):
+    loss = loss_fn(ytr[i:i + 64], model(xtr[i:i + 64]))''',
+  '''
+for i in range(0, len(xtr), 64):
+    loss = loss_fn(model(xtr[i:i + 64]), ytr[i + 64])''',
+  '''
+for i in range(0, len(xtr), 64):
+    loss = loss_fn(model(xtr[i:i + 64]).argmax(dim=1), ytr[i:i + 64])''',
+  '''
+for i in range(0, len(xtr), 64):
+    loss = loss_fn(model(xtr[i:i + 64]), ytr[i:i + 64])''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 60000
@@ -2242,6 +2575,23 @@ hints = [
   "mask = want == k, then (pred[mask] == k).float().mean() — boolean indexing selects the rows.",
   "A class with no samples gives nan here, which is worth handling before it reaches a dashboard.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+mask = pred == k
+per_class.append((pred[mask] == k).float().mean().item())''',
+  '''
+mask = want == k
+per_class.append((want[mask] == k).float().mean().item())''',
+  '''
+mask = want == k
+per_class.append((pred[mask] == k).float().mean().item())''',
+  '''
+mask = want == k
+per_class.append((pred == k).float().mean().item())''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2315,6 +2665,15 @@ hints = [
   "Token 1 at position 0 and token 1 at position 3 are different vectors; that is the whole point of the position table.",
 ]
 
+[quest.quiz]
+choices = [
+  'x = tok(idx) + pos(idx)',
+  'x = tok(idx) + pos(torch.arange(idx.shape[1]))',
+  'x = tok(idx) + pos(torch.arange(idx.shape[0]))',
+  'x = tok(idx) + pos(torch.arange(1, idx.shape[1] + 1))',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -2380,6 +2739,15 @@ hints = [
   "torch.softmax(q @ k.transpose(-2, -1) / d ** 0.5, dim=-1), then att @ v.",
   "dim=-1 on the softmax: each query distributes its attention over the keys, so the last axis sums to one.",
 ]
+
+[quest.quiz]
+choices = [
+  'att = torch.softmax(q @ k.transpose(-2, -1) / d ** 0.5, dim=-1)',
+  'att = torch.softmax(q @ k.transpose(-2, -1), dim=-1) / d ** 0.5',
+  'att = torch.softmax(q @ k.transpose(-2, -1) / d ** 0.5, dim=0)',
+  'att = torch.softmax(q @ k / d ** 0.5, dim=-1)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2448,6 +2816,15 @@ hints = [
   "torch.tril(torch.ones(t, t)), then scores.masked_fill(mask == 0, float(\"-inf\")).",
   "Masking after the softmax leaves rows that do not sum to one and still leaks the future into the gradient.",
 ]
+
+[quest.quiz]
+choices = [
+  'masked = scores.masked_fill(mask == 0, float("-inf"))',
+  'masked = scores.masked_fill(mask == 1, float("-inf"))',
+  'masked = scores.masked_fill(mask == 0, 0.0)',
+  'masked = scores * mask',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2599,6 +2976,15 @@ hints = [
   "Then att.masked_fill(mask == 0, float(\"-inf\")).softmax(dim=-1), in that order.",
   "Greedy generation reads the last position only: model(torch.tensor([out]))[0, -1].argmax().item().",
 ]
+
+[quest.quiz]
+choices = [
+  'y = (att @ v).transpose(1, 2).reshape(B, t, D)',
+  'y = (att @ v).transpose(1, 2).view(B, t, D)',
+  'y = (v @ att).transpose(1, 2).reshape(B, t, D)',
+  'y = (att @ v).transpose(1, 2).reshape(B, D, t)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"

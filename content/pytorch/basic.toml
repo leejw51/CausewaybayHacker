@@ -75,6 +75,15 @@ hints = [
   "A one-dimensional shape prints with a trailing comma: (4,), not (4).",
 ]
 
+[quest.quiz]
+choices = [
+  'x = torch.tensor(input().split())',
+  'x = torch.tensor([float(t) for t in input().split()])',
+  'x = torch.tensor([int(t) for t in input().split()])',
+  'x = torch.tensor([float(t) for t in input()])',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -136,6 +145,15 @@ hints = [
   "flat.reshape(-1, 3) — three columns, and the row count is inferred.",
   "reshape(3, -1) would be three rows of however many, which is the other way round.",
 ]
+
+[quest.quiz]
+choices = [
+  'batch = flat.reshape(3, -1)',
+  'batch = flat.reshape(-1, 2)',
+  'batch = flat.reshape(2, 3)',
+  'batch = flat.reshape(-1, 3)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -203,6 +221,15 @@ hints = [
   "Without dim=0 you get the mean of the whole tensor, which mixes the two features together.",
 ]
 
+[quest.quiz]
+choices = [
+  'z = (x - x.mean(dim=0)) / x.std(dim=0)',
+  'z = (x - x.mean()) / x.std()',
+  'z = x - x.mean(dim=0) / x.std(dim=0)',
+  'z = (x - x.mean(dim=1)) / x.std(dim=1)',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -268,6 +295,23 @@ hints = [
   "table[:, :-1] and table[:, -1] — a slice keeps the axis, a single index drops it.",
   "table[:, -1:] would keep the column axis and give (2, 1), which is not the same shape.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+feats = table[:, :-1]
+labels = table[:, -1:]''',
+  '''
+feats = table[:-1]
+labels = table[-1]''',
+  '''
+feats = table[:, :-1]
+labels = table[:, -1]''',
+  '''
+feats = table[:, 1:]
+labels = table[:, 0]''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -335,6 +379,15 @@ hints = [
   "x @ W would also run here because the matrix is square, and it computes the wrong thing.",
 ]
 
+[quest.quiz]
+choices = [
+  'out = x @ W + b',
+  'out = W @ x.t() + b',
+  'out = x @ W.t() + b',
+  'out = x * W.t() + b',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -396,6 +449,23 @@ hints = [
   "torch.relu(z) keeps the positives and floors everything else at zero.",
   "(a > 0).sum() counts booleans, because True is 1 when summed.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+a = torch.relu(z)
+alive = (a > 0).sum().item()''',
+  '''
+a = torch.relu(z)
+alive = (a >= 0).sum().item()''',
+  '''
+a = torch.relu(z)
+alive = (a > 0).sum()''',
+  '''
+a = torch.clamp(z, max=0)
+alive = (a > 0).sum().item()''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -459,6 +529,23 @@ hints = [
   "(probs >= 0.5).int() turns the booleans into 0 and 1 so they print as numbers.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+probs = torch.sigmoid(scores)
+calls = (probs > 0.5).int()''',
+  '''
+probs = torch.sigmoid(scores)
+calls = (probs >= 0.5)''',
+  '''
+probs = torch.softmax(scores, dim=0)
+calls = (probs >= 0.5).int()''',
+  '''
+probs = torch.sigmoid(scores)
+calls = (probs >= 0.5).int()''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -518,6 +605,15 @@ hints = [
   "dim=-1 means the same thing here and keeps working if a batch axis is added later.",
 ]
 
+[quest.quiz]
+choices = [
+  'probs = torch.softmax(logits, dim=0)',
+  'probs = torch.softmax(logits, dim=1)',
+  'probs = torch.sigmoid(logits)',
+  'probs = logits.exp() / logits.exp().sum()',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -576,6 +672,15 @@ hints = [
   "logits.argmax(dim=1) — one index per row, so the result is (batch,).",
   "Without dim it flattens the whole batch and gives one index into all of it.",
 ]
+
+[quest.quiz]
+choices = [
+  'pred = logits.argmax(dim=0)',
+  'pred = logits.argmax()',
+  'pred = logits.argmin(dim=1)',
+  'pred = logits.argmax(dim=1)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -640,6 +745,23 @@ hints = [
   "(pred == want).float().mean() — the cast to float is what makes mean legal.",
   "mean() straight on a bool tensor raises; torch will not pick a dtype for you.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+acc = (pred == want).mean().item()
+hits = (pred == want).sum().item()''',
+  '''
+acc = (pred == want).float().mean().item()
+hits = (pred == want).sum().item()''',
+  '''
+acc = (pred == want).float().sum().item()
+hits = (pred == want).sum().item()''',
+  '''
+acc = (pred == want).float().mean().item()
+hits = (pred != want).sum().item()''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -707,6 +829,23 @@ hints = [
   "nn.MSELoss() is built first and then called on the pair: nn.MSELoss()(pred, want).",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+by_hand = (pred - want).abs().mean()
+from_lib = nn.MSELoss()(pred, want)''',
+  '''
+by_hand = ((pred - want) ** 2).sum()
+from_lib = nn.MSELoss()(pred, want)''',
+  '''
+by_hand = ((pred - want) ** 2).mean()
+from_lib = nn.MSELoss()(pred, want)''',
+  '''
+by_hand = ((pred - want) ** 2).mean()
+from_lib = nn.L1Loss()(pred, want)''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -770,6 +909,15 @@ hints = [
   "The targets are indices, so they must be int64 — a float target raises.",
 ]
 
+[quest.quiz]
+choices = [
+  'loss = nn.CrossEntropyLoss()(logits, want)',
+  'loss = nn.CrossEntropyLoss()(want, logits)',
+  'loss = nn.NLLLoss()(logits, want)',
+  'loss = nn.CrossEntropyLoss()(torch.softmax(logits, dim=1), want)',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -830,6 +978,15 @@ hints = [
   "loss.backward() — called on the end of the graph, never on the parameter.",
   "The gradient lands in w.grad; backward() itself returns nothing.",
 ]
+
+[quest.quiz]
+choices = [
+  'loss.backward()',
+  'w.backward()',
+  'loss.backward',
+  'torch.autograd.grad(loss, w)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -898,6 +1055,15 @@ hints = [
   "An optimiser does this for you — opt.zero_grad() is the same idea, over every parameter it holds.",
 ]
 
+[quest.quiz]
+choices = [
+  'w.grad.zero_',
+  'w.grad == None',
+  'w.grad = None',
+  'w.requires_grad = False',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -962,6 +1128,15 @@ hints = [
   "w -= lr * w.grad — minus, because the gradient points uphill.",
   "It has to be inside the no_grad block, or torch refuses to modify a leaf that requires grad in place.",
 ]
+
+[quest.quiz]
+choices = [
+  'w += lr * w.grad',
+  'w -= lr * w.grad',
+  'w -= w.grad',
+  'w -= lr * w',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1031,6 +1206,27 @@ hints = [
   "zero_grad, backward, step — clear, compute, apply.",
   "Calling step() before backward() applies whatever was left in .grad from last time.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+opt.zero_grad()
+opt.step()
+loss.backward()''',
+  '''
+loss.backward()
+opt.zero_grad()
+opt.step()''',
+  '''
+opt.zero_grad()
+loss.backward()
+opt.step''',
+  '''
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1111,6 +1307,31 @@ hints = [
   "loss = loss_fn(model(x), y), then zero_grad, backward, step.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+loss = loss_fn(model(x), y)
+loss.backward()
+opt.zero_grad()
+opt.step()''',
+  '''
+loss = loss_fn(model(x), y)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+  '''
+loss = loss_fn(model(x), x)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+  '''
+loss = loss_fn(model(y), x)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 30000
@@ -1173,6 +1394,15 @@ hints = [
   "nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3)) — the hidden width appears twice, as out then in.",
   "nn.ReLU() is a module and is built with parentheses; torch.relu is the function version.",
 ]
+
+[quest.quiz]
+choices = [
+  'model = nn.Sequential(nn.Linear(4, 8), nn.ReLU(), nn.Linear(8, 3))',
+  'model = nn.Sequential(nn.Linear(8, 4), nn.ReLU(), nn.Linear(4, 3))',
+  'model = nn.Sequential(nn.Linear(4, 8), nn.ReLU, nn.Linear(8, 3))',
+  'model = nn.Sequential(nn.Linear(4, 3), nn.ReLU(), nn.Linear(3, 3))',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1258,6 +1488,23 @@ hints = [
   "A layer stored in a plain list instead of on self never appears in parameters() and never trains.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+self.fc1 = nn.Linear(4, 3)
+self.fc2 = nn.Linear(1, 4)''',
+  '''
+self.fc1 = nn.Linear(3, 4)
+self.fc2 = nn.Linear(4, 2)''',
+  '''
+self.fc1 = nn.Linear(3, 4, bias=False)
+self.fc2 = nn.Linear(4, 1)''',
+  '''
+self.fc1 = nn.Linear(3, 4)
+self.fc2 = nn.Linear(4, 1)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1339,6 +1586,31 @@ hints = [
   "The labels are already int64; cross-entropy wants indices, not one-hot rows.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+loss = loss_fn(model(x), y.float())
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+  '''
+loss = loss_fn(model(x).argmax(dim=1), y)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+  '''
+loss = loss_fn(model(x), y)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+  '''
+loss = -loss_fn(model(x), y)
+opt.zero_grad()
+loss.backward()
+opt.step()''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 30000
@@ -1409,6 +1681,15 @@ hints = [
   "model.eval() — it returns the model, but it is called for the switch it flips.",
   "no_grad only stops the graph being recorded; it does not turn dropout off.",
 ]
+
+[quest.quiz]
+choices = [
+  'model.train()',
+  'model.eval',
+  'model.eval()',
+  'model.requires_grad_(False)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1485,6 +1766,15 @@ hints = [
   "fresh = trained would make them the same object, which proves nothing.",
 ]
 
+[quest.quiz]
+choices = [
+  'fresh.load_state_dict(trained)',
+  'fresh.state_dict().update(trained.state_dict())',
+  'fresh.parameters = trained.parameters',
+  'fresh.load_state_dict(trained.state_dict())',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1551,6 +1841,23 @@ hints = [
   "x[i:i + bs] — slicing past the end is not an error; it just gives what is left.",
   "The last batch is short. Code that hard-codes bs anywhere downstream breaks on exactly this batch.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+batch = x[i:i + bs]
+sizes.append(batch.shape[0])''',
+  '''
+batch = x[i:bs]
+sizes.append(batch.shape[0])''',
+  '''
+batch = x[i:i + bs - 1]
+sizes.append(batch.shape[0])''',
+  '''
+batch = x[i:i + bs]
+sizes.append(batch.shape[1])''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1619,6 +1926,23 @@ hints = [
   "TensorDataset(x, y) then DataLoader(ds, batch_size=4, shuffle=False).",
   "len(dl) is the number of batches; len(ds) is the number of samples. They are different numbers.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+ds = TensorDataset(x, y)
+dl = DataLoader(ds, batch_size=4, drop_last=True)''',
+  '''
+ds = TensorDataset(x, y)
+dl = DataLoader(ds, batch_size=4, shuffle=False)''',
+  '''
+ds = TensorDataset(x, y)
+dl = DataLoader(x, batch_size=4, shuffle=False)''',
+  '''
+ds = TensorDataset(x, y)
+dl = DataLoader(ds, batch_size=3, shuffle=False)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1714,6 +2038,23 @@ hints = [
   "The shuffle happens before the split; splitting a sorted-by-class dataset gives a test set of one class.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+x_tr, y_tr = x[:30], y[30:]
+x_te, y_te = x[30:], y[:30]''',
+  '''
+x_tr, y_tr = x[:30], y[:30]
+x_te, y_te = x[31:], y[31:]''',
+  '''
+x_tr, y_tr = x[:, :30], y[:30]
+x_te, y_te = x[:, 30:], y[30:]''',
+  '''
+x_tr, y_tr = x[:30], y[:30]
+x_te, y_te = x[30:], y[30:]''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 30000
@@ -1798,6 +2139,23 @@ hints = [
   "Record loss.item() on step 0 into first, and every step into last.",
   "Keep the float, not the tensor: holding the tensor holds the whole graph alive with it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+first = loss.item() if step == 0 else first
+last = loss.item()''',
+  '''
+first = loss.item()
+last = loss.item()''',
+  '''
+last = loss.item() if step == 0 else last
+first = loss.item()''',
+  '''
+first = loss.item() if step == 0 else first
+last = loss.item''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1886,6 +2244,15 @@ hints = [
   "Without the activation the two Linears collapse into one and two of the four stay wrong forever.",
   "Tanh is smoother than ReLU on a problem this small, and a small ReLU layer can start dead and never recover.",
 ]
+
+[quest.quiz]
+choices = [
+  'model = nn.Sequential(nn.Linear(2, 8), nn.Linear(8, 1))',
+  'model = nn.Sequential(nn.Linear(2, 1), nn.Tanh(), nn.Linear(1, 1))',
+  'model = nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 1))',
+  'model = nn.Sequential(nn.Linear(2, 8), nn.Tanh(), nn.Linear(8, 2))',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"

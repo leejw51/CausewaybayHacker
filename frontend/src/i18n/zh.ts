@@ -218,8 +218,6 @@ export const zh: Partial<Catalogue> = {
   "quest.sheetRight": "答对了",
   "quest.sheetStreak": "连胜 ×{n}",
   "quest.sheetCombo": "×{n} 连击",
-  "quest.quizPick": "选出对的那一行，然后敲出来  (1–4)",
-  "quest.quizRight": "答对了 — 现在把它敲出来",
   "quest.job": "这次的任务",
   "quest.sample": "样例 · {name}",
   "quest.in": "输入",

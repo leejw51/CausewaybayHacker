@@ -78,6 +78,15 @@ hints = [
   "Leave the `main()` call at the bottom. A function that is never called prints nothing, and the starter is exactly that.",
 ]
 
+[quest.quiz]
+choices = [
+  'print("hello", "causewaybay")',
+  'print("Hello, Causewaybay")',
+  'print("hello, causewaybay")',
+  'print("hello, " .. causewaybay)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -142,6 +151,15 @@ hints = [
   "local n = tonumber(io.read(\"*l\")) reads and converts in one go. tonumber ignores the spaces around the digits for you.",
   "A negative n squared is positive. The test knows.",
 ]
+
+[quest.quiz]
+choices = [
+  'local n = tonumber(io.read("*l"))',
+  'local n = #io.read("*l")',
+  'local n = tonumber(io.read("*l"), 16)',
+  'local n = tonumber(io.read("*l"):sub(2))',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -214,6 +232,15 @@ hints = [
   "%.2f is a C format: f for a float, .2 for two digits after the point. print(a / b) alone would print 3.5, one digit short.",
 ]
 
+[quest.quiz]
+choices = [
+  'print(string.format("%2f", a / b))',
+  'print(string.format("%.2f", math.floor(a / b)))',
+  'print(math.floor(a / b * 100) / 100)',
+  'print(string.format("%.2f", a / b))',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -284,6 +311,23 @@ hints = [
   "print(bit.tohex(n, 8)) — the second argument is how many hex digits; 8 digits are 4 bytes.",
   "2^31 - 1 is 2147483647: a double holds it exactly and print shows it without a decimal point.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+print(bit.tohex(n, 4))
+print(2^31 - 1)''',
+  '''
+print(bit.tohex(n, 8))
+print(2^31 - 1)''',
+  '''
+print(string.format("%x", n))
+print(2^31 - 1)''',
+  '''
+print(bit.tohex(n, 8))
+print(2^31)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -385,6 +429,15 @@ hints = [
   "#h is the length of the string; string.rep with a count of 0 is the empty string, so the 64-character maximum gets no padding at all.",
 ]
 
+[quest.quiz]
+choices = [
+  'print(string.rep("0", 64) .. h)',
+  'print(string.rep("0", 64 - #h) .. h)',
+  'print(h .. string.rep("0", 64 - #h))',
+  'print(string.rep("0", 63 - #h) .. h)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -458,6 +511,15 @@ hints = [
   "\"float[1]\" is single precision; \"double[1]\" would be the same width as x and change nothing.",
 ]
 
+[quest.quiz]
+choices = [
+  'local y = ffi.new("double[1]", x)[0]',
+  'local y = ffi.new("int[1]", x)[0]',
+  'local y = ffi.new("float", x)',
+  'local y = ffi.new("float[1]", x)[0]',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -525,6 +587,23 @@ hints = [
   "print(s:upper()) then print(s:reverse()) — two method calls, colon and empty parentheses.",
   "s.upper() with a dot passes nothing, and string.upper complains about a nil where the string should be.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+print(s:upper())
+print(s:reverse())''',
+  '''
+print(s.upper())
+print(s:reverse())''',
+  '''
+print(s:upper())
+print(s:reverse():upper())''',
+  '''
+print(string.upper(s))
+print(s)''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -597,6 +676,23 @@ hints = [
   "local head = s:sub(1, n), then head = head .. \"!\" — sub copies, .. makes another.",
   "s:sub(0, n) is the same as s:sub(1, n); a 0 is clamped to the start. There is no += in Lua: write the name on both sides.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+local head = s:sub(1, n - 1)
+head = head .. "!"''',
+  '''
+local head = s:sub(1, n)
+head = head + "!"''',
+  '''
+local head = s:sub(1, n)
+head = head .. "!"''',
+  '''
+local head = s:sub(n)
+head = head .. "!"''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -679,6 +775,23 @@ hints = [
   "unpack is global in LuaJIT (table.unpack is Lua 5.2). Without the braces round it the two values would go nowhere.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local part = { unpack(v, 2, 4) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])''',
+  '''
+local part = v
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])''',
+  '''
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v]); table.insert(part, v[#v - 1])''',
+  '''
+local part = { unpack(v, 2, 3) }
+table.insert(part, v[#v - 1]); table.insert(part, v[#v])''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -752,6 +865,15 @@ hints = [
   "local bytes = { head:byte(1, -1) }, then print(string.char(unpack(bytes))) — byte goes one way, char the other.",
   "head:byte() with no arguments is only the first byte; the 1, -1 asks for all of them.",
 ]
+
+[quest.quiz]
+choices = [
+  'local bytes = { head:byte(1) }',
+  'local bytes = { head:byte(1, -2) }',
+  'local bytes = { head:byte(1, -1) }',
+  'local bytes = head:byte(1, -1)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -829,6 +951,15 @@ hints = [
   "for i = 1, 0 runs zero times: a loop whose start is past its end has no body to run.",
 ]
 
+[quest.quiz]
+choices = [
+  'for i = 1, n - 1 do',
+  'for i = 1, n do',
+  'for i = 0, n - 1 do',
+  'for i = 1, n, 2 do',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -898,6 +1029,15 @@ hints = [
   "return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3 — min caps the dear rides at ten, max stops the rest going negative.",
   "The function's job ends at return; nothing after it in the body runs, and the return must be the last statement of its block.",
 ]
+
+[quest.quiz]
+choices = [
+  'return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 3',
+  'return math.max(rides, 10) * 5 + math.min(rides - 10, 0) * 3',
+  'return math.min(rides, 10) * 3 + math.max(rides - 10, 0) * 5',
+  'return math.min(rides, 10) * 5 + math.max(rides - 10, 0) * 5',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -994,6 +1134,15 @@ hints = [
   "price on its own is not a name in total(); it would be a global, and a global nobody set is nil.",
 ]
 
+[quest.quiz]
+choices = [
+  'return self.price * self.qty',
+  'return price * qty',
+  'return self.price + self.qty',
+  'return Stall.price * Stall.qty',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1066,6 +1215,15 @@ hints = [
   "local line = Line[word:upper()] — square brackets look a key up by a string, and the names are upper-case.",
   "Line.word would look for a key spelled w-o-r-d; only the bracket form takes the string you read.",
 ]
+
+[quest.quiz]
+choices = [
+  'local line = Line[word]',
+  'local line = Line[word:upper()]',
+  'local line = Line[word:lower()]',
+  'local line = Line[word:upper()] + 1',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1171,6 +1329,15 @@ hints = [
   "The first position is 1, not 0: xs[0] = 7 would put 7 at a key the list does not count. table.sort returns nothing, so do not assign it.",
 ]
 
+[quest.quiz]
+choices = [
+  'table.remove(xs)',
+  'xs[1] = nil',
+  'table.remove(xs, 1)',
+  'table.remove(xs, 2)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1273,6 +1440,15 @@ hints = [
   "table.insert(chain, 1, 0), then table.remove(chain), then chain[1] = 9, then table.sort(chain) — one per placeholder, in that order.",
   "With two arguments table.insert appends; the position goes in the middle. table.remove without a position is the end, table.remove(chain, 1) would be the front.",
 ]
+
+[quest.quiz]
+choices = [
+  'table.insert(chain, 0)',
+  'table.insert(chain, 0, 1)',
+  'chain[0] = 0',
+  'table.insert(chain, 1, 0)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1403,6 +1579,15 @@ hints = [
   "Assigning nil is the only way to remove a key. There is no += : read the value, add, write it back under the same key.",
 ]
 
+[quest.quiz]
+choices = [
+  'counts[first] = 0',
+  'counts.first = nil',
+  'counts[first] = nil',
+  'table.remove(counts, first)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1520,6 +1705,15 @@ hints = [
   "or hands back its left side unless that is nil or false; a stall numbered 0 is still 0. The += line needs the key to exist, and last does.",
 ]
 
+[quest.quiz]
+choices = [
+  'print(numbers[w] and -1)',
+  'print(numbers.w or -1)',
+  'print(numbers.get(w, -1))',
+  'print(numbers[w] or -1)',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1631,6 +1825,15 @@ hints = [
   "pairs gives the key first; with one name in the for, that is what you get. The order is the table's own, which is why vals is sorted before it is printed.",
 ]
 
+[quest.quiz]
+choices = [
+  'seen[first] = nil',
+  'seen[first] = false',
+  'seen.first = nil',
+  'seen:remove(first)',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1727,6 +1930,15 @@ hints = [
   "table.remove with no position takes the end, which is the top; #stack names that same slot for assignment.",
 ]
 
+[quest.quiz]
+choices = [
+  'stack[#stack] = 100',
+  'stack[#stack + 1] = 100',
+  'table.insert(stack, 1, 100)',
+  'stack.push(100)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1813,6 +2025,15 @@ hints = [
   "asc = table.sort(asc) would set asc to nil: sort returns nothing. The comparator must be strict: >= would be an invalid order function.",
 ]
 
+[quest.quiz]
+choices = [
+  'table.sort(desc, function(a, b) return a < b end)',
+  'table.sort(desc, function(a, b) return a > b end)',
+  'table.sort(asc, function(a, b) return a > b end)',
+  'table.sort(desc, function(b, a) return a > b end)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1897,6 +2118,15 @@ hints = [
   "for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end on its own line, then local r = s:reverse().",
   "Going to #v instead of half would swap every pair twice and put the list back the way it was.",
 ]
+
+[quest.quiz]
+choices = [
+  'for i = 1, math.floor(#v / 2) do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end',
+  'for i = 1, #v do v[i], v[#v - i + 1] = v[#v - i + 1], v[i] end',
+  'for i = 1, math.floor(#v / 2) do v[i], v[#v - i] = v[#v - i], v[i] end',
+  'for i = 1, math.floor(#v / 2) do v[i] = v[#v - i + 1]; v[#v - i + 1] = v[i] end',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1984,6 +2214,23 @@ hints = [
   "if a.score ~= b.score then return a.score > b.score end, then return a.name < b.name — the tie-break only runs when the scores are equal.",
   "~= is Lua's not-equal. Returning a.score >= b.score would say two equal rows each belong before the other, and sort refuses that.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if a.score ~= b.score then return a.score < b.score end
+return a.name < b.name''',
+  '''
+if a.score ~= b.score then return a.score > b.score end
+return a.name > b.name''',
+  '''
+if a.score ~= b.score then return a.name < b.name end
+return a.score > b.score''',
+  '''
+if a.score ~= b.score then return a.score > b.score end
+return a.name < b.name''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2076,6 +2323,15 @@ hints = [
   "return x + k inside add, then return add (no parentheses) as make_adder's last line.",
   "return add() would call it with no argument and fail on nil + k; the bare name is the function. The starter's return nil is why main dies with attempt to call local 'add' (a nil value).",
 ]
+
+[quest.quiz]
+choices = [
+  'return add(k)',
+  'return add()',
+  'return add',
+  'return make_adder',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2181,6 +2437,15 @@ hints = [
   "local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs))) — filter first, then map, then sum.",
   "An anonymous function needs its return and its end: function(x) x * x end is a syntax error. Lua's % is floored, so -4 % 2 is 0 and the negatives count.",
 ]
+
+[quest.quiz]
+choices = [
+  'local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 1 end, xs)))',
+  'local total = sum(map(function(x) return x * 2 end, filter(function(x) return x % 2 == 0 end, xs)))',
+  'local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 end, xs)))',
+  'local total = sum(map(function(x) return x * x end, filter(function(x) return x % 2 == 0 end, xs)))',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2292,6 +2557,15 @@ hints = [
   "coroutine.resume(co) in the first loop, while coroutine.status(co) ~= \"dead\" do coroutine.resume(co) end in the second.",
   "A coroutine you never resume never runs; one you resume once stops at its yield with the square still unwritten. The status tells you which.",
 ]
+
+[quest.quiz]
+choices = [
+  'while coroutine.status(co) == "dead" do coroutine.resume(co) end',
+  'while coroutine.status(co) ~= "dead" do coroutine.resume(co) end',
+  'while coroutine.status(co) ~= "suspended" do coroutine.resume(co) end',
+  'while coroutine.status(co) ~= "dead" do coroutine.yield() end',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2431,6 +2705,15 @@ hints = [
   "n.left = insert(n.left, v) under the if, n.right = insert(n.right, v) under the else.",
   "The assignment is the point: insert returns the subtree's root, which is a brand-new Node when the child was nil. A new Node has no left or right key at all — reading one is nil, and that is fine until you index into it.",
 ]
+
+[quest.quiz]
+choices = [
+  'n.left = insert(n.left, v)',
+  'insert(n.left, v)',
+  'n.left = insert(n.right, v)',
+  'n.left = Node.new(v)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"

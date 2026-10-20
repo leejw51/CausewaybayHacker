@@ -85,6 +85,15 @@ hints = [
   ":02d inside an f-string is width two, zero padded, decimal. 5 cents is 0.05, not 0.5.",
 ]
 
+[quest.quiz]
+choices = [
+  'cents = f"{cents // 100}.{cents % 100:02d}"',
+  'cents = f"{cents / 100}.{cents % 100:02d}"',
+  'cents = f"{cents // 100}.{cents // 100:02d}"',
+  'cents = f"{cents % 100}.{cents // 100:02d}"',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -188,6 +197,31 @@ hints = [
   "while True with a break is how Python spells a loop whose exit is in the middle. There is no do-while.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+value = int(input())
+if value == 0:
+    continue
+skipped += 1''',
+  '''
+value = int(input())
+if value == 0:
+    break
+skipped += 1''',
+  '''
+value = int(input())
+skipped += 1
+if value == 0:
+    break''',
+  '''
+value = int(input())
+if value != 0:
+    break
+skipped += 1''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -270,6 +304,27 @@ hints = [
   "sys.stdin.read().split() reads everything at once and splits on any whitespace, so the line breaks stop mattering.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+print(nums[1])
+print(nums[-1])
+print(sum(nums[1:-1]))''',
+  '''
+print(nums[0])
+print(nums[len(nums)])
+print(sum(nums[1:-1]))''',
+  '''
+print(nums[0])
+print(nums[-1])
+print(sum(nums[1:-1]))''',
+  '''
+print(nums[0])
+print(nums[-1])
+print(sum(nums[0:-1]))''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -340,6 +395,15 @@ hints = [
   "line[::-1] is the whole reversal. Slicing a str gives a str.",
   "A byte string reversed would cut a multi-byte character in half; reversing the str does not, because a str has no bytes in it.",
 ]
+
+[quest.quiz]
+choices = [
+  'print(len(line.encode("utf-16")))',
+  'print(len(line.encode("ascii")))',
+  'print(len(bytes(line)))',
+  'print(len(line.encode("utf-8")))',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -421,6 +485,23 @@ hints = [
   "key=lambda item: (-item[1], item[0]) — count descending, then word ascending, in one tuple.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for word in words:
+    counts[word] = counts.get(word, 0) + 1''',
+  '''
+for word in words:
+    counts[word] += 1''',
+  '''
+for word in words:
+    counts[word] = counts.get(word, 1)''',
+  '''
+for word in words:
+    counts[word] = counts.get(word) + 1''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -499,6 +580,15 @@ hints = [
   "a & b is the intersection, a - b is the difference, a | b is the union. len of each is the count.",
   "\" \".join(sorted(both)) needs strings — these already are — and the `if both else \"-\"` covers the empty case in one expression.",
 ]
+
+[quest.quiz]
+choices = [
+  'both = sorted(a | b)',
+  'both = sorted(a & b)',
+  'both = sorted(a - b)',
+  'both = sorted(a ^ b)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -584,6 +674,15 @@ hints = [
   "Defaults go after the parameters without them — def tag(name, cents, unit=\"catty\") — and a default that is a list or dict is shared between calls, which is the follow-up question.",
   "tag(*parts) spreads the list; with two parts the default fills the third.",
 ]
+
+[quest.quiz]
+choices = [
+  'print(tag(parts))',
+  'print(tag(**parts))',
+  'print(tag(*parts))',
+  'print(tag(*parts[1:]))',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -681,6 +780,34 @@ hints = [
   "continue inside the except skips the rest of the loop body for that line, so the bad line adds nothing.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+try:
+    value = double(line)
+except TypeError:
+    print(f"BAD {line}")
+    continue''',
+  '''
+try:
+    value = double(line)
+except ValueError:
+    print(f"BAD {line}")
+    break''',
+  '''
+try:
+    value = double(line)
+except ValueError:
+    print(f"BAD {line}")''',
+  '''
+try:
+    value = double(line)
+except ValueError:
+    print(f"BAD {line}")
+    continue''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -770,6 +897,15 @@ hints = [
   "[str(v * 2) for v in nums if v > 10] — transform at the front, filter at the back.",
   "{v for v in nums} is a set comprehension; set(nums) is the same thing and either is fine here.",
 ]
+
+[quest.quiz]
+choices = [
+  'big = [str(v * 2) for v in nums if v > 10]',
+  'big = [str(v) * 2 for v in nums if v > 10]',
+  'big = [v * 2 for v in nums if v > 10]',
+  'big = [str(v * 2) for v in nums if v < 10]',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -866,6 +1002,15 @@ hints = [
   "For the tie, sort on a tuple: `min(prices, key=lambda k: (prices[k], k))` takes the cheapest, then the alphabetically first among equals.",
 ]
 
+[quest.quiz]
+choices = [
+  'dear = {price: item for item, price in prices.items() if price > 100}',
+  'dear = {item: price for item, price in prices.items() if price > 100}',
+  'dear = {item: price for item, price in prices.items() if price < 100}',
+  'dear = {item: price for item, price in prices.values() if price > 100}',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -942,6 +1087,15 @@ hints = [
   "key=lambda pair: (pair[1], pair[0]) sorts by price and then by name; sorted is stable, but you do not need that when the key is total.",
   "enumerate(ranked, start=1) gives (rank, (name, price)), and the nested tuple unpacks in the for line.",
 ]
+
+[quest.quiz]
+choices = [
+  'ranked = sorted(zip(names, prices), key=lambda pair: (pair[0], pair[1]))',
+  'ranked = sorted(zip(names, prices), key=lambda pair: (-pair[1], pair[0]))',
+  'ranked = sorted(zip(names, prices), key=lambda pair: (pair[1], pair[0]))',
+  'ranked = sorted(zip(names, prices), key=lambda pair: (pair[1], pair[0]), reverse=True)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1061,6 +1215,15 @@ hints = [
   "print(book) calls repr(book) when there is no __str__, so __repr__ is the one method to write. Make it look like the constructor call that would rebuild it; that is the convention.",
 ]
 
+[quest.quiz]
+choices = [
+  'items = []',
+  'Notebook.items = []',
+  'self.items = {}',
+  'self.items = []',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1179,6 +1342,23 @@ hints = [
   "case Order(kind=other): is a capture pattern — it always matches and binds the tag — so it goes last, exactly like the `other =>` arm in a Rust match.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+case Order(kind="STUDENT"):
+    return str(base // 2)''',
+  '''
+case "STUDENT":
+    return str(base // 2)''',
+  '''
+case Order(kind="STUDENT"):
+    return str(base / 2)''',
+  '''
+case Order(kind=STUDENT):
+    return str(base // 2)''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1274,6 +1454,27 @@ hints = [
   "yield value, then advance. The function pauses at the yield and resumes after it on the next request.",
   "A generator can be consumed once. That is why main builds a fresh ticker for the sum instead of reusing the one the loop drained.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for _ in range(count):
+    return value
+    value += step''',
+  '''
+for _ in range(count):
+    yield value
+    value += step''',
+  '''
+for _ in range(count):
+    value += step
+    yield value''',
+  '''
+for _ in range(count - 1):
+    yield value
+    value += step''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1392,6 +1593,31 @@ hints = [
   "*args, **kwargs is how the wrapper forwards any signature at all without knowing it, which is what makes the decorator reusable.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+@functools.wraps
+def wrapper(*args, **kwargs):
+    wrapper.calls += 1
+    return func(*args, **kwargs)''',
+  '''
+@functools.wraps(func)
+def wrapper(*args, **kwargs):
+    func.calls += 1
+    return func(*args, **kwargs)''',
+  '''
+@functools.wraps(func)
+def wrapper(*args, **kwargs):
+    wrapper.calls += 1
+    return func(*args, **kwargs)''',
+  '''
+@functools.wraps(func)
+def wrapper(*args, **kwargs):
+    wrapper.calls += 1
+    return func(args, kwargs)''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1501,6 +1727,23 @@ hints = [
   "__iter__ can return iter(self._goods); it does not have to be a generator, though `yield from self._goods` also works.",
   "max(bag, key=len) keeps the first of equal-length items, which is why the sample says duckegg and not something later.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+def __iter__(self):
+    return self._goods''',
+  '''
+def __iter__(self):
+    yield self._goods''',
+  '''
+def __iter__(self):
+    return next(self._goods)''',
+  '''
+def __iter__(self):
+    return iter(self._goods)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1672,6 +1915,23 @@ hints = [
   "Optional[Stall] in the annotation is not enforced by the interpreter. It is a note to the reader and to the type checker, and the reader is the one on the clock.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+stall = lookup(board, name)
+if stall is None:''',
+  '''
+stall = lookup(board, name)
+if stall is not None:''',
+  '''
+stall = board[name]
+if stall is None:''',
+  '''
+stall = lookup(board, name)
+if stall.cents is None:''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1785,6 +2045,39 @@ hints = [
   "Start every thread, then join every thread. Starting and joining in the same loop iteration is correct and runs them one at a time.",
   "results is a closure over main's local list; the nested function sees the same list, which is why the writes are visible after join.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for i, v in enumerate(nums):
+    thread = threading.Thread(target=square, args=(v, i))
+    threads.append(thread)
+    thread.start()
+for thread in threads:
+    thread.join()''',
+  '''
+for i, v in enumerate(nums):
+    thread = threading.Thread(target=square, args=(i, v))
+    threads.append(thread)
+    thread.start()
+for thread in threads:
+    thread.join()''',
+  '''
+for i, v in enumerate(nums):
+    thread = threading.Thread(target=square, args=(i, v))
+    threads.append(thread)
+    thread.join()
+for thread in threads:
+    thread.start()''',
+  '''
+for i, v in enumerate(nums):
+    thread = threading.Thread(target=square, args=(i))
+    threads.append(thread)
+    thread.start()
+for thread in threads:
+    thread.join()''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1901,6 +2194,31 @@ hints = [
   "A dict or a list is mutated in place, so `drawer[\"total\"] += value` changes the one object every thread shares. `nonlocal total` would also work and is the other honest answer.",
   "threading.Lock() once in main, `with lock:` around the read-modify-write. The GIL is not a lock on your data; it is a lock on the interpreter.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+def pay(value):
+    with lock():
+        drawer["total"] += value
+        drawer["hits"] += 1''',
+  '''
+def pay(value):
+    with lock.acquire():
+        drawer["total"] += value
+        drawer["hits"] += 1''',
+  '''
+def pay(value):
+    with lock:
+        drawer["total"] += value
+        drawer["hits"] += 1''',
+  '''
+def pay(value):
+    with lock:
+        drawer["total"] += value
+        drawer["hits"] += value''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2028,6 +2346,31 @@ hints = [
   "If the values could legitimately be None, the sentinel is a private object: SENTINEL = object(), compared with `is`.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+while True:
+    value = hatch.get()
+    if value is None:
+        continue''',
+  '''
+while True:
+    value = hatch.get
+    if value is None:
+        break''',
+  '''
+while True:
+    value = hatch.get()
+    if value == "None":
+        break''',
+  '''
+while True:
+    value = hatch.get()
+    if value is None:
+        break''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2131,6 +2474,23 @@ hints = [
   "as_completed yields as jobs finish; the index in the result is the only record of where each one came from.",
   "with ThreadPoolExecutor(...) as pool: waits for every submitted job on the way out, so nothing is left running when you print. pool.map would also work here and keeps the order for you, at the cost of not learning as_completed.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+futures = [pool.submit(square, i, v) for i, v in enumerate(nums)]
+results = [future.result() for future in as_completed(futures)]''',
+  '''
+futures = [pool.submit(square(i, v)) for i, v in enumerate(nums)]
+results = [future.result() for future in as_completed(futures)]''',
+  '''
+futures = [pool.submit(square, (i, v)) for i, v in enumerate(nums)]
+results = [future.result() for future in as_completed(futures)]''',
+  '''
+futures = [pool.submit(square, i, v) for i, v in enumerate(nums)]
+results = [future for future in as_completed(futures)]''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2249,6 +2609,15 @@ hints = [
   "asyncio.run(...) is the executor: it makes the loop, runs one coroutine to completion, and closes the loop. There is one of these per program, at the top.",
   "gather returns results in argument order. If you needed them as they finish, that is asyncio.as_completed, and then you carry the index yourself, exactly like the thread pool.",
 ]
+
+[quest.quiz]
+choices = [
+  'results = asyncio.gather(*(double(v) for v in nums))',
+  'results = await asyncio.gather(*(double(v) for v in nums))',
+  'results = await asyncio.gather(double(v) for v in nums)',
+  'results = await asyncio.gather(*(v * 2 for v in nums))',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2387,6 +2756,23 @@ hints = [
   "A task cancelled while awaiting get() raises CancelledError inside it, which ends the while True. return_exceptions=True keeps gather from re-raising that at you.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+tasks = [asyncio.create_task(consumer(queue, results)) for _ in range(workers)]
+queue.join()''',
+  '''
+tasks = [asyncio.create_task(consumer(queue, results)) for _ in range(workers)]
+await asyncio.gather(*tasks)''',
+  '''
+tasks = [asyncio.create_task(consumer(queue, results)) for _ in range(workers)]
+await queue.join()''',
+  '''
+tasks = [consumer(queue, results) for _ in range(workers)]
+await queue.join()''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2514,6 +2900,28 @@ hints = [
   "with opened(stall) as x: would bind whatever the generator yields. It yields nothing here, and that is fine.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+try:
+    yield
+except ValueError:''',
+  '''
+try:
+    return
+finally:''',
+  '''
+yield
+try:
+    pass
+finally:''',
+  '''
+try:
+    yield
+finally:''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2630,6 +3038,27 @@ hints = [
   "running(squares(nums)) composes because a generator is an iterable; running never knows or cares that its input is another generator.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for value in stream:
+    total += value
+    yield value, total''',
+  '''
+for value in stream:
+    yield value, total
+    total += value''',
+  '''
+for value in stream:
+    total += value
+    return value, total''',
+  '''
+for value in stream:
+    total += value
+    yield total, value''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2725,6 +3154,15 @@ hints = [
   "for value, group in groupby(nums): the group is an iterator over that run, consumed once. len(list(group)) is its length.",
   "combinations(distinct, 2) yields each unordered pair once. Counting them is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
 ]
+
+[quest.quiz]
+choices = [
+  'runs = [f"{value}x{len(list(group))}" for value, group in groupby(sorted(nums))]',
+  'runs = [f"{value}x{len(list(group))}" for value, group in groupby(nums)]',
+  'runs = [f"{value}x{len(group)}" for value, group in groupby(nums)]',
+  'runs = [f"{value}x{len(list(group))}" for group, value in groupby(nums)]',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2844,6 +3282,23 @@ hints = [
   "functools.reduce(operator.mul, range(1, k + 1), 1) — the third argument is the starting value, and it is what makes the empty range give 1.",
   "functools.partial(int, base=2) is a callable that takes the string and supplies base=2 itself. functools.cache is the same as lru_cache(maxsize=None) on 3.9 and later; either name is fine.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+@functools.lru_cache(maxsize=0)
+def fib(n):''',
+  '''
+@functools.cached_property
+def fib(n):''',
+  '''
+@functools.lru_cache(maxsize=None)
+def fib(n):''',
+  '''
+@functools.lru_cache(maxsize=1)
+def fib(n):''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3010,6 +3465,22 @@ hints = [
   "isinstance against a runtime-checkable protocol only checks that the method exists, not its signature or its return type. The type checker checks those; the interpreter never does.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+@runtime_checkable
+class Sign:''',
+  '''
+@Protocol
+class Sign:''',
+  '''
+class Sign(Protocol):''',
+  '''
+@runtime_checkable
+class Sign(Protocol):''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3163,6 +3634,23 @@ hints = [
   "The TOTAL is the sum of the original cents, which only holds because the assignments failed. In the starter every price is 0 by then, and TOTAL is 0 — the mutation was not only allowed, it went through.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+@dataclass(frozen=True)
+class Price:''',
+  '''
+@dataclass
+class Price:''',
+  '''
+@dataclass(eq=False)
+class Price:''',
+  '''
+@dataclass(slots=True)
+class Price:''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3311,6 +3799,15 @@ hints = [
   "Order matters when you have several except clauses: a subclass clause after its base class clause is dead code, and Python will not warn you.",
 ]
 
+[quest.quiz]
+choices = [
+  'return NotANumber()',
+  'raise NotANumber() from err',
+  'raise NotANumber(err)',
+  'raise PriceError() from err',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3425,6 +3922,27 @@ hints = [
   "StopIteration is raised, not returned. The for loop catches it; you never see it.",
   "Save the value you are about to return before you advance, or you are off by one step.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+def __next__(self):
+    if self.left == 0:
+        return StopIteration''',
+  '''
+def __next__(self):
+    if self.left < 0:
+        raise StopIteration''',
+  '''
+def __next__(self):
+    if self.left == 0:
+        raise StopIteration''',
+  '''
+def next(self):
+    if self.left == 0:
+        raise StopIteration''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3545,6 +4063,15 @@ hints = [
   "bisect_left and bisect_right never raise; list.index raises ValueError when x is absent, and one of the hidden cases is exactly that.",
   "defaultdict(list) creates the list on first access, so groups[letter].append(w) never needs a check. Sort the items before printing; a defaultdict is in insertion order like any dict.",
 ]
+
+[quest.quiz]
+choices = [
+  'word, count = max(counts.items(), key=lambda item: (-item[1], item[0]))',
+  'word, count = counts.most_common(1)[0]',
+  'word, count = min(counts.items(), key=lambda item: (item[1], item[0]))',
+  'word, count = min(counts.items(), key=lambda item: (-item[1], item[0]))',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3705,6 +4232,27 @@ hints = [
   "The await asyncio.sleep(0) after create_task gives the watcher one turn to actually start, so there is a running task to cancel and not just a scheduled one.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+except asyncio.CancelledError:
+    print("CANCELLED")
+    raise''',
+  '''
+except asyncio.TimeoutError:
+    print("CANCELLED")
+    raise''',
+  '''
+except Exception:
+    print("CANCELLED")
+    raise''',
+  '''
+except asyncio.CancelledError:
+    print("CANCELLED")
+    continue''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3852,6 +4400,23 @@ hints = [
   "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right.",
   "Time k=1 against k=4 on a big n. When they match, you have met the GIL. That is not the bug in this quest; it is the reason the next version of this program is a ProcessPoolExecutor.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+lo = n * i // k
+hi = n * (i + 1) // k''',
+  '''
+lo = n * i // k + 1
+hi = n * (i + 1) // k''',
+  '''
+lo = n * i // k + 1
+hi = n * (i + 1) // k - 1''',
+  '''
+lo = i * k + 1
+hi = (i + 1) * k''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

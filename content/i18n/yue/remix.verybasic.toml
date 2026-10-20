@@ -17,7 +17,7 @@ brief = '''
 
 喺 Go 入面，兩個 `int64` 之間嘅 `/` 係整數除法，`%` 係餘數。`float64(a)` 就係轉型 —— 一個似函數嘅 cast —— 要兩邊都係 `float64`，`/` 先會準確咁除。`Printf` 入面嘅 `%.2f` 印兩位小數。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  7 2
@@ -41,7 +41,7 @@ brief = '''
 
 喺 Rust 入面，兩個 `i64` 之間嘅 `/` 係整數除法，`%` 係餘數。`a as f64` 係轉型，佢綁得比 `/` 緊，所以 `a as f64 / b as f64` 係兩個浮點數相除。`println!` 入面嘅 `{:.2}` 印兩位小數。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  7 2
@@ -65,7 +65,7 @@ brief = '''
 
 喺 Python 入面，`/` 永遠畀返浮點數，就算兩邊都係 int，所以準確份額根本唔使轉型。整數商係*另一個*運算子 `//`，`%` 係餘數。`f"{f:.2f}"` 印兩位小數。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  7 2
@@ -89,7 +89,7 @@ brief = '''
 
 喺 Go 入面，做嘢嘅係 `strings` package：`strings.Split` 畀你一個 `[]string`，`strings.Join` 將佢駁返埋，`strings.ToUpper` 回傳一個新字串。`len(s)` 係位元組數；字元數係 `utf8.RuneCountInString(s)`，因為 Go 嘅字串係位元組，而 rune 係佢解碼出嚟嘅嘢。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  Mei,Bo,Alex
@@ -113,7 +113,7 @@ brief = '''
 
 喺 Rust 入面，`split(',')` 係一個 iterator，所以要 `collect` 做 `Vec<&str>`；喺個 vec 上面 `join(" | ")` 整出一個 `String`，`to_uppercase()` 再整多一個。`len()` 係位元組數；字元數係 `chars().count()`，因為 `&str` 係 UTF-8 位元組，`chars()` 將佢哋解碼。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  Mei,Bo,Alex
@@ -137,7 +137,7 @@ brief = '''
 
 喺 Python 入面，啲 method 喺字串身上：`line.split(",")` 畀你一個 list，`" | ".join(names)` 係喺*分隔符*上面 call 嘅，`.upper()` 回傳一個新字串。`len(s)` 數嘅係字元，唔係位元組，因為 Python 嘅 `str` 已經解碼咗 —— 位元組數要用 `len(s.encode())`。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  Mei,Bo,Alex
@@ -161,7 +161,7 @@ brief = '''
 
 Go 得一個迴圈關鍵字。`for cond { }` 就係佢嘅 while 迴圈，`steps++` 係遞增陳述式 —— 係陳述式，唔係表達式，所以唔可以擺喺更大嘅表達式入面。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  6
@@ -184,7 +184,7 @@ brief = '''
 
 Rust 寫做 `while cond { }`，遞增係 `steps += 1;` —— 冇 `++`。入面個 `if` 都係表達式，所以 `n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 };` 都一樣得。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  6
@@ -207,7 +207,7 @@ brief = '''
 
 Python 寫做 `while cond:`，有個冒號同縮排嘅主體，遞增係 `steps += 1` —— 冇 `++`。入面嘅 `if` / `else` 都要冒號；成個程式一個大括號都冇。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  6
@@ -230,7 +230,7 @@ brief = '''
 
 喺 Go 入面，函數字面值 `func() int { ... }` 用 reference 捕捉 `n`，所以入面嘅 `n++` 會改到外面嘅 `n`，而 `counter` 將個字面值當做 `func() int` 型別嘅值回傳。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea coffee milk
@@ -255,7 +255,7 @@ brief = '''
 
 喺 Rust 入面，閉包係 `|| { ... }`，`move` 令佢將 `n` 帶埋走 —— 冇 `move` 嘅話，佢會借一個就快出 scope 嘅局部變數。佢會改佢捕捉咗嘅嘢，所以回傳型別係 `impl FnMut() -> i64`，call 嘅人要用 `mut` 綁住佢。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea coffee milk
@@ -280,7 +280,7 @@ brief = '''
 
 喺 Python 入面，閉包係一個內層 `def`。由外層 scope 讀 `n` 係免費嘅，但係一賦值就會整出一個新嘅局部變數 —— 除非內層函數先用一個關鍵字聲明 `n` 係屬於外層 scope 嘅。邊一行係嗰個聲明？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  tea coffee milk
@@ -305,7 +305,7 @@ struct 將有名嘅欄位組成一個值，method 就係掛喺個型別上面嘅
 
 喺 Go 入面，method 係一個喺名前面有 receiver 嘅函數：`func (it Item) Total() int64`。receiver 係個 struct 嘅副本；`(it *Item)` 就會係 pointer。匯出嘅欄位同 method 用大階字母開頭。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea 12 3
@@ -330,7 +330,7 @@ struct 將有名嘅欄位組成一個值，method 就係掛喺個型別上面嘅
 
 喺 Rust 入面，method 住喺 `impl Item { }` block 入面，`&self` 表示個 method 係借個 struct，而唔係攞走佢。主體係 `self.price * self.qty`；最後一條表達式就係回傳值，所以冇 `return`，亦冇分號。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea 12 3
@@ -355,7 +355,7 @@ struct 將有名嘅欄位組成一個值，method 就係掛喺個型別上面嘅
 
 喺 Python 入面，class 裝住喺 `__init__` 設定嘅欄位，同埋下面嘅 method；每個 method 第一個參數都係 `self`，要明寫出嚟，`self.price * self.qty` 經佢讀欄位。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  tea 12 3
@@ -380,7 +380,7 @@ enum 係一個有一組固定、有名嘅值嘅型別，對佢做 match 就要�
 
 Go 冇 enum 關鍵字：一個有名嘅整數型別加一個有 `iota` 嘅 `const` block 就砌到一個 —— `Red`、`Green`、`Yellow` 係 0、1、2。分支係一個 `switch`，每個值一個 `case`；唔會 fall-through，`default` 接住其餘嘅。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  red green yellow green
@@ -405,7 +405,7 @@ enum 係一個有一組固定、有名嘅值嘅型別，對佢做 match 就要�
 
 Rust 有 `enum Light { Red, Green, Yellow }`，對佢 `match` 就一定要講齊每個 variant：一個一條 arm，variant 連埋型別寫喺 `=>` 左邊，結果喺右邊，後面一個逗號。邊一行係畀 red 三十秒嗰條 arm？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  red green yellow green
@@ -430,7 +430,7 @@ enum 係一個有一組固定、有名嘅值嘅型別，對佢做 match 就要�
 
 Python 嘅 `enum.Enum` 畀你 `Light.RED`、`Light.GREEN` 同 `Light.YELLOW`，`match l:` 每個值一個 `case` 咁揀。有點嘅名好重要：`case` 後面淨係一個名，就係一個乜都 match 嘅 capture pattern，Python 會拒絕，因為佢後面嘅 case 永遠行唔到。邊一行係 red 嘅 case？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  red green yellow green
@@ -455,7 +455,7 @@ brief = '''
 
 喺 Go 入面，`strconv.ParseInt` 回傳個值*同埋*一個 `error`，call 完即刻檢查就係成個語言嘅慣用寫法：將個 error 同 `nil` 比較，如果喺錯嗰邊，就講出嚟然後跳過。乜都冇 throw。邊一行係嗰個檢查？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  12 x 30 4y 8
@@ -479,7 +479,7 @@ brief = '''
 
 喺 Rust 入面，`t.parse::<i64>()` 回傳一個 `Result`，`let Ok(v) = ... else { ... };` 將個值攞出嚟，或者行 `else` —— 而佢一定要離開（`continue`、`return`、`break`）。有 `Ok` 同 `Err` 兩條 arm 嘅 `match` 係同一樣嘢嘅長寫法。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  12 x 30 4y 8
@@ -503,7 +503,7 @@ brief = '''
 
 喺 Python 入面，壞 token 會令 `int(t)` raise `ValueError`，一個 `try:` block 配一個正正指明嗰個 class 嘅子句就接得住 —— 加數放喺 `try` 入面，訊息放喺子句下面，迴圈就咁再轉過。邊一行係嗰個子句？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  12 x 30 4y 8
@@ -527,7 +527,7 @@ brief = '''
 
 喺 Go 入面，list 就係 slice。`append` 回傳變長咗嘅 slice，一定要賦值返；`nums[1:]` 用重新切片嘅方式甩走頭一個；`nums[len(nums)-1]` 係最後一個 —— 冇負數 index —— 而 `nums[1:3]` 係一個同原本共用 array 嘅子 slice。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  5 6 7 8
@@ -551,7 +551,7 @@ brief = '''
 
 喺 Rust 入面，list 係 `Vec`。`push` 就地加長，`remove(0)` 攞走頭一個，`nums[nums.len() - 1]` 係最後一個（或者 `*nums.last().unwrap()`），`&nums[1..3]` 係由佢借出嚟嘅 slice —— 一個 `&[i64]`，唔係副本。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  5 6 7 8
@@ -575,7 +575,7 @@ brief = '''
 
 喺 Python 入面，list 就係 `list`。`append` 加長佢，`pop(0)` 攞走頭一個，`nums[-1]` 係最後一個 —— 負數 index 由尾數起 —— 而 `nums[1:3]` 係一個新 list，裝住位置 1 同 2。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  5 6 7 8
@@ -599,7 +599,7 @@ map 由 key 去到 value，成個竅門就係遇到一個仲未有嘅 key 會點
 
 喺 Go 入面，唔存在嘅 key 讀出嚟係零值，所以加一唔使檢查：讀、加一、存 —— 用 Go 最短嘅「多一個」寫法。`counts[w]` 讀返佢，`len(counts)` 係 key 嘅數目。邊一行將個數加一？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea bun tea milk tea
@@ -626,7 +626,7 @@ map 由 key 去到 value，成個竅門就係遇到一個仲未有嘅 key 會點
 
 喺 Rust 入面，唔存在嘅 key 係一個問題，entry API 就係答案：`counts.entry(key).or_insert(0)` 畀你一個指向個 value 嘅 `&mut`，有需要就先插入 0，`*... += 1` 經佢寫入。key 係 `String`，所以要 `w.to_string()`；`counts[w]` 讀返佢。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea bun tea milk tea
@@ -653,7 +653,7 @@ map 由 key 去到 value，成個竅門就係遇到一個仲未有嘅 key 會點
 
 喺 Python 入面，讀一個唔存在嘅 key 係 `KeyError`，所以加一嗰陣要問 `counts.get(w, 0)`，佢會回傳預設值，然後存多一。（`collections.Counter` 同 `defaultdict(int)` 將呢行收埋咗；佢哋收埋嘅就係呢行。）
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  tea bun tea milk tea
@@ -680,7 +680,7 @@ brief = '''
 
 Go 冇 comprehension。迴圈*就係* comprehension：`for _, x := range nums`，一個 `if` 做 filter，`append` 做 map —— Python 一行，Go 四行，而每一行都直接了當。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6
@@ -703,7 +703,7 @@ brief = '''
 
 Rust 嘅 comprehension 係 iterator 鏈：`.iter()` 逐個行、`.filter(|x| ...)` 留低、`.map(|x| ...)` 變換、`.collect()` 砌出個 `Vec` —— 係 lazy 嘅，未 `collect` 之前乜都唔會行。啲閉包見到嘅係 `&i64`，所以要 `*x`。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6
@@ -726,7 +726,7 @@ brief = '''
 
 Python 嘅 list comprehension 係一條表達式：`[x * x for x in nums if x % 2 == 0]` —— 先 map，再迴圈，再 filter，全部喺方括號入面。讀落就好似一句說話：「x 嘅平方，nums 入面每個 x，如果 x 係雙數」。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6
@@ -749,7 +749,7 @@ brief = '''
 
 喺 Go 入面，`slices.SortFunc` 收一個回傳 int 嘅比較函數：負、零或者正。`cmp.Compare(b.Score, a.Score)` 參數調轉就係由大到細，而第一個係零嘅時候，`cmp.Or` 會跌落去比較個名。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  mei 90
@@ -775,7 +775,7 @@ brief = '''
 
 喺 Rust 入面，`sort_by` 收一個回傳 `Ordering` 嘅閉包。`b.score.cmp(&a.score)` 兩邊調轉就係由大到細，`.then_with(|| a.name.cmp(&b.name))` 係決勝，淨係第一個係 `Equal` 先會行。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  mei 90
@@ -801,7 +801,7 @@ brief = '''
 
 喺 Python 入面，`sort` 收一個 `key` 函數，而 tuple key 會按佢啲部分順序排：`(-p.score, p.name)` —— 取負令分數由大到細，個名就由細到大決勝。唔使 comparator；個 key 講晒。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  mei 90
@@ -827,7 +827,7 @@ brief = '''
 
 喺 Go 入面，子節點係 `*Node`，空嘅子節點係 `nil`。`insert` 嘅 base case 就係 nil 檢查：砌一個裝住 `v` 嘅新節點，回傳佢嘅地址 —— 一個 pointer，唔係一個值。邊一行回傳新節點？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  5 3 8 1 4
@@ -850,7 +850,7 @@ brief = '''
 
 喺 Rust 入面，子節點係 `Option<Box<Node>>`：`None` 代表空，heap 上面一個 box 代表節點。`insert` 收個 option 再交返出嚟：`None` 嗰條 arm 砌 `Some(Box::new(Node { val: v, left: None, right: None }))`，`Some(mut node)` 嗰條 arm 遞迴入其中一邊，再回傳個節點。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  5 3 8 1 4
@@ -873,7 +873,7 @@ brief = '''
 
 喺 Python 入面，子節點唔係 `Node` 就係 `None`。`insert` 嘅 base case 係 `if n is None:` —— 砌一個裝住 `v` 嘅節點交返出去；其他每一步都遞迴入其中一邊再回傳 `n`。邊一行砌個節點？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  5 3 8 1 4
@@ -896,7 +896,7 @@ brief = '''
 
 喺 Go 入面，interface 列出一組 method，其他乜都唔使：`Circle` 同 `Rect` 只要有 `Area() float64` 呢個 method 就滿足佢，一個 `[]Shape` 兩樣都裝得。邊一行開始宣告 `Shape`？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  circle 1
@@ -921,7 +921,7 @@ brief = '''
 
 喺 Rust 入面，個行為只宣告一次，唯一必需嘅 method 係 `fn area(&self) -> f64;`，每個型別都要明寫 `impl Shape for Circle { ... }`。`Box<dyn Shape>` 兩樣都裝得。邊一行開始個宣告？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  circle 1
@@ -946,7 +946,7 @@ brief = '''
 
 喺 Python 入面，乜都唔使宣告：任何有 `area()` method 嘅物件都得，呢個就係 duck typing。想*檢查*嘅話，`typing.Protocol` 講明個 method，`@runtime_checkable` 令 `isinstance(s, Shape)` 可以喺執行時問 —— 程式每加一個面積之前都會問。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  circle 1
@@ -971,7 +971,7 @@ brief = '''
 
 喺 Go 入面，型別參數連埋佢嘅約束擺喺方括號入面：`func largest[T cmp.Ordered](xs []T) T`。`cmp.Ordered` 係容許 `<` 同 `>` 嘅約束；`any` 就唔得。`largest(nums)` 呢個 call 由參數推斷出 `T`。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  3 9 4
@@ -995,7 +995,7 @@ brief = '''
 
 喺 Rust 入面，型別參數連埋佢嘅 bound 擺喺角括號入面：`fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T`。`PartialOrd` 容許 `>`，`Copy` 容許 `best = x` 由 slice 度複製出嚟，兩個都係 trait —— bound 就係 trait。`largest(&nums)` 推斷出 `T`。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  3 9 4
@@ -1019,7 +1019,7 @@ brief = '''
 
 喺 Python 入面，型別參數係 `def` 嗰行嘅一部分：函數名後面緊接一個方括號入面嘅名就宣告咗佢，之後參數同回傳嘅注解就用佢。執行時係 duck typing；簽名係畀檢查器睇嘅。邊一行係個簽名？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  3 9 4
@@ -1043,7 +1043,7 @@ brief = '''
 
 喺 Go 入面，slice 係 by value 傳，但個值係一個細細嘅 header —— pointer、長度、容量 —— 所以 `total(orders)` 同 `take(orders)` 見到嘅都係同一個 array，兩個之後 `orders` 仲用得。`take` 將收到嘅嘢清零，call 嘅人都會見到。冇 move 呢回事。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  12 30 8
@@ -1066,7 +1066,7 @@ brief = '''
 
 喺 Rust 入面，`total(&orders)` 係借：`&Vec<i64>` 會 coerce 做函數要嘅 `&[i64]`，之後 `orders` 仍然屬於 call 嘅人。`take(orders)` 將個 `Vec` move 入 `take`，佢 return 嗰陣就 drop 咗，嗰行之後再用 `orders` 就係 E0382。兩個 call 嘅次序就係成個程式。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  12 30 8
@@ -1089,7 +1089,7 @@ brief = '''
 
 喺 Python 入面，每個名都係 reference，call 傳嘅係 reference：`total(orders)` 同 `take(orders)` 收到嘅都係正正同一個 list 物件。`take` 清空佢，之後 `main` 入面嘅 `orders` 都係空 —— 唔係 move，唔係複製，係共用。`orders[:]` 或者 `list(orders)` 先會係副本。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  12 30 8
@@ -1112,7 +1112,7 @@ brief = '''
 
 喺 Go 入面，`func longest(a, b string) string` 回傳佢其中一個參數，冇人要講有效幾耐：字串係唔可以改嘅，只要仲有嘢掂得到佢，collector 就會保住佢。同一型別嘅兩個參數共用個型別名。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea coffee
@@ -1136,7 +1136,7 @@ brief = '''
 
 喺 Rust 入面，`fn longest<'a>(a: &'a str, b: &'a str) -> &'a str` 表示回傳嘅 reference 活得同兩個輸入之中短命嗰個一樣耐 —— 三個位嘅 `'a` 將佢哋綁埋一齊。唔寫嘅話 rustc 會話 E0106：佢分唔到結果係借 `a` 定 `b`，所以佢唔會估。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  tea coffee
@@ -1160,7 +1160,7 @@ brief = '''
 
 喺 Python 入面，函數回傳佢其中一個參數，只要仲有名指住個物件，佢就一直活 —— 冇 lifetime，冇 `&`。簽名將兩個參數同結果都注解做 `str`，同每個 `def` 一樣用冒號收尾。係邊一行？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  tea coffee
@@ -1184,7 +1184,7 @@ brief = '''
 
 喺 Go 入面，`go func(...) { ... }(args)` 開一個 goroutine，`sync.WaitGroup` 數住佢哋：每次開之前 `wg.Add(1)`，入面第一件事 `defer wg.Done()`，迴圈之後 `wg.Wait()`。嗰份數同佢嘅 index 當參數傳入去，咁每個 goroutine 都有自己嗰份。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7
@@ -1207,7 +1207,7 @@ brief = '''
 
 喺 Rust 入面，`thread::spawn(move || ...)` 開一條線程，回傳一個 `JoinHandle`；`move` 令閉包有自己一份 chunk（係 `Vec`，所以條線程擁有佢），`h.join().unwrap()` 等佢完，再交返閉包回傳嘅嘢 —— 呢度即係個和，所以完全冇共享狀態。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7
@@ -1230,7 +1230,7 @@ brief = '''
 
 喺 Python 入面，`threading.Thread(target=work, args=(i, c))` 整一條線程 —— `args` 係 tuple，所以得一個參數要寫 `(i,)`，有個逗號 —— `t.start()` 行佢，`t.join()` 等佢。因為 GIL，三條線程係輪流加，但形狀一樣。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7
@@ -1253,7 +1253,7 @@ brief = '''
 
 喺 Go 入面，`sync.Mutex` 係一個有兩個 method 嘅值，一個攞鎖、一個放鎖，計數器就係普通變數。紀律要你自己守：攞鎖、加、放鎖。Go 嘅 method 名匯出嘅話用大階開頭，呢兩個都係。邊一行攞鎖？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3
@@ -1275,7 +1275,7 @@ brief = '''
 
 喺 Rust 入面，計數器*就係*把鎖：`Arc<Mutex<i64>>`，用 `Arc::clone` 共享，用 `.lock().unwrap()` 打開，佢回傳一個 guard，deref 出嚟就係個數，喺條陳述式尾被 drop 嗰陣就解鎖。`*guard += x` 經佢寫入；唔經把鎖就冇辦法掂到個數。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3
@@ -1297,7 +1297,7 @@ brief = '''
 
 喺 Python 入面，`threading.Lock()` 就係 mutex，context manager 喺一個縮排 block 前後攞鎖同放鎖 —— 關鍵字後面係物件本身，唔係 call 佢，尾一個冒號。邊一行開始嗰個 block？
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  1 2 3
@@ -1319,7 +1319,7 @@ brief = '''
 
 喺 Go 入面，`ch <- x` 送出，`for x := range ch` 一直收到 channel 閂咗為止 —— 而閂 channel 係一個內建函數，唔係 method，生產者送晒所有嘢之後 call 一次。邊一行閂 channel？
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10
@@ -1342,7 +1342,7 @@ brief = '''
 
 喺 Rust 入面，`mpsc::channel()` 畀你一個 `Sender` 同一個 `Receiver`；三個消費者經 `Arc<Mutex<Receiver>>` 共用個 receiver，每個鎖住佢再 `recv()`。`tx.send(x)` 送出，`drop(tx)` 就係 close：所有 sender 都冇咗之後，`recv` 回傳 `Err`，消費者就 break 出嚟，回傳自己嘅數。
 
-揀出做到嘅嗰一行，然後喺 `// FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `// FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10
@@ -1365,7 +1365,7 @@ brief = '''
 
 喺 Python 入面，`queue.Queue` 就係 channel：`q.put(x)` 送出，`q.get()` 會 block 住直到有嘢。`Queue` 冇 close，所以生產者送一個哨兵 —— `None`，每個消費者一個 —— 每個消費者收到就 break。呢個就係 close，用手寫出嚟。
 
-揀出做到嘅嗰一行，然後喺 `# FILL` 註解嗰度打出嚟。
+揀出做到嘅嗰一行。佢填喺 `# FILL` 註解嗰度。
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10
