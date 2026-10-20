@@ -875,3 +875,47 @@ Ok(n)
 hints = [
   "兩種失敗，兩個形狀：搵嘢俾你嘅係 Option，要先變做 Result，`?` 先用得；parse 俾你嘅係 Result，但佢個錯誤仲未係 String。",
 ]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "rust.cheatsheet.53.let-else"
+title = "唔係就走"
+story = "銅鑼灣電車嘅讀卡機一係讀到車費，一係乜都讀唔到；讀唔到嗰陣，閘口就繼續閂住。"
+brief = '''
+`a: Option<i32>`。將個值攞出嚟放入 `x`，等呢行**之後**嘅行用得到；`a` 係
+`None` 嗰陣就離開個 function。
+
+```
+fn show(a: Option<i32>) {
+    ____
+    println!("{}", x);
+}
+```
+
+空位應該填邊一行？
+'''
+hints = [
+  "呢個 pattern 會將 `x` 綁到成個 block 剩低嘅部分，所以唔可以擺喺 `if` 入面。而且 `else` 嗰邊唔可以正常完——一定要離開：return、break、continue 或者 panic。",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "rust.cheatsheet.54.let-else-continue"
+title = "糊咗嗰張跳過佢"
+story = "Mei 將大排檔嘅落單紙加埋；有一張糊咗，其餘照計。"
+brief = '''
+`lines` 係 `["4", "x", "10"]`。parse 到嘅數加埋，parse 唔到嘅跳過，
+等 `total` 最後係 `14`。
+
+```
+for s in lines {
+    ____
+    total += n;
+}
+```
+
+空位應該填邊一行？
+'''
+hints = [
+  "`parse` 俾你嘅係 Result，所以個 pattern 係 Result 成功嗰邊，唔係 Option 嘅。else 嗰邊要離開呢一轉 loop，而唔係成個 loop 收工。",
+]

@@ -898,3 +898,47 @@ Který výraz patří do mezery?
 hints = [
   "Dvě selhání, dva tvary: vyhledání dá Option, který se musí stát Resultem, než ho tu `?` může použít; parsování dá Result, jehož chyba ještě není String.",
 ]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "rust.cheatsheet.53.let-else"
+title = "JINAK ODEJDI"
+story = "Čtečka jízdenek tramvaje v Causeway Bay buď přečte jízdné, nebo nepřečte nic; když nepřečte nic, turniket zůstane zavřený."
+brief = '''
+`a: Option<i32>`. Vytáhni hodnotu do `x`, aby ji mohly používat řádky **za**
+tímto, a opusť funkci, když je `a` rovno `None`.
+
+```
+fn show(a: Option<i32>) {
+    ____
+    println!("{}", x);
+}
+```
+
+Který řádek patří do mezery?
+'''
+hints = [
+  "Vzor váže `x` pro celý zbytek bloku, takže nemůže být uvnitř `if`. A větev `else` nesmí skončit normálně — musí odejít: return, break, continue nebo panic.",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "rust.cheatsheet.54.let-else-continue"
+title = "PŘESKOČ ROZMAZANÝ LÍSTEK"
+story = "Mei sčítá objednávkové lístky z dai pai dong; jeden je rozmazaný a ostatní se pořád počítají."
+brief = '''
+`lines` je `["4", "x", "10"]`. Sečti čísla, která jdou naparsovat, a ta, která
+nejdou, přeskoč, aby `total` skončil na `14`.
+
+```
+for s in lines {
+    ____
+    total += n;
+}
+```
+
+Který řádek patří do mezery?
+'''
+hints = [
+  "`parse` dává Result, takže vzor je úspěšná varianta Resultu, ne Optionu. Větev else musí opustit tento průchod smyčkou, ne celou smyčku.",
+]

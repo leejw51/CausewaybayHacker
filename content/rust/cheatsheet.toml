@@ -1493,7 +1493,7 @@ difficulty  = 2
 story       = "The Octopus top-up machine at Causeway Bay station either has a balance or it does not, and the receipt printer only speaks Result."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.46.map-err"]
-map         = { x = 0.793, y = 0.96, kind = "quest" }
+map         = { x = 0.83, y = 0.96, kind = "quest" }
 brief       = '''
 `o` is an `Option<u32>`. `r` must be `Ok(v)` when `o` is `Some(v)`, and
 `Err("empty")` when it is `None`.
@@ -1527,7 +1527,7 @@ difficulty  = 2
 story       = "Mei's tram-stop counter reads a scrawled number off the clipboard; when it cannot read one it should shrug, not explain."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.47.option-to-result"]
-map         = { x = 0.647, y = 0.9, kind = "quest" }
+map         = { x = 0.72, y = 0.9, kind = "quest" }
 brief       = '''
 `r` is the `Result<u32, ParseIntError>` from `s.parse::<u32>()`. `o` must
 be `Some(n)` when the parse worked and `None` when it did not — the error
@@ -1562,7 +1562,7 @@ difficulty  = 2
 story       = "The printer in the Sogo basement logs jobs as Result; the night manager wants a list of what went wrong and nothing about what went right."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.48.result-to-option"]
-map         = { x = 0.5, y = 0.96, kind = "quest" }
+map         = { x = 0.61, y = 0.96, kind = "quest" }
 brief       = '''
 `r` is a `Result<u32, String>`. `e` must be `Some(message)` when `r` is
 an `Err(message)`, and `None` when `r` is `Ok`.
@@ -1596,7 +1596,7 @@ difficulty  = 2
 story       = "Three meters on the Hennessy Road tram line report in; one of them reports a fault, and Alex wants the readings that came through."
 concepts    = ["error-handling", "iteration"]
 requires    = ["rust.cheatsheet.49.result-err"]
-map         = { x = 0.353, y = 0.9, kind = "quest" }
+map         = { x = 0.5, y = 0.9, kind = "quest" }
 brief       = '''
 `results` is a `Vec<Result<u32, String>>`, for example
 `[Ok(3), Err("x"), Ok(5)]`. `good` must be the values of the `Ok`s only:
@@ -1631,7 +1631,7 @@ difficulty  = 3
 story       = "The dai pai dong's order slips say a number of bowls; a smudged slip should just mean no order, not an error report."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.50.filter-map-result-ok"]
-map         = { x = 0.207, y = 0.96, kind = "quest" }
+map         = { x = 0.39, y = 0.96, kind = "quest" }
 brief       = '''
 Inside `fn double(s: &str) -> Option<u32>`, parse `s` as a `u32` and stop
 with `None` if it does not parse. `double("21")` is `Some(42)`,
@@ -1667,7 +1667,7 @@ difficulty  = 3
 story       = "The seat map for the Times Square screening is a HashMap of names to seat numbers written by hand: some names are missing, and some numbers are not numbers."
 concepts    = ["error-handling", "collections", "enums"]
 requires    = ["rust.cheatsheet.51.ok-question-in-option-fn"]
-map         = { x = 0.06, y = 0.93, kind = "boss" }
+map         = { x = 0.28, y = 0.9, kind = "quest" }
 brief       = '''
 Inside `fn seat(m: &HashMap<&str, &str>, k: &str) -> Result<u32, String>`:
 a missing `k` must return `Err(format!("no {k}"))`, and a value that does
@@ -1693,3 +1693,77 @@ choices = [
   'm.get(k).ok_or(format!("no {k}"))?.parse::<u32>().map_err(|e| e.to_string())?',
 ]
 answer  = 3
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id          = "rust.cheatsheet.53.let-else"
+node        = 53
+title       = "OR ELSE LEAVE"
+difficulty  = 2
+story       = "The tram ticket reader at Causeway Bay either reads a fare or reads nothing; when it reads nothing, the gate just stays shut."
+concepts    = ["pattern-matching", "enums", "control-flow"]
+requires    = ["rust.cheatsheet.52.both-ways"]
+map         = { x = 0.17, y = 0.96, kind = "quest" }
+brief       = '''
+`a: Option<i32>`. Pull the value out into `x` so the lines **after** this one
+can use it, and leave the function when `a` is `None`.
+
+```
+fn show(a: Option<i32>) {
+    ____
+    println!("{}", x);
+}
+```
+
+Which line fills the blank?
+'''
+solution    = 'let Some(x) = a else { return };'
+hints = [
+  "The pattern binds `x` for the rest of the block, so it cannot live inside an `if`. And the `else` branch must never finish normally — it has to leave: return, break, continue or panic.",
+]
+
+[quest.quiz]
+choices = [
+  'let Some(x) = a else { return };',
+  'let Some(x) = a else { None };',
+  'if let Some(x) = a { return };',
+  'let Some(x) = a { return };',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id          = "rust.cheatsheet.54.let-else-continue"
+node        = 54
+title       = "SKIP THE SMUDGE"
+difficulty  = 2
+story       = "Mei adds up the order slips from the dai pai dong; one slip is a smudge, and the rest still count."
+concepts    = ["pattern-matching", "error-handling", "control-flow"]
+requires    = ["rust.cheatsheet.53.let-else"]
+map         = { x = 0.06, y = 0.93, kind = "boss" }
+brief       = '''
+`lines` is `["4", "x", "10"]`. Add up the numbers that parse and skip the
+ones that do not, so `total` ends at `14`.
+
+```
+for s in lines {
+    ____
+    total += n;
+}
+```
+
+Which line fills the blank?
+'''
+solution    = 'let Ok(n) = s.parse::<i32>() else { continue };'
+hints = [
+  "`parse` gives a Result, so the pattern is its success variant, not Option's. The else branch has to leave this pass of the loop without ending the whole loop.",
+]
+
+[quest.quiz]
+choices = [
+  'let Ok(n) = s.parse::<i32>() else { break };',
+  'let Some(n) = s.parse::<i32>() else { continue };',
+  'let Ok(n) = s.parse::<i32>() else { continue };',
+  'let Ok(n) = s.parse::<i32>() else { 0 };',
+]
+answer  = 2
