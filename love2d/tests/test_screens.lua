@@ -189,8 +189,10 @@ return function()
         end
         T.ok(m.widest >= widest, tag .. ": the name is measured as it is drawn")
         T.ok(m.label_w >= m.widest, tag .. ": the label column holds the widest name")
-        T.ok(m.y0 + #rows * (m.rh + 12) - 12 <= Categories.band_top(shape[3]) - 10,
-          tag .. ": four rows end above the PLAYGROUND band")
+        T.ok(m.y0 + m.per_col * (m.rh + 12) - 12 <= Categories.band_top(shape[3]) - 10,
+          tag .. ": every row ends above the PLAYGROUND band")
+        local lx, _ = Categories.row_at(m, #rows)
+        T.ok(lx + m.w <= shape[2], tag .. ": the last column is on the screen")
         T.ok(m.rh >= 12 + UI.lineHeight(m.name_size) + 14, tag .. ": the row holds its name")
         T.ok(m.count_w >= UI.textWidth("00 / 00", m.count_size), tag .. ": the counts plate holds NN / NN")
         T.ok(m.y0 > m.title_y + m.title_h, tag .. ": the first row starts under the title")

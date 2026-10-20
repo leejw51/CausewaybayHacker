@@ -121,7 +121,10 @@ end
 local TITLE_SIZE, NAME_SIZE, COUNT_SIZE, BLURB_SIZE = 16, 13, 10, 7
 local TITLE_FLOOR, SIZE_FLOOR = 8, 5
 
-local function measure(vw, vh, rows, title_step, step, blurb, tight)
+local COL_GAP = 16
+
+local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
+  cols = cols or 1
   local title_size = math.max(TITLE_FLOOR, TITLE_SIZE - title_step)
   local name_size = math.max(SIZE_FLOOR, NAME_SIZE - step)
   local count_size = math.max(SIZE_FLOOR, COUNT_SIZE - step)
@@ -129,7 +132,10 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight)
   local title_h = UI.lineHeight(title_size)
   local y0 = title_y + title_h + 18
   local pad = Layout.isPortrait() and 12 or 60
-  local w = vw - pad * 2
+  -- Seven roads (RUST, with the two sheet roads) at the largest type in a
+  -- 720-tall window do not fit in one column at any size: the last resort
+  -- is two, side by side, each this wide.
+  local w = math.floor((vw - pad * 2 - COL_GAP * (cols - 1)) / cols)
 
   local name_h, blurb_h = UI.lineHeight(name_size), UI.lineHeight(BLURB_SIZE)
   local plate_h = name_h + 8
@@ -159,7 +165,7 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight)
   local count_y = stacked and (12 + name_h + 8) or (tight and 4 or 8)
 
   -- Rows: what the type needs, stretched to what the screen has.
-  local n = math.max(1, #rows)
+  local n = math.max(1, math.ceil(#rows / cols))
   local bottom = Categories.band_top(vh) - 10
   local need = 12 + name_h + 4 + (blurb and blurb_h or 0) + 14
   need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
@@ -192,7 +198,11 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight)
     stacked = stacked, tight = tight or false, widest = widest,
     title_size = title_size, name_size = name_size, count_size = count_size,
     blurb_size = BLURB_SIZE, bottom = bottom,
-    fits = y0 + n * (rh + 12) - 12 <= bottom,
+    cols = cols, per_col = n,
+    -- Down the screen, and across: a name wider than its label column
+    -- (CHEATSHEET ADVANCED, at the largest step in portrait) does not fit
+    -- either, and the type steps down until it does.
+    fits = y0 + n * (rh + 12) - 12 <= bottom and widest <= label_w,
   }
 end
 
@@ -220,7 +230,23 @@ function Categories.metrics(vw, vh, rows)
     step = step + 1
     m = measure(vw, vh, rows, title_step, step, false, true)
   end
-  return m
+  if m.fits or Layout.isPortrait() then return m end
+  -- Landscape and still over: two columns, from the largest type down.
+  step = 0
+  local two = measure(vw, vh, rows, title_step, step, false, false, 2)
+  while not two.fits and step < NAME_SIZE - SIZE_FLOOR do
+    step = step + 1
+    two = measure(vw, vh, rows, title_step, step, false, false, 2)
+  end
+  return two.fits and two or m
+end
+
+--- Where row `i` (1-based) stands: its left edge and its top. One column, or
+--- two filled top to bottom — read by the draw and by the click alike.
+function Categories.row_at(m, i)
+  local col = math.floor((i - 1) / m.per_col)
+  local r = (i - 1) % m.per_col
+  return m.pad + col * (m.w + COL_GAP), m.y0 + r * (m.rh + 12)
 end
 
 --- The band under the rows: one button, PLAYGROUND — the same desk the
@@ -278,6 +304,8 @@ function Categories:draw()
     local selected = i == self.cursor
     local lift = selected and Anim.lift(Anim.now() - self.picked_at) * 5 or 0
     local push = (selected and self.pressed_at) and Anim.press(t - self.pressed_at) * 4 or 0
+    local pad, row_y = Categories.row_at(m, i)
+    y = row_y
     local ry = y - lift + push
 
     if selected then
@@ -433,9 +461,9 @@ function Categories:mousepressed(x, y)
   -- margin, even — so a press was tested against rows that were not where
   -- the rows were drawn.
   local m = Categories.metrics(Layout.vw, Layout.vh, rows)
-  local pad, w, rh = m.pad, m.w, m.rh
-  local ry = m.y0
+  local w, rh = m.w, m.rh
   for i = 1, #rows do
+    local pad, ry = Categories.row_at(m, i)
     if x >= pad and x <= pad + w and y >= ry and y <= ry + rh then
       if self.cursor ~= i then
         self.cursor = i
@@ -446,7 +474,6 @@ function Categories:mousepressed(x, y)
       self:choose()
       return
     end
-    ry = ry + rh + 12
   end
 end
 

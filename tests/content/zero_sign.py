@@ -90,7 +90,9 @@ def scan(path):
     """Fragile (quest id, case, here, there) for one pack."""
     bad = []
     for quest in tomllib.loads(path.read_text())["quest"]:
-        for case in quest["tests"]["cases"]:
+        # The sheet roads have no tests: their quests are judged by the pick,
+        # and nothing in them is run, so nothing in them prints a zero.
+        for case in quest.get("tests", {}).get("cases", []):
             try:
                 here, caught = run(quest["solution"], case.get("stdin", ""), flip=False)
                 if not caught:

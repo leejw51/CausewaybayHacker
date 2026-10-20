@@ -735,7 +735,13 @@ fn validate_choices<'a>(quest: &'a QuestDef, quiz: &'a QuizDef) -> Result<&'a st
     let distinct: BTreeSet<String> = quiz
         .choices
         .iter()
-        .map(|c| choice_lines(c).iter().map(|l| l.trim()).collect::<Vec<_>>().join("\n"))
+        .map(|c| {
+            choice_lines(c)
+                .iter()
+                .map(|l| l.trim())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
         .collect();
     if distinct.len() != 4 || distinct.contains("") {
         return Err(bad_request(format!(

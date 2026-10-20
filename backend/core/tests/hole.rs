@@ -8,13 +8,19 @@ const SOLUTION: &str = "func main() {\n\tn := read()\n\tif n > 0 {\n\t\tfmt.Prin
 #[test]
 fn one_line_is_cut_at_its_own_indent() {
     let got = hole_program(SOLUTION, "n := read()").unwrap();
-    assert_eq!(got, format!("func main() {{\n\t{HOLE}\n\tif n > 0 {{\n\t\tfmt.Println(n)\n\t}}\n}}\n"));
+    assert_eq!(
+        got,
+        format!("func main() {{\n\t{HOLE}\n\tif n > 0 {{\n\t\tfmt.Println(n)\n\t}}\n}}\n")
+    );
 }
 
 #[test]
 fn several_lines_written_at_the_margin_find_the_indented_run() {
     let got = hole_program(SOLUTION, "\nif n > 0 {\n\tfmt.Println(n)\n}\n").unwrap();
-    assert_eq!(got, format!("func main() {{\n\tn := read()\n\t{HOLE}\n}}\n"));
+    assert_eq!(
+        got,
+        format!("func main() {{\n\tn := read()\n\t{HOLE}\n}}\n")
+    );
 }
 
 #[test]
