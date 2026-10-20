@@ -139,7 +139,10 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
 
   local name_h, blurb_h = UI.lineHeight(name_size), UI.lineHeight(BLURB_SIZE)
   local plate_h = name_h + 8
-  local count_h = UI.lineHeight(count_size) + 4 + 7 + 10
+  -- The counts plate: the number, the bar under it, and air below. Tight,
+  -- the air goes — seven roads at the largest step in a 720-tall window
+  -- were thirteen pixels over the band, and this is where they came from.
+  local count_h = UI.lineHeight(count_size) + 4 + 7 + (tight and 5 or 10)
   -- The name as it is drawn — `VERY BASIC`, in the player's language — not
   -- the id: `VERYBASIC` is a space narrower, and the gutter sized from it
   -- wrapped VERY over BASIC and printed it through the blurb.
@@ -174,7 +177,7 @@ local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
   -- plate instead. Five roads (RUST's FRAMEWORKS) at the largest type in a
   -- 720-tall window did not fit any other way.
   if tight then
-    need = math.max(12 + name_h + 14, 4 + math.max(plate_h, count_h) + 4)
+    need = math.max(12 + name_h + 8, 4 + math.max(plate_h, count_h) + 2)
   end
   if stacked then need = math.max(need, count_y + count_h + 10) end
   local avail = math.floor((bottom - y0) / n) - 12
