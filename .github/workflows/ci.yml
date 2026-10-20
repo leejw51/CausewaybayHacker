@@ -468,7 +468,9 @@ jobs:
   content:
     name: Content (solutions, starters, mistake fixtures)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Every wrong quiz choice is swapped into its hole and built too —
+    # three more builds a quest; `verify_pack.py` judges quests in parallel.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

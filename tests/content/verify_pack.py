@@ -20,7 +20,8 @@ For every quest it:
     and compares under the declared `match` mode
   * compiles and runs `starter` and asserts it does NOT pass (SPEC §9.5)
 """
-import os, re, shutil, subprocess, sys, tomllib, tempfile, pathlib, json
+import os, re, shutil, subprocess, sys, tomllib, tempfile, pathlib, json, threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Written by PM and lifted into tests/ by QA so SPEC §9.4 and §9.5 have one
 # implementation rather than two. Re-lifted 2026-09-11 to pick up the brief
@@ -120,10 +121,19 @@ def cargo_env():
 _shelf_warm = False
 
 
+_shelf_lock = threading.Lock()
+
+
 def ensure_shelf():
     """Build the shelf into CACHE once per cache — `cwbhacker warm`, for the
     gate. The marker holds the digest, so a shelf edited since is rebuilt;
-    the network is needed only when it is."""
+    the network is needed only when it is. Quests are judged on several
+    threads (`JOBS`), so the first to arrive builds it and the rest wait."""
+    with _shelf_lock:
+        _ensure_shelf()
+
+
+def _ensure_shelf():
     global _shelf_warm
     if _shelf_warm:
         return
@@ -983,6 +993,50 @@ def main_i18n(argv):
 
 
 # ---------------------------------------------------------------- main
+# How many quests are judged at once: the machine's cores, or CWBHACKER_JOBS.
+JOBS = int(os.environ.get("CWBHACKER_JOBS") or os.cpu_count() or 2)
+
+
+def check_quest(pack, q):
+    """Build and run one quest: its solution, its starter, and each wrong
+    choice swapped into the hole. Returns (ok, the report's lines)."""
+    lines = []
+    wd_s = SCRATCH / f"{q['id']}.sol"
+    wd_t = SCRATCH / f"{q['id']}.start"
+    lang = quest_lang(pack, q)
+    sv, sp, st, sn = judge(lang, q["solution"], q, wd_s)
+    tv, tp, tt, tn = judge(lang, q["starter"], q, wd_t)
+    vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
+    sol_ok = sv == "accepted" and sp == st
+    start_ok = not (tv == "accepted" and tp == tt)
+    # Every wrong choice, swapped into the hole the right one leaves,
+    # must not pass. Three more judges per quest; the quiz is honest.
+    quiz_ok = True
+    wrongs = []
+    quiz = q.get("quiz")
+    spans = hole_spans(q["solution"], quiz["choices"][quiz["answer"]]) if quiz else []
+    if quiz and len(quiz.get("choices", [])) == 4 and len(spans) == 1:
+        for k, wrong in enumerate(quiz["choices"]):
+            if k == quiz["answer"]:
+                continue
+            swapped = fill_hole(q["solution"], spans[0], wrong)
+            wv, wp, wt, _ = judge(lang, swapped, q, SCRATCH / f"{q['id']}.wrong{k}")
+            if wv == "accepted" and wp == wt:
+                quiz_ok = False
+                wrongs.append(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")
+    lines.append(f"  {q['node']:>4} {q['id']:<34} "
+                 f"{('PASS' if sol_ok else 'FAIL:'+sv):<10} "
+                 f"{str(sp)+'/'+str(st):>7} "
+                 f"{('rejected:'+tv if start_ok else 'ACCEPTED!!'):<14} "
+                 f"{vis:>3} {','.join(q.get('concepts', []))}")
+    lines += wrongs
+    if not sol_ok:
+        lines.append(f"        solution notes: {sn}")
+    if not start_ok:
+        lines.append(f"        STARTER PASSES — SPEC §9.5 violation")
+    return sol_ok and start_ok and quiz_ok, lines
+
+
 def main(argv):
     if "--i18n" in argv:
         return main_i18n([a for a in argv if a != "--i18n"])
@@ -1012,6 +1066,7 @@ def main(argv):
             print(f"  structure OK  (map: {turns} direction changes)")
         print(f"  {'node':>4} {'id':<34} {'sol':<10} {'cases':>7} "
               f"{'starter':<14} {'vis':>3} {'concepts'}")
+        pending = []
         for q in pack["quest"]:
             if pack["category"] in SHEETS:
                 # Nothing to build: the pick is judged against the quiz,
@@ -1020,41 +1075,20 @@ def main(argv):
                     concept_use.setdefault(c, set()).add(q["id"])
                 print(f"  {q['node']:>4} {q['id']:<34} {'QUIZ':<10}")
                 continue
-            wd_s = SCRATCH / f"{q['id']}.sol"
-            wd_t = SCRATCH / f"{q['id']}.start"
-            lang = quest_lang(pack, q)
-            sv, sp, st, sn = judge(lang, q["solution"], q, wd_s)
-            tv, tp, tt, tn = judge(lang, q["starter"], q, wd_t)
-            vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
-            sol_ok = sv == "accepted" and sp == st
-            start_ok = not (tv == "accepted" and tp == tt)
-            # Every wrong choice, swapped into the hole the right one leaves,
-            # must not pass. Three more judges per quest; the quiz is honest.
-            quiz_ok = True
-            quiz = q.get("quiz")
-            spans = hole_spans(q["solution"], quiz["choices"][quiz["answer"]]) if quiz else []
-            if quiz and len(quiz.get("choices", [])) == 4 and len(spans) == 1:
-                for k, wrong in enumerate(quiz["choices"]):
-                    if k == quiz["answer"]:
-                        continue
-                    swapped = fill_hole(q["solution"], spans[0], wrong)
-                    wv, wp, wt, _ = judge(lang, swapped, q, SCRATCH / f"{q['id']}.wrong{k}")
-                    if wv == "accepted" and wp == wt:
-                        quiz_ok = False
-                        print(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")
-            if not sol_ok or not start_ok or not quiz_ok:
+            pending.append(q)
+        # Each quest builds in its own scratch directories, so they are
+        # judged side by side and reported in order: a wrong choice swapped
+        # into every hole is three more builds a quest, and one at a time
+        # the gate outgrew CI's clock.
+        with ThreadPoolExecutor(max_workers=JOBS) as pool:
+            results = list(pool.map(lambda q: check_quest(pack, q), pending))
+        for q, (ok, lines) in zip(pending, results):
+            if not ok:
                 all_ok = False
             for c in q.get("concepts", []):
                 concept_use.setdefault(c, set()).add(q["id"])
-            print(f"  {q['node']:>4} {q['id']:<34} "
-                  f"{('PASS' if sol_ok else 'FAIL:'+sv):<10} "
-                  f"{str(sp)+'/'+str(st):>7} "
-                  f"{('rejected:'+tv if start_ok else 'ACCEPTED!!'):<14} "
-                  f"{vis:>3} {','.join(q.get('concepts', []))}")
-            if not sol_ok:
-                print(f"        solution notes: {sn}")
-            if not start_ok:
-                print(f"        STARTER PASSES — SPEC §9.5 violation")
+            for line in lines:
+                print(line)
     print("\n=== concept coverage (mistake kind -> quests reachable) ===")
     for kind, cs in kindmap.items():
         reach = set()
