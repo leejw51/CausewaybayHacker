@@ -76,6 +76,10 @@ fn a_quiz_imports_and_reaches_the_wire() {
         wire.get("solution").is_none(),
         "the quiz does not leak the solution"
     );
+    assert_eq!(
+        wire["quiz"]["program"], "fn main() {\n    ____\n}\n",
+        "the program around the hole travels with it, the right line cut out"
+    );
 }
 
 #[test]

@@ -232,8 +232,6 @@ export const yue: Partial<Catalogue> = {
   "quest.sheetRight": "啱",
   "quest.sheetStreak": "連勝 ×{n}",
   "quest.sheetCombo": "×{n} COMBO",
-  "quest.quizPick": "揀啱嗰一行，然後打出嚟  (1–4)",
-  "quest.quizRight": "啱 — 而家打出嚟",
   "quest.job": "今次嘅任務",
   "quest.sample": "示例 · {name}",
   "quest.in": "輸入",

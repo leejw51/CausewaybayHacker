@@ -61,8 +61,10 @@ pub struct QuestDef {
     pub tests: toml::Value,
     #[serde(default)]
     pub time_limit_s: Option<i64>,
-    /// VERY BASIC and CHEATSHEET: the four choices and the index of the right
-    /// one. On CHEATSHEET it is the whole quest.
+    /// The four choices and the index of the right one. Every road is picked,
+    /// not typed (SPEC §0): on the sheet roads the quiz is the whole quest,
+    /// and on every other road the right choice is lines of `solution`, cut
+    /// out of it to make the program the player is shown ([`hole_program`]).
     #[serde(default)]
     pub quiz: Option<QuizDef>,
     /// REMIX LAND only: which toolchain judges this quest — `go`, `rust` or
@@ -104,6 +106,78 @@ pub fn quest_lang<'a>(land: &'a str, quest: &'a QuestDef) -> &'a str {
 pub struct QuizDef {
     pub choices: Vec<String>,
     pub answer: i64,
+    /// Off the sheet roads: the solution with the right choice cut out and
+    /// [`HOLE`] in its place, which is what the player reads. Derived at
+    /// import and never authored — a pack that wrote one would be keeping a
+    /// second copy of the solution that nothing checks against the first.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub program: Option<String>,
+}
+
+/// What stands in the program where the right choice was cut out.
+pub const HOLE: &str = "____";
+
+/// The most lines one choice may run to. Four of them sit under the program
+/// on a phone; a choice longer than this is a second program, not a pick.
+pub const MAX_CHOICE_LINES: usize = 8;
+
+/// A choice's lines, without blank lines at either end.
+fn choice_lines(text: &str) -> Vec<&str> {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let first = lines.iter().position(|l| !l.trim().is_empty());
+    let last = lines.iter().rposition(|l| !l.trim().is_empty());
+    match (first, last) {
+        (Some(a), Some(b)) => lines[a..=b].to_vec(),
+        _ => Vec::new(),
+    }
+}
+
+/// Every place `right` stands in `solution`, as the line range it covers.
+/// Lines are compared with their indentation stripped, so a choice written
+/// at the left margin finds the same lines indented inside a function.
+fn hole_spans(solution: &str, right: &str) -> Vec<std::ops::Range<usize>> {
+    let want: Vec<&str> = choice_lines(right).iter().map(|l| l.trim()).collect();
+    let have: Vec<&str> = solution.split('\n').map(str::trim).collect();
+    let k = want.len();
+    if k == 0 || k > have.len() {
+        return Vec::new();
+    }
+    (0..=have.len() - k)
+        .filter(|&i| have[i..i + k] == want[..])
+        .map(|i| i..i + k)
+        .collect()
+}
+
+/// The program a picked quest shows: its solution with the right choice cut
+/// out and [`HOLE`] at the indentation the cut began at. `None` when the
+/// right choice does not stand in the solution exactly once — the importer
+/// refuses that quest, so a served quest always has one.
+pub fn hole_program(solution: &str, right: &str) -> Option<String> {
+    let spans = hole_spans(solution, right);
+    let [span] = spans.as_slice() else {
+        return None;
+    };
+    let lines: Vec<&str> = solution.split('\n').collect();
+    let first = lines[span.start];
+    let indent = &first[..first.len() - first.trim_start().len()];
+    let hole = format!("{indent}{HOLE}");
+    let mut out: Vec<&str> = lines[..span.start].to_vec();
+    out.push(&hole);
+    out.extend_from_slice(&lines[span.end..]);
+    Some(out.join("\n"))
+}
+
+/// The quiz as it is stored and served: on a road with a program around the
+/// hole, that program filled in.
+fn served_quiz(category: &str, quest: &QuestDef) -> Option<QuizDef> {
+    let mut quiz = quest.quiz.clone()?;
+    if !is_sheet(category) {
+        let right = usize::try_from(quiz.answer)
+            .ok()
+            .and_then(|i| quiz.choices.get(i))?;
+        quiz.program = hole_program(&quest.solution, right);
+    }
+    Some(quiz)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -499,6 +573,7 @@ pub fn validate(pack: &Pack) -> Result<()> {
             validate_cheatsheet(quest)?;
             continue;
         }
+        validate_hole_quiz(quest)?;
         let tests = tests_json(quest)?;
         let cases = tests
             .get("cases")
@@ -647,6 +722,87 @@ pub fn validate(pack: &Pack) -> Result<()> {
     Ok(())
 }
 
+/// Four choices, distinct and non-empty, and the answer one of them — what
+/// every quiz has, on every road.
+fn validate_choices<'a>(quest: &'a QuestDef, quiz: &'a QuizDef) -> Result<&'a str> {
+    if quiz.choices.len() != 4 {
+        return Err(bad_request(format!(
+            "quest '{}' has {} choices; a quiz has four",
+            quest.id,
+            quiz.choices.len()
+        )));
+    }
+    let distinct: BTreeSet<String> = quiz
+        .choices
+        .iter()
+        .map(|c| {
+            choice_lines(c)
+                .iter()
+                .map(|l| l.trim())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect();
+    if distinct.len() != 4 || distinct.contains("") {
+        return Err(bad_request(format!(
+            "quest '{}' has an empty or repeated choice",
+            quest.id
+        )));
+    }
+    usize::try_from(quiz.answer)
+        .ok()
+        .and_then(|i| quiz.choices.get(i))
+        .map(String::as_str)
+        .ok_or_else(|| {
+            bad_request(format!(
+                "quest '{}' has answer {} outside its four choices",
+                quest.id, quiz.answer
+            ))
+        })
+}
+
+/// A quest off the sheet roads: picked like a sheet quest, but the choices
+/// fill a hole in its solution, so the right one must be lines of that
+/// solution and stand in it exactly once — twice and the hole is ambiguous,
+/// never and there is nothing to cut. Its `tests` stay and are still checked
+/// below: the content gate swaps every wrong choice into the hole and runs
+/// them, which is what keeps one choice right (SPEC §9.5).
+///
+/// A quest with no quiz still imports and is judged by the runner: every
+/// shipped pack has one on every quest, and the content gate refuses a pack
+/// that does not (`verify_pack.py`), but the judge it falls back to is kept
+/// whole rather than left to rot behind a refusal.
+fn validate_hole_quiz(quest: &QuestDef) -> Result<()> {
+    let Some(quiz) = quest.quiz.as_ref() else {
+        return Ok(());
+    };
+    let right = validate_choices(quest, quiz)?;
+    if let Some(long) = quiz
+        .choices
+        .iter()
+        .position(|c| choice_lines(c).len() > MAX_CHOICE_LINES)
+    {
+        return Err(bad_request(format!(
+            "quest '{}' has choice {long} longer than {MAX_CHOICE_LINES} lines",
+            quest.id
+        )));
+    }
+    if quest.solution.contains(HOLE) || quiz.choices.iter().any(|c| c.contains(HOLE)) {
+        return Err(bad_request(format!(
+            "quest '{}' uses the hole marker '{HOLE}' in its solution or a choice",
+            quest.id
+        )));
+    }
+    match hole_spans(&quest.solution, right).len() {
+        1 => Ok(()),
+        n => Err(bad_request(format!(
+            "quest '{}' has a right choice that stands {n} times in its solution; \
+             it must be lines of the solution, exactly once",
+            quest.id
+        ))),
+    }
+}
+
 /// A CHEATSHEET quest: four distinct choices, the answer one of them, the
 /// solution that answer, and no tests or clock — the submit judges the pick
 /// against the choice, so a case here would be a promise nothing keeps.
@@ -657,29 +813,7 @@ fn validate_cheatsheet(quest: &QuestDef) -> Result<()> {
             quest.id
         ))
     })?;
-    if quiz.choices.len() != 4 {
-        return Err(bad_request(format!(
-            "quest '{}' has {} choices; a cheatsheet quest has four",
-            quest.id,
-            quiz.choices.len()
-        )));
-    }
-    let distinct: BTreeSet<&str> = quiz.choices.iter().map(|c| c.trim()).collect();
-    if distinct.len() != 4 || distinct.contains("") {
-        return Err(bad_request(format!(
-            "quest '{}' has an empty or repeated choice",
-            quest.id
-        )));
-    }
-    let right = usize::try_from(quiz.answer)
-        .ok()
-        .and_then(|i| quiz.choices.get(i))
-        .ok_or_else(|| {
-            bad_request(format!(
-                "quest '{}' has answer {} outside its four choices",
-                quest.id, quiz.answer
-            ))
-        })?;
+    let right = validate_choices(quest, quiz)?;
     if quest.solution.trim() != right.trim() {
         return Err(bad_request(format!(
             "quest '{}' has a solution that is not its right choice",
@@ -851,7 +985,10 @@ fn reconcile(conn: &Connection, pack: &Pack, ids: &[String]) -> Result<PackCount
                 quest.map.x,
                 quest.map.y,
                 quest.map.kind,
-                quest.quiz.as_ref().map(serde_json::to_string).transpose()?,
+                served_quiz(&pack.category, quest)
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()?,
                 quest_lang(&pack.land, quest),
             ],
         );

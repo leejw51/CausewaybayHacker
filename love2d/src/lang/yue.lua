@@ -258,8 +258,6 @@ return {
   ["RIGHT"] = "啱",
   ["VERY BASIC"] = "入門",
   ["BASIC"] = "基礎",
-  ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "揀啱嗰一行，然後打出嚟  (1–4)",
-  ["RIGHT — NOW TYPE IT"] = "啱 — 而家打出嚟",
   ["ADVANCED"] = "進階",
   ["FRAMEWORKS"] = "框架",
   ["OPEN"] = "開咗",

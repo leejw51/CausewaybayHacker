@@ -14,7 +14,7 @@ story = "23:00 ve strojovně pod Chow Yei Ching Building. Konzole je otevřená,
 brief = '''
 Tenzor je ta jediná hodnota, ze které je tahle země postavená. `torch.tensor` ho postaví z pythonového seznamu a zachová pořadí, v jakém ho dostal.
 
-Vyber řádek, který postaví tenzor `1 2 3`, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který postaví tenzor `1 2 3`. Patří tam, kde je komentář `# FILL`.
 
 ```
 output: [1, 2, 3]
@@ -71,7 +71,7 @@ story = "Nový akumulátor pro otáčky ventilátorů: tři řádky po čtyřech
 brief = '''
 `torch.zeros` bere rozměry jako samostatné argumenty — jeden na každou dimenzi — a vyplní tenzor nulami.
 
-Vyber řádek, který udělá tři řádky po čtyřech, a napiš ho.
+Vyber řádek, který udělá tři řádky po čtyřech.
 
 ```
 output: (3, 4) 0.0
@@ -90,7 +90,7 @@ story = "Šest strojů a tiskárna štítků je chce očíslovat od nuly, tak ja
 brief = '''
 `torch.arange(n)` je `range(n)` jako tenzor: od `0` až po `n`, ale bez něj.
 
-Vyber řádek, který počítá od nuly do pěti, a napiš ho.
+Vyber řádek, který počítá od nuly do pěti.
 
 ```
 output: [0, 1, 2, 3, 4, 5]

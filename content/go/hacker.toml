@@ -120,6 +120,31 @@ hints = [
   "The comma-ok form is the whole idiom: i, ok := seen[k].",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if i, ok := seen[x-target]; ok {
+	fmt.Printf("%d %d\n", i+1, j+1)
+	return
+}''',
+  '''
+if i, ok := seen[target-x]; ok {
+	fmt.Printf("%d %d\n", i+1, j+1)
+	continue
+}''',
+  '''
+if i, ok := seen[target-x]; ok {
+	fmt.Printf("%d %d\n", j+1, i+1)
+	return
+}''',
+  '''
+if i, ok := seen[target-x]; ok {
+	fmt.Printf("%d %d\n", i+1, j+1)
+	return
+}''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -306,6 +331,43 @@ hints = [
   "Record a new best only on a strictly shorter run, so the leftmost run of each length is the one you keep.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for sum >= s {
+	if bestLen == 0 || right-left+1 < bestLen {
+		bestLen, bestStart = right-left+1, left+1
+	}
+	sum -= values[left]
+	left++
+}''',
+  '''
+for sum >= s {
+	if bestLen == 0 || right-left+1 < bestLen {
+		bestLen, bestStart = right-left+1, left+1
+	}
+	left++
+	sum -= values[left]
+}''',
+  '''
+for sum >= s {
+	if bestLen == 0 || right-left+1 < bestLen {
+		bestLen, bestStart = right-left+1, left
+	}
+	sum -= values[left]
+	left++
+}''',
+  '''
+if sum >= s {
+	if bestLen == 0 || right-left+1 < bestLen {
+		bestLen, bestStart = right-left+1, left+1
+	}
+	sum -= values[left]
+	left++
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -431,6 +493,40 @@ hints = [
   "merged[last].end is addressable because merged is a slice of structs, not of pointers — assign straight into it.",
   "Extend to the larger of the two ends; a short interval inside a long one must not shrink it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if last >= 0 && s.start <= merged[last].end {
+	merged[last].end = s.end
+	continue
+}
+merged = append(merged, s)''',
+  '''
+if last >= 0 && s.start <= merged[last].end {
+	if s.end > merged[last].end {
+		merged[last].end = s.end
+	}
+}
+merged = append(merged, s)''',
+  '''
+if last > 0 && s.start <= merged[last].end {
+	if s.end > merged[last].end {
+		merged[last].end = s.end
+	}
+	continue
+}
+merged = append(merged, s)''',
+  '''
+if last >= 0 && s.start <= merged[last].end {
+	if s.end > merged[last].end {
+		merged[last].end = s.end
+	}
+	continue
+}
+merged = append(merged, s)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -587,6 +683,34 @@ hints = [
   "grid[r][c] indexes a string, so it is a byte: compare against '#', not \"#\".",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if grid[nr][nc] != '#' || seen[nr][nc] {
+	continue
+}
+queue = append(queue, cell{nr, nc})''',
+  '''
+if grid[nr][nc] != '#' && seen[nr][nc] {
+	continue
+}
+seen[nr][nc] = true
+queue = append(queue, cell{nr, nc})''',
+  '''
+if grid[nr][nc] != '#' || seen[nr][nc] {
+	continue
+}
+seen[nr][nc] = true
+queue = append(queue, cell{nr, nc})''',
+  '''
+if grid[nr][nc] == '#' || seen[nr][nc] {
+	continue
+}
+seen[nr][nc] = true
+queue = append(queue, cell{nr, nc})''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -709,6 +833,35 @@ hints = [
   "A closer is wrong when the stack is empty, or when the character at the top index is not its partner.",
   "If the loop finishes with anything left on the stack, the top of it is the last unclosed bracket.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if len(stack) == 0 || line[stack[len(stack)-1]] != want {
+	fail(i)
+	return
+}
+stack = stack[:len(stack)-1]''',
+  '''
+if len(stack) == 0 || line[stack[0]] != want {
+	fail(i)
+	return
+}
+stack = stack[1:]''',
+  '''
+if len(stack) == 0 && line[stack[len(stack)-1]] != want {
+	fail(i)
+	return
+}
+stack = stack[:len(stack)-1]''',
+  '''
+if len(stack) == 0 || line[stack[len(stack)-1]] != want {
+	fail(i)
+	return
+}
+stack = stack[1:]''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -850,6 +1003,47 @@ hints = [
   "Each half is plain sorted, so the second search is an ordinary binary search run at most twice.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for lo < hi {
+	mid := lo + (hi-lo)/2
+	if nums[mid] > nums[hi] {
+		lo = mid + 1
+	} else {
+		hi = mid
+	}
+}''',
+  '''
+for lo < hi {
+	mid := lo + (hi-lo)/2
+	if nums[mid] > nums[lo] {
+		lo = mid + 1
+	} else {
+		hi = mid
+	}
+}''',
+  '''
+for lo < hi {
+	mid := lo + (hi-lo)/2
+	if nums[mid] > nums[hi] {
+		lo = mid
+	} else {
+		hi = mid
+	}
+}''',
+  '''
+for lo <= hi {
+	mid := lo + (hi-lo)/2
+	if nums[mid] > nums[hi] {
+		lo = mid + 1
+	} else {
+		hi = mid
+	}
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -985,6 +1179,31 @@ hints = [
   "Appending to groups[k] works on a missing key: the zero value of a slice is nil and append handles nil.",
   "Sorting the joined lines sorts by first word, because the first word is where each line starts.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for _, word := range words {
+	k := key(word)
+	groups[k] = []string{word}
+}''',
+  '''
+for _, word := range words {
+	k := key(word)
+	groups[k] = append(groups[k], word)
+}''',
+  '''
+for _, word := range words {
+	k := key(word)
+	groups[word] = append(groups[k], word)
+}''',
+  '''
+for _, word := range words {
+	k := strings.ToLower(word)
+	groups[k] = append(groups[k], word)
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1173,6 +1392,31 @@ hints = [
   "After the loop the smallest of the k largest is at index 0, and that is the k-th largest overall.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+heap.Push(h, v)
+if h.Len() >= k {
+	heap.Pop(h)
+}''',
+  '''
+h.Push(v)
+if h.Len() > k {
+	heap.Pop(h)
+}''',
+  '''
+heap.Push(h, v)
+if h.Len() > k {
+	heap.Pop(h)
+}''',
+  '''
+heap.Push(h, v)
+if h.Len() > k {
+	h.Pop()
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1322,6 +1566,38 @@ hints = [
   "Save cursor.Next before you overwrite it, or the rest of the list is gone.",
   "Advance slow once for every two steps fast manages; when fast or fast.Next is nil, stop.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for cursor := head; cursor != nil; {
+	next := cursor.Next
+	cursor.Next = reversed
+	reversed = cursor
+	cursor = cursor.Next
+}''',
+  '''
+for cursor := head; cursor != nil; {
+	next := cursor.Next
+	cursor.Next = reversed
+	reversed = cursor
+	cursor = next
+}''',
+  '''
+for cursor := head; cursor != nil; {
+	next := cursor.Next
+	reversed = cursor
+	cursor.Next = reversed
+	cursor = next
+}''',
+  '''
+for cursor := head; cursor != nil; {
+	next := cursor.Next
+	reversed = cursor
+	cursor = next
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1495,6 +1771,31 @@ hints = [
   "The base case is both conditions at once: past the end of the slice, or sitting on a -1.",
   "Depth is 1 + the deeper child, and 0 for a missing node.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+walk(tree, 2*i+1, order, out)
+if order == 1 {
+	*out = append(*out, tree[i])
+}''',
+  '''
+walk(tree, 2*i+2, order, out)
+if order == 1 {
+	*out = append(*out, tree[i])
+}''',
+  '''
+walk(tree, 2*i+1, order, out)
+if order == 2 {
+	*out = append(*out, tree[i])
+}''',
+  '''
+walk(tree, 2*i+1, order, out)
+if order == 1 {
+	*out = append(*out, tree[2*i+1])
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1670,6 +1971,35 @@ hints = [
   "A missing node is vacuously valid — the base case returns true.",
   "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+value := tree[i]
+if value <= low || value >= high {
+	return false
+}
+return valid(tree, 2*i+1, low, value) && valid(tree, 2*i+2, value, high)''',
+  '''
+value := tree[i]
+if value <= low || value >= high {
+	return false
+}
+return valid(tree, 2*i+1, value, high) && valid(tree, 2*i+2, low, value)''',
+  '''
+value := tree[i]
+if value <= low || value >= high {
+	return false
+}
+return valid(tree, 2*i+1, low, high) && valid(tree, 2*i+2, low, high)''',
+  '''
+value := tree[i]
+if value <= low || value >= high {
+	return false
+}
+return valid(tree, 2*i+1, low, value) || valid(tree, 2*i+2, value, high)''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1861,6 +2191,43 @@ hints = [
   "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if next.at+1 <= len(lists[next.which]) {
+	heap.Push(h, entry{
+		value: lists[next.which][next.at+1],
+		which: next.which,
+		at:    next.at + 1,
+	})
+}''',
+  '''
+if next.at+1 < len(lists[next.which]) {
+	heap.Push(h, entry{
+		value: lists[next.which][next.at+1],
+		which: next.which,
+		at:    next.at,
+	})
+}''',
+  '''
+if next.at+1 < len(lists[next.which]) {
+	heap.Push(h, entry{
+		value: lists[next.which][next.at+1],
+		which: next.which,
+		at:    next.at + 1,
+	})
+}''',
+  '''
+if next.at+1 < len(lists[next.which]) {
+	heap.Push(h, entry{
+		value: lists[next.which][next.at],
+		which: next.which,
+		at:    next.at + 1,
+	})
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1999,6 +2366,27 @@ hints = [
   "chosen is built with append and passed down; the capacity was reserved up front so the append does not surprise you.",
   "The base case is len(chosen) == len(nums) — a full arrangement, not an empty one.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+used[i] = true
+build(nums, used, append(chosen, nums[i]), out)
+used[i] = false''',
+  '''
+used[i] = false
+build(nums, used, append(chosen, nums[i]), out)
+used[i] = true''',
+  '''
+used[i] = true
+build(nums, used, append(chosen, nums[0]), out)
+used[i] = false''',
+  '''
+used[i] = true
+build(nums, used, chosen, out)
+used[i] = false''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2170,6 +2558,27 @@ hints = [
   "The success base case is at+1 == len(word) — checked after matching this cell, not before.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+here := grid[r][c]
+grid[r][c] = '#'
+grid[r][c] = here''',
+  '''
+here := grid[r][c]
+grid[r][c] = '#'
+defer func() { grid[r][c] = '#' }()''',
+  '''
+here := grid[r][c]
+grid[r][c] = '#'
+defer func() { grid[c][r] = here }()''',
+  '''
+here := grid[r][c]
+grid[r][c] = '#'
+defer func() { grid[r][c] = here }()''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2319,6 +2728,39 @@ hints = [
   "A plain queue gives *an* order; taking the smallest ready task gives *the* order the statement asks for.",
   "You never detect the cycle directly. You notice that fewer than n tasks came out.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for _, next := range after[task] {
+	if waiting[next] == 0 {
+		ready = append(ready, next)
+	}
+	waiting[next]--
+}''',
+  '''
+for _, next := range after[task] {
+	waiting[task]--
+	if waiting[next] == 0 {
+		ready = append(ready, next)
+	}
+}''',
+  '''
+for _, next := range after[task] {
+	waiting[next]--
+	if waiting[next] == 0 {
+		ready = append(ready, task)
+	}
+}''',
+  '''
+for _, next := range after[task] {
+	waiting[next]--
+	if waiting[next] == 0 {
+		ready = append(ready, next)
+	}
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2487,6 +2929,35 @@ hints = [
   "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if size[ra] < size[rb] {
+	ra, rb = rb, ra
+}
+parent[rb] = ra
+size[rb] += size[ra]''',
+  '''
+if size[ra] < size[rb] {
+	ra, rb = rb, ra
+}
+parent[ra] = rb
+size[ra] += size[rb]''',
+  '''
+if size[ra] < size[rb] {
+	ra, rb = rb, ra
+}
+parent[rb] = rb
+size[ra] += size[rb]''',
+  '''
+if size[ra] < size[rb] {
+	ra, rb = rb, ra
+}
+parent[rb] = ra
+size[ra] += size[rb]''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2615,6 +3086,35 @@ hints = [
   "Guard against reading an unreachable cell before you add one to it.",
   "REACH is how many cells of the finished table are not still marked unreachable.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if coin < amount && best[amount-coin] != unreachable {
+	if candidate := best[amount-coin] + 1; candidate < best[amount] {
+		best[amount] = candidate
+	}
+}''',
+  '''
+if coin <= amount && best[amount-coin] != unreachable {
+	if candidate := best[amount-coin] + coin; candidate < best[amount] {
+		best[amount] = candidate
+	}
+}''',
+  '''
+if coin <= amount && best[amount-coin] != unreachable {
+	if candidate := best[amount-coin] + 1; candidate > best[amount] {
+		best[amount] = candidate
+	}
+}''',
+  '''
+if coin <= amount && best[amount-coin] != unreachable {
+	if candidate := best[amount-coin] + 1; candidate < best[amount] {
+		best[amount] = candidate
+	}
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2755,6 +3255,39 @@ hints = [
   "For the zero count, look the prefix up before you record it, or every prefix finds itself.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if nums[i] < 0 {
+	current = nums[i]
+	currentStart = i
+} else {
+	current += nums[i]
+}''',
+  '''
+if current < 0 {
+	current = nums[i]
+	currentStart = i
+} else {
+	current += nums[i]
+}''',
+  '''
+if current < 0 {
+	current = nums[i]
+	currentStart = i - 1
+} else {
+	current += nums[i]
+}''',
+  '''
+if current < 0 {
+	current = 0
+	currentStart = i
+} else {
+	current += nums[i]
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2891,6 +3424,38 @@ hints = [
   "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
   "LCS is the same walk with max instead of min, and no diagonal step on a mismatch.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if a[i-1] == b[j-1] {
+	edit[i][j] = edit[i-1][j-1]
+	lcs[i][j] = lcs[i-1][j-1] + 1
+	continue
+}
+edit[i][j] = 1 + min3(edit[i-1][j-1], edit[i-1][j], edit[i][j-1])''',
+  '''
+if a[i] == b[j] {
+	edit[i][j] = edit[i-1][j-1]
+	lcs[i][j] = lcs[i-1][j-1] + 1
+	continue
+}
+edit[i][j] = 1 + min3(edit[i-1][j-1], edit[i-1][j], edit[i][j-1])''',
+  '''
+if a[i-1] == b[j-1] {
+	edit[i][j] = edit[i-1][j-1]
+	lcs[i][j] = lcs[i-1][j-1] + 1
+}
+edit[i][j] = 1 + min3(edit[i-1][j-1], edit[i-1][j], edit[i][j-1])''',
+  '''
+if a[i-1] == b[j-1] {
+	edit[i][j] = edit[i-1][j-1] + 1
+	lcs[i][j] = lcs[i-1][j-1] + 1
+	continue
+}
+edit[i][j] = 1 + min3(edit[i-1][j-1], edit[i-1][j], edit[i][j-1])''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3059,6 +3624,35 @@ hints = [
   "Running off the end of tails means this value extends the longest run so far — append it.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if tails[mid] > value {
+	low = mid + 1
+} else {
+	high = mid
+}''',
+  '''
+if tails[mid] < value {
+	low = mid
+} else {
+	high = mid
+}''',
+  '''
+if tails[mid] < value {
+	low = mid + 1
+} else {
+	high = mid
+}''',
+  '''
+if tails[mid] < value {
+	low = mid + 1
+} else {
+	high = mid - 1
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3189,6 +3783,27 @@ hints = [
   "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
   "A power of two has exactly one bit set, so clearing the lowest leaves zero — and zero itself has to be excluded by hand.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for walk := alone; walk != 0; walk >>= 1 {
+	bits++
+}''',
+  '''
+for walk := alone; walk != 0; walk &= walk + 1 {
+	bits++
+}''',
+  '''
+for walk := alone; walk != 0; walk &= walk - 1 {
+	bits++
+}''',
+  '''
+for walk := alone; walk != 0; walk ^= walk - 1 {
+	bits++
+}''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3344,6 +3959,35 @@ hints = [
   "The spiral wants the original grid, so copy before you rotate. append([]int64(nil), row...) is the one-line row copy.",
   "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for r := 0; r < n; r++ {
+	for c := r + 1; c < n; c++ {
+		grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+	}
+}''',
+  '''
+for r := 0; r < n; r++ {
+	for c := 0; c < n; c++ {
+		grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+	}
+}''',
+  '''
+for r := 0; r < n; r++ {
+	for c := r + 1; c < n; c++ {
+		grid[r][c] = grid[c][r]
+	}
+}''',
+  '''
+for r := 0; r < n; r++ {
+	for c := r + 1; c < n; c++ {
+		grid[r][c], grid[c][r] = grid[r][c], grid[c][r]
+	}
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3519,6 +4163,39 @@ hints = [
   "`through` is bumped on the node you step onto, so the root never counts itself.",
   "A query that falls off the trie answers NO and 0 without a special case — carry a flag and stop walking.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if next == 0 {
+	nodes = append(nodes, node{})
+	next = len(nodes)
+	nodes[at].children[slot] = next
+}
+nodes[next].through++''',
+  '''
+if next == 0 {
+	nodes = append(nodes, node{})
+	next = len(nodes) - 1
+	nodes[at].children[slot] = next
+}
+nodes[next].through++''',
+  '''
+if next == 0 {
+	nodes = append(nodes, node{})
+	next = len(nodes) - 1
+	nodes[at].children[slot] = next
+}
+nodes[at].through++''',
+  '''
+if next == 0 {
+	nodes = append(nodes, node{})
+	next = len(nodes) - 1
+	nodes[next].children[slot] = at
+}
+nodes[next].through++''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3708,6 +4385,15 @@ hints = [
   "copy(values[lo:hi], scratch[lo:hi]) writes the merged run back; a Fenwick tree is the other O(n log n) answer and is worth naming in the room.",
 ]
 
+[quest.quiz]
+choices = [
+  'inversions += int64(mid - left + 1)',
+  'inversions += int64(right - mid)',
+  'inversions += int64(mid - left)',
+  'inversions++',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3864,6 +4550,43 @@ hints = [
   "Ranging a map is deliberately unordered, so collect and sort before you can talk about `second largest`.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+sort.Slice(distinct, func(i, j int) bool { return distinct[i] < distinct[j] })
+
+if len(distinct) < 2 {
+	fmt.Println("NONE")
+	continue
+}
+fmt.Println(distinct[1])''',
+  '''
+sort.Slice(distinct, func(i, j int) bool { return distinct[i] > distinct[j] })
+
+if len(distinct) < 1 {
+	fmt.Println("NONE")
+	continue
+}
+fmt.Println(distinct[1])''',
+  '''
+sort.Slice(distinct, func(i, j int) bool { return distinct[i] > distinct[j] })
+
+if len(distinct) < 2 {
+	fmt.Println("NONE")
+	continue
+}
+fmt.Println(distinct[0])''',
+  '''
+sort.Slice(distinct, func(i, j int) bool { return distinct[i] > distinct[j] })
+
+if len(distinct) < 2 {
+	fmt.Println("NONE")
+	continue
+}
+fmt.Println(distinct[1])''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4000,6 +4723,39 @@ hints = [
   "Population variance is the mean of the squared deviations — divide the sum by n.",
   "For an even count the median is the average of values[n/2-1] and values[n/2], and that subtraction is where the off-by-one lives.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+variance := 0.0
+for _, v := range values {
+	delta := float64(v) - mean
+	variance += delta * delta
+}
+variance /= float64(n - 1)''',
+  '''
+variance := 0.0
+for _, v := range values {
+	delta := float64(v) - mean
+	variance += delta
+}
+variance /= float64(n)''',
+  '''
+variance := 0
+for _, v := range values {
+	delta := float64(v) - mean
+	variance += delta * delta
+}
+variance /= float64(n)''',
+  '''
+variance := 0.0
+for _, v := range values {
+	delta := float64(v) - mean
+	variance += delta * delta
+}
+variance /= float64(n)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4145,6 +4901,15 @@ hints = [
   "Pull the ADD argument inside the ADD case, from the same scanner. The loop counter counts commands, not tokens.",
   "items[:len(items)-1] panics on an empty slice, so VOID needs the length check that Vec::pop would have done for you.",
 ]
+
+[quest.quiz]
+choices = [
+  'cents, _ := strconv.ParseInt(sc.Text(), 10, 64)',
+  'cents, _ := strconv.ParseInt(next(), 10, 64)',
+  'cents, _ := strconv.Atoi(next())',
+  'cents, _ := strconv.ParseInt(next(), 10, 8)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4419,6 +5184,39 @@ hints = [
   "The spanning-tree half of the generator guarantees every node is reachable, so the inf filter never removes anything — keep it anyway, because the unreachable-node version is the follow-up.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for _, e := range g[cur.node] {
+	if cur.dist+e.w < dist[e.to] {
+		dist[e.to] = e.w
+		heap.Push(q, item{dist[e.to], e.to})
+	}
+}''',
+  '''
+for _, e := range g[cur.node] {
+	if cur.dist+e.w > dist[e.to] {
+		dist[e.to] = cur.dist + e.w
+		heap.Push(q, item{dist[e.to], e.to})
+	}
+}''',
+  '''
+for _, e := range g[cur.node] {
+	if cur.dist+e.w < dist[e.to] {
+		dist[e.to] = cur.dist + e.w
+		heap.Push(q, item{dist[e.to], e.to})
+	}
+}''',
+  '''
+for _, e := range g[cur.node] {
+	if cur.dist+e.w < dist[e.to] {
+		dist[e.to] = cur.dist + e.w
+		heap.Push(q, item{dist[e.to], cur.node})
+	}
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4613,6 +5411,27 @@ hints = [
   "Range(l, r) is Prefix(r+1) - Prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for i := index; i < len(f.tree); i += i & -i {
+	f.tree[i] += delta
+}''',
+  '''
+for i := index + 1; i < len(f.tree); i += i & -i {
+	f.tree[i] += delta
+}''',
+  '''
+for i := index + 1; i > 0; i -= i & -i {
+	f.tree[i] += delta
+}''',
+  '''
+for i := index + 1; i <= len(f.tree); i += i & -i {
+	f.tree[i] += delta
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4784,6 +5603,39 @@ hints = [
   "When the loop stops, i and j have both moved one past the palindrome — so it starts at i+1 and its length is j-i-1.",
   "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for i >= 0 && j < n && s[i] == s[j] {
+	i--
+	j++
+}
+// i and j have each stepped one too far
+start, length := i, j-i+1''',
+  '''
+for i >= 0 && j < n && s[i] == s[j] {
+	i--
+	j++
+}
+// i and j have each stepped one too far
+start, length := i+1, j-i-1''',
+  '''
+for i >= 0 && j < n && s[i] == s[j] {
+	i--
+	j++
+}
+// i and j have each stepped one too far
+start, length := i+1, j-i''',
+  '''
+for i > 0 && j < n && s[i] == s[j] {
+	i--
+	j++
+}
+// i and j have each stepped one too far
+start, length := i+1, j-i-1''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4985,6 +5837,43 @@ hints = [
   "inverse(v) is power(v, P-2), and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
   "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two power calls per query. Not needed to pass, and worth saying out loud.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for exp > 0 {
+	if exp&1 == 1 {
+		result = result * base
+	}
+	base = base * base % P
+	exp >>= 1
+}''',
+  '''
+for exp > 0 {
+	if exp&1 == 1 {
+		result = result * base % P
+	}
+	base = base * base % P
+	exp >>= 1
+}''',
+  '''
+for exp > 0 {
+	if exp&1 == 0 {
+		result = result * base % P
+	}
+	base = base * base % P
+	exp >>= 1
+}''',
+  '''
+for exp > 0 {
+	if exp&1 == 1 {
+		result = result * base % P
+	}
+	base = base * 2 % P
+	exp >>= 1
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -5199,6 +6088,39 @@ hints = [
   "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if i > 0 && open[i-1][j] {
+	routes = (routes + ways[i][j-1]) % P
+	if best[i-1][j] < cheapest {
+		cheapest = best[i-1][j]
+	}
+}''',
+  '''
+if i > 0 && open[i-1][j] {
+	routes = (routes + ways[i-1][j]) % P
+	if best[i-1][j] < cheapest {
+		cheapest = best[i-1][j]
+	}
+}''',
+  '''
+if i > 0 && open[i-1][j] {
+	routes = (routes + ways[i-1][j]) % P
+	if best[i-1][j] > cheapest {
+		cheapest = best[i-1][j]
+	}
+}''',
+  '''
+if i >= 0 && open[i-1][j] {
+	routes = (routes + ways[i-1][j]) % P
+	if best[i-1][j] < cheapest {
+		cheapest = best[i-1][j]
+	}
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5386,6 +6308,15 @@ hints = [
   "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
 ]
 
+[quest.quiz]
+choices = [
+  'sort.SliceStable(riders, func(i, j int) bool { return riders[i].score > riders[j].score })',
+  'sort.Slice(riders, func(i, j int) bool { return riders[i].score > riders[j].score })',
+  'sort.SliceStable(riders, func(i, j int) bool { return riders[i].score < riders[j].score })',
+  'sort.SliceStable(riders, func(i, j int) bool { return riders[i].index > riders[j].index })',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5571,6 +6502,43 @@ hints = [
   "Overwriting a key that is already present is not an eviction — check the map before you decide the cache is full.",
   "Walking Front to Back is already most-recent-first, so the last line needs no sort.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if recent.Len() == capacity {
+	oldest := recent.Front()
+	delete(where, oldest.Value.(*pair).key)
+	recent.Remove(oldest)
+	evicted++
+}
+where[key] = recent.PushFront(&pair{key: key, value: value})''',
+  '''
+if recent.Len() == capacity {
+	oldest := recent.Back()
+	delete(where, key)
+	recent.Remove(oldest)
+	evicted++
+}
+where[key] = recent.PushFront(&pair{key: key, value: value})''',
+  '''
+if recent.Len() == capacity {
+	oldest := recent.Back()
+	delete(where, oldest.Value.(*pair).key)
+	recent.Remove(oldest)
+	evicted++
+}
+where[key] = recent.PushFront(&pair{key: key, value: value})''',
+  '''
+if recent.Len() > capacity {
+	oldest := recent.Back()
+	delete(where, oldest.Value.(*pair).key)
+	recent.Remove(oldest)
+	evicted++
+}
+where[key] = recent.PushFront(&pair{key: key, value: value})''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"

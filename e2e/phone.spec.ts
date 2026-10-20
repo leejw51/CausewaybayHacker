@@ -1,5 +1,24 @@
+/**
+ * The game on a phone, both ways up. A quest is four choices and no editor
+ * (SPEC §0), so what a phone has to show on the quest screen is the choices,
+ * each one wide enough to press; the editor a phone has to fit is the
+ * playground's, in CODE mode, where it takes the screen.
+ */
 import { mkdirSync } from "node:fs";
-import { expect, freshAccount, login, openSelectedNode, pickCategory, pickLand, sceneNow, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
+import {
+  atScreen,
+  choicesShown,
+  clickButton,
+  expect,
+  freshAccount,
+  login,
+  openSelectedNode,
+  pickCategory,
+  pickLand,
+  sceneNow,
+  test,
+} from "./fixtures.js";
 
 const SHOTS = process.env.PHONE_SHOTS ?? "test-results/phone";
 mkdirSync(SHOTS, { recursive: true });
@@ -11,6 +30,23 @@ const BACKEND =
   process.env.E2E_BACKEND_URL ??
   process.env.E2E_BASE_URL ??
   "http://127.0.0.1:5390";
+
+/** Where the four choices are drawn, in CSS pixels. */
+const choiceRects = (page: Page) =>
+  page.evaluate(() =>
+    window.__cwbCapture!
+      .buttons()
+      .filter((b) => b.id.startsWith("choice:"))
+      .map((b) => b.client),
+  );
+
+/** Inside the screen's width, and wide enough to read and press. */
+function fitsAcross(page: Page, c: number[]): void {
+  const vw = page.viewportSize()!.width;
+  expect(c[0]).toBeGreaterThanOrEqual(0);
+  expect(c[0] + c[2]).toBeLessThanOrEqual(vw + 1);
+  expect(c[2]).toBeGreaterThan(vw * 0.3);
+}
 
 // A real phone: iPhone-sized CSS viewport, DPR 3, touch. This is the shape
 // the "code page is too small" report came from.
@@ -31,16 +67,11 @@ test("phone, held sideways: the quest screen", async ({ page }) => {
   await openSelectedNode(page);
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${SHOTS}/L3-quest.png` });
-  const box = await page.evaluate(() => {
-    const r = (document.querySelector(".cm-editor") as HTMLElement).getBoundingClientRect();
-    return [r.x, r.y, r.width, r.height];
-  });
-  console.log(`[phone-landscape] editor ${JSON.stringify(box)}`);
-  expect(box[3]).toBeGreaterThan(120);
-  const at = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
-  await page.mouse.click(at![0], at![1]);
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: `${SHOTS}/L4-code-mode.png` });
+  await choicesShown(page);
+  await expect(page.locator(".cm-content")).toBeHidden();
+  const choices = await choiceRects(page);
+  console.log(`[phone-landscape] choices ${JSON.stringify(choices)}`);
+  for (const c of choices) fitsAcross(page, c);
 });
 
 test("phone: the quest screen", async ({ page }) => {
@@ -63,36 +94,44 @@ test("phone: the quest screen", async ({ page }) => {
   await openSelectedNode(page);
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${SHOTS}/03-quest.png` });
-  const info = await page.evaluate(() => {
-    const cm = document.querySelector(".cm-editor") as HTMLElement | null;
-    const r = cm?.getBoundingClientRect();
-    const fs = cm ? getComputedStyle(cm.querySelector(".cm-content") as Element).fontSize : null;
-    return { rect: r ? [r.x, r.y, r.width, r.height] : null, fontSize: fs, vw: innerWidth, vh: innerHeight };
-  });
-  console.log(`[phone] editor ${JSON.stringify(info)}`);
+  // The pick: four choices, each inside the screen's width, and no editor.
+  await choicesShown(page);
+  await expect(page.locator(".cm-content")).toBeHidden();
+  const choices = await choiceRects(page);
+  console.log(`[phone] choices ${JSON.stringify(choices)}`);
+  for (const c of choices) fitsAcross(page, c);
+  await page.keyboard.press("Escape");
+  await atScreen(page, "map");
+  await page.screenshot({ path: `${SHOTS}/04-map.png` });
 
-  // CODE mode: the editor takes the screen, BACK gives the furniture back.
-  const at = await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"));
-  expect(at).not.toBeNull();
-  await page.mouse.click(at![0], at![1]);
+  // CODE mode, on the playground: the editor takes the screen, DONE gives
+  // the furniture back.
+  await page.keyboard.press("Escape");
+  await atScreen(page, "lands");
+  await clickButton(page, "playground");
+  await expect.poll(() => sceneNow(page), { timeout: 30_000 }).toBe("playground");
+  await expect(page.locator(".cm-content")).toBeVisible();
+  const framed = (await page.locator(".cm-editor").boundingBox())!;
+  await clickButton(page, "code");
   await page.waitForTimeout(800);
-  await page.screenshot({ path: `${SHOTS}/04-code-mode.png` });
+  await page.screenshot({ path: `${SHOTS}/05-code-mode.png` });
   const focus = await page.evaluate(() => {
     const r = (document.querySelector(".cm-editor") as HTMLElement).getBoundingClientRect();
     return { rect: [r.x, r.y, r.width, r.height], back: window.__cwbCapture!.buttonAt("unfocus") };
   });
   console.log(`[phone] code mode ${JSON.stringify(focus)}`);
-  expect(focus.rect[3]).toBeGreaterThan(500);
-  // DONE returns to the quest screen — and is still *signed in*. The header
+  // Taller than on the split page, and at least half the phone: the code
+  // page's own toolbar (RUN, FORMAT, UNDO…) is several rows on a phone.
+  expect(focus.rect[3]).toBeGreaterThan(framed.height);
+  expect(focus.rect[3]).toBeGreaterThan(page.viewportSize()!.height * 0.5);
+  // DONE returns to the playground — and is still *signed in*. The header
   // is not drawn in CODE mode, and its LOG OUT hit box used to outlive it in
   // exactly this corner, so the button that ends a writing session logged
   // the player out and landed them on the login screen.
+  expect(focus.back).not.toBeNull();
   await page.mouse.click(focus.back![0], focus.back![1]);
   await page.waitForTimeout(900);
-  expect(await sceneNow(page)).toBe("quest");
-  expect(await page.evaluate(() => window.__cwbCapture!.buttonAt("focus"))).not.toBeNull();
-  await page.screenshot({ path: `${SHOTS}/05-back-from-code.png` });
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: `${SHOTS}/06-map.png` });
+  expect(await sceneNow(page)).toBe("playground");
+  expect(await page.evaluate(() => window.__cwbCapture!.buttonAt("code"))).not.toBeNull();
+  await page.screenshot({ path: `${SHOTS}/06-back-from-code.png` });
 });

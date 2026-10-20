@@ -5,7 +5,8 @@
  * `aborting due to 2 previous errors` — and a trackpad would not move it.
  *
  * In landscape the console sits beside the code, the full height of it; in
- * portrait it stays underneath.
+ * portrait it stays underneath. The playground is the screen with a console:
+ * every quest is picked, not typed (SPEC §0), so a quest has no RUN.
  */
 import { expect, type Page } from "@playwright/test";
 import {
@@ -13,9 +14,6 @@ import {
   clickButton,
   freshAccount,
   login,
-  openSelectedNode,
-  pickCategory,
-  pickLand,
   run,
   sceneNow,
   setSource,
@@ -102,23 +100,6 @@ async function scrolls(page: Page, r: Box): Promise<void> {
   await touch("touchEnd", 0);
   await expect.poll(scroll).toBeGreaterThan(0);
 }
-
-test("the quest console in CODE mode scrolls, beside the code when wide", async ({
-  page,
-}, info) => {
-  await login(page, freshAccount());
-  await pickLand(page, "rust");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
-  await clickButton(page, "focus");
-  const r = await runBroken(page);
-  placed(page, r, info.project.name === "landscape");
-  if (SHOTS)
-    await page.screenshot({
-      path: `${SHOTS}/quest-code-${info.project.name}.png`,
-    });
-  await scrolls(page, r);
-});
 
 for (const mode of ["framed", "code"] as const) {
   test(`the playground's output scrolls (${mode}), beside the code when wide`, async ({

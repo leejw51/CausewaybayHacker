@@ -537,3 +537,485 @@ heap.push(Reverse((0u64, 0usize)));
 hints = [
   "pop 會畀一個 Option；入面係個 wrapper，而 wrapper 入面先係個 tuple —— 三層，而個 wrapper 啱啱好得一個欄位。",
 ]
+
+# ---------------------------------------------------------------- 31
+[[quest]]
+id    = "rust.cheatsheet_advanced.31.as-deref"
+title = "個名淨係借嚟睇"
+story = "Mei 喺茶餐廳本數簿度用 `Option<String>` 記住熟客個名；收據打印機要 `&str`，而本數簿仲要留返個名。"
+brief = '''
+`name: Option<String>` 入面可能有個熟客嘅名。`n` 一定要係由 `name`
+**借返嚟**嘅 `Option<&str>` —— 裝住同一段字嘅 `Some`，或者 `None` —— 而下一行
+仲要印 `name`，所以佢唔可以畀人 move 走。
+```
+let n: Option<&str> = ____;
+println!("{:?} {:?}", n, name);
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "借個 Option 得到嘅係指住 `String` 嘅 reference 嘅 Option，唔係指住 `str` 嘅。有一個 method 可以一步過借入面嘅嘢兼 deref 埋。用 value 去 map 會將個 String move 走，而 clone 出嚟嗰個係一個喺嗰行尾就死咗嘅臨時值。",
+]
+
+# ---------------------------------------------------------------- 32
+[[quest]]
+id    = "rust.cheatsheet_advanced.32.ok-or-else"
+title = "淨係空嗰陣"
+story = "銅鑼灣港鐵站啲儲物櫃每報一個空格就寫一行審計紀錄 —— 而 Alex 話，滿咗嘅格一行都唔准寫。"
+brief = '''
+`slot: Option<u32>`。`audit(tag: &str) -> String` **每次畀人呼叫**都會喺車站個
+審計 log 寫一行，然後回傳錯誤文字。`r` 喺 `Some(n)` 嗰陣係 `Ok(n)`，喺 `None`
+嗰陣係裝住審計文字嘅 `Err` —— 而滿咗嘅格唔可以掂個 log。
+```
+let r: Result<u32, String> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "將 Option 變做 Result 要一個錯誤值，而參數就算用唔着都會喺呼叫之前計咗先 —— 所以入面嘅副作用次次都會發生。交出去嘅應該係一樣可以呼叫嘅嘢，唔係一個值；亦唔係將 closure 擺喺要值嘅位。",
+]
+
+# ---------------------------------------------------------------- 33
+[[quest]]
+id    = "rust.cheatsheet_advanced.33.map-or-else"
+title = "PORT 定投訴"
+story = "時代廣場大電視嘅 config 畀一個 port，或者一句 parse 投訴；狀態列一次過砌好其中一樣再顯示。"
+brief = '''
+`r: Result<u16, String>`。`msg` 喺 `Ok(8080)` 嗰陣係 `"port 8080"`，喺 `Err`
+嗰陣係 `"bad: "` 後面跟住個錯誤 —— 對 `r` 淨係呼叫一次，唔用 `match`，亦唔另外
+unwrap。
+```
+let msg: String = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "一次呼叫嘅版本收兩個 closure，同佢個即刻計嘅兄弟一樣，後備嗰個排先。喺 Result 上面，後備 closure 收到嘅係個錯誤，所以佢收一個參數 —— 而次序調轉咗嗰對喺呢度照樣編譯得到，只係印錯嗰行。",
+]
+
+# ---------------------------------------------------------------- 34
+[[quest]]
+id    = "rust.cheatsheet_advanced.34.is-ok-and"
+title = "真 VIP 先得"
+story = "會員碼潦潦草草寫咗喺茶餐廳張紙巾度；過 900 就坐 VIP 卡位，字糊咗就乜都冇。"
+brief = '''
+`code: Result<u32, ParseIntError>`。淨係當 `code` 係 `Ok` **而且**個數大過
+`900`，`vip` 先係 `true`；`Err` 永遠都唔係 VIP。
+```
+let vip: bool = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "map 做 bool 之後再問佢係咪 Ok，就將個 bool 掉咗；預設值擺 true 又會放啲糊咗嘅字入嚟。有一個呼叫可以同時檢查 variant 同條件 —— 而佢個 closure 係用 value 收個數，唔係隔住 reference。",
+]
+
+# ---------------------------------------------------------------- 35
+[[quest]]
+id    = "rust.cheatsheet_advanced.35.or-else"
+title = "先睇 CACHE"
+story = "Mei 部電話記得上次睇過嗰份餐牌；淨係 cache 冇嗰陣，先應該頂住港鐵斷斷續續嘅訊號再去攞。"
+brief = '''
+`cache: Option<String>`；`fetch(id: u32) -> Option<String>` **每次畀人呼叫**都要
+上網。有 cache 嘅餐牌，`v` 就係佢，唔係就係 `fetch(id)` 回傳嘅嘢 —— 而 cache
+中咗嗰陣唔可以掂網絡。
+```
+let v: Option<String> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "由一個 Option 退返去另一個 Option，有即刻計同遲啲先計兩種口味；即刻計嗰種就算中咗都會計個參數 —— 即係個網絡呼叫。unwrap 喺度都唔啱：`v` 仲係一個 Option。",
+]
+
+# ---------------------------------------------------------------- 36
+[[quest]]
+id    = "rust.cheatsheet_advanced.36.option-zip"
+title = "要就兩樣都有"
+story = "軒尼詩道架電車嘅 GPS 訊號可能甩咗緯度或者經度；地圖淨係喺兩樣都到咗先至落點。"
+brief = '''
+`lat: Option<f64>`，`lng: Option<f64>`。**兩個**都喺度嗰陣 `p` 係
+`Some((lat, lng))`，缺咗任何一個就係 `None`。
+```
+let p: Option<(f64, f64)> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "有一個 method 可以將兩個 Option 配成一個 tuple 嘅 Option，兩個都係 `Some` 先至係 `Some`。`or` 同 `and` 各自淨係交返一邊，永遠唔會兩邊，而 map 會令第二個仲係包住。",
+]
+
+# ---------------------------------------------------------------- 37
+[[quest]]
+id    = "rust.cheatsheet_advanced.37.transpose"
+title = "可以冇，但唔可以錯"
+story = "駱克道張收據嘅貼士欄係可選嘅；填咗就一定要係數字，寫到亂晒嘅貼士會令張收據彈返轉頭。"
+brief = '''
+喺 `fn tip(raw: Option<&str>) -> Result<Option<u32>, ParseIntError>` 入面。
+`raw` 係 `None` 嗰陣 `n` 係 `None`，parse 到就係 `Some(t)` —— 而壞咗嘅數字會令
+`tip` 回傳嗰個錯誤。
+```
+let n: Option<u32> = ____;
+Ok(n)
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "map 個 parse 會得到一個入面裝住 Result 嘅 Option，但呢度嘅 `?` 要 Result 喺外層 —— 有一個 method 可以將兩層對調。closure 入面嘅 `?` 冇地方去，而用 `ok()` 掉咗個錯誤，啱啱好掉咗一定要失敗嗰種情況。",
+]
+
+# ---------------------------------------------------------------- 38
+[[quest]]
+id    = "rust.cheatsheet_advanced.38.collect-option"
+title = "樣樣都有，唔係就唔接單"
+story = "禮頓道間餅店淨係喺每樣嘢都喺架上先至接團體單；少一個蛋撻，成張單就取消。"
+brief = '''
+`stock: HashMap<&str, u32>`，`ids: Vec<&str>`。如果**每個** id 都喺 `stock`
+入面，`all` 就係按次序裝住每個 id 數量嘅 `Some`；缺咗任何一個就係 `None`。
+```
+let all: Option<Vec<u32>> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "一個產出 Option 嘅 iterator 可以收集做一個 Vec 嘅 Option，只要有一個係 `None` 佢即刻變 `None` —— 但啲元素一定要已經係擁有嘅數字，唔係 reference。跳過缺咗嘅，只會得到一張包喺 `Some` 入面嘅唔齊嘅單。",
+]
+
+# ---------------------------------------------------------------- 39
+[[quest]]
+id    = "rust.cheatsheet_advanced.39.collect-result-try"
+title = "第一張壞飛就出局"
+story = "Alex 喺一個可能失敗嘅 function 入面加埋 Sogo 門口啲輪候飛；有一張糊咗，個 function 就將個錯誤直接交上去。"
+brief = '''
+喺 `fn total(ws: &[&str]) -> Result<i32, ParseIntError>` 入面。`v` 裝住 parse
+做 `i32` 嘅**全部** token；只要有一個 token 失敗，`total` 就喺呢度回傳嗰個錯誤。
+```
+let v: Vec<i32> = ____;
+Ok(v.iter().sum())
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "先將啲 Result 收集做一個 Result，再傳上去。因為 `v` 先係嗰個 Vec，collect 要寫明目標 —— 係 Result，唔係 Vec。closure 入面嘅 `?` 冇地方去，而喺第一次失敗靜靜雞停低唔係錯誤。",
+]
+
+# ---------------------------------------------------------------- 40
+[[quest]]
+id    = "rust.cheatsheet_advanced.40.take-while"
+title = "第一次飆升就停"
+story = "怡和街凍倉個溫度計按次序記錄；一有讀數到 40，之後嘅就全部信唔過。"
+brief = '''
+`temps: Vec<i32>`，按時間次序。`ok` 裝住第一個大過或者等於 `40` 嘅讀數**之前**
+嘅讀數；嗰個讀數之後嘅一個都唔留，就算再凍返都一樣。
+```
+let ok: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "filter 會留低每一個凍嘅讀數，包括飆升之後嗰啲；你要嘅係第一次出 false 就永遠停低嘅 adaptor。而喺 `iter()` 上面，除非先將啲元素 copy 出嚟，closure 見到嘅係 reference 嘅 reference。",
+]
+
+# ---------------------------------------------------------------- 41
+[[quest]]
+id    = "rust.cheatsheet_advanced.41.skip-while"
+title = "過咗個開頭"
+story = "茶餐廳個餐牌檔以註釋行開頭；Mei 要嘅係之後嘅全部 —— 包括下面嗰行屬於餐牌嘅 `#` 行。"
+brief = '''
+`lines: Vec<&str>`，例如 `["# menu", "# v2", "milk tea", "# sold out:", "pineapple bun"]`。
+`body` 掉咗以 `#` 開頭嘅**開頭**嗰幾行，由第一行唔係嘅開始全部留低，後面嘅 `#` 行都算。
+```
+let body: Vec<&str> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "filter 會刪晒每一行 `#`，唔止開頭嗰啲；你要嘅係一路掉到條件第一次唔成立為止，之後原封不動留低其餘嘅。喺 `iter()` 上面，除非 copy 出嚟，啲元素係指住 `&str` 嘅 reference。",
+]
+
+# ---------------------------------------------------------------- 42
+[[quest]]
+id    = "rust.cheatsheet_advanced.42.scan-running-total"
+title = "碌住嘅餘額"
+story = "Mei 張八達通嘅紀錄列住增值同電車車費；佢要嘅係每行之後嘅餘額，唔係再睇多次嗰啲行。"
+brief = '''
+`deltas: Vec<i32>`，例如 `[50, -20, 100, -5]`。`bal` 係由 `0` 開始、每次變動之後
+嘅累計餘額：`[50, 30, 130, 125]`。
+```
+let bal: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "個狀態係以可變 reference 交畀 closure —— 要經嗰個 reference 去更新 —— 而每一步都要產出一個裝住新狀態嘅 Option，唔係啱啱加落去嗰個變動。",
+]
+
+# ---------------------------------------------------------------- 43
+[[quest]]
+id    = "rust.cheatsheet_advanced.43.fold-init"
+title = "茶錢"
+story = "Lucky Mac 每張枱收十蚊茶錢，餸錢另計；吉枱都照樣要畀茶錢。"
+brief = '''
+`items: Vec<u32>` 可能係空嘅。`total` 係 `10` 加埋所有項目嘅總和：`[28, 16, 32]`
+就係 `86`，`[]` 就係 `10`。
+```
+let total: u32 = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "合併類嘅 adaptor 入面，一個收初始值、永遠回傳一個普通數字；另一個由第一個元素開始、回傳一個 Option —— 空 Vec 就係 `None` —— 所以啲茶錢唔係唔見咗，就係 unwrap 直接 panic。",
+]
+
+# ---------------------------------------------------------------- 44
+[[quest]]
+id    = "rust.cheatsheet_advanced.44.partition"
+title = "雙數靠左，單數靠右"
+story = "時代廣場個閘口，雙數嘅輪候號行左邊門，單數行右邊 —— 一次過搞掂。"
+brief = '''
+`ns: Vec<i32>` 裝住正數，之後唔會再用。一次過行一轉：`evens` 攞雙數，`odds`
+攞單數，兩邊都保持次序。
+```
+let (evens, odds): (Vec<i32>, Vec<i32>) = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "有一個 adaptor 喺條件係 true 嗰陣將元素送入第一個 Vec，false 就送入第二個 —— 所以條件一定要係 bool，而 true 嗰邊喺左。filter 淨係收集到一個 Vec，唔係一對。",
+]
+
+# ---------------------------------------------------------------- 45
+[[quest]]
+id    = "rust.cheatsheet_advanced.45.get-or-insert-with"
+title = "餐牌淨係載一次"
+story = "Bo 師傅廚房部平板喺第一次有人問嗰陣由後台載入餐牌；之後就喺手上嗰份度加落去。"
+brief = '''
+`cache: Option<Vec<String>>` 一開始係 `None`；`load() -> Vec<String>` 好慢，
+**最多只可以行一次**。每一轉都攞到餐牌嘅 `&mut` —— 淨係 `cache` 係空先至載入
+—— 然後 push 一道餸；已經有嘅餐牌永遠唔會畀人換走。
+```
+for dish in ["toast", "bun"] {
+    let menu: &mut Vec<String> = ____;
+    menu.push(dish.to_string());
+}
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "無條件插入會換走個餐牌，而「空先至填」嘅呼叫入面收值嗰個，每一轉都會整多次嗰個值。傳個 function 本身，唔係佢嘅結果。",
+]
+
+# ---------------------------------------------------------------- 46
+[[quest]]
+id    = "rust.cheatsheet_advanced.46.next-if"
+title = "淨係要數字"
+story = "波斯富街小巴個車費牌寫住 `123+4`；Alex 個 parser 讀出個數，仲要將個 `+` 留畀下一步。"
+brief = '''
+`it: Peekable<Chars>` 行緊 `"123+4"`，`n: u32 = 0`。個 loop 將開頭啲數字食入 `n`
+（`123`），喺 `+` 度**唔食佢**就停，所以之後嘅 `it.next()` 係 `Some('+')`。
+```
+while let Some(c) = ____ {
+    n = n * 10 + c.to_digit(10).unwrap();
+}
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "先攞下一個字再 filter，個 `+` 已經畀你食咗；淨係 peek 就永遠唔會行前。Peekable 可以淨係喺下一個元素符合條件嗰陣先攞走佢 —— `_eq` 嗰個 variant 要嘅係一個用嚟比較嘅值，唔係 closure。",
+]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet_advanced.47.iter-filter-copied"
+title = "兩個 & 號"
+story = "時代廣場戲院個排隊叫號機將啲號碼擺喺一個 Vec 度；經理想要啲大號碼，但又唔想交出成張 list。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後仲要用。
+`b` 要裝住大過 15 嘅值，以 `i32` 形式：`[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "`.iter()` 派出嚟嘅係 `&i32`，而 `filter` 借畀 closure 嘅係每個元素嘅 reference，所以 closure 見到嘅係 `&&i32`。出嚟嘅元素喺你 copy 佢之前仍然係 reference。",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet_advanced.48.into-iter-filter"
+title = "一個 & 號"
+story = "糖街個檔口收檔：Vec 入面啲號碼過咗今晚就唔使用，所以可以直接攞走，唔使借。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後**唔再**需要。
+`b` 要裝住大過 15 嘅值：`[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "Vec 嘅 `.into_iter()` 派出嚟嘅係啲 `i32` 本身，所以 `filter` 借畀 closure 嘅係 `&i32` —— 一層 reference，唔係兩層 —— 之後亦都冇嘢要 copy。",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet_advanced.49.copied-first"
+title = "先 copy"
+story = "Alex 喺揀之前先將塊板上面啲錶數抄低，咁塊板上面乜都唔會畀人郁到。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後仲要用。
+今次喺 filter **之前**先 copy 啲元素。`b` 一定要係 `[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "啲元素一 copy 咗就係普通嘅 `i32`，所以 `filter` 借畀 closure 嘅係 `&i32` —— 同 `.into_iter()` 之後一樣，得一層 reference。",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet_advanced.50.parse-once"
+title = "淨係 parse 一次"
+story = "寶靈頓道街市個價錢板係靠一部好慢嘅相機讀，每讀一次都要錢；Mei 想每張價錢牌淨係讀一次。"
+brief = '''
+`a: Vec<&str>` 係 `["123", "456.5", "-1.2", "aa", "12345678"]`。`parse`
+係一個 closure，將一個 `&str` parse 做 `f32`，仲會數自己畀人 call 咗幾多次。`c`
+一定要係 parse 到嘅啲數，而每個字串淨係 call `parse` 一次 —— 五次，唔係九次。
+```
+let c: Vec<f32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "用「parse 唔 parse 到」嚟 filter，會將 parse 咗出嚟嘅數掉咗，於是下一步又要 parse 多次。有一個 adapter 可以喺同一步入面留低個數、掉咗啲失敗。",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet_advanced.51.all-or-nothing"
+title = "一係全部，一係冇"
+story = "利園落貨區張送貨單：只要有一個重量讀唔到，成張單就退返轉頭，唔係淨係嗰一行。"
+brief = '''
+`a: Vec<&str>` 裝住啲重量。全部都 parse 到做 `f32` 嘅話，`c` 一定要係裝住所有重量嘅 `Ok`；
+只要有一個唔得，就係第一個 `Err` ——
+`["123", "aa"]` 得出 `Err`，`["1", "2.5"]` 得出 `Ok([1.0, 2.5])`。
+```
+let c: Result<Vec<f32>, ParseFloatError> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "將一堆 Result collect 做一個 Result，會喺第一個 Err 度停 —— 不過前提係啲 Err 行得到去嗰度。任何先掉咗啲失敗嘅寫法，都唔會剩低嘢可以失敗。",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet_advanced.52.then-not-then-some"
+title = "唔存在嘅 index"
+story = "銅鑼灣總站架電車，塊板上面得三個位，但有個乘客要五號位。"
+brief = '''
+`xs: Vec<i32>` 係 `[7, 8, 9]`，`i: usize` 可能超出咗尾。`i` 喺範圍內嘅話 `v` 一定要
+係 `Some(xs[i])`，唔係就係 `None` —— 而且唔可以 panic。
+```
+let v: Option<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "收值嗰個版本喺睇個 bool 之前已經計咗個參數，所以出界嘅 index 一樣會 panic。closure 版本淨係喺條件係真嗰陣先行。",
+]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "rust.cheatsheet_advanced.53.unwrap-or-else-err"
+title = "closure 收到嘅係個錯誤"
+story = "怡和街間洗衣舖個櫃枱會印一張號碼飛；部機卡住嗰陣，就印出錯誤訊息嘅長度 —— 嗰個係老闆自己用嚟表示有幾嚴重嘅暗號。"
+brief = '''
+`r: Result<usize, String>`。`n` 一定要係 `Ok` 入面個值，或者 —— 當 `r` 係
+`Err(msg)` 嗰陣 —— `msg` 嘅長度。
+```
+let n: usize = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "喺 Result 度，lazy 嘅後備值會將個錯誤交畀 closure，所以 closure 要收一個參數。即刻計嗰個版本收嘅係普通值，乜都唔會傳畀佢。",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "rust.cheatsheet_advanced.54.result-and-then"
+title = "可能會失敗嘅一步"
+story = "喺茶餐廳夾錢：先由張單讀出總數，再分一半 —— 而單數嘅總數係冇辦法公平咁分一半。"
+brief = '''
+`parsed: Result<u32, String>` 係 parse 咗嘅總數，
+`fn half(n: u32) -> Result<u32, String>` 遇到單數會失敗。`r` 一定要係
+一半，或者先出現嗰個錯誤 —— `"8"` 得出 `Ok(4)`，`"7"`
+得出 `Err("7 is odd")`。
+```
+let r: Result<u32, String> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "呢一步本身就回傳 Result。用佢嚟轉換個值，會將一個 Result 塞入另一個 Result 入面；chain 起嚟就會將兩個壓平做一個。",
+]
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id    = "rust.cheatsheet_advanced.55.map-err-variant"
+title = "啲錯誤類型唔同"
+story = "希慎廣場戲院個訂飛系統有自己嘅錯誤 enum，但個飛嘅 parser 唔識講佢嘅語言。"
+brief = '''
+`enum MyErr { Parse(ParseIntError), Missing }` 冇 `From` impl。喺
+`fn seats(s: Option<&str>) -> Result<u32, MyErr>` 入面，`s` 已經
+unwrap 咗做 `&str`。將佢 parse 做 `u32`，再將 parse 失敗變成
+`MyErr::Parse(e)`。
+```
+let n = ____;
+Ok(n)
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "tuple struct 形式嘅 enum variant 本身已經係一個由佢個欄位去個 enum 嘅 function，所以可以直接放喺要 closure 嘅位 —— 唔使 call 佢，亦唔使再包多層。",
+]
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id    = "rust.cheatsheet_advanced.56.result-has-no-filter"
+title = "Result 冇 filter"
+story = "維園閘口個人數計數器報出嚟嘅一係係一個數，一係係故障；讀數係零即係個計數器從來冇畀人撳過。"
+brief = '''
+`r: Result<u32, ParseIntError>`。當 `r` 係 `Ok(n)` 而且 `n > 0`，`v` 一定要係
+`Some(n)`，其他情況就係 `None` —— parse 錯誤同零都一樣。
+```
+let v: Option<u32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "淨係喺測試通過嗰陣先留低個值，呢個係 Option 嘅 method；Result 冇呢個 method，因為測試唔過嗰陣需要一個錯誤嚟做結果。先落返去做 Option。closure 收到嘅係借返嚟嘅 reference。",
+]
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id    = "rust.cheatsheet_advanced.57.bool-option-result"
+title = "BOOL、OPTION、RESULT"
+story = "利舞台塊座位板：一個座位號一係喺板上面，一係唔喺；唔喺嗰陣，售票處想要一句說話。"
+brief = '''
+喺 `fn pick(xs: &[u32], i: usize) -> Result<u32, String>` 入面：`i` 喺範圍內就回傳
+`xs[i]`，唔係就回傳 `Err(format!("no item {i}"))`
+—— 永遠唔 panic，而且淨係喺需要嗰陣先砌個訊息。
+```
+let v = ____;
+Ok(v)
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "三個類型一個接一個：bool 變 Option（要 lazy，唔係個 index 會 panic），Option 變 Result（要 lazy，咁個訊息淨係需要嗰陣先 format），之後 Result function 入面嘅 `?` 先用得到佢。",
+]

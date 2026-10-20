@@ -15,7 +15,7 @@ story = "19:00 nad Times Square. Velká obrazovka se rozsvítí načerno a prvn�
 brief = '''
 Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna metoda na globálním objektu `console` zapíše řádek na standardní výstup.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 output: hello, causewaybay
@@ -34,7 +34,7 @@ story = "LED stěna Hysan Place rozděluje klipy noci mezi své panely; plánova
 brief = '''
 `a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené mezerou. TypeScript má jediný typ `number` a žádný operátor celočíselného dělení: `/` dá vždy zlomek, `Math.trunc` ho zahodí a `%` je zbytek.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  7 2
@@ -54,7 +54,7 @@ story = "Tramvajová tabule na Yee Wo Street ukazuje čekání na dvě desetinn�
 brief = '''
 `x` a `y` jsou čísla. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. Číslo má metodu, která ho naformátuje s pevným počtem desetinných míst a vrátí řetězec.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  7 2
@@ -74,7 +74,7 @@ story = "Banner aplikace Lee Garden přijde od marketingu malými písmeny a bra
 brief = '''
 `s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Metoda řetězce vrátí kopii, ve které je každé písmeno velké.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  kwan lee
@@ -95,7 +95,7 @@ story = "Příjezdové tabule na Yee Wo Street míří na sudých zastávkách n
 brief = '''
 `n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je `if`, který porovná zbytek s nulou operátorem striktní rovnosti, dlouhým tři znaky.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -115,7 +115,7 @@ story = "Velín ve třicátém patře sčítá své obrazovky jedna plus dvě pl
 brief = '''
 `n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst do `total`. Hlavička `for` má začátek, podmínku kontrolovanou před každým průchodem a krok.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -135,7 +135,7 @@ story = "Obrazovka na Times Square účtuje prvních deset reklamních slotů no
 brief = '''
 `fare(rides)` musí vrátit platbu: prvních deset jízd po 5, každou jízdu po desáté po 3. Signatura říká `: number`, takže tělo, které nic nevrátí, se nezkompiluje. Funkce vrací hodnotu jedním klíčovým slovem.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -155,7 +155,7 @@ story = "Každá produktová karta v aplikaci Lee Garden má jméno a cenu; kons
 brief = '''
 Konstruktor `Stall` dostane `name` a `price`. Třída deklaruje `price: number` a pod `strict` musí být každé deklarované pole přiřazeno v konstruktoru. Musí uložit `price` na objekt stejně, jako se ukládá `name`, aby ho `s.price` přečetlo zpátky.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tofu 12
@@ -175,7 +175,7 @@ story = "Cena krát množství je jeden řádek každého košíku v aplikaci Le
 brief = '''
 `Stall.total()` musí vrátit cenu krát množství. Parametry konstruktoru s `public` deklarují pole a rovnou je uloží; uvnitř metody se k polím objektu dostaneš přes `this`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tofu 12 3
@@ -195,7 +195,7 @@ story = "Panel MTR nad východem Causeway Bay na stěně Hysan jmenuje tři link
 brief = '''
 `word` je jedno z `island`, `tsuenwan`, `kwuntong`. Program z něj musí udělat odpovídající člen `Line`. Enum se dá indexovat jménem člena, ale jen klíčem, o kterém tsc ví, že je jedním z jeho jmen: `keyof typeof Line` je ta množina jmen a `as` řekne tsc, že řetězec jedním z nich je. Aserce se za běhu vymaže — nic nekontroluje, takže řetězec by měl sedět.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tsuenwan
@@ -215,7 +215,7 @@ story = "Každý klip, který velín dostane, jde na playlist noci v pořadí, v
 brief = '''
 `xs` je `number[]`, které začíná prázdné. Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, aby zůstalo pořadí vstupu. Pole na to má jednu metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -236,7 +236,7 @@ story = "První klip na playlistu Hysan Place byl stažen dřív, než šel do v
 brief = '''
 `xs` drží celá čísla z řádku. Program musí odstranit prvek na indexu 0, aby se zbytek posunul dolů. Jedna metoda pole odstraňuje podle počátečního indexu a počtu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -256,7 +256,7 @@ story = "Horké zprávy jdou na začátek tickeru pod obrazovkou na Times Square
 brief = '''
 `chain` je `number[]`; TypeScript nemá deque a pole zvládne oba konce. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, takže poslední přečtené skončí první. Pole má pro ten konec metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -276,7 +276,7 @@ story = "Aplikace Lee Garden počítá ťuknutí na produkt, jeden řádek na pr
 brief = '''
 `counts` je `Map<string, number>`. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. `get` má typ `number | undefined`, protože klíč může chybět, a `??` dodá hodnotu, která se použije, když chybí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  siu mai har gau siu mai
@@ -299,7 +299,7 @@ story = "Tabulka velína mapuje jméno zastávky na číslo tabule a dotaz na za
 brief = '''
 `table` mapuje jména na čísla tabulí a číslo tabule může být 0. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. `get` vrací pro chybějící klíč `undefined`; jeden operátor nahradí přesně `null` a `undefined` a nic jiného.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  2
@@ -322,7 +322,7 @@ story = "Šest slotů v rotaci na Times Square, tři různí inzerenti; faktura 
 brief = '''
 `xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. `Set` si nechá od každé jednu a počítá se vlastností, ne přes `length`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 5 3 8 5 3
@@ -342,7 +342,7 @@ story = "Překryvy se na stěně Hysan Place skládají na sebe a sundávají se
 brief = '''
 `stack` je pole používané jako zásobník. Program musí sundat HORNÍ (poslední) prvek do `top`. Jedna metoda pole odebere a vrátí poslední položku; má typ `number | undefined`, protože zásobník mohl být prázdný.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -363,7 +363,7 @@ story = "Fronta na pop-up v Lee Garden se obsluhuje v pořadí, v jakém se lid�
 brief = '''
 `q` je pole, které drží lístky v pořadí. Program musí sundat PRVNÍ z nich do `first`. Pole odebírá zepředu jednou metodou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -384,7 +384,7 @@ story = "Poruchy chodí do velína v libovolném pořadí a stěna má pokaždé
 brief = '''
 Standardní knihovna TypeScriptu nemá haldu, takže starter nese malou `MinHeap`: `push` přidá hodnotu a probublá ji nahoru, `pop` vezme nejmenší. Každé `x` musí jít dovnitř vlastní metodou haldy, aby `pop` později vracel nejmenší jako první. Zápis přímo do `items` probublání přeskočí a rozbije pořadí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 1 4 2 3
@@ -404,7 +404,7 @@ story = "Jízdné na tabuli na Yee Wo Street je v pořadí, v jakém se přidáv
 brief = '''
 `xs` drží celá čísla z řádku. Program musí `xs` seřadit na místě, vzestupně, než se vypíše. Metoda pole `sort` bere komparátor: záporný výsledek nechá první argument první. Bez něj `sort` porovnává čísla jako řetězce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 4 1
@@ -424,7 +424,7 @@ story = "Žebříček ťukací hry na obrazovce Times Square má být skóre od 
 brief = '''
 `rows` je `[string, number][]`: pole typovaných n-tic, jméno a pak skóre. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. Komparátor je arrow funkce; `||` propadne k druhému porovnání jen tehdy, když první dá 0, a `byName` porovná dva řetězce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -449,7 +449,7 @@ story = "Stěna Hysan Place posouvá text zprava doleva a operátor chce mít ř
 brief = '''
 `s` je jeden řádek textu. Program ho musí vypsat obráceně. Řetězec žádné vlastní obrácení nemá: rozlož ho do pole znaků, obrať pole a spoj ho zpátky do řetězce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  kwan lee
@@ -469,7 +469,7 @@ story = "Ke každé ceně v aplikaci Lee Garden se přičte stejný servisní po
 brief = '''
 `makeAdder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Její návratový typ `(x: number) => number` říká, že musí vrátit funkci — samotnou vnitřní funkci, aby se `add(x)` dalo zavolat později a `k` zůstalo zapamatované.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -490,7 +490,7 @@ story = "Obrazovky na sudých patrech parkovacího domu platí nájem podle čtv
 brief = '''
 `xs` drží celá čísla z řádku. `total` musí být součet druhých mocnin SUDÝCH hodnot, postavený z `filter`, `map` a `reduce` a tří arrow funkcí. `reduce` potřebuje počáteční hodnotu, jinak prázdné pole nemá od čeho začít.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4 5 6
@@ -510,7 +510,7 @@ story = "Každý panel stěny Hysan Place renderuje svůj vlastní snímek a st�
 brief = '''
 Žádná vlákna tu nejsou: jedna smyčka událostí a `square` jí vrací řízení, zatímco spí. Každé volání už bylo spuštěno a jeho promise je v `tasks`. Než se vypíšou výsledky, musí `main` POČKAT, až se všechny vyřídí. `Promise` má funkci, která z pole promisů udělá jeden, a `await` na něj čeká.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -531,7 +531,7 @@ story = "Čtyři prodejní feedy přičítají do jednoho čítače na konzoli v
 brief = '''
 Jedno vlákno, a přesto souběh: každý worker přečte `counter`, udělá `await` a zapíše ho zpátky, a ostatní workery běží v té mezeře. `lock` je malý asynchronní zámek. Před čtením musí každý worker zámek VZÍT a počkat, dokud ho nemá; uvolnění je už napsané za zápisem. `acquire` vrací promise, který se vyřídí, když je zámek tvůj.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1000
@@ -551,7 +551,7 @@ story = "23:59 ve velínu ve třicátém patře: feed přijde s typem `any`, ka�
 brief = '''
 Id obrazovek jdou do binárního vyhledávacího stromu a každý potomek má anotaci `TreeNode | null` — ne `any` — takže tsc udělá z prázdného případu případ. `insert(n, v)` vrací kořen stromu, ve kterém je `v`; případ `null` a pravá strana jsou napsané. Pro menší `v` se levý potomek musí nahradit výsledkem vložení do něj, aby se z potomka `null` stal uzel.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 4

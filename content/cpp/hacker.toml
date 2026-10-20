@@ -129,6 +129,15 @@ hints = [
   "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
 ]
 
+[quest.quiz]
+choices = [
+  'auto hit = seen.find(target - nums[j]);',
+  'auto hit = seen.find(nums[j] - target);',
+  'auto hit = seen.find(target + nums[j]);',
+  'auto hit = seen.find(nums[j]);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -229,6 +238,23 @@ hints = [
   "Record the best length and where it started, or you cannot print the run at the end; substr(start, len) does the rest.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (previous != last.end() && previous->second > start) {
+    start = previous->second + 1;''',
+  '''
+if (previous != last.end() && previous->second >= start) {
+    start = previous->second + 1;''',
+  '''
+if (previous != last.end() && previous->second >= start) {
+    start = previous->second;''',
+  '''
+if (previous != last.end() && previous->second >= start) {
+    start = previous->second - 1;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -326,6 +352,23 @@ hints = [
   "Extend the last merged interval when the new start is <= its end; otherwise push a new one.",
   "Extend to max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (!merged.empty() && start < merged.back().second) {
+    merged.back().second = std::max(merged.back().second, end);''',
+  '''
+if (!merged.empty() && start <= merged.back().second) {
+    merged.back().second = std::min(merged.back().second, end);''',
+  '''
+if (!merged.empty() && start <= merged.back().second) {
+    merged.back().second = std::max(merged.back().second, end);''',
+  '''
+if (!merged.empty() && end <= merged.back().second) {
+    merged.back().second = std::max(merged.back().second, end);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -452,6 +495,15 @@ hints = [
   "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
   "Two small arrays of the four offsets beat four copies of the body. Do the bounds check in int before you index: rows and cols are ints here on purpose, so r - 1 at r == 0 is -1 and not a wrapped size_t.",
 ]
+
+[quest.quiz]
+choices = [
+  "if (grid[nr][nc] != '.' || dist[nr][nc] > 0) {",
+  "if (grid[nr][nc] != '.' && dist[nr][nc] >= 0) {",
+  "if (grid[nr][nc] != '.' || dist[nr][nc] < 0) {",
+  "if (grid[nr][nc] != '.' || dist[nr][nc] >= 0) {",
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -580,6 +632,35 @@ hints = [
   "low + (high - low) / 2, and move high down to mid on success so you keep the smallest capacity that worked.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (days_needed(weights, mid) <= days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (days_needed(weights, mid) < days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (days_needed(weights, mid) >= days) {
+    high = mid;
+} else {
+    low = mid + 1;
+}''',
+  '''
+if (days_needed(weights, mid) <= days) {
+    low = mid + 1;
+} else {
+    high = mid;
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -692,6 +773,15 @@ hints = [
   "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
   "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
 ]
+
+[quest.quiz]
+choices = [
+  'while (!pending.empty() && nums[pending.back()] <= nums[i]) {',
+  'while (!pending.empty() && nums[pending.back()] > nums[i]) {',
+  'while (!pending.empty() && nums[pending.back()] < nums[i]) {',
+  'while (!pending.empty() && pending.back() < nums[i]) {',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -812,6 +902,23 @@ hints = [
   "REACH is just how many cells of the finished table are not still marked unreachable.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (coin < amount && best[amount - coin] != unreachable) {
+    long long candidate = best[amount - coin] + 1;''',
+  '''
+if (coin <= amount && best[amount - coin] != unreachable) {
+    long long candidate = best[amount - coin] + 1;''',
+  '''
+if (coin <= amount && best[amount - coin] != unreachable) {
+    long long candidate = best[amount - coin];''',
+  '''
+if (coin <= amount && best[amount - coin] == unreachable) {
+    long long candidate = best[amount - coin] + 1;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -931,6 +1038,31 @@ hints = [
   "The comparator returns a.second > b.second when the counts differ, and a.first < b.first when they do not — a total order, so the sort's instability cannot show.",
   "std::min(k, ranked.size()) is what makes k-too-big safe; slicing past the end of a vector is not an error the runtime reports.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (a.second != b.second) {
+    return a.second < b.second;
+}
+return a.first < b.first;''',
+  '''
+if (a.second != b.second) {
+    return a.second > b.second;
+}
+return a.first > b.first;''',
+  '''
+if (a.first != b.first) {
+    return a.first < b.first;
+}
+return a.second > b.second;''',
+  '''
+if (a.second != b.second) {
+    return a.second > b.second;
+}
+return a.first < b.first;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1071,6 +1203,31 @@ hints = [
   "For the middle, advance slow only on the steps where fast managed two.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::unique_ptr<Node> node = std::move(head);
+head = std::move(node->next);
+node->next = std::move(reversed);
+reversed = std::move(node);''',
+  '''
+std::unique_ptr<Node> node = head;
+head = std::move(node->next);
+node->next = std::move(reversed);
+reversed = std::move(node);''',
+  '''
+std::unique_ptr<Node> node = std::move(head);
+node->next = std::move(reversed);
+head = std::move(node->next);
+reversed = std::move(node);''',
+  '''
+std::unique_ptr<Node> node = std::move(head);
+head = std::move(node->next);
+node->next = std::move(reversed);
+reversed = std::move(node->next);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1205,6 +1362,35 @@ hints = [
   "The base case is both conditions at once: past the end of the vector, or sitting on a -1.",
   "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (order == 0) out.push_back(tree[i]);
+walk(tree, 2 * i, order, out);
+if (order == 1) out.push_back(tree[i]);
+walk(tree, 2 * i + 1, order, out);
+if (order == 2) out.push_back(tree[i]);''',
+  '''
+if (order == 0) out.push_back(tree[i]);
+walk(tree, 2 * i + 1, order, out);
+if (order == 1) out.push_back(tree[i]);
+walk(tree, 2 * i + 2, order, out);
+if (order == 2) out.push_back(tree[i]);''',
+  '''
+if (order == 0) out.push_back(tree[i]);
+walk(tree, 2 * i + 1, order, out);
+if (order == 2) out.push_back(tree[i]);
+walk(tree, 2 * i + 2, order, out);
+if (order == 1) out.push_back(tree[i]);''',
+  '''
+if (order == 0) out.push_back(tree[i]);
+walk(tree, 2 * i + 2, order, out);
+if (order == 1) out.push_back(tree[i]);
+walk(tree, 2 * i + 1, order, out);
+if (order == 2) out.push_back(tree[i]);''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1361,6 +1547,31 @@ hints = [
   "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (value <= low || value >= high) {
+    return false;
+}
+return valid(tree, 2 * i + 1, value, high) && valid(tree, 2 * i + 2, low, value);''',
+  '''
+if (value <= low || value >= high) {
+    return false;
+}
+return valid(tree, 2 * i + 1, std::numeric_limits<long long>::min(), value) && valid(tree, 2 * i + 2, value, std::numeric_limits<long long>::max());''',
+  '''
+if (value <= low || value >= high) {
+    return false;
+}
+return valid(tree, 2 * i + 1, low, value) && valid(tree, 2 * i + 2, value, high);''',
+  '''
+if (value <= low && value >= high) {
+    return false;
+}
+return valid(tree, 2 * i + 1, low, value) && valid(tree, 2 * i + 2, value, high);''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1499,6 +1710,15 @@ hints = [
   "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
 ]
 
+[quest.quiz]
+choices = [
+  'std::priority_queue<Entry, std::vector<Entry>, std::less<Entry>> heap;',
+  'std::priority_queue<Entry> heap;',
+  'std::priority_queue<long long, std::vector<long long>, std::greater<long long>> heap;',
+  'std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> heap;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1630,6 +1850,27 @@ hints = [
   "chosen.pop_back() goes between the two calls. That is the undo in try-recurse-undo.",
   "The base case is at == nums.size(), and the empty selection there is the empty subset, which still counts.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+chosen.push_back(nums[at]);
+build(nums, at + 1, chosen, out);
+chosen.pop_back();  // the undo in try-recurse-undo''',
+  '''
+chosen.push_back(nums[at]);
+build(nums, at + 1, chosen, out);
+chosen.clear();  // the undo in try-recurse-undo''',
+  '''
+chosen.push_back(nums[at]);
+build(nums, at, chosen, out);
+chosen.pop_back();  // the undo in try-recurse-undo''',
+  '''
+chosen.push_back(nums[at]);
+chosen.pop_back();  // the undo in try-recurse-undo
+build(nums, at + 1, chosen, out);''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1779,6 +2020,39 @@ hints = [
   "Chain the four directions with || rather than four ifs and a found flag: || already stops at the first branch that succeeds, and the && !found in the loop conditions does the same for the starting cells.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (grid[r][c] != word[at]) {
+    return false;
+}
+if (at == word.size()) {
+    return true;
+}''',
+  '''
+if (grid[r][c] != word[at]) {
+    return false;
+}
+if (at + 1 == word.size()) {
+    return true;
+}''',
+  '''
+if (at + 1 == word.size()) {
+    return true;
+}
+if (grid[r][c] != word[at]) {
+    return false;
+}''',
+  '''
+if (grid[r][c] != word[0]) {
+    return false;
+}
+if (at + 1 == word.size()) {
+    return true;
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1909,6 +2183,23 @@ hints = [
   "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
   "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (waiting[next]-- == 0) {
+    ready.push(next);''',
+  '''
+if (--waiting[next] == 0) {
+    ready.push(task);''',
+  '''
+if (--waiting[next] == 0) {
+    ready.push(next);''',
+  '''
+if (waiting[next] == 0) {
+    ready.push(next);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2063,6 +2354,35 @@ hints = [
   "An edge whose two ends already have the same root is the redundant one — count it and move on.",
   "Only a root's size entry is meaningful, so read the largest off the roots, not off every index.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (size[a] < size[b]) {
+    std::swap(a, b);
+}
+parent[b] = a;
+size[a] += size[b];''',
+  '''
+if (size[a] < size[b]) {
+    std::swap(a, b);
+}
+parent[b] = a;
+size[b] += size[a];''',
+  '''
+if (size[a] < size[b]) {
+    std::swap(a, b);
+}
+parent[a] = b;
+size[a] += size[b];''',
+  '''
+if (size[a] < size[b]) {
+    std::swap(a, b);
+}
+parent[b] = a;
+size[a] = size[b] + 1;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2227,6 +2547,15 @@ hints = [
   "If the big case times out, nothing is wrong with your answer — the shape of your loop is the answer here. Two nested loops over 200000 values is 2 x 10^10 comparisons.",
 ]
 
+[quest.quiz]
+choices = [
+  'auto slot = std::find(tails.begin(), tails.end(), value);',
+  'auto slot = std::lower_bound(tails.begin(), tails.end(), value);',
+  'auto slot = std::max_element(tails.begin(), tails.end());',
+  'auto slot = std::lower_bound(tails.rbegin(), tails.rend(), value);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2341,6 +2670,15 @@ hints = [
   "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours — std::min with a braced list takes all three at once.",
   "LCS is the same walk with max instead of min, and no diagonal step on a mismatch.",
 ]
+
+[quest.quiz]
+choices = [
+  'edit[i][j] = 1 + std::min(edit[i - 1][j], edit[i][j - 1]);',
+  'edit[i][j] = std::min({edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1]});',
+  'edit[i][j] = 1 + std::max({edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1]});',
+  'edit[i][j] = 1 + std::min({edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1]});',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2464,6 +2802,15 @@ hints = [
   "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
 ]
 
+[quest.quiz]
+choices = [
+  'for (int room = weight; room <= cap; ++room) {',
+  'for (int room = cap; room > weight; --room) {',
+  'for (int room = cap; room >= weight; --room) {',
+  'for (int room = cap - 1; room >= weight; --room) {',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2577,6 +2924,15 @@ hints = [
   "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width. std::popcount in <bit> is the C++20 one-liner.",
   "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
 ]
+
+[quest.quiz]
+choices = [
+  'for (unsigned long long walk = alone; walk != 0; walk &= walk - 1) {',
+  'for (unsigned long long walk = alone; walk != 0; walk >>= 1) {',
+  'for (unsigned long long walk = alone - 1; walk != 0; walk &= walk - 1) {',
+  'for (unsigned long long walk = alone; walk != 0; walk -= 1) {',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2704,6 +3060,27 @@ hints = [
   "The spiral wants the original grid, so keep a copy before you rotate in place.",
   "The two if guards inside the spiral loop are what stop a single middle row or column being walked twice.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for (auto row : grid) {
+    std::reverse(row.begin(), row.end());
+}''',
+  '''
+for (auto& row : grid) {
+    std::sort(row.begin(), row.end());
+}''',
+  '''
+for (auto& row : grid) {
+    std::reverse(row.begin() + 1, row.end());
+}''',
+  '''
+for (auto& row : grid) {
+    std::reverse(row.begin(), row.end());
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2864,6 +3241,23 @@ hints = [
   "A query that falls off the trie leaves at == -1, and -1 answers NO and 0 without a special case.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+nodes[at].through++;
+at = nodes[at].children[slot];''',
+  '''
+at = nodes[at].children[slot];
+nodes[at].through++;''',
+  '''
+at = nodes[at].children[slot];
+nodes[0].through++;''',
+  '''
+at = nodes[at].children[slot];
+nodes[at].through = 1;''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2975,6 +3369,35 @@ hints = [
   "seen[0] = 1 up front is what lets a run that starts at index 0 be found at all.",
   "The final prefix is the total, so the second line costs nothing extra.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+auto earlier = seen.find(k - prefix);
+if (earlier != seen.end()) {
+    runs += earlier->second;
+}
+seen[prefix]++;''',
+  '''
+auto earlier = seen.find(prefix - k);
+if (earlier != seen.end()) {
+    runs += 1;
+}
+seen[prefix]++;''',
+  '''
+seen[prefix]++;
+auto earlier = seen.find(prefix - k);
+if (earlier != seen.end()) {
+    runs += earlier->second;
+}''',
+  '''
+auto earlier = seen.find(prefix - k);
+if (earlier != seen.end()) {
+    runs += earlier->second;
+}
+seen[prefix]++;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3147,6 +3570,15 @@ hints = [
   "A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room; merge sort is less code under a clock.",
 ]
 
+[quest.quiz]
+choices = [
+  'inversions += static_cast<long long>(right - mid);',
+  'inversions += static_cast<long long>(mid - lo);',
+  'inversions += static_cast<long long>(mid - left);',
+  'inversions += static_cast<long long>(hi - right);',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3264,6 +3696,19 @@ hints = [
   "A std::set is sorted and de-duplicated at once, so *std::next(rbegin()) is the second largest distinct value.",
   "Guard with size() < 2 first: std::next on a reverse iterator past the end is undefined, and in this land undefined does not mean an error message.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::cout << *std::next(distinct.rbegin()) << '\n';''',
+  '''
+std::cout << *distinct.rbegin() << '\n';''',
+  '''
+std::cout << *std::next(distinct.begin()) << '\n';''',
+  '''
+std::cout << *(distinct.rbegin() + 1) << '\n';''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3385,6 +3830,27 @@ hints = [
   "Population variance is the mean of the squared deviations — divide the sum by n.",
   "For an even count the median is the average of values[n/2 - 1] and values[n/2], and that subtraction is where the off-by-one lives.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+double median = n % 2 == 1
+    ? static_cast<double>(values[middle])
+    : (static_cast<double>(values[middle]) + static_cast<double>(values[middle + 1])) / 2.0;''',
+  '''
+double median = n % 2 == 1
+    ? static_cast<double>(values[middle])
+    : (static_cast<double>(values[middle - 1]) + static_cast<double>(values[middle])) / 2.0;''',
+  '''
+double median = n % 2 == 1
+    ? static_cast<double>(values[middle])
+    : (values[middle - 1] + values[middle]) / 2;''',
+  '''
+double median = n % 2 == 1
+    ? static_cast<double>(values[middle])
+    : static_cast<double>(values[middle - 1] + values[middle] / 2);''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3511,6 +3977,27 @@ hints = [
   "Pull the ADD argument inside the ADD branch, from the same stream. The loop counter counts commands, not tokens.",
   "Guard the pop_back with empty(). On an empty vector it is undefined behaviour, and the one time it appears to work is the one time it is not being tested.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+long long cents = 0;
+items.push_back(cents);
+std::cin >> cents;''',
+  '''
+long long cents = 0;
+std::cin >> command;
+items.push_back(cents);''',
+  '''
+long long cents = 0;
+std::cin >> cents;
+items.push_back(cents);''',
+  '''
+long long cents = 0;
+std::cin >> cents;
+items.insert(items.begin(), cents);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3753,6 +4240,27 @@ hints = [
   "The spanning-tree half of the generator guarantees every node is reachable, so the filter on INF never actually removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (w < dist[v]) {
+    dist[v] = w;
+    heap.emplace(dist[v], v);''',
+  '''
+if (d + w < dist[v]) {
+    dist[v] = d + w;
+    heap.emplace(dist[v], v);''',
+  '''
+if (d + w < dist[v]) {
+    dist[v] = d + w;
+    heap.emplace(d, v);''',
+  '''
+if (d + w > dist[v]) {
+    dist[v] = d + w;
+    heap.emplace(dist[v], v);''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3948,6 +4456,15 @@ hints = [
   "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging.",
 ]
 
+[quest.quiz]
+choices = [
+  'for (long long i = static_cast<long long>(upto); i > 0; i -= 1) {',
+  'for (long long i = static_cast<long long>(upto) - 1; i > 0; i -= i & -i) {',
+  'for (long long i = static_cast<long long>(upto); i > 0; i >>= 1) {',
+  'for (long long i = static_cast<long long>(upto); i > 0; i -= i & -i) {',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4123,6 +4640,31 @@ hints = [
   "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
   "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+while (i >= 0 && j < n && s[i] == s[j]) {
+    --i;
+    ++j;
+}''',
+  '''
+while (i > 0 && j < n && s[i] == s[j]) {
+    --i;
+    ++j;
+}''',
+  '''
+while (i >= 0 && j < n && s[i] != s[j]) {
+    --i;
+    ++j;
+}''',
+  '''
+while (i >= 0 && j < n && s[i] == s[j]) {
+    --i;
+    --j;
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -4314,6 +4856,35 @@ hints = [
   "inverse(v) is power(v, P - 2), and it only works because P is prime — that is the whole content of Fermat's little theorem here.",
   "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two power() calls per query. Not needed to pass, and worth saying out loud.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+while (exp > 0) {
+    if (exp & 1) result = result * base % P;
+    base = base * result % P;
+    exp >>= 1;
+}''',
+  '''
+while (exp > 0) {
+    if (exp % 2 == 0) result = result * base % P;
+    base = base * base % P;
+    exp >>= 1;
+}''',
+  '''
+while (exp > 0) {
+    if (exp & 1) result = result * base % P;
+    base = base * base % P;
+    exp >>= 1;
+}''',
+  '''
+while (exp > 0) {
+    base = base * base % P;
+    if (exp & 1) result = result * base % P;
+    exp >>= 1;
+}''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4513,6 +5084,31 @@ hints = [
   "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (i > 0 && open[i - 1][j]) {
+    routes = (routes + ways[i - 1][j]) % P;
+    cheapest = std::max(cheapest, best[i - 1][j]);
+}''',
+  '''
+if (i > 0 && open[i - 1][j]) {
+    routes = (routes * ways[i - 1][j]) % P;
+    cheapest = std::min(cheapest, best[i - 1][j]);
+}''',
+  '''
+if (i > 0 && !open[i - 1][j]) {
+    routes = (routes + ways[i - 1][j]) % P;
+    cheapest = std::min(cheapest, best[i - 1][j]);
+}''',
+  '''
+if (i > 0 && open[i - 1][j]) {
+    routes = (routes + ways[i - 1][j]) % P;
+    cheapest = std::min(cheapest, best[i - 1][j]);
+}''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4679,6 +5275,27 @@ hints = [
   "The other answer keeps std::sort and compares (score descending, then index ascending) — a total order, so there are no ties left to be unstable about.",
   "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+    return a.first > b.first;
+});''',
+  '''
+std::stable_sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+    return a.first < b.first;
+});''',
+  '''
+std::stable_sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+    return a.first > b.first;
+});''',
+  '''
+std::stable_sort(riders.begin(), riders.end(), [](const auto& a, const auto& b) {
+    return a.second > b.second;
+});''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4865,6 +5482,23 @@ hints = [
   "Eviction: take back().first, erase that key from the map, then pop_back. After pop_back the iterator the map held is dangling, so the map entry has to go first.",
   "Walking the list front to back is already most-recent-first, so the last line needs no sort.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+recent.splice(recent.begin(), recent, hit->second);
+std::cout << hit->second->second << '\n';''',
+  '''
+recent.splice(recent.end(), recent, hit->second);
+std::cout << hit->second->second << '\n';''',
+  '''
+recent.splice(recent.begin(), recent, hit->second);
+std::cout << hit->second->first << '\n';''',
+  '''
+recent.push_front(*hit->second);
+std::cout << hit->second->second << '\n';''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"

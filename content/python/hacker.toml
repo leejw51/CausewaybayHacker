@@ -130,6 +130,23 @@ hints = [
   "Print and return the moment you find it — the first hit as you scan is already the smallest second index.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+i = seen.get(x - target)
+if i is not None:''',
+  '''
+i = seen.get(target - x)
+if i is None:''',
+  '''
+i = seen.get(target - x)
+if i is not None:''',
+  '''
+i = seen.get(target - x, 0)
+if i is not None:''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -228,6 +245,23 @@ hints = [
   "Record the best length *and* where it started, or you cannot print the run at the end.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if previous is not None and previous >= start:
+    start = previous + 1''',
+  '''
+if previous is not None and previous > start:
+    start = previous + 1''',
+  '''
+if previous is not None and previous >= start:
+    start = i''',
+  '''
+if previous is not None and previous >= start:
+    start = previous''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -323,6 +357,27 @@ hints = [
   "Extend the last merged interval when the new start is <= its end; otherwise append a new one. Store the merged ones as lists, not tuples, so the end can be changed in place.",
   "Extend to max(last.end, end) — a short interval swallowed by a long one must not shrink it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if merged and start < merged[-1][1]:
+    if end > merged[-1][1]:
+        merged[-1][1] = end''',
+  '''
+if merged and start <= merged[-1][1]:
+    if end > merged[-1][1]:
+        merged[-1][1] = end''',
+  '''
+if merged and start <= merged[-1][1]:
+    if end < merged[-1][1]:
+        merged[-1][1] = end''',
+  '''
+if merged and start <= merged[-1][0]:
+    if end > merged[-1][1]:
+        merged[-1][1] = end''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -438,6 +493,23 @@ hints = [
   "The distance grid doubles as the visited set: -1 means not seen yet, so you need no second structure.",
   "grid[r - 1] when r is 0 does not raise. It reads the last row, and the search leaks out through the bottom of the map. Check nr < 0 by hand — this is the one bounds error Python will not report for you.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if grid[nr][nc] != "." or dist[nr][nc] > 0:
+    continue''',
+  '''
+if grid[nr][nc] != "." and dist[nr][nc] >= 0:
+    continue''',
+  '''
+if grid[nr][nc] != ".":
+    continue''',
+  '''
+if grid[nr][nc] != "." or dist[nr][nc] >= 0:
+    continue''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -555,6 +627,31 @@ hints = [
   "(low + high) // 2 cannot overflow in Python, and move `high` down to `mid` on success so you keep the smallest capacity that worked.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if days_needed(weights, mid) < days:
+    high = mid
+else:
+    low = mid + 1''',
+  '''
+if days_needed(weights, mid) <= days:
+    low = mid
+else:
+    high = mid - 1''',
+  '''
+if days_needed(weights, mid) <= days:
+    high = mid
+else:
+    low = mid + 1''',
+  '''
+if days_needed(weights, mid) <= days:
+    high = mid
+else:
+    low = mid''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -656,6 +753,23 @@ hints = [
   "When the new value beats the value at the top of the stack, that index's answer is the new value — and keep popping, it may beat several.",
   "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if pending and nums[pending[-1]] < value:
+    answer[pending.pop()] = value''',
+  '''
+while pending and nums[pending[-1]] < value:
+    answer[pending.pop()] = value''',
+  '''
+while pending and nums[pending[0]] < value:
+    answer[pending.pop(0)] = value''',
+  '''
+while pending and nums[pending[-1]] > value:
+    answer[pending.pop()] = value''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -759,6 +873,31 @@ hints = [
   "REACH is just how many cells of the finished table are not still None.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if coin <= amount and best[amount - coin] is not None:
+    candidate = best[amount - coin] + 1
+    if best[amount] is None or candidate < best[amount]:
+        best[amount] = candidate''',
+  '''
+if coin < amount and best[amount - coin] is not None:
+    candidate = best[amount - coin] + 1
+    if best[amount] is None or candidate < best[amount]:
+        best[amount] = candidate''',
+  '''
+if coin <= amount and best[amount - coin] is not None:
+    candidate = best[amount - coin] + 1
+    if best[amount] is None or candidate > best[amount]:
+        best[amount] = candidate''',
+  '''
+if coin <= amount and best[amount - coin] is not None:
+    candidate = best[amount - coin]
+    if best[amount] is None or candidate < best[amount]:
+        best[amount] = candidate''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -855,6 +994,15 @@ hints = [
   "key=lambda item: (-item[1], item[0]) — count descending by negating it, then the word ascending.",
   "ranked[:k] is safe when there are fewer than k — a slice past the end stops at the end instead of raising.",
 ]
+
+[quest.quiz]
+choices = [
+  'ranked = sorted(counts.items(), key=lambda item: (item[1], item[0]))',
+  'ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]), reverse=True)',
+  'ranked = sorted(counts.items(), key=lambda item: (item[0], -item[1]))',
+  'ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -994,6 +1142,31 @@ hints = [
   "For the middle, advance slow only on the steps where fast managed two.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+following = cursor.next
+reversed_head = cursor
+cursor.next = reversed_head
+cursor = following''',
+  '''
+following = cursor.next
+cursor.next = reversed_head
+reversed_head = cursor
+cursor = cursor.next''',
+  '''
+following = cursor.next
+cursor.next = reversed_head
+reversed_head = cursor
+cursor = following''',
+  '''
+cursor.next = reversed_head
+following = cursor.next
+reversed_head = cursor
+cursor = following''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1112,6 +1285,31 @@ hints = [
   "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
   "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+walk(tree, 2 * i + 2, order, out)
+if order == 1:
+    out.append(tree[i])
+walk(tree, 2 * i + 1, order, out)''',
+  '''
+walk(tree, 2 * i + 1, order, out)
+if order == 1:
+    out.append(tree[i])
+walk(tree, 2 * i + 2, order, out)''',
+  '''
+walk(tree, 2 * i, order, out)
+if order == 1:
+    out.append(tree[i])
+walk(tree, 2 * i + 1, order, out)''',
+  '''
+walk(tree, 2 * i + 1, order, out)
+if order == 2:
+    out.append(tree[i])
+walk(tree, 2 * i + 2, order, out)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1253,6 +1451,15 @@ hints = [
   "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took.",
 ]
 
+[quest.quiz]
+choices = [
+  'return valid(tree, 2 * i + 1, value, high) and valid(tree, 2 * i + 2, low, value)',
+  'return valid(tree, 2 * i + 1, low, value) or valid(tree, 2 * i + 2, value, high)',
+  'return valid(tree, 2 * i + 1, low, value) and valid(tree, 2 * i + 2, value, high)',
+  'return valid(tree, 2 * i + 1, low, high) and valid(tree, 2 * i + 2, low, high)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1373,6 +1580,31 @@ hints = [
   "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+value, which, at = heapq.heappop(heap)
+out.append(str(value))
+if at < len(lists[which]):
+    heapq.heappush(heap, (lists[which][at + 1], which, at + 1))''',
+  '''
+value, which, at = heap.pop()
+out.append(str(value))
+if at + 1 < len(lists[which]):
+    heapq.heappush(heap, (lists[which][at + 1], which, at + 1))''',
+  '''
+value, which, at = heapq.heappop(heap)
+out.append(str(value))
+if at + 1 < len(lists[which]):
+    heapq.heappush(heap, (lists[which][at], which, at + 1))''',
+  '''
+value, which, at = heapq.heappop(heap)
+out.append(str(value))
+if at + 1 < len(lists[which]):
+    heapq.heappush(heap, (lists[which][at + 1], which, at + 1))''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1482,6 +1714,27 @@ hints = [
   "chosen.pop() goes between the two calls. That is the `undo` in try-recurse-undo.",
   "The base case is at == len(nums), and the empty selection there is the empty subset, which still counts.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+chosen.append(nums[at])
+build(nums, at + 1, chosen, out)
+chosen.pop()''',
+  '''
+chosen.append(nums[at])
+build(nums, at + 1, chosen, out)
+chosen.pop(0)''',
+  '''
+chosen.append(nums[at])
+build(nums, at, chosen, out)
+chosen.pop()''',
+  '''
+build(nums, at + 1, chosen, out)
+chosen.append(nums[at])
+chosen.pop()''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1609,6 +1862,31 @@ hints = [
   "Chain the four directions with `or` rather than four ifs and a `found` flag: `or` already stops at the first branch that succeeds, and so does `any` over the starting cells. Carrying on after a hit is work you were asked not to do.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if grid[r][c] != word[at]:
+    return False
+if at == len(word):
+    return True''',
+  '''
+if grid[r][c] != word[at]:
+    return False
+if at + 1 == len(word):
+    return True''',
+  '''
+if at + 1 == len(word):
+    return True
+if grid[r][c] != word[at]:
+    return False''',
+  '''
+if grid[r][c] == word[at]:
+    return False
+if at + 1 == len(word):
+    return True''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1724,6 +2002,31 @@ hints = [
   "A plain deque gives *an* order; a min-heap gives *the* order the statement asks for.",
   "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for nxt in after[task]:
+    waiting[task] -= 1
+    if waiting[nxt] == 0:
+        heapq.heappush(ready, nxt)''',
+  '''
+for nxt in after[task]:
+    waiting[nxt] -= 1
+    if waiting[nxt] == 0:
+        heapq.heappush(ready, task)''',
+  '''
+for nxt in after[task]:
+    if waiting[nxt] == 0:
+        heapq.heappush(ready, nxt)
+    waiting[nxt] -= 1''',
+  '''
+for nxt in after[task]:
+    waiting[nxt] -= 1
+    if waiting[nxt] == 0:
+        heapq.heappush(ready, nxt)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1931,6 +2234,31 @@ hints = [
   "parent[x], x = root, parent[x] compresses in one line: the right-hand side is evaluated in full before either assignment happens, so the old parent[x] is read before it is overwritten.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if size[a] < size[b]:
+    a, b = b, a
+parent[a] = b
+size[a] += size[b]''',
+  '''
+if size[a] < size[b]:
+    a, b = b, a
+parent[b] = a
+size[b] += size[a]''',
+  '''
+if size[a] < size[b]:
+    a, b = b, a
+parent[b] = a
+size[a] += size[b]''',
+  '''
+if size[a] < size[b]:
+    a, b = b, a
+parent[b] = a
+size[a] += 1''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -2024,6 +2352,35 @@ hints = [
   "Strictly increasing means you replace the first tail that is >= value, which is exactly what bisect_left finds. bisect_right would give you non-decreasing instead.",
   "Running off the end of tails means this value extends the longest run so far — append it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+at = bisect_left(tails, value)
+if at == len(tails):
+    tails.append(value)
+else:
+    tails[at] = value''',
+  '''
+at = bisect_right(tails, value)
+if at == len(tails):
+    tails.append(value)
+else:
+    tails[at] = value''',
+  '''
+at = bisect_left(tails, value)
+if at == len(tails):
+    tails.append(value)
+else:
+    tails.insert(at, value)''',
+  '''
+at = bisect_left(tails, value)
+if at == 0:
+    tails.append(value)
+else:
+    tails[at] = value''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2132,6 +2489,31 @@ hints = [
   "Matching characters cost nothing and step diagonally; a mismatch costs one and takes the cheapest of the three neighbours.",
   "LCS is the same walk with max instead of min, and no diagonal step on a mismatch. And [[0] * w for _ in range(h)] — never [[0] * w] * h, which is h references to one row.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if a[i - 1] == b[j - 1]:
+    edit[i][j] = edit[i - 1][j - 1] + 1
+else:
+    edit[i][j] = 1 + min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])''',
+  '''
+if a[i - 1] == b[j - 1]:
+    edit[i][j] = edit[i - 1][j - 1]
+else:
+    edit[i][j] = 1 + min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])''',
+  '''
+if a[i - 1] == b[j - 1]:
+    edit[i][j] = edit[i - 1][j - 1]
+else:
+    edit[i][j] = 1 + min(edit[i - 1][j], edit[i][j - 1])''',
+  '''
+if a[i] == b[j]:
+    edit[i][j] = edit[i - 1][j - 1]
+else:
+    edit[i][j] = 1 + min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2244,6 +2626,31 @@ hints = [
   "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for room in range(weight, cap + 1):
+    candidate = best[room - weight] + value
+    if candidate > best[room]:
+        best[room] = candidate''',
+  '''
+for room in range(cap, weight, -1):
+    candidate = best[room - weight] + value
+    if candidate > best[room]:
+        best[room] = candidate''',
+  '''
+for room in range(cap, weight - 1, -1):
+    candidate = best[room] + value
+    if candidate > best[room]:
+        best[room] = candidate''',
+  '''
+for room in range(cap, weight - 1, -1):
+    candidate = best[room - weight] + value
+    if candidate > best[room]:
+        best[room] = candidate''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2353,6 +2760,27 @@ hints = [
   "Counting bits by clearing the lowest one each time runs once per set bit, not once per bit width.",
   "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+while walk:
+    walk >>= 1
+    bits += 1''',
+  '''
+while walk:
+    walk -= 1
+    bits += 1''',
+  '''
+while walk:
+    walk &= walk - 1
+    bits += 1''',
+  '''
+while walk:
+    walk &= walk + 1
+    bits += 1''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2464,6 +2892,27 @@ hints = [
   "The spiral wants the original grid, so copy it before you rotate in place: [row[:] for row in grid], not grid[:], which copies the outer list and shares every row.",
   "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for r in range(n):
+    for c in range(n):
+        grid[r][c], grid[c][r] = grid[c][r], grid[r][c]''',
+  '''
+for r in range(n):
+    for c in range(r + 1, n):
+        grid[r][c], grid[c][r] = grid[c][r], grid[r][c]''',
+  '''
+for r in range(n):
+    for c in range(r + 1, n):
+        grid[r][c], grid[c][r] = grid[r][c], grid[c][r]''',
+  '''
+for r in range(n):
+    for c in range(1, n):
+        grid[r][c], grid[c][r] = grid[c][r], grid[r][c]''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2620,6 +3069,40 @@ hints = [
   "A query that falls off the trie leaves `at` as None, and None answers NO and 0 without a special case.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+child = at.children.get(letter)
+if child is None:
+    child = Node()
+    nodes += 1
+child.through += 1
+at = child''',
+  '''
+child = at.children.get(letter)
+if child is None:
+    child = Node()
+    at.children[letter] = child
+    nodes += 1
+at.through += 1
+at = child''',
+  '''
+child = Node()
+at.children[letter] = child
+nodes += 1
+child.through += 1
+at = child''',
+  '''
+child = at.children.get(letter)
+if child is None:
+    child = Node()
+    at.children[letter] = child
+    nodes += 1
+child.through += 1
+at = child''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2718,6 +3201,23 @@ hints = [
   "seen = {0: 1} up front is what lets a run that starts at index 0 be found at all.",
   "The final prefix is the total, so the second line costs nothing extra. collections.defaultdict(int) would save the .get(…, 0)s, and Counter would too.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+runs += seen.get(prefix + k, 0)
+seen[prefix] = seen.get(prefix, 0) + 1''',
+  '''
+runs += seen.get(k - prefix, 0)
+seen[prefix] = seen.get(prefix, 0) + 1''',
+  '''
+runs += seen.get(prefix - k, 0)
+seen[prefix] = 1''',
+  '''
+runs += seen.get(prefix - k, 0)
+seen[prefix] = seen.get(prefix, 0) + 1''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2875,6 +3375,27 @@ hints = [
   "The recursion is log2(200000), about eighteen frames deep — nowhere near the limit. A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+inversions += 1
+merged.append(right[j])
+j += 1''',
+  '''
+inversions += len(left) - i
+merged.append(right[j])
+j += 1''',
+  '''
+inversions += len(left) - i - 1
+merged.append(right[j])
+j += 1''',
+  '''
+inversions += len(right) - j
+merged.append(right[j])
+j += 1''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -2980,6 +3501,23 @@ hints = [
   "ranked[-2] on a list of one raises IndexError, which is why the length check comes first; there is no nth() that quietly gives None here.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+ranked = sorted(distinct)
+print(ranked[1] if len(ranked) >= 2 else "NONE")''',
+  '''
+ranked = sorted(distinct, reverse=True)
+print(ranked[-2] if len(ranked) >= 2 else "NONE")''',
+  '''
+ranked = sorted(distinct)
+print(ranked[-2] if len(ranked) >= 2 else "NONE")''',
+  '''
+ranked = sorted(distinct)
+print(ranked[-2] if len(ranked) > 2 else "NONE")''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3076,6 +3614,31 @@ hints = [
   "statistics.pstdev is the population one; statistics.stdev is the sample one and is wrong here. Writing the loop yourself — mean of the squared deviations, then math.sqrt — is equally correct.",
   "For an even count the median is the average of values[n//2 - 1] and values[n//2], and that subtraction is where the off-by-one lives. statistics.median does this for you, and knowing that it does is fine too.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if len(values) % 2 == 1:
+    median = float(values[middle])
+else:
+    median = (values[middle - 1] + values[middle]) / 2''',
+  '''
+if len(values) % 2 == 0:
+    median = float(values[middle])
+else:
+    median = (values[middle - 1] + values[middle]) / 2''',
+  '''
+if len(values) % 2 == 1:
+    median = float(values[middle])
+else:
+    median = (values[middle] + values[middle + 1]) / 2''',
+  '''
+if len(values) % 2 == 1:
+    median = float(values[middle])
+else:
+    median = float(values[middle])''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3193,6 +3756,27 @@ hints = [
   "Pull the ADD argument inside the ADD branch, from the same iterator. The loop counter counts commands, not tokens.",
   "`if items: items.pop()` — the guard is two words, and without it VOID on an empty till is an IndexError.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+elif command == "VOID":
+    if items:
+        items.pop(0)''',
+  '''
+elif command == "VOID":
+    if items:
+        items.clear()''',
+  '''
+elif command == "VOID":
+    if not items:
+        items.pop()''',
+  '''
+elif command == "VOID":
+    if items:
+        items.pop()''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3397,6 +3981,35 @@ hints = [
   "float(\"inf\") is the honest `unreached`: it compares greater than every int and needs no None check in the relaxation. The spanning-tree half of the generator guarantees every node is reachable, so the final filter never removes anything — keep it anyway, because the version of this question with an unreachable node is the follow-up.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for v, w in graph[u]:
+    candidate = dist[v] + w
+    if candidate < dist[v]:
+        dist[v] = candidate
+        heapq.heappush(heap, (candidate, v))''',
+  '''
+for v, w in graph[u]:
+    candidate = d + w
+    if candidate > dist[v]:
+        dist[v] = candidate
+        heapq.heappush(heap, (candidate, v))''',
+  '''
+for v, w in graph[u]:
+    candidate = d + w
+    if candidate < dist[v]:
+        dist[v] = candidate
+        heapq.heappush(heap, (candidate, v))''',
+  '''
+for v, w in graph[u]:
+    candidate = w
+    if candidate < dist[v]:
+        dist[v] = candidate
+        heapq.heappush(heap, (candidate, v))''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -3576,6 +4189,27 @@ hints = [
   "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging. Binding self.tree to a local inside the loops is a real speed-up in CPython, and it is the only micro-optimisation this quest needs.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+while i > 0:
+    total += tree[i]
+    i -= i & -i''',
+  '''
+while i > 0:
+    total += tree[i]
+    i -= 1''',
+  '''
+while i >= 0:
+    total += tree[i]
+    i -= i & -i''',
+  '''
+while i > 0:
+    total += tree[i]
+    i -= i & (i - 1)''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -3727,6 +4361,31 @@ hints = [
   "When the loop stops, i and j have both moved one past the palindrome — so it starts at i + 1 and its length is j - i - 1.",
   "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for. And `i >= 0` has to be checked by hand: s[-1] is a valid index in Python and it is the wrong character.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+length = j - i
+if length > best_len:
+    best_len = length
+    best_start = i + 1''',
+  '''
+length = j - i - 1
+if length > best_len:
+    best_len = length
+    best_start = i''',
+  '''
+length = j - i - 1
+if length > best_len:
+    best_len = length
+    best_start = j''',
+  '''
+length = j - i - 1
+if length > best_len:
+    best_len = length
+    best_start = i + 1''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3892,6 +4551,15 @@ hints = [
   "pow(v, P - 2, P) is the modular inverse, and it only works because P is prime — that is the whole content of Fermat's little theorem here. Python 3.8 and later also accept pow(v, -1, P), which is the same thing said directly.",
   "Precomputing inverse factorials as well, backwards from inverse(factorial[n]), removes the two pow() calls per query. Not needed to pass, and worth saying out loud.",
 ]
+
+[quest.quiz]
+choices = [
+  'value = factorial[a] // (factorial[b] * factorial[a - b]) % P',
+  'value = factorial[a] * inverse(factorial[b]) % P * inverse(factorial[a - b]) % P',
+  'value = factorial[a] * inverse(factorial[b] * factorial[a]) % P',
+  'value = factorial[a] * inverse(factorial[b]) % P * factorial[a - b] % P',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4069,6 +4737,30 @@ hints = [
   "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if j > 0 and best[i][j - 1] is not None:
+    routes += ways[i][j - 1]
+    if cheapest is None or best[i][j - 1] > cheapest:
+        cheapest = best[i][j - 1]''',
+  '''
+if j > 0 and best[i][j - 1] is not None:
+    routes = ways[i][j - 1]
+    if cheapest is None or best[i][j - 1] < cheapest:
+        cheapest = best[i][j - 1]''',
+  '''
+if j > 0 and best[i][j - 1] is not None:
+    routes += ways[i][j - 1]
+    cheapest = best[i][j - 1]''',
+  '''
+if j > 0 and best[i][j - 1] is not None:
+    routes += ways[i][j - 1]
+    if cheapest is None or best[i][j - 1] < cheapest:
+        cheapest = best[i][j - 1]''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -4195,6 +4887,15 @@ hints = [
   "The other answer sorts by key=lambda r: (-r[0], r[1]) — a total order, so there are no ties left to be unstable about. Never sort the tuples bare: (score, index) compares the index on a tie, which is ascending, and you wanted descending score with ascending index.",
   "TIES counts adjacent equal scores in the finished order, and that count is the same whichever of the two you wrote — it is the index order that gives you away.",
 ]
+
+[quest.quiz]
+choices = [
+  'riders = sorted(riders, reverse=True)',
+  'riders = sorted(riders, key=lambda r: -r[0], reverse=True)',
+  'riders = sorted(riders, key=lambda r: r[0], reverse=True)',
+  'riders = sorted(riders, key=lambda r: (r[0], r[1]), reverse=True)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4447,6 +5148,27 @@ hints = [
   "The survivors are the OrderedDict read from the hot end: reversed(cache) is most-recent-first, so the last line needs no sort and no stamps.",
   "sys.setrecursionlimit is not a fix, and knowing why is the answer they want: it moves the limit, it does not remove it, and past a certain point the interpreter stops raising and starts crashing.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if len(cache) >= cap and cache:
+    cache.popitem()
+    evicted += 1''',
+  '''
+if len(cache) >= cap and cache:
+    cache.popitem(last=False)
+    evicted += 1''',
+  '''
+if len(cache) > cap and cache:
+    cache.popitem(last=False)
+    evicted += 1''',
+  '''
+if len(cache) >= cap and cache:
+    cache.pop(key, None)
+    evicted += 1''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

@@ -107,6 +107,15 @@ hints = [
   "%02d inside string.format is width two, zero padded, decimal. 5 cents is 0.05, not 0.5.",
 ]
 
+[quest.quiz]
+choices = [
+  'cents = string.format("%d.%02d", math.floor(cents / 10), cents % 10)',
+  'cents = string.format("%d.%02d", cents % 100, math.floor(cents / 100))',
+  'cents = string.format("%d.%02d", math.floor(cents / 100), cents % 100)',
+  'cents = string.format("%.2f", cents)',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -217,6 +226,39 @@ hints = [
   "while true do ... break is how Lua spells a loop whose exit is in the middle. There is also repeat ... until, which tests at the bottom.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if i % 3 == 0 then
+  return "FISH"
+end
+if i % 15 == 0 then
+  return "FISHVEG"
+end''',
+  '''
+if i % 15 == 0 then
+  return "FISHVEG"
+end
+if i % 3 == 0 then
+  return "FISH"
+end''',
+  '''
+if i % 15 == 0 then
+  print("FISHVEG")
+end
+if i % 3 == 0 then
+  return "FISH"
+end''',
+  '''
+if i % 5 == 0 then
+  return "FISHVEG"
+end
+if i % 3 == 0 then
+  return "FISH"
+end''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -314,6 +356,15 @@ hints = [
   "io.read(\"*a\") reads everything at once and gmatch(\"%S+\") walks the tokens, so the line breaks stop mattering. The first token is the count; skip it.",
 ]
 
+[quest.quiz]
+choices = [
+  'for i = 1, #nums - 1 do',
+  'for i = 2, #nums do',
+  'for i = 1, #nums do',
+  'for i = 2, #nums - 1 do',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -402,6 +453,15 @@ hints = [
   "table.insert(reversed, 1, ch) pushes at the front, so the last character ends up first. table.concat joins with no separator.",
 ]
 
+[quest.quiz]
+choices = [
+  'table.insert(reversed, 1, ch)',
+  'table.insert(reversed, ch)',
+  'table.insert(reversed, ch, 1)',
+  'reversed[#reversed] = ch',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -489,6 +549,31 @@ hints = [
   "Collect the keys with pairs into a list, then table.sort the list. The table itself has no order to fix.",
   "function(a, b) if counts[a] ~= counts[b] then return counts[a] > counts[b] end return a < b end — count descending, then word ascending, and never true for equal arguments.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if counts[a] ~= counts[b] then
+  return counts[a] < counts[b]
+end
+return a < b''',
+  '''
+if counts[a] ~= counts[b] then
+  return a < b
+end
+return counts[a] > counts[b]''',
+  '''
+if counts[a] ~= counts[b] then
+  return counts[a] > counts[b]
+end
+return a < b''',
+  '''
+if counts[a] == counts[b] then
+  return counts[a] > counts[b]
+end
+return a < b''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -630,6 +715,15 @@ hints = [
   "#set is 0 for a table with only string keys. Copy the keys into a list with pairs, table.sort it, and #list is the count and table.concat(list, \" \") is the line.",
 ]
 
+[quest.quiz]
+choices = [
+  'if b[key] then',
+  'if not b[key] then',
+  'if not a[key] then',
+  'if b[key] == false then',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -737,6 +831,15 @@ hints = [
   "tag(unpack(parts)) spreads the list; with two parts the third parameter is nil and the or fills it.",
 ]
 
+[quest.quiz]
+choices = [
+  'unit = unit and "catty"',
+  'unit = "catty" or unit',
+  'unit = unit or catty',
+  'unit = unit or "catty"',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -843,6 +946,15 @@ hints = [
   "local ok, value = pcall(double, line) — pcall takes the function and its arguments separately; pcall(double(line)) would call double first and crash before pcall ever ran.",
   "When ok is false, value is the message. Print BAD and move on; the bad line adds nothing to the total.",
 ]
+
+[quest.quiz]
+choices = [
+  'local ok, value = pcall(double(line))',
+  'local value, ok = pcall(double, line)',
+  'local ok, value = pcall(double, line)',
+  'local ok, value = double(line)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -969,6 +1081,15 @@ hints = [
   "map(filter(nums, big), double) — filter first, transform second, same as the if at the back and the expression at the front of a comprehension.",
   "A set is a table keyed by the values; #set does not count keys, a pairs loop does.",
 ]
+
+[quest.quiz]
+choices = [
+  'local big = map(filter(nums, function(v) return v * 2 end), function(v) return v > 10 end)',
+  'local big = map(filter(nums, function(v) return v > 10 end), function(v) return v * 2 end)',
+  'local big = filter(nums, function(v) return v > 10 end)',
+  'local big = map(filter(nums, function(v) return v > 10 end), function(v) v = v * 2 end)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1113,6 +1234,15 @@ hints = [
   "Walk the sorted keys and replace the best only on a strictly lower price: the first of equal prices is alphabetically first, so the tie settles itself.",
 ]
 
+[quest.quiz]
+choices = [
+  'if cheapest == nil or prices[item] < prices[cheapest] then',
+  'if cheapest == nil or prices[item] > prices[cheapest] then',
+  'if cheapest ~= nil and prices[item] < prices[cheapest] then',
+  'if cheapest == nil or item < cheapest then',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1220,6 +1350,31 @@ hints = [
   "function(a, b) if a.price ~= b.price then return a.price < b.price end return a.name < b.name end — price, then name, and false for equal records.",
   "for rank, stall in ipairs(stalls) hands you the rank for free, starting at 1.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if a.price ~= b.price then
+  return a.price > b.price
+end
+return a.name < b.name''',
+  '''
+if a.name ~= b.name then
+  return a.name < b.name
+end
+return a.price < b.price''',
+  '''
+if a.price == b.price then
+  return a.price < b.price
+end
+return a.name < b.name''',
+  '''
+if a.price ~= b.price then
+  return a.price < b.price
+end
+return a.name < b.name''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1368,6 +1523,15 @@ hints = [
   "print(book) calls tostring(book), which uses the metatable's __tostring. Notebook is the metatable, so function Notebook:__tostring() is the one method to write. Make it look like the constructor call that would rebuild it; that is the convention.",
 ]
 
+[quest.quiz]
+choices = [
+  'Notebook.items = {} return setmetatable({}, Notebook)',
+  'return setmetatable({ items = {} }, Notebook)',
+  'return setmetatable({ items = {} })',
+  'return { items = {}, __index = Notebook }',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1498,6 +1662,31 @@ hints = [
   "ARMS[order.kind] is nil for a kind with no arm, and the if falls through to UNKNOWN — the same job as the last arm of a match, done by the table.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local arm = ARMS.kind
+if arm then
+  return arm(order)
+end''',
+  '''
+local arm = ARMS[order.kind]
+if arm then
+  return arm()
+end''',
+  '''
+local arm = ARMS[order.kind]
+if arm then
+  return arm(order)
+end''',
+  '''
+local arm = ARMS[order.kind]
+if arm then
+  return arm
+end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1627,6 +1816,31 @@ hints = [
   "A wrapped coroutine can be consumed once, and calling it after it is dead is an error. That is why main builds a fresh ticker for the sum instead of reusing the one the loop drained.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for _ = 0, count do
+  coroutine.yield(value)
+  value = value + step
+end''',
+  '''
+for _ = 1, count do
+  value = value + step
+  coroutine.yield(value)
+end''',
+  '''
+for _ = 1, count do
+  return value
+  value = value + step
+end''',
+  '''
+for _ = 1, count do
+  coroutine.yield(value)
+  value = value + step
+end''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1750,6 +1964,31 @@ hints = [
   "price = counted(price) after the function is the same as a decorator above it: the name is rebound to whatever counted returned, and the original survives only as the upvalue func inside the closure.",
   "... in the __call forwards any arguments at all without knowing them, which is what makes the wrapper reusable for any function.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+__call = function(self, ...)
+  self.calls = self.calls + 1
+  return func(...)
+end,''',
+  '''
+__call = function(self, ...)
+  self.calls = self.calls + 1
+  return func(self, ...)
+end,''',
+  '''
+__call = function(self, ...)
+  self.calls = self.calls + 1
+  func(...)
+end,''',
+  '''
+__call = function(self, ...)
+  self.calls = 1
+  return func(...)
+end,''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1909,6 +2148,35 @@ hints = [
   "iter returns a closure over a counter: each call bumps it and returns self.goods[i], which is nil past the end, and nil is what stops a generic for.",
   "longest keeps the first of equal-length items because it only replaces on strictly greater, which is why the sample says duckegg and not something later.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+local i = 1
+return function()
+  i = i + 1
+  return self.goods[i]
+end''',
+  '''
+local i = 0
+return function()
+  i = i + 1
+  return self.goods[i]
+end''',
+  '''
+return function()
+  local i = 0
+  i = i + 1
+  return self.goods[i]
+end''',
+  '''
+local i = 0
+return function()
+  return self.goods[i]
+  i = i + 1
+end''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2074,6 +2342,23 @@ hints = [
   "pairs walks the board in no order, which is why the comparison has to settle the tie itself: lower cents, then lower name, and never trust which stall came first.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local stall = board.name
+if stall == nil then''',
+  '''
+local stall = lookup(board, name)
+if stall ~= nil then''',
+  '''
+local stall = lookup(board, name)
+if not stall.cents then''',
+  '''
+local stall = lookup(board, name)
+if stall == nil then''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2203,6 +2488,15 @@ hints = [
   "resume returns ok, ... — false and the error message when the coroutine died. Check it; the starter's runners all died on `value * value` with value nil, silently.",
   "results is an upvalue of square: the nested function sees the same table main sees, which is why the writes are visible afterwards.",
 ]
+
+[quest.quiz]
+choices = [
+  'local ok, err = coroutine.resume(co)',
+  'local ok, err = coroutine.resume(co, nums[i], i)',
+  'local ok, err = coroutine.resume(co, i, nums[i])',
+  'local ok, err = coroutine.resume(square, i, nums[i])',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2367,6 +2661,25 @@ hints = [
   "total = total + value with no yield between the read and the write. The yield can stay in pay; it just cannot sit in the middle of the update.",
   "Do not write local total = total + value: that makes a new local that shadows the upvalue, and the outer total never moves. The closure shares the variable only if you assign to it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+local seen = total
+coroutine.yield()
+total = seen + value
+hits = hits + 1''',
+  '''
+total = total + value
+hits = hits + 1''',
+  '''
+total = value
+hits = hits + 1''',
+  '''
+total = total + value
+hits = value''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2562,6 +2875,15 @@ hints = [
   "The sentinel is a fresh table because nil cannot be stored in a table and because a table compares equal only to itself. If the values could be tables too, the sentinel is still safe: nobody else can have this one.",
 ]
 
+[quest.quiz]
+choices = [
+  'if value == CLOSED then',
+  'if value == nil then',
+  'if value == {} then',
+  'if value ~= CLOSED then',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2736,6 +3058,39 @@ hints = [
   "The pool finishes jobs in its own order, and the index in the result is the only record of where each one came from. Sort on it before printing.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if coroutine.status(co) == "dead" then
+  results[#results + 1] = { value, index }
+  table.remove(running, i)
+else
+  i = i + 1
+end''',
+  '''
+if coroutine.status(co) == "dead" then
+  results[#results + 1] = { index, value }
+  table.remove(running)
+else
+  i = i + 1
+end''',
+  '''
+if coroutine.status(co) == "dead" then
+  results[#results + 1] = { index, value }
+  table.remove(running, i)
+else
+  i = i + 1
+end''',
+  '''
+if coroutine.status(co) == "suspended" then
+  results[#results + 1] = { index, value }
+  table.remove(running, i)
+else
+  i = i + 1
+end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2902,6 +3257,35 @@ hints = [
   "The resume that makes a task dead is the one whose second return value is the task's return. Store it at the task's own index; that is what keeps the results in input order.",
   "If you needed results as they finish, that is the pool from the last quest, and then you carry the index yourself.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if coroutine.status(co) == "dead" then
+  results[i] = ok
+else
+  live = live + 1
+end''',
+  '''
+if coroutine.status(co) == "suspended" then
+  results[i] = value
+else
+  live = live + 1
+end''',
+  '''
+if coroutine.status(co) == "dead" then
+  results[i] = value
+else
+  live = live - 1
+end''',
+  '''
+if coroutine.status(co) == "dead" then
+  results[i] = value
+else
+  live = live + 1
+end''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3173,6 +3557,39 @@ hints = [
   "A consumer woken with \"cancel\" gets nil from get and returns, which ends the while true. Resuming it with nothing would just park it again.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local job = get(queue)
+if job == nil then
+  return
+end
+results[job.index] = job.value * 10
+task_done(queue)''',
+  '''
+local job = get(queue)
+if job ~= nil then
+  return
+end
+results[job.index] = job.value * 10
+task_done(queue)''',
+  '''
+local job = get(queue)
+if job == nil then
+  return
+end
+results[job.value] = job.index * 10
+task_done(queue)''',
+  '''
+local job = get(queue)
+if job == nil then
+  return
+end
+results[job.index] = job.value * 10
+queue.head = queue.head + 1''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3312,6 +3729,39 @@ hints = [
   "total = total + parse_cents(cents) evaluates the right side first; when parse_cents raises, nothing is assigned, so the bad line adds nothing.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local ok, err = pcall(body)
+-- runs on the normal exit and on the error the body raised
+if not ok then
+  error(err, 0)
+end
+print("SHUT " .. stall)''',
+  '''
+local ok, err = pcall(body)
+-- runs on the normal exit and on the error the body raised
+print("SHUT " .. stall)
+if not ok then
+  error(err, 0)
+end''',
+  '''
+local ok, err = body()
+-- runs on the normal exit and on the error the body raised
+print("SHUT " .. stall)
+if not ok then
+  error(err, 0)
+end''',
+  '''
+local ok, err = pcall(body)
+-- runs on the normal exit and on the error the body raised
+print("SHUT " .. stall)
+if ok then
+  error(err, 0)
+end''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3447,6 +3897,31 @@ hints = [
   "Wrap the loop in coroutine.wrap and coroutine.yield(value, total) inside it. A yield can carry several values, and the for receives them as its several variables.",
   "running(squares(nums)) composes because a wrapped coroutine is a function the for can call; running never knows or cares that its input is another coroutine.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for value in stream do
+  coroutine.yield(value, total)
+  total = total + value
+end''',
+  '''
+for value in stream do
+  total = total + value
+  coroutine.yield(total, value)
+end''',
+  '''
+for value in stream do
+  total = total + value
+  coroutine.yield(value, total)
+end''',
+  '''
+for _, value in ipairs(stream) do
+  total = total + value
+  coroutine.yield(value, total)
+end''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3664,6 +4139,31 @@ hints = [
   "for value, run in tools.groupby(nums) do — the run is a list of that run's members, and #run is its length.",
   "tools.combinations(distinct, 2) yields each unordered pair once. Counting them is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+while i < #list and list[i] == value do
+  run[#run + 1] = list[i]
+  i = i + 1
+end''',
+  '''
+while i <= #list and list[i] == value do
+  run[#run + 1] = list[i]
+  i = i + 1
+end''',
+  '''
+if i <= #list and list[i] == value then
+  run[#run + 1] = list[i]
+  i = i + 1
+end''',
+  '''
+while i <= #list and list[i] == list[1] do
+  run[#run + 1] = list[i]
+  i = i + 1
+end''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3928,6 +4428,46 @@ hints = [
   "partial(parse, 2) returns a function that supplies the base itself and takes the text. unpack(bound, 1, count) puts the bound arguments first; select(\"#\", ...) counts them even if one is nil.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local hit = cache[n]
+if hit ~= nil then
+  return hit
+end
+self.misses = self.misses + 1
+local value = func(n)
+return value''',
+  '''
+self.misses = self.misses + 1
+local hit = cache[n]
+if hit ~= nil then
+  return hit
+end
+local value = func(n)
+cache[n] = value
+return value''',
+  '''
+local hit = cache[n]
+if hit == nil then
+  return hit
+end
+self.misses = self.misses + 1
+local value = func(n)
+cache[n] = value
+return value''',
+  '''
+local hit = cache[n]
+if hit ~= nil then
+  return hit
+end
+self.misses = self.misses + 1
+local value = func(n)
+cache[n] = value
+return value''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4143,6 +4683,15 @@ hints = [
   "implements checks that a function exists at the name, not its arity or what it returns. Nothing in Lua ever checks those; the call finds out.",
 ]
 
+[quest.quiz]
+choices = [
+  'if type(object[name]) ~= "function" then',
+  'if type(rawget(object, name)) ~= "function" then',
+  'if type(object[name]) == "function" then',
+  'if object[name] ~= "function" then',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4343,6 +4892,43 @@ hints = [
   "Key the set by price:key(), a string built from the fields. The table itself is a key only to itself.",
   "The TOTAL is the sum of the original cents, which only holds because the assignments failed. In the starter every price is 0 by then, and TOTAL is 0 — the mutation was not only allowed, it went through.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+local fields = setmetatable({ name = name, cents = cents }, Price)
+return setmetatable(fields, {
+  __index = Price,
+  __newindex = function(_, key)
+    error("frozen: cannot set " .. key, 2)
+  end,
+})''',
+  '''
+local fields = setmetatable({ name = name, cents = cents }, Price)
+return setmetatable({}, {
+  __index = Price,
+  __newindex = function(_, key)
+    error("frozen: cannot set " .. key, 2)
+  end,
+})''',
+  '''
+local fields = setmetatable({ name = name, cents = cents }, Price)
+return setmetatable({}, {
+  __index = fields,
+  __newindex = function(_, key)
+    error("frozen: cannot set " .. key, 2)
+  end,
+})''',
+  '''
+local fields = setmetatable({ name = name, cents = cents }, Price)
+return setmetatable({}, {
+  __index = fields,
+  __newindex = function(_, key)
+    print("frozen: cannot set " .. key)
+  end,
+})''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4554,6 +5140,35 @@ hints = [
   "Order matters when you test several classes: a subclass test after its base class test is dead code, and Lua will not warn you. Re-raise what you do not recognise — error(result, 0) — rather than swallowing it.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local ok, kg = pcall(parse_kg, text)
+if not ok then
+  -- the parse failure becomes the cause; the caller sees our type
+  error(kg)
+end''',
+  '''
+local ok, kg = pcall(parse_kg, text)
+if not ok then
+  -- the parse failure becomes the cause; the caller sees our type
+  error(NotANumber.new(kg))
+end''',
+  '''
+local ok, kg = pcall(parse_kg, text)
+if not ok then
+  -- the parse failure becomes the cause; the caller sees our type
+  error(NotANumber)
+end''',
+  '''
+local ok, kg = pcall(parse_kg, text)
+if not ok then
+  -- the parse failure becomes the cause; the caller sees our type
+  return NotANumber.new(kg)
+end''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4702,6 +5317,15 @@ hints = [
   "nil is returned, not raised. The for loop stops on it; you never see it. Save the value you are about to return before you advance, or you are off by one step.",
   "for value in obj:iter() is for value in Tickets.next, obj — the method call just produces the pair. Returning a closure over self would also work; the pair is the protocol without the extra function.",
 ]
+
+[quest.quiz]
+choices = [
+  'return Tickets.next',
+  'return self, Tickets.next',
+  'return Tickets.next(self), self',
+  'return Tickets.next, self',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4990,6 +5614,15 @@ hints = [
   "The __index metamethod runs only for a missing key; rawset inside it stores the new list so the next read is a plain hit. Sort the keys before printing — a table with a metatable is still in no order.",
 ]
 
+[quest.quiz]
+choices = [
+  'if list[mid] < x then',
+  'if list[mid] <= x then',
+  'if x < list[mid] then',
+  'if list[lo] < x then',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5206,6 +5839,43 @@ hints = [
   "The first resume after create gives the watcher its turn to start and park on the yield, so the cancel has a yield to land on and not a function that has not begun.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local ok, result = coroutine.resume(task)
+if not ok then
+  error(result, 0)
+end
+if ok then
+  return true, result
+end''',
+  '''
+local ok, result = coroutine.resume(task)
+if not ok then
+  error(result, 0)
+end
+if coroutine.status(task) == "suspended" then
+  return true, result
+end''',
+  '''
+local ok, result = coroutine.resume(task)
+if not ok then
+  error(result, 0)
+end
+if coroutine.status(task) == "dead" then
+  return true, result
+end''',
+  '''
+local ok, result = coroutine.resume(task)
+if not ok then
+  error(result, 0)
+end
+if coroutine.status(task) == "dead" then
+  return result
+end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -5412,6 +6082,27 @@ hints = [
   "Two limbs: lo under 10^9 with the carry moved to hi on every add. 41666791666750000 is hi 41666791 and lo 666750000, printed as %d%09d.",
   "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right. Then time k=1 against k=4 on a big n: when they match, you have met the coroutine.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+chunks[index] = total
+-- read, add, write with no yield between: the update cannot be lost
+add_sum(total, part)''',
+  '''
+chunks[index] = part
+-- read, add, write with no yield between: the update cannot be lost
+add_sum(total, part)''',
+  '''
+chunks[index] = part
+-- read, add, write with no yield between: the update cannot be lost
+add_sum(part, total)''',
+  '''
+chunks[index + 1] = part
+-- read, add, write with no yield between: the update cannot be lost
+add_sum(total, part)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

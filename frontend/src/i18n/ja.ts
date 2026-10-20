@@ -228,8 +228,6 @@ export const ja: Partial<Catalogue> = {
   "quest.sheetRight": "正解",
   "quest.sheetStreak": "連続 ×{n}",
   "quest.sheetCombo": "×{n} コンボ",
-  "quest.quizPick": "正しい行を選んで、その行を打つ  (1–4)",
-  "quest.quizRight": "正解 — その行を打とう",
   "quest.job": "今回の課題",
   "quest.sample": "サンプル · {name}",
   "quest.in": "入力",

@@ -66,6 +66,15 @@ hints = [
   "Println adds the newline; Print does not.",
 ]
 
+[quest.quiz]
+choices = [
+  'import fmt',
+  'import "fmt"',
+  'include "fmt"',
+  'import "os"',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -151,6 +160,15 @@ hints = [
   "The same shape as the line above it: n * 2 becomes n * n.",
 ]
 
+[quest.quiz]
+choices = [
+  'fmt.Println(n ^ 2)',
+  'fmt.Println(n ** 2)',
+  'fmt.Println(n * n * n)',
+  'fmt.Println(n * n)',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -231,6 +249,15 @@ hints = [
   "fmt.Printf(\"%.2f\\n\", float64(a)/float64(b))",
   "Convert both sides: float64(a) / b does not compile, because a float64 and an int64 cannot be divided.",
 ]
+
+[quest.quiz]
+choices = [
+  'fmt.Printf("%.2f\n", float64(a)/float64(b))',
+  'fmt.Printf("%.2f\n", float64(a/b))',
+  'fmt.Printf("%.2d\n", float64(a)/float64(b))',
+  'fmt.Println("%.2f", float64(a)/float64(b))',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -321,6 +348,15 @@ hints = [
   "b := uint64(a) — the type name is the conversion; then fmt.Println(math.MaxInt32).",
   "A width is part of the type: an int32 and an int64 never mix without a conversion written out.",
 ]
+
+[quest.quiz]
+choices = [
+  'var b uint64 = a',
+  'b := uint16(a)',
+  'b := float64(a)',
+  'b := uint64(a)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -414,6 +450,15 @@ hints = [
   "Big-endian means the last byte is the least significant: 255 lands in buf[31] as ff.",
 ]
 
+[quest.quiz]
+choices = [
+  'copy(buf[:], n.Bytes())',
+  'n.FillBytes(buf)',
+  'n.FillBytes(buf[:])',
+  'buf = n.Bytes()',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -505,6 +550,23 @@ hints = [
   "x, _ := strconv.ParseFloat(s, 64) then y := float32(x).",
   "ParseFloat returns two values; the _ throws the error away here because the input is known good.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+x, _ := strconv.ParseFloat(s, 32)
+y := float32(x)''',
+  '''
+x, _ := strconv.ParseFloat(s, 64)
+y := float32(x)''',
+  '''
+x, _ := strconv.ParseFloat(s, 64)
+y := x''',
+  '''
+x := strconv.ParseFloat(s, 64)
+y := float32(x)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -612,6 +674,23 @@ hints = [
   "The _ = strings.ToUpper line only kept the import used; delete it once you call strings.ToUpper for real.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+fmt.Println(strings.ToUpper(line))
+fmt.Println(line)''',
+  '''
+fmt.Println(strings.Title(line))
+fmt.Println(reverse(line))''',
+  '''
+fmt.Println(line.ToUpper())
+fmt.Println(reverse(line))''',
+  '''
+fmt.Println(strings.ToUpper(line))
+fmt.Println(reverse(line))''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -698,6 +777,23 @@ hints = [
   "t := s[0:4] then t += \"_bay\".",
   "s[a:b] runs from index a up to but not including b — 0:4 is four bytes.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+t := s[0:4]
+t += "_bay"''',
+  '''
+t := s[0:3]
+t += "_bay"''',
+  '''
+t := s[1:5]
+t += "_bay"''',
+  '''
+t := s[0:4]
+t = "_bay"''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -801,6 +897,23 @@ hints = [
   "copy fills as many elements as the shorter side has; dst was made with room for two.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+copy(xs[1:3], dst)
+dst = append(dst, 99)''',
+  '''
+copy(dst, xs[1:2])
+dst = append(dst, 99)''',
+  '''
+copy(dst, xs[1:3])
+dst = append(dst, 99)''',
+  '''
+copy(dst, xs[1:3])
+append(dst, 99)''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -892,6 +1005,23 @@ hints = [
   "b := []byte(s) then b = append(b, []byte(\"!!\")...).",
   "The ... after a slice spreads its elements as separate arguments; without it append wants single bytes.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+b := []byte(s)
+b = append(b, []byte("!!"))''',
+  '''
+b := []byte(s)
+b = append(b, []byte("!!")...)''',
+  '''
+b := []byte(s)
+b = append([]byte("!!"), b...)''',
+  '''
+b := []rune(s)
+b = append(b, []rune("!!")...)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -986,6 +1116,23 @@ hints = [
   "An if needs braces even for one statement; it does not need parentheses.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+sum += i
+if i%3 == 1 { threes++ }''',
+  '''
+sum = i
+if i%3 == 0 { threes++ }''',
+  '''
+sum += i
+if i/3 == 0 { threes++ }''',
+  '''
+sum += i
+if i%3 == 0 { threes++ }''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1072,6 +1219,23 @@ hints = [
   "if rides <= 10 { return rides * 5 } and then return 50 + (rides-10)*3.",
   "Ten rides at 5 is 50; that is where the second formula starts counting from.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if rides <= 10 { return rides * 5 }
+return 50 + (rides-10)*3''',
+  '''
+if rides <= 10 { return rides * 5 }
+return 50 + rides*3''',
+  '''
+if rides >= 10 { return rides * 5 }
+return 50 + (rides-10)*3''',
+  '''
+if rides <= 10 { return rides * 5 }
+return (rides-10)*3''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1178,6 +1342,27 @@ hints = [
   "it := Item{Name: name, Price: price, Qty: qty} — and in Total, return it.Price * it.Qty.",
   "Delete the _, _, _ = line once the literal uses the three names; Go refuses an unused variable.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+func (it Item) Total() int {
+	return it.Price + it.Qty
+}''',
+  '''
+func Total(it Item) int {
+	return it.Price * it.Qty
+}''',
+  '''
+func (it Item) Total() int {
+	return it.Price * it.Qty
+}''',
+  '''
+func (it Item) Total() int {
+	it.Price * it.Qty
+}''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1318,6 +1503,23 @@ hints = [
   "A Go switch does not fall through: each case ends by itself, no break needed.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+case TsuenWan: return "green"
+case KwunTong: return "red"''',
+  '''
+case TsuenWan: return "red"
+case KwunTong: return "green"''',
+  '''
+case "tsuenwan": return "red"
+case "kwuntong": return "green"''',
+  '''
+case Island: return "red"
+case KwunTong: return "green"''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1438,6 +1640,15 @@ hints = [
   "xs = append(xs, v) in the loop; then xs = append(xs[:1], xs[2:]...), xs[0] = 99 and sort.Ints(xs) after it.",
   "xs[:1] is everything before index 1 and xs[2:] everything after it; append joins the two, and the ... spreads the second slice into arguments.",
 ]
+
+[quest.quiz]
+choices = [
+  'xs = append(xs[:1], xs[1:]...)',
+  'xs = append(xs[:2], xs[3:]...)',
+  'xs = append(xs[:1], xs[2:])',
+  'xs = append(xs[:1], xs[2:]...)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1572,6 +1783,15 @@ hints = [
   "Remove takes the *Element, not the value, so it is handed l.Front(); after that the old second element is the new front, and that is the one edited. e.Value is an interface{}, which is why the walk writes e.Value.(int).",
 ]
 
+[quest.quiz]
+choices = [
+  'l.Remove(l.Front())',
+  'l.Remove(l.Back())',
+  'l.Front().Remove()',
+  'l.MoveToBack(l.Front())',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1692,6 +1912,15 @@ hints = [
   "counts[w]++ in the loop; delete(counts, \"tea\") and counts[\"bun\"] = 10 after it; sort.Strings(keys) once keys is built.",
   "Assigning to a key is the same line whether the key exists or not: it overwrites when it does and inserts when it does not.",
 ]
+
+[quest.quiz]
+choices = [
+  'counts["tea"] = 0',
+  'delete(counts["tea"])',
+  'delete(counts, "tea")',
+  'counts.delete("tea")',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1817,6 +2046,15 @@ hints = [
   "counts[w]++ in the loop; delete(counts, \"the\") and if n, ok := counts[\"tram\"]; ok { counts[\"tram\"] = n * 100 } after it; sort.Strings(keys) once keys is built.",
   "The comma-ok read never inserts: when \"tram\" is absent, ok is false and nothing is written — a plain counts[\"tram\"] read would have handed back 0 and an assignment would have created the key.",
 ]
+
+[quest.quiz]
+choices = [
+  'if n, ok := counts["tram"]; !ok { counts["tram"] = n * 100 }',
+  'if n, ok := counts["tram"]; ok { counts["tram"] = n * 100 }',
+  'counts["tram"] = counts["tram"] * 100',
+  'if n, ok := counts["tram"]; ok { counts["tram"] = n + 100 }',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1946,6 +2184,15 @@ hints = [
   "seen[v] = struct{}{} in the loop; delete(seen, 8) and delete(seen, 3); seen[4] = struct{}{} after it; sort.Ints(keys) once keys is built.",
   "delete on a value that is not there does nothing, and adding one that is already there changes nothing: both halves of the edit are safe to run whatever the input held.",
 ]
+
+[quest.quiz]
+choices = [
+  'delete(seen, 4); seen[3] = struct{}{}',
+  'delete(seen, 3); seen[4] = struct{}',
+  'delete(seen, 3); seen[4] = true',
+  'delete(seen, 3); seen[4] = struct{}{}',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2089,6 +2336,23 @@ hints = [
   "Popping narrows the slice; nothing is copied and nothing is freed. After the pop, len(stack)-1 names the element that used to be second from the top.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+stack = stack[1:]
+stack[len(stack)-1] = 99''',
+  '''
+stack = stack[:len(stack)-1]
+stack[len(stack)-1] = 99''',
+  '''
+stack = stack[:len(stack)-1]
+stack[0] = 99''',
+  '''
+stack = stack[:len(stack)]
+stack[len(stack)-1] = 99''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2207,6 +2471,15 @@ hints = [
   "sort.IntSlice(xs) is a conversion, not a copy — the sort still happens inside xs.",
 ]
 
+[quest.quiz]
+choices = [
+  'sort.Sort(sort.Reverse(sort.IntSlice(xs)))',
+  'sort.Reverse(sort.IntSlice(xs))',
+  'sort.Sort(sort.IntSlice(xs))',
+  'sort.Sort(sort.Reverse(xs))',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2321,6 +2594,23 @@ hints = [
   "slices.Reverse(xs) then slices.Reverse(r) — in place, nothing to assign.",
   "[]rune(word) copies the string into characters you may reorder; string(r) joins them back.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+slices.Reverse(xs)
+slices.Reverse([]rune(word))''',
+  '''
+xs = slices.Reverse(xs)
+r = slices.Reverse(r)''',
+  '''
+slices.Reverse(xs)
+slices.Reverse(r)''',
+  '''
+slices.Sort(xs)
+slices.Reverse(r)''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2446,6 +2736,23 @@ hints = [
   "less answers \"does i go first?\": a higher score goes first, and among equal scores the smaller name does.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if a.Score != b.Score { return a.Score < b.Score }
+return a.Name < b.Name''',
+  '''
+if a.Score != b.Score { return a.Score > b.Score }
+return a.Name > b.Name''',
+  '''
+if a.Score == b.Score { return a.Score > b.Score }
+return a.Name < b.Name''',
+  '''
+if a.Score != b.Score { return a.Score > b.Score }
+return a.Name < b.Name''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2552,6 +2859,15 @@ hints = [
   "add := func(x int) int { return x + k }",
   "k is not a parameter; the literal simply reaches out and reads it. Delete the _ = k line once it does.",
 ]
+
+[quest.quiz]
+choices = [
+  'add := func(x int) { return x + k }',
+  'add := func(x int) int { return x + 1 }',
+  'add := func(x int) int { return x + k }',
+  'add := func(x, k int) int { return x + k }',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2693,6 +3009,23 @@ hints = [
   "The literal's signature must match the parameter exactly: func(int) bool for keep, func(int) int for f.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+evens := filter(xs, func(x int) bool { return x%2 == 1 })
+squares := mapInts(evens, func(x int) int { return x * x })''',
+  '''
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(evens, func(x int) int { return x * x })''',
+  '''
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(xs, func(x int) int { return x * x })''',
+  '''
+evens := filter(xs, func(x int) bool { return x%2 == 0 })
+squares := mapInts(evens, func(x int) int { return x + x })''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2831,6 +3164,23 @@ hints = [
   "defer wg.Done() as the first line, results[i] = x * x as the second.",
   "defer runs Done when the goroutine returns, whatever happens in between; a plain wg.Done() first would say \"finished\" before the work.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+defer wg.Done()
+results[i] = x * x''',
+  '''
+defer wg.Wait()
+results[i] = x * x''',
+  '''
+defer wg.Done()
+results = append(results, x*x)''',
+  '''
+defer wg.Done()
+results[i] = x + x''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3014,6 +3364,35 @@ hints = [
   "n.Left = insert(n.Left, v) in the first branch, n.Right = insert(n.Right, v) in the second.",
   "insert returns the subtree's root — a brand-new node when the child was nil — so the result has to be stored back into the child field, or the tree never grows.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if v > n.Val {
+	n.Left = insert(n.Left, v)
+} else {
+	n.Right = insert(n.Right, v)
+}''',
+  '''
+if v < n.Val {
+	insert(n.Left, v)
+} else {
+	insert(n.Right, v)
+}''',
+  '''
+if v < n.Val {
+	n.Left = insert(n.Left, v)
+} else {
+	n.Right = insert(n.Right, v)
+}''',
+  '''
+if v < n.Val {
+	n.Left = &Node{Val: v}
+} else {
+	n.Right = &Node{Val: v}
+}''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"

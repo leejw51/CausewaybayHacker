@@ -83,6 +83,15 @@ hints = [
   "Two decimals with a leading zero is the {:02} width flag.",
 ]
 
+[quest.quiz]
+choices = [
+  'let cents = cents.parse().unwrap();',
+  'cents = cents.parse::<i64>().unwrap();',
+  'let cents: i64 = cents.parse().unwrap();',
+  'let cents: u8 = cents.parse().unwrap();',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -157,6 +166,15 @@ hints = [
   "A parameter of type &str borrows; a parameter of type String takes.",
   "Change the signature first, then the call site needs an &.",
 ]
+
+[quest.quiz]
+choices = [
+  'receipt(&name);',
+  'receipt(name);',
+  'receipt(&input);',
+  'receipt(name.as_str().to_owned());',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -240,6 +258,15 @@ hints = [
   "An iterator of &i64 sums straight into an i64.",
 ]
 
+[quest.quiz]
+choices = [
+  'nums[1..nums.len()].iter().sum()',
+  'nums[0..nums.len() - 1].iter().sum()',
+  'nums[1..nums.len() - 1].sum()',
+  'nums[1..nums.len() - 1].iter().sum()',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -313,6 +340,15 @@ hints = [
   "chars() walks scalar values, so chars().count() is the other number.",
   "chars().rev().collect::<String>() reverses safely; reversing the bytes would not.",
 ]
+
+[quest.quiz]
+choices = [
+  'let reversed: String = line.bytes().rev().collect();',
+  'let reversed: String = line.chars().rev().collect();',
+  'let reversed: String = line.chars().collect();',
+  'let reversed = line.chars().rev().collect();',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -442,6 +478,23 @@ hints = [
   "add changes the till, so it takes &mut self; total only reads, so it takes &self.",
   "Iterating &till.items borrows, which is what you want — printing should not empty the till.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+fn add(&self, name: &str, cents: i64) {
+    self.items.push((name.to_string(), cents));''',
+  '''
+fn add(mut self, name: &str, cents: i64) {
+    self.items.push((name.to_string(), cents));''',
+  '''
+fn add(&mut self, name: &str, cents: i64) {
+    self.items.push((name.to_string(), cents));''',
+  '''
+fn add(&mut self, name: &str, cents: i64) {
+    self.items.push((name, cents));''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -574,6 +627,15 @@ hints = [
   "Matching on &Rider gives you &String in the Other arm — format! is happy with that.",
 ]
 
+[quest.quiz]
+choices = [
+  'Rider::Other => format!("UNKNOWN {}", tag),',
+  '_ => format!("UNKNOWN {}", rider),',
+  'Rider::Other(tag) => tag.to_string(),',
+  'Rider::Other(tag) => format!("UNKNOWN {}", tag),',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -648,6 +710,15 @@ hints = [
   "A HashMap has no order. Collect it into a Vec before you print.",
   "Ordering::then chains the tie-break: count descending, then word ascending.",
 ]
+
+[quest.quiz]
+choices = [
+  'counts.entry(word).or_insert(0) += 1;',
+  '*counts.entry(word).or_insert(0) += 1;',
+  '*counts.entry(word).or_insert(1) += 1;',
+  '*counts.get_mut(word).unwrap() += 1;',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -752,6 +823,15 @@ hints = [
   "SUM is the sum of what you printed — the doubled values, not the originals.",
 ]
 
+[quest.quiz]
+choices = [
+  'let n: i64 = text.trim().parse()?;',
+  'let n: i64 = text.trim().parse().unwrap();',
+  'let n: i64 = text.trim().parse().ok()?;',
+  'let n: i64 = text.trim().parse().unwrap_or(0);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -848,6 +928,23 @@ hints = [
   "A HashSet built straight from the iterator gives you the distinct count with len().",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+.map(|n| (n * 2).to_string())
+.filter(|&&n| n > 10)''',
+  '''
+.filter(|n| n > 10)
+.map(|n| (n * 2).to_string())''',
+  '''
+.filter(|&&n| n > 10)
+.map(|n| (n * 2).to_string())''',
+  '''
+.filter(|&&n| n > 10)
+.map(|n| n.to_string())''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -934,6 +1031,15 @@ hints = [
   "to_uppercase returns String, not &str — it has to allocate, because the result is not a piece of the input.",
   "&str and String compare directly; the standard library implements equality between them, so you do not need as_str().",
 ]
+
+[quest.quiz]
+choices = [
+  'let shouted: &str = word.to_uppercase();',
+  'let shouted: String = input.to_uppercase();',
+  'let shouted = word.make_ascii_uppercase();',
+  'let shouted: String = word.to_uppercase();',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1036,6 +1142,15 @@ hints = [
   ".ok() throws the error away on purpose — you are not reporting why it failed, only that it did.",
   "find_map runs the closure until one returns Some, so it stops at the first line that parses.",
 ]
+
+[quest.quiz]
+choices = [
+  'let doubled = row.trim().parse::<i64>().ok().map(|v| v * 2).unwrap();',
+  'let doubled = row.trim().parse::<i64>().ok().map(|v| v * 2).unwrap_or(-1);',
+  'let doubled = row.trim().parse::<i64>().ok().and_then(|v| v * 2).unwrap_or(-1);',
+  'let doubled = row.trim().parse::<i64>().ok().map(|v| v * 2).unwrap_or_default();',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1145,6 +1260,15 @@ hints = [
   "An `if` after the pattern is a match guard — it separates two arms that share a shape.",
   "`[command, ..]` binds the first element and ignores the rest; `[]` is the empty line you still have to cover.",
 ]
+
+[quest.quiz]
+choices = [
+  '["GO", arg] if arg.parse::<i64>().unwrap_or(0) > 0 => {',
+  '["GO", arg] if arg.parse::<i64>().is_ok() => {',
+  '["GO", arg] if arg.parse::<i64>().unwrap_or(0) >= 0 => {',
+  '["GO", arg] if arg > 0 => {',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1268,6 +1392,23 @@ hints = [
   "base stays private on purpose — it is the one thing in here that is nobody else's business.",
   "Making the function public does not make the door public: `mod pass` needs pub as well.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+fn adult(km: i64) -> i64 {
+    base(km)''',
+  '''
+pub fn adult(km: i64) -> i64 {
+    super::base(km)''',
+  '''
+pub fn adult(km: i64) -> i64 {
+    base(km)''',
+  '''
+pub(self) fn adult(km: i64) -> i64 {
+    base(km)''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1427,6 +1568,15 @@ hints = [
   "The recursive sum needs no mut and no loop: Some(entry) => entry.cents + sum(&entry.next), None => 0.",
 ]
 
+[quest.quiz]
+choices = [
+  'head = Some(Entry { cents, next: head });',
+  'head = Box::new(Some(Entry { cents, next: head }));',
+  'head = Some(Box::new(Entry { cents, next: None }));',
+  'head = Some(Box::new(Entry { cents, next: head }));',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1545,6 +1695,23 @@ hints = [
   "Three of the four cases fail and the one that passes is km = 0, which is exactly why one test case proves nothing.",
   "In a crate this is #[cfg(test)] mod tests with #[test] fn fares() and assert_eq!(fare(arg), want).",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if got != want {
+    passed += 1;''',
+  '''
+if got == want {
+    passed += 1;''',
+  '''
+if got == want {
+    passed + 1;''',
+  '''
+if got = want {
+    passed += 1;''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1749,6 +1916,23 @@ hints = [
   "A single Vec holding both would need Box<dyn Sign>, and that is a different mechanism with a run-time lookup. You are not being asked for it, and reaching for it here would be the wrong answer to a question about traits.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+fn tag(&self) -> &'static str {
+    "TRAM"''',
+  '''
+fn tag(self) -> &'static str {
+    "TRAM"''',
+  '''
+fn tags(&self) -> &'static str {
+    "TRAM"''',
+  '''
+fn tag() -> &'static str {
+    "TRAM"''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1840,6 +2024,15 @@ hints = [
   "Take the count before the loop; the Vec is consumed by iterating it by value.",
 ]
 
+[quest.quiz]
+choices = [
+  'handles.push(thread::spawn(|| value * value));',
+  'thread::spawn(move || value * value).join().unwrap();',
+  'handles.push(thread::spawn(move || value * value));',
+  'handles.push(thread::spawn(move || { value * value; }));',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1930,6 +2123,23 @@ hints = [
   "One keyword in front of the closure changes it from borrowing to owning.",
   "line is already a fresh String per iteration, so giving it away costs nothing.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let line = lines.next().unwrap();
+handles.push(thread::spawn(move || line.to_uppercase()));''',
+  '''
+let line = lines.next().unwrap().to_string();
+handles.push(thread::spawn(move || line.to_uppercase()));''',
+  '''
+let line = lines.next().unwrap().to_string();
+handles.push(thread::spawn(|| line.to_uppercase()));''',
+  '''
+let line = lines.next().unwrap().to_string();
+handles.push(thread::spawn(move || line.to_uppercase()).join().unwrap());''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2030,6 +2240,15 @@ hints = [
   "drop(tx) after the loop. Without it the receiver waits forever for a sender that is sitting in main.",
   "rx.iter() yields until the channel is closed, so collect() is the whole receive loop.",
 ]
+
+[quest.quiz]
+choices = [
+  'drop(rx);',
+  'drop(&tx);',
+  'let _ = tx;',
+  'drop(tx);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2135,6 +2354,23 @@ hints = [
   "Arc::clone(&total) inside the loop, before the move closure — the clone is what each thread takes.",
   "The guard from lock() derefs to the value; *guard += value, and the guard unlocks when it goes out of scope.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let mut guard = total.lock().unwrap();
+*guard += value;''',
+  '''
+let guard = total.lock().unwrap();
+*guard += value;''',
+  '''
+let mut guard = total.lock();
+*guard += value;''',
+  '''
+let mut guard = *total.lock().unwrap();
+guard += value;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2254,6 +2490,23 @@ hints = [
   "Sorting Vec<(&String, &i64)> sorts by the word first, which is what the output wants.",
   "Hold the read guard in a binding while you iterate it, or the temporary is dropped before you are done with it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let mut guard = counts.read().unwrap();
+*guard.entry(word).or_insert(0) += 1;''',
+  '''
+let guard = counts.write().unwrap();
+*guard.entry(word).or_insert(0) += 1;''',
+  '''
+let mut guard = counts.write().unwrap();
+*guard.entry(word).or_insert(0) += 1;''',
+  '''
+let mut guard = counts.write().unwrap();
+*guard.entry(word).or_insert(1) += 1;''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2386,6 +2639,23 @@ hints = [
   "impl<'a> Board<'a> — declare it before you use it, the same as a type parameter.",
   "longest returns &'a str, not &str: the answer outlives the borrow of self, it belongs to the input.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+struct Board {
+    lines: Vec<&str>,''',
+  '''
+struct Board<'a> {
+    lines: Vec<&'a str>,''',
+  '''
+struct Board<'a> {
+    lines: Vec<&str>,''',
+  '''
+struct Board<'a> {
+    lines: Vec<String>,''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2538,6 +2808,15 @@ hints = [
   "The bound belongs on the impl block, not the struct: impl<T: PartialOrd> Pair<T>.",
 ]
 
+[quest.quiz]
+choices = [
+  'fn largest<T: PartialOrd>(xs: &[T]) -> T {',
+  'fn largest<T: Copy>(xs: &[T]) -> T {',
+  'fn largest<T: PartialOrd + Copy>(xs: Vec<T>) -> T {',
+  'fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2658,6 +2937,31 @@ hints = [
   "left is the countdown; decrement it every time you hand a value out.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+let value = self.current;
+self.current += self.step;
+self.left -= 1;
+Some(value)''',
+  '''
+self.current += self.step;
+let value = self.current;
+self.left -= 1;
+Some(value)''',
+  '''
+let value = self.current;
+self.current += self.step;
+self.left - 1;
+Some(value)''',
+  '''
+let value = self.current;
+self.current += self.step;
+self.left -= 1;
+value''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2773,6 +3077,27 @@ hints = [
   "for square in rx1 inside the second thread is a receive loop that ends when stage one drops tx1.",
   "main's loop over rx2 ends when the second thread ends, which is why joining afterwards does not hang.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for square in rx1 {
+    tx2.send((square, total)).unwrap();
+    total += square;''',
+  '''
+for square in rx1 {
+    total += square;
+    tx2.send((square, total)).unwrap();''',
+  '''
+for square in rx1 {
+    let total = total + square;
+    tx2.send((square, total)).unwrap();''',
+  '''
+for square in rx2 {
+    total += square;
+    tx2.send((square, total)).unwrap();''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2973,6 +3298,26 @@ hints = [
   "This executor busy-loops on Pending. A real one would park the thread until the waker fired, and that is the only interesting difference.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+cx.waker().wake_by_ref();
+Poll::Pending''',
+  '''
+this.done = true;
+cx.waker().wake_by_ref();
+Poll::Ready(())''',
+  '''
+this.done = true;
+cx.waker().wake_by_ref();
+Poll::Pending''',
+  '''
+this.done = true;
+cx.waker().wake_by_ref();
+Pending''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3112,6 +3457,15 @@ hints = [
   "Rc's refcount is a plain usize; Arc's is an AtomicUsize. That single difference is the whole of why one is Send and the other is not.",
   "assert_sync(&*total) asks about the Mutex itself rather than the Arc around it — Mutex<T> is Sync whenever T is Send.",
 ]
+
+[quest.quiz]
+choices = [
+  'let total = &total;',
+  'let total = Arc::new(Mutex::new(0i64));',
+  'let total = Arc::clone(total);',
+  'let total = Arc::clone(&total);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3295,6 +3649,15 @@ hints = [
   "Both functions have the same one-line body. The difference is entirely in the signature, and entirely in where the method lookup happens.",
 ]
 
+[quest.quiz]
+choices = [
+  'fn render_dynamic(sign: &dyn Sign) {',
+  'fn render_dynamic(sign: &Sign) {',
+  'fn render_dynamic(sign: dyn Sign) {',
+  'fn render_dynamic<T: Sign>(sign: &T) {',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3436,6 +3799,23 @@ hints = [
   "catch_unwind needs AssertUnwindSafe around the closure because it captures a &RefCell; the panic message still goes to stderr, which the tests do not read.",
   "Rc::clone(&ledger) is spelled that way rather than .clone() so a reader can see it copies a handle and not the Vec. Rc::strong_count reads 2 while both handles are alive, and the two borrow_mut() in the panic test can come one from each handle — they are the same RefCell, and it counts them together.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+bump(&counter);
+ledger.borrow().push(value);''',
+  '''
+bump(&counter);
+ledger.borrow_mut().push(value);''',
+  '''
+bump(&counter);
+ledger.borrow_mut().clone().push(value);''',
+  '''
+bump(&counter);
+ledger.push(value);''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3603,6 +3983,27 @@ hints = [
   "Display is what {} prints; Debug is what {:?} prints; the Error trait is what lets it go into a Box<dyn Error>. All three are worth having and only one is needed here.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+impl From<FareError> for ParseIntError {
+    fn from(_: FareError) -> ParseIntError {
+        FareError::NotANumber''',
+  '''
+impl From<ParseIntError> for FareError {
+    fn into(_: ParseIntError) -> FareError {
+        FareError::NotANumber''',
+  '''
+impl From<ParseIntError> for FareError {
+    fn from(_: ParseIntError) -> FareError {
+        FareError::NotANumber''',
+  '''
+impl From<ParseIntError> for FareError {
+    fn from(_: ParseIntError) -> FareError {
+        FareError::Negative(0)''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3743,6 +4144,23 @@ hints = [
   "The Arc is still needed — the atomic makes the *access* safe, not the *sharing*.",
   "Drop runs in reverse declaration order, so `second` goes first. Binding them as _first and _second keeps them alive to the end of main; a bare `_` would drop them immediately.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+total.store(value, Ordering::Relaxed);
+hits.fetch_add(1, Ordering::Relaxed);''',
+  '''
+*total += value;
+*hits += 1;''',
+  '''
+total.fetch_add(value, Ordering::Relaxed);
+hits.store(1, Ordering::Relaxed);''',
+  '''
+total.fetch_add(value, Ordering::Relaxed);
+hits.fetch_add(1, Ordering::Relaxed);''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3889,6 +4307,15 @@ hints = [
   "One word changes: the bound on apply_once. The closure is already correct.",
   "apply_fn_mut takes `mut f: F` — the parameter itself has to be mutable for the closure to mutate its own captures.",
 ]
+
+[quest.quiz]
+choices = [
+  'fn apply_fn_mut<F: FnMut(i64)>(values: &[i64], mut f: F) {',
+  'fn apply_fn_mut<F: Fn(i64)>(values: &[i64], mut f: F) {',
+  'fn apply_fn_mut<F: FnMut(i64)>(values: &[i64], f: F) {',
+  'fn apply_fn_mut<F: FnOnce(i64)>(values: &[i64], mut f: F) {',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -4049,6 +4476,23 @@ hints = [
   "The direction of the money decides which guard gets the minus, not which lock is taken first.",
   "The two guards drop at the end of transfer, in reverse order, which is fine — it is the acquire order that matters.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let mut guard_a = a.lock().unwrap();
+let mut guard_b = a.lock().unwrap();''',
+  '''
+let mut guard_a = a.lock().unwrap();
+let mut guard_b = b.lock().unwrap();''',
+  '''
+let guard_a = a.lock().unwrap();
+let guard_b = b.lock().unwrap();''',
+  '''
+let mut guard_a = *a.lock().unwrap();
+let mut guard_b = *b.lock().unwrap();''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

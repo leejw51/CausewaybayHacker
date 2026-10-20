@@ -108,6 +108,23 @@ hints = [
   "The name is the first token of the line, and a line with only a name gives 0 0, no special case needed.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::string rest;
+std::cin >> rest;''',
+  '''
+std::string rest;
+std::getline(std::cin, rest);''',
+  '''
+std::string rest;
+rest.clear();''',
+  '''
+std::string rest;
+std::getline(std::cin, rest, ' ');''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -244,6 +261,15 @@ hints = [
   "&sheet.front() is the address of the first element and only makes sense when there is one; test for nullptr before you write *first.",
 ]
 
+[quest.quiz]
+choices = [
+  'void load(std::vector<long long> sheet, long long value) {',
+  'void load(const std::vector<long long>& sheet, long long value) {',
+  'void load(std::vector<long long>& sheet, long long value) {',
+  'void load(std::vector<long long>* sheet, long long value) {',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -334,6 +360,15 @@ hints = [
   "With one or two values that range is empty or backwards — guard it with an if on nums.size() before you build it.",
   "The 0LL matters: accumulate deduces its result type from the initial value, and a plain 0 is an int.",
 ]
+
+[quest.quiz]
+choices = [
+  'middle = std::accumulate(nums.begin(), nums.end() - 1, 0LL);',
+  'middle = std::accumulate(nums.begin() + 1, nums.end(), 0LL);',
+  'middle = std::accumulate(nums.begin() + 1, nums.end() - 2, 0LL);',
+  'middle = std::accumulate(nums.begin() + 1, nums.end() - 1, 0LL);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -441,6 +476,35 @@ hints = [
   "Collect each character as its own small std::string, reverse the vector of them, and join.",
   "Counting the bytes for which (c & 0xC0) != 0x80 is the character count without decoding anything.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (starts_char(c)) {
+    chars.emplace_back(1, static_cast<char>(c));
+} else {
+    chars.back().push_back(static_cast<char>(c));
+}''',
+  '''
+if (starts_char(c)) {
+    chars.emplace_back(static_cast<char>(c), 1);
+} else {
+    chars.back().push_back(static_cast<char>(c));
+}''',
+  '''
+if (starts_char(c)) {
+    chars.emplace_back(1, static_cast<char>(c));
+} else {
+    chars.emplace_back(1, static_cast<char>(c));
+}''',
+  '''
+if (starts_char(c)) {
+    chars.emplace_back(1, static_cast<char>(c));
+} else {
+    chars.front().push_back(static_cast<char>(c));
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -592,6 +656,27 @@ hints = [
   "Return the items as a const reference so main can walk them without copying the vector, and mark every method that does not modify the ledger const.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+void add(const std::string& item, long long cents) const {
+    items_.emplace_back(item, cents);
+}''',
+  '''
+void add(const std::string& item, long long cents) {
+    items_.emplace_back(item, cents);
+}''',
+  '''
+static void add(const std::string& item, long long cents) {
+    items_.emplace_back(item, cents);
+}''',
+  '''
+void add(const std::string& item, long long cents) {
+    items_.emplace_back(cents, item);
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -735,6 +820,31 @@ hints = [
   "std::to_string turns the number into a std::string; the UNKNOWN line is a string concatenation with +.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+case Card::Member: return std::to_string(base / 2);
+case Card::Crew: return std::to_string(base);
+case Card::Junior: return "200";
+case Card::Other: return "UNKNOWN " + tag.raw;''',
+  '''
+case Card::Member: return std::to_string(base);
+case Card::Crew: return std::to_string(base / 2);
+case Card::Junior: return "200";
+case Card::Other: return "UNKNOWN " + raw;''',
+  '''
+case Card::Member: return std::to_string(base);
+case Card::Crew: return std::to_string(base / 2);
+case Card::Junior: return "200";
+case Card::Other: return "UNKNOWN " + tag.raw;''',
+  '''
+case Card::Member: return std::to_string(base);
+case Card::Crew: return std::to_string(base / 2);
+case Card::Junior: return "200";
+case Card::Other: return "UNKNOWN" + tag.raw;''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -827,6 +937,39 @@ hints = [
   "A vector can be built straight from the map's begin() and end(); each element is a std::pair<const std::string, long long>.",
   "The comparator is a lambda that returns true when a must come before b: count descending first, word ascending on a tie.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+    if (a.second != b.second) {
+        return a.second > b.second;
+    }
+    return a.first < b.first;
+});''',
+  '''
+std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+    if (a.second != b.second) {
+        return a.second < b.second;
+    }
+    return a.first < b.first;
+});''',
+  '''
+std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+    if (a.second == b.second) {
+        return a.second > b.second;
+    }
+    return a.first < b.first;
+});''',
+  '''
+std::sort(rows.begin(), rows.end() - 1, [](const auto& a, const auto& b) {
+    if (a.second != b.second) {
+        return a.second > b.second;
+    }
+    return a.first < b.first;
+});''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -944,6 +1087,15 @@ hints = [
   "Print by walking the vector and asking the map for each count, never by walking the map.",
 ]
 
+[quest.quiz]
+choices = [
+  'if (++count[name] == 0) order.push_back(name);',
+  'if (count[name]++ == 1) order.push_back(name);',
+  'if (count.count(name) == 0) order.push_back(name);',
+  'if (count[name]++ == 0) order.push_back(name);',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1050,6 +1202,15 @@ hints = [
   "A set is sorted by its element type's operator<, and std::pair compares first then second — which is the berth-then-name order the output wants.",
   "for (const auto& [berth, name] : moorings) unpacks each pair into two names; n minus the set's size is the duplicate count.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::multiset<std::pair<int, std::string>> moorings;',
+  'std::set<std::pair<int, std::string>> moorings;',
+  'std::set<std::pair<std::string, int>> moorings;',
+  'std::set<std::pair<int, std::string>, std::greater<>> moorings;',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1174,6 +1335,23 @@ hints = [
   "std::unique moves the duplicates to the end and returns an iterator to where they start; the distance from begin() is the distinct count. It only sees adjacent duplicates, so sort a copy first.",
   "find_if hands back end() on a miss, and iterator minus begin() is the index on a hit.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::sort(sorted.begin(), sorted.end());
+auto last = std::unique(sorted.begin(), sorted.end() - 1);''',
+  '''
+std::sort(sorted.begin(), sorted.end());
+auto last = std::adjacent_find(sorted.begin(), sorted.end());''',
+  '''
+std::sort(sorted.begin(), sorted.end());
+auto last = std::unique(sorted.begin(), sorted.end());''',
+  '''
+std::sort(sorted.begin(), sorted.end());
+auto last = std::unique(sorted.rbegin(), sorted.rend());''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1329,6 +1507,39 @@ hints = [
   "Pair<T> is a class template; you name the type at the point of use — Pair<long long> — and the methods are const because they only compare.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+T best = T{};
+for (const T& x : xs) {
+    if (x > best) {
+        best = x;
+    }
+}''',
+  '''
+T best = xs[0];
+for (const T& x : xs) {
+    if (x < best) {
+        best = x;
+    }
+}''',
+  '''
+long long best = xs[0];
+for (const T& x : xs) {
+    if (x > best) {
+        best = x;
+    }
+}''',
+  '''
+T best = xs[0];
+for (const T& x : xs) {
+    if (x > best) {
+        best = x;
+    }
+}''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1462,6 +1673,15 @@ hints = [
   "Without mutable the body is a const member function of the closure type, and total += delta is a compile error, not a silent no-op.",
   "std::count_if(begin, end, predicate) returns how many elements the predicate accepted; the predicate is a lambda taking one command.",
 ]
+
+[quest.quiz]
+choices = [
+  'return [total = 0LL](long long delta) mutable {',
+  'return [total = 0LL](long long delta) {',
+  'return [](long long delta) mutable {',
+  'return [total = 1LL](long long delta) mutable {',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1605,6 +1825,15 @@ hints = [
   "Returning a long long or a std::string from the same function is legal because the return type is a variant that can hold either; get_if picks the branch in main.",
 ]
 
+[quest.quiz]
+choices = [
+  'if (ec == std::errc() || ptr != end) {',
+  'if (ec != std::errc() || ptr != end) {',
+  'if (ec != std::errc() || ptr == end) {',
+  'if (!ec || ptr != end) {',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1744,6 +1973,15 @@ hints = [
   "Uncaught exceptions call std::terminate, which aborts the process with no output flushed beyond what already went out. That is what the starter does on line two.",
 ]
 
+[quest.quiz]
+choices = [
+  '} catch (const std::invalid_argument& e) {',
+  '} catch (const std::exception& e) {',
+  '} catch (const NegativeDistance& e) {',
+  '} catch (const NegativeDistance&) {',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1860,6 +2098,35 @@ hints = [
   "end() is the iterator with nothing left; operator!= compares only the countdown, so the value inside end() does not matter.",
   "std::accumulate walks the same three operators the for loop does — once begin()/end() exist, both work without another line.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+iterator& operator++() {
+    value += step;
+    ++left;
+    return *this;
+}''',
+  '''
+iterator& operator++() {
+    value += step;
+    --left;
+    return *this;
+}''',
+  '''
+iterator& operator++() {
+    value *= step;
+    --left;
+    return *this;
+}''',
+  '''
+iterator& operator++() {
+    value += step;
+    --left;
+    return iterator{value, step, left};
+}''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1998,6 +2265,27 @@ hints = [
   "The inner braces are the whole reason TALLY prints before DONE. Remove them and it prints after.",
   "Destruction is reverse construction, always, which is why second goes first and why a lock taken second is released first.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+Tally() {
+    std::cout << "TALLY " << count << ' ' << sum << '\n';
+}''',
+  '''
+~Tally() const {
+    std::cout << "TALLY " << count << ' ' << sum << '\n';
+}''',
+  '''
+void close() {
+    std::cout << "TALLY " << count << ' ' << sum << '\n';
+}''',
+  '''
+~Tally() {
+    std::cout << "TALLY " << count << ' ' << sum << '\n';
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2169,6 +2457,15 @@ hints = [
   "A segmentation fault is the OS refusing a read of an address the process does not own. Address 0 is always one of those, which is why nullptr crashes reliably and a stale pointer into freed memory does not.",
 ]
 
+[quest.quiz]
+choices = [
+  'if (Shell* shell = lookup(table, name)) {',
+  'if (Shell* shell = lookup(table, name); shell->seconds > 0) {',
+  'if (Shell* shell = lookup(table, name) != nullptr) {',
+  'if (Shell& shell = *lookup(table, name)) {',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2271,6 +2568,27 @@ hints = [
   "Capture [i, &nums, &out]: the index by value so each thread keeps its own, the vectors by reference so the writes land in main's copy.",
   "Join every thread before you read out. join() blocks until that thread has finished, and after it the writes are visible.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+threads.emplace_back([i, nums, out] {
+    out[i] = nums[i] * nums[i];
+});''',
+  '''
+threads.emplace_back([i, &nums, &out] {
+    out[i] = nums[i] + nums[i];
+});''',
+  '''
+threads.emplace_back([i, &nums, &out] {
+    out[i] = nums[i] * nums[i];
+});''',
+  '''
+threads.emplace_back([i, &nums, &out] {
+    out[i] = nums[i] * i;
+});''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2396,6 +2714,15 @@ hints = [
   "Put the jthread vector in its own block so the joins happen at the closing brace, before the print loop reads the lines.",
 ]
 
+[quest.quiz]
+choices = [
+  'std::vector<std::thread> threads;',
+  'std::jthread threads;',
+  'std::vector<std::jthread*> threads;',
+  'std::vector<std::jthread> threads;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2509,6 +2836,15 @@ hints = [
   "std::lock_guard<std::mutex> lock(total_mutex); is one line, and the unlock is the end of the block.",
   "Reading total after every join is safe without the lock: join() is a synchronisation point, and no thread is left to write.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::lock_guard<std::mutex> lock(total_mutex);',
+  'std::lock_guard<std::mutex>(total_mutex);',
+  'total_mutex.lock();',
+  'std::lock_guard<std::mutex> lock(total);',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2662,6 +2998,15 @@ hints = [
   "Dropping the const from snapshot() also compiles, and is the wrong answer — the method really does not change the value, and the signature should say so.",
   "A std::mutex cannot be copied or moved, so a class holding one cannot be either; pass Counter by reference, which the lambda already does.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::mutex mutex_;',
+  'const std::mutex mutex_;',
+  'mutable std::mutex mutex_;',
+  'static std::mutex mutex_;',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2818,6 +3163,15 @@ hints = [
   "The direction of the water decides which level gets the minus, not which lock is taken first.",
   "Two std::lock_guard objects, always A's mutex then B's, is the same answer; the rule is that every thread agrees on the order.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::scoped_lock lock(a, b);',
+  'std::scoped_lock lock(a.mutex, b.mutex);',
+  'std::lock_guard<std::mutex> lock(a.mutex, b.mutex);',
+  'std::scoped_lock<std::mutex> lock(a.mutex, b.mutex);',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2989,6 +3343,15 @@ hints = [
   "cv.wait takes a std::unique_lock, not a lock_guard, because wait has to unlock and relock it; the predicate is re-checked on every wakeup.",
 ]
 
+[quest.quiz]
+choices = [
+  'cv.wait(lock, [&] { return !tank.empty() && done; });',
+  'cv.wait(lock, [&] { return !tank.empty(); });',
+  'cv.wait(mutex, [&] { return !tank.empty() || done; });',
+  'cv.wait(lock, [&] { return !tank.empty() || done; });',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3113,6 +3476,27 @@ hints = [
   "total += value on an atomic is also atomic and also fine; total = total + value is not — that is a load and a store with a gap between them.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+threads.emplace_back([total, &hits, value] {
+    total.fetch_add(value, std::memory_order_relaxed);
+    hits.fetch_add(1, std::memory_order_relaxed);''',
+  '''
+threads.emplace_back([&total, &hits, value] {
+    total.fetch_add(value, std::memory_order_relaxed);
+    hits.fetch_add(1, std::memory_order_relaxed);''',
+  '''
+threads.emplace_back([&total, &hits, value] {
+    total.exchange(value, std::memory_order_relaxed);
+    hits.fetch_add(1, std::memory_order_relaxed);''',
+  '''
+threads.emplace_back([&total, &hits, value] {
+    total.fetch_add(value, std::memory_order_relaxed);
+    hits.fetch_add(value, std::memory_order_relaxed);''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3227,6 +3611,23 @@ hints = [
   "A local sum inside the thread and one write to partial[i] at the end keeps the shared vector touched exactly once per thread.",
   "k > n makes some chunks empty — begin == end — and the loop simply does not run. No special case.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::size_t begin = static_cast<std::size_t>(i) * n / k;
+std::size_t end = static_cast<std::size_t>(i + 1) * n / k;''',
+  '''
+std::size_t begin = i * (n / k);
+std::size_t end = (i + 1) * (n / k);''',
+  '''
+std::size_t begin = static_cast<std::size_t>(i) * n / k;
+std::size_t end = begin + n / k;''',
+  '''
+std::size_t begin = static_cast<std::size_t>(i) * k / n;
+std::size_t end = static_cast<std::size_t>(i + 1) * k / n;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3344,6 +3745,27 @@ hints = [
   "get() can be called exactly once per future and blocks until the value is there; walking the vector in order gives you the output in order.",
   "The promise is moved or referenced into the thread, set_value(n) is called there, and ready.get() in main waits for it. Join the thread before main returns.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+squares.push_back(std::thread([value] {
+    return value * value;
+}));''',
+  '''
+squares.push_back(std::async(std::launch::async, [value] {
+    value * value;
+}));''',
+  '''
+squares.push_back(std::async(std::launch::async, [value] {
+    return value * value;
+}));''',
+  '''
+squares.push_back(std::async(std::launch::async, [value] {
+    return value + value;
+}));''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3501,6 +3923,15 @@ hints = [
   "The recursive sum is two lines: nullptr is 0, otherwise cents plus the sum of the rest.",
 ]
 
+[quest.quiz]
+choices = [
+  'head = std::make_unique<Entry>(Entry{*it, head});',
+  'head = std::make_unique<Entry>(Entry{*it, nullptr});',
+  'head = std::make_unique<Entry>(Entry{*it, std::move(head->next)});',
+  'head = std::make_unique<Entry>(Entry{*it, std::move(head)});',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3613,6 +4044,15 @@ hints = [
   "A weak_ptr is constructed straight from a shared_ptr and never changes the count; expired() is the whole question you ask it.",
   "reset() on both handles drops the count to zero; the first reset alone would not free anything, and one of the hints in the room is to say why.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::shared_ptr<std::vector<long long>> mirror = ledger;',
+  'std::weak_ptr<std::vector<long long>> mirror = ledger;',
+  'std::shared_ptr<std::vector<long long>> mirror = std::make_shared<std::vector<long long>>(*ledger);',
+  'std::shared_ptr<std::vector<long long>> mirror(ledger.get());',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3778,6 +4218,15 @@ hints = [
   "The move constructor is marked noexcept on purpose: std::vector only moves elements during a reallocation when the move cannot throw, and otherwise copies them to stay exception-safe.",
   "reserve(n) on both vectors is what makes the counts exact. Without it a reallocation would move (or copy) every element already stored, and the numbers would depend on the growth policy.",
 ]
+
+[quest.quiz]
+choices = [
+  'sent.push_back(d);',
+  'sent.push_back(std::move(d));',
+  'sent.emplace_back(d);',
+  'sent.push_back(std::move(d.text));',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3984,6 +4433,23 @@ hints = [
   "A function template print(const Ring<T>&) deduces T from the argument, so one printer serves both rings.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+slots_[head_] = item;
+head_ = (head_ + 1) % count_;''',
+  '''
+slots_[head_] = item;
+head_ = (head_ - 1) % slots_.size();''',
+  '''
+slots_[head_] = item;
+head_ = (head_ + 1) % slots_.size();''',
+  '''
+head_ = (head_ + 1) % slots_.size();
+slots_[head_] = item;''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4110,6 +4576,39 @@ hints = [
   "std::erase_if(vector, pred) returns how many it removed, which is exactly the REMOVED line.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (*it < threshold) {
+    it = moorings.erase(it);
+    ++removed;
+} else {
+    ++it;
+}''',
+  '''
+if (*it <= threshold) {
+    it = moorings.erase(it);
+    ++removed;
+} else {
+    ++it;
+}''',
+  '''
+if (*it > threshold) {
+    it = moorings.erase(it);
+    ++removed;
+} else {
+    ++it;
+}''',
+  '''
+if (*it < threshold) {
+    it = moorings.erase(it);
+} else {
+    ++it;
+    ++removed;
+}''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4226,6 +4725,15 @@ hints = [
   "Record only the first index that leaves the range; a later value may bring the total back inside, and the question asked where it first left.",
   "If you must add two ints and want to know whether it is safe: check v > INT_MAX - total before the add, not the sign of the sum after it. The first is defined; the second is the thing the compiler deletes.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (overflow_at < 0 && (total < low || total >= high)) {',
+  'if (overflow_at < 0 && (static_cast<int>(total) < low || static_cast<int>(total) > high)) {',
+  'if (overflow_at < 0 && (nums[i] < low || nums[i] > high)) {',
+  'if (overflow_at < 0 && (total < low || total > high)) {',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4359,6 +4867,15 @@ hints = [
   "A lambda whose first parameter is std::stop_token gets one automatically from the jthread that runs it; that is the whole hookup.",
   "std::stop_callback on_stop(token, fn) is an object: it registers in its constructor and unregisters in its destructor, so it lives for the loop and no longer.",
 ]
+
+[quest.quiz]
+choices = [
+  'std::thread pump([&](std::stop_token token) {',
+  'std::jthread pump([&](std::stop_source token) {',
+  'std::jthread pump([&](std::stop_token token) {',
+  'std::jthread pump([=](std::stop_token token) {',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -4537,6 +5054,43 @@ hints = [
   "partial is still captured by reference, and that is correct: pump owns it, pump joins before returning it, and each thread writes only its own slot.",
   "main moves its handle into pump on purpose. If it had kept one, FREED would be no — the buffer would be alive because main was still holding it, and that is the other answer this boss accepts you being able to explain.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+pumps.emplace_back([i, begin, end, buffer, partial] {
+    long long sum = 0;
+    for (std::size_t j = begin; j < end; ++j) {
+        sum += (*buffer)[j];
+    }
+    partial[i] = sum;
+});''',
+  '''
+pumps.emplace_back([i, begin, end, buffer, &partial] {
+    long long sum = 0;
+    for (std::size_t j = begin; j < end; ++j) {
+        sum += (*buffer)[j];
+    }
+    partial[i] = sum;
+});''',
+  '''
+pumps.emplace_back([i, begin, end, buffer, &partial] {
+    long long sum = 0;
+    for (std::size_t j = begin; j < end; ++j) {
+        sum += buffer[j];
+    }
+    partial[i] = sum;
+});''',
+  '''
+pumps.emplace_back([i, begin, end, buffer, &partial] {
+    long long sum = 0;
+    for (std::size_t j = begin; j < end; ++j) {
+        sum = (*buffer)[j];
+    }
+    partial[i] = sum;
+});''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

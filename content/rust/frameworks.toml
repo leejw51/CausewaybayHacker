@@ -125,6 +125,30 @@ hints = [
   "A missing field is `None`, not a parse error: turn it into an error with `.ok_or_else(|| anyhow!(\"missing amount\"))` and give it the same `line n` context.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+.ok_or_else(|| anyhow!("missing amount"))
+.with_context(|| format!("line {n}"))?
+.parse()?;''',
+  '''
+.ok_or_else(|| anyhow!("missing amount"))?
+.with_context(|| format!("line {n}"))
+.parse()
+.with_context(|| format!("line {n}"))?;''',
+  '''
+.ok_or_else(|| anyhow!("missing amount"))
+.with_context(|| format!("line {n}"))?
+.parse()
+.with_context(|| format!("line {n}"))?;''',
+  '''
+.ok_or(anyhow!("missing amount"))
+.context("line {n}")?
+.parse()
+.context("line {n}")?;''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["anyhow"]
@@ -293,6 +317,23 @@ hints = [
   "The signature changes to `Result<(), TransferError>`; `println!(\"{e}\")` in `main` then prints the attribute's text.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+#[error("insufficient funds in {account}: need {need}, have {have}")]
+Insufficient { account: String, need: i64, have: i64 },''',
+  '''
+#[error("insufficient funds in {0}: need {1}, have {2}")]
+Insufficient { account: String, need: i64, have: i64 },''',
+  '''
+#[display("insufficient funds in {account}: need {need}, have {have}")]
+Insufficient { account: String, need: i64, have: i64 },''',
+  '''
+#[error("insufficient funds in {account}: need {have}, have {need}")]
+Insufficient { account: String, need: i64, have: i64 },''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["thiserror"]
@@ -397,6 +438,23 @@ hints = [
   "`let orders: Vec<Order> = serde_json::from_str(&input)?;` — the type on the left is what tells serde what to build.",
   "Key order and whitespace are JSON's business, not yours; serde reads any object with those three keys. Printing is the same loop as before.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+#[derive(Debug)]
+struct Order {''',
+  '''
+#[derive(Debug, Serialize)]
+struct Order {''',
+  '''
+#[derive(Debug, Clone)]
+struct Order {''',
+  '''
+#[derive(Debug, Deserialize)]
+struct Order {''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -516,6 +574,30 @@ hints = [
   "`serde_json::to_string(record)` gives compact JSON with the struct's field order; `println!` it, one record per line.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+fee_cents: i64,
+#[serde(skip_serializing_if = "Option::is_none")]
+auth_code: Option<String>,''',
+  '''
+#[serde(default)]
+fee_cents: i64,
+#[serde(skip_serializing_if = "Option::is_none")]
+auth_code: Option<String>,''',
+  '''
+#[serde(default)]
+fee_cents: i64,
+#[serde(default)]
+auth_code: Option<String>,''',
+  '''
+#[serde(default)]
+fee_cents: i64,
+#[serde(skip_serializing_if = "Option::is_none")]
+auth_code: String,''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["serde", "serde_json"]
@@ -631,6 +713,27 @@ hints = [
   "The path grows one piece per level: `format!(\"{path}.{key}\")` unless `path` is empty (then just the key), and `format!(\"{path}[{i}]\")` for an index.",
   "`Value::String(s) => println!(\"{path} = {s}\")` prints a string bare; `other => println!(\"{path} = {other}\")` uses `Value`'s own `Display`, which is compact JSON — `null`, `true`, `1.5`.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+Value::List(items) => {
+    for (i, child) in items.iter().enumerate() {
+        walk(&format!("{path}[{i}]"), child);''',
+  '''
+Value::Array(items) => {
+    for (i, child) in items.enumerate() {
+        walk(&format!("{path}[{i}]"), child);''',
+  '''
+Value::Array(items) => {
+    for (i, child) in items.iter().enumerate() {
+        walk(&format!("{path}[{i}]"), child);''',
+  '''
+Value::Array(items) => {
+    for (i, child) in items.iter().enumerate() {
+        walk(&format!("{path}.{i}"), child);''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -791,6 +894,23 @@ hints = [
   "`match toml::from_str::<Config>(&input) { Ok(cfg) => cfg, Err(_) => { println!(\"ERROR: config rejected\"); return; } }`.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+#[serde(default)]
+port: u16,''',
+  '''
+#[serde(default = default_port)]
+port: u16,''',
+  '''
+#[serde(default = "default_port()")]
+port: u16,''',
+  '''
+#[serde(default = "default_port")]
+port: u16,''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["toml", "serde"]
@@ -919,6 +1039,23 @@ hints = [
   "`Cli::parse()` reads the real argv, which is empty here. `Cli::try_parse_from(iter)` takes any iterator of strings whose first item is the program name: `std::iter::once(\"settle\").chain(line.split_whitespace())`.",
   "`Err(e) => println!(\"ERROR: {:?}\", e.kind())` — `ErrorKind` is a plain enum, and its `Debug` is the variant name.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+#[arg(long, default_value_t = 100)]
+limit: u32,''',
+  '''
+#[arg(short, default_value_t = 100)]
+limit: u32,''',
+  '''
+#[arg(long, default_value = 100)]
+limit: u32,''',
+  '''
+#[arg(long)]
+limit: u32,''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1071,6 +1208,30 @@ hints = [
   "After `try_parse_from`, match on `cli.command`: `Command::Refund { id, reason: Some(why) } => ...` and `Command::Refund { id, reason: None } => ...` are two arms of one match.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+Refund {
+    id: String,
+    reason: Option<String>,''',
+  '''
+Refund {
+    id: String,
+    #[arg(long)]
+    reason: Option<String>,''',
+  '''
+Refund {
+    id: String,
+    #[arg(short)]
+    reason: Option<String>,''',
+  '''
+Refund {
+    id: String,
+    #[arg(long)]
+    reason: String,''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["clap"]
@@ -1186,6 +1347,23 @@ hints = [
   "The pattern: `HK\\$(?P<dollars>\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(?P<cents>\\d{2}))?`. `&caps[0]` is the whole match, `caps[\"dollars\"]` the group text, and `caps.name(\"cents\")` is an `Option<Match>` because the group may not have taken part.",
   "`let dollars: i64 = caps[\"dollars\"].replace(',', \"\").parse().unwrap();` then `let cents: i64 = caps.name(\"cents\").map_or(0, |m| m.as_str().parse().unwrap());` and the amount is `dollars * 100 + cents`.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let dollars: i64 = caps["dollars"].parse().unwrap();
+let cents: i64 = caps.name("cents").map_or(0, |m| m.as_str().parse().unwrap());''',
+  '''
+let dollars: i64 = caps["dollars"].replace(',', "").parse().unwrap();
+let cents: i64 = caps["cents"].parse().unwrap_or(0);''',
+  '''
+let dollars: i64 = caps["dollars"].replace(',', "").parse().unwrap();
+let cents: i64 = caps.name("cents").map_or(0, |m| m.parse().unwrap());''',
+  '''
+let dollars: i64 = caps["dollars"].replace(',', "").parse().unwrap();
+let cents: i64 = caps.name("cents").map_or(0, |m| m.as_str().parse().unwrap());''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1370,6 +1548,23 @@ hints = [
   "`value.format(\"%d %b %Y %a\")` prints `02 Oct 2026 Fri` straight into `println!` — `%a` is the weekday's three-letter name.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+day.checked_add_days(Days::new(1)).expect("date in range");
+if !matches!(day.weekday(), Weekday::Sat | Weekday::Sun) {''',
+  '''
+day = day.checked_add_days(Days::new(1)).expect("date in range");
+if matches!(day.weekday(), Weekday::Sat | Weekday::Sun) {''',
+  '''
+day = day.checked_add_days(Days::new(1)).expect("date in range");
+if !matches!(day.weekday(), Weekday::Sat | Weekday::Sun) {''',
+  '''
+day = day.checked_add_days(Days::new(1)).expect("date in range");
+if !matches!(day.weekday(), Weekday::Saturday | Weekday::Sunday) {''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["chrono"]
@@ -1504,6 +1699,23 @@ hints = [
   "Inside the loop: `let amounts: Vec<i64> = group.map(|(_, cents)| *cents).collect();` then `println!(\"{account} {}={}\", amounts.iter().join(\"+\"), amounts.iter().sum::<i64>())`.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+.sorted_by_key(|(account, _)| *account)
+.chunk_by(|(account, _)| *account);''',
+  '''
+.chunk_by(|(account, _)| *account)
+.sorted_by_key(|(account, _)| *account);''',
+  '''
+.sorted()
+.chunk_by(|(account, _)| *account);''',
+  '''
+.sorted_by_key(|(_, cents)| *cents)
+.chunk_by(|(account, _)| *account);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["itertools"]
@@ -1632,6 +1844,15 @@ hints = [
   "`counts.get_index(0)` is `Option<(&K, &V)>`: the first merchant ever inserted. No second variable needed to remember it.",
   "For `TOP`, walk `&counts` in order and replace the best only when `*count > best` — strictly greater, so the earliest of a tie stays. `max_by_key` returns the *last* maximum, which is the wrong one here.",
 ]
+
+[quest.quiz]
+choices = [
+  'if let Some((first, _)) = counts.get(0) {',
+  'if let Some((first, _)) = counts.get_index(0) {',
+  'if let Some((first, _)) = counts.get_index(1) {',
+  'if let Some((first, _)) = counts.iter().last() {',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1763,6 +1984,15 @@ hints = [
   "`deck.shuffle(&mut rng);` then `let draw: u32 = rng.random_range(1..=100);` — the type annotation decides which integers come out of the stream, so it has to be `u32`.",
 ]
 
+[quest.quiz]
+choices = [
+  'let mut rng = StdRng::from_seed(seed);',
+  'let mut rng = rand::rng();',
+  'let mut rng = StdRng::seed_from_u64(seed);',
+  'let rng = StdRng::seed_from_u64(seed);',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["rand"]
@@ -1889,6 +2119,27 @@ hints = [
   "A parallel `collect()` into a `Vec` keeps input order, but the brief wants card order: `fees.par_sort_unstable()` (or plain `sort()`) before the print loop, which stays sequential.",
   "`let total: i64 = fees.par_iter().map(|&(_, f)| f).sum();` — the type on the left tells `sum` what to add into.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+.map(|&(card, cents)| (card, fee(cents)))
+.collect();
+fees.par_sort_unstable_by_key(|&(_, f)| f);''',
+  '''
+.map(|(card, cents)| (card, fee(cents)))
+.collect();
+fees.par_sort_unstable();''',
+  '''
+.map(|&(card, cents)| (card, fee(cents)))
+.collect();
+fees.sort_by(|a, b| b.cmp(a));''',
+  '''
+.map(|&(card, cents)| (card, fee(cents)))
+.collect();
+fees.par_sort_unstable();''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2051,6 +2302,35 @@ hints = [
   "Merge with `entry`: `let e = shared.entry(merchant).or_insert((0, 0)); e.0 += cents; e.1 += count;` — one `lock()` per till, taken after the local map is complete, so the lock is held for the merge and nothing else.",
   "`let mut shared = ledger.lock();` then the `for (merchant, (cents, count)) in local` loop; the guard is a local and drops when the thread's closure ends.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let mut shared = ledger.lock();
+for (merchant, (cents, count)) in local {
+    let entry = shared.entry(merchant).or_insert((0, 0));
+    entry.0 += cents;
+    entry.1 += count;''',
+  '''
+let mut shared = ledger.lock().unwrap();
+for (merchant, (cents, count)) in local {
+    let entry = shared.entry(merchant).or_insert((0, 0));
+    entry.0 += cents;
+    entry.1 += count;''',
+  '''
+let shared = ledger.lock();
+for (merchant, (cents, count)) in local {
+    let entry = shared.entry(merchant).or_insert((0, 0));
+    entry.0 += cents;
+    entry.1 += count;''',
+  '''
+let mut shared = ledger.lock();
+for (merchant, (cents, count)) in local {
+    let entry = shared.entry(merchant).or_insert((0, 0));
+    entry.0 += cents;
+    entry.1 += 1;''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2256,6 +2536,15 @@ hints = [
   "`drop(tx);` right after the `for p in 0..producers` loop, inside the `thread::scope` closure. Nothing else changes.",
 ]
 
+[quest.quiz]
+choices = [
+  'drop(rx);',
+  'drop(tx);',
+  'let _ = tx;',
+  'drop(tx.clone());',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["crossbeam"]
@@ -2401,6 +2690,15 @@ hints = [
   "`select! { recv(rx) -> answer => { approved += 1; println!(\"{} APPROVED\", answer.unwrap()); } recv(after(Duration::from_millis(300))) -> _ => { timed_out += 1; println!(\"{card} TIMEOUT\"); } }`",
 ]
 
+[quest.quiz]
+choices = [
+  'let timeout = after(Duration::from_millis(300));',
+  'let timeout = after(Duration::from_secs(300));',
+  'let timeout = thread::sleep(Duration::from_millis(300));',
+  'let timeout = Duration::from_millis(300);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["crossbeam"]
@@ -2536,6 +2834,15 @@ hints = [
   "`tokio::join!(a, b)` runs two futures on the same task and gives back `(a_result, b_result)` — the tag and the fee, inside `check`.",
   "A `Vec<JoinHandle<_>>` awaited front to back is the input order, whatever order the tasks actually finished in: `for (i, h) in handles.into_iter().enumerate() { let (tag, cents, fee) = h.await.unwrap(); println!(...); }`.",
 ]
+
+[quest.quiz]
+choices = [
+  'handles.push(tokio::spawn(check(merchant, cents)));',
+  'handles.push(check(merchant.to_string(), cents));',
+  'handles.push(tokio::spawn(check(merchant.to_string(), cents).await));',
+  'handles.push(tokio::spawn(check(merchant.to_string(), cents)));',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2692,6 +2999,15 @@ hints = [
   "`drop(tx);` right after the spawn loop. Then `while let Some(..) = rx.recv().await` ends exactly when the last till has finished sending.",
 ]
 
+[quest.quiz]
+choices = [
+  'drop(rx);',
+  'drop(tx);',
+  'let _ = tx;',
+  'drop(&tx);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["tokio"]
@@ -2830,6 +3146,15 @@ hints = [
   "Put the `select!` in an `async fn authorise(...) -> (&'static str, u64)` and wrap *that* in the timeout, so one deadline covers both acquirers.",
   "`match timeout(..).await { Ok((who, code)) => println!(\"DONE {id} {who} {code}\"), Err(_) => println!(\"TIMEOUT {id}\") }`.",
 ]
+
+[quest.quiz]
+choices = [
+  'match timeout(Duration::from_secs(1), authorise(id, primary_speed, backup_speed)) {',
+  'match timeout(Duration::from_secs(5), authorise(id, primary_speed, backup_speed)).await {',
+  'match timeout(Duration::from_secs(1), authorise(id, primary_speed, backup_speed)).await {',
+  'match timeout(authorise(id, primary_speed, backup_speed), Duration::from_secs(1)).await {',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3031,6 +3356,15 @@ hints = [
   "`let scores = join_all(rows.iter().map(|&(id, c)| score(id, c))).await;` then `rows.iter().zip(&scores)` to print.",
 ]
 
+[quest.quiz]
+choices = [
+  'let scores = join_all(rows.iter().map(|&(id, cents)| score(id, cents)));',
+  'let scores = try_join_all(rows.iter().map(|&(id, cents)| score(id, cents))).await;',
+  'let scores = join_all(rows.iter().map(|&(id, cents)| score(id, cents))).await;',
+  'let scores = join_all(rows.iter().map(|(id, cents)| score(id, cents))).await;',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 crates     = ["futures", "tokio"]
@@ -3222,6 +3556,15 @@ hints = [
   "`Level` orders `Error < Warn < Info < Debug < Trace`, so a record is wanted when `record.level() <= log::max_level()`. The macros already check `max_level()` before they call you.",
   "`println!(\"[{}] {}: {}\", record.level(), record.target(), record.args())` — `Level` displays as `ERROR`, `WARN`, ...; the `target:` you pass in each macro is what `record.target()` returns.",
 ]
+
+[quest.quiz]
+choices = [
+  'metadata.level() >= log::max_level()',
+  'metadata.level() <= log::max_level()',
+  'metadata.level() < log::max_level()',
+  'metadata.level() <= log::Level::Info',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3418,6 +3761,27 @@ hints = [
   "Each task is `tokio::spawn(post(Arc::clone(&book), transfer))` returning `anyhow::Result<()>`; `handle.await` gives you a `Result<Result<()>, JoinError>`, so it is two `?`s — the first with a context of its own.",
   "Join the handles **in the order you spawned them** and stop at the first `Err`: that is what makes `transfer 2` the one reported when transfers 2 and 3 are both bad. The map is a `BTreeMap`, so the accounts come out sorted for free.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let mut book = book.lock().unwrap();
+*book.entry(transfer.from).or_insert(0) -= transfer.cents;
+*book.entry(transfer.to).or_insert(0) += transfer.cents;''',
+  '''
+let mut book = book.lock();
+*book.entry(transfer.from).or_insert(0) -= transfer.cents;
+*book.entry(transfer.to).or_insert(0) += transfer.cents;''',
+  '''
+let mut book = book.lock().await;
+*book.entry(transfer.from).or_insert(0) += transfer.cents;
+*book.entry(transfer.to).or_insert(0) -= transfer.cents;''',
+  '''
+let mut book = book.lock().await;
+*book.entry(transfer.from).or_insert(0) -= transfer.cents;
+*book.entry(transfer.to).or_insert(0) += transfer.cents;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"

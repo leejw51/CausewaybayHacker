@@ -1,5 +1,4 @@
-# LUA LAND — VERY BASIC. The grammar as a question first: four lines, one of
-# them right, and then that line typed. Types, tables, a stack, a queue, a
+# LUA LAND — VERY BASIC. The grammar as a question first: four lines, one of them right, and the pick is the answer. Types, tables, a stack, a queue, a
 # heap, a metatable class, a coroutine, a lock — the constructs a HackerRank-
 # style live coding test leans on, one per node, in Tai Hang on the fifteenth
 # night of the eighth month, from the first lantern on Wun Sha Street at 21:00
@@ -45,7 +44,7 @@ map          = { x = 0.044, y = 0.146, kind = "quest" }
 brief       = '''
 The program must print exactly `hello, causewaybay` on one line. One built-in writes its arguments and a newline to standard output.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 output: hello, causewaybay
@@ -97,7 +96,7 @@ map          = { x = 0.247, y = 0.058, kind = "quest" }
 brief       = '''
 `a` and `b` are integers. The program must print the whole-number quotient and the remainder on one line, separated by ONE space. LuaJIT has one number type and no integer-division operator: `/` gives the fraction, `math.floor` drops it, and `%` is the remainder. `print` puts a TAB between its arguments, so the two go into one string with `..` first.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  7 2
@@ -146,7 +145,7 @@ map          = { x = 0.333, y = 0.132, kind = "quest" }
 brief       = '''
 `x` and `y` are numbers. The program must print `x / y` with exactly two digits after the point. `string.format` takes a C-style spec: `f` is a fixed-point number and the digit after the dot is how many decimals.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  7 2
@@ -195,7 +194,7 @@ map          = { x = 0.518, y = 0.065, kind = "quest" }
 brief       = '''
 `s` is one line of text. After its length, the program must print `s` in upper case. A string method returns a copy with every letter capitalised, and a method is called with a colon so the string passes itself.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  kwan lee
@@ -247,7 +246,7 @@ map          = { x = 0.604, y = 0.137, kind = "quest" }
 brief       = '''
 `n` is a positive integer. The program must print `even` when `n` is divisible by two and `odd` otherwise. The condition is an `if` header comparing the remainder to zero, and it ends in `then`.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  4
@@ -304,7 +303,7 @@ map          = { x = 0.822, y = 0.054, kind = "quest" }
 brief       = '''
 `n` is a positive integer. The loop must visit every integer from 1 up to and including `n`, adding each to `total`. A numeric `for` takes a start and a stop, and the stop IS included.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  4
@@ -361,7 +360,7 @@ map          = { x = 0.898, y = 0.144, kind = "quest" }
 brief       = '''
 `pay(laps)` must return the pay: the first ten laps at 5 each, every lap after the tenth at 3. A function hands a value back with one keyword; a function that only prints hands back `nil`.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3
@@ -420,7 +419,7 @@ map          = { x = 0.953, y = 0.263, kind = "quest" }
 brief       = '''
 `Stall.new(name, price)` builds a table with `Stall` as its metatable — Lua's class. It must store `price` on the object the same way `name` is stored, so `s.price` reads it back. A field is written on `self`; a bare name is a local.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  tofu 12
@@ -491,7 +490,7 @@ map          = { x = 0.753, y = 0.338, kind = "quest" }
 brief       = '''
 `Stall:total()` must return price times quantity. A method declared with a colon has a hidden first parameter, `self`, and the object's fields are reached through it; `price` on its own is a global that was never set.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  tofu 12 3
@@ -572,7 +571,7 @@ map          = { x = 0.671, y = 0.280, kind = "quest" }
 brief       = '''
 `word` is one of `island`, `tsuenwan`, `kwuntong`. Lua has no enum: `Line` is a table of named numbers, the nearest thing, and `COLOUR` is keyed by those numbers. The program must turn `word` into the matching `Line` member. A table is indexed by a key, and the keys here are in capitals; a table is not callable, and `Line.word` looks for a key spelled `word`.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  tsuenwan
@@ -629,7 +628,7 @@ map          = { x = 0.474, y = 0.314, kind = "quest" }
 brief       = '''
 `xs` starts as an empty table, and a Lua list is a table with keys 1, 2, 3, ... Each integer `x` read in the loop must be added at the end, keeping the input's order. The `table` library has a function for that; with two arguments it appends, with three the middle one is a position.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -689,7 +688,7 @@ map          = { x = 0.396, y = 0.276, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers, from index 1. The program must remove the element at index 1 so the rest shift down. `table.remove` takes a position and shifts what follows; setting a slot to `nil` leaves a hole, not a shorter list.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -742,7 +741,7 @@ map          = { x = 0.185, y = 0.313, kind = "quest" }
 brief       = '''
 `chain` is a table used as a list. Lua has no deque; `table.insert` with a position is the nearest thing, and it shifts everything after that position up one. Each `x` read in the loop must be added at the FRONT, so the last one read ends up first.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1 2 3
@@ -799,7 +798,7 @@ map          = { x = 0.119, y = 0.272, kind = "quest" }
 brief       = '''
 `counts` is a table keyed by word. For each word `w` the program must add one to its count, starting from zero the first time. A missing key reads as `nil`, and `nil` cannot be added to; `or` supplies a default, and it binds looser than `+`, so the default needs its own parentheses.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  siu mai har gau siu mai
@@ -867,7 +866,7 @@ map          = { x = 0.055, y = 0.556, kind = "quest" }
 brief       = '''
 `stalls` maps names to stall numbers. For the word `w` the program must print its number, or `-1` when `w` is not in the table. A missing key is `nil`, not an error, and `or` turns a `nil` into a default.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  2
@@ -931,7 +930,7 @@ map          = { x = 0.255, y = 0.468, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. The program must print how many DISTINCT values there are. Lua has no set: a table whose KEYS are the values is the nearest thing — a key stored twice is one key — and the count loop already walks the keys with `pairs`, because `#` counts only the slots from 1. Each `x` must be marked in `seen` as a key.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3 5 3 8 5 3
@@ -994,7 +993,7 @@ map          = { x = 0.327, y = 0.554, kind = "quest" }
 brief       = '''
 `stack` is a table used as a stack. The program must take the TOP (last) element off into `top`. `table.remove` removes and returns an element, and with no position it takes the last one.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1050,7 +1049,7 @@ map          = { x = 0.529, y = 0.468, kind = "quest" }
 brief       = '''
 `q` is a table holding the carriers in order. Lua has no deque; `table.remove` with a position is the nearest thing, and everything after that position shifts down. The program must take the FIRST one off into `first`.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1 2 3 4
@@ -1106,7 +1105,7 @@ map          = { x = 0.619, y = 0.533, kind = "quest" }
 brief       = '''
 Lua's standard library has no heap, so the starter carries a small `MinHeap` class: `push` adds a value and sifts it up, `pop` takes the smallest. Each `x` must go in through the heap's own method, called with a colon so the heap passes itself, so that `pop` later returns the smallest first. Writing into `items` directly skips the sift and breaks the order.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  5 1 4 2 3
@@ -1257,7 +1256,7 @@ map          = { x = 0.801, y = 0.447, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. The program must sort `xs` in place, ascending, before it is printed. The `table` library has a function that does it, ascending by default; a second argument would be a comparison function.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3 1 4 1
@@ -1310,7 +1309,7 @@ map          = { x = 0.901, y = 0.543, kind = "quest" }
 brief       = '''
 `rows` is a list of tables with a `name` and a `score`. It must be sorted by score descending, then by name ascending. `table.sort` takes a comparison function that answers whether `a` goes before `b`; the score decides unless the two are equal, and then the name does.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  3
@@ -1380,7 +1379,7 @@ map          = { x = 0.953, y = 0.667, kind = "quest" }
 brief       = '''
 `s` is one line of text. The program must print it reversed. The string library has a method for exactly that, called with a colon; `sub` cuts a piece out and does not turn it round.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  kwan lee
@@ -1429,7 +1428,7 @@ map          = { x = 0.750, y = 0.724, kind = "quest" }
 brief       = '''
 `make_adder(k)` defines an inner function `add` that returns `x + k`. It must hand back that inner function itself — a function is a value like any other — so `add(x)` can be called later with `k` remembered.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  5
@@ -1503,7 +1502,7 @@ map          = { x = 0.666, y = 0.676, kind = "quest" }
 brief       = '''
 `xs` holds the line's integers. Lua has no `map` or `filter` built in, so the starter carries `map(f, xs)`, `filter(f, xs)` and `sum(xs)`. `total` must be the sum of the squares of the EVEN values, built from those three and two anonymous functions — `function(x) ... end` is Lua's lambda.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -1596,7 +1595,7 @@ map          = { x = 0.472, y = 0.739, kind = "quest" }
 brief       = '''
 There are no threads here: a coroutine is the nearest thing, a function that runs only while it is resumed and hands control back with `yield`. Every worker in `workers` has been started — resumed once, as far as its first yield — and none has written its result. Before the results are printed, the main program must run each `co` to its end. One function in the `coroutine` library continues a coroutine from where it yielded.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1 2 3
@@ -1686,7 +1685,7 @@ map          = { x = 0.394, y = 0.686, kind = "quest" }
 brief       = '''
 One coroutine runs at a time, and still a race: each worker reads `counter`, yields, and writes it back, and the other three run in the gap. Lua has no mutex; `lock` is a small cooperative one, and its `acquire` yields until the lock is free and then takes it. Before the read, each worker must TAKE the lock through that method — with a colon, so the lock passes itself; the release is already written after the write.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  1000
@@ -1825,7 +1824,7 @@ map          = { x = 0.818, y = 0.870, kind = "boss" }
 brief       = '''
 The segment numbers are read into `segments`, which starts at 1 like every Lua list — `segments[0]` is `nil`, and so is a child that is not there yet; neither is an error until it is followed. `insert(n, v)` returns the root of the tree with `v` in it; the `nil` case and the right-hand side are written. For a smaller `v` the left child must be replaced by the result of inserting into it, so a `nil` child becomes a node.
 
-Pick the line that does it, then type it where the `-- FILL` comment is.
+Pick the line that does it. It goes where the `-- FILL` comment is.
 
 ```
 input:  5 3 8 1 4

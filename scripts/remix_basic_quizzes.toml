@@ -1,0 +1,981 @@
+# REMIX LAND — BASIC: the quiz on every quest. scripts/remix_pack.py reads
+# this file and writes each entry as the quest's [quest.quiz] in
+# content/remix/basic.toml, so edit the quizzes here, not there.
+#
+# One table per quest id. `answer` is the 0-based index of the right
+# choice, which is a contiguous run of the quest's solution lines, verbatim
+# (indentation aside) and found there exactly once: the server cuts it out
+# and the player picks which of the four fills the hole. Each wrong choice,
+# swapped in, must make the program fail its tests — verify_pack runs that.
+# Choices are dedented to the hole; Go keeps its tabs.
+
+["remix.basic.01.numbers-go"]
+choices = [
+  '''
+q := a / b
+r := a % b
+f := float64(a / b)''',
+  '''
+q := a / b
+r := a % b
+f := float64(a) / float64(b)''',
+  '''
+q := a / b
+r := a % b
+f := float64(a) / b''',
+  '''
+q := a % b
+r := a / b
+f := float64(a) / float64(b)''',
+]
+answer  = 1
+
+["remix.basic.02.numbers-rust"]
+choices = [
+  '''
+let q = a / b;
+let r = a % b;
+let f = (a / b) as f64;''',
+  '''
+let q = a / b;
+let r = a % b;
+let f = a as f64 / b;''',
+  '''
+let q = a / b;
+let r = a % b;
+let f = a as f64 / b as f64;''',
+  '''
+let q = a / b;
+let r = a / b;
+let f = a as f64 / b as f64;''',
+]
+answer  = 2
+
+["remix.basic.03.numbers-python"]
+choices = [
+  '''
+q = a / b
+r = a % b
+f = a / b''',
+  '''
+q = a // b
+r = a % b
+f = a // b''',
+  '''
+q = a // b
+r = a % b
+f = float(a // b)''',
+  '''
+q = a // b
+r = a % b
+f = a / b''',
+]
+answer  = 3
+
+["remix.basic.04.strings-go"]
+choices = [
+  '''
+names := strings.Split(line, ",")
+joined := strings.ToUpper(strings.Join(names, " | "))
+chars := utf8.RuneCountInString(line)''',
+  '''
+names := strings.Split(line, ",")
+joined := strings.ToUpper(strings.Join(names, " | "))
+chars := len(line)''',
+  '''
+names := strings.Split(line, ",")
+joined := strings.Join(strings.ToUpper(names), " | ")
+chars := utf8.RuneCountInString(line)''',
+  '''
+names := strings.Split(line, ", ")
+joined := strings.ToUpper(strings.Join(names, " | "))
+chars := utf8.RuneCountInString(line)''',
+]
+answer  = 0
+
+["remix.basic.05.strings-rust"]
+choices = [
+  '''
+let names: Vec<&str> = line.split(',').collect();
+let joined = names.join(" | ").to_uppercase();
+let chars = line.len();''',
+  '''
+let names: Vec<&str> = line.split(',').collect();
+let joined = names.join(" | ").to_uppercase();
+let chars = line.chars().count();''',
+  '''
+let names: Vec<&str> = line.split(',').collect();
+let joined = names.join(" | ").to_ascii_uppercase();
+let chars = line.chars().count();''',
+  '''
+let names = line.split(',');
+let joined = names.join(" | ").to_uppercase();
+let chars = line.chars().count();''',
+]
+answer  = 1
+
+["remix.basic.06.strings-python"]
+choices = [
+  '''
+names = line.split(",")
+joined = names.join(" | ").upper()
+chars = len(line)''',
+  '''
+names = line.split(",")
+joined = " | ".join(names).upper()
+chars = len(line.encode())''',
+  '''
+names = line.split(",")
+joined = " | ".join(names).upper()
+chars = len(line)''',
+  '''
+names = line.split()
+joined = " | ".join(names).upper()
+chars = len(line)''',
+]
+answer  = 2
+
+["remix.basic.07.loops-go"]
+choices = [
+  '''
+while n != 1 {
+	steps++''',
+  '''
+for n != 1 {
+	steps =+ 1''',
+  '''
+for n == 1 {
+	steps++''',
+  '''
+for n != 1 {
+	steps++''',
+]
+answer  = 3
+
+["remix.basic.08.loops-rust"]
+choices = [
+  '''
+while n != 1 {
+    steps += 1;''',
+  '''
+while n != 1 {
+    steps++;''',
+  '''
+while n != 1 {
+    steps =+ 1;''',
+  '''
+for n != 1 {
+    steps += 1;''',
+]
+answer  = 0
+
+["remix.basic.09.loops-python"]
+choices = [
+  '''
+while n != 1:
+    steps++''',
+  '''
+while n != 1:
+    steps += 1''',
+  '''
+while n != 1:
+    steps =+ 1''',
+  '''
+for n != 1:
+    steps += 1''',
+]
+answer  = 1
+
+["remix.basic.10.closures-go"]
+choices = [
+  '''
+return func() int {
+	defer func() { n++ }()
+	return n
+}''',
+  '''
+return func() {
+	n++
+	return n
+}''',
+  '''
+return func() int {
+	n++
+	return n
+}''',
+  '''
+return func() int {
+	n := n + 1
+	return n
+}''',
+]
+answer  = 2
+
+["remix.basic.11.closures-rust"]
+choices = [
+  '''
+|| {
+    n += 1;
+    n
+}''',
+  '''
+move || {
+    n += 1;
+    n;
+}''',
+  '''
+move || {
+    n + 1
+}''',
+  '''
+move || {
+    n += 1;
+    n
+}''',
+]
+answer  = 3
+
+["remix.basic.12.closures-python"]
+choices = [
+  '''
+nonlocal n
+n += 1
+return n''',
+  '''
+global n
+n += 1
+return n''',
+  '''
+n = 0
+n += 1
+return n''',
+  '''
+nonlocal n
+return n
+n += 1''',
+]
+answer  = 0
+
+["remix.basic.13.structs-go"]
+choices = [
+  'return it.Price + it.Qty',
+  'return it.Price * it.Qty',
+  'return Price * Qty',
+  'it.Price * it.Qty',
+]
+answer  = 1
+
+["remix.basic.14.structs-rust"]
+choices = [
+  'self.price * self.qty;',
+  'price * qty',
+  'self.price * self.qty',
+  'self.price + self.qty',
+]
+answer  = 2
+
+["remix.basic.15.structs-python"]
+choices = [
+  'self.price * self.qty',
+  'return price * qty',
+  'return self.price + self.qty',
+  'return self.price * self.qty',
+]
+answer  = 3
+
+["remix.basic.16.enums-go"]
+choices = [
+  '''
+case Red:
+	return 30
+case Green:
+	return 25''',
+  '''
+case Red:
+	return 30
+case Yellow:
+	return 25''',
+  '''
+case "red":
+	return 30
+case "green":
+	return 25''',
+  '''
+case Red:
+	fallthrough
+case Green:
+	return 25''',
+]
+answer  = 0
+
+["remix.basic.17.enums-rust"]
+choices = [
+  '''
+Red => 30,
+Green => 25,
+Yellow => 5,''',
+  '''
+Light::Red => 30,
+Light::Green => 25,
+Light::Yellow => 5,''',
+  '''
+Light::Red => 30,
+Light::Green => 25,''',
+  '''
+Light.Red => 30,
+Light.Green => 25,
+Light.Yellow => 5,''',
+]
+answer  = 1
+
+["remix.basic.18.enums-python"]
+choices = [
+  '''
+case RED:
+    return 30
+case GREEN:
+    return 25''',
+  '''
+case "red":
+    return 30
+case "green":
+    return 25''',
+  '''
+case Light.RED:
+    return 30
+case Light.GREEN:
+    return 25''',
+  '''
+case Light.RED:
+    return 30
+case Light.GREEN:
+    return 5''',
+]
+answer  = 2
+
+["remix.basic.19.errors-go"]
+choices = [
+  '''
+v, err := strconv.ParseInt(t, 10, 64)
+if err != nil {
+	fmt.Println("bad:", t)
+	break''',
+  '''
+v, err := strconv.Atoi(t)
+if err != nil {
+	fmt.Println("bad:", t)
+	continue''',
+  '''
+v, err := strconv.ParseInt(t, 10, 64)
+if err == nil {
+	fmt.Println("bad:", t)
+	continue''',
+  '''
+v, err := strconv.ParseInt(t, 10, 64)
+if err != nil {
+	fmt.Println("bad:", t)
+	continue''',
+]
+answer  = 3
+
+["remix.basic.20.errors-rust"]
+choices = [
+  '''
+let Ok(v) = t.parse::<i64>() else {
+    println!("bad: {}", t);
+    continue;
+};''',
+  '''
+let Ok(v) = t.parse::<i64>() else {
+    println!("bad: {}", t);
+    break;
+};''',
+  '''
+let Ok(v) = t.parse::<i64>() else {
+    println!("bad: {}", t);
+};''',
+  '''
+let Some(v) = t.parse::<i64>() else {
+    println!("bad: {}", t);
+    continue;
+};''',
+]
+answer  = 0
+
+["remix.basic.21.errors-python"]
+choices = [
+  '''
+try:
+    total += int(t)
+except TypeError:
+    print("bad:", t)''',
+  '''
+try:
+    total += int(t)
+except ValueError:
+    print("bad:", t)''',
+  '''
+try:
+    total += int(t)
+catch ValueError:
+    print("bad:", t)''',
+  '''
+try:
+    total += int(t)
+except ValueError:
+    pass''',
+]
+answer  = 1
+
+["remix.basic.22.list-go"]
+choices = [
+  '''
+append(nums, 100)
+nums = nums[1:]
+last := nums[len(nums)-1]
+mid := nums[1:3]''',
+  '''
+nums = append(nums, 100)
+nums = nums[:len(nums)-1]
+last := nums[len(nums)-1]
+mid := nums[1:3]''',
+  '''
+nums = append(nums, 100)
+nums = nums[1:]
+last := nums[len(nums)-1]
+mid := nums[1:3]''',
+  '''
+nums = append(nums, 100)
+nums = nums[1:]
+last := nums[len(nums)-1]
+mid := nums[1:2]''',
+]
+answer  = 2
+
+["remix.basic.23.list-rust"]
+choices = [
+  '''
+nums.push(100);
+nums.pop();
+let last = nums[nums.len() - 1];
+let mid = &nums[1..3];''',
+  '''
+nums.push(100);
+nums.remove(0);
+let last = nums[nums.len() - 1];
+let mid = nums[1..3];''',
+  '''
+nums.push(100);
+nums.remove(nums.len() - 1);
+let last = nums[nums.len() - 1];
+let mid = &nums[1..3];''',
+  '''
+nums.push(100);
+nums.remove(0);
+let last = nums[nums.len() - 1];
+let mid = &nums[1..3];''',
+]
+answer  = 3
+
+["remix.basic.24.list-python"]
+choices = [
+  '''
+nums.append(100)
+nums.pop(0)
+last = nums[-1]
+mid = nums[1:3]''',
+  '''
+nums.append(100)
+nums.pop()
+last = nums[-1]
+mid = nums[1:3]''',
+  '''
+nums.push(100)
+nums.pop(0)
+last = nums[-1]
+mid = nums[1:3]''',
+  '''
+nums.append(100)
+nums.pop(0)
+last = nums[len(nums)]
+mid = nums[1:3]''',
+]
+answer  = 0
+
+["remix.basic.25.map-go"]
+choices = [
+  '''
+fmt.Println(w, counts[w])
+counts[w]++''',
+  '''
+counts[w]++
+fmt.Println(w, counts[w])''',
+  '''
+counts[w] = 1
+fmt.Println(w, counts[w])''',
+  '''
+counts[w] += counts[w]
+fmt.Println(w, counts[w])''',
+]
+answer  = 1
+
+["remix.basic.26.map-rust"]
+choices = [
+  '''
+counts.entry(w.to_string()).or_insert(0) += 1;
+println!("{} {}", w, counts[w]);''',
+  '''
+*counts.entry(w).or_insert(0) += 1;
+println!("{} {}", w, counts[w]);''',
+  '''
+*counts.entry(w.to_string()).or_insert(0) += 1;
+println!("{} {}", w, counts[w]);''',
+  '''
+println!("{} {}", w, counts[w]);
+*counts.entry(w.to_string()).or_insert(0) += 1;''',
+]
+answer  = 2
+
+["remix.basic.27.map-python"]
+choices = [
+  '''
+counts[w] += 1
+print(w, counts[w])''',
+  '''
+counts[w] = counts.get(w) + 1
+print(w, counts[w])''',
+  '''
+counts[w] = counts.get(w, 1)
+print(w, counts[w])''',
+  '''
+counts[w] = counts.get(w, 0) + 1
+print(w, counts[w])''',
+]
+answer  = 3
+
+["remix.basic.28.comprehension-go"]
+choices = [
+  '''
+for _, x := range nums {
+	if x%2 == 0 {
+		squares = append(squares, x*x)
+	}
+}''',
+  '''
+for _, x := range nums {
+	if x%2 == 1 {
+		squares = append(squares, x*x)
+	}
+}''',
+  '''
+for _, x := range nums {
+	if x%2 == 0 {
+		append(squares, x*x)
+	}
+}''',
+  '''
+for x := range nums {
+	if x%2 == 0 {
+		squares = append(squares, x*x)
+	}
+}''',
+]
+answer  = 0
+
+["remix.basic.29.comprehension-rust"]
+choices = [
+  'let squares: Vec<i64> = nums.iter().filter(|x| x % 2 == 0).map(|x| x * x).collect();',
+  'let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 0).map(|x| x * x).collect();',
+  'let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 1).map(|x| x * x).collect();',
+  'let squares: Vec<i64> = nums.iter().filter(|x| *x % 2 == 0).map(|x| x * x);',
+]
+answer  = 1
+
+["remix.basic.30.comprehension-python"]
+choices = [
+  'squares = (x * x for x in nums if x % 2 == 0)',
+  'squares = [x * x if x % 2 == 0 for x in nums]',
+  'squares = [x * x for x in nums if x % 2 == 0]',
+  'squares = [x * x for x in nums if x % 2]',
+]
+answer  = 2
+
+["remix.basic.31.sorting-go"]
+choices = [
+  'return cmp.Or(cmp.Compare(a.Score, b.Score), cmp.Compare(a.Name, b.Name))',
+  'return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(b.Name, a.Name))',
+  'return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(b.Score, a.Score))',
+  'return cmp.Or(cmp.Compare(b.Score, a.Score), cmp.Compare(a.Name, b.Name))',
+]
+answer  = 3
+
+["remix.basic.32.sorting-rust"]
+choices = [
+  'people.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.name.cmp(&b.name)));',
+  'people.sort_by(|a, b| a.score.cmp(&b.score).then_with(|| a.name.cmp(&b.name)));',
+  'people.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| b.name.cmp(&a.name)));',
+  'people.sort_by(|a, b| b.score.cmp(a.score).then_with(|| a.name.cmp(b.name)));',
+]
+answer  = 0
+
+["remix.basic.33.sorting-python"]
+choices = [
+  'people.sort(key=lambda p: (p.score, p.name))',
+  'people.sort(key=lambda p: (-p.score, p.name))',
+  'people.sort(key=lambda p: (-p.score, p.name), reverse=True)',
+  'people.sort(lambda p: (-p.score, p.name))',
+]
+answer  = 1
+
+["remix.basic.34.tree-go"]
+choices = [
+  'return Node{Val: v}',
+  'return nil',
+  'return &Node{Val: v}',
+  'return &Node{Val: n.Val}',
+]
+answer  = 2
+
+["remix.basic.35.tree-rust"]
+choices = [
+  'None => Some(Node { val: v, left: None, right: None }),',
+  'None => None,',
+  'None => Some(Box::new(Node { val: v })),',
+  'None => Some(Box::new(Node { val: v, left: None, right: None })),',
+]
+answer  = 3
+
+["remix.basic.36.tree-python"]
+choices = [
+  'return Node(v)',
+  'n = Node(v)',
+  'return None',
+  'return Node(n)',
+]
+answer  = 0
+
+["remix.basic.37.interface-go"]
+choices = [
+  '''
+type Shape struct {
+	Area() float64''',
+  '''
+type Shape interface {
+	Area() float64''',
+  '''
+type Shape interface {
+	area() float64''',
+  '''
+type Shape interface {
+	Area() int''',
+]
+answer  = 1
+
+["remix.basic.38.interface-rust"]
+choices = [
+  '''
+trait Shape {
+    fn area(self) -> f64;''',
+  '''
+interface Shape {
+    fn area(&self) -> f64;''',
+  '''
+trait Shape {
+    fn area(&self) -> f64;''',
+  '''
+trait Shape {
+    fn area(&mut self) -> f64;''',
+]
+answer  = 2
+
+["remix.basic.39.interface-python"]
+choices = [
+  '''
+@runtime_checkable
+class Shape:
+    def area(self) -> float: ...''',
+  '''
+@runtime_checkable
+class Shape(Protocol):
+    def perimeter(self) -> float: ...''',
+  '''
+@staticmethod
+class Shape(Protocol):
+    def area(self) -> float: ...''',
+  '''
+@runtime_checkable
+class Shape(Protocol):
+    def area(self) -> float: ...''',
+]
+answer  = 3
+
+["remix.basic.40.generics-go"]
+choices = [
+  'func largest[T cmp.Ordered](xs []T) T {',
+  'func largest[T any](xs []T) T {',
+  'func largest[T comparable](xs []T) T {',
+  'func largest<T cmp.Ordered>(xs []T) T {',
+]
+answer  = 0
+
+["remix.basic.41.generics-rust"]
+choices = [
+  'fn largest<T: PartialOrd>(xs: &[T]) -> T {',
+  'fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {',
+  'fn largest<T: Copy>(xs: &[T]) -> T {',
+  'fn largest<T: PartialOrd + Clone>(xs: &[T]) -> T {',
+]
+answer  = 1
+
+["remix.basic.42.generics-python"]
+choices = [
+  'def largest<T>(xs: list[T]) -> T:',
+  'def largest[T](*xs: T) -> T:',
+  'def largest[T](xs: list[T]) -> T:',
+  'def largest[T](xs: list[T]) => T:',
+]
+answer  = 2
+
+["remix.basic.43.ownership-go"]
+choices = [
+  '''
+n := take(orders)
+sum := total(orders)''',
+  '''
+sum := total(orders[1:])
+n := take(orders)''',
+  '''
+sum := total(orders)
+n := take(orders[1:])''',
+  '''
+sum := total(orders)
+n := take(orders)''',
+]
+answer  = 3
+
+["remix.basic.44.ownership-rust"]
+choices = [
+  '''
+let sum = total(&orders);
+let n = take(orders);''',
+  '''
+let n = take(orders);
+let sum = total(&orders);''',
+  '''
+let sum = total(orders);
+let n = take(orders);''',
+  '''
+let sum = total(&orders);
+let n = take(&orders);''',
+]
+answer  = 0
+
+["remix.basic.45.ownership-python"]
+choices = [
+  '''
+n = take(orders)
+sum_ = total(orders)''',
+  '''
+sum_ = total(orders)
+n = take(orders)''',
+  '''
+sum_ = total(orders)
+n = take(sum_)''',
+  '''
+sum_ = total
+n = take(orders)''',
+]
+answer  = 1
+
+["remix.basic.46.lifetimes-go"]
+choices = [
+  'if len(a) > len(b) {',
+  'if len(a) <= len(b) {',
+  'if len(a) >= len(b) {',
+  'if a >= b {',
+]
+answer  = 2
+
+["remix.basic.47.lifetimes-rust"]
+choices = [
+  'fn longest(a: &str, b: &str) -> &str {',
+  "fn longest<'a>(a: &'a str, b: &str) -> &'a str {",
+  "fn longest<'a>(a: &str, b: &str) -> &'a str {",
+  "fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {",
+]
+answer  = 3
+
+["remix.basic.48.lifetimes-python"]
+choices = [
+  'return a if len(a) >= len(b) else b',
+  'return a if len(a) > len(b) else b',
+  'return b if len(a) >= len(b) else a',
+  'return max(a, b)',
+]
+answer  = 0
+
+["remix.basic.49.threads-go"]
+choices = [
+  '''
+go func(i int, chunk []int64) {
+	defer wg.Wait()''',
+  '''
+go func(i int, chunk []int64) {
+	defer wg.Done()''',
+  '''
+go func(chunk []int64, i int) {
+	defer wg.Done()''',
+  '''
+go func(i int, chunk []int64) {
+	defer wg.Done''',
+]
+answer  = 1
+
+["remix.basic.50.threads-rust"]
+choices = [
+  '''
+let chunk = chunk;
+handles.push(thread::spawn(move || chunk.iter().sum::<i64>()));''',
+  '''
+let chunk = chunk.to_vec();
+handles.push(thread::spawn(|| chunk.iter().sum::<i64>()));''',
+  '''
+let chunk = chunk.to_vec();
+handles.push(thread::spawn(move || chunk.iter().sum::<i64>()));''',
+  '''
+let chunk = chunk.to_vec();
+handles.push(thread::spawn(move || chunk.iter().sum::<i64>()).join());''',
+]
+answer  = 2
+
+["remix.basic.51.threads-python"]
+choices = [
+  '''
+threads = [threading.Thread(target=work, args=(c, i)) for i, c in enumerate(chunks)]
+for t in threads:
+    t.start()''',
+  '''
+threads = [threading.Thread(work, args=(i, c)) for i, c in enumerate(chunks)]
+for t in threads:
+    t.start()''',
+  '''
+threads = [threading.Thread(target=work, args=(i, c)) for i, c in enumerate(chunks)]
+for t in threads:
+    t.join()''',
+  '''
+threads = [threading.Thread(target=work, args=(i, c)) for i, c in enumerate(chunks)]
+for t in threads:
+    t.start()''',
+]
+answer  = 3
+
+["remix.basic.52.mutex-go"]
+choices = [
+  'counter += x',
+  'counter++',
+  'counter = x',
+  'x += counter',
+]
+answer  = 0
+
+["remix.basic.53.mutex-rust"]
+choices = [
+  '''
+let counter = &counter;
+handles.push(thread::spawn(move || {
+    for _ in 0..1000 {
+        *counter.lock().unwrap() += x;
+    }
+}));''',
+  '''
+let counter = Arc::clone(&counter);
+handles.push(thread::spawn(move || {
+    for _ in 0..1000 {
+        *counter.lock().unwrap() += x;
+    }
+}));''',
+  '''
+let counter = Arc::clone(&counter);
+handles.push(thread::spawn(move || {
+    for _ in 0..1000 {
+        *counter.lock() += x;
+    }
+}));''',
+  '''
+let counter = Arc::clone(&counter);
+handles.push(thread::spawn(|| {
+    for _ in 0..1000 {
+        *counter.lock().unwrap() += x;
+    }
+}));''',
+]
+answer  = 1
+
+["remix.basic.54.mutex-python"]
+choices = [
+  'counter += 1',
+  'counter = x',
+  'counter += x',
+  'x += counter',
+]
+answer  = 2
+
+["remix.basic.55.channel-go"]
+choices = [
+  '''
+for x := range nums {
+	ch <- x
+}''',
+  '''
+for _, x := range nums {
+	x <- ch
+}''',
+  '''
+for _, x := range nums {
+	ch <- x
+	close(ch)
+}''',
+  '''
+for _, x := range nums {
+	ch <- x
+}''',
+]
+answer  = 3
+
+["remix.basic.56.channel-rust"]
+choices = [
+  '''
+for x in nums {
+    tx.send(x).unwrap();
+}''',
+  '''
+for x in &nums {
+    tx.send(x).unwrap();
+}''',
+  '''
+for x in nums {
+    rx.send(x).unwrap();
+}''',
+  '''
+for x in nums {
+    tx.send(&x).unwrap();
+}''',
+]
+answer  = 0
+
+["remix.basic.57.channel-python"]
+choices = [
+  '''
+for x in nums:
+    q.append(x)''',
+  '''
+for x in nums:
+    q.put(x)''',
+  '''
+for x in nums:
+    q.put(nums)''',
+  '''
+for x in q:
+    q.put(x)''',
+]
+answer  = 1

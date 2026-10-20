@@ -154,6 +154,15 @@ hints = [
   "Print and `return` the moment you find it — a `return` at the top level of the chunk ends the program, and the first hit as you scan is already the smallest second index.",
 ]
 
+[quest.quiz]
+choices = [
+  'local i = seen[x - target]',
+  'local i = seen[target - x]',
+  'local i = seen[target] - x',
+  'local i = nums[target - x]',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -243,6 +252,15 @@ hints = [
   "A repeat only matters if its last position is inside the current window — that is the `previous ~= nil and previous >= start` test.",
   "Record the best length *and* where it started, or you cannot print the run at the end. `text:sub(start, start + length - 1)` is the run; `sub` includes both ends.",
 ]
+
+[quest.quiz]
+choices = [
+  'if previous ~= nil and previous < start then start = previous + 1 end',
+  'if previous ~= nil and previous >= start then start = previous end',
+  'if previous ~= nil and previous > start then start = previous + 1 end',
+  'if previous ~= nil and previous >= start then start = previous + 1 end',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -343,6 +361,15 @@ hints = [
   "Extend the last merged interval when the new start is <= its end; otherwise append a new one. `merged[#merged]` is the last one, and it is a table, so writing `top[2] = e` changes it in place.",
   "Extend to the larger of the two ends — a short interval swallowed by a long one must not shrink it.",
 ]
+
+[quest.quiz]
+choices = [
+  'if top ~= nil and span[1] <= top[2] then',
+  'if top ~= nil and span[1] < top[2] then',
+  'if top ~= nil and span[2] <= top[2] then',
+  'if top ~= nil and span[1] <= top[1] then',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -473,6 +500,23 @@ hints = [
   "`open[nr]` is nil off the top or bottom of the floor, and indexing it is a runtime error. Check `nr >= 0 and nr < rows` before you read `open[nr][nc]` — or read `open[nr] and open[nr][nc]`, which is the same check said in Lua.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if nr >= 0 and nr <= rows and nc >= 0 and nc <= cols
+    and open[nr][nc] and dist[nr][nc] < 0 then''',
+  '''
+if nr >= 0 and nr < rows and nc >= 0 and nc < cols
+    and open[nr][nc] and dist[nr][nc] <= 0 then''',
+  '''
+if nr >= 0 and nr < rows and nc >= 0 and nc < cols
+    and open[nr][nc] and dist[nr][nc] < 0 then''',
+  '''
+if nr >= 0 and nr < rows and nc >= 0 and nc < cols
+    and open[nr][nc] or dist[nr][nc] < 0 then''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -592,6 +636,35 @@ hints = [
   "math.floor((low + high) / 2) — `/` gives you 7.5 otherwise — and move `high` down to `mid` on success so you keep the smallest capacity that worked.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if days_needed(mid) < days then
+  high = mid
+else
+  low = mid + 1
+end''',
+  '''
+if days_needed(mid) <= days then
+  low = mid + 1
+else
+  high = mid
+end''',
+  '''
+if days_needed(mid) <= days then
+  high = mid
+else
+  low = mid + 1
+end''',
+  '''
+if days_needed(mid) >= days then
+  high = mid
+else
+  low = mid + 1
+end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -699,6 +772,15 @@ hints = [
   "Strictly greater, so equal values do not resolve each other; they stack up and resolve together later.",
 ]
 
+[quest.quiz]
+choices = [
+  'while #pending > 0 and nums[pending[#pending]] < value do',
+  'while #pending > 0 and nums[pending[#pending]] > value do',
+  'while #pending > 0 and pending[#pending] < value do',
+  'while #pending > 0 and nums[pending[#pending]] <= value do',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -804,6 +886,31 @@ hints = [
   "REACH is how many of 0..target have an entry — walk the range and count; `#best` is a border on a table with holes and can be anything.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local candidate = best[amount - coin] + 1
+if best[amount] == nil or candidate > best[amount] then
+  best[amount] = candidate
+end''',
+  '''
+local candidate = best[amount - coin] + 1
+if candidate < best[amount] then
+  best[amount] = candidate
+end''',
+  '''
+local candidate = best[amount - coin] + coin
+if best[amount] == nil or candidate < best[amount] then
+  best[amount] = candidate
+end''',
+  '''
+local candidate = best[amount - coin] + 1
+if best[amount] == nil or candidate < best[amount] then
+  best[amount] = candidate
+end''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -900,6 +1007,23 @@ hints = [
   "The comparator returns counts[a] > counts[b] when they differ, and a < b when they do not. Strings compare with < in Lua, byte by byte, which is the ascending the statement asks for.",
   "math.min(k, #words) is the loop bound — running the loop to k on a shorter list prints nil.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if counts[a] ~= counts[b] then return counts[a] < counts[b] end
+return a < b''',
+  '''
+if counts[a] ~= counts[b] then return counts[a] > counts[b] end
+return a < b''',
+  '''
+if counts[a] ~= counts[b] then return counts[a] > counts[b] end
+return a > b''',
+  '''
+if counts[a] ~= counts[b] then return a < b end
+return counts[a] > counts[b]''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1023,6 +1147,30 @@ hints = [
   "For the middle, advance slow only on the steps where fast managed two.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local following = cursor.next
+cursor.next = nil
+reversed_head = cursor
+cursor = following''',
+  '''
+local following = cursor.next
+cursor.next = reversed_head
+reversed_head = cursor
+cursor = following''',
+  '''
+local following = cursor.next
+cursor.next = reversed_head
+reversed_head = following
+cursor = following''',
+  '''
+local following = cursor.next
+reversed_head = cursor
+cursor = following''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1136,6 +1284,27 @@ hints = [
   "The base case is both conditions at once: past the end of the array, or sitting on a -1.",
   "Depth is 1 + the deeper of the two children, and 0 for a missing node.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+walk(2 * i, order, out)
+if order == 1 then out[#out + 1] = tree[i] end
+walk(2 * i + 1, order, out)''',
+  '''
+walk(2 * i + 2, order, out)
+if order == 1 then out[#out + 1] = tree[i] end
+walk(2 * i + 1, order, out)''',
+  '''
+walk(2 * i + 1, order, out)
+walk(2 * i + 2, order, out)
+if order == 1 then out[#out + 1] = tree[i] end''',
+  '''
+walk(2 * i + 1, order, out)
+if order == 1 then out[#out + 1] = tree[i] end
+walk(2 * i + 2, order, out)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1267,6 +1436,27 @@ hints = [
   "A missing node is vacuously valid — that is the base case, and it returns true, not false.",
   "The lookup is the binary search: smaller goes left, otherwise right, and the depth is how many hops it took. Falling off the tree returns nil, and nil prints as ABSENT.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if low ~= nil and value <= low then return false end
+if high ~= nil and value >= high then return false end
+return valid(2 * i + 1, low, value) and valid(2 * i + 2, value, high)''',
+  '''
+if value <= low then return false end
+if value >= high then return false end
+return valid(2 * i + 1, low, value) and valid(2 * i + 2, value, high)''',
+  '''
+if low ~= nil and value <= low then return false end
+if high ~= nil and value >= high then return false end
+return valid(2 * i + 1, value, high) and valid(2 * i + 2, low, value)''',
+  '''
+if low ~= nil and value <= low then return false end
+if high ~= nil and value >= high then return false end
+return valid(2 * i + 1, low, value) or valid(2 * i + 2, value, high)''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1473,6 +1663,23 @@ hints = [
   "Push the next element of a list only when you pop one of its elements — that keeps the heap at k.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if l <= size and less(heap[smallest], heap[l]) then smallest = l end
+if r <= size and less(heap[smallest], heap[r]) then smallest = r end''',
+  '''
+if l < size and less(heap[l], heap[smallest]) then smallest = l end
+if r < size and less(heap[r], heap[smallest]) then smallest = r end''',
+  '''
+if l <= size and less(heap[l], heap[smallest]) then smallest = l end
+if r <= size and less(heap[r], heap[smallest]) then smallest = r end''',
+  '''
+if l <= size and heap[l] < heap[smallest] then smallest = l end
+if r <= size and heap[r] < heap[smallest] then smallest = r end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1580,6 +1787,27 @@ hints = [
   "chosen[#chosen] = nil goes between the two calls. That is the `undo` in try-recurse-undo.",
   "The base case is at > #nums, and the empty selection there is the empty subset, which still counts — and prints as `-`.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+chosen[#chosen + 1] = nums[at]
+build(at + 1, chosen)
+chosen[1] = nil''',
+  '''
+chosen[#chosen + 1] = nums[at]
+build(at, chosen)
+chosen[#chosen] = nil''',
+  '''
+chosen[#chosen + 1] = nums[at]
+build(at + 1, chosen)
+chosen[#chosen] = nil''',
+  '''
+chosen[#chosen + 1] = nums[at]
+chosen[#chosen] = nil
+build(at + 1, chosen)''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1719,6 +1947,23 @@ hints = [
   "The success base case is `at == #letters` — checked after matching this cell, not before.",
   "Chain the four directions with `or` rather than four ifs and a `found` flag: `or` already stops at the first branch that succeeds. Carrying on after a hit is work you were asked not to do.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+local here = grid[r][c]
+grid[r][c] = "#"''',
+  '''
+local here = grid[r][c]
+grid[r][c] = here''',
+  '''
+local here = grid[r][c]
+grid[r - 1][c] = "#"''',
+  '''
+local here = grid[r][c]
+letters[at] = "#"''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1901,6 +2146,31 @@ hints = [
   "A plain queue gives *an* order; a min-heap gives *the* order the statement asks for.",
   "You never detect the cycle directly. You notice that fewer than n tasks came out, and the ones left are in it.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for _, nxt in ipairs(after[task]) do
+  waiting[nxt] = waiting[nxt] - 1
+  push(nxt)
+end''',
+  '''
+for _, nxt in ipairs(after[task]) do
+  waiting[task] = waiting[task] - 1
+  if waiting[nxt] == 0 then push(nxt) end
+end''',
+  '''
+for _, nxt in ipairs(after[task]) do
+  waiting[nxt] = waiting[nxt] - 1
+  if waiting[nxt] == 1 then push(nxt) end
+end''',
+  '''
+for _, nxt in ipairs(after[task]) do
+  waiting[nxt] = waiting[nxt] - 1
+  if waiting[nxt] == 0 then push(nxt) end
+end''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2118,6 +2388,27 @@ hints = [
   "parent[v], v = root, parent[v] compresses in one line: Lua evaluates the whole right-hand side before it assigns anything, so the old parent[v] is read before it is overwritten.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if size[a] < size[b] then a, b = b, a end
+parent[b] = a
+size[b] = size[a] + size[b]''',
+  '''
+if size[a] < size[b] then a, b = b, a end
+parent[b] = a
+size[a] = size[a] + size[b]''',
+  '''
+if size[a] < size[b] then a, b = b, a end
+parent[a] = b
+size[a] = size[a] + size[b]''',
+  '''
+if size[a] < size[b] then a = b end
+parent[b] = a
+size[a] = size[a] + size[b]''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -2214,6 +2505,35 @@ hints = [
   "Strictly increasing means you replace the first tail that is >= value, which is what the search with `tails[mid] < value` finds. Searching for the first tail > value would give you non-decreasing instead.",
   "Running off the end of tails — low == #tails + 1 — means this value extends the longest run so far, and `tails[low] = value` is then an append.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if tails[mid] > value then
+  low = mid + 1
+else
+  high = mid
+end''',
+  '''
+if tails[mid] < value then
+  low = mid + 1
+else
+  high = mid
+end''',
+  '''
+if tails[mid] < value then
+  high = mid
+else
+  low = mid + 1
+end''',
+  '''
+if tails[mid] <= value then
+  low = mid + 1
+else
+  high = mid
+end''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2337,6 +2657,15 @@ hints = [
   "LCS is the same walk with max instead of min, and no diagonal step on a mismatch. And build every row with its own {} inside the loop — one shared row table is the bug that prints a plausible wrong number.",
 ]
 
+[quest.quiz]
+choices = [
+  'edit[i][j] = 1 + math.max(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])',
+  'edit[i][j] = math.min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])',
+  'edit[i][j] = 1 + math.min(edit[i - 1][j - 1], edit[i - 1][j])',
+  'edit[i][j] = 1 + math.min(edit[i - 1][j - 1], edit[i - 1][j], edit[i][j - 1])',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2449,6 +2778,23 @@ hints = [
   "The greedy pass is a straight loop over the sorted items — no backtracking, which is exactly why it is wrong.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+for room = cap, item.weight, -1 do
+  local candidate = best[room - item.weight] + item.value''',
+  '''
+for room = item.weight, cap do
+  local candidate = best[room - item.weight] + item.value''',
+  '''
+for room = cap, item.weight + 1, -1 do
+  local candidate = best[room - item.weight] + item.value''',
+  '''
+for room = cap, 0, -1 do
+  local candidate = best[room - item.weight] + item.value''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2559,6 +2905,15 @@ hints = [
   "Counting bits by clearing the lowest one each time — walk = bit.band(walk, walk - 1) — runs once per set bit, not once per bit width.",
   "A power of two has exactly one bit set, so clearing the lowest one leaves zero — and zero itself has to be excluded by hand.",
 ]
+
+[quest.quiz]
+choices = [
+  'walk = bit.rshift(walk, 1)',
+  'walk = walk - 1',
+  'walk = band(walk, walk - 1)',
+  'walk = bit.lshift(walk, 1)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2678,6 +3033,27 @@ hints = [
   "The spiral wants the original grid, so copy it row by row before you rotate in place: a table is a reference, and `copy = grid` copies nothing.",
   "The two `if` guards inside the spiral loop are what stop a single middle row or column being walked twice.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+for c = 1, n do
+  grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+end''',
+  '''
+for c = r + 1, n do
+  grid[r][c], grid[c][r] = grid[r][c], grid[c][r]
+end''',
+  '''
+for c = r + 1, n do
+  grid[r][c], grid[c][r] = grid[c][r], grid[r][c]
+end''',
+  '''
+for c = r + 1, n do
+  grid[r][c] = grid[c][r]
+end''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2820,6 +3196,37 @@ hints = [
   "A query that falls off the trie leaves `at` as nil, and nil answers NO and 0 — but only if you test `at ~= nil` before you read a field off it; `nil.terminal` is a runtime error.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local child = at.children[letter]
+if child == nil then
+  child = new_node()
+  at.children[letter] = child
+  nodes = nodes + 1
+end''',
+  '''
+local child = at.children[letter]
+if child == nil then
+  child = new_node()
+  nodes = nodes + 1
+end''',
+  '''
+local child = new_node()
+if at.children[letter] == nil then
+  at.children[letter] = child
+  nodes = nodes + 1
+end''',
+  '''
+local child = at.children[letter]
+if child == nil then
+  child = new_node()
+  root.children[letter] = child
+  nodes = nodes + 1
+end''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2913,6 +3320,23 @@ hints = [
   "seen = { [0] = 1 } up front is what lets a run that starts at index 1 be found at all.",
   "The final prefix is the total, so the second line costs nothing extra. (seen[key] or 0) is how a missing count reads as zero.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+seen[prefix] = (seen[prefix] or 0) + 1
+runs = runs + (seen[prefix - k] or 0)''',
+  '''
+runs = runs + (seen[k - prefix] or 0)
+seen[prefix] = (seen[prefix] or 0) + 1''',
+  '''
+runs = runs + seen[prefix - k]
+seen[prefix] = (seen[prefix] or 0) + 1''',
+  '''
+runs = runs + (seen[prefix - k] or 0)
+seen[prefix] = (seen[prefix] or 0) + 1''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3063,6 +3487,15 @@ hints = [
   "The recursion is log2(200000), about eighteen frames deep — nowhere near LuaJIT's roof. A Fenwick tree over the compressed values is the other O(n log n) answer and is worth naming in the room.",
 ]
 
+[quest.quiz]
+choices = [
+  'inversions = inversions + (mid - i)',
+  'inversions = inversions + (mid - i + 1)',
+  'inversions = inversions + (j - i)',
+  'inversions = inversions + (hi - j + 1)',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -3164,6 +3597,23 @@ hints = [
   "A table keyed by the values de-duplicates; pairs gets the keys back out in no particular order, and table.sort puts them in one, so ranked[#ranked - 1] is the second largest distinct value.",
   "ranked[#ranked - 1] on a sequence of one is ranked[0], which is nil and prints as `nil` rather than raising — which is why the length check comes first, and why a missing key is not an error until it is followed.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+table.sort(ranked)
+if #ranked >= 2 then print(ranked[2]) else print("NONE") end''',
+  '''
+table.sort(ranked)
+if #ranked >= 2 then print(ranked[#ranked - 1]) else print("NONE") end''',
+  '''
+table.sort(ranked)
+if #ranked > 2 then print(ranked[#ranked - 1]) else print("NONE") end''',
+  '''
+table.sort(ranked, function(a, b) return a > b end)
+if #ranked >= 2 then print(ranked[#ranked - 1]) else print("NONE") end''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3269,6 +3719,35 @@ hints = [
   "The population deviation is the square root of the mean of the squared differences from the mean — divide by n. Dividing by n - 1 is the sample one and is wrong here.",
   "For an even count the median is the average of values[n / 2] and values[n / 2 + 1] in a 1-based table, and that pair of indices is where the off-by-one lives. n / 2 is a whole number when n is even, so it is a valid key.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if n % 2 == 1 then
+  median = values[(n - 1) / 2]
+else
+  median = (values[n / 2] + values[n / 2 + 1]) / 2
+end''',
+  '''
+if n % 2 == 1 then
+  median = values[(n + 1) / 2]
+else
+  median = values[n / 2] + values[n / 2 + 1] / 2
+end''',
+  '''
+if n % 2 == 0 then
+  median = values[(n + 1) / 2]
+else
+  median = (values[n / 2] + values[n / 2 + 1]) / 2
+end''',
+  '''
+if n % 2 == 1 then
+  median = values[(n + 1) / 2]
+else
+  median = (values[n / 2] + values[n / 2 + 1]) / 2
+end''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3382,6 +3861,15 @@ hints = [
   "Pull the ADD argument inside the ADD branch, from the same iterator. The loop counter counts commands, not tokens.",
   "`if #items > 0 then items[#items] = nil end` is the pop with its guard — the guard is free in Lua, and writing it anyway says you saw the case.",
 ]
+
+[quest.quiz]
+choices = [
+  'items[#items + 1] = tonumber(next_token()) or 0',
+  'items[#items + 1] = tonumber(command) or 0',
+  'items[#items] = tonumber(next_token()) or 0',
+  'table.insert(items, 1, tonumber(next_token()) or 0)',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -3626,6 +4114,35 @@ hints = [
   "math.huge is the honest `unreached`: it compares greater than every number and needs no nil check in the relaxation. The spanning-tree half of the generator guarantees every stop is reachable, so the final filter never removes anything — keep it anyway, because the version of this question with an unreachable stop is the follow-up.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+local candidate = w
+if candidate < dist[v] then
+  dist[v] = candidate
+  push(candidate, v)
+end''',
+  '''
+local candidate = d + w
+if candidate < dist[u] then
+  dist[v] = candidate
+  push(candidate, v)
+end''',
+  '''
+local candidate = d + w
+if candidate < dist[v] then
+  dist[v] = candidate
+  push(candidate, v)
+end''',
+  '''
+local candidate = d + w
+if candidate < dist[v] then
+  dist[v] = candidate
+  push(candidate, u)
+end''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -3804,6 +4321,23 @@ hints = [
   "range(l, r) is prefix(r + 1) - prefix(l), and getting that pair of off-by-ones right is most of the debugging. Binding bit.band to a local is the only micro-optimisation this quest needs, and LuaJIT barely needs that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+sum = sum + tree[i]
+i = i - 1''',
+  '''
+sum = sum + tree[i]
+i = bit.rshift(i, 1)''',
+  '''
+sum = sum + tree[i]
+i = i - band(i, -i)''',
+  '''
+sum = sum + tree[i]
+i = i - band(i, -i) - 1''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -3948,6 +4482,15 @@ hints = [
   "When the loop stops, i and j have both moved one past the palindrome — so its length is j - i - 1, and in a 1-based table i is already the 0-based start.",
   "Only update on a strictly longer palindrome, and the leftmost of each length is the one you keep, which is what AT is asking for. s[0] is nil, not a wrapped character, and nil == s[j] is simply false — the `i >= 1` check is still the honest one to write.",
 ]
+
+[quest.quiz]
+choices = [
+  'local length = j - i - 1',
+  'local length = j - i + 1',
+  'local length = j - i',
+  'local length = j - i - 2',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -4134,6 +4677,27 @@ hints = [
   "Precompute inverse factorials as well, backwards from powmod(factorial[n], P - 2): inv_factorial[i - 1] = inv_factorial[i] * i. Then a query is two mulmods and no powmod at all.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if e % 2 == 1 then result = mulmod(result, base) end
+base = mulmod(base, base)
+e = e - 1''',
+  '''
+if e % 2 == 0 then result = mulmod(result, base) end
+base = mulmod(base, base)
+e = math.floor(e / 2)''',
+  '''
+if e % 2 == 1 then result = mulmod(result, base) end
+base = mulmod(result, base)
+e = math.floor(e / 2)''',
+  '''
+if e % 2 == 1 then result = mulmod(result, base) end
+base = mulmod(base, base)
+e = math.floor(e / 2)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -4305,6 +4869,39 @@ hints = [
   "The destination can be open and still unreachable, which is exactly when PATHS is 0 and MIN is -1. One of the hidden cases is that.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if j > 0 and best[i][j - 1] ~= nil then
+  routes = routes + ways[i][j - 1]
+  if cheapest == nil or best[i][j - 1] > cheapest then
+    cheapest = best[i][j - 1]
+  end
+end''',
+  '''
+if j > 0 and best[i][j - 1] ~= nil then
+  routes = routes + ways[i][j - 1]
+  if cheapest == nil or best[i][j - 1] < cheapest then
+    cheapest = best[i][j - 1]
+  end
+end''',
+  '''
+if j > 0 and best[i][j - 1] ~= nil then
+  routes = routes + ways[i][j - 1]
+  if best[i][j - 1] < cheapest then
+    cheapest = best[i][j - 1]
+  end
+end''',
+  '''
+if j > 0 and best[i][j - 1] ~= nil then
+  routes = ways[i][j - 1]
+  if cheapest == nil or best[i][j - 1] < cheapest then
+    cheapest = best[i][j - 1]
+  end
+end''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 10000
@@ -4432,6 +5029,23 @@ hints = [
   "Never write a comparator that says `<=` or returns true both ways — `invalid order function for sorting` is table.sort telling you the order is not an order.",
   "TIES counts adjacent equal scores in the finished order, and that count is the same whichever comparator you wrote — it is the index order that gives you away.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if a.score ~= b.score then return a.score < b.score end
+return a.index < b.index''',
+  '''
+if a.score ~= b.score then return a.score > b.score end
+return a.index < b.index''',
+  '''
+if a.score ~= b.score then return a.score > b.score end
+return a.index > b.index''',
+  '''
+if a.score ~= b.score then return a.index < b.index end
+return a.score > b.score''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -4712,6 +5326,24 @@ hints = [
   "Overwriting a key that is already present is a touch, not an insert — check nodes[key] before you decide the cache is full, or the overwrite case evicts something it should not.",
   "The survivors are the list read from the hot end: walk tail.prev back to head. No sort, no stamps, and never pairs — pairs has no order to give you.",
 ]
+
+[quest.quiz]
+choices = [
+  'out[#out + 1] = tostring(node.value)',
+  '''
+unlink(node)
+link_hot(node)
+out[#out + 1] = tostring(op.value)''',
+  '''
+unlink(node)
+link_hot(node)
+out[#out + 1] = tostring(node.key)''',
+  '''
+unlink(node)
+link_hot(node)
+out[#out + 1] = tostring(node.value)''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"

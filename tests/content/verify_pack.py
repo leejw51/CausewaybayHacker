@@ -20,7 +20,8 @@ For every quest it:
     and compares under the declared `match` mode
   * compiles and runs `starter` and asserts it does NOT pass (SPEC §9.5)
 """
-import os, re, shutil, subprocess, sys, tomllib, tempfile, pathlib, json
+import os, re, shutil, subprocess, sys, tomllib, tempfile, pathlib, json, threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Written by PM and lifted into tests/ by QA so SPEC §9.4 and §9.5 have one
 # implementation rather than two. Re-lifted 2026-09-11 to pick up the brief
@@ -120,10 +121,19 @@ def cargo_env():
 _shelf_warm = False
 
 
+_shelf_lock = threading.Lock()
+
+
 def ensure_shelf():
     """Build the shelf into CACHE once per cache — `cwbhacker warm`, for the
     gate. The marker holds the digest, so a shelf edited since is rebuilt;
-    the network is needed only when it is."""
+    the network is needed only when it is. Quests are judged on several
+    threads (`JOBS`), so the first to arrive builds it and the rest wait."""
+    with _shelf_lock:
+        _ensure_shelf()
+
+
+def _ensure_shelf():
     global _shelf_warm
     if _shelf_warm:
         return
@@ -384,12 +394,24 @@ def run_case(workdir, stdin, timeout_ms, max_bytes):
     # and the runner reads its stdout with `from_utf8_lossy`. Decoding
     # strictly here crashed the whole run on one wrong starter instead of
     # failing the one case.
-    try:
-        p = subprocess.run([str(workdir / "prog")], input=stdin.encode(),
-                           capture_output=True,
-                           timeout=timeout_ms / 1000.0, cwd=workdir)
-    except subprocess.TimeoutExpired:
-        return None, "timeout"
+    #
+    # ETXTBSY is retried: quests are judged on several threads, and a child
+    # forked by one thread can still hold the write handle of a program
+    # another thread has just written, for the instant before its exec
+    # closes it. Executing that program then fails with "Text file busy".
+    import errno, time
+    for attempt in range(20):
+        try:
+            p = subprocess.run([str(workdir / "prog")], input=stdin.encode(),
+                               capture_output=True,
+                               timeout=timeout_ms / 1000.0, cwd=workdir)
+            break
+        except subprocess.TimeoutExpired:
+            return None, "timeout"
+        except OSError as e:
+            if e.errno != errno.ETXTBSY or attempt == 19:
+                raise
+            time.sleep(0.05 * (attempt + 1))
     if len(p.stdout) > max_bytes:
         return None, "output_limit"
     got = p.stdout.decode("utf-8", errors="replace")
@@ -478,6 +500,74 @@ def added_lines(starter, solution):
             continue
         out.append(t)
     return out
+
+
+# ---------------------------------------------------------------- the hole
+# Off the sheet roads the right choice is lines of the solution, compared
+# line by line with the indentation stripped, and it must be there exactly
+# once: the server cuts it out (backend/core/src/content.rs `hole_program`)
+# and the player sees the rest of the program around a `____`.
+HOLE = "____"
+MAX_CHOICE_LINES = 8
+
+
+def choice_lines(text):
+    """A choice's lines, dedented, without blank lines at either end."""
+    lines = text.split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    pad = min((len(l) - len(l.lstrip()) for l in lines if l.strip()), default=0)
+    return [l[pad:].rstrip() for l in lines]
+
+
+def hole_spans(solution, right):
+    """Every place `right` stands in `solution`, as (first line, end)."""
+    want = [l.strip() for l in choice_lines(right)]
+    have = [l.strip() for l in solution.split("\n")]
+    k = len(want)
+    if k == 0:
+        return []
+    return [(i, i + k) for i in range(len(have) - k + 1) if have[i:i + k] == want]
+
+
+def fill_hole(solution, span, choice):
+    """The solution with `span` replaced by `choice`, at the hole's indent."""
+    lines = solution.split("\n")
+    first = lines[span[0]]
+    indent = first[: len(first) - len(first.lstrip())]
+    body = [indent + l if l else l for l in choice_lines(choice)]
+    return "\n".join(lines[: span[0]] + body + lines[span[1]:])
+
+
+def hole_quiz(q, cat):
+    qid = q["id"]
+    quiz = q.get("quiz")
+    if not quiz:
+        return [f"{qid}: a {cat} quest needs [quest.quiz] — every road is picked, not typed"]
+    errs = []
+    choices = quiz.get("choices", [])
+    answer = quiz.get("answer", -1)
+    if len(choices) != 4:
+        errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
+    if not isinstance(answer, int) or not 0 <= answer < len(choices):
+        return errs + [f"{qid}: quiz.answer {answer!r} out of range"]
+    norm_ = ["\n".join(l.strip() for l in choice_lines(c)) for c in choices]
+    if len(set(norm_)) != len(norm_) or "" in norm_:
+        errs.append(f"{qid}: empty or duplicate choices")
+    for k, c in enumerate(choices):
+        if len(choice_lines(c)) > MAX_CHOICE_LINES:
+            errs.append(f"{qid}: choice {k} is {len(choice_lines(c))} lines (> {MAX_CHOICE_LINES})")
+        if HOLE in c:
+            errs.append(f"{qid}: choice {k} contains the hole marker {HOLE!r}")
+    spans = hole_spans(q["solution"], choices[answer])
+    if len(spans) != 1:
+        errs.append(f"{qid}: the right choice stands {len(spans)} times in the solution; "
+                    f"it must be a run of its lines exactly once")
+    if HOLE in q["solution"]:
+        errs.append(f"{qid}: the solution contains the hole marker {HOLE!r}")
+    return errs
 
 
 def structural(pack, path, vocab):
@@ -619,38 +709,28 @@ def structural(pack, path, vocab):
                 errs.append(f"{qid}: solution adds {len(added)} lines over its "
                             f"starter (> {MAX_ADDED[cat]}) — a {cat} quest is a "
                             f"grammar drill; the scaffolding belongs in the starter")
-        # VERY BASIC: the quiz. Four choices, one of which is exactly the line
-        # the solution adds; the answer given away nowhere in the starter or
-        # the brief; and (checked by `main`, since it compiles) each wrong
-        # choice must fail when swapped into the solution — otherwise the quiz
-        # has two right answers and the player who picked the other was
-        # right too.
-        if cat == "verybasic":
-            quiz = q.get("quiz")
+        # The quiz, on every road (SPEC §0): four choices, one right, and the
+        # pick is the submission. Off the sheet roads the right choice is a
+        # run of the solution's own lines — the server cuts it out of the
+        # solution and shows the rest as the program with a hole — and (checked
+        # by `main`, since it compiles) each wrong choice swapped into that
+        # hole must fail, or the quiz has two right answers.
+        errs += hole_quiz(q, cat)
+        # VERY BASIC: the hole is the one line the solution adds, and it is
+        # given away nowhere in the starter or the brief.
+        quiz = q.get("quiz")
+        if cat == "verybasic" and quiz:
             added = added_lines(q["starter"], q["solution"])
-            if not quiz:
-                errs.append(f"{qid}: a verybasic quest needs [quest.quiz]")
-            else:
-                choices = quiz.get("choices", [])
-                answer = quiz.get("answer", -1)
-                if len(choices) != 4:
-                    errs.append(f"{qid}: quiz has {len(choices)} choices, want 4")
-                if not (isinstance(answer, int) and 0 <= answer < len(choices)):
-                    errs.append(f"{qid}: quiz.answer {answer!r} out of range")
-                elif len(added) != 1:
+            choices = quiz.get("choices", [])
+            answer = quiz.get("answer", -1)
+            if isinstance(answer, int) and 0 <= answer < len(choices):
+                right = choices[answer].strip()
+                if len(added) != 1:
                     errs.append(f"{qid}: a verybasic solution adds {len(added)} lines; the quiz is about one")
-                else:
-                    right = choices[answer].strip()
-                    if right != added[0]:
-                        errs.append(f"{qid}: quiz answer {right!r} is not the line the solution adds {added[0]!r}")
-                    if sum(1 for c in choices if c.strip() == right) != 1:
-                        errs.append(f"{qid}: the right answer appears more than once among the choices")
-                    if right in q["starter"] or right in q["brief"]:
-                        errs.append(f"{qid}: the answer line is given away in the starter or the brief")
-                if len(set(c.strip() for c in choices)) != len(choices):
-                    errs.append(f"{qid}: duplicate choices")
-        elif "quiz" in q:
-            errs.append(f"{qid}: only verybasic quests carry a quiz")
+                elif right != added[0]:
+                    errs.append(f"{qid}: quiz answer {right!r} is not the line the solution adds {added[0]!r}")
+                if right in q["starter"] or right in q["brief"]:
+                    errs.append(f"{qid}: the answer line is given away in the starter or the brief")
         # `lang` is REMIX LAND's field: required there, one of its three, and
         # refused everywhere else, where a `lang` that disagreed with the land
         # would send a Go program to rustc.
@@ -925,6 +1005,50 @@ def main_i18n(argv):
 
 
 # ---------------------------------------------------------------- main
+# How many quests are judged at once: the machine's cores, or CWBHACKER_JOBS.
+JOBS = int(os.environ.get("CWBHACKER_JOBS") or os.cpu_count() or 2)
+
+
+def check_quest(pack, q):
+    """Build and run one quest: its solution, its starter, and each wrong
+    choice swapped into the hole. Returns (ok, the report's lines)."""
+    lines = []
+    wd_s = SCRATCH / f"{q['id']}.sol"
+    wd_t = SCRATCH / f"{q['id']}.start"
+    lang = quest_lang(pack, q)
+    sv, sp, st, sn = judge(lang, q["solution"], q, wd_s)
+    tv, tp, tt, tn = judge(lang, q["starter"], q, wd_t)
+    vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
+    sol_ok = sv == "accepted" and sp == st
+    start_ok = not (tv == "accepted" and tp == tt)
+    # Every wrong choice, swapped into the hole the right one leaves,
+    # must not pass. Three more judges per quest; the quiz is honest.
+    quiz_ok = True
+    wrongs = []
+    quiz = q.get("quiz")
+    spans = hole_spans(q["solution"], quiz["choices"][quiz["answer"]]) if quiz else []
+    if quiz and len(quiz.get("choices", [])) == 4 and len(spans) == 1:
+        for k, wrong in enumerate(quiz["choices"]):
+            if k == quiz["answer"]:
+                continue
+            swapped = fill_hole(q["solution"], spans[0], wrong)
+            wv, wp, wt, _ = judge(lang, swapped, q, SCRATCH / f"{q['id']}.wrong{k}")
+            if wv == "accepted" and wp == wt:
+                quiz_ok = False
+                wrongs.append(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")
+    lines.append(f"  {q['node']:>4} {q['id']:<34} "
+                 f"{('PASS' if sol_ok else 'FAIL:'+sv):<10} "
+                 f"{str(sp)+'/'+str(st):>7} "
+                 f"{('rejected:'+tv if start_ok else 'ACCEPTED!!'):<14} "
+                 f"{vis:>3} {','.join(q.get('concepts', []))}")
+    lines += wrongs
+    if not sol_ok:
+        lines.append(f"        solution notes: {sn}")
+    if not start_ok:
+        lines.append(f"        STARTER PASSES — SPEC §9.5 violation")
+    return sol_ok and start_ok and quiz_ok, lines
+
+
 def main(argv):
     if "--i18n" in argv:
         return main_i18n([a for a in argv if a != "--i18n"])
@@ -954,6 +1078,7 @@ def main(argv):
             print(f"  structure OK  (map: {turns} direction changes)")
         print(f"  {'node':>4} {'id':<34} {'sol':<10} {'cases':>7} "
               f"{'starter':<14} {'vis':>3} {'concepts'}")
+        pending = []
         for q in pack["quest"]:
             if pack["category"] in SHEETS:
                 # Nothing to build: the pick is judged against the quiz,
@@ -962,48 +1087,20 @@ def main(argv):
                     concept_use.setdefault(c, set()).add(q["id"])
                 print(f"  {q['node']:>4} {q['id']:<34} {'QUIZ':<10}")
                 continue
-            wd_s = SCRATCH / f"{q['id']}.sol"
-            wd_t = SCRATCH / f"{q['id']}.start"
-            lang = quest_lang(pack, q)
-            sv, sp, st, sn = judge(lang, q["solution"], q, wd_s)
-            tv, tp, tt, tn = judge(lang, q["starter"], q, wd_t)
-            vis = sum(1 for c in q["tests"]["cases"] if c.get("visible"))
-            sol_ok = sv == "accepted" and sp == st
-            start_ok = not (tv == "accepted" and tp == tt)
-            # VERY BASIC: every wrong choice, swapped in for the answer line,
-            # must not pass. Three more judges per quest; the quiz is honest.
-            quiz_ok = True
-            quiz = q.get("quiz")
-            if pack["category"] == "verybasic" and quiz and len(quiz.get("choices", [])) == 4:
-                right = quiz["choices"][quiz["answer"]].strip()
-                for k, wrong in enumerate(quiz["choices"]):
-                    if k == quiz["answer"]:
-                        continue
-                    lines = q["solution"].split("\n")
-                    swapped = []
-                    for line in lines:
-                        if line.strip() == right:
-                            indent = line[: len(line) - len(line.lstrip())]
-                            swapped.append(indent + wrong.strip())
-                        else:
-                            swapped.append(line)
-                    wv, wp, wt, _ = judge(lang, "\n".join(swapped), q, SCRATCH / f"{q['id']}.wrong{k}")
-                    if wv == "accepted" and wp == wt:
-                        quiz_ok = False
-                        print(f"        WRONG CHOICE {k} ALSO PASSES: {wrong!r}")
-            if not sol_ok or not start_ok or not quiz_ok:
+            pending.append(q)
+        # Each quest builds in its own scratch directories, so they are
+        # judged side by side and reported in order: a wrong choice swapped
+        # into every hole is three more builds a quest, and one at a time
+        # the gate outgrew CI's clock.
+        with ThreadPoolExecutor(max_workers=JOBS) as pool:
+            results = list(pool.map(lambda q: check_quest(pack, q), pending))
+        for q, (ok, lines) in zip(pending, results):
+            if not ok:
                 all_ok = False
             for c in q.get("concepts", []):
                 concept_use.setdefault(c, set()).add(q["id"])
-            print(f"  {q['node']:>4} {q['id']:<34} "
-                  f"{('PASS' if sol_ok else 'FAIL:'+sv):<10} "
-                  f"{str(sp)+'/'+str(st):>7} "
-                  f"{('rejected:'+tv if start_ok else 'ACCEPTED!!'):<14} "
-                  f"{vis:>3} {','.join(q.get('concepts', []))}")
-            if not sol_ok:
-                print(f"        solution notes: {sn}")
-            if not start_ok:
-                print(f"        STARTER PASSES — SPEC §9.5 violation")
+            for line in lines:
+                print(line)
     print("\n=== concept coverage (mistake kind -> quests reachable) ===")
     for kind, cs in kindmap.items():
         reach = set()

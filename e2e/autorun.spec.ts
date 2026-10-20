@@ -1,7 +1,8 @@
 /**
- * AUTO-RUN: a button beside RUN, on the quest screen and the playground alike.
- * On by default, it makes a plain ENTER in the editor run the code; off, ENTER
- * is only a new line again. One preference for both screens.
+ * AUTO-RUN: a button beside RUN, on the playground — the one screen with an
+ * editor now that every quest is picked, not typed (SPEC §0). On by default,
+ * it makes a plain ENTER in the editor run the code; off, ENTER is only a new
+ * line again.
  *
  * Counted on the wire rather than by the answer: the request leaving the page
  * is the thing ENTER has to cause, and it needs no compiler on the server.
@@ -12,9 +13,6 @@ import {
   clickButton,
   freshAccount,
   login,
-  openSelectedNode,
-  pickCategory,
-  pickLand,
   sceneNow,
   test,
 } from "./fixtures";
@@ -75,14 +73,5 @@ test("ENTER runs the playground while AUTO-RUN is on", async ({ page }) => {
   await expect
     .poll(() => sceneNow(page), { timeout: 30_000 })
     .toBe("playground");
-  await enterRunsThenToggle(page, runs);
-});
-
-test("ENTER runs a quest while AUTO-RUN is on", async ({ page }) => {
-  const runs = countSent("quest.run");
-  await login(page, freshAccount());
-  await pickLand(page, "rust");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
   await enterRunsThenToggle(page, runs);
 });

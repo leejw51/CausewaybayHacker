@@ -1,7 +1,8 @@
 /**
- * STDERR: a button beside AUTO-RUN, on the quest screen and the playground
- * alike. Off by default — the output is what the program printed, and the
- * compiler only when the build failed. One preference for both screens.
+ * STDERR: a button beside AUTO-RUN, on the playground — the one screen with a
+ * run console now that every quest is picked, not typed (SPEC §0). Off by
+ * default — the output is what the program printed, and the compiler only
+ * when the build failed.
  *
  * The output is drawn on a canvas, so what this checks is the button: that it
  * is there, on screen, says its state, and keeps the preference.
@@ -12,9 +13,6 @@ import {
   clickButton,
   freshAccount,
   login,
-  openSelectedNode,
-  pickCategory,
-  pickLand,
   sceneNow,
   test,
 } from "./fixtures";
@@ -53,13 +51,5 @@ test("the playground has STDERR, off by default", async ({ page }) => {
   await expect
     .poll(() => sceneNow(page), { timeout: 30_000 })
     .toBe("playground");
-  await offThenOn(page);
-});
-
-test("a quest has STDERR, off by default", async ({ page }) => {
-  await login(page, freshAccount());
-  await pickLand(page, "rust");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
   await offThenOn(page);
 });

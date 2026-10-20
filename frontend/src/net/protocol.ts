@@ -241,14 +241,17 @@ export function roadsOf(land: Land | string): readonly Category[] {
 }
 
 /**
- * §5.3. VERY BASIC and CHEATSHEET: the grammar asked as a question. Four
- * choices, `answer` the index of the right one. The question is the brief.
- * On VERY BASIC the right line is then typed; on CHEATSHEET the pick is the
- * submission. Absent on every other road.
+ * §5.3. Every road is a question (SPEC §0): four choices, `answer` the index
+ * of the right one, and the pick is the submission — nothing is typed. The
+ * question is the brief. Off the sheet roads the choices fill a hole in a
+ * program, and `program` is that program with `____` where the right choice
+ * was cut out; on the sheet roads the brief carries its own snippet and
+ * `program` is absent.
  */
 export interface Quiz {
   choices: string[];
   answer: number;
+  program?: string;
 }
 /** The languages quest prose can arrive in (SPEC §12.1); `"en"` is the source. */
 export type TextLocale = "en" | "ko" | "yue" | "zh" | "ja" | "cs";

@@ -2358,10 +2358,94 @@ function Quest.choice_boxes(x, y, w, heights, gap)
   return out
 end
 
---- Whether this is a sheet quest (SPEC §0) — CHEATSHEET BASIC or ADVANCED —
---- where the pick is the answer.
+--- Whether the pick is the answer — on every road now (SPEC §0): a quest
+--- with a quiz has no editor and nothing is typed. The name is the road it
+--- started on.
 function Quest:cheatsheet()
-  return self.quest ~= nil and Land.is_sheet(self.quest.category)
+  return self.quest ~= nil and self.quest.quiz ~= nil
+end
+
+--- What stands in a quiz's program where the right choice was cut out.
+Quest.HOLE = "____"
+
+--- The program around a quiz's hole, as the brief draws it: whole when it
+--- is short, and cut to `before` lines above the hole and `after` below it
+--- when it is long, with a `⋮` where lines were left out — the four choices
+--- sit under it. Each line is `{ kind = "code"|"hole"|"cut", text = … }`.
+--- The web client's `programLines` (frontend/src/ui/quiz.ts), line for line.
+function Quest.program_lines(program, before, after, whole)
+  before, after, whole = before or 22, after or 14, whole or 40
+  local text = tostring(program or ""):gsub("^\n+", ""):gsub("\n+$", "")
+  local lines = {}
+  for line in (text .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
+  local hole
+  for i, line in ipairs(lines) do
+    if hole == nil and line:match("^%s*(.-)%s*$") == Quest.HOLE then hole = i end
+  end
+  local function as(i)
+    return { kind = i == hole and "hole" or "code", text = lines[i] }
+  end
+  local out = {}
+  if #lines <= whole or not hole then
+    for i = 1, #lines do out[#out + 1] = as(i) end
+    return out
+  end
+  local from = math.max(1, hole - before)
+  local to = math.min(#lines, hole + after)
+  if from > 1 then out[#out + 1] = { kind = "cut", text = "⋮" } end
+  for i = from, to do out[#out + 1] = as(i) end
+  if to < #lines then out[#out + 1] = { kind = "cut", text = "⋮" } end
+  return out
+end
+
+--- `UI.wrap` for code: each line keeps its indentation, which `UI.wrap`
+--- folds away with the rest of the whitespace, and Go's tabs go in as four
+--- spaces because the face draws a tab as nothing.
+function Quest.code_wrap(text, width, size)
+  local out = {}
+  for raw in (tostring(text):gsub("\t", "    ") .. "\n"):gmatch("(.-)\n") do
+    local lead, rest = raw:match("^( *)(.-)%s*$")
+    if rest == "" then
+      out[#out + 1] = ""
+    else
+      for _, piece in ipairs(UI.wrap(rest, math.max(24, width - UI.textWidth(lead, size)), size)) do
+        out[#out + 1] = lead .. piece
+      end
+    end
+  end
+  return out
+end
+
+--- The program a quiz's choices fill, with its hole lit. Nothing on a sheet
+--- road, whose brief carries its own snippet. Returns the y after it.
+function Quest:draw_program(x, y, column)
+  local quiz = self.quest and self.quest.quiz
+  local program = quiz and quiz.program
+  if type(program) ~= "string" or program == "" then return y end
+  local size = 7
+  local lh = UI.lineHeight(size) + 2
+  local rows = {}
+  for _, line in ipairs(Quest.program_lines(program)) do
+    for _, piece in ipairs(Quest.code_wrap(line.text, column - 12, size)) do
+      rows[#rows + 1] = { kind = line.kind, text = piece }
+    end
+  end
+  local h = #rows * lh + 8
+  love.graphics.setColor(Theme.ink[1], Theme.ink[2], Theme.ink[3], 0.6)
+  love.graphics.rectangle("fill", x, y, column, h)
+  local cy = y + 4
+  for _, row in ipairs(rows) do
+    local colour = row.kind == "cut" and Theme.dim or Theme.grass
+    if row.kind == "hole" then
+      colour = self.quiz_right and Theme.admit or Theme.coin
+      love.graphics.setColor(colour[1], colour[2], colour[3], 0.3)
+      love.graphics.rectangle("fill", x + 2, cy - 1, column - 4, lh)
+    end
+    UI.text(row.text, x + 6, cy, size, colour)
+    cy = cy + lh
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+  return y + h + 8
 end
 
 --- One of the four, chosen.
@@ -2400,13 +2484,7 @@ function Quest:draw_choices(x, y, column, clip)
   local quiz = self.quest and self.quest.quiz
   self.choice_hits = {}
   if not quiz or not quiz.choices then return y end
-  local head
-  if self:cheatsheet() then
-    head = self.quiz_right and I18n.t("RIGHT") or I18n.t("PICK THE RIGHT LINE  (1–4)")
-  else
-    head = self.quiz_right and I18n.t("RIGHT — NOW TYPE IT")
-      or I18n.t("PICK THE LINE, THEN TYPE IT  (1–4)")
-  end
+  local head = self.quiz_right and I18n.t("RIGHT") or I18n.t("PICK THE RIGHT LINE  (1–4)")
   for _, line in ipairs(UI.wrap(head, column, 8)) do
     y = y + UI.text(line, x, y, 8, self.quiz_right and Theme.admit or Theme.coin) + 3
   end
@@ -2414,7 +2492,9 @@ function Quest:draw_choices(x, y, column, clip)
   local size = 8
   local wraps, heights = {}, {}
   for i, text in ipairs(quiz.choices) do
-    wraps[i] = UI.wrap(tostring(text), column - 30, size)
+    -- A choice can be several lines of a program, indented.
+    wraps[i] = Quest.code_wrap((tostring(text):gsub("^\n+", ""):gsub("\n+$", "")),
+      column - 30, size)
     heights[i] = math.max(36, #wraps[i] * (UI.lineHeight(size) + 2) + 14)
   end
   local boxes = Quest.choice_boxes(x, y, column, heights, 6)
@@ -2482,18 +2562,28 @@ function Quest:draw_brief(rect, tint)
     -- cream rather than dimmed or flagged: an English specification under a
     -- Korean interface is what a Korean programmer's editor looks like, and
     -- `refresh` asks again the moment the language changes (see `update`).
-    if self.quest.story and self.quest.story ~= "" then
-      for _, line in ipairs(UI.wrap(self.quest.story, column, prose)) do
-        y = y + UI.text(line, x, y, prose, Theme.withAlpha(Theme.coin, 0.9)) + 3
+    -- The story line is scenery. On a picked quest it goes under the
+    -- choices, so the question and its four answers come first — at the
+    -- largest type step the story alone was most of the panel.
+    local function story()
+      if self.quest.story and self.quest.story ~= "" then
+        for _, line in ipairs(UI.wrap(self.quest.story, column, prose)) do
+          y = y + UI.text(line, x, y, prose, Theme.withAlpha(Theme.coin, 0.9)) + 3
+        end
+        y = y + 8
       end
-      y = y + 8
     end
+    local picked = self:cheatsheet()
+    if not picked then story() end
     for _, line in ipairs(UI.wrap(self.quest.brief or "", column, prose)) do
       y = y + UI.text(line, x, y, prose, Theme.cream) + 3
     end
     y = y + 10
-    -- VERY BASIC: the question was the brief; here are the answers.
+    -- The question was the brief; here is the program with its hole, and
+    -- the four things that might go in it.
+    y = self:draw_program(x, y, column)
     y = self:draw_choices(x, y, column, rect)
+    if picked then story() end
 
     if self.quest.concepts and #self.quest.concepts > 0 then
       y = y + UI.text(I18n.t("CONCEPTS"), x, y, 8, Theme.withAlpha(Theme.cream, 0.6)) + 4

@@ -5,7 +5,7 @@
  * player who found the line and then fat-fingers 3 keeps the editor.
  */
 import { describe, expect, it } from "vitest";
-import { quizPick, startsLocked, visibleBox } from "../src/ui/quiz";
+import { quizPick, startsLocked, visibleBox, programLines, HOLE } from "../src/ui/quiz";
 
 const quiz = { choices: ["a", "b", "c", "d"], answer: 2 };
 
@@ -50,5 +50,30 @@ describe("visibleBox", () => {
   it("drops a box scrolled entirely out of the panel", () => {
     expect(visibleBox([0, 20, 300, 40], clip)).toBeNull();
     expect(visibleBox([0, 320, 300, 40], clip)).toBeNull();
+  });
+});
+
+describe("programLines", () => {
+  it("shows a short program whole and marks the hole", () => {
+    const lines = programLines("a\n\t____\nb\n");
+    expect(lines.map((l) => l.kind)).toEqual(["code", "hole", "code"]);
+    expect(lines[1].text).toBe("\t____");
+  });
+
+  it("cuts a long program to a window around the hole", () => {
+    const body = Array.from({ length: 100 }, (_, i) => (i === 60 ? "  ____" : `line ${i}`));
+    const lines = programLines(body.join("\n"), 5, 3);
+    expect(lines[0]).toEqual({ kind: "cut", text: "⋮" });
+    expect(lines.at(-1)).toEqual({ kind: "cut", text: "⋮" });
+    expect(lines.filter((l) => l.kind === "hole")).toHaveLength(1);
+    expect(lines[1].text).toBe("line 55");
+    expect(lines.at(-2)!.text).toBe("line 63");
+  });
+
+  it("keeps the edge it does not need to cut", () => {
+    const body = Array.from({ length: 60 }, (_, i) => (i === 2 ? HOLE : `x${i}`));
+    const lines = programLines(body.join("\n"), 5, 3);
+    expect(lines[0].text).toBe("x0");
+    expect(lines.at(-1)!.kind).toBe("cut");
   });
 });

@@ -62,16 +62,28 @@ class QuizRules(unittest.TestCase):
                           quiz={"choices": ["a", "b", "c", "d"], "answer": 0})
         self.assertTrue(any("is not the line the solution adds" in e for e in errs), errs)
 
-    def test_only_verybasic_carries_a_quiz(self):
+    def _basic(self, quiz):
         pack = tomllib.loads((FIX / "basic-with-time-limit.toml").read_text())
         q = pack["quest"][0]
         del q["time_limit_s"]
         q["concepts"] = ["io", "strings"]
-        q["quiz"] = {"choices": ["a", "b", "c", "d"], "answer": 0}
+        if quiz is not None:
+            q["quiz"] = quiz
         fake = HERE.parent.parent / "content" / "rust" / "basic.toml"
         vocab, _ = vp.load_vocab()
-        errs, _ = vp.structural(pack, fake, vocab)
-        self.assertTrue(any("only verybasic" in e for e in errs), errs)
+        return q, vp.structural(pack, fake, vocab)[0]
+
+    def test_every_road_is_picked(self):
+        _, errs = self._basic(None)
+        self.assertTrue(any("needs [quest.quiz]" in e for e in errs), errs)
+
+    def test_the_right_choice_is_cut_from_the_solution_exactly_once(self):
+        _, errs = self._basic({"choices": ["a", "b", "c", "d"], "answer": 0})
+        self.assertTrue(any("stands 0 times in the solution" in e for e in errs), errs)
+        q, _ = self._basic(None)
+        line = next(l.strip() for l in q["solution"].split("\n") if "println!" in l)
+        _, errs = self._basic({"choices": [line, "b", "c", "d"], "answer": 0})
+        self.assertFalse(any("quiz" in e or "solution" in e for e in errs), errs)
 
 
 class FrameworksRoad(unittest.TestCase):

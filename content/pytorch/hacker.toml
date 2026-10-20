@@ -93,6 +93,15 @@ hints = [
   "torch.cdist(x, x) is the library answer; the interview usually wants the broadcast written out.",
 ]
 
+[quest.quiz]
+choices = [
+  'dist = (x.unsqueeze(1) - x.unsqueeze(0)).pow(2).sum(dim=0).sqrt()',
+  'dist = (x.unsqueeze(1) - x.unsqueeze(0)).pow(2).sum(dim=-1)',
+  'dist = (x.unsqueeze(1) - x.unsqueeze(0)).pow(2).sum(dim=-1).sqrt()',
+  'dist = (x - x).pow(2).sum(dim=-1).sqrt()',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -171,6 +180,15 @@ hints = [
   "logits.topk(k, dim=1).indices is (n, k), already sorted best first, so column 0 is the top-1 prediction.",
   "(idx == want.unsqueeze(1)).any(dim=1) — the unsqueeze is what lets the label broadcast across the k columns.",
 ]
+
+[quest.quiz]
+choices = [
+  'topk = (idx == want.unsqueeze(1)).all(dim=1).float().mean().item()',
+  'topk = (idx == want.unsqueeze(1)).any(dim=1).float().mean().item()',
+  'topk = (idx == want).any(dim=1).float().mean().item()',
+  'topk = (idx[:, -1] == want).float().mean().item()',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -255,6 +273,23 @@ hints = [
   "Then one matmul: qn @ kn.t(). A zero vector would divide by zero, which is what the eps in F.normalize is for.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+qn = q / q.norm(dim=1, keepdim=True)
+kn = k / k.norm(dim=1, keepdim=True)''',
+  '''
+qn = q / q.norm(dim=0, keepdim=True)
+kn = k / k.norm(dim=0, keepdim=True)''',
+  '''
+qn = q / q.norm(dim=1)
+kn = k / k.norm(dim=1)''',
+  '''
+qn = q / q.norm()
+kn = k / k.norm()''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -330,6 +365,15 @@ hints = [
   "x - x.max(dim=1, keepdim=True).values, then exp, then divide by the row sum.",
   "max(dim=...) returns values and indices; .values is the half you want, and keepdim keeps the broadcast honest.",
 ]
+
+[quest.quiz]
+choices = [
+  'e = torch.exp(x)',
+  'e = torch.exp(x - x.max(dim=1).values)',
+  'e = torch.exp(x - x.max())',
+  'e = torch.exp(x - x.max(dim=1, keepdim=True).values)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -411,6 +455,15 @@ hints = [
   "The default reduction is the mean over the batch, not the sum — that is the other half of matching the library.",
 ]
 
+[quest.quiz]
+choices = [
+  'mine = logp.gather(1, y.unsqueeze(1)).squeeze(1).mean()',
+  'mine = -logp.gather(1, y.unsqueeze(1)).squeeze(1).mean()',
+  'mine = -logp.gather(0, y.unsqueeze(1)).squeeze(1).mean()',
+  'mine = -logp.gather(1, y.unsqueeze(1)).squeeze(1).sum()',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -485,6 +538,15 @@ hints = [
   "torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0) — dim 1, index shaped like the source.",
   "y.unsqueeze(1) == torch.arange(c) gives the same matrix as booleans, and reads better in an interview.",
 ]
+
+[quest.quiz]
+choices = [
+  'hot = torch.zeros(n, c).scatter_(0, y.unsqueeze(1), 1.0)',
+  'hot = torch.zeros(n, c).scatter_(1, y, 1.0)',
+  'hot = torch.zeros(n, c).scatter_(1, y.unsqueeze(1), 1.0)',
+  'hot = torch.zeros(n, c).scatter_(1, y.unsqueeze(0), 1.0)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -562,6 +624,15 @@ hints = [
   "Append the ones column with torch.cat([x, torch.ones(n, 1)], dim=1) — that column is the intercept.",
   "torch.linalg.lstsq(xb, y.unsqueeze(1)).solution — it wants a matrix on the right-hand side.",
 ]
+
+[quest.quiz]
+choices = [
+  'xb = torch.cat([torch.ones(n, 1), x], dim=1)',
+  'xb = torch.cat([x, torch.ones(n, 1)], dim=0)',
+  'xb = torch.cat([x, torch.zeros(n, 1)], dim=1)',
+  'xb = torch.cat([x, torch.ones(n, 1)], dim=1)',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -656,6 +727,23 @@ hints = [
   "An empty cluster has no mean — guard it, or the centroid becomes nan and never recovers.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+dist = (x.unsqueeze(1) - c.unsqueeze(0)).pow(2).sum(dim=-1)
+assign = dist.argmax(dim=1)''',
+  '''
+dist = (x.unsqueeze(1) - c.unsqueeze(0)).pow(2).sum(dim=-1)
+assign = dist.argmin(dim=1)''',
+  '''
+dist = (x.unsqueeze(1) - c.unsqueeze(0)).pow(2).sum(dim=-1)
+assign = dist.argmin(dim=0)''',
+  '''
+dist = (x.unsqueeze(0) - c.unsqueeze(1)).pow(2).sum(dim=-1)
+assign = dist.argmin(dim=1)''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -741,6 +829,27 @@ hints = [
   "Top-left is the elementwise maximum of the two corners, bottom-right the minimum; then (rb - lt).clamp(min=0).",
   "The union is areaA + areaB - intersection — subtract it or every overlap is understated.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+lt = torch.minimum(a[:, None, :2], b[None, :, :2])
+rb = torch.maximum(a[:, None, 2:], b[None, :, 2:])
+wh = (rb - lt).clamp(min=0)''',
+  '''
+lt = torch.maximum(a[:, None, :2], b[None, :, :2])
+rb = torch.minimum(a[:, None, 2:], b[None, :, 2:])
+wh = rb - lt''',
+  '''
+lt = torch.maximum(a[:, None, :2], b[None, :, :2])
+rb = torch.minimum(a[:, None, 2:], b[None, :, 2:])
+wh = (rb - lt).clamp(min=0)''',
+  '''
+lt = torch.maximum(a[:, None, :2], b[None, :, :2])
+rb = torch.minimum(a[:, None, 2:], b[None, :, :2])
+wh = (rb - lt).clamp(min=0)''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -832,6 +941,23 @@ hints = [
   "The comparison is strictly greater than the threshold for suppression, so a box exactly at thr is kept.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if iou <= thr:
+    rest.append(j)''',
+  '''
+if iou >= thr:
+    rest.append(j)''',
+  '''
+if iou > thr:
+    rest.append(j)''',
+  '''
+if iou <= thr:
+    rest.append(i)''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -910,6 +1036,23 @@ hints = [
   "Without the scaling the activations shrink by a factor of (1 - p) and every layer downstream sees the wrong scale at inference.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+keep = (torch.rand(n, generator=g) < p).float()
+out = x * keep / (1.0 - p)''',
+  '''
+keep = (torch.rand(n, generator=g) >= p).float()
+out = x * keep / p''',
+  '''
+keep = (torch.rand(n, generator=g) >= p).float()
+out = x * keep''',
+  '''
+keep = (torch.rand(n, generator=g) >= p).float()
+out = x * keep / (1.0 - p)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -987,6 +1130,15 @@ hints = [
   "nn.GELU(approximate=\"tanh\") is the other one; the default is exact and that is what you have to match.",
 ]
 
+[quest.quiz]
+choices = [
+  'mine = x * 0.5 * (1.0 + torch.erf(x * 2.0 ** 0.5))',
+  'mine = x * 0.5 * (1.0 + torch.erf(x / 2.0 ** 0.5))',
+  'mine = x * 0.5 * (1.0 + torch.erf(x / 2.0))',
+  'mine = x * (1.0 + torch.erf(x / 2.0 ** 0.5))',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1061,6 +1213,15 @@ hints = [
   "x.pow(2).mean(dim=-1, keepdim=True) then sqrt — keepdim, so it broadcasts back across the row.",
   "There is no mean subtraction and no bias; a row of all ones comes out as a row of all ones.",
 ]
+
+[quest.quiz]
+choices = [
+  'out = x / torch.sqrt(x.pow(2).sum(dim=-1, keepdim=True) + 1e-6)',
+  'out = x / torch.sqrt(x.pow(2).mean(dim=0, keepdim=True) + 1e-6)',
+  'out = x / torch.sqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-6)',
+  'out = x / torch.sqrt(x.pow(2).mean(dim=-1) + 1e-6)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1137,6 +1298,23 @@ hints = [
   "The frequencies are 1 / 10000 ** (i / d) for i in arange(0, d, 2) — one per pair, not one per column.",
   "pe[:, 0::2] and pe[:, 1::2] are the even and odd columns; both take the same (t, d/2) argument.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+pe[:, 0::2] = torch.sin(pos * freq)
+pe[:, 1::2] = torch.cos(pos * freq)''',
+  '''
+pe[:, 0::2] = torch.cos(pos * freq)
+pe[:, 1::2] = torch.sin(pos * freq)''',
+  '''
+pe[:, 0::2] = torch.sin(pos / freq)
+pe[:, 1::2] = torch.cos(pos / freq)''',
+  '''
+pe[0::2] = torch.sin(pos * freq)
+pe[1::2] = torch.cos(pos * freq)''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1220,6 +1398,23 @@ hints = [
   "eps / c spread over all c classes is exactly the mean of -log_softmax across the row.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+smooth = -logp.sum(dim=1)
+mine = ((1.0 - eps) * nll + eps * smooth).mean()''',
+  '''
+smooth = -logp.mean(dim=1)
+mine = ((1.0 - eps) * nll + eps * smooth).mean()''',
+  '''
+smooth = -logp.mean(dim=1)
+mine = (eps * nll + (1.0 - eps) * smooth).mean()''',
+  '''
+smooth = -logp.mean(dim=0)
+mine = ((1.0 - eps) * nll + eps * smooth).mean()''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1297,6 +1492,15 @@ hints = [
   "torch.where(y > 0.5, p, 1 - p) is p_t — the probability of whichever label is the true one.",
   "gamma = 0 collapses focal loss back to plain BCE, which is the check to run first.",
 ]
+
+[quest.quiz]
+choices = [
+  'focal = (-(pt) ** gamma * torch.log(pt)).mean()',
+  'focal = (-(1.0 - pt) ** gamma * torch.log(1.0 - pt)).mean()',
+  'focal = (-(1.0 - pt) ** gamma * torch.log(pt)).mean()',
+  'focal = (-(1.0 - pt) * gamma * torch.log(pt)).mean()',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1390,6 +1594,23 @@ hints = [
   "Divide each micro-batch loss by k before its backward pass.",
   "This holds because the micro-batches are equal size; with a short last batch the weighting has to be by sample count.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+loss = (w * chunk).mean() / k
+loss.backward()''',
+  '''
+loss = (w * chunk).mean()
+loss.backward()''',
+  '''
+loss = (w * chunk).sum() / k
+loss.backward()''',
+  '''
+loss = (w * chunk).mean() / size
+loss.backward()''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1498,6 +1719,27 @@ hints = [
   "With a constant gradient the corrected mh/sqrt(vh) is almost exactly 1, so each step moves about lr.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+mh = m
+vh = v
+w = w - lr * mh / (vh ** 0.5 + eps)''',
+  '''
+mh = m / (1 - b1 ** t)
+vh = v / (1 - b2 ** t)
+w = w - lr * mh / (vh + eps)''',
+  '''
+mh = m / (1 - b1 ** (t - 1))
+vh = v / (1 - b2 ** (t - 1))
+w = w - lr * mh / (vh ** 0.5 + eps)''',
+  '''
+mh = m / (1 - b1 ** t)
+vh = v / (1 - b2 ** t)
+w = w - lr * mh / (vh ** 0.5 + eps)''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1581,6 +1823,15 @@ hints = [
   "Divide by mask.sum(dim=1), not by t, or every short row is pulled towards zero.",
 ]
 
+[quest.quiz]
+choices = [
+  'mask = torch.arange(t) <= lens.unsqueeze(1)',
+  'mask = torch.arange(t) < lens.unsqueeze(1)',
+  'mask = torch.arange(t) < lens',
+  'mask = torch.arange(t).unsqueeze(1) < lens',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1660,6 +1911,15 @@ hints = [
   "Masking the query axis instead gives whole rows of -inf, and softmax of that is nan.",
 ]
 
+[quest.quiz]
+choices = [
+  'scores = scores.masked_fill(~keep.unsqueeze(0), float("-inf"))',
+  'scores = scores.masked_fill(keep.unsqueeze(0), float("-inf"))',
+  'scores = scores.masked_fill(~keep.unsqueeze(0), 0.0)',
+  'scores = scores.masked_fill(~keep.unsqueeze(1), float("-inf"))',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1733,6 +1993,15 @@ hints = [
   "x.unfold(0, k, s) — dimension, size, step, in that order.",
   "The number of windows is (n - k) // s + 1, and the result is a view, so writing to it writes to x.",
 ]
+
+[quest.quiz]
+choices = [
+  'win = x.unfold(0, s, k)',
+  'win = x.unfold(1, k, s)',
+  'win = x.unfold(0, k, s)',
+  'win = x.unfold(0, k, 1)',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1813,6 +2082,15 @@ hints = [
   "x.unfold(0, k, 1) is (n - k + 1, k); one matmul with the kernel finishes it.",
   "If you flip the kernel you get a true convolution, and it will not match conv1d.",
 ]
+
+[quest.quiz]
+choices = [
+  'mine = x.unfold(0, k, 1) @ w.flip(0)',
+  'mine = x.unfold(0, k, k) @ w',
+  'mine = x.unfold(0, 1, k) @ w',
+  'mine = x.unfold(0, k, 1) @ w',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1898,6 +2176,15 @@ hints = [
   "amax takes a tuple of dimensions; max does not, which is why it is the one to reach for here.",
 ]
 
+[quest.quiz]
+choices = [
+  'out = x.reshape(h // 2, 2, w // 2, 2).amax(dim=(1, 3))',
+  'out = x.reshape(h // 2, 2, w // 2, 2).amax(dim=(0, 2))',
+  'out = x.reshape(h // 2, w // 2, 2, 2).amax(dim=(2, 3))',
+  'out = x.reshape(h // 2, 2, w // 2, 2).amax(dim=(1, 2))',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -1971,6 +2258,15 @@ hints = [
   "torch.zeros(g).index_add_(0, grp, val) — repeated indices accumulate, which is the whole point.",
   "Plain indexed assignment, out[grp] = val, keeps only the last write per index instead of summing.",
 ]
+
+[quest.quiz]
+choices = [
+  'out = torch.zeros(g).index_copy_(0, grp, val)',
+  'out = torch.zeros(g).index_add_(0, grp, val)',
+  'out = torch.zeros(n).index_add_(0, grp, val)',
+  'out = torch.zeros(g).scatter_(0, grp, val)',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2057,6 +2353,27 @@ hints = [
   "Accumulate count, sum and sum of squares; then mean = sum/count and var = sq/count - mean².",
   "unbiased=False is the population variance — dividing by n, which is what this formula gives.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+count += bs
+total += chunk.sum().item()
+sq += chunk.pow(2).sum().item()''',
+  '''
+count += chunk.numel()
+total += chunk.sum().item()
+sq += chunk.sum().item() ** 2''',
+  '''
+count += chunk.numel()
+total += chunk.sum().item()
+sq += chunk.pow(2).sum().item()''',
+  '''
+count += 1
+total += chunk.sum().item()
+sq += chunk.pow(2).sum().item()''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2149,6 +2466,15 @@ hints = [
   "lam * ce(x, y) + (1 - lam) * ce(x, y[perm]) — y[perm] is the shuffled partner label.",
   "In a real implementation the inputs are mixed too, with the same lam drawn from a Beta distribution.",
 ]
+
+[quest.quiz]
+choices = [
+  'loss = lam * ce(x, y) + lam * ce(x, y[perm])',
+  'loss = (1 - lam) * ce(x, y) + lam * ce(x, y[perm])',
+  'loss = lam * ce(x, y) + (1 - lam) * ce(x, perm)',
+  'loss = lam * ce(x, y) + (1 - lam) * ce(x, y[perm])',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2251,6 +2577,23 @@ hints = [
   "Torch initialises the momentum buffer to the first decayed gradient rather than to mu * 0 + g — the same thing here, and worth knowing it is a special case.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+d = g - wd * w
+b = mu * b + d if t > 0 else d''',
+  '''
+d = g + wd * w
+b = mu * b + d if t > 0 else d''',
+  '''
+d = g + wd * w
+b = mu * b + (1 - mu) * d if t > 0 else d''',
+  '''
+d = g + wd * w
+b = mu * d + b if t > 0 else d''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -2330,6 +2673,15 @@ hints = [
   "Uniform logits over v tokens give ln(v), and exp of that is v.",
 ]
 
+[quest.quiz]
+choices = [
+  'ppl = torch.exp(ce)',
+  'ppl = torch.log(ce)',
+  'ppl = 2 ** ce',
+  'ppl = torch.exp(-ce)',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -2401,6 +2753,15 @@ hints = [
   "thr = x.topk(k).values[-1] is the k-th largest; mask everything strictly below it.",
   "Masking before the softmax is what renormalises the survivors; zeroing afterwards leaves them summing to less than one.",
 ]
+
+[quest.quiz]
+choices = [
+  'thr = x.topk(k).values[0]',
+  'thr = x.topk(k).values[-1]',
+  'thr = x.topk(k).indices[-1]',
+  'thr = x.topk(k - 1).values[-1]',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2485,6 +2846,23 @@ hints = [
   "Expand every live beam by every token, sort by the running total, keep the best `beam`.",
   "Length-normalise the score by dividing by the sequence length if you want it to stop preferring short sequences — say so out loud even when it is not asked for.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+cand.sort(key=lambda p: p[1])
+live = cand[:beam]''',
+  '''
+cand.sort(key=lambda p: -p[1])
+live = cand[beam:]''',
+  '''
+cand.sort(key=lambda p: -p[1])
+live = cand[:beam]''',
+  '''
+cand.sort(key=lambda p: -p[0][-1])
+live = cand[:beam]''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2571,6 +2949,15 @@ hints = [
   "No mask is needed on the cached step — the last position may attend to everything before it, which is the whole cache.",
 ]
 
+[quest.quiz]
+choices = [
+  'cached = (torch.softmax(q @ k_cache.t(), dim=-1) @ v_cache)[0]',
+  'cached = (torch.softmax(q @ k_cache.t() / d ** 0.5, dim=0) @ v_cache)[0]',
+  'cached = (torch.softmax(k_cache @ q.t() / d ** 0.5, dim=-1) @ v_cache)[0]',
+  'cached = (torch.softmax(q @ k_cache.t() / d ** 0.5, dim=-1) @ v_cache)[0]',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 20000
@@ -2642,6 +3029,23 @@ hints = [
   "x.view(b, t, h, d // h).transpose(1, 2) — split the feature axis, then swap time and head.",
   "The merge is heads.transpose(1, 2).reshape(b, t, d); view raises there, because the transpose broke contiguity.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+heads = x.view(b, t, h, d // h).transpose(1, 2)
+back = heads.transpose(1, 2).reshape(b, t, d)''',
+  '''
+heads = x.view(b, t, h, d // h).transpose(1, 2)
+back = heads.reshape(b, t, d)''',
+  '''
+heads = x.view(b, t, h, d // h).transpose(2, 3)
+back = heads.transpose(2, 3).reshape(b, t, d)''',
+  '''
+heads = x.view(b, t, d // h, h).transpose(1, 2)
+back = heads.transpose(1, 2).reshape(b, t, d)''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2722,6 +3126,15 @@ hints = [
   "cache.index_select(0, parents) — or the equivalent cache[parents], which reads better.",
   "index_select copies, so a forked parent gives two independent rows rather than two views of one.",
 ]
+
+[quest.quiz]
+choices = [
+  'out = cache.index_select(1, parents)',
+  'out = cache[parents.argsort()]',
+  'out = cache.index_select(0, parents)',
+  'out = cache.gather(0, parents.unsqueeze(1))',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2860,6 +3273,27 @@ hints = [
   "block is two residuals: x = x + proj(attend(x)) and then x = x + mlp(ln2(x)). Pre-norm means the LayerNorm is inside each branch, never on the residual itself.",
   "If the causality check fails, the mask is missing or applied after the softmax; if the reference check fails, the scale is d rather than d // h.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+att = (q @ k.transpose(-2, -1)) / (d // h) ** 0.5
+mask = torch.triu(torch.ones(t, t))
+att = att.masked_fill(mask == 0, float("-inf")).softmax(dim=-1)''',
+  '''
+att = (q @ k.transpose(-2, -1)) / (d // h) ** 0.5
+mask = torch.tril(torch.ones(t, t))
+att = att.masked_fill(mask == 0, float("-inf")).softmax(dim=-1)''',
+  '''
+att = (q @ k.transpose(-2, -1)) / d ** 0.5
+mask = torch.tril(torch.ones(t, t))
+att = att.masked_fill(mask == 0, float("-inf")).softmax(dim=-1)''',
+  '''
+att = (q @ k.transpose(-2, -1)) / (d // h) ** 0.5
+mask = torch.tril(torch.ones(t, t))
+att = att.masked_fill(mask == 0, float("-inf")).softmax(dim=-2)''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"

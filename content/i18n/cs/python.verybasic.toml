@@ -14,7 +14,7 @@ story = "06:00 na Bowrington Road. První cenová tabule dne je prázdná a fix 
 brief = '''
 Program musí vypsat přesně `hello, causewaybay` na jeden řádek. Jedna vestavěná funkce zapíše řádek na standardní výstup.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 output: hello, causewaybay
@@ -33,7 +33,7 @@ story = "Dvě kávy, jedna bankovka u pultu rybího stánku. Pokladna má říct
 brief = '''
 `a` a `b` jsou celá čísla. Program musí vypsat celočíselný podíl a zbytek na jeden řádek, oddělené mezerou. Python má na každé jeden operátor.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  7 2
@@ -53,7 +53,7 @@ story = "Váha na trhu ukazuje gramy na tři místa a účtenka chce dvě. Účt
 brief = '''
 `x` a `y` jsou floaty. Program musí vypsat `x / y` s přesně dvěma číslicemi za tečkou. F-string nese formátovací specifikaci za dvojtečkou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  7 2
@@ -73,7 +73,7 @@ story = "Štít zeleninového stánku je namalovaný velkými písmeny a v seši
 brief = '''
 `s` je jeden řádek textu. Po jeho délce musí program vypsat `s` velkými písmeny. Řetězcová metoda vrátí kopii s každým písmenem velkým.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  kwan lee
@@ -94,7 +94,7 @@ story = "Čísla stánků na Bowrington Road jsou na jedné straně sudá a na d
 brief = '''
 `n` je kladné celé číslo. Program musí vypsat `even`, když je `n` dělitelné dvěma, a jinak `odd`. Podmínka je hlavička `if` porovnávající zbytek s nulou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  4
@@ -114,7 +114,7 @@ story = "Počet tašek za ráno je jedna plus dvě plus tři až po poslední st
 brief = '''
 `n` je kladné celé číslo. Smyčka musí projít každé celé číslo od 1 až po `n` včetně a každé přičíst do `total`. `range` bere začátek a konec a konec není zahrnutý.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  4
@@ -134,7 +134,7 @@ story = "Prvních deset rozvozů dne platí pět každý a každý další plat�
 brief = '''
 `fare(rides)` musí vrátit výplatu: prvních deset jízd po 5, každá jízda po desáté po 3. Funkce vrací hodnotu jedním klíčovým slovem.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3
@@ -154,7 +154,7 @@ story = "Každý stánek má na kartě jméno a cenu. Pole ceny na kartě chybí
 brief = '''
 `Stall.__init__` dostává `name` a `price`. Musí uložit `price` na objekt stejně, jako se ukládá `name`, aby ho `s.price` přečetlo zpět.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  tofu 12
@@ -174,7 +174,7 @@ story = "Cena krát množství je jeden řádek každé objednávky u nudlového
 brief = '''
 `Stall.total(self)` musí vrátit cenu krát množství. Uvnitř metody se k polím objektu dostaneš přes `self`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  tofu 12 3
@@ -194,7 +194,7 @@ story = "Mapa MTR nad rybím stánkem jmenuje tři linky; chlapec má slovo a po
 brief = '''
 `word` je jedno z `island`, `tsuenwan`, `kwuntong`. Program ho musí proměnit na odpovídající člen `Line`. Třídu Enum lze indexovat jménem člena.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  tsuenwan
@@ -214,7 +214,7 @@ story = "Každá bedna z náklaďáku jde na ranní seznam v pořadí, v jakém 
 brief = '''
 `xs` začíná prázdný. Každé celé číslo `x` přečtené ve smyčce se musí přidat na konec, v pořadí vstupu. Seznam na to má jednu metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3 1 4 1
@@ -235,7 +235,7 @@ story = "První bedna na ranním seznamu se prodala, než se seznam přečetl; m
 brief = '''
 `xs` drží celá čísla z řádku. Program musí odstranit prvek na indexu 0, aby se zbytek posunul dolů. Jeden příkaz maže podle indexu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3 1 4 1
@@ -255,7 +255,7 @@ story = "Rozvážkový řetěz visí u pultu a nejnovější lístek jde na zač
 brief = '''
 `chain` je `deque`. Každé `x` přečtené ve smyčce se musí přidat na ZAČÁTEK, aby to poslední přečtené skončilo první. Deque má pro ten konec metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1 2 3
@@ -275,7 +275,7 @@ story = "Jeden sešit na stánek, jeden řádek na položku, vedle každé poče
 brief = '''
 `counts` je dict. Pro každé slovo `w` musí program přičíst jedničku k jeho počtu, poprvé od nuly. `get` čte s výchozí hodnotou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  siu mai har gau siu mai
@@ -298,7 +298,7 @@ story = "Tabulka stánků mapuje jméno na číslo a dotaz na stánek, který ta
 brief = '''
 `table` mapuje jména na čísla stánků. Pro slovo `w` musí program vypsat jeho číslo, nebo `-1`, když `w` v tabulce není. Metoda dictu čte s výchozí hodnotou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  2
@@ -321,7 +321,7 @@ story = "Šest stánků, čtyři různé ceny. Tabule chce, kolik je různých c
 brief = '''
 `xs` drží celá čísla z řádku. Program musí vypsat, kolik je RŮZNÝCH hodnot. Množina si nechá od každé jednu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3 5 3 8 5 3
@@ -341,7 +341,7 @@ story = "Talíře jdou na hromadu a berou se z vrchu; myčka pořád bere jeden 
 brief = '''
 `stack` je seznam použitý jako zásobník. Program musí vzít VRCHNÍ (poslední) prvek do `top`. Jedna metoda seznamu odebere a vrátí poslední položku.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1 2 3 4
@@ -362,7 +362,7 @@ story = "Lístky se vyvolávají v pořadí, v jakém byly vzaty; chlapec pořá
 brief = '''
 `q` je `deque` s lístky v pořadí. Program musí vzít PRVNÍ do `first`. Deque odebírá z čela jednou metodou.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1 2 3 4
@@ -383,7 +383,7 @@ story = "Objednávky chodí v libovolném pořadí a kuchyně chce pokaždé tu 
 brief = '''
 `heap` začíná jako prázdný seznam. Každé `x` se musí vložit tak, aby `heapq.heappop` později vracel nejmenší první. `heapq` má push, který udrží pořadí haldy.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  5 1 4 2 3
@@ -403,7 +403,7 @@ story = "Ceny na tabuli jsou v pořadí, v jakém stánky otevřely, a zákazní
 brief = '''
 `xs` drží celá čísla z řádku. Program musí `xs` seřadit na místě, vzestupně, než se vypíše. Seznam na to má metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3 1 4 1
@@ -423,7 +423,7 @@ story = "Tabule kurýrů je skóre od nejvyššího a dva kurýři se stejným s
 brief = '''
 `rows` je seznam dvojic `(name, score)`. Musí se seřadit podle skóre sestupně, pak podle jména vzestupně. `sort` bere funkci `key`, která vrací n-tici.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  3
@@ -448,7 +448,7 @@ story = "Jméno sampanu je na zádi namalované pozpátku a lodní deník ho tak
 brief = '''
 `s` je jeden řádek textu. Program ho musí vypsat obráceně. Řez s krokem -1 projde řetězec pozpátku.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  kwan lee
@@ -468,7 +468,7 @@ story = "Ovocný stánek přičítá stejnou přirážku ke každé velkoobchodn
 brief = '''
 `make_adder(k)` definuje vnitřní funkci `add`, která vrací `x + k`. Musí vrátit tu vnitřní funkci samotnou, aby se `add(x)` dalo zavolat později s `k` zapamatovaným.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  5
@@ -489,7 +489,7 @@ story = "Sudě číslované stánky platí druhou mocninou svého čísla a lich
 brief = '''
 `xs` drží celá čísla z řádku. `total` musí být součet druhých mocnin SUDÝCH hodnot, sestavený pomocí `map`, `filter` a dvou lambd.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1 2 3 4 5 6
@@ -509,7 +509,7 @@ story = "Každý stánek umocňuje svůj stav zásob na vlastním vlákně a obj
 brief = '''
 Každé vlákno v `threads` bylo spuštěno. Než se vypíšou výsledky, hlavní vlákno musí POČKAT, až každé skončí. Vlákno na to má jednu metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1 2 3
@@ -530,7 +530,7 @@ story = "Čtyři pokladní přičítají k jednomu počítadlu ve stejnou chvíl
 brief = '''
 `lock` je `threading.Lock`. Před `counter += 1` musí každý pracovník zámek VZÍT; uvolnění je už napsané za zápisem. Jedna metoda ho získá.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  1000
@@ -550,7 +550,7 @@ story = "05:59 u cenové tabule: levá větev cenového stromu je None a první 
 brief = '''
 `insert(n, v)` vrací kořen stromu s `v` uvnitř; prázdný případ a pravá strana jsou napsané. Pro menší `v` se levé dítě musí nahradit výsledkem vložení do něj, aby se z dítěte `None` stal uzel.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `# FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `# FILL`.
 
 ```
 input:  5 3 8 1 4

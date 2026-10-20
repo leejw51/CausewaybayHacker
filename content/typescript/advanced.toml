@@ -112,6 +112,15 @@ hints = [
   "padStart(2, \"0\") pads on the left to width two: 5 cents is 0.05, not 0.5.",
 ]
 
+[quest.quiz]
+choices = [
+  'const dollars: string = `${Math.trunc(cents / 100)}.${String(cents % 100)}`;',
+  'const dollars: string = `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;',
+  'const dollars: string = `${cents / 100}`;',
+  'const dollars: string = `${Math.trunc(cents / 100)}.${String(cents % 100).padEnd(2, "0")}`;',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -225,6 +234,31 @@ hints = [
   "=== not ==. `\"0\" == 0` is true and `\"\" == 0` is true too, which is how a blank line ends a loop it should not.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (i % 3 === 0) return "AD";
+if (i % 5 === 0) return "NEWS";
+if (i % 15 === 0) return "ADNEWS";
+return String(i);''',
+  '''
+if (i % 3 === 0 || i % 5 === 0) return "ADNEWS";
+if (i % 3 === 0) return "AD";
+if (i % 5 === 0) return "NEWS";
+return String(i);''',
+  '''
+if (i % 15 === 0) return "ADNEWS";
+if (i % 3 === 0) return "AD";
+if (i % 5 === 0) return "NEWS";
+return String(i);''',
+  '''
+if (i % 15 === 0) return "ADNEWS";
+if (i % 5 === 0) return "AD";
+if (i % 3 === 0) return "NEWS";
+return String(i);''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -308,6 +342,15 @@ hints = [
   "nums.slice(1, -1) is everything except the first and last; with one or two values it is [].",
   "reduce needs the 0 as its second argument, or an empty middle throws instead of summing to nothing.",
 ]
+
+[quest.quiz]
+choices = [
+  'const middle = nums.slice(1);',
+  'const middle = nums.slice(0, -1);',
+  'const middle = nums.splice(1, -1);',
+  'const middle = nums.slice(1, -1);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -403,6 +446,15 @@ hints = [
   "split(\"\") splits by code unit and breaks the emoji; reversing the spread array keeps each character whole.",
 ]
 
+[quest.quiz]
+choices = [
+  'bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;',
+  'bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : 3;',
+  'bytes += cp < 0x80 ? 1 : cp < 0x10000 ? 2 : 4;',
+  'bytes += ch.length;',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -494,6 +546,15 @@ hints = [
   "b[1] - a[1] || wordOrder: a comparator returning 0 hands the tie to the right side of the ||.",
 ]
 
+[quest.quiz]
+choices = [
+  'counts.set(word, counts.get(word) ?? 0 + 1);',
+  'counts.set(word, (counts.get(word) ?? 0) + 1);',
+  'counts.set(word, counts.get(word)! + 1);',
+  'counts.set(word, (counts[word] ?? 0) + 1);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -584,6 +645,15 @@ hints = [
   "[...a].filter((x) => b.has(x)) is the intersection; negate the test for the difference; spread both into one Set for the union.",
   "both.length > 0 ? both.join(\" \") : \"-\" covers the empty case in one expression.",
 ]
+
+[quest.quiz]
+choices = [
+  'const both = [...a].filter((x) => b.has(x));',
+  'const both = [...a].filter((x) => !b.has(x)).sort();',
+  'const both = [...a].filter((x) => b.has(x)).sort();',
+  'const both = a.filter((x) => b.has(x)).sort();',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -681,6 +751,15 @@ hints = [
   "A default fires on undefined, including an undefined passed on purpose. `unit ?? \"hour\"` inside the body is the same idea spelled at the call site.",
   "`$${...}` in a template literal is a literal dollar sign followed by an interpolation.",
 ]
+
+[quest.quiz]
+choices = [
+  'function tag(name: string, cents: number, unit: string): string {',
+  'function tag(name: string, cents: number, unit?: string): string {',
+  'function tag(name: string, cents: number, unit: string = "/hour"): string {',
+  'function tag(name: string, cents: number, unit: string = "hour"): string {',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -805,6 +884,35 @@ hints = [
   "catch (err: unknown), then `if (err instanceof NotANumber)`. Anything else is re-thrown with `throw err`; a catch that swallows everything is how programs learn to fail silently.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (err instanceof NotANumber) {
+  console.log(`BAD ${line}`);
+  continue;
+}
+throw err;''',
+  '''
+if (err instanceof NotANumber) {
+  console.log(`BAD ${line}`);
+  break;
+}
+throw err;''',
+  '''
+if (!(err instanceof NotANumber)) {
+  console.log(`BAD ${line}`);
+  continue;
+}
+throw err;''',
+  '''
+if (err instanceof NotANumber) {
+  console.log(`BAD ${line}`);
+  return;
+}
+throw err;''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -897,6 +1005,15 @@ hints = [
   "filter first, map second: filter on the original value, then double what survived.",
   "new Set(nums).size is the distinct count. A Set compares numbers by value, so the two 12s are one.",
 ]
+
+[quest.quiz]
+choices = [
+  'const evens = nums.filter((v) => v % 2 !== 0).reduce((sum, v) => sum + v, 0);',
+  'const evens = nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 0);',
+  'const evens = nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v);',
+  'const evens = nums.filter((v) => v % 2 === 0).reduce((sum, v) => sum + v, 1);',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1017,6 +1134,15 @@ hints = [
   "For the cheapest, sort by price and fall through to the name when the prices tie: a[1] - b[1] || byKey(a, b). The first entry wins.",
 ]
 
+[quest.quiz]
+choices = [
+  'const dear = Object.fromEntries(Object.entries(prices).filter(([, v]) => v >= 100));',
+  'const dear = Object.fromEntries(Object.entries(prices).filter(([v]) => v > 100));',
+  'const dear = Object.fromEntries(Object.entries(prices).filter(([, v]) => v > 100));',
+  'const dear = Object.fromEntries(Object.keys(prices).filter((k) => prices[k] > 100));',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1114,6 +1240,27 @@ hints = [
   "Compare names with < and >. localeCompare would work here and would also ask the machine's locale, which is not a question a ranking board should depend on.",
   "sort mutates the array in place and returns it. toSorted is the copying version, and it is in es2023.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+ranked.sort(
+  (a, b) => b.cents - a.cents || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+);''',
+  '''
+ranked.sort(
+  (a, b) => a.cents - b.cents,
+);''',
+  '''
+ranked.sort(
+  (a, b) => a.cents - b.cents || (a.name > b.name ? -1 : a.name < b.name ? 1 : 0),
+);''',
+  '''
+ranked.sort(
+  (a, b) => a.cents - b.cents || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+);''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1262,6 +1409,15 @@ hints = [
   "items: Entry[] = [] without `static`, and `this.items` everywhere the starter says Notebook.items.",
   "toString(): string { return `Notebook(items=..., total=...)` } — the template literal in main calls it for you.",
 ]
+
+[quest.quiz]
+choices = [
+  'items: Entry[] = [];',
+  'static items: Entry[] = [];',
+  'items!: Entry[];',
+  'items: Entry[] = [["PENCIL", 0]];',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1421,6 +1577,30 @@ hints = [
   "const unreachable: never = order in the default is the exhaustiveness check — the same job as a Rust match with no `_` arm.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+case "ADULT":
+case "STUDENT":
+case "SENIOR":
+  return { kind: "ADULT", stops };''',
+  '''
+case "ADULT":
+case "STUDENT":
+case "SENIOR":
+  return { kind, stops };''',
+  '''
+case "ADULT":
+case "STUDENT":
+case "SENIOR":
+  return { kind, raw: kind };''',
+  '''
+case "ADULT":
+case "STUDENT":
+  return { kind, stops };''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1533,6 +1713,23 @@ hints = [
   "yield value, then advance. The function pauses at the yield and resumes after it on the next request.",
   "A generator can be walked once. That is why main builds a fresh ticker for the sum instead of reusing the one the first loop drained.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+value += step;
+yield value;''',
+  '''
+yield value;
+value = step;''',
+  '''
+yield value;
+value += step;''',
+  '''
+return value;
+value += step;''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1654,6 +1851,23 @@ hints = [
   "wrapper.name = fn.name compiles and then throws TypeError: Cannot assign to read only property 'name'. defineProperty is the way past it.",
   "(...args: A) => R with A extends unknown[] is how the wrapper forwards any signature without knowing it, and how price keeps its (hours: number) => number type after wrapping.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+return fn(...args);
+wrapper.calls += 1;''',
+  '''
+wrapper.calls += 1;
+return fn(args);''',
+  '''
+wrapper.calls = 1;
+return fn(...args);''',
+  '''
+wrapper.calls += 1;
+return fn(...args);''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1808,6 +2022,27 @@ hints = [
   "[Symbol.iterator]() can hand back the array's own iterator: this.goods[Symbol.iterator](). A `*[Symbol.iterator]() { yield* this.goods; }` generator also works.",
   "report keeps the first of equal-length items because it only replaces on a strictly longer one — > and not >=.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+[Symbol.iterator](): Iterator<string> {
+  return this.goods[Symbol.iterator]();
+}''',
+  '''
+[Symbol.iterator](): Iterator<string> {
+  return this.goods[Symbol.iterator];
+}''',
+  '''
+[Symbol.iterator](): Iterator<string> {
+  return [...this.goods].reverse()[Symbol.iterator]();
+}''',
+  '''
+iterator(): Iterator<string> {
+  return this.goods[Symbol.iterator]();
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1989,6 +2224,27 @@ hints = [
   "`!` and `as` are both promises to the compiler that it cannot check. They are erased at run time along with every other type, and what is left is the value that actually arrived.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (all === []) {
+  return undefined;
+}''',
+  '''
+if (all.length === 0) {
+  return undefined;
+}''',
+  '''
+if (all.length < 0) {
+  return undefined;
+}''',
+  '''
+if (!all) {
+  return undefined;
+}''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2105,6 +2361,15 @@ hints = [
   "Start every task, then wait for all of them. `for (const t of tasks) await t;` is also correct here, because the tasks were all started before the first await.",
   "results is captured by square's closure; it is the same array main prints, which is why the writes are visible after the join.",
 ]
+
+[quest.quiz]
+choices = [
+  'Promise.all(tasks);',
+  'await tasks;',
+  'await Promise.all(tasks);',
+  'await Promise.race(tasks);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2252,6 +2517,35 @@ hints = [
   "The lock is a queue of promises. `const ahead = this.tail; this.tail = <a new promise you can resolve>; await ahead;` — then run, then resolve yours.",
   "Resolve in `finally`, and `return await critical()` inside the try, so the release happens after the critical section has finished and not when its promise was merely created.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+try {
+  return critical();
+} finally {
+  release();
+}''',
+  '''
+try {
+  return await critical();
+} catch {
+  release();
+}''',
+  '''
+try {
+  return await critical();
+} finally {
+  release;
+}''',
+  '''
+try {
+  return await critical();
+} finally {
+  release();
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2437,6 +2731,27 @@ hints = [
   "If undefined could be a real value on the channel, receive would return { done: true } | { done: false, value: T } instead — the same shape an iterator's next() returns, and for the same reason.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const receiver = this.waiting.shift();
+if (receiver !== undefined) receiver(item);
+else this.items.push(item);''',
+  '''
+const receiver = this.waiting.shift();
+if (receiver !== undefined) receiver(item);
+this.items.push(item);''',
+  '''
+const receiver = this.waiting[0];
+if (receiver !== undefined) receiver(item);
+else this.items.push(item);''',
+  '''
+const receiver = this.waiting.shift();
+if (receiver === undefined) receiver(item);
+else this.items.push(item);''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2582,6 +2897,24 @@ hints = [
   "`for (const running of pool) await running;` also works. What does not work is any array method that takes a callback — map, forEach, filter — used as if it would await the callback for you.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+const i = ++next;
+results.push(await render(i, nums[i]));''',
+  '''
+const i = next++;
+results.push(await render(i, nums[i]));''',
+  '''
+const i = next;
+results.push(await render(i, nums[i]));
+next++;''',
+  '''
+const i = next++;
+results.push(render(i, nums[i]));''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2703,6 +3036,15 @@ hints = [
   "return Promise.all(nums.map((v) => double(v))) — the await is at the caller, where run(nums) is awaited.",
   "Promise.all keeps argument order. If you wanted results as they finish you would carry the index yourself, exactly like the worker pool.",
 ]
+
+[quest.quiz]
+choices = [
+  'return nums.map((v) => double(v));',
+  'return Promise.race(nums.map((v) => double(v)));',
+  'return Promise.all(nums.map((v) => double(v)));',
+  'return Promise.all(nums.map((v) => double(v * 2)));',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2922,6 +3264,31 @@ hints = [
   "close() wakes every consumer parked in get() with undefined, which ends their loops; that is why main can await them after the join.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+this.unfinished++;
+if (this.unfinished === 0) {
+  for (const joiner of this.joiners.splice(0)) joiner();
+}''',
+  '''
+this.unfinished--;
+if (this.unfinished < 0) {
+  for (const joiner of this.joiners.splice(0)) joiner();
+}''',
+  '''
+this.unfinished--;
+if (this.unfinished === 0) {
+  this.joiners.splice(0);
+}''',
+  '''
+this.unfinished--;
+if (this.unfinished === 0) {
+  for (const joiner of this.joiners.splice(0)) joiner();
+}''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3073,6 +3440,23 @@ hints = [
   "A generator is not the only way: a `withSlot(name, body)` function with try/finally around `body()` does the same job. The generator form is the one that shows what for...of does on the way out.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+yield;
+} finally {''',
+  '''
+yield;
+} catch {''',
+  '''
+return;
+} finally {''',
+  '''
+yield name;
+} finally {''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3195,6 +3579,23 @@ hints = [
   "The starter's output is one line and PIPE 1. A stage that yields after its loop is an array with extra steps.",
   "running(squares(nums)) composes because a generator is an Iterable; running never knows or cares that its input is another generator.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+yield [value, total];
+total += value;''',
+  '''
+total += value;
+yield [value, total];''',
+  '''
+total = value;
+yield [value, total];''',
+  '''
+total += value;
+return [value, total];''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -3343,6 +3744,31 @@ hints = [
   "pairs is two nested loops with j starting at i + 1. The count is n*(n-1)/2, and checking that by hand is how you know you have the right n.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+if (run !== undefined && run.value === value) {
+  run.length++;
+  break;
+}''',
+  '''
+if (run !== undefined && run.value !== value) {
+  run.length++;
+  continue;
+}''',
+  '''
+if (run !== undefined && run.value === value) {
+  run.length++;
+  continue;
+}''',
+  '''
+if (run === undefined || run.value === value) {
+  run.length++;
+  continue;
+}''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3484,6 +3910,23 @@ hints = [
   "fib must call the memoised fib in its recursion, or only the outermost call is cached. Declaring fib with its type up front is what lets the arrow refer to it.",
   "reduce((a, b) => a * b, 1n) — the second argument is the starting value, and it is what makes the empty range give 1n. It has to be a bigint too: 1 * 1n is TS2365, not a quiet conversion.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const hit = cache.get(key);
+if (hit === undefined) return hit.value;''',
+  '''
+const hit = cache.get(key);
+if (hit !== undefined) return fn(key);''',
+  '''
+const hit = cache.get(key);
+if (hit !== undefined) wrapper.misses += 1;''',
+  '''
+const hit = cache.get(key);
+if (hit !== undefined) return hit.value;''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3663,6 +4106,15 @@ hints = [
   "A type guard is only as honest as its body. `return true` also compiles. The compiler trusts `x is Sign` the way it trusts `as` and `!` — and all three are erased with the types.",
 ]
 
+[quest.quiz]
+choices = [
+  'return typeof x === "object" && x !== null && "render" in x && typeof x.render === "function";',
+  'return x instanceof Shop;',
+  'return typeof x === "object" && "render" in x && typeof x.render === "function";',
+  'return typeof x === "object" && x !== null && typeof x.render === "function";',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -3839,6 +4291,15 @@ hints = [
   "The TOTAL is the sum of the original cents, which only holds because the writes failed. In the starter every price is 0 by then and TOTAL is 0 — the readonly fields were written on, and nothing said a word.",
 ]
 
+[quest.quiz]
+choices = [
+  'Object.seal(this);',
+  'Object.freeze(this);',
+  'Object.preventExtensions(this);',
+  'Object.freeze(Price);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4005,6 +4466,15 @@ hints = [
   "A catch in TypeScript has no type filter, so the order of your instanceof checks is the order of Python's except clauses: a subclass tested after its base class is dead code, and nothing warns you.",
 ]
 
+[quest.quiz]
+choices = [
+  'throw cause;',
+  'throw new Error("not a number", { cause });',
+  'throw new NotANumber({ cause });',
+  'return new NotANumber({ cause });',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4160,6 +4630,27 @@ hints = [
   "A done result's value is ignored by for...of. The starter's last ticket is in the result that says done, which is why the screen and the sum are both short by the last ticket.",
   "Save the value you are about to return before you advance, or you are off by one step the other way.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (this.left < 0) {
+  return { done: true, value: undefined };
+}''',
+  '''
+if (this.left === 1) {
+  return { done: true, value: undefined };
+}''',
+  '''
+if (this.left === 0) {
+  return { done: false, value: undefined };
+}''',
+  '''
+if (this.left === 0) {
+  return { done: true, value: undefined };
+}''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -4396,6 +4887,15 @@ hints = [
   "One bisect with a flag: move lo past mid while sorted[mid] < x — and, for the right bisection, while sorted[mid] === x too. indexOf returns -1 when x is absent, and one of the hidden cases is exactly that.",
   "Map keeps insertion order like an object does, so sort the letters before printing. [...groups.keys()].sort() is the order the statement asks for.",
 ]
+
+[quest.quiz]
+choices = [
+  'if (sorted[mid] < x || (right && sorted[mid] === x)) lo = mid + 1;',
+  'if (sorted[mid] <= x || (right && sorted[mid] === x)) lo = mid + 1;',
+  'if (sorted[mid] < x || (right || sorted[mid] === x)) lo = mid + 1;',
+  'if (sorted[mid] > x || (right && sorted[mid] === x)) lo = mid + 1;',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -4655,6 +5155,23 @@ hints = [
   "Clear the deadline's timer in the finally. Without it, every screen that answered still leaves a 200 ms timer behind, and the process waits for the last of them before it exits: right output, slower every run. Cancelling the token is the same courtesy in the other direction.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+token.cancel();
+clearTimeout(timer);''',
+  '''
+reject(new Timeout());
+token.cancel();''',
+  '''
+reject(new Cancelled());
+token.cancel();''',
+  '''
+throw new Timeout();
+token.cancel();''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -4822,6 +5339,15 @@ hints = [
   "`total += await x` reads total before it awaits. `const part = await x; total += part;` reads it after — or, with no await at all in the loop body, there is nothing to race.",
   "n*(n+1)*(2n+1)/6 is the closed form for the total. Check TOTAL against it once and you know the chunk boundaries are right.",
 ]
+
+[quest.quiz]
+choices = [
+  'return Promise.resolve();',
+  'return new Promise((resolve) => process.nextTick(resolve));',
+  'return new Promise((resolve) => setImmediate(resolve));',
+  'return new Promise((resolve) => resolve());',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"

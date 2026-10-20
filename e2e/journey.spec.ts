@@ -9,15 +9,14 @@ import {
   login,
   logout,
   pickCategory,
+  pickOnScreen,
   receivedFrames,
   run,
-  sourceThatPrints,
+  sceneNow,
   scene,
   setSource,
-  submit,
   test,
   Wire,
-  WRONG_SOURCE,
   type Account,
 } from "./fixtures.js";
 
@@ -41,6 +40,12 @@ import {
  * It runs twice, once per orientation (`playwright.config.ts`). SPEC §10 makes
  * both first-class on every screen, so the journey is the assertion rather
  * than a separate "does it look right sideways" test.
+ *
+ * Training is picking: every quest on every road is four choices, one right
+ * (SPEC §0), so the player clears a node by pressing the right one and misses
+ * it by pressing another. Nothing is typed on a quest. The one thing here
+ * that still needs an editor and a compiler — the console painting while a
+ * program runs — is the playground's.
  */
 
 test.describe.configure({ mode: "serial" });
@@ -189,15 +194,17 @@ test("RUST × BASIC opens a map, and every node on it is playable", async ({
 test("a wrong answer is rejected and the node stays open", async ({ page }) => {
   const account = freshAccount();
   const wire = await Wire.as(test.info().project.use.baseURL!, account);
-  await toQuest(page, account, wire);
-
-  await setSource(page, WRONG_SOURCE);
-  await submit(page); // waits for the result screen itself
-
   try {
+    const opened = await toQuest(page, account, wire);
+    // Nothing to type into: the four choices are the answer.
+    await expect(page.locator(".cm-content")).toBeHidden();
+    // A wrong pick is recorded and the player stays on the quest.
+    await pickOnScreen(page, wire, opened, "wrong");
+
     const history = await wire.history();
     expect(history.length, "the attempt was not recorded").toBe(1);
     expect(history[0].verdict).not.toBe("accepted");
+    expect(history[0].quest_id).toBe(opened);
     const nodes = await wire.map();
     const first = [...nodes].sort((a, b) => a.node - b.node)[0];
     expect(first.state, "a failed attempt cleared the node").toBe("open");
@@ -213,31 +220,13 @@ test("the right answer clears it, and the clear survives a reload", async ({
   const account = freshAccount();
   const wire = await Wire.as(test.info().project.use.baseURL!, account);
   try {
-    // The answer comes from the quest's own visible case, over the wire —
-    // content is PM's, and a suite that hard-codes a string breaks the day
-    // one changes.
     // Whatever quest the browser opens is the one this test is about — the
-    // lands scan is a click sweep and a test that insisted on one quest id
-    // would be asserting the panel's geometry rather than the game.
+    // right choice comes from the server, so the test never hard-codes an
+    // answer that content could change.
     const opened = await toQuest(page, account, wire);
-    const got = await wire.ok("quest.get", { quest_id: opened });
-    const source = sourceThatPrints(
-      (
-        got.quest as {
-          tests?: { visible?: { stdin?: string; expect?: string }[] };
-        }
-      ).tests?.visible?.[0],
-    );
-    expect(
-      source,
-      `the browser opened ${opened}, whose visible case cannot be answered by ` +
-        `printing a constant — it reads stdin, and that quest is teaching ` +
-        `something this suite should not shortcut`,
-    ).not.toBeNull();
     const node = { quest_id: opened };
 
-    await setSource(page, source!);
-    await submit(page);
+    await pickOnScreen(page, wire, opened, "right");
 
     // Which quest did the browser actually submit to? If the lands scan
     // picked the wrong category row, the symptom without this line is
@@ -304,22 +293,8 @@ test("logout, then a second wallet sees its own map and none of the first's", as
   try {
     // ---- the first wallet trains -------------------------------------
     const opened = await toQuest(page, first, firstWire);
-    const got = await firstWire.ok("quest.get", { quest_id: opened });
-    const source = sourceThatPrints(
-      (
-        got.quest as {
-          tests?: { visible?: { stdin?: string; expect?: string }[] };
-        }
-      ).tests?.visible?.[0],
-    );
-    expect(
-      source,
-      `${opened} cannot be answered by printing a constant`,
-    ).not.toBeNull();
     const node = { quest_id: opened };
-
-    await setSource(page, source!);
-    await submit(page);
+    await pickOnScreen(page, firstWire, opened, "right");
     expect((await firstWire.node(node.quest_id))?.state).toBe("cleared");
 
     // ---- and logs out ------------------------------------------------
@@ -493,142 +468,139 @@ test("the compiler's output paints while it is still compiling", async ({
   // rustc on a warm cache is ~130 ms and says nothing about a clean program,
   // so what is observable is the program's own stdout — the same `run.log`
   // stream, the same console, the same repaint (§4.18).
+  //
+  // On the playground: every quest is picked now (SPEC §0) and has no RUN,
+  // so the console that streams is the playground's. Its runs are not
+  // attempts, so the server's side of it is the reply, not the history.
   const account = freshAccount();
-  const wire = await Wire.as(test.info().project.use.baseURL!, account);
-  try {
-    await login(page, account);
-    await enterRustQuest(page, wire);
+  await login(page, account);
+  await atScreen(page, "lands");
+  await clickButton(page, "playground");
+  await expect
+    .poll(() => sceneNow(page), { timeout: 30_000 })
+    .toBe("playground");
 
-    // Well inside the quest's 5 s run limit. A *wrong* answer, which is what
-    // a player is usually running.
-    await setSource(
-      page,
-      `
+  // Well inside the 5 s run limit.
+  await setSource(
+    page,
+    `
 use std::{thread, time::Duration};
 fn main() {
-    for i in 1..=3 {
-        println!("line {i} of 3, then a pause");
-        thread::sleep(Duration::from_millis(900));
-    }
-    println!("not the answer");
+  for i in 1..=3 {
+      println!("line {i} of 3, then a pause");
+      thread::sleep(Duration::from_millis(900));
+  }
+  println!("not the answer");
 }
 `,
-    );
+  );
 
-    type Frame = { at: number; type: string; payload: Record<string, unknown> };
-    const since = Date.now();
-    const frames = (): Frame[] =>
-      receivedFrames()
-        .filter((f) => f.at >= since)
-        .map((f) => {
-          try {
-            const m = JSON.parse(f.text) as { type: string; payload: Record<string, unknown> };
-            return { at: f.at, type: m.type, payload: m.payload };
-          } catch {
-            return { at: f.at, type: "", payload: {} };
-          }
-        });
-    const logs = () => frames().filter((f) => f.type === "run.log");
-    const replied = () => frames().find((f) => f.type === "quest.run.ok");
-    // Two redraws in one evaluation: nothing can be handled between them (the
-    // page is single-threaded), so `again` is the determinism control — if it
-    // ever differs from `png`, the capture is noisy and no comparison of two
-    // pictures means anything.
-    const redraw = () =>
-      page.evaluate(() => {
-        const api = window.__cwbCapture!;
-        api.redraw();
-        const png = api.png();
-        api.redraw();
-        return { png, again: api.png(), name: api.scene() };
+  type Frame = { at: number; type: string; payload: Record<string, unknown> };
+  const since = Date.now();
+  const frames = (): Frame[] =>
+    receivedFrames()
+      .filter((f) => f.at >= since)
+      .map((f) => {
+        try {
+          const m = JSON.parse(f.text) as { type: string; payload: Record<string, unknown> };
+          return { at: f.at, type: m.type, payload: m.payload };
+        } catch {
+          return { at: f.at, type: "", payload: {} };
+        }
       });
-
-    await run(page); // Ctrl/Cmd+Enter — the reflex key
-
-    // The first chunk, and the verdict not yet in: freeze right there.
-    await expect
-      .poll(() => logs().length, {
-        timeout: 60_000,
-        message: "no `run.log` arrived for the run at all",
-      })
-      .toBeGreaterThan(0);
-
-    // A picture of exactly the state the first `n` frames made. Taken again
-    // if anything lands while it is being drawn, so `n` is never a guess.
-    const still = async () => {
-      for (;;) {
-        const n = frames().length;
-        const pic = await redraw();
-        if (frames().length === n) return { ...pic, n };
-      }
-    };
-    let a = await still();
-    expect(
-      replied(),
-      "the verdict arrived together with the first output chunk: `run.log` " +
-        "is buffered and flushed at the end of the run (§5.4), which is a " +
-        "spinner with extra steps",
-    ).toBeUndefined();
-    expect(a.name, "a run does not leave the quest screen (§4.9b)").toBe("quest");
-
-    // Still frozen. Wait for the next thing the server says. If it is a
-    // chunk of output and nothing else, that chunk is the only difference
-    // between `a` and the next picture. Anything else (an `edit.push.ok`
-    // from the editor, say) moves the baseline up to include it and waits
-    // again — never attributing someone else's change to the console.
-    let b: Awaited<ReturnType<typeof still>> | null = null;
-    const deadline = Date.now() + 10_000;
-    while (!b && Date.now() < deadline) {
-      await expect
-        .poll(() => frames().length, { timeout: 10_000 })
-        .toBeGreaterThan(a.n);
-      const fresh = frames().slice(a.n);
-      expect(
-        fresh.some((f) => f.type === "quest.run.ok"),
-        "the verdict arrived before a second chunk of output could be seen " +
-          "on its own: the program's lines are not reaching the page as they " +
-          "are printed (§5.4)",
-      ).toBe(false);
-      const next = await still();
-      if (next.n === a.n + 1 && fresh[0].type === "run.log") b = next;
-      else a = next;
-    }
-    expect(b, "no chunk of output arrived on its own mid-run").not.toBeNull();
-    const between = frames().slice(a.n, b!.n);
-    expect(
-      between.map((f) => f.type),
-      "only output arrived between the two pictures, so only output can tell them apart",
-    ).toEqual(["run.log"]);
-    expect(
-      replied(),
-      "the verdict landed before the second picture was taken",
-    ).toBeUndefined();
-
-    expect(
-      a.again === a.png && b!.again === b!.png,
-      "two redraws at dt = 0 with nothing arriving between them differ — the " +
-        "capture is not deterministic, so no comparison below means anything",
-    ).toBe(true);
-    expect(
-      b!.png !== a.png,
-      "a `run.log` chunk arrived mid-run and the quest screen did not change: " +
-        "the console is not repainting from the stream. SPEC §5.4 exists so " +
-        "the player watches the run think instead of a spinner.",
-    ).toBe(true);
-    await info.attach(`console-mid-run-${info.project.name}.png`, {
-      body: Buffer.from(b!.png.split(",")[1], "base64"),
-      contentType: "image/png",
+  const logs = () => frames().filter((f) => f.type === "run.log");
+  const replied = () => frames().find((f) => f.type === "playground.run.ok");
+  // Two redraws in one evaluation: nothing can be handled between them (the
+  // page is single-threaded), so `again` is the determinism control — if it
+  // ever differs from `png`, the capture is noisy and no comparison of two
+  // pictures means anything.
+  const redraw = () =>
+    page.evaluate(() => {
+      const api = window.__cwbCapture!;
+      api.redraw();
+      const png = api.png();
+      api.redraw();
+      return { png, again: api.png(), name: api.scene() };
     });
 
-    await page.evaluate(() => window.__cwbCapture!.resume());
-    // The run finishes, and it really did happen — the server saw it.
-    await expect.poll(() => replied() !== undefined, { timeout: 60_000 }).toBe(true);
+  await run(page); // Ctrl/Cmd+Enter — the reflex key
+
+  // The first chunk, and the verdict not yet in: freeze right there.
+  await expect
+    .poll(() => logs().length, {
+      timeout: 60_000,
+      message: "no `run.log` arrived for the run at all",
+    })
+    .toBeGreaterThan(0);
+
+  // A picture of exactly the state the first `n` frames made. Taken again
+  // if anything lands while it is being drawn, so `n` is never a guess.
+  const still = async () => {
+    for (;;) {
+      const n = frames().length;
+      const pic = await redraw();
+      if (frames().length === n) return { ...pic, n };
+    }
+  };
+  let a = await still();
+  expect(
+    replied(),
+    "the verdict arrived together with the first output chunk: `run.log` " +
+      "is buffered and flushed at the end of the run (§5.4), which is a " +
+      "spinner with extra steps",
+  ).toBeUndefined();
+  expect(a.name, "a run does not leave the playground").toBe("playground");
+
+  // Still frozen. Wait for the next thing the server says. If it is a
+  // chunk of output and nothing else, that chunk is the only difference
+  // between `a` and the next picture. Anything else (an `edit.push.ok`
+  // from the editor, say) moves the baseline up to include it and waits
+  // again — never attributing someone else's change to the console.
+  let b: Awaited<ReturnType<typeof still>> | null = null;
+  const deadline = Date.now() + 10_000;
+  while (!b && Date.now() < deadline) {
     await expect
-      .poll(async () => (await wire.history()).length, { timeout: 120_000 })
-      .toBeGreaterThan(0);
-    const [latest] = await wire.history();
-    expect(latest.verdict, "the slow source was judged").toBeTruthy();
-  } finally {
-    wire.close();
+      .poll(() => frames().length, { timeout: 10_000 })
+      .toBeGreaterThan(a.n);
+    const fresh = frames().slice(a.n);
+    expect(
+      fresh.some((f) => f.type === "playground.run.ok"),
+      "the verdict arrived before a second chunk of output could be seen " +
+        "on its own: the program's lines are not reaching the page as they " +
+        "are printed (§5.4)",
+    ).toBe(false);
+    const next = await still();
+    if (next.n === a.n + 1 && fresh[0].type === "run.log") b = next;
+    else a = next;
   }
+  expect(b, "no chunk of output arrived on its own mid-run").not.toBeNull();
+  const between = frames().slice(a.n, b!.n);
+  expect(
+    between.map((f) => f.type),
+    "only output arrived between the two pictures, so only output can tell them apart",
+  ).toEqual(["run.log"]);
+  expect(
+    replied(),
+    "the verdict landed before the second picture was taken",
+  ).toBeUndefined();
+
+  expect(
+    a.again === a.png && b!.again === b!.png,
+    "two redraws at dt = 0 with nothing arriving between them differ — the " +
+      "capture is not deterministic, so no comparison below means anything",
+  ).toBe(true);
+  expect(
+    b!.png !== a.png,
+    "a `run.log` chunk arrived mid-run and the playground did not change: " +
+      "the console is not repainting from the stream. SPEC §5.4 exists so " +
+      "the player watches the run think instead of a spinner.",
+  ).toBe(true);
+  await info.attach(`console-mid-run-${info.project.name}.png`, {
+    body: Buffer.from(b!.png.split(",")[1], "base64"),
+    contentType: "image/png",
+  });
+
+  await page.evaluate(() => window.__cwbCapture!.resume());
+  // The run finishes, and it really did happen — the server answered it.
+  await expect.poll(() => replied() !== undefined, { timeout: 60_000 }).toBe(true);
 });

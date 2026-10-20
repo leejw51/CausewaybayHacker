@@ -1,7 +1,7 @@
 # REMIX LAND — VERY BASIC. The same trios as BASIC, asked as a question
 # first: one line, four choices, one right — and two of the wrong ones are
 # the same line in the other two languages, because writing Python in a Go
-# file is the mistake this land exists to cure. Pick the line, then type it.
+# file is the mistake this land exists to cure. Pick the line.
 # Go, then Rust, then Python, one trio per concept, the yuenyeung café on
 # Sugar Street.
 #
@@ -35,7 +35,7 @@ An integer and a float are different types, and dividing two integers gives an i
 
 In Go `/` on two `int64` values is integer division and `%` the remainder. `float64(a)` is the conversion — a function-shaped cast — and only once both sides are `float64` does `/` divide exactly. `%.2f` in `Printf` prints two decimals.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7 2
@@ -127,7 +127,7 @@ An integer and a float are different types, and dividing two integers gives an i
 
 In Rust `/` on two `i64` values is integer division and `%` the remainder. `a as f64` is the conversion, and it binds tighter than `/`, so `a as f64 / b as f64` divides two floats. `{:.2}` in `println!` prints two decimals.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  7 2
@@ -209,7 +209,7 @@ An integer and a float are different types, and dividing two integers gives an i
 
 In Python `/` always gives a float, even for two ints, so the exact share needs no conversion at all. The integer quotient is the *other* operator, `//`, and `%` is the remainder. `f"{f:.2f}"` prints two decimals.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  7 2
@@ -291,7 +291,7 @@ A string is split into pieces on a separator, the pieces are joined back with an
 
 In Go the `strings` package does the work: `strings.Split` gives a `[]string`, `strings.Join` takes one back, `strings.ToUpper` returns a new string. `len(s)` is bytes; the character count is `utf8.RuneCountInString(s)`, because a Go string is bytes and a rune is what it decodes to.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  Mei,Bo,Alex
@@ -386,7 +386,7 @@ A string is split into pieces on a separator, the pieces are joined back with an
 
 In Rust `split(',')` is an iterator, so it is `collect`ed into a `Vec<&str>`; `join(" | ")` on the vec makes a `String`, and `to_uppercase()` makes another. `len()` is bytes; the character count is `chars().count()`, because a `&str` is UTF-8 bytes and `chars()` decodes them.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  Mei,Bo,Alex
@@ -465,7 +465,7 @@ A string is split into pieces on a separator, the pieces are joined back with an
 
 In Python the methods are on the string: `line.split(",")` gives a list, `" | ".join(names)` is called on the *separator*, and `.upper()` returns a new string. `len(s)` counts characters, not bytes, because a Python `str` is already decoded — the byte count would be `len(s.encode())`.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  Mei,Bo,Alex
@@ -546,7 +546,7 @@ A loop runs while a condition holds, a branch picks one of two arms, and a count
 
 Go has one loop keyword. `for cond { }` is its while loop, and `steps++` is the increment statement — a statement, not an expression, so it cannot sit inside a larger one.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  6
@@ -654,7 +654,7 @@ A loop runs while a condition holds, a branch picks one of two arms, and a count
 
 Rust spells it `while cond { }`, and the increment is `steps += 1;` — there is no `++`. The `if` inside is an expression too, which is why `n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 };` would also work.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  6
@@ -750,7 +750,7 @@ A loop runs while a condition holds, a branch picks one of two arms, and a count
 
 Python spells it `while cond:` with a colon and an indented body, and the increment is `steps += 1` — no `++`. The `if` / `else` inside take colons too; there are no braces anywhere.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  6
@@ -842,7 +842,7 @@ A closure is a function that captures a variable from the scope it was made in a
 
 In Go a function literal `func() int { ... }` captures `n` by reference, so `n++` inside it changes the `n` outside, and `counter` returns the literal as a value of type `func() int`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea coffee milk
@@ -950,7 +950,7 @@ A closure is a function that captures a variable from the scope it was made in a
 
 In Rust the closure is `|| { ... }`, and `move` makes it take `n` with it — without `move` it would borrow a local that is about to go out of scope. It mutates its capture, so the return type is `impl FnMut() -> i64`, and the caller binds it `mut`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea coffee milk
@@ -1044,7 +1044,7 @@ A closure is a function that captures a variable from the scope it was made in a
 
 In Python the closure is an inner `def`. Reading `n` from the outer scope is free, but assigning to it makes a new local — unless the inner function first declares, in one keyword, that `n` belongs to the enclosing scope. Which line is that declaration?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tea coffee milk
@@ -1144,7 +1144,7 @@ A struct groups named fields into one value, and a method is a function attached
 
 In Go a method is a function with a receiver before its name: `func (it Item) Total() int64`. The receiver is a copy of the struct; `(it *Item)` would be a pointer. Exported fields and methods start with a capital letter.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea 12 3
@@ -1282,7 +1282,7 @@ A struct groups named fields into one value, and a method is a function attached
 
 In Rust methods live in an `impl Item { }` block, and `&self` says the method borrows the struct rather than taking it. `self.price * self.qty` is the body; the last expression is the return value, so there is no `return` and no semicolon.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea 12 3
@@ -1406,7 +1406,7 @@ A struct groups named fields into one value, and a method is a function attached
 
 In Python a class holds the fields set in `__init__` and the methods under it; every method takes `self` first, explicitly, and `self.price * self.qty` reads the fields through it.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tea 12 3
@@ -1514,7 +1514,7 @@ An enum is a type with a fixed set of named values, and a match over one names e
 
 Go has no enum keyword: a named integer type and a `const` block with `iota` make one — `Red`, `Green`, `Yellow` are 0, 1, 2. The branch is a `switch` with one `case` per value; there is no fall-through, and `default` catches the rest.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  red green yellow green
@@ -1658,7 +1658,7 @@ An enum is a type with a fixed set of named values, and a match over one names e
 
 Rust has `enum Light { Red, Green, Yellow }`, and `match` over it must name every variant: one arm each, the variant written with its type on the left of `=>` and the result on the right, a comma after. Which line is the arm that gives red its thirty seconds?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  red green yellow green
@@ -1774,7 +1774,7 @@ An enum is a type with a fixed set of named values, and a match over one names e
 
 Python's `enum.Enum` gives `Light.RED`, `Light.GREEN` and `Light.YELLOW`, and `match l:` picks one with a `case` per value. The dotted name matters: a bare name after `case` is a capture pattern that matches anything, and Python refuses it because the cases after it could never run. Which line is the red case?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  red green yellow green
@@ -1894,7 +1894,7 @@ Parsing can fail, and each language hands the failure back differently: as a sec
 
 In Go `strconv.ParseInt` returns the value *and* an `error`, and the check right after the call is the idiom of the whole language: compare the error with `nil`, and on the wrong side of that comparison say so and skip. Nothing is thrown. Which line is the check?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  12 x 30 4y 8
@@ -1995,7 +1995,7 @@ Parsing can fail, and each language hands the failure back differently: as a sec
 
 In Rust `t.parse::<i64>()` returns a `Result`, and `let Ok(v) = ... else { ... };` takes the value out or runs the `else` — which must leave (`continue`, `return`, `break`). A `match` with `Ok` and `Err` arms is the longer spelling of the same thing.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  12 x 30 4y 8
@@ -2078,7 +2078,7 @@ Parsing can fail, and each language hands the failure back differently: as a sec
 
 In Python `int(t)` raises `ValueError` on a bad token, and a `try:` block with a clause naming exactly that class catches it — the add goes in the `try`, the message under the clause, and the loop simply goes round again. Which line is the clause?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  12 x 30 4y 8
@@ -2157,7 +2157,7 @@ A growable sequence: push on the end, take off the front, index the last, and cu
 
 In Go the list is a slice. `append` returns the grown slice and must be assigned back; `nums[1:]` drops the front by re-slicing; `nums[len(nums)-1]` is the last — there are no negative indexes — and `nums[1:3]` is a sub-slice that shares the array.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 6 7 8
@@ -2268,7 +2268,7 @@ A growable sequence: push on the end, take off the front, index the last, and cu
 
 In Rust the list is a `Vec`. `push` grows it in place, `remove(0)` takes the front, `nums[nums.len() - 1]` is the last (or `*nums.last().unwrap()`), and `&nums[1..3]` is a slice borrowed from it — a `&[i64]`, not a copy.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 6 7 8
@@ -2355,7 +2355,7 @@ A growable sequence: push on the end, take off the front, index the last, and cu
 
 In Python the list is `list`. `append` grows it, `pop(0)` takes the front, `nums[-1]` is the last — negative indexes count from the end — and `nums[1:3]` is a new list holding positions 1 and 2.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  5 6 7 8
@@ -2438,7 +2438,7 @@ A map goes from a key to a value, and the whole trick is what happens on a key t
 
 In Go a missing key reads as the zero value, so the bump needs no check: read, add one, store — in Go's shortest spelling of one more. `counts[w]` reads it back, and `len(counts)` is the number of keys. Which line bumps the count?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea bun tea milk tea
@@ -2532,7 +2532,7 @@ A map goes from a key to a value, and the whole trick is what happens on a key t
 
 In Rust a missing key is a question, and the entry API is the answer: `counts.entry(key).or_insert(0)` gives a `&mut` to the value, inserting 0 first if it must, and `*... += 1` writes through it. The key is a `String`, so `w.to_string()`; `counts[w]` reads it back.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea bun tea milk tea
@@ -2614,7 +2614,7 @@ A map goes from a key to a value, and the whole trick is what happens on a key t
 
 In Python a missing key is `KeyError` on read, so the bump asks `counts.get(w, 0)`, which returns the default instead, and stores one more. (`collections.Counter` and `defaultdict(int)` hide this line; this is what they hide.)
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tea bun tea milk tea
@@ -2692,7 +2692,7 @@ Build a new list from an old one by keeping some elements and transforming each:
 
 Go has no comprehension. The loop *is* the comprehension: `for _, x := range nums`, an `if` for the filter, and `append` for the map — four lines where Python has one, and every one of them plain.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -2808,7 +2808,7 @@ Build a new list from an old one by keeping some elements and transforming each:
 
 Rust's comprehension is an iterator chain: `.iter()` walks, `.filter(|x| ...)` keeps, `.map(|x| ...)` transforms, and `.collect()` builds the `Vec` — lazily, nothing runs until the `collect`. The closures see `&i64`, hence the `*x`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -2890,7 +2890,7 @@ Build a new list from an old one by keeping some elements and transforming each:
 
 Python's list comprehension is one expression: `[x * x for x in nums if x % 2 == 0]` — the map first, then the loop, then the filter, all inside the brackets. It reads like the sentence "x squared, for each x in nums, if x is even".
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6
@@ -2964,7 +2964,7 @@ Sorting by more than one key: the primary key descending, the tie broken by a se
 
 In Go `slices.SortFunc` takes a comparison returning an int: negative, zero or positive. `cmp.Compare(b.Score, a.Score)` with the arguments swapped sorts descending, and `cmp.Or` falls through to the name comparison when the first is zero.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  mei 90
@@ -3095,7 +3095,7 @@ Sorting by more than one key: the primary key descending, the tie broken by a se
 
 In Rust `sort_by` takes a closure returning an `Ordering`. `b.score.cmp(&a.score)` with the sides swapped is descending, and `.then_with(|| a.name.cmp(&b.name))` is the tie-break, run only when the first is `Equal`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  mei 90
@@ -3200,7 +3200,7 @@ Sorting by more than one key: the primary key descending, the tie broken by a se
 
 In Python `sort` takes a `key` function, and a tuple key sorts by its parts in order: `(-p.score, p.name)` — the negation makes the score descending, and the name breaks the tie ascending. No comparator; the key says it all.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  mei 90
@@ -3297,7 +3297,7 @@ A binary search tree: every node has a value, a left child with smaller values a
 
 In Go a child is a `*Node`, and an empty child is `nil`. The base case of `insert` is the nil check: build a new node with `v` in it and return its address — a pointer, not a value. Which line returns the new node?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4
@@ -3459,7 +3459,7 @@ A binary search tree: every node has a value, a left child with smaller values a
 
 In Rust a child is `Option<Box<Node>>`: `None` for empty, a heap box for a node. `insert` takes the option and gives it back: the `None` arm builds `Some(Box::new(Node { val: v, left: None, right: None }))`, and the `Some(mut node)` arm recurses into one side and returns the node.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  5 3 8 1 4
@@ -3607,7 +3607,7 @@ A binary search tree: every node has a value, a left child with smaller values a
 
 In Python a child is either a `Node` or `None`. The base case of `insert` is `if n is None:` — build one node holding `v` and hand it back; every other step recurses into one side and returns `n`. Which line builds the node?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  5 3 8 1 4
@@ -3747,7 +3747,7 @@ One name for a behaviour that several types provide, so the caller can hold any 
 
 In Go an interface names a method set, and nothing else is needed: `Circle` and `Rect` satisfy it just by having an `Area() float64` method, and a `[]Shape` holds either. Which line opens the declaration of `Shape`?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  circle 1
@@ -3899,7 +3899,7 @@ One name for a behaviour that several types provide, so the caller can hold any 
 
 In Rust the behaviour is declared once, with `fn area(&self) -> f64;` as its one required method, and each type says `impl Shape for Circle { ... }` explicitly. `Box<dyn Shape>` holds either. Which line opens the declaration?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  circle 1
@@ -4039,7 +4039,7 @@ One name for a behaviour that several types provide, so the caller can hold any 
 
 In Python nothing has to be declared: any object with an `area()` method will do, and that is duck typing. To *check* it, `typing.Protocol` names the method, and `@runtime_checkable` lets `isinstance(s, Shape)` ask at run time — which the program does before adding each area.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  circle 1
@@ -4181,7 +4181,7 @@ A function over a type parameter: written once, used with integers and with stri
 
 In Go the type parameter goes in square brackets with its constraint: `func largest[T cmp.Ordered](xs []T) T`. `cmp.Ordered` is the constraint that allows `<` and `>`; `any` would not. The call `largest(nums)` infers `T` from the argument.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 9 4
@@ -4302,7 +4302,7 @@ A function over a type parameter: written once, used with integers and with stri
 
 In Rust the type parameter goes in angle brackets with its bound: `fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T`. `PartialOrd` allows `>`, `Copy` allows `best = x` to copy out of the slice, and both are traits — a bound is a trait. `largest(&nums)` infers `T`.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  3 9 4
@@ -4397,7 +4397,7 @@ A function over a type parameter: written once, used with integers and with stri
 
 In Python the type parameter is part of the `def` line: a name in square brackets right after the function's name declares it, and the parameter and return annotations then use it. At run time it is duck typing; the signature is what a checker reads. Which line is the signature?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  3 9 4
@@ -4490,7 +4490,7 @@ A value handed to a function is either lent — the caller keeps it — or given
 
 In Go a slice is passed by value, but the value is a small header — pointer, length, capacity — so `total(orders)` and `take(orders)` both see the same array, and `orders` is still usable after either. `take` zeroes what it is given, and the caller would see that too. There is no move.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  12 30 8
@@ -4620,7 +4620,7 @@ A value handed to a function is either lent — the caller keeps it — or given
 
 In Rust `total(&orders)` lends: `&Vec<i64>` coerces to the `&[i64]` the function wants, and `orders` is still the caller's afterwards. `take(orders)` moves the `Vec` into `take`, which drops it on return, and using `orders` after that line is E0382. The order of the two calls is the program.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  12 30 8
@@ -4710,7 +4710,7 @@ A value handed to a function is either lent — the caller keeps it — or given
 
 In Python every name is a reference, and a call passes the reference: `total(orders)` and `take(orders)` both receive the very same list object. `take` clears it, and afterwards `orders` in `main` is empty too — not moved, not copied, shared. `orders[:]` or `list(orders)` would have been the copy.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  12 30 8
@@ -4806,7 +4806,7 @@ A function that returns one of its two string arguments returns a reference into
 
 In Go `func longest(a, b string) string` returns one of its arguments and nobody has to say for how long: a string is immutable and the collector keeps it as long as anything can reach it. Two parameters of one type share the type name.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea coffee
@@ -4915,7 +4915,7 @@ A function that returns one of its two string arguments returns a reference into
 
 In Rust `fn longest<'a>(a: &'a str, b: &'a str) -> &'a str` says the returned reference lives as long as the shorter of the two inputs — the `'a` on all three ties them together. Leave it out and rustc says E0106: it cannot tell whether the result borrows from `a` or `b`, so it will not guess.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  tea coffee
@@ -4998,7 +4998,7 @@ A function that returns one of its two string arguments returns a reference into
 
 In Python the function returns one of its arguments, and the object lives as long as any name refers to it — no lifetime, no `&`. The signature annotates both parameters and the result as `str`, and ends in a colon like every `def`. Which line is it?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  tea coffee
@@ -5079,7 +5079,7 @@ Start several threads, give each a piece of the work, wait for all of them, and 
 
 In Go `go func(...) { ... }(args)` starts a goroutine, and a `sync.WaitGroup` counts them: `wg.Add(1)` before each start, `defer wg.Done()` first thing inside, `wg.Wait()` after the loop. The chunk and its index are passed as arguments so each goroutine has its own.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7
@@ -5223,7 +5223,7 @@ Start several threads, give each a piece of the work, wait for all of them, and 
 
 In Rust `thread::spawn(move || ...)` starts a thread and returns a `JoinHandle`; `move` gives the closure its own copy of the chunk (a `Vec`, so the thread owns it), and `h.join().unwrap()` waits and hands back what the closure returned — the sum, here, so no shared state at all.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7
@@ -5319,7 +5319,7 @@ Start several threads, give each a piece of the work, wait for all of them, and 
 
 In Python `threading.Thread(target=work, args=(i, c))` makes a thread — `args` is a tuple, hence the comma in `(i,)` for one argument — `t.start()` runs it and `t.join()` waits. The GIL means the three add in turns, but the shape is the same.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7
@@ -5417,7 +5417,7 @@ Several threads adding to one number is a data race unless the number is locked 
 
 In Go a `sync.Mutex` is a value with two methods, one to take the lock and one to release it, and the counter is an ordinary variable. The discipline is yours: take, add, release. Method names in Go start with a capital when they are exported, and these are. Which line takes the lock?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -5540,7 +5540,7 @@ Several threads adding to one number is a data race unless the number is locked 
 
 In Rust the counter *is* the lock: `Arc<Mutex<i64>>`, shared by `Arc::clone` and opened by `.lock().unwrap()`, which returns a guard that dereferences to the number and unlocks when it is dropped at the end of the statement. `*guard += x` writes through it; there is no way to reach the number without the lock.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3
@@ -5637,7 +5637,7 @@ Several threads adding to one number is a data race unless the number is locked 
 
 In Python `threading.Lock()` is the mutex, and a context manager takes and releases it around an indented block — the object itself after the keyword, not a call to it, and a colon at the end. Which line opens that block?
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3
@@ -5737,7 +5737,7 @@ One producer puts work on a channel, several consumers take from it, each keeps 
 
 In Go `ch <- x` sends and `for x := range ch` receives until the channel is closed — and closing is a built-in function, not a method, called once by the producer when it has sent everything. Which line closes the channel?
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10
@@ -5883,7 +5883,7 @@ One producer puts work on a channel, several consumers take from it, each keeps 
 
 In Rust `mpsc::channel()` gives a `Sender` and one `Receiver`; three consumers share the receiver through `Arc<Mutex<Receiver>>`, each locking it to `recv()`. `tx.send(x)` sends, and `drop(tx)` is the close: once every sender is gone, `recv` returns `Err` and the consumers break out and return their tallies.
 
-Pick the line that does it, then type it where the `// FILL` comment is.
+Pick the line that does it. It goes where the `// FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10
@@ -6021,7 +6021,7 @@ One producer puts work on a channel, several consumers take from it, each keeps 
 
 In Python `queue.Queue` is the channel: `q.put(x)` sends and `q.get()` blocks until there is something. A `Queue` has no close, so the producer sends a sentinel — `None`, once per consumer — and each consumer breaks when it gets one. That is the close, spelled by hand.
 
-Pick the line that does it, then type it where the `# FILL` comment is.
+Pick the line that does it. It goes where the `# FILL` comment is.
 
 ```
 input:  1 2 3 4 5 6 7 8 9 10

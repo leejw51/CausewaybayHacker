@@ -254,8 +254,6 @@ return {
   ["RIGHT"] = "正解",
   ["VERY BASIC"] = "超基礎",
   ["BASIC"] = "基礎",
-  ["PICK THE LINE, THEN TYPE IT  (1–4)"] = "正しい行を選んで、その行を打つ  (1–4)",
-  ["RIGHT — NOW TYPE IT"] = "正解 — その行を打とう",
   ["ADVANCED"] = "応用",
   ["FRAMEWORKS"] = "フレームワーク",
   ["OPEN"] = "公開",

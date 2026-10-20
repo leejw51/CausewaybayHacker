@@ -15,7 +15,7 @@ brief = '''
 Přečti jeden řádek, jméno. Vypiš `hello, ` a za tím jméno, na jeden řádek.
 `println!` je makro, které vypíše řádek; `{}` je místo, kam přijde hodnota.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  mei
@@ -36,7 +36,7 @@ brief = '''
 Přečti jedno nezáporné celé číslo `a` jako `i32`. Vytvoř `b`, tutéž hodnotu jako `u64`, a program vypíše `b + 1`.
 `as` převádí mezi šířkami celých čísel.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  12
@@ -57,7 +57,7 @@ brief = '''
 Přečti jedno desetinné číslo do `x` jako `f64` — široký float — a program ho vypíše na deset desetinných míst.
 `parse` vyčte z textu číslo; `trim` nejdřív odstraní konec řádku.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3.14159265
@@ -78,7 +78,7 @@ brief = '''
 Přečti jeden řádek a vypiš ho velkými písmeny.
 `String` má metodu, která vrátí kopii velkými písmeny.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  jardines bazaar
@@ -99,7 +99,7 @@ brief = '''
 Přečti celé číslo `n`. Nastav `even` na `bool`, který je true, když je `n` sudé; program z něj vypíše `even` nebo `odd`.
 `%` je zbytek po dělení, `==` porovnání.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -120,7 +120,7 @@ brief = '''
 Přečti `n`. Přičti do `total` každé celé číslo od 1 do `n` včetně; program ho vypíše.
 `for` přes rozsah to udělá; `..=` zahrnuje konec.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -141,7 +141,7 @@ brief = '''
 Napiš `double`: funkci, která vezme `i64` a vrátí jeho dvojnásobek. Program přečte `n` a vypíše `double(n)`.
 Poslední výraz funkce, bez středníku, je její návratová hodnota.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -162,7 +162,7 @@ brief = '''
 Deklaruj `Stall`: strukturu s polem `name`, které je `String`, a polem `price`, které je `i64`. Program přečte obojí, jednu sestaví a vypíše ji.
 `struct` pojmenuje typ a vyjmenuje pole s jejich typy.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  fish 38
@@ -183,7 +183,7 @@ brief = '''
 Dej `Stall` metodu `total`, která vrátí `price * qty`. Program volá `stall.total()`.
 Metody žijí v bloku `impl` a berou `&self`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  38 3
@@ -204,7 +204,7 @@ brief = '''
 `match` přes `Line` má větev pro `Island` a `KwunTong`. Přidej větev pro `TsuenWan`, jejíž barva je `red`.
 Větev je `Type::Variant => value,`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tsuenwan
@@ -225,7 +225,7 @@ brief = '''
 Vytvoř `v`: prázdný, rostoucí vektor `i64`, do kterého může smyčka vkládat push. Program vypíše jeho délku a součet.
 Vektor se vytvoří pomocí `Vec::new()` a musí být `mut`, aby mohl růst.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -246,7 +246,7 @@ brief = '''
 `v` drží celá čísla z řádku. Odstraň hodnotu na indexu 0; program vypíše, co zbylo.
 Vektor odstraňuje podle indexu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4 5 6 7
@@ -267,7 +267,7 @@ brief = '''
 `list` je `LinkedList<i64>`. Dej každé `x` na ZAČÁTEK, aby program vypsal hodnoty v opačném pořadí.
 Spojový seznam umí vkládat na oba konce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -288,7 +288,7 @@ brief = '''
 `count` je `BTreeMap<String, i64>`. Pro každé slovo `w` přičti jedničku k jeho počtu — nové slovo začíná na nule. Program vypíše `word count` na řádek, seřazeno.
 `entry` najde nebo vytvoří políčko, `or_insert` mu dá počáteční hodnotu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  siu mai har gau siu mai
@@ -312,7 +312,7 @@ brief = '''
 `counts` je `HashMap`, který prochází své klíče v žádném pevném pořadí. `keys` drží tyto klíče ve `Vec`. Seřaď `keys`, aby se součet pokaždé vytiskl stejně.
 `Vec` se řadí na místě.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  f e d c b a f
@@ -338,7 +338,7 @@ brief = '''
 `seen` je `BTreeSet<i64>`. Přidej do ní každé `x`; hodnota, která už v množině je, se podruhé nepřidá. Program vypíše, kolik je různých hodnot, a hodnoty v pořadí.
 Množina vkládá pomocí insert.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 3 2 1
@@ -360,7 +360,7 @@ brief = '''
 `stack` je `Vec<i64>` použitý jako zásobník. Odebírej z něj hodnoty pop, dokud není prázdný, a každou vkládej do `out`; program je vypíše — poslední dovnitř, první ven.
 `pop` dává `Option`, takže smyčka je `while let`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -381,7 +381,7 @@ brief = '''
 `queue` je `VecDeque<i64>`. Vezmi PRVNÍ hodnotu z čela do `first`; program pak vezme druhou a vypíše obě.
 Deque odebírá na obou koncích.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -402,7 +402,7 @@ brief = '''
 `heap` je `BinaryHeap<Reverse<i64>>` — max-halda proměněná v min-haldu tím, že je každá hodnota zabalená v `Reverse`. Vlož do ní každé `x`; program je vybírá od nejmenšího.
 Co jde dovnitř, musí být zabalené.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 1 4 2 3
@@ -423,7 +423,7 @@ brief = '''
 `v` drží celá čísla z řádku. Seřaď ho vzestupně, na místě; program ho vypíše.
 `Vec` na to má metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 1 4 2 3
@@ -444,7 +444,7 @@ brief = '''
 `rows` je `Vec<(String, i64)>` jmen a skóre. Seřaď ho podle skóre sestupně, pak podle jména vzestupně; program vypíše `name score` na řádek.
 `sort_by_key` řadí podle klíče; `Reverse` otočí jednu jeho část.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -470,7 +470,7 @@ brief = '''
 Přečti jeden řádek. Vytvoř `rev`, tentýž text se znaky v opačném pořadí; program ho vypíše.
 Znaky dává `chars()`, iterátor umí běžet pozpátku a iterátor znaků se posbírá do `String`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  kwan lee
@@ -491,7 +491,7 @@ brief = '''
 Přečti `k`, pak řádek celých čísel. Vytvoř `add`: closure, která vezme `i64` a vrátí ho plus `k`. Program ji použije na každé číslo.
 Closure je `|args| body` a může použít `k` zvenčí.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -513,7 +513,7 @@ brief = '''
 `nums` drží celá čísla z řádku. Vytvoř `total`: součet druhých mocnin těch sudých, jako jeden řetězec iterátoru.
 `filter` nechává, `map` proměňuje, `sum` sčítá.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4 5 6
@@ -534,7 +534,7 @@ brief = '''
 Pro každé `x` spusť vlákno, které spočítá `x * x`, a vlož jeho handle do `handles`. Program je po řadě spojí a vypíše mocniny.
 `thread::spawn` bere closure; `move` dá vláknu vlastní kopii `x`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -555,7 +555,7 @@ brief = '''
 `c` je klon `Arc<Mutex<i64>>` uvnitř každého vlákna. Přičti `x` k číslu uvnitř mutexu. Program spojí každé vlákno a vypíše součet.
 `lock()` dá guard; `*` se dostane k číslu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -576,7 +576,7 @@ brief = '''
 `insert` vloží `value` do stromu pod `n`: menší hodnoty jdou do levého podstromu, větší do pravého, a podstrom se přiřadí zpět. Napiš ten jeden řádek. Program vypíše průchod inorder a výšku.
 `take()` vyzvedne dítě, aby se mohlo předat rekurzivnímu volání.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 4

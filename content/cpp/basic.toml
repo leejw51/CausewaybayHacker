@@ -67,6 +67,15 @@ hints = [
   "main returns int; reaching the end of main without a return is fine and means 0.",
 ]
 
+[quest.quiz]
+choices = [
+  'std::cout << "Hello, causewaybay\n";',
+  'std::cout << "hello, causewaybay\n";',
+  'std::cout << "hello,causewaybay\n";',
+  'std::cout << "hello, causewaybay\n"',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -136,6 +145,19 @@ hints = [
   "std::cout << n * n << '\\\\n'; — the same shape as the line above it.",
   "long long holds 3000000000 squared; an int would not, which is why the plaque says long long.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::cout << n ^ 2 << '\n';''',
+  '''
+std::cout << n * 2 << '\n';''',
+  '''
+std::cout << n + n << '\n';''',
+  '''
+std::cout << n * n << '\n';''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -214,6 +236,19 @@ hints = [
   "std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\\\\n';",
   "Only one operand needs the cast: double divided by long long is a double.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a) / b << '\n';''',
+  '''
+std::cout << std::fixed << std::setprecision(2) << static_cast<double>(a / b) << '\n';''',
+  '''
+std::cout << std::setprecision(2) << static_cast<double>(a) / b << '\n';''',
+  '''
+std::cout << std::fixed << std::setprecision(1) << static_cast<double>(a) / b << '\n';''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -295,6 +330,19 @@ hints = [
   "uint64_t b = static_cast<uint64_t>(a); — the cast names the width it goes to.",
   "std::numeric_limits<uint64_t>::max() is 18446744073709551615; the int32_t line above it is the same call with the other type.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::cout << std::numeric_limits<int64_t>::max() << '\n';''',
+  '''
+std::cout << std::numeric_limits<uint64_t>::min() << '\n';''',
+  '''
+std::cout << std::numeric_limits<uint64_t>::max() << '\n';''',
+  '''
+std::cout << std::numeric_limits<uint32_t>::max() << '\n';''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -385,6 +433,15 @@ hints = [
   "v >> (8 * i) slides byte i to the bottom; static_cast<uint8_t> throws the rest away.",
 ]
 
+[quest.quiz]
+choices = [
+  'buf[i] = static_cast<uint8_t>(v >> (8 * i));',
+  'buf[31 - i] = static_cast<uint8_t>(v >> (8 * i));',
+  'buf[31 - i] = static_cast<uint8_t>(v << (8 * i));',
+  'buf[31 - i] = static_cast<uint8_t>(v >> i);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -465,6 +522,23 @@ hints = [
   "double x = std::stod(s); — string to double, from <string>.",
   "float y = static_cast<float>(x); — the narrowing is spelled out; y prints with fewer true digits.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+double x = std::stof(s);
+float y = static_cast<float>(x);''',
+  '''
+double x = std::stod(s);
+double y = static_cast<double>(x);''',
+  '''
+double x = std::stoi(s);
+float y = static_cast<float>(x);''',
+  '''
+double x = std::stod(s);
+float y = static_cast<float>(x);''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -555,6 +629,23 @@ hints = [
   "std::string rev(line.rbegin(), line.rend()); — a string built from two reverse iterators is the reverse.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());''',
+  '''
+std::transform(upper.begin(), upper.end(), upper.begin(), ::tolower);
+std::string rev(line.rbegin(), line.rend());''',
+  '''
+std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+std::string rev(line.begin(), line.end());''',
+  '''
+std::transform(upper.begin(), upper.end(), line.begin(), ::toupper);
+std::string rev(line.rbegin(), line.rend());''',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -630,6 +721,23 @@ hints = [
   "std::string t = s.substr(0, 4); — start at 0, take 4; the result is its own string.",
   "t += \"...\"; — append in place; t.append(\"...\") is the same.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+std::string t = s.substr(1, 4);
+t += "...";''',
+  '''
+std::string t = s.substr(0, 3);
+t += "...";''',
+  '''
+std::string t = s.substr(0, 4);
+t += "...";''',
+  '''
+std::string t = s.substr(0, 4);
+t = "...";''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -723,6 +831,23 @@ hints = [
   "part.insert(part.end(), v.begin(), v.end()); — insert a range at the end is append.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::vector<long long> part(v.begin() + 1, v.begin() + 2);
+part.insert(part.end(), v.begin(), v.end());''',
+  '''
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());''',
+  '''
+std::vector<long long> part(v.begin(), v.begin() + 3);
+part.insert(part.end(), v.begin(), v.end());''',
+  '''
+std::vector<long long> part(v.begin() + 1, v.begin() + 3);
+part.insert(part.begin(), v.begin(), v.end());''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -815,6 +940,23 @@ hints = [
   "head.insert(head.end(), bytes.end() - 2, bytes.end()); — the last two, appended.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 3, bytes.end());''',
+  '''
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 2);
+head.insert(head.end(), bytes.end() - 2, bytes.end());''',
+  '''
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.begin(), bytes.end() - 2, bytes.end());''',
+  '''
+std::vector<uint8_t> head(bytes.begin(), bytes.begin() + 3);
+head.insert(head.end(), bytes.end() - 2, bytes.end());''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -898,6 +1040,15 @@ hints = [
   "<= n, not < n: the salute counts n itself.",
 ]
 
+[quest.quiz]
+choices = [
+  'for (long long i = 1; i < n; ++i) {',
+  'for (long long i = 0; i <= n; ++i) {',
+  'for (long long i = 1; i <= n; ++i) {',
+  'for (long long i = 0; i < n; ++i) {',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -974,6 +1125,23 @@ hints = [
   "if (rides <= 10) return rides * 5; — then, on the next line, return 50 + (rides - 10) * 3;",
   "Ten rides at 5 is 50, and every ride past the tenth adds 3 on top of that.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (rides <= 10) return rides * 5;
+return 50 + rides * 3;''',
+  '''
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 3;''',
+  '''
+if (rides <= 10) return rides * 5;
+return 50 + (rides - 10) * 5;''',
+  '''
+if (rides > 10) return rides * 5;
+return 50 + (rides - 10) * 3;''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1070,6 +1238,15 @@ hints = [
   "return price * qty; inside total(), and Stall s{name, price, qty}; in main.",
   "Brace initialisation fills the fields in declaration order: name, then price, then qty.",
 ]
+
+[quest.quiz]
+choices = [
+  'Stall s{name, price, qty};',
+  'Stall s{price, name, qty};',
+  'Stall s{name, price};',
+  'Stall s{"name", price, qty};',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1173,6 +1350,23 @@ hints = [
   "case Line::TsuenWan: return \"red\"; and case Line::KwunTong: return \"green\"; — the same shape as the Island line.",
   "An enum class enumerator is always written with its type in front: Line::TsuenWan, never TsuenWan alone.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+case Line::TsuenWan: return "green";
+case Line::KwunTong: return "red";''',
+  '''
+case TsuenWan: return "red";
+case KwunTong: return "green";''',
+  '''
+case Line::TsuenWan: return "red";
+case Line::KwunTong: "green";''',
+  '''
+case Line::TsuenWan: return "red";
+case Line::KwunTong: return "green";''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1280,6 +1474,31 @@ hints = [
   "xs.push_back(99); xs.erase(xs.begin()); xs[0] = 700; std::sort(xs.begin(), xs.end()); — add, remove, edit, sort.",
   "erase and sort take iterators (xs.begin(), xs.end()); [] takes an index.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());''',
+  '''
+xs.push_front(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());''',
+  '''
+xs.insert(xs.begin(), 99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end());''',
+  '''
+xs.push_back(99);
+xs.erase(xs.begin());
+xs[0] = 700;
+std::sort(xs.begin(), xs.end(), std::greater<>{});''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1396,6 +1615,31 @@ hints = [
   "std::sort cannot sort a std::list (no random access); the list's own l.sort() can.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+l.push_front(0);
+l.pop_front();
+l.front() = 99;
+l.sort();''',
+  '''
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+std::sort(l.begin(), l.end());''',
+  '''
+l.push_front(0);
+l.pop_back();
+l.front() = 99;
+l.sort();''',
+  '''
+l.push_front(0);
+l.pop_back();
+l.back() = 99;
+l.sort();''',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1496,6 +1740,27 @@ hints = [
   "counts[\"crab\"] = 1; counts.erase(\"rice\"); counts.at(\"fish\") = 9; — add, remove, edit.",
   "[] creates a missing key; at() refuses to. Use at() when the key must already be there.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+counts.at("crab") = 1;
+counts.erase("rice");
+counts.at("fish") = 9;''',
+  '''
+counts["crab"] = 1;
+counts.erase("rice");
+counts.at("fish") = 9;''',
+  '''
+counts["crab"] = 1;
+counts["rice"] = 0;
+counts.at("fish") = 9;''',
+  '''
+counts["crab"] = 1;
+counts.erase("rice");
+counts.insert({"fish", 9});''',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1607,6 +1872,27 @@ hints = [
   "The table has no order of its own: the keys are copied out for you; sorting them is the fourth line, before the print.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+counts.at("gun") = 12;
+counts.erase("siu");
+counts.at("mai") = 0;''',
+  '''
+counts["gun"] = 12;
+counts["siu"] = 0;
+counts.at("mai") = 0;''',
+  '''
+counts["gun"] = 12;
+counts.erase("siu");
+counts.insert({"mai", 0});''',
+  '''
+counts["gun"] = 12;
+counts.erase("siu");
+counts.at("mai") = 0;''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1713,6 +1999,27 @@ hints = [
   "seen.insert(100); seen.erase(3); seen.erase(1); seen.insert(-1); — the last two calls share a line.",
   "erase(3) on a set without a 3 does nothing, and insert(-1) when -1 is already there does nothing: both are safe.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+seen.insert(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);''',
+  '''
+seen.push_back(100);
+seen.erase(3);
+seen.erase(1); seen.insert(-1);''',
+  '''
+seen.insert(100);
+seen.erase(3);
+seen.insert(-1);''',
+  '''
+seen.insert(100);
+seen.erase(3);
+seen.erase(-1); seen.insert(1);''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1839,6 +2146,27 @@ hints = [
   "top() is a reference, so st.top() = 99 changes the element that pop() would remove next.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+st.push(0);
+st.pop();
+st.front() = 99;''',
+  '''
+st.push(0);
+st.pop();
+st.top() = 99;''',
+  '''
+st.push(0);
+st.top() = 99;
+st.pop();''',
+  '''
+st.push(0);
+st.pop();
+st.push(99);''',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1941,6 +2269,15 @@ hints = [
   "std::sort takes a range, not a container: begin() and end().",
 ]
 
+[quest.quiz]
+choices = [
+  'std::sort(v.begin(), v.end(), std::less<>{});',
+  'std::sort(v.rbegin(), v.rend(), std::greater<>{});',
+  'std::sort(v.begin(), v.end(), std::greater<>{});',
+  'std::sort(v.begin(), v.end(), std::greater<>);',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2042,6 +2379,23 @@ hints = [
   "std::string r(s.rbegin(), s.rend()); — reverse iterators build the reversed copy.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+std::reverse(v.begin(), v.end() - 1);
+std::string r(s.rbegin(), s.rend());''',
+  '''
+std::reverse(v.begin(), v.end());
+std::string r(s.begin(), s.end());''',
+  '''
+v.reverse();
+std::string r(s.rbegin(), s.rend());''',
+  '''
+std::reverse(v.begin(), v.end());
+std::string r(s.rbegin(), s.rend());''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2139,6 +2493,15 @@ hints = [
   "The comparator answers \"does a go before b\": higher score first, and on a tie the smaller name.",
 ]
 
+[quest.quiz]
+choices = [
+  'std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name > b.name; });',
+  'std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });',
+  'std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.score != b.score ? a.score < b.score : a.name < b.name; });',
+  'std::sort(rs.begin(), rs.end(), [](const Row& a, const Row& b) { return a.name != b.name ? a.name < b.name : a.score > b.score; });',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2232,6 +2595,15 @@ hints = [
   "[k] copies k into the lambda; [] captures nothing and cannot see k at all.",
 ]
 
+[quest.quiz]
+choices = [
+  'auto add = [k](long long v) { return v + k; };',
+  'auto add = [](long long v) { return v + k; };',
+  'auto add = [k](long long v) { return v * k; };',
+  'auto add = [&k](long long v) { return v - k; };',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2319,6 +2691,15 @@ hints = [
   "long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });",
   "The lambda gets the running total and one element, and returns the new total.",
 ]
+
+[quest.quiz]
+choices = [
+  'long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 1 ? acc + v * v : acc; });',
+  'long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v : acc; });',
+  'long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : acc; });',
+  'long long total = std::accumulate(xs.begin(), xs.end(), 0LL, [](long long acc, long long v) { return v % 2 == 0 ? acc + v * v : v; });',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2431,6 +2812,27 @@ hints = [
   "threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; }); in the loop, then for (auto& t : threads) t.join(); after it.",
   "A thread not joined by the end of main terminates the program; join them all before printing.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+threads.emplace_back([&, i] { results[i] = xs[i] + xs[i]; });
+}
+for (auto& t : threads) t.join();''',
+  '''
+threads.push_back([&, i] { results[i] = xs[i] * xs[i]; });
+}
+for (auto& t : threads) t.join();''',
+  '''
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+}
+threads.clear();''',
+  '''
+threads.emplace_back([&, i] { results[i] = xs[i] * xs[i]; });
+}
+for (auto& t : threads) t.join();''',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2577,6 +2979,35 @@ hints = [
   "n->left = insert(n->left, v); on the left, n->right = insert(n->right, v); on the right.",
   "Store the result back: the child may have been nullptr, and the new node is what insert returns.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (v < n->val) {
+    n->left = insert(n->left, v);
+} else {
+    n->right = insert(n->right, v);
+}''',
+  '''
+if (v > n->val) {
+    n->left = insert(n->left, v);
+} else {
+    n->right = insert(n->right, v);
+}''',
+  '''
+if (v < n->val) {
+    insert(n->left, v);
+} else {
+    insert(n->right, v);
+}''',
+  '''
+if (v < n->val) {
+    n->left = insert(n->right, v);
+} else {
+    n->right = insert(n->left, v);
+}''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"

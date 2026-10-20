@@ -17,7 +17,7 @@ bufferovaný zapisovač na stdout; jeho `print` bere formátovací řetězec
 a n-tici argumentů — prázdnou n-tici, `.{}`, když žádné nejsou — a může
 selhat, takže volání musí mít `try`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  (nothing)
@@ -41,7 +41,7 @@ Zig počítá v typu svých operandů a v `-O Debug` se zastaví s
 `panic: integer overflow`, když se výsledek nevejde; `a` se proto musí
 rozšířit na `i64` před násobením, ne až po něm.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -65,7 +65,7 @@ Načti dvě kladná celá čísla `a` a `b`. Program potřebuje `q`, podíl jako
 mu řekne, jaké, pomocí `@as(f64, ...)` kolem něj.
 Výpis s `{d:.2}` už je napsaný.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  7 2
@@ -87,7 +87,7 @@ brief = '''
 bajtů. Program musí vypsat, kolik bajtů drží. Řez nese svou délku jako
 pole, ne jako metodu.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  kwan lee
@@ -110,7 +110,7 @@ je `n` dělitelné dvěma beze zbytku. Na znaménkovém celém čísle Zig oper�
 `%` odmítne — znaménko zbytku je nejednoznačné — a chce `@mod` nebo `@rem`
 jménem.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  4
@@ -133,7 +133,7 @@ napsané; hlavička `for`, která vede `i` od 1 do `n`, je díra. `for` přes
 rozsah `a..b` začíná na `a` a končí před `b` a hodnota se zachytí pomocí
 `|i|` za závorkami.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  10
@@ -155,7 +155,7 @@ brief = '''
 Jeho `return` je díra; `main` načte `x` a vypíše `square(x)`. Každý
 příkaz v Zigu končí středníkem a `^` není mocnina.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  7
@@ -178,7 +178,7 @@ brief = '''
 závorkami a každé pole se pojmenuje s tečkou, `.field = value`; vynechané
 pole je chyba překladu, ne nula.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  fish 40
@@ -201,7 +201,7 @@ deklarovaná uvnitř struktury, jejímž prvním parametrem je struktura sama,
 a k polím se dostane přes ten parametr — žádné implicitní `this` není.
 Díra je `return`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  fish 40 3
@@ -225,7 +225,7 @@ vybranou podle slova; `switch`, který vypíše barvu, je napsaný. V Zigu je
 porovnávají pomocí `std.mem.eql`, nikdy `==`. Když je typ deklarovaný, dá
 se hodnota výčtu napsat jen jako `.island`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  tsuenwan
@@ -248,7 +248,7 @@ Načti řádek celých čísel. Každá hodnota `x` se musí při čtení připo
 žádný alokátor: každé volání, které ho může zvětšit, dostane `gpa`, a může
 selhat, takže má `try`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -273,7 +273,7 @@ zbytku, a jedno, které mezeru zaplní posledním prvkem; obě vrací odstraněn
 hodnotu, a hodnotu Zig nedovolí jen tak upustit na zem — musí se přiřadit,
 do `_`, když ji nikdo nechce.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -296,7 +296,7 @@ Načti řádek celých čísel. Každý `item` se musí napojit na ZAČÁTEK
 je intruzivní: propojuje pole `node` vložené v každém `Item`, přes
 ukazatel, a průchod, který je vypíše, je napsaný.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3
@@ -319,7 +319,7 @@ Načti řádek slov. Pro každé `word` musí počet v `counts`,
 hodnotou — `null` pro slovo, které ještě nepadlo, a z toho udělá `orelse`
 nulu — a `put` uloží nový počet. Smyčka i seřazený výpis jsou napsané.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  fish crab fish
@@ -344,7 +344,7 @@ brief = '''
 číslo, dokud se nerozbalí — `orelse` dá výchozí hodnotu,
 `.?` na `null` zpanikaří.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  fish 40 crab 120
@@ -368,7 +368,7 @@ knihovna Zigu žádný typ množiny nemá; hašovací mapa, jejíž typ hodnoty 
 `void`, jím je, a hodnota typu `void` se píše `{}`. Výpis počtu a
 seřazených hodnot je napsaný.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3 1 3 2 1
@@ -393,7 +393,7 @@ a vypisovat hodnoty od posledního vloženého. `pop` vrací volitelnou
 hodnotu — vrchol, nebo `null`, jakmile je zásobník prázdný — a `while` ji
 umí v každém průchodu rozbalit a na `null` skončit. Díra je hlavička smyčky.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -416,7 +416,7 @@ Načti řádek celých čísel. Každé `x` se musí vložit na KONEC `q`,
 Stejně jako ArrayList dostává Deque `gpa` při každém volání, které ho
 může zvětšit.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -440,7 +440,7 @@ nejmenšího. Pořadí fronty je funkce, se kterou byla deklarovaná:
 `byValue` odpoví `std.math.Order` pro dva prvky a prvek, který označí
 za menší, vyjde první. Díra je její `return`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 2
@@ -463,7 +463,7 @@ na místě. Řazení v `std.mem` bere typ prvku, řez, kontext (`{}`, když
 žádný není) a uspořádání — `std.sort` je jmenný prostor, ne funkce, a
 žijí v něm `asc` a `desc`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 2
@@ -487,7 +487,7 @@ funkce, `byScoreDesc`, předaná `std.mem.sort` jménem, a odpoví `true`,
 když `a` jde před `b`. Díra je její `return`. Skóre jsou
 navzájem různá.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  3
@@ -514,7 +514,7 @@ brief = '''
 funkcí z `std.mem` přes celý řez, které se napřed dá typ prvku.
 ArrayList žádné vlastní obracení nemá.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -538,7 +538,7 @@ kolem sebe — takže to nejbližší je napsané tady: `Adder`, struktura,
 která nese `k` v poli, s metodou `call`, která se k němu dostane přes
 `self`. Díra je `return` té metody.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5
@@ -563,7 +563,7 @@ ukazatel na funkci, `*const fn (i64) bool`. Odpovědí Zigu na lambdu je
 funkce deklarovaná uvnitř anonymní struktury a vybraná z ní jménem, celé
 na jednom řádku: `struct { fn f(...) ... }.f`.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4 6
@@ -587,7 +587,7 @@ nad `v.items` s ukazatelem na `result`; `main` na něj počká přes join a vyp�
 `std.Thread.spawn` bere konfiguraci (`.{}` pro výchozí), funkci
 a její argumenty jako n-tici, a může selhat.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  1 2 3 4
@@ -613,7 +613,7 @@ vrací chybové sjednocení, a prostá nezrušitelná podoba nevrací nic.
 Odemknout mutex, který nikdo nedrží, je `unreachable`, a v `-O Debug`
 je to panika.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  (nothing)
@@ -640,7 +640,7 @@ jinak doprava — a uloží, co vrátí rekurze; volání alokuje, takže má
 nerozbaluje pomocí `.?` dřív, než se někdo podíval.
 Průchod inorder pak vypíše vzestupně.
 
-Vyber řádek, který to udělá, a napiš ho tam, kde je komentář `// FILL`.
+Vyber řádek, který to udělá. Patří tam, kde je komentář `// FILL`.
 
 ```
 input:  5 3 8 1 4
