@@ -895,3 +895,223 @@ Který výraz vyplní mezeru?
 hints = [
   "Vzít další znak a pak ho filtrovat už `+` snědlo, a samotné nahlédnutí se nikdy nepohne dál. Peekable umí vzít další položku jen tehdy, když na ní platí podmínka — varianta `_eq` chce hodnotu k porovnání, ne closure.",
 ]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet_advanced.47.iter-filter-copied"
+title = "DVA AMPERSANDY"
+story = "Pořadník u pokladny kina na Times Square drží čísla ve Vec a vedoucí chce ta velká, aniž by se seznamu vzdal."
+brief = '''
+`a: Vec<i32>` je `[10, 16, 300, 1000, 200]` a bude potřeba i potom.
+`b` musí obsahovat hodnoty větší než 15 jako `i32`: `[16, 300, 1000, 200]`.
+
+```
+let b: Vec<i32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "`.iter()` vydává `&i32` a `filter` půjčuje své closure referenci na každou položku, takže closure vidí `&&i32`. Položky, které vyjdou ven, jsou pořád reference, dokud je nezkopírujete.",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet_advanced.48.into-iter-filter"
+title = "JEDEN AMPERSAND"
+story = "Zavírací doba u stánku na Sugar Street: čísla ve Vec po dnešní noci nebudou potřeba, takže je lze vzít, ne půjčit."
+brief = '''
+`a: Vec<i32>` je `[10, 16, 300, 1000, 200]` a potom už **není** potřeba.
+`b` musí obsahovat hodnoty větší než 15: `[16, 300, 1000, 200]`.
+
+```
+let b: Vec<i32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "`.into_iter()` na Vec vydává samotná `i32`, takže `filter` půjčuje své closure `&i32` — jednu referenci, ne dvě — a potom už není co kopírovat.",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet_advanced.49.copied-first"
+title = "NEJDŘÍV KOPIE"
+story = "Alex si odečty měřičů z tabule opíše dřív, než je začne třídit, takže na tabuli se ničeho nedotkne."
+brief = '''
+`a: Vec<i32>` je `[10, 16, 300, 1000, 200]` a bude potřeba i potom.
+Tentokrát položky zkopírujte **před** filtrováním. `b` musí být `[16, 300, 1000, 200]`.
+
+```
+let b: Vec<i32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Jakmile jsou položky zkopírované, jsou to obyčejná `i32`, takže `filter` půjčuje své closure `&i32` — stejnou jedinou referenci jako po `.into_iter()`.",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet_advanced.50.parse-once"
+title = "PARSOVAT JEDNOU"
+story = "Cenovou tabuli na tržnici na Bowrington Road čte pomalá kamera a každé čtení něco stojí; Mei chce každou cenovku přečíst jednou."
+brief = '''
+`a: Vec<&str>` je `["123", "456.5", "-1.2", "aa", "12345678"]`. `parse`
+je closure, která naparsuje jeden `&str` jako `f32` a počítá, kolikrát byla
+zavolána. `c` musí obsahovat čísla, která se naparsují, a `parse` se zavolá
+jednou na řetězec — pětkrát, ne devětkrát.
+
+```
+let c: Vec<f32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Filtrování podle toho, zda parsování projde, naparsované číslo zahodí, takže další krok musí parsovat znovu. Jeden adaptér umí v tomtéž kroku číslo ponechat a selhání zahodit.",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet_advanced.51.all-or-nothing"
+title = "VŠECHNO, NEBO NIC"
+story = "Dodací list pro vykládací rampu v Lee Garden: je-li jediná váha nečitelná, vrací se celý list, ne jen ten řádek."
+brief = '''
+`a: Vec<&str>` obsahuje váhy. `c` musí být `Ok` se všemi vahami, když se
+všechny naparsují jako `f32`, a první `Err`, když kterákoli z nich ne —
+`["123", "aa"]` dá `Err`, `["1", "2.5"]` dá `Ok([1.0, 2.5])`.
+
+```
+let c: Result<Vec<f32>, ParseFloatError> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Sesbírání Resultů do jednoho Resultu se zastaví na prvním Err — ale jen pokud se k němu Erry dostanou. Cokoli, co selhání zahodí dřív, nenechá nic, na čem by se dalo selhat.",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet_advanced.52.then-not-then-some"
+title = "INDEX, KTERÝ TAM NENÍ"
+story = "Tramvaj na konečné v Causeway Bay má na tabuli tři sedadla a cestující chce sedadlo číslo pět."
+brief = '''
+`xs: Vec<i32>` je `[7, 8, 9]` a `i: usize` může být za koncem. `v` musí
+být `Some(xs[i])`, když je `i` v rozsahu, a `None`, když není — bez
+panikaření.
+
+```
+let v: Option<i32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Verze s hodnotou vyhodnotí svůj argument dřív, než se na bool vůbec podívá, takže index mimo rozsah stejně zpanikaří. Verze s closure se spustí jen tehdy, když je podmínka pravdivá.",
+]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "rust.cheatsheet_advanced.53.unwrap-or-else-err"
+title = "CLOSURE DOSTANE CHYBU"
+story = "Pult prádelny na Yee Wo Street tiskne číslo lístku, nebo — když se stroj zasekne — délku chybové zprávy: majitelův vlastní kód pro to, jak je to zlé."
+brief = '''
+`r: Result<usize, String>`. `n` musí být hodnota z `Ok`, nebo — když je `r`
+`Err(msg)` — délka `msg`.
+
+```
+let n: usize = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Na Resultu líná záloha předá své closure chybu, takže closure bere jeden argument. Dychtivá verze bere obyčejnou hodnotu a nepředává se jí vůbec nic.",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "rust.cheatsheet_advanced.54.result-and-then"
+title = "KROK, KTERÝ MŮŽE SELHAT"
+story = "Dělení účtu v cha chaan teng: celková částka se přečte z účtenky a pak se vydělí dvěma — a lichou částku nejde spravedlivě rozpůlit."
+brief = '''
+`parsed: Result<u32, String>` je naparsovaná částka a
+`fn half(n: u32) -> Result<u32, String>` selže na lichých číslech. `r` musí
+být polovina, nebo ta chyba, která přišla první — `"8"` dá `Ok(4)`, `"7"`
+dá `Err("7 is odd")`.
+
+```
+let r: Result<u32, String> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Ten krok sám vrací Result. Transformovat jím hodnotu by vnořilo jeden Result do druhého; řetězení je zploští do jednoho.",
+]
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id    = "rust.cheatsheet_advanced.55.map-err-variant"
+title = "TYPY CHYB SE LIŠÍ"
+story = "Rezervační systém kina v Hysan Place má vlastní chybový enum a parser lístků jeho řečí nemluví."
+brief = '''
+`enum MyErr { Parse(ParseIntError), Missing }` nemá žádnou `From` impl. Uvnitř
+`fn seats(s: Option<&str>) -> Result<u32, MyErr>` už bylo `s`
+rozbaleno na `&str`. Naparsujte ho jako `u32` a špatné parsování převeďte na
+`MyErr::Parse(e)`.
+
+```
+let n = ____;
+Ok(n)
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Varianta enumu ve tvaru tuple structu už je funkcí ze svého pole do enumu, takže ji lze předat tam, kde se čeká closure — bez volání a bez obalování.",
+]
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id    = "rust.cheatsheet_advanced.56.result-has-no-filter"
+title = "RESULT NEMÁ FILTER"
+story = "Počítadlo návštěvníků u brány Victoria Parku hlásí číslo nebo poruchu; nulový odečet znamená, že počítadlo nikdo nikdy nezmáčkl."
+brief = '''
+`r: Result<u32, ParseIntError>`. `v` musí být `Some(n)`, když je `r` `Ok(n)`
+s `n > 0`, a jinak `None` — pro chybu parsování i pro nulu.
+
+```
+let v: Option<u32> = ____;
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Ponechat hodnotu jen tehdy, když projde testem, je metoda Option; Result takovou metodu nemá, protože neúspěšný test by potřeboval chybu, kterou by se stal. Nejdřív sestupte na Option. Closure dostane půjčenou referenci.",
+]
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id    = "rust.cheatsheet_advanced.57.bool-option-result"
+title = "BOOL, OPTION, RESULT"
+story = "Tabule sedadel v Lee Theatre: číslo sedadla na tabuli buď je, nebo není, a pokladna chce větu, když tam není."
+brief = '''
+Uvnitř `fn pick(xs: &[u32], i: usize) -> Result<u32, String>`: vraťte
+`xs[i]`, když je `i` v rozsahu, a jinak `Err(format!("no item {i}"))`
+— nikdy nepanikařit a zprávu sestavit, jen když je potřeba.
+
+```
+let v = ____;
+Ok(v)
+```
+
+Který výraz vyplní mezeru?
+'''
+hints = [
+  "Tři typy za sebou: bool se stane Option (líně, jinak index zpanikaří), Option se stane Resultem (líně, aby se zpráva formátovala jen v případě potřeby), a teprve pak ho může použít `?` ve funkci vracející Result.",
+]

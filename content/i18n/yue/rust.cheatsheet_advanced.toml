@@ -823,3 +823,199 @@ while let Some(c) = ____ {
 hints = [
   "先攞下一個字再 filter，個 `+` 已經畀你食咗；淨係 peek 就永遠唔會行前。Peekable 可以淨係喺下一個元素符合條件嗰陣先攞走佢 —— `_eq` 嗰個 variant 要嘅係一個用嚟比較嘅值，唔係 closure。",
 ]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet_advanced.47.iter-filter-copied"
+title = "兩個 & 號"
+story = "時代廣場戲院個排隊叫號機將啲號碼擺喺一個 Vec 度；經理想要啲大號碼，但又唔想交出成張 list。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後仲要用。
+`b` 要裝住大過 15 嘅值，以 `i32` 形式：`[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "`.iter()` 派出嚟嘅係 `&i32`，而 `filter` 借畀 closure 嘅係每個元素嘅 reference，所以 closure 見到嘅係 `&&i32`。出嚟嘅元素喺你 copy 佢之前仍然係 reference。",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet_advanced.48.into-iter-filter"
+title = "一個 & 號"
+story = "糖街個檔口收檔：Vec 入面啲號碼過咗今晚就唔使用，所以可以直接攞走，唔使借。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後**唔再**需要。
+`b` 要裝住大過 15 嘅值：`[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "Vec 嘅 `.into_iter()` 派出嚟嘅係啲 `i32` 本身，所以 `filter` 借畀 closure 嘅係 `&i32` —— 一層 reference，唔係兩層 —— 之後亦都冇嘢要 copy。",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet_advanced.49.copied-first"
+title = "先 copy"
+story = "Alex 喺揀之前先將塊板上面啲錶數抄低，咁塊板上面乜都唔會畀人郁到。"
+brief = '''
+`a: Vec<i32>` 係 `[10, 16, 300, 1000, 200]`，之後仲要用。
+今次喺 filter **之前**先 copy 啲元素。`b` 一定要係 `[16, 300, 1000, 200]`。
+```
+let b: Vec<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "啲元素一 copy 咗就係普通嘅 `i32`，所以 `filter` 借畀 closure 嘅係 `&i32` —— 同 `.into_iter()` 之後一樣，得一層 reference。",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet_advanced.50.parse-once"
+title = "淨係 parse 一次"
+story = "寶靈頓道街市個價錢板係靠一部好慢嘅相機讀，每讀一次都要錢；Mei 想每張價錢牌淨係讀一次。"
+brief = '''
+`a: Vec<&str>` 係 `["123", "456.5", "-1.2", "aa", "12345678"]`。`parse`
+係一個 closure，將一個 `&str` parse 做 `f32`，仲會數自己畀人 call 咗幾多次。`c`
+一定要係 parse 到嘅啲數，而每個字串淨係 call `parse` 一次 —— 五次，唔係九次。
+```
+let c: Vec<f32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "用「parse 唔 parse 到」嚟 filter，會將 parse 咗出嚟嘅數掉咗，於是下一步又要 parse 多次。有一個 adapter 可以喺同一步入面留低個數、掉咗啲失敗。",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet_advanced.51.all-or-nothing"
+title = "一係全部，一係冇"
+story = "利園落貨區張送貨單：只要有一個重量讀唔到，成張單就退返轉頭，唔係淨係嗰一行。"
+brief = '''
+`a: Vec<&str>` 裝住啲重量。全部都 parse 到做 `f32` 嘅話，`c` 一定要係裝住所有重量嘅 `Ok`；
+只要有一個唔得，就係第一個 `Err` ——
+`["123", "aa"]` 得出 `Err`，`["1", "2.5"]` 得出 `Ok([1.0, 2.5])`。
+```
+let c: Result<Vec<f32>, ParseFloatError> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "將一堆 Result collect 做一個 Result，會喺第一個 Err 度停 —— 不過前提係啲 Err 行得到去嗰度。任何先掉咗啲失敗嘅寫法，都唔會剩低嘢可以失敗。",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet_advanced.52.then-not-then-some"
+title = "唔存在嘅 index"
+story = "銅鑼灣總站架電車，塊板上面得三個位，但有個乘客要五號位。"
+brief = '''
+`xs: Vec<i32>` 係 `[7, 8, 9]`，`i: usize` 可能超出咗尾。`i` 喺範圍內嘅話 `v` 一定要
+係 `Some(xs[i])`，唔係就係 `None` —— 而且唔可以 panic。
+```
+let v: Option<i32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "收值嗰個版本喺睇個 bool 之前已經計咗個參數，所以出界嘅 index 一樣會 panic。closure 版本淨係喺條件係真嗰陣先行。",
+]
+
+# ---------------------------------------------------------------- 53
+[[quest]]
+id    = "rust.cheatsheet_advanced.53.unwrap-or-else-err"
+title = "closure 收到嘅係個錯誤"
+story = "怡和街間洗衣舖個櫃枱會印一張號碼飛；部機卡住嗰陣，就印出錯誤訊息嘅長度 —— 嗰個係老闆自己用嚟表示有幾嚴重嘅暗號。"
+brief = '''
+`r: Result<usize, String>`。`n` 一定要係 `Ok` 入面個值，或者 —— 當 `r` 係
+`Err(msg)` 嗰陣 —— `msg` 嘅長度。
+```
+let n: usize = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "喺 Result 度，lazy 嘅後備值會將個錯誤交畀 closure，所以 closure 要收一個參數。即刻計嗰個版本收嘅係普通值，乜都唔會傳畀佢。",
+]
+
+# ---------------------------------------------------------------- 54
+[[quest]]
+id    = "rust.cheatsheet_advanced.54.result-and-then"
+title = "可能會失敗嘅一步"
+story = "喺茶餐廳夾錢：先由張單讀出總數，再分一半 —— 而單數嘅總數係冇辦法公平咁分一半。"
+brief = '''
+`parsed: Result<u32, String>` 係 parse 咗嘅總數，
+`fn half(n: u32) -> Result<u32, String>` 遇到單數會失敗。`r` 一定要係
+一半，或者先出現嗰個錯誤 —— `"8"` 得出 `Ok(4)`，`"7"`
+得出 `Err("7 is odd")`。
+```
+let r: Result<u32, String> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "呢一步本身就回傳 Result。用佢嚟轉換個值，會將一個 Result 塞入另一個 Result 入面；chain 起嚟就會將兩個壓平做一個。",
+]
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id    = "rust.cheatsheet_advanced.55.map-err-variant"
+title = "啲錯誤類型唔同"
+story = "希慎廣場戲院個訂飛系統有自己嘅錯誤 enum，但個飛嘅 parser 唔識講佢嘅語言。"
+brief = '''
+`enum MyErr { Parse(ParseIntError), Missing }` 冇 `From` impl。喺
+`fn seats(s: Option<&str>) -> Result<u32, MyErr>` 入面，`s` 已經
+unwrap 咗做 `&str`。將佢 parse 做 `u32`，再將 parse 失敗變成
+`MyErr::Parse(e)`。
+```
+let n = ____;
+Ok(n)
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "tuple struct 形式嘅 enum variant 本身已經係一個由佢個欄位去個 enum 嘅 function，所以可以直接放喺要 closure 嘅位 —— 唔使 call 佢，亦唔使再包多層。",
+]
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id    = "rust.cheatsheet_advanced.56.result-has-no-filter"
+title = "Result 冇 filter"
+story = "維園閘口個人數計數器報出嚟嘅一係係一個數，一係係故障；讀數係零即係個計數器從來冇畀人撳過。"
+brief = '''
+`r: Result<u32, ParseIntError>`。當 `r` 係 `Ok(n)` 而且 `n > 0`，`v` 一定要係
+`Some(n)`，其他情況就係 `None` —— parse 錯誤同零都一樣。
+```
+let v: Option<u32> = ____;
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "淨係喺測試通過嗰陣先留低個值，呢個係 Option 嘅 method；Result 冇呢個 method，因為測試唔過嗰陣需要一個錯誤嚟做結果。先落返去做 Option。closure 收到嘅係借返嚟嘅 reference。",
+]
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id    = "rust.cheatsheet_advanced.57.bool-option-result"
+title = "BOOL、OPTION、RESULT"
+story = "利舞台塊座位板：一個座位號一係喺板上面，一係唔喺；唔喺嗰陣，售票處想要一句說話。"
+brief = '''
+喺 `fn pick(xs: &[u32], i: usize) -> Result<u32, String>` 入面：`i` 喺範圍內就回傳
+`xs[i]`，唔係就回傳 `Err(format!("no item {i}"))`
+—— 永遠唔 panic，而且淨係喺需要嗰陣先砌個訊息。
+```
+let v = ____;
+Ok(v)
+```
+空位應該填邊個表達式？
+'''
+hints = [
+  "三個類型一個接一個：bool 變 Option（要 lazy，唔係個 index 會 panic），Option 變 Result（要 lazy，咁個訊息淨係需要嗰陣先 format），之後 Result function 入面嘅 `?` 先用得到佢。",
+]
