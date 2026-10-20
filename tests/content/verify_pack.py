@@ -394,12 +394,24 @@ def run_case(workdir, stdin, timeout_ms, max_bytes):
     # and the runner reads its stdout with `from_utf8_lossy`. Decoding
     # strictly here crashed the whole run on one wrong starter instead of
     # failing the one case.
-    try:
-        p = subprocess.run([str(workdir / "prog")], input=stdin.encode(),
-                           capture_output=True,
-                           timeout=timeout_ms / 1000.0, cwd=workdir)
-    except subprocess.TimeoutExpired:
-        return None, "timeout"
+    #
+    # ETXTBSY is retried: quests are judged on several threads, and a child
+    # forked by one thread can still hold the write handle of a program
+    # another thread has just written, for the instant before its exec
+    # closes it. Executing that program then fails with "Text file busy".
+    import errno, time
+    for attempt in range(20):
+        try:
+            p = subprocess.run([str(workdir / "prog")], input=stdin.encode(),
+                               capture_output=True,
+                               timeout=timeout_ms / 1000.0, cwd=workdir)
+            break
+        except subprocess.TimeoutExpired:
+            return None, "timeout"
+        except OSError as e:
+            if e.errno != errno.ETXTBSY or attempt == 19:
+                raise
+            time.sleep(0.05 * (attempt + 1))
     if len(p.stdout) > max_bytes:
         return None, "output_limit"
     got = p.stdout.decode("utf-8", errors="replace")
