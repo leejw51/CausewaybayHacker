@@ -286,7 +286,7 @@ difficulty  = 3
 story       = "The minibus queue takes the shortest trip first. BinaryHeap only knows how to put the biggest on top."
 concepts    = ["heaps", "collections"]
 requires    = ["rust.cheatsheet.09.count"]
-map         = { x = 0.94, y = 0.27, kind = "quest" }
+map         = { x = 0.94, y = 0.24, kind = "quest" }
 brief       = '''
 `h` is a `BinaryHeap<i32>`. Push `x` so that `h.pop()` gives the
 **smallest** first.
@@ -314,7 +314,7 @@ difficulty  = 3
 story       = "The photocopier in the Times Square office. The original stays on the glass."
 concepts    = ["ownership", "move-semantics"]
 requires    = ["rust.cheatsheet.10.min-heap"]
-map         = { x = 0.83, y = 0.3, kind = "quest" }
+map         = { x = 0.83, y = 0.27, kind = "quest" }
 brief       = '''
 `let a = String::from("x");` — make `b` a `String` of its own, so `a` can
 still be used after.
@@ -342,7 +342,7 @@ difficulty  = 3
 story       = "The ledger in Room 7-32 has a gap. A function that returns Result has to say why."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.11.clone"]
-map         = { x = 0.72, y = 0.24, kind = "quest" }
+map         = { x = 0.72, y = 0.21, kind = "quest" }
 brief       = '''
 Inside a `fn … -> Result<i32, &'static str>`, `o` is an `Option<i32>`. Get
 the value out, or return the error `"missing"`.
@@ -370,7 +370,7 @@ difficulty  = 2
 story       = "The step counters on the Victoria Park track log a minus when the battery dips; Mei wants the squares of the real laps, added up."
 concepts    = ["iteration", "closures"]
 requires    = ["rust.cheatsheet.12.ok-or"]
-map         = { x = 0.61, y = 0.3, kind = "quest" }
+map         = { x = 0.61, y = 0.27, kind = "quest" }
 brief       = '''
 `v: Vec<i64>` holds positive **and negative** numbers. `s` is the sum of
 the squares of the positive ones only.
@@ -404,7 +404,7 @@ difficulty  = 2
 story       = "The 7-Eleven on Yee Wo Street puts a dollar on every price on the shelf, and the shelf has to still be there afterwards."
 concepts    = ["iteration", "borrowing", "mutability"]
 requires    = ["rust.cheatsheet.13.filter-map-sum"]
-map         = { x = 0.5, y = 0.24, kind = "quest" }
+map         = { x = 0.5, y = 0.21, kind = "quest" }
 brief       = '''
 `let mut v: Vec<i32> = …;` — add one to **every element of `v` itself**,
 and `v` is still used on the next line.
@@ -432,7 +432,7 @@ difficulty  = 2
 story       = "The tram timetable down Hennessy Road: Mei wants the gap between each stop and the one after it."
 concepts    = ["slices", "iteration"]
 requires    = ["rust.cheatsheet.14.iter-mut"]
-map         = { x = 0.39, y = 0.3, kind = "quest" }
+map         = { x = 0.39, y = 0.27, kind = "quest" }
 brief       = '''
 `v: Vec<i64>` with at least three elements. `d` holds `v[i+1] - v[i]`
 for every `i`, so it is exactly one shorter than `v`.
@@ -466,7 +466,7 @@ difficulty  = 2
 story       = "The window-cleaner reads the Percival Street neon from the far end; Mei wants the letters in his order."
 concepts    = ["strings", "iteration"]
 requires    = ["rust.cheatsheet.15.windows"]
-map         = { x = 0.28, y = 0.24, kind = "quest" }
+map         = { x = 0.28, y = 0.21, kind = "quest" }
 brief       = '''
 `s: &str` may contain non-ASCII characters. `r` is a new `String` with
 the characters of `s` in reverse order.
@@ -494,7 +494,7 @@ difficulty  = 2
 story       = "Two queues merge at the foot of the Times Square escalator; the lists for each were lent to Mei, not given."
 concepts    = ["slices", "ownership"]
 requires    = ["rust.cheatsheet.16.reverse-string"]
-map         = { x = 0.17, y = 0.3, kind = "quest" }
+map         = { x = 0.17, y = 0.27, kind = "quest" }
 brief       = '''
 `a: Vec<i32>` and `b: Vec<i32>`. `c` is a **new** `Vec<i32>` with `a`'s
 elements followed by `b`'s — and both `a` and `b` are still used after.
@@ -522,7 +522,7 @@ difficulty  = 3
 story       = "Ferris pins every visited corner of the Causeway Bay grid into a set, and the compiler wants to know how two pins are compared."
 concepts    = ["structs", "traits", "hashing"]
 requires    = ["rust.cheatsheet.17.concat"]
-map         = { x = 0.06, y = 0.27, kind = "quest" }
+map         = { x = 0.06, y = 0.24, kind = "quest" }
 brief       = '''
 `struct P { x: i32, y: i32 }` must go into a `HashSet<P>`. Which derive
 line above the struct is **enough** for `set.insert(p)` to compile?
@@ -550,7 +550,7 @@ difficulty  = 3
 story       = "Four couriers on Lockhart Road report in on one radio, and the dispatcher must know when the last of them has signed off."
 concepts    = ["channels", "concurrency", "ownership"]
 requires    = ["rust.cheatsheet.18.derive-hash"]
-map         = { x = 0.06, y = 0.44, kind = "quest" }
+map         = { x = 0.06, y = 0.38, kind = "quest" }
 brief       = '''
 Four producers, one consumer. The `for` loop must end once the four
 messages have arrived.
@@ -590,7 +590,7 @@ difficulty  = 3
 story       = "Lucky Mac's night kitchen: one ticket rail, four cooks, and only one of them can be reading it at a time."
 concepts    = ["shared-state", "channels", "smart-pointers"]
 requires    = ["rust.cheatsheet.19.drop-tx"]
-map         = { x = 0.17, y = 0.47, kind = "quest" }
+map         = { x = 0.17, y = 0.41, kind = "quest" }
 brief       = '''
 `rx: Receiver<u64>` is the job queue. Four worker threads, each spawned
 with `move`, must all pull jobs from this **one** receiver. Which line
@@ -619,7 +619,7 @@ difficulty  = 3
 story       = "A customer record comes down the wire from the fintech on Gloucester Road as JSON, and Mei wants it as a struct."
 concepts    = ["serialization", "structs", "error-handling"]
 requires    = ["rust.cheatsheet.20.shared-receiver"]
-map         = { x = 0.28, y = 0.41, kind = "quest" }
+map         = { x = 0.28, y = 0.35, kind = "quest" }
 brief       = '''
 `s: &str` holds one JSON object. `User` derives `Deserialize` and has a
 `name: String` field. Fill the blank so this compiles:
@@ -654,7 +654,7 @@ difficulty  = 3
 story       = "The Sogo price board is sorted; Mei wants where the first item costing at least `t` begins."
 concepts    = ["binary-search", "slices", "closures"]
 requires    = ["rust.cheatsheet.21.from-str"]
-map         = { x = 0.39, y = 0.47, kind = "quest" }
+map         = { x = 0.39, y = 0.41, kind = "quest" }
 brief       = '''
 `v: Vec<i64>` is sorted ascending and may contain duplicates; `t: i64`
 may or may not be in it. `i` is the index of the **first element ≥ `t`**
@@ -684,7 +684,7 @@ difficulty  = 3
 story       = "Compound rent on a Causeway Bay walk-up: a base to a power, and the exponent arrived as the wrong width."
 concepts    = ["math", "types"]
 requires    = ["rust.cheatsheet.22.lower-bound"]
-map         = { x = 0.5, y = 0.41, kind = "quest" }
+map         = { x = 0.5, y = 0.35, kind = "quest" }
 brief       = '''
 `x: u64` and `e: u64`, and the result fits. `p` is `x` raised to the
 power `e`.
@@ -712,7 +712,7 @@ difficulty  = 4
 story       = "The last till on Jardine's Bazaar hands over one line of space-separated numbers, newline and all; everything upstream depends on this one parse."
 concepts    = ["io", "strings", "iteration", "error-handling"]
 requires    = ["rust.cheatsheet.23.pow"]
-map         = { x = 0.61, y = 0.47, kind = "quest" }
+map         = { x = 0.61, y = 0.41, kind = "quest" }
 brief       = '''
 `line` came from `read_line`, so the `\n` is still on it, and the numbers
 may be separated by **more than one space**. Turn it into a `Vec<i64>`
@@ -747,7 +747,7 @@ difficulty  = 1
 story       = "The egg-waffle stall on Jardine's Bazaar keeps a running count of orders, and the count has to be allowed to change."
 concepts    = ["bindings", "types", "mutability"]
 requires    = ["rust.cheatsheet.24.read-vec"]
-map         = { x = 0.72, y = 0.41, kind = "quest" }
+map         = { x = 0.72, y = 0.35, kind = "quest" }
 brief       = '''
 Declare `y` as an **unsigned 64-bit** integer holding 10, so that the
 next line compiles:
@@ -782,7 +782,7 @@ difficulty  = 1
 story       = "Mei writes the smallest function in the till above Jardine's Bazaar, and the compiler argues about the last character."
 concepts    = ["functions", "types", "control-flow"]
 requires    = ["rust.cheatsheet.25.let-mut"]
-map         = { x = 0.83, y = 0.47, kind = "quest" }
+map         = { x = 0.83, y = 0.41, kind = "quest" }
 brief       = '''
 A function `add` that takes two `i32` values and returns their sum, so
 that `println!("{}", add(2, 3));` prints `5`. The whole function on one
@@ -811,7 +811,7 @@ difficulty  = 2
 story       = "Five trams sit in the depot off Percival Street; Mei only wants to look at the second and the third, and the depot keeps all five."
 concepts    = ["slices", "borrowing"]
 requires    = ["rust.cheatsheet.26.fn-add"]
-map         = { x = 0.94, y = 0.44, kind = "quest" }
+map         = { x = 0.94, y = 0.38, kind = "quest" }
 brief       = '''
 `v: Vec<i32>` has at least four elements. `w` is a `&[i32]` that borrows
 **exactly** the elements at indices 1 and 2 — two elements, no copy.
@@ -845,7 +845,7 @@ difficulty  = 2
 story       = "The locker board at Causeway Bay station may have no entry for a number, and the display still has to show something."
 concepts    = ["error-handling", "zero-values", "enums"]
 requires    = ["rust.cheatsheet.27.sub-slice"]
-map         = { x = 0.94, y = 0.61, kind = "quest" }
+map         = { x = 0.94, y = 0.52, kind = "quest" }
 brief       = '''
 `o: Option<i32>`. `n` is an `i32`: the value inside `o`, or 0 if `o` is
 `None` — and the line must **never panic**.
@@ -873,7 +873,7 @@ difficulty  = 2
 story       = "The BFS over the Causeway Bay grid takes stops in the order they were found — the minibus queue at Yee Wo Street, not a stack of plates."
 concepts    = ["stacks-queues", "collections", "pattern-matching"]
 requires    = ["rust.cheatsheet.28.unwrap-or"]
-map         = { x = 0.83, y = 0.64, kind = "quest" }
+map         = { x = 0.83, y = 0.55, kind = "quest" }
 brief       = '''
 `q: VecDeque<usize>` is the queue. The loop **removes** the element at
 the front each round and ends when the queue is empty:
@@ -907,7 +907,7 @@ difficulty  = 3
 story       = "The sign over Lockhart Road reads 銅鑼灣 in three characters, and Mei's first count came back far too high."
 concepts    = ["strings", "types", "iteration"]
 requires    = ["rust.cheatsheet.29.pop-front"]
-map         = { x = 0.72, y = 0.58, kind = "quest" }
+map         = { x = 0.72, y = 0.49, kind = "quest" }
 brief       = '''
 `s: &str` contains Chinese characters. `n` is the number of
 **characters** in `s` — so for `"銅鑼灣"` it is 3, not 9.
@@ -941,7 +941,7 @@ difficulty  = 1
 story       = "Happy hour at the cha chaan teng doubles the stamp on a loyalty card, if there is a card. No card, no stamp, and no crash at the till."
 concepts    = ["closures", "enums"]
 requires    = ["rust.cheatsheet.30.char-count"]
-map         = { x = 0.61, y = 0.64, kind = "quest" }
+map         = { x = 0.61, y = 0.55, kind = "quest" }
 brief       = '''
 `o: Option<i32>`. `d` is the value inside `o` doubled, still wrapped:
 `Some(21)` becomes `Some(42)`, and `None` stays `None` without panicking.
@@ -975,7 +975,7 @@ difficulty  = 2
 story       = "The order slip may be blank, and when it is not, Alex may have written \"tea\" where the table number goes."
 concepts    = ["closures", "enums", "error-handling"]
 requires    = ["rust.cheatsheet.31.option-map"]
-map         = { x = 0.5, y = 0.58, kind = "quest" }
+map         = { x = 0.5, y = 0.49, kind = "quest" }
 brief       = '''
 `s: Option<&str>`. `n` is the number written in `s`: `Some("42")` gives
 `Some(42)`, while `Some("tea")` and `None` both give `None`. Parsing can
@@ -1010,7 +1010,7 @@ difficulty  = 2
 story       = "Upstairs at the Times Square food court, only bills over a hundred dollars get the free lemon tea."
 concepts    = ["closures", "enums"]
 requires    = ["rust.cheatsheet.32.and-then"]
-map         = { x = 0.39, y = 0.64, kind = "quest" }
+map         = { x = 0.39, y = 0.55, kind = "quest" }
 brief       = '''
 `t: Option<i32>` is a bill. `big` keeps the bill only if it is **over
 100**: `Some(150)` stays `Some(150)`, `Some(20)` becomes `None`, and `None`
@@ -1045,7 +1045,7 @@ difficulty  = 2
 story       = "The menu board caches today's special. Ringing the kitchen on Pennington Street takes a minute, so Mei only rings when the board is blank."
 concepts    = ["closures", "error-handling", "enums"]
 requires    = ["rust.cheatsheet.33.option-filter"]
-map         = { x = 0.28, y = 0.58, kind = "quest" }
+map         = { x = 0.28, y = 0.49, kind = "quest" }
 brief       = '''
 `cache: Option<String>`, and `fn fetch() -> String` is slow. `s` is the
 cached string, or `fetch()`'s result when `cache` is `None` — and `fetch`
@@ -1080,7 +1080,7 @@ difficulty  = 1
 story       = "If nobody ordered at table 9, the dim sum trolley still rolls past with an empty tray, not a hole."
 concepts    = ["zero-values", "enums", "traits"]
 requires    = ["rust.cheatsheet.34.unwrap-or-else"]
-map         = { x = 0.17, y = 0.64, kind = "quest" }
+map         = { x = 0.17, y = 0.55, kind = "quest" }
 brief       = '''
 `o: Option<Vec<i32>>`. `v` is the Vec inside `o`, or the type's own
 default — the empty Vec — when `o` is `None`, without naming the default.
@@ -1114,7 +1114,7 @@ difficulty  = 2
 story       = "The badge printer at the Hysan Place counter sizes each tag by the name on it, and a missing name gets a tag of width zero."
 concepts    = ["closures", "enums"]
 requires    = ["rust.cheatsheet.35.unwrap-or-default"]
-map         = { x = 0.06, y = 0.61, kind = "quest" }
+map         = { x = 0.06, y = 0.52, kind = "quest" }
 brief       = '''
 `o: Option<&str>`. `n` is the length of the string inside, or `0` for
 `None` — a default and a transform in **one** call: `Some("Mei")` gives 3.
@@ -1148,7 +1148,7 @@ difficulty  = 1
 story       = "The SOGO cashier knocks ten dollars off for card members. Everyone else gets nothing, not a zero."
 concepts    = ["types", "enums"]
 requires    = ["rust.cheatsheet.36.map-or"]
-map         = { x = 0.06, y = 0.78, kind = "quest" }
+map         = { x = 0.06, y = 0.66, kind = "quest" }
 brief       = '''
 `vip: bool`. `discount` is `Some(10)` when `vip` is true and `None` when
 it is false, written in one call on the bool.
@@ -1182,7 +1182,7 @@ difficulty  = 2
 story       = "Printing the full menu at the Yee Wo Street dai pai dong takes a while. After closing time, Alex doesn't want the printer to start at all."
 concepts    = ["closures", "types", "enums"]
 requires    = ["rust.cheatsheet.37.then-some"]
-map         = { x = 0.17, y = 0.81, kind = "quest" }
+map         = { x = 0.17, y = 0.69, kind = "quest" }
 brief       = '''
 `open: bool`, and `fn menu() -> Vec<String>` is slow. `m` is
 `Some(menu())` when `open` is true and `None` when it is false — and
@@ -1217,7 +1217,7 @@ difficulty  = 2
 story       = "Rain on the tram stop board at Percival Street smudged some of the arrival minutes into letters. Keep the numbers, drop the rest."
 concepts    = ["iteration", "closures", "error-handling"]
 requires    = ["rust.cheatsheet.38.bool-then"]
-map         = { x = 0.28, y = 0.75, kind = "quest" }
+map         = { x = 0.28, y = 0.63, kind = "quest" }
 brief       = '''
 `words: Vec<&str>` is `["3", "x", "7"]`. `nums` holds every word that
 parses as a number, and simply **skips** the ones that don't: `[3, 7]`.
@@ -1251,7 +1251,7 @@ difficulty  = 3
 story       = "On the 2 a.m. minibus to Mong Kok, only even-numbered seats earn points tonight, and they earn double."
 concepts    = ["iteration", "closures", "enums"]
 requires    = ["rust.cheatsheet.39.filter-map-parse"]
-map         = { x = 0.39, y = 0.81, kind = "quest" }
+map         = { x = 0.39, y = 0.69, kind = "quest" }
 brief       = '''
 `v: Vec<i32>` is `[1, 2, 3, 4]`. `d` holds `x * 2` for each **even** `x`
 only — `[4, 8]` — choosing and transforming in a single adapter.
@@ -1285,7 +1285,7 @@ difficulty  = 2
 story       = "The Lee Garden till roll scrolls past. Mei wants the first receipt over fifty dollars, and only that one."
 concepts    = ["iteration", "closures", "borrowing"]
 requires    = ["rust.cheatsheet.40.filter-map-then-some"]
-map         = { x = 0.5, y = 0.75, kind = "quest" }
+map         = { x = 0.5, y = 0.63, kind = "quest" }
 brief       = '''
 `v: Vec<i32>` is `[12, 64, 30, 90]`. `f` is a reference to the **first**
 element over 50, or `None` if there is none: here `Some(&64)`.
@@ -1319,7 +1319,7 @@ difficulty  = 2
 story       = "The Island Line display needs to light the right dot, so it wants Causeway Bay's place on the line, not its name."
 concepts    = ["iteration", "closures", "collections"]
 requires    = ["rust.cheatsheet.41.find"]
-map         = { x = 0.61, y = 0.81, kind = "quest" }
+map         = { x = 0.61, y = 0.69, kind = "quest" }
 brief       = '''
 `stops: Vec<&str>` is `["Admiralty", "Wan Chai", "Causeway Bay", "Tin Hau"]`.
 `i` is the **index** of `"Causeway Bay"`, or `None` if it is missing: here
@@ -1354,7 +1354,7 @@ difficulty  = 3
 story       = "The meter readings from the Lockhart Road substation start with dashes and n/a. The first real number is the one the engineer wants."
 concepts    = ["iteration", "closures", "error-handling"]
 requires    = ["rust.cheatsheet.42.position"]
-map         = { x = 0.72, y = 0.75, kind = "quest" }
+map         = { x = 0.72, y = 0.63, kind = "quest" }
 brief       = '''
 `cells: Vec<&str>` is `["--", "n/a", "42", "7"]`. `first` is the **first**
 cell that parses as a number, already parsed — `Some(42)` — or `None` if
@@ -1389,7 +1389,7 @@ difficulty  = 2
 story       = "The order slips are pinned up line by line at the Kam Wah counter. The stock count wants every word from all of them in one list."
 concepts    = ["iteration", "strings", "collections"]
 requires    = ["rust.cheatsheet.43.find-map"]
-map         = { x = 0.83, y = 0.81, kind = "quest" }
+map         = { x = 0.83, y = 0.69, kind = "quest" }
 brief       = '''
 `lines: Vec<&str>` is `["milk tea", "pineapple bun x2"]`. `words` is every
 word of every line in one flat list:
@@ -1424,7 +1424,7 @@ difficulty  = 1
 story       = "The milk tea fridge at the Times Square kiosk passes inspection only if every reading of the day stayed under forty."
 concepts    = ["iteration", "closures"]
 requires    = ["rust.cheatsheet.44.flat-map"]
-map         = { x = 0.94, y = 0.78, kind = "quest" }
+map         = { x = 0.94, y = 0.66, kind = "quest" }
 brief       = '''
 `temps: Vec<i32>`. `ok` is true when **every** reading is under 40:
 `[30, 35]` gives `true`, `[30, 45]` gives `false`.
@@ -1458,7 +1458,7 @@ difficulty  = 3
 story       = "The queue machine at the Causeway Bay clinic prints a ticket number. When the scan is garbage, the screen should say \"bad ticket\", not ParseIntError."
 concepts    = ["error-handling", "closures", "types"]
 requires    = ["rust.cheatsheet.45.all"]
-map         = { x = 0.94, y = 0.93, kind = "quest" }
+map         = { x = 0.94, y = 0.8, kind = "quest" }
 brief       = '''
 Inside `fn ticket(s: &str) -> Result<u32, String>`, parse `s` with `?`.
 A bad `s` must make the function return `Err("bad ticket".to_string())`
@@ -1493,7 +1493,7 @@ difficulty  = 2
 story       = "The Octopus top-up machine at Causeway Bay station either has a balance or it does not, and the receipt printer only speaks Result."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.46.map-err"]
-map         = { x = 0.83, y = 0.96, kind = "quest" }
+map         = { x = 0.83, y = 0.83, kind = "quest" }
 brief       = '''
 `o` is an `Option<u32>`. `r` must be `Ok(v)` when `o` is `Some(v)`, and
 `Err("empty")` when it is `None`.
@@ -1527,7 +1527,7 @@ difficulty  = 2
 story       = "Mei's tram-stop counter reads a scrawled number off the clipboard; when it cannot read one it should shrug, not explain."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.47.option-to-result"]
-map         = { x = 0.72, y = 0.9, kind = "quest" }
+map         = { x = 0.72, y = 0.77, kind = "quest" }
 brief       = '''
 `r` is the `Result<u32, ParseIntError>` from `s.parse::<u32>()`. `o` must
 be `Some(n)` when the parse worked and `None` when it did not — the error
@@ -1562,7 +1562,7 @@ difficulty  = 2
 story       = "The printer in the Sogo basement logs jobs as Result; the night manager wants a list of what went wrong and nothing about what went right."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.48.result-to-option"]
-map         = { x = 0.61, y = 0.96, kind = "quest" }
+map         = { x = 0.61, y = 0.83, kind = "quest" }
 brief       = '''
 `r` is a `Result<u32, String>`. `e` must be `Some(message)` when `r` is
 an `Err(message)`, and `None` when `r` is `Ok`.
@@ -1596,7 +1596,7 @@ difficulty  = 2
 story       = "Three meters on the Hennessy Road tram line report in; one of them reports a fault, and Alex wants the readings that came through."
 concepts    = ["error-handling", "iteration"]
 requires    = ["rust.cheatsheet.49.result-err"]
-map         = { x = 0.5, y = 0.9, kind = "quest" }
+map         = { x = 0.5, y = 0.77, kind = "quest" }
 brief       = '''
 `results` is a `Vec<Result<u32, String>>`, for example
 `[Ok(3), Err("x"), Ok(5)]`. `good` must be the values of the `Ok`s only:
@@ -1631,7 +1631,7 @@ difficulty  = 3
 story       = "The dai pai dong's order slips say a number of bowls; a smudged slip should just mean no order, not an error report."
 concepts    = ["error-handling", "enums"]
 requires    = ["rust.cheatsheet.50.filter-map-result-ok"]
-map         = { x = 0.39, y = 0.96, kind = "quest" }
+map         = { x = 0.39, y = 0.83, kind = "quest" }
 brief       = '''
 Inside `fn double(s: &str) -> Option<u32>`, parse `s` as a `u32` and stop
 with `None` if it does not parse. `double("21")` is `Some(42)`,
@@ -1667,7 +1667,7 @@ difficulty  = 3
 story       = "The seat map for the Times Square screening is a HashMap of names to seat numbers written by hand: some names are missing, and some numbers are not numbers."
 concepts    = ["error-handling", "collections", "enums"]
 requires    = ["rust.cheatsheet.51.ok-question-in-option-fn"]
-map         = { x = 0.28, y = 0.9, kind = "quest" }
+map         = { x = 0.28, y = 0.77, kind = "quest" }
 brief       = '''
 Inside `fn seat(m: &HashMap<&str, &str>, k: &str) -> Result<u32, String>`:
 a missing `k` must return `Err(format!("no {k}"))`, and a value that does
@@ -1703,7 +1703,7 @@ difficulty  = 2
 story       = "The tram ticket reader at Causeway Bay either reads a fare or reads nothing; when it reads nothing, the gate just stays shut."
 concepts    = ["pattern-matching", "enums", "control-flow"]
 requires    = ["rust.cheatsheet.52.both-ways"]
-map         = { x = 0.17, y = 0.96, kind = "quest" }
+map         = { x = 0.17, y = 0.83, kind = "quest" }
 brief       = '''
 `a: Option<i32>`. Pull the value out into `x` so the lines **after** this one
 can use it, and leave the function when `a` is `None`.
@@ -1740,7 +1740,7 @@ difficulty  = 2
 story       = "Mei adds up the order slips from the dai pai dong; one slip is a smudge, and the rest still count."
 concepts    = ["pattern-matching", "error-handling", "control-flow"]
 requires    = ["rust.cheatsheet.53.let-else"]
-map         = { x = 0.06, y = 0.93, kind = "boss" }
+map         = { x = 0.06, y = 0.8, kind = "quest" }
 brief       = '''
 `lines` is `["4", "x", "10"]`. Add up the numbers that parse and skip the
 ones that do not, so `total` ends at `14`.
@@ -1767,3 +1767,312 @@ choices = [
   'let Ok(n) = s.parse::<i32>() else { 0 };',
 ]
 answer  = 2
+
+# ---------------------------------------------------------------- 55
+[[quest]]
+id          = "rust.cheatsheet.55.ok-or-else"
+node        = 55
+title       = "ONLY WHEN EMPTY"
+difficulty  = 2
+story       = "The lost-property desk at Causeway Bay station writes a full report only when a bag really is missing; a report for every bag would jam the printer."
+concepts    = ["error-handling", "closures"]
+requires    = ["rust.cheatsheet.54.let-else-continue"]
+map         = { x = 0.06, y = 0.94, kind = "quest" }
+brief       = '''
+Inside a `fn … -> Result<u32, String>`, `slot` is an `Option<u32>`.
+`report(id)` builds a long `String` and is slow. Get the value out, or
+return the error from `report(id)` — and call `report` **only** when
+`slot` is `None`.
+
+```
+let v: u32 = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'slot.ok_or_else(|| report(id))?'
+hints = [
+  "`ok_or` builds its error before it looks at the Option, so `report` would run every time. The `_else` version takes a closure — the closure itself, not the result of calling it.",
+]
+
+[quest.quiz]
+choices = [
+  'slot.ok_or(report(id))?',
+  'slot.ok_or_else(report(id))?',
+  'slot.ok_or_else(|| report(id))?',
+  'slot.ok_or_else(|| report(id))',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 56
+[[quest]]
+id          = "rust.cheatsheet.56.option-or"
+node        = 56
+title       = "THE SPARE KEY"
+difficulty  = 2
+story       = "The night watchman at the Lee Garden loading bay tries his own key first, and the spare under the mat only when his pocket is empty."
+concepts    = ["error-handling", "enums"]
+requires    = ["rust.cheatsheet.55.ok-or-else"]
+map         = { x = 0.17, y = 0.97, kind = "quest" }
+brief       = '''
+`mine` and `spare` are both `Option<u32>`. `key` must be `mine` when it is
+`Some`, and `spare` otherwise — still an `Option`, because the spare may be
+missing too.
+
+```
+let key: Option<u32> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'mine.or(spare)'
+hints = [
+  "`unwrap_or` takes the wrapper off; this keeps it on. `and` is the other way round — it hands back the second one only when the first is `Some`.",
+]
+
+[quest.quiz]
+choices = [
+  'mine.unwrap_or(spare)',
+  'mine.or(spare)',
+  'mine.and(spare)',
+  'mine.or_else(spare)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 57
+[[quest]]
+id          = "rust.cheatsheet.57.is-some-and"
+node        = 57
+title       = "COUNTED AND OVER TEN"
+difficulty  = 2
+story       = "The Times Square minibus leaves only when the driver has a head count, and the count is more than ten."
+concepts    = ["error-handling", "closures"]
+requires    = ["rust.cheatsheet.56.option-or"]
+map         = { x = 0.28, y = 0.91, kind = "quest" }
+brief       = '''
+`seats` is an `Option<u32>`. `go` must be `true` only when `seats` is
+`Some(n)` with `n > 10`; a `None` is `false`.
+
+```
+let go: bool = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'seats.is_some_and(|n| n > 10)'
+hints = [
+  "`map` leaves the answer inside an Option. Of the two tests left, one says `true` for `None` and one says `false`. The closure gets the `u32` itself, not a reference.",
+]
+
+[quest.quiz]
+choices = [
+  'seats.map(|n| n > 10)',
+  'seats.is_none_or(|n| n > 10)',
+  'seats.is_some_and(|n| n > 10)',
+  'seats.is_some_and(|&n| n > 10)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 58
+[[quest]]
+id          = "rust.cheatsheet.58.transpose"
+node        = 58
+title       = "FLIP THE WRAPPERS"
+difficulty  = 3
+story       = "The form at the Wan Chai licensing office has an optional age box. Left blank is fine; a box that says 'twelve-ish' is not."
+concepts    = ["error-handling", "enums"]
+requires    = ["rust.cheatsheet.57.is-some-and"]
+map         = { x = 0.39, y = 0.97, kind = "quest" }
+brief       = '''
+Inside a `fn … -> Result<Option<u32>, ParseIntError>`, `age` is an
+`Option<&str>`. `a` must be `None` when the box is blank and `Some(n)` when
+it parses — and a bad number must leave the function through `?`.
+
+```
+let a: Option<u32> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'age.map(|s| s.parse()).transpose()?'
+hints = [
+  "`map` gives an `Option<Result<u32, _>>`, and `?` needs the Result on the outside. `transpose` swaps the layers: `Some(Err(e))` becomes `Err(e)` and `None` becomes `Ok(None)`. Turning the error into `None` with `.ok()` would let the bad box through.",
+]
+
+[quest.quiz]
+choices = [
+  'age.map(|s| s.parse())?',
+  'age.map(|s| s.parse()).transpose()?',
+  'age.map(|s| s.parse().ok()).flatten()',
+  'age.transpose().map(|s| s.parse())?',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 59
+[[quest]]
+id          = "rust.cheatsheet.59.map-collect"
+node        = 59
+title       = "NOTHING UNTIL ASKED"
+difficulty  = 1
+story       = "Mei doubles every price on the Sugar Street menu board for the festival. Writing the rule down is not the same as repainting the board."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.cheatsheet.58.transpose"]
+map         = { x = 0.5, y = 0.91, kind = "quest" }
+brief       = '''
+`v` is `vec![1, 2, 3]`. `d` must be a new `Vec` holding `[2, 4, 6]`.
+
+```
+let d: Vec<i32> = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'v.iter().map(|x| x * 2).collect()'
+hints = [
+  "An iterator adapter is a recipe — `map` on its own builds nothing. Something at the end has to pull the values through and gather them into the `Vec`.",
+]
+
+[quest.quiz]
+choices = [
+  'v.iter().map(|x| x * 2)',
+  'v.map(|x| x * 2)',
+  'v.iter().for_each(|x| x * 2)',
+  'v.iter().map(|x| x * 2).collect()',
+]
+answer  = 3
+
+# ---------------------------------------------------------------- 60
+[[quest]]
+id          = "rust.cheatsheet.60.fold-sum"
+node        = 60
+title       = "RUNNING TOTAL"
+difficulty  = 2
+story       = "The cashier at the Causeway Bay wet market keeps one number in her head and adds each basket to it as it comes."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.cheatsheet.59.map-collect"]
+map         = { x = 0.61, y = 0.97, kind = "quest" }
+brief       = '''
+`v` is a `Vec<i32>`. Add it up with `fold`: start at `0`, and each step
+gives the new total.
+
+```
+let total: i32 = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'v.iter().fold(0, |acc, x| acc + x)'
+hints = [
+  "The start value comes first and the closure second. The closure does not change the total in place — it returns the next one, and that return is what the next step gets as `acc`.",
+]
+
+[quest.quiz]
+choices = [
+  'v.iter().fold(|acc, x| acc + x, 0)',
+  'v.iter().fold(0, |acc, x| acc + x)',
+  'v.iter().fold(0, |acc, x| { acc + x; })',
+  'v.iter().fold(0, |acc, x| acc += x)',
+]
+answer  = 1
+
+# ---------------------------------------------------------------- 61
+[[quest]]
+id          = "rust.cheatsheet.61.fold-max"
+node        = 61
+title       = "BELOW ZERO"
+difficulty  = 2
+story       = "The cold store under the Bowrington Road market logs minus degrees all night; Alex wants the warmest reading."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.cheatsheet.60.fold-sum"]
+map         = { x = 0.72, y = 0.91, kind = "quest" }
+brief       = '''
+`t` is `vec![-8, -3, -12]`. `hi` must be the largest, `-3`, found with
+`fold`.
+
+```
+let hi: i32 = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 't.iter().fold(i32::MIN, |m, &x| m.max(x))'
+hints = [
+  "The start value is a real candidate: start at `0` and nothing below zero can ever win. On `.iter()` the item is a `&i32`, and `max` wants the number itself.",
+]
+
+[quest.quiz]
+choices = [
+  't.iter().fold(0, |m, &x| m.max(x))',
+  't.iter().fold(i32::MIN, |m, x| m.max(x))',
+  't.iter().fold(i32::MIN, |m, &x| m.max(x))',
+  't.iter().fold(i32::MIN, |m, &x| m > x)',
+]
+answer  = 2
+
+# ---------------------------------------------------------------- 62
+[[quest]]
+id          = "rust.cheatsheet.62.fold-tuple"
+node        = 62
+title       = "SUM AND COUNT"
+difficulty  = 3
+story       = "The lift counter at Hysan Place wants the average load, so on one pass it keeps two numbers: people so far and trips so far."
+concepts    = ["iteration", "closures"]
+requires    = ["rust.cheatsheet.61.fold-max"]
+map         = { x = 0.83, y = 0.97, kind = "quest" }
+brief       = '''
+`v` is `vec![4, 6, 2]`. In **one** `fold`, get the sum and the count
+together: `(12, 3)`.
+
+```
+let (s, c): (i32, i32) = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'v.iter().fold((0, 0), |(s, c), &x| (s + x, c + 1))'
+hints = [
+  "`fold` carries exactly one accumulator, so make it a tuple. The closure still takes two arguments — the tuple, destructured in place, and the item — and the count goes up by one, not by the item.",
+]
+
+[quest.quiz]
+choices = [
+  'v.iter().fold((0, 0), |(s, c), &x| (s + x, c + 1))',
+  'v.iter().fold(0, 0, |s, c, &x| (s + x, c + 1))',
+  'v.iter().fold((0, 0), |(s, c), &x| (s + x, c + x))',
+  'v.iter().fold((0, 0), |s, c, &x| (s + x, c + 1))',
+]
+answer  = 0
+
+# ---------------------------------------------------------------- 63
+[[quest]]
+id          = "rust.cheatsheet.63.parse-fold"
+node        = 63
+title       = "ALL OF IT IN ONE"
+difficulty  = 3
+story       = "Last tram on Hennessy Road: the conductor totals the fares on every ticket stub that reads as a number, and the torn ones count for nothing."
+concepts    = ["iteration", "error-handling", "closures"]
+requires    = ["rust.cheatsheet.62.fold-tuple"]
+map         = { x = 0.94, y = 0.94, kind = "boss" }
+brief       = '''
+`stubs` is `vec!["5", "torn", "7"]`. `total` must be `12`: parse each
+stub, skip the ones that fail, and fold the rest.
+
+```
+let total: i32 = ____;
+```
+
+Which expression fills the blank?
+'''
+solution    = 'stubs.iter().filter_map(|s| s.parse::<i32>().ok()).fold(0, |a, x| a + x)'
+hints = [
+  "`filter_map` wants an Option back — `Some` keeps, `None` drops — so the parse's Result has to become one first. Stopping at the first torn stub is not the same as skipping it.",
+]
+
+[quest.quiz]
+choices = [
+  'stubs.iter().map_while(|s| s.parse::<i32>().ok()).fold(0, |a, x| a + x)',
+  'stubs.iter().filter_map(|s| s.parse::<i32>()).fold(0, |a, x| a + x)',
+  'stubs.iter().map(|s| s.parse::<i32>().ok()).fold(0, |a, x| a + x)',
+  'stubs.iter().filter_map(|s| s.parse::<i32>().ok()).fold(0, |a, x| a + x)',
+]
+answer  = 3
