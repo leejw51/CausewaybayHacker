@@ -779,3 +779,122 @@ Který výraz patří do mezery?
 hints = [
   "Změň chybovou stranu Result a stranu Ok nech být, pak ji `?` vynese ven. Zahození chyby přes `.ok()` dá Option, což je správně, když tě zajímá jen to, jestli se to povedlo — ale `?` na Option ve funkci, která vrací Result, nefunguje.",
 ]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet.47.option-to-result"
+title = "ZABALENÉ NENÍ PŘEVEDENÉ"
+story = "Dobíjecí automat na Octopus ve stanici Causeway Bay buď zůstatek má, nebo nemá, a tiskárna účtenek mluví jen v Result."
+brief = '''
+`o` je `Option<u32>`. `r` musí být `Ok(v)`, když je `o` rovno `Some(v)`, a
+`Err("empty")`, když je `None`.
+
+```
+let r: Result<u32, &str> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Zabalit celé Option do `Ok` dá `Result<Option<u32>, _>` — `None` je pořád uvnitř. Převést znamená říct, jakou chybou se `None` stane.",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet.48.result-to-option"
+title = "STAČÍ ŘÍCT, JESTLI TO PROŠLO"
+story = "Meiin počítač na tramvajové zastávce čte načmárané číslo z desek; když ho nepřečte, má jen pokrčit rameny, ne vysvětlovat."
+brief = '''
+`r` je `Result<u32, ParseIntError>` z `s.parse::<u32>()`. `o` musí být
+`Some(n)`, když parsování vyšlo, a `None`, když ne — samotnou chybu nepotřebujeme.
+
+```
+let o: Option<u32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Sestup z Result do Option si ponechá stranu Ok a chybu zahodí. `Some(…)` by místo toho zabalilo celý Result a druhá strana Resultu je chyba, ne hodnota.",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet.49.result-err"
+title = "JEN STÍŽNOSTI"
+story = "Tiskárna v suterénu Sogo zapisuje úlohy jako Result; noční vedoucí chce seznam toho, co se pokazilo, a nic o tom, co prošlo."
+brief = '''
+`r` je `Result<u32, String>`. `e` musí být `Some(message)`, když je `r`
+`Err(message)`, a `None`, když je `r` rovno `Ok`.
+
+```
+let e: Option<String> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Metoda, která si nechá stranu Ok jako Option, má dvojče: to si nechá stranu Err a Ok zahodí.",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet.50.filter-map-result-ok"
+title = "JEN DOBRÉ ODEČTY"
+story = "Tři měřiče na tramvajové trati na Hennessy Road posílají hlášení; jeden hlásí poruchu a Alex chce jen ty odečty, které dorazily."
+brief = '''
+`results` je `Vec<Result<u32, String>>`, například
+`[Ok(3), Err("x"), Ok(5)]`. `good` musí obsahovat jen hodnoty z `Ok`:
+`[3, 5]`.
+
+```
+let good: Vec<u32> = ____;
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Metodu lze předat její cestou místo closure. Potřebuješ tu, která z každého Result udělá Option, spolu s adaptérem, který si nechá jen Some a rozbalí je.",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet.51.ok-question-in-option-fn"
+title = "OTAZNÍK NA STRANĚ OPTION"
+story = "Na objednávkových lístcích z dai pai dong je počet misek; rozmazaný lístek má znamenat žádnou objednávku, ne hlášení chyby."
+brief = '''
+Uvnitř `fn double(s: &str) -> Option<u32>` naparsuj `s` jako `u32` a skonči
+s `None`, když to nejde. `double("21")` je `Some(42)`,
+`double("x")` je `None`.
+
+```
+let n = ____;
+Some(n * 2)
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "`?` nese jen stejný druh selhání, jaký funkce vrací. Tahle funkce vrací Option, takže nejdřív převeď Result z parsování na Option; pak se `?` může zastavit na jeho `None`.",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet.52.both-ways"
+title = "TAM A ZPÁTKY"
+story = "Zasedací pořádek promítání na Times Square je ručně psaná HashMap jmen na čísla sedadel: některá jména chybí a některá čísla nejsou čísla."
+brief = '''
+Uvnitř `fn seat(m: &HashMap<&str, &str>, k: &str) -> Result<u32, String>`:
+chybějící `k` musí vrátit `Err(format!("no {k}"))` a hodnota, která
+nejde naparsovat, musí vrátit chybu parsování jako `String`.
+
+```
+let n = ____;
+Ok(n)
+```
+
+Který výraz patří do mezery?
+'''
+hints = [
+  "Dvě selhání, dva tvary: vyhledání dá Option, který se musí stát Resultem, než ho tu `?` může použít; parsování dá Result, jehož chyba ještě není String.",
+]

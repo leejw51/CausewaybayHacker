@@ -756,3 +756,122 @@ let n: u32 = ____;
 hints = [
   "淨係改 Result 錯誤嗰邊，Ok 嗰邊唔郁，`?` 就可以將佢帶出去。用 `.ok()` 掉咗個錯誤會變成 Option，如果你淨係理成唔成功嗰個就啱——但喺返 Result 嘅 function 入面，唔可以對 Option 用 `?`。",
 ]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet.47.option-to-result"
+title = "包住唔等於轉咗"
+story = "銅鑼灣站嘅八達通增值機一係有餘額，一係冇，但係收據打印機淨係識聽 Result。"
+brief = '''
+`o` 係一個 `Option<u32>`。`o` 係 `Some(v)` 嗰陣 `r` 一定要係 `Ok(v)`，係 `None`
+嗰陣一定要係 `Err("empty")`。
+
+```
+let r: Result<u32, &str> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "成個 Option 用 `Ok` 包住，得到嘅係 `Result<Option<u32>, _>`——`None` 仲喺入面。轉換即係講清楚 `None` 要變成邊個錯誤。",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet.48.result-to-option"
+title = "話我知 parse 唔 parse 到就得"
+story = "Mei 嘅電車站計數器讀夾板上面亂寫嘅數字；讀唔到就聳聳膊，唔使解釋。"
+brief = '''
+`r` 係 `s.parse::<u32>()` 返嚟嘅 `Result<u32, ParseIntError>`。parse 成功嗰陣
+`o` 一定要係 `Some(n)`，唔成功就係 `None`——個錯誤本身唔使要。
+
+```
+let o: Option<u32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "由 Result 落去 Option，會留低 Ok 嗰邊，掉咗個錯誤。`Some(…)` 只係將成個 Result 包住，而 Result 另一邊係錯誤，唔係值。",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet.49.result-err"
+title = "淨係要投訴"
+story = "崇光地庫部打印機用 Result 記低每單嘢；夜更經理淨係想要一張出錯嘅清單，成功嗰啲唔使提。"
+brief = '''
+`r` 係一個 `Result<u32, String>`。`r` 係 `Err(message)` 嗰陣 `e` 一定要係
+`Some(message)`，`r` 係 `Ok` 嗰陣就係 `None`。
+
+```
+let e: Option<String> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "將 Ok 嗰邊留做 Option 嘅 method 有個孖生兄弟：留低 Err 嗰邊、掉咗 Ok 嗰個。",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet.50.filter-map-result-ok"
+title = "淨係留好嘅讀數"
+story = "軒尼詩道電車線上面三個錶報數；其中一個報咗故障，Alex 淨係要傳到嚟嘅讀數。"
+brief = '''
+`results` 係 `Vec<Result<u32, String>>`，例如
+`[Ok(3), Err("x"), Ok(5)]`。`good` 一定要淨係得啲 `Ok` 嘅值：
+`[3, 5]`。
+
+```
+let good: Vec<u32> = ____;
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "method 可以用路徑傳入去，代替 closure。你要嗰個將每個 Result 變做 Option 嘅 method，再配埋淨係留低 Some 同拆開佢哋嘅 adapter。",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet.51.ok-question-in-option-fn"
+title = "問號，Option 嗰邊"
+story = "大排檔張落單紙寫住要幾多碗；字糊咗嘅單應該當冇落單，唔係報錯。"
+brief = '''
+喺 `fn double(s: &str) -> Option<u32>` 入面，將 `s` parse 做 `u32`，parse 唔到
+就用 `None` 停低。`double("21")` 係 `Some(42)`，
+`double("x")` 係 `None`。
+
+```
+let n = ____;
+Some(n * 2)
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "`?` 只可以帶出同個 function 返嘅同一種失敗。呢個 function 返 Option，所以要先將 parse 嘅 Result 變做 Option；咁 `?` 先可以喺佢個 `None` 度停。",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet.52.both-ways"
+title = "去完又返"
+story = "時代廣場放映會嘅座位表係一個手寫嘅 HashMap，名對座位號：有啲名冇，有啲號碼唔係數字。"
+brief = '''
+喺 `fn seat(m: &HashMap<&str, &str>, k: &str) -> Result<u32, String>` 入面：
+搵唔到 `k` 一定要返 `Err(format!("no {k}"))`，個值 parse 唔到一定要
+將 parse 錯誤以 `String` 返出去。
+
+```
+let n = ____;
+Ok(n)
+```
+
+空位應該填邊個表達式？
+'''
+hints = [
+  "兩種失敗，兩個形狀：搵嘢俾你嘅係 Option，要先變做 Result，`?` 先用得；parse 俾你嘅係 Result，但佢個錯誤仲未係 String。",
+]

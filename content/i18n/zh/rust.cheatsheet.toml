@@ -760,3 +760,122 @@ let n: u32 = ____;
 hints = [
   "只改 Result 的错误那一侧，Ok 那一侧不动，`?` 就能把它带出去。用 `.ok()` 丢掉错误会得到一个 Option，如果你只关心成没成功那是对的——但在返回 Result 的函数里，不能对 Option 用 `?`。",
 ]
+
+# ---------------------------------------------------------------- 47
+[[quest]]
+id    = "rust.cheatsheet.47.option-to-result"
+title = "包起来不等于转换"
+story = "铜锣湾站的八达通增值机要么有余额，要么没有，可收据打印机只听得懂 Result。"
+brief = '''
+`o` 是一个 `Option<u32>`。`o` 是 `Some(v)` 时 `r` 必须是 `Ok(v)`，是 `None` 时
+必须是 `Err("empty")`。
+
+```
+let r: Result<u32, &str> = ____;
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "把整个 Option 包进 `Ok` 得到的是 `Result<Option<u32>, _>`——`None` 还在里面。转换的意思是说清楚 `None` 要变成哪个错误。",
+]
+
+# ---------------------------------------------------------------- 48
+[[quest]]
+id    = "rust.cheatsheet.48.result-to-option"
+title = "只告诉我解析成没成"
+story = "阿薇的电车站计数器读剪贴板上潦草的数字；读不出来就耸耸肩，不用解释。"
+brief = '''
+`r` 是 `s.parse::<u32>()` 返回的 `Result<u32, ParseIntError>`。解析成功时 `o`
+必须是 `Some(n)`，失败时是 `None`——错误本身用不着。
+
+```
+let o: Option<u32> = ____;
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "从 Result 降到 Option，会保留 Ok 那一边，把错误扔掉。`Some(…)` 只是把整个 Result 包起来，而 Result 的另一边是错误，不是值。",
+]
+
+# ---------------------------------------------------------------- 49
+[[quest]]
+id    = "rust.cheatsheet.49.result-err"
+title = "只要投诉"
+story = "崇光地库的打印机用 Result 记录每个任务；夜班经理只想要一份出错的清单，成功的一概不提。"
+brief = '''
+`r` 是一个 `Result<u32, String>`。`r` 是 `Err(message)` 时 `e` 必须是
+`Some(message)`，`r` 是 `Ok` 时是 `None`。
+
+```
+let e: Option<String> = ____;
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "把 Ok 那边留成 Option 的方法有个孪生兄弟：留下 Err 那边、丢掉 Ok 的那个。",
+]
+
+# ---------------------------------------------------------------- 50
+[[quest]]
+id    = "rust.cheatsheet.50.filter-map-result-ok"
+title = "只留好读数"
+story = "轩尼诗道电车线上的三个计量表发回报告；其中一个报了故障，Alex 只要传过来的读数。"
+brief = '''
+`results` 是 `Vec<Result<u32, String>>`，比如
+`[Ok(3), Err("x"), Ok(5)]`。`good` 必须只有那些 `Ok` 的值：
+`[3, 5]`。
+
+```
+let good: Vec<u32> = ____;
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "方法可以用路径传进去，代替闭包。你需要那个把每个 Result 变成 Option 的方法，再配上只保留 Some 并拆开它们的适配器。",
+]
+
+# ---------------------------------------------------------------- 51
+[[quest]]
+id    = "rust.cheatsheet.51.ok-question-in-option-fn"
+title = "问号，Option 那边"
+story = "大排档的点单纸写着要几碗；字迹糊了的单子应该就是没点，而不是报错。"
+brief = '''
+在 `fn double(s: &str) -> Option<u32>` 里，把 `s` 解析成 `u32`，解析不了就以
+`None` 结束。`double("21")` 是 `Some(42)`，
+`double("x")` 是 `None`。
+
+```
+let n = ____;
+Some(n * 2)
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "`?` 只能带出和函数返回值同一种的失败。这个函数返回 Option，所以先把解析得到的 Result 变成 Option；这样 `?` 才能在它的 `None` 上停下。",
+]
+
+# ---------------------------------------------------------------- 52
+[[quest]]
+id    = "rust.cheatsheet.52.both-ways"
+title = "去了又回"
+story = "时代广场放映会的座位表是一个手写的 HashMap，名字对座位号：有的名字没有，有的号码不是数字。"
+brief = '''
+在 `fn seat(m: &HashMap<&str, &str>, k: &str) -> Result<u32, String>` 里：
+找不到 `k` 必须返回 `Err(format!("no {k}"))`，值解析不了必须
+把解析错误以 `String` 返回。
+
+```
+let n = ____;
+Ok(n)
+```
+
+哪个表达式填进空缺？
+'''
+hints = [
+  "两种失败，两种形状：查找给的是 Option，要先变成 Result，`?` 才能在这里用；解析给的是 Result，但它的错误还不是 String。",
+]
