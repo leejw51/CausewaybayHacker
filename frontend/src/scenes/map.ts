@@ -32,6 +32,7 @@ import {
   btnPad,
   clipped,
   fill,
+  inRect,
   panel,
   pixBtn,
   well,
@@ -212,6 +213,9 @@ export function phoneCoinRadius(plateW: number, base: number): number {
   return Math.min(base, Math.max(8, Math.round(plateW * 0.04)));
 }
 
+/** The closest the player can zoom: a quarter of the map across. */
+const MAX_VIEW_ZOOM = 4;
+
 function f8(s: number): number {
   return Math.round(4 * s);
 }
@@ -266,6 +270,22 @@ export class MapScene implements Scene {
    * thing you see before the quest screen is the ground coming up at you.
    */
   private zoom = 1;
+
+  /**
+   * The player's own view of the overworld: how far in (1 is the whole map,
+   * `MAX_VIEW_ZOOM` the closest) and the map point at the middle of the plate.
+   * A road of fifty streets on a small plate is a pile of coins at 1; the
+   * wheel, a pinch, a drag and the +/− buttons spread it out.
+   */
+  private viewZ = 1;
+  private viewU = 0.5;
+  private viewV = 0.5;
+  /** A drag across the ground, from where it started, while one is live. */
+  private drag: { x: number; y: number; u: number; v: number; moved: boolean } | null = null;
+  /** The street under the cursor, lit from the ground; -1 when none is. */
+  private hovered = -1;
+  /** The zoom buttons in the plate's corner. */
+  private readonly zoomBtns = new Buttons();
 
   /**
    * Mei, in map coordinates, and the walk she is in the middle of.
@@ -516,6 +536,7 @@ export class MapScene implements Scene {
     // The plate is worked out here rather than in `draw`, because the ground
     // plane has to be handed to the WebGL layer before the frame is rendered
     // and `draw` runs after it.
+    this.measureCrowded();
     this.plate = this.mapPlate();
     this.stepMei(dt);
     this.feedGl();
@@ -576,6 +597,22 @@ export class MapScene implements Scene {
     const n = this.nodes[this.selected];
     if (this.walk) gl.map.aim(this.mei[0], this.mei[1], 0.86);
     else gl.map.aim(n?.x ?? 0.5, n?.y ?? 0.5, this.zoom);
+    // A drag puts the ground under the finger now; a wheel notch glides.
+    gl.map.view(this.viewU, this.viewV, this.viewZ, this.drag !== null);
+    // The light under the street: bright where the cursor is, a glow on the
+    // selection when it is nowhere, out while she walks.
+    const lit = this.hovered >= 0 ? this.hovered : this.selected;
+    const ln = this.walk ? undefined : this.nodes[lit];
+    gl.map.hover(
+      ln && this.shown(lit)
+        ? {
+            u: ln.x,
+            v: ln.y,
+            ru: this.nodeRadius() / Math.max(1, this.plate[2] * this.viewZ),
+            strength: this.hovered >= 0 ? 1 : 0.45,
+          }
+        : null,
+    );
   }
 
   // -- the switcher --------------------------------------------------------
@@ -611,7 +648,21 @@ export class MapScene implements Scene {
    * still the phone's own question (`isPhone`); a tablet has room for it.
    */
   private compact(): boolean {
-    return this.app.layout.isPhone() || this.app.layout.minTouchH() > 0;
+    return this.app.layout.isPhone() || this.app.layout.minTouchH() > 0 || this.crowded;
+  }
+
+  /**
+   * Whether the full bar would take more than a quarter of the screen's
+   * height — a wide face (ARCADE), a large type step or a long language can
+   * wrap it to five rows on a desktop, and the overworld under it was left a
+   * stamp with fifty coins piled on it. Then the desktop takes the compact
+   * register too. Measured once a frame, in `update`, not on every call.
+   */
+  private crowded = false;
+  private measureCrowded(): void {
+    this.crowded = false;
+    if (this.app.layout.isPhone() || this.app.layout.minTouchH() > 0) return;
+    this.crowded = this.barLayout().h > this.app.layout.vh * 0.25;
   }
 
   private barFont(s: number) {
@@ -923,6 +974,9 @@ export class MapScene implements Scene {
       ev?.preventDefault();
       return this.cycleLand();
     }
+    if (name === "=" || name === "+" || name === "kp+") return this.zoomAt(1.4);
+    if (name === "-" || name === "kp-") return this.zoomAt(1 / 1.4);
+    if (name === "0") return this.resetView();
     if (name === "q") return this.cycleCategory(-1);
     if (name === "e") return this.cycleCategory(1);
     // The walk is delight, not a toll. Any key while she is walking puts her at
@@ -945,7 +999,7 @@ export class MapScene implements Scene {
   }
 
   controls(): Buttons[] {
-    return this.sheetOpen ? [this.sheet, this.bar] : [this.bar];
+    return this.sheetOpen ? [this.sheet, this.bar] : [this.bar, this.zoomBtns];
   }
 
   /**
@@ -962,6 +1016,9 @@ export class MapScene implements Scene {
     } else if (id === "close") this.sheetOpen = false;
     else if (id === "find") this.findEl.focus();
     else if (id === "auto") void this.autoSelect();
+    else if (id === "zoom:in") this.zoomAt(1.5);
+    else if (id === "zoom:out") this.zoomAt(1 / 1.5);
+    else if (id === "zoom:reset") this.resetView();
     else if (id === "enter") this.choose(this.nodes[this.selected]);
     else if (id === "play") void this.app.go(new PlaygroundScene(this.app), "forward");
     else if (id === "reset") void this.resetRoad();
@@ -995,7 +1052,33 @@ export class MapScene implements Scene {
       if (phase === "down") this.act(onBar.id);
       return;
     }
+    const onZoom = this.zoomBtns.hit(x, y);
+    if (phase === "move") this.zoomBtns.hovered = onZoom?.id ?? null;
+    if (onZoom && !this.drag) {
+      if (phase === "down") this.act(onZoom.id);
+      return;
+    }
+    // A drag across the ground pans the view. It starts on the ground — a
+    // press on a coin is still a press on a coin — and anything past a few
+    // pixels is a pan, not a tap.
+    if (this.drag) {
+      if (phase === "up") {
+        this.drag = null;
+        return;
+      }
+      const dx = x - this.drag.x;
+      const dy = y - this.drag.y;
+      if (Math.hypot(dx, dy) > 4) this.drag.moved = true;
+      if (this.drag.moved) {
+        this.viewU = this.drag.u - dx / (this.plate[2] * this.viewZ);
+        this.viewV = this.drag.v - dy / (this.plate[3] * this.viewZ);
+        this.clampView();
+        this.hovered = -1;
+      }
+      return;
+    }
     const phone = this.compact();
+    const touch = this.app.layout.isPhone() || this.app.layout.minTouchH() > 0;
     // A finger is wider than a cursor: on a touch screen a coin's hit area is
     // at least the touch target, whatever the coin was drawn at.
     const reach = phone ? this.app.layout.minTouchH() / 2 : 0;
@@ -1007,11 +1090,14 @@ export class MapScene implements Scene {
     for (let i = 0; i < this.nodes.length; i++) {
       if (!this.shown(i)) continue;
       const [nx, ny] = this.nodeAt(this.nodes[i]);
+      // Zoomed in, a street can be off the plate; it is not there to press.
+      if (!this.onPlate(nx, ny)) continue;
       const d = Math.hypot(x - nx, y - ny);
       if (d > Math.max(reach, this.nodeRadius(this.nodes[i]) * 1.4) || d >= best) continue;
       hit = i;
       best = d;
     }
+    if (phase === "move") this.hovered = hit;
     if (hit >= 0) {
       const i = hit;
       if (phase === "move" && this.selected !== i) {
@@ -1023,7 +1109,7 @@ export class MapScene implements Scene {
         // second is the step: tapping a coin selects it and fills the strip,
         // tapping the selected coin (or GO IN) walks there. A click goes
         // straight in.
-        if (phone && this.selected !== i) {
+        if (touch && this.selected !== i) {
           this.selected = i;
           this.app.chip.blip();
           return;
@@ -1034,7 +1120,51 @@ export class MapScene implements Scene {
       return;
     }
     // A click on the ground, mid-walk, is also "get on with it".
-    if (phase === "down" && this.walk) this.skipWalk();
+    if (phase === "down" && this.walk) return this.skipWalk();
+    if (phase === "down" && this.onPlate(x, y)) {
+      this.drag = { x, y, u: this.viewU, v: this.viewV, moved: false };
+    }
+  }
+
+  /** The wheel, or a trackpad: zoom about the cursor, over the plate. */
+  wheel(dy: number, x: number, y: number): void {
+    if (this.sheetOpen || !this.onPlate(x, y)) return;
+    this.zoomAt(Math.exp(-dy * 0.0025), x, y);
+  }
+
+  /** Two fingers, or a trackpad pinch: zoom about their middle. */
+  pinch(scale: number, x: number, y: number): void {
+    if (this.sheetOpen) return;
+    this.drag = null;
+    this.zoomAt(scale, x, y);
+  }
+
+  /** + − and 1:1, stacked in the plate's top-right corner. */
+  private drawZoom(g: Ctx): void {
+    this.zoomBtns.reset();
+    if (this.sheetOpen) return;
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const f = ensureFonts(s).ui;
+    const size = Math.max(layout.minTouchH(), Math.round(f.height + 14 * s));
+    const gap = Math.round(6 * s);
+    const [px, py, pw] = this.plate;
+    // One column, as wide as its widest label, so 1:1 does not wrap.
+    const items = [
+      ["zoom:in", "+"],
+      ["zoom:out", "−"],
+      ["zoom:reset", "1:1"],
+    ] as const;
+    const bw = Math.max(size, ...items.map(([, l]) => width(f, l) + Math.round(16 * s)));
+    const x = px + pw - bw - gap;
+    let y = py + gap;
+    for (const [id, label] of items) {
+      const dim =
+        id === "zoom:in" ? this.viewZ >= MAX_VIEW_ZOOM - 1e-3 : this.viewZ <= 1 + 1e-3;
+      pixBtn(g, f, x, y, bw, size, label, { hover: this.zoomBtns.hovered === id, dim });
+      this.zoomBtns.add({ id, rect: [x, y, bw, size], label, painted: true, dim });
+      y += size + gap;
+    }
   }
 
   /**
@@ -1275,7 +1405,50 @@ export class MapScene implements Scene {
       if (p) return p;
     }
     const [x, y, w, h] = this.plate;
-    return [x + u * w, y + v * h];
+    return [
+      x + ((u - this.viewU) * this.viewZ + 0.5) * w,
+      y + ((v - this.viewV) * this.viewZ + 0.5) * h,
+    ];
+  }
+
+  /**
+   * Keep the view on the map: at zoom `z` a 1/z-wide window of it is shown,
+   * and its middle cannot go nearer an edge than half of that.
+   */
+  private clampView(): void {
+    this.viewZ = Math.min(MAX_VIEW_ZOOM, Math.max(1, this.viewZ));
+    const half = 0.5 / this.viewZ;
+    this.viewU = Math.min(1 - half, Math.max(half, this.viewU));
+    this.viewV = Math.min(1 - half, Math.max(half, this.viewV));
+  }
+
+  /**
+   * Zoom by `factor` about the virtual point `(x, y)`: the map under it stays
+   * under it. Outside the plate, about the plate's middle.
+   */
+  private zoomAt(factor: number, x?: number, y?: number): void {
+    const [px, py, pw, ph] = this.plate;
+    const inside = x !== undefined && y !== undefined && inRect(x, y, this.plate);
+    const fx = inside ? (x! - px) / pw - 0.5 : 0;
+    const fy = inside ? (y! - py) / ph - 0.5 : 0;
+    const u = this.viewU + fx / this.viewZ;
+    const v = this.viewV + fy / this.viewZ;
+    this.viewZ *= factor;
+    this.clampView();
+    this.viewU = u - fx / this.viewZ;
+    this.viewV = v - fy / this.viewZ;
+    this.clampView();
+  }
+
+  private resetView(): void {
+    this.viewZ = 1;
+    this.viewU = 0.5;
+    this.viewV = 0.5;
+  }
+
+  /** Whether a virtual point is on the plate, where the ground is. */
+  private onPlate(x: number, y: number): boolean {
+    return inRect(x, y, this.plate);
   }
 
   /**
@@ -1338,7 +1511,14 @@ export class MapScene implements Scene {
    */
   private nodeRadius(n?: MapNode): number {
     const design = Math.round(18 * this.app.layout.uiScale());
-    const base = this.compact() ? phoneCoinRadius(this.plate[2], design) : design;
+    // Never wider than the closest two streets are apart at this zoom: the
+    // packs keep nodes 0.06 of the map apart, so 0.028 of the map shown is a
+    // coin that touches its nearest neighbour at worst. Zooming in grows the
+    // gaps, and the coins grow back to the design size with them.
+    const base = Math.min(
+      this.compact() ? phoneCoinRadius(this.plate[2] * this.viewZ, design) : design,
+      Math.max(8, Math.round(this.plate[2] * this.viewZ * 0.028)),
+    );
     const gl = this.app.backdrop;
     if (!n || !gl?.map.active) return base;
     return base * gl.map.scaleAt(n.x, n.y);
@@ -1373,6 +1553,7 @@ export class MapScene implements Scene {
       this.drawNodes(g);
       this.drawMei(g);
     });
+    this.drawZoom(g);
     g.restore();
 
     header(g, this.app, `${landName(this.land)} · ${t(`map.${this.category}` as "map.basic")}`);
@@ -1840,7 +2021,8 @@ export class MapScene implements Scene {
       // On a phone the coins are smaller than the design and the pixel face
       // is two ems wide for two digits: the chrome face, whose advance is
       // narrow, fits every number on every coin.
-      const nf = n.kind === "boss" || this.app.layout.isPhone() ? fonts.stationSm : fonts.ui;
+      const nf =
+        n.kind === "boss" || this.app.layout.isPhone() || r < 14 * s ? fonts.stationSm : fonts.ui;
       // On a locked node the number sits low, so the padlock's shackle stays
       // visible above it — the lock is the whole reason the marker is there.
       const ny = y - nf.height / 2 + (n.state === "locked" ? rr * 0.22 : 0);
@@ -1908,7 +2090,10 @@ export class MapScene implements Scene {
    */
   private drawWires(g: Ctx): void {
     const art = this.app.assets?.picture("fg_wires");
-    if (!art) return;
+    // The wires hang in front of the whole map, not of one street: zoomed in
+    // they would cover the street at the wrong size, so they fade as you go.
+    const fade = Math.max(0, 1 - (this.viewZ - 1) * 2.5);
+    if (!art || fade <= 0) return;
     const [px, py, pw] = this.plate;
     const gl = this.app.backdrop?.map;
     const [lu] = gl?.active ? gl.lean() : [0.5];
@@ -1925,7 +2110,7 @@ export class MapScene implements Scene {
     const drift = reducedMotion() ? 0 : Math.sin(this.t * 0.21) * pw * 0.012;
     const slide = (0.5 - lu) * pw * 0.5 + drift;
     g.save();
-    g.globalAlpha = 0.9;
+    g.globalAlpha = 0.9 * fade;
     g.drawImage(
       art,
       0,

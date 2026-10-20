@@ -39,6 +39,7 @@ import {
   type WebGLRenderer,
 } from "three";
 import { Chase, reducedMotion } from "../engine/motion";
+import { HoverFx } from "./hoverfx";
 
 /** Narrow enough that the perspective is a lean, not a fish-eye. */
 const FOV = 34;
@@ -114,6 +115,18 @@ export class Mode7 {
   private readonly fv = new Chase(0.5, "camera");
   private readonly zoom = new Chase(1, "camera");
 
+  /**
+   * The player's own view: where they have panned to and how far in they
+   * have zoomed (1 is the whole map, 4 is a quarter of it across). Separate
+   * from the focus and zoom above, which belong to the walk and the dive.
+   */
+  private readonly pu = new Chase(0.5, "camera");
+  private readonly pv = new Chase(0.5, "camera");
+  private readonly uz = new Chase(1, "camera");
+
+  /** The light under the hovered street (`hoverfx.ts`). */
+  private readonly fx = new HoverFx();
+
   /** Set every frame by the map scene; cleared by the app before each update. */
   wanted = false;
   /** True only on the frames the map should actually be drawn. */
@@ -127,6 +140,7 @@ export class Mode7 {
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.frustumCulled = false;
     this.scene.add(this.mesh);
+    this.scene.add(this.fx.group);
   }
 
   /**
@@ -190,10 +204,44 @@ export class Mode7 {
     this.zoom.snap(zoom);
   }
 
+  /**
+   * The player's pan and zoom. Chased, so a wheel notch glides; `snap` for a
+   * drag, where the ground has to stay under the finger.
+   */
+  view(u: number, v: number, zoom: number, snap = false): void {
+    for (const [c, x] of [
+      [this.pu, u],
+      [this.pv, v],
+      [this.uz, zoom],
+    ] as const) {
+      if (snap) c.snap(x);
+      else c.to(x);
+    }
+  }
+
+  /**
+   * Light the street at map `(u, v)` whose coin is `ru` of the map's width
+   * across, at `strength` 0..1; `null` puts the light out.
+   */
+  hover(at: { u: number; v: number; ru: number; strength: number } | null): void {
+    this.fx.set(
+      at && {
+        x: (at.u - 0.5) * this.aspect,
+        z: at.v - 0.5,
+        r: at.ru * this.aspect,
+        strength: at.strength,
+      },
+    );
+  }
+
   update(dt: number): void {
     this.fu.update(dt);
     this.fv.update(dt);
     this.zoom.update(dt);
+    this.pu.update(dt);
+    this.pv.update(dt);
+    this.uz.update(dt);
+    this.fx.update(dt, reducedMotion());
     this.place();
     this.live = this.wanted && this.tex !== null;
     this.wanted = false;
@@ -216,7 +264,12 @@ export class Mode7 {
     const z = this.zoom.value;
     // Only what the push has bought. `1 - z` is how far in we are.
     const lean = Math.max(0, 1 - z) * Mode7.DIVE_LEAN * (reducedMotion() ? 0.4 : 1);
-    this.look(0.5 + (this.fu.value - 0.5) * lean, 0.5 + (this.fv.value - 0.5) * lean, z);
+    // The lean starts from wherever the player has panned to, and the
+    // player's zoom divides the height: at 1 and the centre, this is the old
+    // camera exactly.
+    const pu = this.pu.value;
+    const pv = this.pv.value;
+    this.look(pu + (this.fu.value - pu) * lean, pv + (this.fv.value - pv) * lean, z / this.uz.value);
   }
 
   private look(u: number, v: number, zoom: number): void {
@@ -335,6 +388,7 @@ export class Mode7 {
   }
 
   dispose(): void {
+    this.fx.dispose();
     this.tex?.dispose();
     this.mat.dispose();
     this.mesh.geometry.dispose();

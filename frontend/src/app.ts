@@ -66,6 +66,8 @@ export interface Scene {
   key?(name: string, ev: KeyboardEvent): void;
   /** Wheel or trackpad, in virtual pixels. Positive is downwards. */
   wheel?(dy: number, x: number, y: number): void;
+  /** Two fingers or a trackpad pinch: the scale since the last call, about a point. */
+  pinch?(scale: number, x: number, y: number): void;
   /** The window changed shape or orientation; rebuild anything cached. */
   resized?(): void;
   /** True when leaving would throw away something the player typed. */
@@ -1093,15 +1095,59 @@ export class App {
       }
       this.scene?.pointer?.(v[0], v[1], phase);
     };
+    // Two fingers down is a pinch, for a scene that takes one: the moves stop
+    // being pointer moves and become a scale about the fingers' middle.
+    const fingers = new Map<number, [number, number]>();
+    let spread = 0;
+    const pinching = (): boolean => fingers.size >= 2 && !!this.scene?.pinch;
+    const pinchState = (): { d: number; mid: [number, number] } => {
+      const [a, b] = [...fingers.values()];
+      return { d: Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+    };
     this.canvas.addEventListener("pointerdown", (ev) => {
       // The first gesture is what lets an AudioContext start at all.
       this.chip.unlock();
       this.canvas.setPointerCapture(ev.pointerId);
+      fingers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (pinching()) {
+        // The first finger's press ends here, so it is not also a drag.
+        send(ev, "up");
+        spread = pinchState().d;
+        return;
+      }
       send(ev, "down");
     });
-    this.canvas.addEventListener("pointermove", (ev) => send(ev, "move"));
-    this.canvas.addEventListener("pointerup", (ev) => send(ev, "up"));
-    this.canvas.addEventListener("pointercancel", (ev) => send(ev, "up"));
+    this.canvas.addEventListener("pointermove", (ev) => {
+      if (fingers.has(ev.pointerId)) fingers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (pinching()) {
+        const { d, mid } = pinchState();
+        const v = this.layout.toVirtual(mid[0], mid[1]);
+        if (spread > 0 && d > 0 && v && !this.modal) this.scene?.pinch?.(d / spread, v[0], v[1]);
+        spread = d;
+        return;
+      }
+      send(ev, "move");
+    });
+    const lift = (ev: PointerEvent): void => {
+      const was = pinching();
+      fingers.delete(ev.pointerId);
+      if (!was) send(ev, "up");
+    };
+    this.canvas.addEventListener("pointerup", lift);
+    this.canvas.addEventListener("pointercancel", lift);
+    // Safari on a Mac sends a trackpad pinch as gesture events, not as a
+    // ctrl-wheel; the scale they carry is since the gesture began.
+    let gesture = 1;
+    const onGesture = (ev: Event): void => {
+      const e = ev as Event & { scale: number; clientX: number; clientY: number };
+      ev.preventDefault();
+      if (ev.type === "gesturestart") gesture = 1;
+      const v = this.layout.toVirtual(e.clientX, e.clientY);
+      if (v && !this.modal && e.scale > 0) this.scene?.pinch?.(e.scale / gesture, v[0], v[1]);
+      gesture = e.scale;
+    };
+    this.canvas.addEventListener("gesturestart", onGesture);
+    this.canvas.addEventListener("gesturechange", onGesture);
     this.canvas.addEventListener(
       "wheel",
       (ev) => {
