@@ -761,6 +761,11 @@ fn validate_choices<'a>(quest: &'a QuestDef, quiz: &'a QuizDef) -> Result<&'a st
 /// never and there is nothing to cut. Its `tests` stay and are still checked
 /// below: the content gate swaps every wrong choice into the hole and runs
 /// them, which is what keeps one choice right (SPEC §9.5).
+///
+/// A quest with no quiz still imports and is judged by the runner: every
+/// shipped pack has one on every quest, and the content gate refuses a pack
+/// that does not (`verify_pack.py`), but the judge it falls back to is kept
+/// whole rather than left to rot behind a refusal.
 fn validate_hole_quiz(quest: &QuestDef) -> Result<()> {
     let Some(quiz) = quest.quiz.as_ref() else {
         return Ok(());

@@ -119,9 +119,9 @@ impl Streamer {
     }
 }
 
-/// The choice a quest is answered with, or `None` for a quest that is
-/// compiled and run. Every road is picked (SPEC §0); a quest with no quiz is
-/// one a pack has not reached yet, and it is judged the old way.
+/// The choice a quest is answered with, or `None` for a quest with no quiz,
+/// which is compiled and run. Every shipped quest has one (SPEC §0, checked
+/// by the content gate); the runner's path stays for a pack that does not.
 fn quiz_answer(quest: &quests::Quest) -> Option<String> {
     let quiz = quest.quiz.as_ref()?;
     let answer = quiz.get("answer")?.as_u64()? as usize;

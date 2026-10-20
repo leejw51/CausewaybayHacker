@@ -1639,7 +1639,9 @@ Rules:
   `hacker` quest must additionally carry at least one hidden case.
 * `solution` is mandatory and is run by CI (SPEC §9.4). A quest without a
   working reference answer does not get imported.
-* `[quest.quiz]` is mandatory on every road (§0): four distinct choices of at
+* `[quest.quiz]` is mandatory on every road (§0) — `verify_pack.py` refuses a
+  pack with a quest that has none; the importer still takes one, and judges
+  it by the runner, so that judge stays whole. Four distinct choices of at
   most eight lines each, and `answer` the 0-based index of the right one. On
   the sheet roads `solution` is the right choice itself and there are no
   `tests`. Everywhere else the right choice must be a run of `solution`'s

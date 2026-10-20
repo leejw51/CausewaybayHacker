@@ -80,6 +80,15 @@ hints = [
   "No clone: the string is not copied, it changes hands. Using receipt after this line is E0382.",
 ]
 
+[quest.quiz]
+choices = [
+  'let kept = receipt;',
+  'let kept = receipt.len();',
+  'let kept = *receipt;',
+  'let kept: &str = receipt;',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -176,6 +185,15 @@ hints = [
   "width wants a &str; a &String coerces to one at the call, so &names[i] is enough.",
 ]
 
+[quest.quiz]
+choices = [
+  'total += width(names[i]);',
+  'total += width(&names[i]);',
+  'total += width(&names[i + 1]);',
+  'total = width(&names[i]);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -271,6 +289,15 @@ hints = [
   "p is a &mut i64: the star reaches through it. The call needs &mut, not &, and prices was declared mut for exactly this.",
 ]
 
+[quest.quiz]
+choices = [
+  'bump(&prices, by);',
+  'bump(prices, by);',
+  'bump(&mut prices, by);',
+  'bump(&mut prices.clone(), by);',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -348,6 +375,15 @@ hints = [
   "let mut sorted = names.clone(); — mut, because sort() changes it in place.",
   "let mut sorted = names; would compile too, and then names is gone and the first println! is E0382.",
 ]
+
+[quest.quiz]
+choices = [
+  'let mut sorted = names;',
+  'let sorted = names.clone();',
+  'let mut sorted = &names;',
+  'let mut sorted = names.clone();',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -434,6 +470,15 @@ hints = [
   "std::mem::swap(&mut a, &mut b); then let taken = std::mem::take(&mut a);",
   "Both take &mut: the values stay where they are and only the contents move. After take, a is an empty String, not a moved-out one — it is still usable.",
 ]
+
+[quest.quiz]
+choices = [
+  'let taken = std::mem::take(&mut a);',
+  'let taken = std::mem::take(a);',
+  'let taken = a.clone();',
+  'let taken = std::mem::replace(&mut b, String::new());',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -522,6 +567,15 @@ hints = [
   "let middle = &nums[1..nums.len() - 1];",
   "The range end is exclusive, so len() - 1 stops just before the last element. The & in front makes it a borrow rather than a move out of the vector.",
 ]
+
+[quest.quiz]
+choices = [
+  'let middle = &nums[1..nums.len()];',
+  'let middle = &nums[1..nums.len() - 1];',
+  'let middle = &nums[0..nums.len() - 1];',
+  'let middle = &nums[1..=nums.len() - 1];',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -612,6 +666,15 @@ hints = [
   "banner(name) without the & tries to pass a String where a &str is wanted: E0308. The ampersand is the whole lesson.",
 ]
 
+[quest.quiz]
+choices = [
+  'print!("** {} **", name)',
+  'format!("** {} **", name);',
+  'format!("** {} **", name)',
+  'format!("** {} **", &name[1..])',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -696,6 +759,15 @@ hints = [
   "to_digit returns an Option<u32>; filter_map drops the Nones. A byte minus b'a' is 0 for a, and adding b'A' lands on the capital.",
 ]
 
+[quest.quiz]
+choices = [
+  "let first = (code.as_bytes()[0] - b'A' + b'a') as char;",
+  'let first = code.as_bytes()[0] as char;',
+  "let first = (code[0] - b'a' + b'A') as char;",
+  "let first = (code.as_bytes()[0] - b'a' + b'A') as char;",
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -776,6 +848,15 @@ hints = [
   "if let Some(m) = nums.iter().max() { println!(\"MAX {}\", m); } and then find(...).copied().unwrap_or(0).",
   "max() on an empty iterator is None and if let simply skips. find hands back Option<&i64>; copied() makes it Option<i64> so unwrap_or(0) type-checks.",
 ]
+
+[quest.quiz]
+choices = [
+  'let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap_or(0);',
+  'let even = nums.iter().find(|&&x| x % 2 == 0).unwrap_or(0);',
+  'let even = nums.iter().find(|&&x| x % 2 == 0).copied().unwrap();',
+  'let even = nums.iter().position(|&x| x % 2 == 0).unwrap_or(0);',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -866,6 +947,15 @@ hints = [
   "? only works in a function whose return type is a Result (or Option) with a matching error type — here ParseIntError, which is exactly what parse gives.",
 ]
 
+[quest.quiz]
+choices = [
+  'out.push(tok.parse::<i64>().unwrap());',
+  'out.push(tok.parse::<i64>()?);',
+  'out.push(tok.parse::<i64>());',
+  'out.push(tok.parse::<i64>().unwrap_or(0));',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -949,6 +1039,15 @@ hints = [
   "0 => \"ZERO\", 1..=9 => \"ONE DIGIT\", x if x % 2 == 0 => \"EVEN\", _ => \"ODD\",",
   "Put the guard arm before _ or it never runs. 1..=9 is inclusive at both ends; 1..9 would leave 9 to the guard.",
 ]
+
+[quest.quiz]
+choices = [
+  'x if x % 2 == 1 => "EVEN",',
+  'x % 2 == 0 => "EVEN",',
+  'x if x % 2 == 0 => "EVEN",',
+  'x if x / 2 == 0 => "EVEN",',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1036,6 +1135,15 @@ hints = [
   "nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect() — and .filter(|&&x| x > 10).sum() for the second.",
   "The type on the let is what tells collect() and sum() what to build; without Vec<i64> and i64 the compiler cannot infer them.",
 ]
+
+[quest.quiz]
+choices = [
+  'let squares: Vec<i64> = nums.iter().map(|x| x * x).filter(|&&x| x % 2 == 0).collect();',
+  'let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x);',
+  'let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * 2).collect();',
+  'let squares: Vec<i64> = nums.iter().filter(|&&x| x % 2 == 0).map(|x| x * x).collect();',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1130,6 +1238,15 @@ hints = [
   "windows is a slice method, so it is on nums directly, not on nums.iter(). The 1i64 in fold fixes the accumulator's type; a bare 1 would be ambiguous.",
 ]
 
+[quest.quiz]
+choices = [
+  'let product = nums.iter().fold(1i64, |acc, &x| acc * x);',
+  'let product = nums.iter().fold(0i64, |acc, &x| acc * x);',
+  'let product = nums.iter().fold(1i64, |acc, &x| acc + x);',
+  'let product = nums.iter().fold(1i64, |&x, acc| acc * x);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1218,6 +1335,15 @@ hints = [
   "*counts.entry(w.to_string()).or_insert(0) += 1;",
   "The key is a String, so w (a &str) is turned into one with to_string(). The star in front dereferences the &mut usize that or_insert returns.",
 ]
+
+[quest.quiz]
+choices = [
+  'counts.entry(w.to_string()).or_insert(0) += 1;',
+  '*counts.entry(w.to_string()).or_insert(0) += 1;',
+  '*counts.entry(w.to_string()).or_insert(1) += 1;',
+  'counts.insert(w.to_string(), 1);',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1323,6 +1449,15 @@ hints = [
   "b before a in cmp is what makes it descending. cmp takes a reference, hence &a.1. then_with only runs when the first comparison is Equal.",
 ]
 
+[quest.quiz]
+choices = [
+  'rows.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));',
+  'rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));',
+  'rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));',
+  'rows.sort_by(|a, b| b.1.cmp(&a.1));',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1414,6 +1549,15 @@ hints = [
   "heap.push(Reverse(x)); then while let Some(Reverse(x)) = heap.pop() { out.push(x); }",
   "Reverse is a tuple struct, so Reverse(x) both wraps on push and destructures in the pattern. Without it the output would come out largest first.",
 ]
+
+[quest.quiz]
+choices = [
+  'heap.push(x);',
+  'heap.push(Reverse(-x));',
+  'heap.push(Reverse(&x));',
+  'heap.push(Reverse(x));',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1529,6 +1673,15 @@ hints = [
   "Ord requires Eq and PartialOrd, and PartialOrd requires PartialEq, so all four go in. The field order in the struct is the sort order.",
 ]
 
+[quest.quiz]
+choices = [
+  '#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]',
+  '#[derive(Debug, Clone, PartialEq, PartialOrd)]',
+  '#[derive(Debug, Clone, Eq, Ord)]',
+  '#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1613,6 +1766,15 @@ hints = [
   "let n: usize = it.next().unwrap().parse().unwrap(); twice, then it.by_ref().take(n).map(|t| t.parse().unwrap()).collect()",
   "parse() infers its target from the let's type, so the : usize and : Vec<i64> are doing real work. by_ref() lets take() borrow the iterator instead of eating it.",
 ]
+
+[quest.quiz]
+choices = [
+  'let nums: Vec<i64> = it.by_ref().skip(n).map(|t| t.parse().unwrap()).collect();',
+  'let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse().unwrap()).collect();',
+  'let nums: Vec<i64> = it.by_ref().take(n - 1).map(|t| t.parse().unwrap()).collect();',
+  'let nums: Vec<i64> = it.by_ref().take(n).map(|t| t.parse()).collect();',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -1703,6 +1865,15 @@ hints = [
   "println!(\"{:.6}\", mean); — println!(\"{:<5}|\", x); — println!(\"{:03}\", nums.len());",
   "The spec sits after the colon inside the braces: .6 is precision, <5 is alignment and width, 03 is zero-fill and width.",
 ]
+
+[quest.quiz]
+choices = [
+  'println!("{:>5}|", x);',
+  'println!("{:5}|", x);',
+  'println!("{:<5}|", x);',
+  'println!("{:05}|", x);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1804,6 +1975,15 @@ hints = [
   "Cast both operands before the multiply: (a * b) as i128 overflows first and widens the wreckage. checked_ and wrapping_ exist for add, sub and mul alike.",
 ]
 
+[quest.quiz]
+choices = [
+  'let wide = (a * b) as i128;',
+  'let wide = a * b;',
+  'let wide = a as i128 * b;',
+  'let wide = a as i128 * b as i128;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1884,6 +2064,15 @@ hints = [
   "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
   "With one reference parameter the compiler fills the lifetime in for you (elision). With two it cannot know which one the result borrows, so you say.",
 ]
+
+[quest.quiz]
+choices = [
+  "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str {",
+  'fn longer(a: &str, b: &str) -> &str {',
+  "fn longer<'a>(a: &'a str, b: &str) -> &'a str {",
+  "fn longer<'a>(a: &str, b: &str) -> &'a str {",
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1982,6 +2171,15 @@ hints = [
   "struct Ticket<'a> { and impl<'a> Ticket<'a> {",
   "The 'a on the field is already there; it needs declaring on the struct, and the impl declares it again with impl<'a> and then applies it with Ticket<'a>.",
 ]
+
+[quest.quiz]
+choices = [
+  'struct Ticket {',
+  "struct Ticket<'a> {",
+  "struct Ticket<'a, 'b> {",
+  'struct Ticket<T> {',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2085,6 +2283,15 @@ hints = [
   "Only fare needs writing: label has a default body in the trait and is inherited. The method signature must match the trait's exactly, &self included.",
 ]
 
+[quest.quiz]
+choices = [
+  'impl Bus { fn fare(&self) -> i64 { 2 * self.km } }',
+  'impl Fare for Bus { fn fare(&self) -> i64 { 2 * km } }',
+  'impl Fare for Bus { fn fare(&self) -> i64 { 2 * self.km } }',
+  'impl Fare for Bus { fn fare(&self) -> i64 { self.km } }',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2179,6 +2386,15 @@ hints = [
   "fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {",
   "Drop Copy and xs[0] is a move out of a borrowed slice (E0507). Drop PartialOrd and > has nothing to call. Bounds are what the body needs, no more.",
 ]
+
+[quest.quiz]
+choices = [
+  'fn largest<T: PartialOrd>(xs: &[T]) -> T {',
+  'fn largest<T: Copy>(xs: &[T]) -> T {',
+  'fn largest<T>(xs: &[T]) -> T {',
+  'fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2282,6 +2498,15 @@ hints = [
   "The type on the let is what turns each Box<Tram> and Box<Bus> into a Box<dyn Fare>; without it the vec! would refuse two different element types.",
 ]
 
+[quest.quiz]
+choices = [
+  'let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Bus { km })];',
+  'let rides: Vec<dyn Fare> = vec![Tram, Bus { km }];',
+  'let rides = vec![Box::new(Tram), Box::new(Bus { km })];',
+  'let rides: Vec<Box<dyn Fare>> = vec![Box::new(Tram), Box::new(Tram)];',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2374,6 +2599,15 @@ hints = [
   "let writer = Rc::clone(&log);",
   "log.clone() does the same thing; Rc::clone(&log) is the spelling that says out loud that only the count went up. The strong_count of 2 is the proof.",
 ]
+
+[quest.quiz]
+choices = [
+  'let writer = &log;',
+  'let writer = Rc::clone(&log);',
+  'let writer = Rc::clone(log);',
+  'let writer = Rc::new(RefCell::new(Vec::new()));',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -2475,6 +2709,15 @@ hints = [
   "charge borrows seen mutably for as long as it is used, so the println! of seen has to come after the last call — which it does. The closure passed to apply only reads fee, so it is a plain Fn.",
 ]
 
+[quest.quiz]
+choices = [
+  'let charge = |x: i64| { seen += 1; x + fee };',
+  'let mut charge = |x: i64| { seen + 1; x + fee };',
+  'let mut charge = |x: i64| { seen += 1; x + fee };',
+  'let mut charge = move |x: i64| { seen += 1; x + fee };',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2573,6 +2816,15 @@ hints = [
   "handles.push(thread::spawn(move || x * x)); — then squares.push(h.join().unwrap());",
   "Joining in the order the handles were pushed is what keeps the output in input order; the threads themselves finish whenever they like.",
 ]
+
+[quest.quiz]
+choices = [
+  'handles.push(thread::spawn(|| x * x));',
+  'handles.push(thread::spawn(move || x * 2));',
+  'handles.push(thread::spawn(move || x * x).join());',
+  'handles.push(thread::spawn(move || x * x));',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2676,6 +2928,15 @@ hints = [
   "let total = Arc::clone(&total); before the spawn, then *total.lock().unwrap() += x; inside.",
   "Without the clone, move takes the one Arc into the first thread and the second iteration is E0382. The count printed at the end is 1 because every clone was dropped with its thread.",
 ]
+
+[quest.quiz]
+choices = [
+  '*total.lock().unwrap() += x;',
+  'total.lock().unwrap() += x;',
+  '*total.lock() += x;',
+  '*total.lock().unwrap() = x;',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -2796,6 +3057,15 @@ hints = [
   "fetch_add takes &self, which is why an atomic needs no Mutex and no mut. The write guard is a temporary here, so the lock is released at the end of the statement.",
 ]
 
+[quest.quiz]
+choices = [
+  'board.read().unwrap().push(x);',
+  'board.write().unwrap().push(x);',
+  'board.write().push(x);',
+  'board.write().unwrap().clone().push(x);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2895,6 +3165,15 @@ hints = [
   "let (tx, rx) = mpsc::channel::<i64>(); and let got: Vec<i64> = rx.iter().collect();",
   "rx.iter() blocks until the channel closes, and the channel closes when tx is dropped at the end of the producer's closure — so the collect finishes exactly when the producer does.",
 ]
+
+[quest.quiz]
+choices = [
+  'let got: Vec<i64> = vec![rx.recv().unwrap()];',
+  'let got: Vec<i64> = rx.recv().unwrap();',
+  'let got: Vec<i64> = rx.iter().collect();',
+  'let got: Vec<i64> = tx.iter().collect();',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -3001,6 +3280,15 @@ hints = [
   "let tx = tx.clone(); inside the loop, drop(tx); after it.",
   "Without the clone, move takes the one sender into the first thread and the loop's second turn is E0382. Without the drop, rx.iter() waits on main's own sender forever — the run times out rather than failing.",
 ]
+
+[quest.quiz]
+choices = [
+  'let tx = &tx;',
+  'let tx = tx;',
+  'let (tx, _) = mpsc::channel::<(usize, i64)>();',
+  'let tx = tx.clone();',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -3156,6 +3444,15 @@ hints = [
   "The guard from lock() is a temporary in that let, so it is dropped at the semicolon and the other workers can take the next job while this one cooks. Holding it across the cook() would serialise the pool.",
   "drop(job_tx) is what turns recv() into Err for the workers; drop(done_tx) is what lets done_rx.iter() finish once the workers have dropped theirs. Forget either and the program waits forever.",
 ]
+
+[quest.quiz]
+choices = [
+  'let job = job_rx.lock().unwrap().recv();',
+  'let job = job_rx.recv();',
+  'let job = job_rx.lock().recv();',
+  'let job = job_rx.lock().unwrap().recv().unwrap();',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
