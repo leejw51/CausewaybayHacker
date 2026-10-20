@@ -80,6 +80,15 @@ hints = [
   "Leave the `main();` call at the bottom. A function that is never called prints nothing, and the starter is exactly that.",
 ]
 
+[quest.quiz]
+choices = [
+  'console.log("hello,", " causewaybay");',
+  'console.log("Hello, Causewaybay");',
+  'console.log("hello, causewaybay");',
+  'console.log("hello causewaybay");',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -148,6 +157,15 @@ hints = [
   "const n: number = Number(input); converts as you read. Number() ignores the newline at the end for you.",
   "A negative n squared is positive. The test knows.",
 ]
+
+[quest.quiz]
+choices = [
+  'const n: number = Number(input);',
+  'const n: number = input.trim() as unknown as number;',
+  'const n: number = Number(input[0]);',
+  'const n: string = input.trim();',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -219,6 +237,15 @@ hints = [
   "console.log((a / b).toFixed(2)); — the parentheses round a / b come first, then .toFixed(2) on the result.",
   "a / b.toFixed(2) would call toFixed on b alone, and tsc refuses to divide a number by the string it returns.",
 ]
+
+[quest.quiz]
+choices = [
+  'console.log((a / b).toFixed(3));',
+  'console.log((a / b).toFixed(2));',
+  'console.log(a / b.toFixed(2));',
+  'console.log((a / b).toFixed());',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -293,6 +320,15 @@ hints = [
   "(1 << 31) - 1 prints -2147483649: the shift is 32-bit and signed. 2 ** 31 - 1 is plain arithmetic and prints 2147483647.",
 ]
 
+[quest.quiz]
+choices = [
+  'console.log((n >> 0).toString(16).padStart(8, "0"));',
+  'console.log((n >>> 0).toString(16).padEnd(8, "0"));',
+  'console.log((n >>> 0).toString(16));',
+  'console.log((n >>> 0).toString(16).padStart(8, "0"));',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -354,6 +390,15 @@ hints = [
   "const n: bigint = BigInt(input.trim()); — BigInt parses the decimal text exactly, however long it is.",
   "The starter is right for 255 and wrong for 2**256 - 1: Number keeps 53 bits and the rest become zeros.",
 ]
+
+[quest.quiz]
+choices = [
+  'const n: bigint = BigInt(Number(input));',
+  'const n: number = Number(input);',
+  'const n: bigint = BigInt(input.trim());',
+  'const n: bigint = input.trim() as unknown as bigint;',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -424,6 +469,15 @@ hints = [
   "new Float32Array([x])[0] gives the same y; Math.fround is the one-call way to write it.",
 ]
 
+[quest.quiz]
+choices = [
+  'const y: number = Math.fround(x);',
+  'const y: number = Math.round(x);',
+  'const y: number = x;',
+  'const y: number = Number(x.toFixed(7));',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -492,6 +546,15 @@ hints = [
   'console.log(s.toUpperCase()); then console.log([...s].reverse().join("")); — a method call, then spread, reverse, join.',
   'join() with no argument puts commas between the letters; join("") puts nothing.',
 ]
+
+[quest.quiz]
+choices = [
+  'console.log(s.split("").reverse());',
+  'console.log([...s].reverse().join(""));',
+  'console.log([...s].reverse().join(" "));',
+  'console.log([...s].reverse().toString());',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -568,6 +631,27 @@ hints = [
   "slice(start, end) stops before end, so slice(0, n) is exactly n characters.",
 ]
 
+[quest.quiz]
+choices = [
+  '''
+let head: string = s.slice(0, n);
+head + "!";
+''',
+  '''
+let head: string = s.slice(n);
+head += "!";
+''',
+  '''
+let head: string = s.slice(0, n + 1);
+head += "!";
+''',
+  '''
+let head: string = s.slice(0, n);
+head += "!";
+''',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -637,6 +721,27 @@ hints = [
   "const part: number[] = v.slice(1, 3); then part.push(...v.slice(-2)); — slice copies, push appends in place.",
   "part.push(v.slice(-2)) without the ... pushes one array, not two numbers, and tsc says so.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+const part: number[] = v.slice(1, 3);
+part.push(...v.slice(-2));
+''',
+  '''
+const part: number[] = v.slice(1, 3);
+part.concat(v.slice(-2));
+''',
+  '''
+const part: number[] = v.splice(1, 2);
+part.push(...v.slice(-2));
+''',
+  '''
+const part: number[] = v.slice(1, 3);
+part.push(...v.slice(-3));
+''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -712,6 +817,27 @@ hints = [
   "let head: Uint8Array = bytes.slice(0, 3); then head = Uint8Array.of(...head, 0x21); — copy, then build a longer one.",
   "A Uint8Array has no push: its length is fixed when it is made. Uint8Array.of takes the bytes you want, spread and all.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(0x21, ...head);
+''',
+  '''
+let head: Uint8Array = bytes.slice(1, 3);
+head = Uint8Array.of(...head, 0x21);
+''',
+  '''
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(...head, 0x21);
+''',
+  '''
+let head: Uint8Array = bytes.slice(0, 3);
+head = Uint8Array.of(...head, 21);
+''',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -797,6 +923,15 @@ hints = [
   "i < n would stop at n - 1; the sum would be short by n.",
 ]
 
+[quest.quiz]
+choices = [
+  'for (let i = 1; i < n; i++) {',
+  'for (let i = 0; i < n; i++) {',
+  'for (const i in [...Array(n)]) {',
+  'for (let i = 1; i <= n; i++) {',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -869,6 +1004,15 @@ hints = [
   "return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3; — min caps the cheap slots at ten, max stops the rest going negative.",
   "The function's job ends at return; nothing after it in the body runs.",
 ]
+
+[quest.quiz]
+choices = [
+  'return Math.max(slots, 10) * 5 + Math.min(slots - 10, 0) * 3;',
+  'return Math.min(slots, 10) * 5 + Math.max(slots - 10, 0) * 3;',
+  'return Math.min(slots, 10) * 3 + Math.max(slots - 10, 0) * 5;',
+  'return Math.min(slots, 10) * 5 + (slots - 10) * 3;',
+]
+answer  = 1
 
 [quest.tests]
 harness    = "stdio"
@@ -977,6 +1121,15 @@ hints = [
   "price on its own is not a name in total(); tsc answers with Cannot find name 'price'.",
 ]
 
+[quest.quiz]
+choices = [
+  'return this.price * this.qty;',
+  'return price * qty;',
+  'return this.price + this.qty;',
+  'return this.price * this.price;',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1079,6 +1232,15 @@ hints = [
   "Without the as keyof typeof Line, tsc refuses: a plain string could be any name, and the enum has only three.",
 ]
 
+[quest.quiz]
+choices = [
+  'const line: Line = Line[word as keyof typeof Line];',
+  'const line: Line = Line.ISLAND;',
+  'const line: Line = Line[word.toUpperCase() as keyof typeof Line];',
+  'const line: Line = word.toUpperCase() as unknown as Line;',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1165,6 +1327,15 @@ hints = [
   "xs.sort() with no comparator prints 100 15 4 7: it sorted the digits as text. (a, b) => a - b sorts them as numbers.",
 ]
 
+[quest.quiz]
+choices = [
+  'xs.sort();',
+  'xs.sort((a, b) => a - b);',
+  'xs.sort((a, b) => b - a);',
+  'xs.toSorted((a, b) => a - b);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1250,6 +1421,15 @@ hints = [
   "chain.unshift(0); then chain.pop(); then chain[0] = 9; then chain = chain.toSorted((a, b) => a - b); — one per placeholder, in that order.",
   "toSorted returns the sorted copy and changes nothing; without the chain = in front, the copy is thrown away.",
 ]
+
+[quest.quiz]
+choices = [
+  'chain.toSorted((a, b) => a - b);',
+  'chain = chain.sorted((a, b) => a - b);',
+  'chain = chain.toSorted((a, b) => b - a);',
+  'chain = chain.toSorted((a, b) => a - b);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -1365,6 +1545,15 @@ hints = [
   "counts.keys() is an iterator, not an array, and has no sort; the spread [...] makes it one. The loop body is already there.",
 ]
 
+[quest.quiz]
+choices = [
+  'counts.set("tofu", (counts.get("tofu") ?? 0) + 4);',
+  'counts.set("tofu", counts.get("tofu") + 4);',
+  'counts.set("tofu", 4);',
+  'counts.set("tofu", (counts.get("tofu") ?? 0) * 4);',
+]
+answer  = 0
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1473,6 +1662,15 @@ hints = [
   "delete is an operator, not a method: delete table[first]. The keys are strings, so the default sort is the right one here.",
 ]
 
+[quest.quiz]
+choices = [
+  'delete table.first;',
+  'table[first] = -1;',
+  'delete table[first];',
+  'delete table[last];',
+]
+answer  = 2
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1563,6 +1761,15 @@ hints = [
   "Without the comparator the last line is 101 3 5: the default sort compares the digits as text.",
 ]
 
+[quest.quiz]
+choices = [
+  'console.log([...seen].sort().join(" "));',
+  'console.log([...seen].sort((a, b) => a - b));',
+  'console.log([...seen].sort((a, b) => b - a).join(" "));',
+  'console.log([...seen].sort((a, b) => a - b).join(" "));',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1650,6 +1857,15 @@ hints = [
   "stack.at(-1) reads the top but cannot be assigned to; the last index is stack.length - 1.",
 ]
 
+[quest.quiz]
+choices = [
+  'stack[stack.length] = 9;',
+  'stack[stack.length - 1] = 9;',
+  'stack[0] = 9;',
+  'stack.push(9);',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1720,6 +1936,15 @@ hints = [
   "const asc: number[] = xs.toSorted((a, b) => a - b); and const desc: number[] = xs.toSorted((a, b) => b - a);",
   "xs.sort(...) for both would sort xs itself, and asc and desc would be the same array: both would print the last order.",
 ]
+
+[quest.quiz]
+choices = [
+  'const desc: number[] = xs.toSorted((a, b) => b - a);',
+  'const desc: number[] = asc.reverse();',
+  'const desc: number[] = xs.toSorted((a, b) => a - b);',
+  'const desc: number[] = xs.toSorted((a, b) => b > a);',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
@@ -1796,6 +2021,15 @@ hints = [
   'v.reverse(); on its own line, then const r: string = [...s].reverse().join("");',
   "s.reverse() is a compile error: Property 'reverse' does not exist on type 'string'. The array has it; the string does not.",
 ]
+
+[quest.quiz]
+choices = [
+  'v.toReversed();',
+  '[...v].reverse();',
+  'v.reverse();',
+  'v.sort((a, b) => b - a);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -1892,6 +2126,15 @@ hints = [
   "A comparator returns a number: negative puts a first, positive puts b first, 0 means a tie. 0 || x is x, so the tie falls through to the names.",
 ]
 
+[quest.quiz]
+choices = [
+  'rows.sort((a, b) => a.score - b.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));',
+  'rows.sort((a, b) => b.score - a.score || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));',
+  'rows.sort((a, b) => b.score - a.score || (a.name > b.name ? -1 : a.name < b.name ? 1 : 0));',
+  'rows.sort((a, b) => b.score - a.score || (a.name < b.name));',
+]
+answer  = 1
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -1983,6 +2226,15 @@ hints = [
   "return add() would call it with no argument, and tsc says Expected 1 arguments, but got 0; the bare name is the function.",
 ]
 
+[quest.quiz]
+choices = [
+  'return x;',
+  'return x * k;',
+  'return k;',
+  'return x + k;',
+]
+answer  = 3
+
 [quest.tests]
 harness    = "stdio"
 timeout_ms = 5000
@@ -2046,6 +2298,15 @@ hints = [
   "const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0); — filter, then map, then reduce.",
   "Leave out the , 0 and reduce on an empty array throws: Reduce of empty array with no initial value. The odd-only test has one.",
 ]
+
+[quest.quiz]
+choices = [
+  'const total: number = xs.filter((x) => x % 2 === 1).map((x) => x * x).reduce((a, b) => a + b, 0);',
+  'const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * 2).reduce((a, b) => a + b, 0);',
+  'const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a + b, 0);',
+  'const total: number = xs.filter((x) => x % 2 === 0).map((x) => x * x).reduce((a, b) => a * b, 0);',
+]
+answer  = 2
 
 [quest.tests]
 harness    = "stdio"
@@ -2150,6 +2411,15 @@ hints = [
   "tasks.push(square(i)); in the loop, await Promise.all(tasks); after it — start them all, then wait once.",
   "A promise nobody awaits still runs, but main prints before it is done; await square(i) inside the loop would run them one at a time.",
 ]
+
+[quest.quiz]
+choices = [
+  'Promise.all(tasks);',
+  'await tasks;',
+  'await Promise.resolve(tasks);',
+  'await Promise.all(tasks);',
+]
+answer  = 3
 
 [quest.tests]
 harness    = "stdio"
@@ -2312,6 +2582,39 @@ hints = [
   "n.left = insert(n.left, v); under the if, n.right = insert(n.right, v); under the else.",
   "The assignment is the point: insert returns the subtree's root, which is a brand-new TreeNode when the child was undefined.",
 ]
+
+[quest.quiz]
+choices = [
+  '''
+if (v < n.val) {
+  n.left = insert(n.left, v);
+} else {
+  n.right = insert(n.right, v);
+}
+''',
+  '''
+if (v < n.val) {
+  insert(n.left, v);
+} else {
+  insert(n.right, v);
+}
+''',
+  '''
+if (v > n.val) {
+  n.left = insert(n.left, v);
+} else {
+  n.right = insert(n.right, v);
+}
+''',
+  '''
+if (v < n.val) {
+  n.left = insert(n.right, v);
+} else {
+  n.right = insert(n.left, v);
+}
+''',
+]
+answer  = 0
 
 [quest.tests]
 harness    = "stdio"
