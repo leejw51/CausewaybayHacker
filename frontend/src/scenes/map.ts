@@ -117,6 +117,33 @@ const LAST_AT = new Map<string, string>();
 const slot = (land: Land, category: Category): string => `${land}.${category}`;
 
 /**
+ * Each map's zoom and pan, for this tab: leaving for a quest and coming back
+ * finds the overworld where it was left. `sessionStorage`, so a new tab starts
+ * on the whole map; every access guarded, because private windows and
+ * blocked site data throw, and the map must work without it.
+ */
+const VIEW_KEY = "cwbh.mapView";
+type View = { z: number; u: number; v: number };
+function readViews(): Record<string, View> {
+  try {
+    const raw = sessionStorage.getItem(VIEW_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, View>) : {};
+  } catch {
+    return {};
+  }
+}
+function writeView(key: string, view: View): void {
+  try {
+    const all = readViews();
+    all[key] = view;
+    sessionStorage.setItem(VIEW_KEY, JSON.stringify(all));
+  } catch {
+    // Nowhere to keep it; the map still works, it just starts whole.
+  }
+}
+
+/**
  * The face at the end of each map, keyed by the map it closes.
  *
  * By map rather than by quest id: the wire already says which node is the
@@ -284,6 +311,8 @@ export class MapScene implements Scene {
   private drag: { x: number; y: number; u: number; v: number; moved: boolean } | null = null;
   /** The street under the cursor, lit from the ground; -1 when none is. */
   private hovered = -1;
+  /** Set when a kept view is loaded, so the camera jumps to it once. */
+  private snapView = false;
   /** The zoom buttons in the plate's corner. */
   private readonly zoomBtns = new Buttons();
 
@@ -382,6 +411,7 @@ export class MapScene implements Scene {
     // in-window half, so ESC back to the lobby lands where the player is.
     this.app.land = this.land;
     this.app.category = this.category;
+    this.loadView();
     // PROTOCOL §6.5: never trust a map cached across a disconnect — a
     // `progress.update` may have been missed while the socket was down.
     this.offState = this.app.client.onState((s) => {
@@ -598,7 +628,8 @@ export class MapScene implements Scene {
     if (this.walk) gl.map.aim(this.mei[0], this.mei[1], 0.86);
     else gl.map.aim(n?.x ?? 0.5, n?.y ?? 0.5, this.zoom);
     // A drag puts the ground under the finger now; a wheel notch glides.
-    gl.map.view(this.viewU, this.viewV, this.viewZ, this.drag !== null);
+    gl.map.view(this.viewU, this.viewV, this.viewZ, this.drag !== null || this.snapView);
+    this.snapView = false;
     // The light under the street: bright where the cursor is, a glow on the
     // selection when it is nowhere, out while she walks.
     const lit = this.hovered >= 0 ? this.hovered : this.selected;
@@ -927,6 +958,7 @@ export class MapScene implements Scene {
     this.meiOn = null;
     this.selected = 0;
     this.zoom = 1;
+    this.loadView();
     this.nodes = [];
     this.edges = [];
     this.pops = [];
@@ -1063,6 +1095,7 @@ export class MapScene implements Scene {
     // pixels is a pan, not a tap.
     if (this.drag) {
       if (phase === "up") {
+        if (this.drag.moved) this.saveView();
         this.drag = null;
         return;
       }
@@ -1438,12 +1471,39 @@ export class MapScene implements Scene {
     this.viewU = u - fx / this.viewZ;
     this.viewV = v - fy / this.viewZ;
     this.clampView();
+    this.saveView();
   }
 
   private resetView(): void {
     this.viewZ = 1;
     this.viewU = 0.5;
     this.viewV = 0.5;
+    this.saveView();
+  }
+
+  /** Keep this map's view for the tab (`VIEW_KEY`). */
+  private saveView(): void {
+    writeView(slot(this.land, this.category), { z: this.viewZ, u: this.viewU, v: this.viewV });
+  }
+
+  /**
+   * This map's view as it was left, or the whole map. The camera jumps to
+   * it rather than gliding: coming back is not a move the player made.
+   */
+  private loadView(): void {
+    const kept = readViews()[slot(this.land, this.category)];
+    const ok = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+    if (kept && ok(kept.z) && ok(kept.u) && ok(kept.v)) {
+      this.viewZ = kept.z;
+      this.viewU = kept.u;
+      this.viewV = kept.v;
+    } else {
+      this.viewZ = 1;
+      this.viewU = 0.5;
+      this.viewV = 0.5;
+    }
+    this.clampView();
+    this.snapView = true;
   }
 
   /** Whether a virtual point is on the plate, where the ground is. */
