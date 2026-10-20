@@ -231,14 +231,17 @@ function Categories.metrics(vw, vh, rows)
     m = measure(vw, vh, rows, title_step, step, false, true)
   end
   if m.fits or Layout.isPortrait() then return m end
-  -- Landscape and still over: two columns, from the largest type down.
-  step = 0
-  local two = measure(vw, vh, rows, title_step, step, false, false, 2)
-  while not two.fits and step < NAME_SIZE - SIZE_FLOOR do
-    step = step + 1
-    two = measure(vw, vh, rows, title_step, step, false, false, 2)
+  -- Landscape and still over: two columns, then three — each from the
+  -- largest type down, with padding and then without.
+  for cols = 2, 3 do
+    for _, tight in ipairs({ false, true }) do
+      for st = 0, NAME_SIZE - SIZE_FLOOR do
+        local c = measure(vw, vh, rows, title_step, st, false, tight, cols)
+        if c.fits then return c end
+      end
+    end
   end
-  return two.fits and two or m
+  return m
 end
 
 --- Where row `i` (1-based) stands: its left edge and its top. One column, or
