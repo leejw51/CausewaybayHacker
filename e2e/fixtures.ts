@@ -594,7 +594,12 @@ export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
   // clicks, and the land is *chosen* rather than toggled toward.
   await pickLand(page, "rust");
   await pickCategory(page, "basic");
+  const since = sentFrames().length;
   await openSelectedNode(page);
+  // The page said which quest it opened when it asked for it. Every road is
+  // picked now (SPEC §0), so there is no editor showing a starter to match.
+  const asked = await openedQuestId(since).catch(() => null);
+  if (asked && asked.startsWith("rust.")) return asked;
   const id = await identifyOpenQuest(page, wire);
   if (id && id.startsWith("rust.")) return id;
   // Still worth asking the wire rather than trusting the click: a content
@@ -602,6 +607,138 @@ export async function enterRustQuest(page: Page, wire: Wire): Promise<string> {
   const first = (await wire.mapOf("rust")).sort((a, b) => a.node - b.node)[0];
   if (first) return first.quest_id;
   throw new Error("the rust/basic map is empty");
+}
+
+/** Every frame the page has sent so far — the `ready` fixture's collection. */
+export function sentFrames(): string[] {
+  return (test.info() as unknown as { _sent?: string[] })._sent ?? [];
+}
+
+/**
+ * Which quest the page opened: the `quest_id` of the last `quest.get` it
+ * sent after frame `since`. A picked quest has no editor whose starter could
+ * say (SPEC §0), but the page names the quest when it asks for it.
+ */
+export async function openedQuestId(since = 0): Promise<string> {
+  let id = "";
+  await expect
+    .poll(
+      () => {
+        for (const f of sentFrames().slice(since).reverse()) {
+          if (!f.includes('"type":"quest.get"')) continue;
+          id = String(
+            (JSON.parse(f) as { payload?: { quest_id?: string } }).payload
+              ?.quest_id ?? "",
+          );
+          if (id) return id;
+        }
+        return "";
+      },
+      { timeout: 30_000, message: "the page never asked for a quest" },
+    )
+    .not.toBe("");
+  return id;
+}
+
+/** A quest's four choices and which one is right, from the server. */
+export async function quizOf(
+  wire: Wire,
+  questId: string,
+): Promise<{ choices: string[]; answer: number; program?: string }> {
+  const got = await wire.ok("quest.get", { quest_id: questId });
+  const quiz = (got.quest as { quiz?: { choices: string[]; answer: number; program?: string } })
+    .quiz;
+  if (!quiz) throw new Error(`${questId} has no quiz`);
+  return quiz;
+}
+
+/** Which of the four choices have a hit box this frame. */
+async function choicesDrawn(page: Page): Promise<boolean[]> {
+  return page.evaluate(() =>
+    [0, 1, 2, 3].map((i) => window.__cwbCapture!.buttonAt(`choice:${i}`) !== null),
+  );
+}
+
+/** Scroll the brief by `dy`, with the pointer over the middle of the screen. */
+async function scrollBrief(page: Page, dy: number): Promise<void> {
+  const vp = page.viewportSize()!;
+  await page.mouse.move(vp.width / 2, vp.height / 2);
+  await page.mouse.wheel(0, dy);
+  await page.waitForTimeout(150);
+}
+
+/**
+ * Until every one of the four choices has been on screen. They deal
+ * themselves out one by one, and on a tall brief — a program and its hole,
+ * on a phone or held upright — the last ones are under the fold, reached the
+ * way a thumb reaches them: by scrolling the brief. A choice scrolled out of
+ * the panel has no hit box, so "drawn" means "could be pressed".
+ */
+export async function choicesShown(page: Page): Promise<void> {
+  const seen = [false, false, false, false];
+  // Down the brief and back up, until each has been seen; the quest may
+  // still be arriving on the first pass, which only waits.
+  const deadline = Date.now() + 45_000;
+  let dy = 150;
+  let still = 0;
+  while (Date.now() < deadline) {
+    (await choicesDrawn(page)).forEach((d, i) => (seen[i] ||= d));
+    if (seen.every(Boolean)) return;
+    const before = JSON.stringify(await choicesDrawn(page));
+    await scrollBrief(page, dy);
+    // Nothing moved for a while: the end of the brief, so turn round.
+    still = JSON.stringify(await choicesDrawn(page)) === before ? still + 1 : 0;
+    if (still >= 8 && seen.some(Boolean)) {
+      dy = -dy;
+      still = 0;
+    }
+  }
+  expect(seen, "every choice can be reached by scrolling the brief").toEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
+}
+
+/** Scroll the brief until choice `i` has a hit box: down first, then up. */
+export async function revealChoice(page: Page, i: number): Promise<void> {
+  for (const dy of [150, -150]) {
+    for (let k = 0; k < 40; k++) {
+      if ((await choicesDrawn(page))[i]) return;
+      await scrollBrief(page, dy);
+    }
+  }
+  throw new Error(`choice:${i} never came on screen`);
+}
+
+/**
+ * Pick on the quest screen, the way a player does (SPEC §0: the pick is the
+ * submission). `right` lands on the verdict screen; `wrong` is recorded and
+ * leaves the player where they are, so this waits for the attempt instead.
+ */
+export async function pickOnScreen(
+  page: Page,
+  wire: Wire,
+  questId: string,
+  which: "right" | "wrong",
+): Promise<void> {
+  const quiz = await quizOf(wire, questId);
+  await choicesShown(page);
+  const before = (await wire.history()).length;
+  const i = which === "right" ? quiz.answer : (quiz.answer + 1) % quiz.choices.length;
+  await revealChoice(page, i);
+  await clickButton(page, `choice:${i}`);
+  if (which === "right") {
+    await atScreen(page, "result");
+  } else {
+    await expect
+      .poll(async () => (await wire.history()).length, {
+        message: "the wrong pick reached the server as a submission",
+      })
+      .toBe(before + 1);
+    await atScreen(page, "quest");
+  }
 }
 
 /** Replace the editor's contents. CodeMirror is not a `<textarea>`. */

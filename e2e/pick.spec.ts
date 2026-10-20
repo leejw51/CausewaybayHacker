@@ -17,6 +17,7 @@ import {
   openSelectedNode,
   pickCategory,
   pickLand,
+  revealChoice,
   test,
   Wire,
 } from "./fixtures.js";
@@ -66,6 +67,7 @@ test(`${road}: a wrong pick stays on the quest, the right one clears it`, async 
 
     // A wrong pick: recorded, and the screen stays where it is.
     const wrong = (quiz.answer + 1) % 4;
+    await revealChoice(page, wrong);
     await clickButton(page, `choice:${wrong}`);
     await expect
       .poll(async () => (await wire.history()).length, {
@@ -76,6 +78,7 @@ test(`${road}: a wrong pick stays on the quest, the right one clears it`, async 
     await atScreen(page, "quest");
 
     // The right one: the verdict screen, and the node is cleared.
+    await revealChoice(page, quiz.answer);
     await clickButton(page, `choice:${quiz.answer}`);
     await atScreen(page, "result");
     const history = await wire.history();

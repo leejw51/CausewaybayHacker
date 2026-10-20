@@ -2,18 +2,20 @@ import { mkdirSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import {
   atScreen,
+  choicesShown,
   clickButton,
   editorText,
   expect,
   freshAccount,
-  identifyOpenQuest,
   login,
+  openedQuestId,
   openSelectedNode,
   pickCategory,
   pickLand,
+  pickOnScreen,
   sceneNow,
+  sentFrames,
   setSource,
-  submit,
   test,
   Wire,
   type Account,
@@ -25,7 +27,12 @@ import {
  * each so a human can look at the layout. Complements `journey.spec.ts`
  * (which proves the loop on the wire) with the menus, AUTO SELECT, the
  * playground, search, AI mode, the story replay, the display keys, every
- * language, and every code-size step.
+ * language, and every text-size step.
+ *
+ * A quest is picked, not typed (SPEC §0): four choices, one right, and no
+ * editor on the quest screen. So the flow trains by pressing choices, and
+ * the quest screen's layout checks are about the choices; CODE mode is the
+ * playground's.
  */
 
 const SHOTS = process.env.SWEEP_SHOTS ?? "test-results/sweep";
@@ -41,8 +48,6 @@ const BACKEND =
   "http://127.0.0.1:5390";
 
 test.describe.configure({ mode: "default" });
-
-const WRONG = 'fn main() { println!("wrong"); }\n';
 
 // ------------------------------------------------------------------ helpers
 
@@ -122,16 +127,6 @@ async function waitButton(
   return found;
 }
 
-function flatten(s: string): string {
-  return s
-    .replace(/\u200b/g, "")
-    .split("\n")
-    .map((l) => l.replace(/\s+$/, ""))
-    .filter((l) => l.length > 0)
-    .join("\n")
-    .trim();
-}
-
 async function waitEditor(page: Page): Promise<string> {
   await page.waitForFunction(
     () =>
@@ -148,20 +143,38 @@ async function pref(page: Page, key: string): Promise<string | null> {
   return page.evaluate((k) => localStorage.getItem("cwbhacker." + k), key);
 }
 
-/** The editor (a DOM overlay) must sit inside the game canvas. */
-async function editorInsideCanvas(page: Page, label: string): Promise<void> {
-  const ed = await page.locator(".cm-editor").boundingBox();
-  const cv = await page.locator("canvas#game").boundingBox();
-  const vp = page.viewportSize()!;
-  expect(ed, `${label}: editor is visible`).not.toBeNull();
-  const msg = `${label}: editor ${JSON.stringify(ed)} vs canvas ${JSON.stringify(cv)} viewport ${vp.width}x${vp.height}`;
-  console.log(`[editor] ${msg}`);
-  expect(ed!.x, msg).toBeGreaterThanOrEqual(cv!.x - 1);
-  expect(ed!.y, msg).toBeGreaterThanOrEqual(cv!.y - 1);
-  expect(ed!.x + ed!.width, msg).toBeLessThanOrEqual(cv!.x + cv!.width + 1);
-  expect(ed!.y + ed!.height, msg).toBeLessThanOrEqual(cv!.y + cv!.height + 1);
-  expect(ed!.width, `${label}: editor has width`).toBeGreaterThan(40);
-  expect(ed!.height, `${label}: editor has height`).toBeGreaterThan(20);
+/**
+ * The quest screen is a pick (SPEC §0): the four choices are drawn inside the
+ * game canvas, across its width, every one reachable, and there is no editor
+ * over them.
+ */
+async function choicesInsideCanvas(page: Page, label: string): Promise<void> {
+  await choicesShown(page);
+  await expect(page.locator(".cm-content"), `${label}: no editor on a pick`).toBeHidden();
+  const cv = (await page.locator("canvas#game").boundingBox())!;
+  const rects = await page.evaluate(() =>
+    window.__cwbCapture!
+      .buttons()
+      .filter((b) => b.id.startsWith("choice:"))
+      .map((b) => b.client),
+  );
+  const msg = `${label}: choices ${JSON.stringify(rects)} vs canvas ${JSON.stringify(cv)}`;
+  console.log(`[choices] ${msg}`);
+  // Held upright, a tall brief keeps some of the four under the fold (they
+  // were each reached above); those on screen now are measured. One cut by
+  // the panel's edge is only as tall as the part that shows.
+  expect(rects.length, msg).toBeGreaterThan(0);
+  for (const r of rects) {
+    expect(r[0], msg).toBeGreaterThanOrEqual(cv.x - 1);
+    expect(r[0] + r[2], msg).toBeLessThanOrEqual(cv.x + cv.width + 1);
+    expect(r[1], msg).toBeGreaterThanOrEqual(cv.y - 1);
+    expect(r[1] + r[3], msg).toBeLessThanOrEqual(cv.y + cv.height + 1);
+    expect(r[2], `${label}: a choice has width`).toBeGreaterThan(40);
+  }
+  expect(
+    Math.max(...rects.map((r) => r[3])),
+    `${label}: a choice has height`,
+  ).toBeGreaterThan(20);
 }
 
 async function signIn(page: Page, account: Account): Promise<void> {
@@ -169,13 +182,15 @@ async function signIn(page: Page, account: Account): Promise<void> {
   await login(page, account);
 }
 
-async function toRustBasicQuest(page: Page, wire: Wire): Promise<string> {
+/** Open the selected RUST × BASIC node, and say which quest the page asked for. */
+async function toRustBasicQuest(page: Page): Promise<string> {
   await pickLand(page, "rust");
   await pickCategory(page, "basic");
+  const since = sentFrames().length;
   await openSelectedNode(page);
-  const id = await identifyOpenQuest(page, wire);
+  const id = await openedQuestId(since);
   expect(id, "the open quest is a rust one").toMatch(/^rust\./);
-  return id!;
+  return id;
 }
 
 /**
@@ -228,19 +243,20 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     await login(page, account);
     await shot(page, "02-lands");
 
-    const questId = await toRustBasicQuest(page, wire);
+    const questId = await toRustBasicQuest(page);
     console.log(`[flow] opened ${questId}`);
     await page.keyboard.press("Escape");
     await atScreen(page, "map");
     await shot(page, "03-map-fresh");
+    let since = sentFrames().length;
     await openSelectedNode(page);
-    await waitEditor(page);
+    expect(await openedQuestId(since)).toBe(questId);
+    await choicesShown(page);
     await shot(page, "04-quest");
 
-    // ---- a wrong submit first -------------------------------------------
-    await setSource(page, WRONG);
-    await submit(page);
-    await shot(page, "05-result-wrong");
+    // ---- a wrong pick first: recorded, and the player stays put ---------
+    await pickOnScreen(page, wire, questId, "wrong");
+    await shot(page, "05-quest-missed");
     let history = await wire.history();
     expect(history.length).toBe(1);
     expect(history[0].verdict).not.toBe("accepted");
@@ -248,7 +264,8 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     console.log(`[flow] wrong verdict = ${history[0].verdict}`);
 
     // ---- AUTO SELECT goes to the failed quest ---------------------------
-    await backToMap(page);
+    await page.keyboard.press("Escape");
+    await atScreen(page, "map");
     await clickButton(page, "menu");
     await atScreen(page, "lands");
     const weakest = (await wire.ok("stats.weakest", { limit: 1 })).weakest as {
@@ -258,34 +275,41 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
       weakest[0]?.quest_id,
       "the server's weakest is the failed quest",
     ).toBe(questId);
+    // AUTO SELECT goes where the server's rule says (PROTOCOL §4.14d): the
+    // first street not cleared, in road order, comes before the ones owed —
+    // and on a fresh wallet that is not the failed one.
+    const next = (await wire.ok("stats.next", { land: "rust" })).next as {
+      quest_id: string;
+    };
+    since = sentFrames().length;
     await clickButton(page, "auto");
     await atScreen(page, "quest");
-    const got = (await wire.ok("quest.get", { quest_id: questId })).quest as {
-      draft?: string | null;
-      starter: string;
-    };
-    const shown = flatten(await waitEditor(page));
-    const expected = flatten(got.draft ?? got.starter);
     expect(
-      shown,
-      "AUTO SELECT opened the quest that beat us (editor shows its draft)",
-    ).toBe(expected);
+      await openedQuestId(since),
+      "AUTO SELECT opened the street the server names",
+    ).toBe(next.quest_id);
+    await choicesShown(page);
     await shot(page, "06-auto-select-quest");
 
-    // ---- SOLVE, then SUBMIT ----------------------------------------------
-    const before = await editorText(page);
-    await clickButton(page, "solve");
-    await expect
-      .poll(async () => editorText(page), {
-        timeout: 30_000,
-        message: "SOLVE filled the editor",
-      })
-      .not.toBe(before);
-    await shot(page, "07-quest-solved");
-    await submit(page);
+    // ---- back to the failed quest, by the map ------------------------------
+    if (next.quest_id !== questId) {
+      await page.keyboard.press("Escape");
+      await atScreen(page, "map");
+      await clickButton(page, "menu");
+      await atScreen(page, "lands");
+      await pickLand(page, "rust");
+      await pickCategory(page, "basic");
+      since = sentFrames().length;
+      await openSelectedNode(page);
+      expect(await openedQuestId(since)).toBe(questId);
+      await choicesShown(page);
+    }
+
+    // ---- the right pick ---------------------------------------------------
+    await pickOnScreen(page, wire, questId, "right");
     await shot(page, "08-result-accepted");
     history = await wire.history();
-    expect(history[0].verdict, "the solved source is accepted").toBe(
+    expect(history[0].verdict, "the right choice is accepted").toBe(
       "accepted",
     );
     const node = await wire.node(questId);
@@ -299,11 +323,12 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
     // ---- next quest -------------------------------------------------------
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(300);
+    since = sentFrames().length;
     await openSelectedNode(page);
-    await waitEditor(page);
-    const next = await identifyOpenQuest(page, wire);
-    console.log(`[flow] next quest = ${next}`);
-    expect(next, "the next node is a different quest").not.toBe(questId);
+    const following = await openedQuestId(since);
+    await choicesShown(page);
+    console.log(`[flow] next quest = ${following}`);
+    expect(following, "the next node is a different quest").not.toBe(questId);
     await shot(page, "10-quest-next");
     await page.keyboard.press("Escape");
     await atScreen(page, "map");
@@ -355,7 +380,7 @@ test("1+2+4: full flow, persistence, AUTO SELECT after a failure, stats", async 
   }
 });
 
-test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
+test("3g: CODE mode leaves the player on the playground, signed in", async ({
   page,
 }) => {
   // The header is not drawn in CODE mode, and `app.logoutRect` is only ever
@@ -364,16 +389,17 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   // before the scene sees the press, so the button that ends a writing
   // session logged the player out. On a desktop the chip carries the address
   // as well as the word, which makes it wide enough to swallow DONE whole.
+  //
+  // This was the quest screen's CODE mode, with its ANSWER, BLANKS and +LINE
+  // drills. A quest is picked now, not typed (SPEC §0), so the drills went
+  // with its editor and CODE mode is the playground's.
   const account = freshAccount();
   await login(page, account);
-  await pickLand(page, "rust");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
-  const code = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("focus"),
-  );
-  expect(code).not.toBeNull();
-  await page.mouse.click(code![0], code![1]);
+  await atScreen(page, "lands");
+  await clickButton(page, "playground");
+  await at(page, "playground");
+  await waitEditor(page);
+  await clickButton(page, "code");
   await page.waitForTimeout(700);
   await shot(page, "60-code-mode");
   const done = await page.evaluate(() =>
@@ -382,188 +408,9 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
   expect(done).not.toBeNull();
   // The controls a writing session actually uses are on this screen too.
   const onCode = await buttonIds(page);
-  for (const id of ["run", "format", "undo", "redo", "answer", "unfocus"]) {
+  for (const id of ["run", "format", "undo", "redo", "unfocus"]) {
     expect(onCode).toContain(id);
   }
-
-  // ANSWER: the reference solution as ghost text *behind* what is typed —
-  // the buffer is untouched, the ghost is in the editor's own layout, and
-  // what has been typed instead of the answer is marked.
-  const answer = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("answer"),
-  );
-  // The *document*, with the ghost taken back out. `editorText` scrapes the
-  // rendered lines, and the ghost is rendered inside them on purpose — which
-  // is exactly why the buffer has to be read without it here.
-  const docText = () =>
-    page.evaluate(() =>
-      Array.from(document.querySelectorAll(".cm-line"))
-        .map((line) => {
-          const copy = line.cloneNode(true) as HTMLElement;
-          copy.querySelectorAll(".cwb-ghost").forEach((gh) => gh.remove());
-          return (copy.textContent ?? "").replace(/\u200b/g, "");
-        })
-        .join("\n"),
-    );
-  const before = await docText();
-  expect(before.trim().length).toBeGreaterThan(0);
-  await page.mouse.click(answer![0], answer![1]);
-  await expect
-    .poll(
-      async () =>
-        page.evaluate(() => document.querySelectorAll(".cwb-ghost").length),
-      {
-        timeout: 30_000,
-        message: "waiting for the answer ghost",
-      },
-    )
-    .toBeGreaterThan(0);
-  // The starter goes: it is the server's boilerplate, and against the answer
-  // it is a screenful of red nobody typed.
-  expect((await docText()).trim()).toBe("");
-  // But the ghost is there to type over, so the *rendered* lines are not.
-  expect(await editorText(page)).not.toBe("");
-  await shot(page, "62-answer-ghost");
-
-  // **TAB is a key like any other in the drill.** An indent the answer does
-  // not have is refused, the same as a wrong letter — the drill puts the
-  // answer's own indentation in by itself — and the editor says so.
-  const beforeTab = await docText();
-  await page.keyboard.press("Tab");
-  await page.waitForTimeout(250);
-  expect(await docText()).toBe(beforeTab);
-  expect(
-    await page.evaluate(() =>
-      document.querySelector(".cwb-editor")!.classList.contains("cwb-miss"),
-    ),
-  ).toBe(true);
-
-  // +LINE hands over a line at a time. Pressed until it stops, it is the
-  // answer — which is the whole of what the button promises.
-  const line = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("complete"),
-  );
-  expect(line).not.toBeNull();
-  const ghosts = () =>
-    page.evaluate(() => document.querySelectorAll(".cwb-ghost").length);
-  for (let i = 0; i < 40 && (await ghosts()) > 0; i++) {
-    await page.mouse.click(line![0], line![1]);
-    await page.waitForTimeout(140);
-  }
-  await page.waitForTimeout(400);
-  expect(await ghosts()).toBe(0);
-  expect(
-    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
-  ).toBe(0);
-  // The buffer is the answer now, which the BLANKS checks below measure from.
-  const full = await docText();
-  expect(full.trim().length).toBeGreaterThan(0);
-  await shot(page, "64-answer-completed");
-
-  // BLANKS: the same answer with holes in it. The code is on the screen and
-  // only the gaps are the player's to type — so the buffer arrives mostly
-  // filled, with underscores where the words were taken out.
-  const blanks = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("blanks"),
-  );
-  expect(blanks).not.toBeNull();
-  await page.mouse.click(blanks![0], blanks![1]);
-  await page.waitForTimeout(900);
-  const drill = await docText();
-  // Everything up to the first hole is typed for you (`blanksFill`), and the
-  // hole is where it stops. Not "the buffer is non-empty": the holes are a
-  // seeded third of the words, and when the answer's very first word is one
-  // of them — `fn`, on today's first RUST × BASIC street — the run up to it
-  // is rightly nothing. So: the buffer is a prefix of the answer, and what
-  // follows it is the hole that is live.
-  expect(
-    full.startsWith(drill),
-    `BLANKS buffer ${JSON.stringify(drill)} is the answer's start`,
-  ).toBe(true);
-  const live = await page.evaluate(() =>
-    (document.querySelector(".cwb-blank-now")?.textContent ?? "").replace(
-      /\u200b/g,
-      "",
-    ),
-  );
-  expect(live.length, "a hole is live").toBeGreaterThan(0);
-  expect(
-    full.slice(drill.length).startsWith(live),
-    `the fill stops at the hole ${JSON.stringify(live)}`,
-  ).toBe(true);
-  // And something is left to do.
-  expect(await ghosts()).toBeGreaterThan(0);
-  // The holes are drawn as the words they are, breathing, rather than as
-  // rows of underscores: a hint you can read is still a hint you must type.
-  const holes = () =>
-    page.evaluate(() => document.querySelectorAll(".cwb-blank").length);
-  expect(await holes()).toBeGreaterThan(0);
-  await shot(page, "65-blanks");
-
-  // ANSWER ONLY: the quest's own scaffold types itself and what is left to
-  // type is the solution — so the buffer arrives with real code in it, not
-  // just the run up to the first word.
-  const solution = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("solution"),
-  );
-  expect(solution).not.toBeNull();
-  await page.mouse.click(solution![0], solution![1]);
-  await page.waitForTimeout(900);
-  const scaffold = await docText();
-  expect(scaffold).toContain("fn main() {");
-  expect(await ghosts()).toBeGreaterThan(0);
-  await shot(page, "67-answer-only");
-  // Back to plain BLANKS for the rest of the checks — and it really is the
-  // BLANKS drill again, not a drill switched off, or the +LINE loop below
-  // would have nothing to chew on and pass without testing anything.
-  await page.mouse.click(blanks![0], blanks![1]);
-  await page.waitForTimeout(700);
-  expect(await ghosts()).toBeGreaterThan(0);
-  expect(await holes()).toBeGreaterThan(0);
-
-  // +LINE hands a whole line over, holes and all; pressed until it stops,
-  // the drill is done and the buffer is the answer again.
-  for (let i = 0; i < 60 && (await ghosts()) > 0; i++) {
-    await page.mouse.click(line![0], line![1]);
-    await page.waitForTimeout(130);
-  }
-  await page.waitForTimeout(400);
-  expect(await ghosts()).toBe(0);
-  expect(
-    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
-  ).toBe(0);
-  await shot(page, "66-blanks-done");
-  // Back to plain ANSWER for the checks below.
-  await page.mouse.click(blanks![0], blanks![1]);
-  await page.waitForTimeout(500);
-
-  // ANSWER shows the solution; it never writes it. Toggle off, type
-  // something of the player's own, toggle back on: the writing stays.
-  await page.mouse.click(answer![0], answer![1]);
-  await page.waitForTimeout(400);
-  await page.keyboard.type("let mine = 1;");
-  await page.waitForTimeout(300);
-  const mine = await docText();
-  expect(mine).toContain("let mine = 1;");
-  await page.mouse.click(answer![0], answer![1]);
-  await page.waitForTimeout(600);
-  expect(await docText()).toBe(mine);
-
-  // A character that is not the answer is marked, not swallowed.
-  await page.keyboard.press("Control+Home");
-  await page.keyboard.type("zz");
-  await page.waitForTimeout(500);
-  expect(
-    await page.evaluate(() => document.querySelectorAll(".cwb-wrong").length),
-  ).toBeGreaterThan(0);
-  // And +LINE refuses while the buffer has stopped being the answer:
-  // completing past a mistake would bury it under correct text. (TAB, by
-  // contrast, indents — it is the editor's key and this mode leaves it be.)
-  const stuck = await docText();
-  await page.mouse.click(line![0], line![1]);
-  await page.waitForTimeout(250);
-  expect(await docText()).toBe(stuck);
-  await shot(page, "63-answer-diverged");
 
   // The effects are painted on their own layer *over* the editor, because
   // both game canvases are under the overlay and the editor's face is all
@@ -587,85 +434,11 @@ test("3g: CODE mode leaves the player on the quest screen, signed in", async ({
 
   await page.mouse.click(done![0], done![1]);
   await page.waitForTimeout(900);
-  expect(await sceneNow(page)).toBe("quest");
+  expect(await sceneNow(page)).toBe("playground");
   expect(
-    await page.evaluate(() => window.__cwbCapture!.buttonAt("focus")),
+    await page.evaluate(() => window.__cwbCapture!.buttonAt("code")),
   ).not.toBeNull();
-  await shot(page, "61-done-back-on-the-quest");
-});
-
-test("3h: a tab-indented answer can be finished — ENTER leaves no red", async ({
-  page,
-}) => {
-  // The report: on a Go quest — gofmt indents with tabs — the ANSWER target
-  // stuck at 161 / 333 and the space bar would not clear the red. It could
-  // not: the editor's auto-indent puts *spaces* in, the answer wanted a tab,
-  // and no key a player could press would make the two agree. The mode fills
-  // a line's indentation itself now, and ENTER no longer guesses one.
-  const account = freshAccount();
-  await login(page, account);
-  await pickLand(page, "go");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
-  const code = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("focus"),
-  );
-  await page.mouse.click(code![0], code![1]);
-  await page.waitForTimeout(500);
-  const answer = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("answer"),
-  );
-  await page.mouse.click(answer![0], answer![1]);
-  await expect
-    .poll(
-      async () =>
-        page.evaluate(() => document.querySelectorAll(".cwb-ghost").length),
-      {
-        timeout: 30_000,
-        message: "waiting for the answer ghost",
-      },
-    )
-    .toBeGreaterThan(0);
-
-  // Walk down the file the way a player does — a line, then ENTER, then a
-  // line — and the red must never appear. ENTER is the moment the bug
-  // happened: the editor put its own spaces in where the answer had a tab.
-  const docText = () =>
-    page.evaluate(() =>
-      Array.from(document.querySelectorAll(".cm-line"))
-        .map((l) => {
-          const copy = l.cloneNode(true) as HTMLElement;
-          copy.querySelectorAll(".cwb-ghost").forEach((g) => g.remove());
-          return (copy.textContent ?? "").replace(/\u200b/g, "");
-        })
-        .join("\n"),
-    );
-  const wrongNow = () =>
-    page.evaluate(() => document.querySelectorAll(".cwb-wrong").length);
-  const line = await page.evaluate(() =>
-    window.__cwbCapture!.buttonAt("complete"),
-  );
-  for (let i = 0; i < 16; i++) {
-    const doc = await docText();
-    if (doc.includes("\t")) break;
-    if (doc.endsWith("\n") || doc.length === 0) {
-      // At a line start: take the line's content.
-      await page.mouse.click(line![0], line![1]);
-    } else {
-      // At a line end: ENTER, which is the moment the bug happened.
-      await page.keyboard.press("Enter");
-    }
-    await page.waitForTimeout(160);
-    expect(await wrongNow()).toBe(0);
-  }
-
-  // And the tab is in the buffer without the player having typed one: the
-  // mode filled the answer's own indentation.
-  const doc = await docText();
-  console.log(`[tabs] ${JSON.stringify(doc)}`);
-  expect(doc).toContain("\t");
-  expect(await wrongNow()).toBe(0);
-  await shot(page, "67-tab-indent");
+  await shot(page, "61-done-back-on-the-playground");
 });
 
 test("4b: AUTO SELECT with no failures says so and stays put", async ({
@@ -1398,8 +1171,8 @@ test("5: every text-size step on the quest screen (en)", async ({ page }) => {
   const wire = await Wire.as(BACKEND, account);
   try {
     await signIn(page, account);
-    await toRustBasicQuest(page, wire);
-    await waitEditor(page);
+    await toRustBasicQuest(page);
+    await choicesShown(page);
     // Down to the floor.
     for (let i = 0; i < 4; i++) {
       await clickButton(page, "fontdown");
@@ -1415,7 +1188,7 @@ test("5: every text-size step on the quest screen (en)", async ({ page }) => {
       steps.push(String(pct));
       await page.waitForTimeout(300);
       await shot(page, `30-font-${String(pct).padStart(3, "0")}`);
-      await editorInsideCanvas(page, `font ${pct}%`);
+      await choicesInsideCanvas(page, `font ${pct}%`);
       await clickButton(page, "fontup");
       await page.waitForTimeout(150);
     }
@@ -1441,27 +1214,26 @@ test("5b: Korean (CJK) at the smallest, default and largest text size, plus the 
     await pickLand(page, "rust");
     await pickCategory(page, "basic");
     await shot(page, "41-ko-map");
+    const since = sentFrames().length;
     await openSelectedNode(page);
-    await waitEditor(page);
+    const questId = await openedQuestId(since);
+    await choicesShown(page);
     await shot(page, "42-ko-quest-100");
-    await editorInsideCanvas(page, "ko 100%");
+    await choicesInsideCanvas(page, "ko 100%");
     for (let i = 0; i < 4; i++) await clickButton(page, "fontdown");
     await page.waitForTimeout(300);
     await shot(page, "42-ko-quest-070");
-    await editorInsideCanvas(page, "ko 70%");
+    await choicesInsideCanvas(page, "ko 70%");
     for (let i = 0; i < 8; i++) await clickButton(page, "fontup");
     await page.waitForTimeout(300);
     expect(await pref(page, "ui.text")).toBe("1.2");
     await shot(page, "42-ko-quest-120");
-    await editorInsideCanvas(page, "ko 120%");
-    // The console drawer and the hint, at the biggest size.
-    await clickButton(page, "console");
-    await page.waitForTimeout(300);
-    await shot(page, "43-ko-quest-120-console");
-    await clickButton(page, "console");
+    await choicesInsideCanvas(page, "ko 120%");
+    // A miss, at the biggest size: the pick says so where it was made.
+    await pickOnScreen(page, wire, questId, "wrong");
+    await shot(page, "43-ko-quest-120-missed");
     // A result and the stats in Korean.
-    await setSource(page, WRONG);
-    await submit(page);
+    await pickOnScreen(page, wire, questId, "right");
     await shot(page, "44-ko-result");
     await backToMap(page);
     await page.keyboard.press("F5");
@@ -1502,7 +1274,7 @@ test("5c: the other CJK locales and Czech on the map and quest", async ({
       if (loc === "ko") continue; // covered above
       await shot(page, `50-${loc}-map`);
       await openSelectedNode(page);
-      await waitEditor(page);
+      await choicesShown(page);
       await shot(page, `51-${loc}-quest`);
       await page.keyboard.press("Escape");
       await atScreen(page, "map");

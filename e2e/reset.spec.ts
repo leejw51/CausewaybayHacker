@@ -5,7 +5,8 @@
  * proving in a real browser against a real server are the ones a unit test
  * cannot see: that it asks first, that saying no changes nothing at all, and
  * that saying yes empties the road the player was looking at and nothing
- * else.
+ * else. The node is cleared the way a player clears one now: by picking the
+ * right one of the four (SPEC §0).
  */
 import {
   atScreen,
@@ -13,27 +14,11 @@ import {
   enterRustQuest,
   freshAccount,
   login,
-  setSource,
-  sourceThatPrints,
-  submit,
+  pickOnScreen,
   test,
   Wire,
 } from "./fixtures.js";
 import { expect } from "@playwright/test";
-
-/** A program that passes whatever quest the browser happens to have opened. */
-async function passing(wire: Wire, quest: string): Promise<string> {
-  const got = await wire.ok("quest.get", { quest_id: quest });
-  const source = sourceThatPrints(
-    (
-      got.quest as {
-        tests?: { visible?: { stdin?: string; expect?: string }[] };
-      }
-    ).tests?.visible?.[0],
-  );
-  if (!source) throw new Error(`no sample case to answer for ${quest}`);
-  return source;
-}
 
 /** The road's cleared count, straight from the server. */
 async function clearedCount(wire: Wire, category = "basic"): Promise<number> {
@@ -52,9 +37,7 @@ test("RESET asks first, and a no leaves the road exactly as it was", async ({
     await login(page, account);
     const quest = await enterRustQuest(page, wire);
     // Clear it the way a player does, so there is something to reset.
-    await setSource(page, await passing(wire, quest));
-    await submit(page);
-    await atScreen(page, "result");
+    await pickOnScreen(page, wire, quest, "right");
     await clickButton(page, "map");
     await atScreen(page, "map");
     expect(await clearedCount(wire)).toBe(1);
@@ -77,9 +60,7 @@ test("RESET empties the road it was asked about, and keeps the XP", async ({
   try {
     await login(page, account);
     const quest = await enterRustQuest(page, wire);
-    await setSource(page, await passing(wire, quest));
-    await submit(page);
-    await atScreen(page, "result");
+    await pickOnScreen(page, wire, quest, "right");
     await clickButton(page, "map");
     await atScreen(page, "map");
 

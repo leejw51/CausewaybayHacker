@@ -4,8 +4,10 @@
  * Twenty touch-sized buttons were most of the screen they are the tools for,
  * so each band carries a text box: type part of a label (or an id) and only
  * the buttons that match stay drawn — and stay clickable. Several words keep
- * a button that matches any of them. Empty, every button is back. This walks the three bands a player meets: the practice page's
- * toolbar, the playground's split page and the playground's code page.
+ * a button that matches any of them. Empty, every button is back. This walks
+ * the three bands a player meets: the practice page's toolbar (short now —
+ * a quest is picked, not typed, so it is BACK, LOBBY, COPY BRIEF and the text
+ * size; SPEC §0), the playground's split page and the playground's code page.
  *
  * A fixture account rather than a fresh one: nothing here records progress,
  * and the fresh path needs the CausewaybayWallet binary built beside this
@@ -13,6 +15,7 @@
  */
 import {
   atScreen,
+  choicesShown,
   clickButton,
   expect,
   fixtureAccount,
@@ -46,22 +49,22 @@ test("the filter narrows the menu buttons on the practice page and the playgroun
   await pickLand(page, "rust");
   await pickCategory(page, "verybasic");
   await openSelectedNode(page);
-  await expect(page.locator(".cm-content")).toBeVisible();
+  await choicesShown(page);
+  await expect(page.locator(".cm-content")).toBeHidden();
   await page.waitForTimeout(1000);
 
-  // The practice page's toolbar.
+  // The practice page's toolbar: the pick's own few buttons.
   const quest = await ids(page);
-  expect(quest).toContain("copybrief");
-  expect(quest).toContain("fontup");
+  expect(quest).toEqual(
+    expect.arrayContaining(["back", "lobby", "copybrief", "fontdown", "fontup"]),
+  );
   const copies = await narrow(page, "copy");
-  expect(copies).toEqual(expect.arrayContaining(["copybrief", "copycode", "copyout"]));
+  expect(copies).toContain("copybrief");
   expect(copies, "a button that does not match is gone").not.toContain("fontup");
   expect(copies.length).toBeLessThan(quest.length);
   // Several words keep every button that matches any one of them.
-  const several = await narrow(page, "copy paste font");
-  expect(several).toEqual(
-    expect.arrayContaining(["copybrief", "copycode", "copyout", "paste", "fontup", "fontdown"]),
-  );
+  const several = await narrow(page, "copy font");
+  expect(several).toEqual(expect.arrayContaining(["copybrief", "fontup", "fontdown"]));
   expect(several, "a button that matches none of the words is gone").not.toContain("lobby");
   // Empty puts every button back.
   expect(await narrow(page, "")).toEqual(quest);

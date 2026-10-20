@@ -1,8 +1,8 @@
 /**
- * The code theme: a DARK / LIGHT button beside the code face, on the quest
- * screen and the playground alike. One preference for both, it survives a
- * reload, and the editor (a DOM element) follows it through
- * `<html data-code-theme>`.
+ * The code theme: a DARK / LIGHT button beside the code face, on the
+ * playground — the one screen with an editor now that every quest is picked,
+ * not typed (SPEC §0). The preference survives a reload, and the editor (a
+ * DOM element) follows it through `<html data-code-theme>`.
  */
 import { expect, type Page } from "@playwright/test";
 import {
@@ -10,9 +10,6 @@ import {
   clickButton,
   freshAccount,
   login,
-  openSelectedNode,
-  pickCategory,
-  pickLand,
   sceneNow,
   test,
 } from "./fixtures";
@@ -59,25 +56,7 @@ async function flipAndCheck(page: Page, where: string): Promise<void> {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${where}-light.png` });
 }
 
-test("the quest screen's THEME button lights the editor, for good", async ({
-  page,
-}) => {
-  await login(page, freshAccount());
-  await pickLand(page, "rust");
-  await pickCategory(page, "basic");
-  await openSelectedNode(page);
-  await flipAndCheck(page, "quest");
-
-  await page.reload();
-  await expect
-    .poll(() =>
-      page.evaluate(() => typeof window.__cwbCapture?.buttons === "function"),
-    )
-    .toBe(true);
-  await expect.poll(() => attr(page)).toBe("light");
-});
-
-test("the playground's THEME button is the same preference", async ({
+test("the playground's THEME button lights the editor, for good", async ({
   page,
 }) => {
   await login(page, freshAccount());
@@ -86,7 +65,25 @@ test("the playground's THEME button is the same preference", async ({
   await expect.poll(() => sceneNow(page), { timeout: 30_000 }).toBe("playground");
   await flipAndCheck(page, "playground");
 
-  // And back.
+  // For good: a reload keeps it.
+  await page.reload();
+  await expect
+    .poll(() =>
+      page.evaluate(() => typeof window.__cwbCapture?.buttons === "function"),
+    )
+    .toBe(true);
+  await expect.poll(() => attr(page)).toBe("light");
+  await expect.poll(() => pref(page)).toBe("light");
+
+  // And back, once the playground is on screen again.
+  await expect.poll(() => sceneNow(page), { timeout: 60_000 }).not.toMatch(/^(boot|title|story|login)$/);
+  if ((await sceneNow(page)) !== "playground") {
+    await atScreen(page, "lands");
+    await clickButton(page, "playground");
+    await expect.poll(() => sceneNow(page), { timeout: 30_000 }).toBe("playground");
+  }
+  await expect(page.locator(".cm-content")).toBeVisible();
+  await expect.poll(() => label(page)).toBe("LIGHT");
   await clickButton(page, "theme");
   await expect.poll(() => attr(page)).toBe("dark");
   await expect.poll(() => pref(page)).toBe("dark");
