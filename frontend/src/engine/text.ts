@@ -160,6 +160,13 @@ const FACE_FILES: Record<string, string> = {
   Galmuri11: "/fonts/Galmuri11.woff2",
   GalmuriMono11: "/fonts/GalmuriMono11.woff2",
   ComicMono: "/fonts/ComicMono.ttf",
+  AppleIIPR3: "/fonts/PRNumber3.ttf",
+  MSX1Code: "/fonts/MSX1-Code.woff2",
+  TopazUnicode: "/fonts/TopazUnicode.woff2",
+  VictorMono: "/fonts/VictorMono-Regular.woff2",
+  VictorMonoScript: "/fonts/VictorMono-Italic.woff2",
+  FantasqueSansMono: "/fonts/FantasqueSansMono-Regular.woff2",
+  MonaspaceRadon: "/fonts/MonaspaceRadon-Regular.woff2",
 };
 const faceLoads = new Map<string, Promise<boolean>>();
 
@@ -249,6 +256,13 @@ export const CODE_FACES = [
   "galmuri",
   "comic",
   "courier",
+  "apple2",
+  "msx",
+  "amiga",
+  "victor",
+  "victorscript",
+  "fantasque",
+  "radon",
 ] as const;
 export type CodeFace = (typeof CODE_FACES)[number];
 
@@ -277,6 +291,19 @@ export const CODE_FACE_SCALE: Record<CodeFace, number> = {
   comic: 0.78,
   // Courier New: cap 0.571 em, advance 0.6 em.
   courier: 0.98,
+  // The three home computers are pixel faces with a 0.875 em cap height.
+  // Apple II is Kreative's PR Number 3, the //e's 80-column text; MSX is the
+  // 8x8 cell of an MSX1's SCREEN 1; Amiga is the A500's Topaz.
+  apple2: 0.64,
+  msx: 0.64,
+  amiga: 0.64,
+  // Victor Mono: cap 0.727 em, advance 0.545 em. Its italic is the cursive.
+  victor: 0.77,
+  victorscript: 0.77,
+  // Fantasque Sans Mono: cap 0.625 em, advance 0.518 em.
+  fantasque: 0.9,
+  // Monaspace Radon, the handwritten one: cap 0.73 em, advance 0.62 em.
+  radon: 0.77,
 };
 
 /** What to call each on the button. Its own name, not a description. */
@@ -289,6 +316,13 @@ export const CODE_FACE_NAME: Record<CodeFace, string> = {
   galmuri: "GALMURI",
   comic: "COMIC",
   courier: "COURIER NEW BOLD",
+  apple2: "APPLE II",
+  msx: "MSX",
+  amiga: "AMIGA TOPAZ",
+  victor: "VICTOR MONO",
+  victorscript: "VICTOR MONO ITALIC",
+  fantasque: "FANTASQUE",
+  radon: "RADON HANDWRITING",
 };
 
 /**
@@ -305,6 +339,13 @@ const CODE_FACE_WEIGHT: Record<CodeFace, string> = {
   galmuri: "normal",
   comic: "normal",
   courier: "bold",
+  apple2: "normal",
+  msx: "normal",
+  amiga: "normal",
+  victor: "normal",
+  victorscript: "normal",
+  fantasque: "normal",
+  radon: "normal",
 };
 
 /** The family each code face is fetched as, for the ones `style.css` lacks. */
@@ -318,6 +359,15 @@ const CODE_FACE_FAMILY: Record<CodeFace, string | null> = {
   comic: "ComicMono",
   // A system face, never fetched: Courier behind it for a machine without it.
   courier: null,
+  apple2: "AppleIIPR3",
+  msx: "MSX1Code",
+  amiga: "TopazUnicode",
+  victor: "VictorMono",
+  // The italic file under a family of its own, so no `font-style` has to
+  // follow it into the canvas and the editor.
+  victorscript: "VictorMonoScript",
+  fantasque: "FantasqueSansMono",
+  radon: "MonaspaceRadon",
 };
 
 let codeFace: CodeFace = "game";
@@ -383,7 +433,7 @@ export function getCodeFace(): CodeFace {
  */
 export const TEXT_SCALE_KEY = "ui.text";
 export const TEXT_SCALE_MIN = 0.7;
-export const TEXT_SCALE_MAX = 1.2;
+export const TEXT_SCALE_MAX = 2;
 export const TEXT_SCALE_STEP = 0.1;
 let textMul = 1;
 

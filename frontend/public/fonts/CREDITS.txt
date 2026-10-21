@@ -16,3 +16,24 @@ Galmuri11.woff2            Galmuri11 and GalmuriMono11 v2.40.4, Lee Minseo (quip
 GalmuriMono11.woff2        https://github.com/quiple/galmuri    SIL OFL 1.1   Galmuri-OFL.txt
 ComicMono.ttf              Comic Mono, dtinth (from Comic Shanns by Shannon Miwa),
                            https://github.com/dtinth/comic-mono-font  MIT  ComicMono-MIT.txt
+PRNumber3.ttf              PR Number 3 (Apple II 80-column text), Kreative Korporation /
+                           Kreative Software, https://kreativekorp.com/software/fonts/apple2/
+                           Kreative Software Relay Fonts Free Use License 1.2f
+                                                                Kreative-FreeLicense.txt
+                           Shipped byte-for-byte as downloaded; the licence forbids changes.
+MSX1-Code.woff2            MSX1 Korean v0.0.1 (pre-alpha), Noah Burney,
+                           https://github.com/nwah/korean-msx-font   SIL OFL 1.1   MSX1Korean-OFL.txt
+                           Subset to Latin and punctuation, and its vertical metrics set to
+                           the glyphs' own extent (the original's line box is two ems).
+TopazUnicode.woff2         Topaz Unicode KS13 (Amiga 500 Topaz), Screwtape,
+                           https://gitlab.com/Screwtapello/topaz-unicode   ISC   TopazUnicode-ISC.txt
+                           Converted from the release .ttf to WOFF2; otherwise unmodified.
+VictorMono-Regular.woff2   Victor Mono v1.5.6, Rune Bjørnerås,
+VictorMono-Italic.woff2    https://github.com/rubjo/victor-mono  SIL OFL 1.1   VictorMono-OFL.txt
+FantasqueSansMono-Regular.woff2
+                           Fantasque Sans Mono v1.8.0, Jany Belluz,
+                           https://github.com/belluzj/fantasque-sans  SIL OFL 1.1  FantasqueSansMono-OFL.txt
+MonaspaceRadon-Regular.woff2
+                           Monaspace Radon v1.400, GitHub Next,
+                           https://github.com/githubnext/monaspace  SIL OFL 1.1   Monaspace-OFL.txt
+                           Converted from the release .otf to WOFF2; otherwise unmodified.
