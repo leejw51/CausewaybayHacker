@@ -382,6 +382,8 @@ export const zh: Partial<Catalogue> = {
   "pg.copyIn": "复制输入",
   "pg.pasteIn": "粘贴输入",
   "pg.codeFace": "代码字体 {name}",
+  "pg.computer": "电脑 {name}",
+  "pg.computerNormal": "普通",
   "code.themeDark": "深色",
   "code.themeLight": "浅色",
   "pg.code": "代码",

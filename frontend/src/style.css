@@ -405,6 +405,187 @@ body {
   background: rgba(216, 40, 0, 0.2);
 }
 
+/* The old computers (`ui/computer.ts`), playground only: `<html
+   data-computer>` is set while that screen is open. After the light block so
+   a machine wins over the paper — an Apple ][ has no light mode.
+
+   The glow is here and not in the shader because it is the one part of the
+   tube that has to blur the glyphs themselves, and the shader over the
+   editor (`gfx/retroscreen.ts`) cannot read them. Cursors are blocks, as
+   all three machines drew them. */
+.cwb-retro {
+  pointer-events: none !important;
+}
+:root[data-computer] .cwb-editor .cm-cursor {
+  border-left-width: 0.62em;
+  box-shadow: none;
+  animation: cwb-retro-blink 1.06s steps(1) infinite;
+}
+@keyframes cwb-retro-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-computer] .cwb-editor .cm-cursor {
+    animation: none;
+  }
+}
+:root[data-computer] .cwb-editor .cm-matchingBracket {
+  animation: none;
+}
+
+/* Apple ][: one green phosphor, every colour a brightness of it. */
+:root[data-computer="apple2"] .cwb-editor {
+  --cwb-syn-keyword: #c8ffc8;
+  --cwb-syn-name: #48ff78;
+  --cwb-syn-fn: #98ffb0;
+  --cwb-syn-type: #78ff98;
+  --cwb-syn-string: #30d860;
+  --cwb-syn-number: #b0ffc0;
+  --cwb-syn-comment: #1f8c40;
+  --cwb-syn-operator: #38c860;
+  --cwb-syn-invalid: #ffffff;
+  --cwb-syn-caret: #48ff78;
+  background: #050c07;
+}
+:root[data-computer="apple2"] .cwb-editor .cm-editor {
+  color: #48ff78;
+  text-shadow:
+    0 0 1px rgba(72, 255, 120, 0.9),
+    0 0 6px rgba(72, 255, 120, 0.55),
+    0 0 14px rgba(72, 255, 120, 0.25);
+}
+:root[data-computer="apple2"] .cwb-editor .cm-gutters {
+  background: #040a06;
+  color: #1f8c40;
+  border-right-color: #1f8c40;
+}
+:root[data-computer="apple2"] .cwb-editor .cm-activeLine {
+  background: rgba(72, 255, 120, 0.06);
+}
+:root[data-computer="apple2"] .cwb-editor .cm-activeLineGutter {
+  background: rgba(72, 255, 120, 0.12);
+  color: #48ff78;
+}
+:root[data-computer="apple2"] .cwb-editor .cm-cursor {
+  border-left-color: #48ff78;
+}
+:root[data-computer="apple2"] .cwb-editor .cm-matchingBracket {
+  color: #050c07 !important;
+  background: #48ff78;
+  outline-color: #48ff78;
+}
+:root[data-computer="apple2"] .cwb-editor .cm-selectionBackground,
+:root[data-computer="apple2"] .cwb-editor .cm-content ::selection {
+  background: rgba(72, 255, 120, 0.3) !important;
+}
+:root[data-computer="apple2"] .cwb-editor .cwb-hint,
+:root[data-computer="apple2"] .cwb-editor .cwb-ghost {
+  color: rgba(72, 255, 120, 0.4);
+}
+
+/* MSX: SCREEN 0, white on the TMS9918's dark blue, the VDP's colours for
+   the rest. */
+:root[data-computer="msx"] .cwb-editor {
+  --cwb-syn-keyword: #ffe680;
+  --cwb-syn-name: #ffffff;
+  --cwb-syn-fn: #42ebf5;
+  --cwb-syn-type: #8cf098;
+  --cwb-syn-string: #ffb0b0;
+  --cwb-syn-number: #ffcf6a;
+  --cwb-syn-comment: #b4b4ff;
+  --cwb-syn-operator: #dcdcdc;
+  --cwb-syn-invalid: #ff5554;
+  --cwb-syn-caret: #ffffff;
+  background: #5455ed;
+}
+:root[data-computer="msx"] .cwb-editor .cm-editor {
+  color: #ffffff;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 6px rgba(200, 210, 255, 0.45);
+}
+:root[data-computer="msx"] .cwb-editor .cm-gutters {
+  background: #4646c8;
+  color: #c8c8ff;
+  border-right-color: #ffffff;
+}
+:root[data-computer="msx"] .cwb-editor .cm-activeLine {
+  background: rgba(255, 255, 255, 0.08);
+}
+:root[data-computer="msx"] .cwb-editor .cm-activeLineGutter {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+:root[data-computer="msx"] .cwb-editor .cm-cursor {
+  border-left-color: #ffffff;
+}
+:root[data-computer="msx"] .cwb-editor .cm-matchingBracket {
+  color: #5455ed !important;
+  background: #ffffff;
+  outline-color: #ffffff;
+}
+:root[data-computer="msx"] .cwb-editor .cm-selectionBackground,
+:root[data-computer="msx"] .cwb-editor .cm-content ::selection {
+  background: rgba(201, 91, 186, 0.6) !important;
+}
+:root[data-computer="msx"] .cwb-editor .cwb-hint,
+:root[data-computer="msx"] .cwb-editor .cwb-ghost {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Amiga: Workbench 1.3's four colours — blue, white, black, orange — and
+   Topaz. */
+:root[data-computer="amiga"] .cwb-editor {
+  --cwb-syn-keyword: #ff8800;
+  --cwb-syn-name: #ffffff;
+  --cwb-syn-fn: #aee8ff;
+  --cwb-syn-type: #ffd060;
+  --cwb-syn-string: #a8ffb0;
+  --cwb-syn-number: #ffd060;
+  --cwb-syn-comment: #80a8d8;
+  --cwb-syn-operator: #e0e0e0;
+  --cwb-syn-invalid: #ff2200;
+  --cwb-syn-caret: #ff8800;
+  background: #0055aa;
+}
+:root[data-computer="amiga"] .cwb-editor .cm-editor {
+  color: #ffffff;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.6),
+    0 0 5px rgba(255, 160, 60, 0.3);
+}
+:root[data-computer="amiga"] .cwb-editor .cm-gutters {
+  background: #ffffff;
+  color: #0055aa;
+  border-right: 2px solid #ff8800;
+  text-shadow: none;
+}
+:root[data-computer="amiga"] .cwb-editor .cm-activeLine {
+  background: rgba(255, 136, 0, 0.12);
+}
+:root[data-computer="amiga"] .cwb-editor .cm-activeLineGutter {
+  background: #ff8800;
+  color: #000022;
+}
+:root[data-computer="amiga"] .cwb-editor .cm-cursor {
+  border-left-color: #ff8800;
+}
+:root[data-computer="amiga"] .cwb-editor .cm-matchingBracket {
+  color: #0055aa !important;
+  background: #ff8800;
+  outline-color: #ff8800;
+}
+:root[data-computer="amiga"] .cwb-editor .cm-selectionBackground,
+:root[data-computer="amiga"] .cwb-editor .cm-content ::selection {
+  background: rgba(255, 136, 0, 0.45) !important;
+}
+:root[data-computer="amiga"] .cwb-editor .cwb-hint,
+:root[data-computer="amiga"] .cwb-editor .cwb-ghost {
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .cwb-hidden {
   display: none !important;
 }

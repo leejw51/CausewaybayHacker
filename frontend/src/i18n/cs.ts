@@ -413,6 +413,8 @@ export const cs: Partial<Catalogue> = {
   "pg.copyIn": "KOPÍROVAT VSTUP",
   "pg.pasteIn": "VLOŽIT VSTUP",
   "pg.codeFace": "písmo kódu {name}",
+  "pg.computer": "počítač {name}",
+  "pg.computerNormal": "NORMÁLNÍ",
   "code.themeDark": "TMAVÉ",
   "code.themeLight": "SVĚTLÉ",
   "pg.code": "KÓD",
