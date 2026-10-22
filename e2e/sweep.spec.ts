@@ -667,9 +667,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
     await pref(page, "quest.face"),
     "the choice is remembered",
   ).toBeTruthy();
-  // Round the cycle and back to where it started: seven faces, two pressed.
+  // Round the cycle and back to where it started: fifteen faces, two pressed.
   // The four downloadable ones are fetched on the press, so each gets time.
-  for (let k = 0; k < 5; k++) {
+  for (let k = 0; k < 13; k++) {
     await clickButton(page, "face");
     await page.waitForTimeout(1200);
   }
@@ -1194,7 +1194,7 @@ test("5: every text-size step on the quest screen (en)", async ({ page }) => {
     }
     console.log(`[font] steps: ${steps.join(", ")}`);
     expect(steps[0]).toBe("70");
-    expect(steps[steps.length - 1]).toBe("120");
+    expect(steps[steps.length - 1]).toBe("200");
   } finally {
     wire.close();
   }
@@ -1224,14 +1224,14 @@ test("5b: Korean (CJK) at the smallest, default and largest text size, plus the 
     await page.waitForTimeout(300);
     await shot(page, "42-ko-quest-070");
     await choicesInsideCanvas(page, "ko 70%");
-    for (let i = 0; i < 8; i++) await clickButton(page, "fontup");
+    for (let i = 0; i < 13; i++) await clickButton(page, "fontup");
     await page.waitForTimeout(300);
-    expect(await pref(page, "ui.text")).toBe("1.2");
-    await shot(page, "42-ko-quest-120");
-    await choicesInsideCanvas(page, "ko 120%");
+    expect(await pref(page, "ui.text")).toBe("2");
+    await shot(page, "42-ko-quest-200");
+    await choicesInsideCanvas(page, "ko 200%");
     // A miss, at the biggest size: the pick says so where it was made.
     await pickOnScreen(page, wire, questId, "wrong");
-    await shot(page, "43-ko-quest-120-missed");
+    await shot(page, "43-ko-quest-200-missed");
     // A result and the stats in Korean.
     await pickOnScreen(page, wire, questId, "right");
     await shot(page, "44-ko-result");
