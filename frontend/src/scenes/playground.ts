@@ -2545,7 +2545,11 @@ export class PlaygroundScene implements Scene {
     // line of its own above the editor: it is never hidden, because it is the
     // only way a program that reads is fed at all.
     const fedH = Math.max(layout.minTouchH(), fonts.codeSm.height + Math.round(10 * s));
-    const hasOut = this.log.lines.length > 0 || this.result !== null;
+    // **A run in flight counts as output.** RUN clears the last result and
+    // log before the first byte of the new one arrives, and without this the
+    // column vanished for that gap — the editor went full width while it
+    // compiled and shrank back when the answer came.
+    const hasOut = this.log.lines.length > 0 || this.result !== null || this.stage !== "idle";
     const wide = !layout.isPortrait();
     const gap = Math.round(5 * s);
     const bodyW = layout.vw - pad * 2;
@@ -3051,7 +3055,11 @@ export class PlaygroundScene implements Scene {
       // Two different silences: nothing has run, or something ran and wrote
       // nothing (or was stopped before it could) — "nothing has been run
       // yet" under a red "it timed out" contradicted the line above it.
-      const line = r ? t("pg.noOutput") : t("pg.nothingRun");
+      const line = r
+        ? t("pg.noOutput")
+        : this.stage !== "idle"
+          ? this.stageLabel()
+          : t("pg.nothingRun");
       printf(g, fonts.codeSm, line, x + pad * 2, ty + pad, w - pad * 4, "left");
       return;
     }
