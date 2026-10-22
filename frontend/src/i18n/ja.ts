@@ -394,6 +394,8 @@ export const ja: Partial<Catalogue> = {
   "pg.copyIn": "入力をコピー",
   "pg.pasteIn": "入力を貼付",
   "pg.codeFace": "コードの書体 {name}",
+  "pg.computer": "コンピューター {name}",
+  "pg.computerNormal": "ノーマル",
   "code.themeDark": "ダーク",
   "code.themeLight": "ライト",
   "pg.code": "コード",

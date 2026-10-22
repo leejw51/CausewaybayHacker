@@ -1740,6 +1740,42 @@
       "h": 1152
     },
     {
+      "name": "bg_playground_apple2",
+      "file": "bg_playground_apple2.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_playground_apple2_p",
+      "file": "bg_playground_apple2_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "bg_playground_msx",
+      "file": "bg_playground_msx.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_playground_msx_p",
+      "file": "bg_playground_msx_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "bg_playground_amiga",
+      "file": "bg_playground_amiga.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_playground_amiga_p",
+      "file": "bg_playground_amiga_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
       "name": "bg_poster",
       "file": "bg_poster.jpg",
       "w": 1024,

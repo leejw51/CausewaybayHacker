@@ -35,6 +35,7 @@ import {
 } from "./engine/text";
 import { CODE_FACE_KEY } from "./ui/editor";
 import { CODE_THEME_KEY, CODE_THEMES, setCodeTheme, type CodeTheme } from "./ui/codetheme";
+import { COMPUTER_KEY, COMPUTERS, setComputer, type Computer } from "./ui/computer";
 import { readEnumPref, readNumberPref, writePref } from "./ui/prefs";
 import { css, Theme } from "./engine/theme";
 import { btnBox, btnPad, fill, inRect, panel, pixBtn, type Ctx, type Rect } from "./engine/ui";
@@ -274,6 +275,8 @@ export class App {
     setCodeFace(readEnumPref<CodeFace>(CODE_FACE_KEY, CODE_FACES, "game"));
     // And the paper under it, for the same reason.
     setCodeTheme(readEnumPref<CodeTheme>(CODE_THEME_KEY, CODE_THEMES, "dark"));
+    // And the old computer the playground is on; only that screen shows it.
+    setComputer(readEnumPref<Computer>(COMPUTER_KEY, COMPUTERS, "normal"));
     // The interface face: named now, fetched by `boot` before it measures.
     restoreUiFace(readEnumPref<UiFace>(UI_FACE_KEY, UI_FACES, "game"));
     // And the text size, for the same reason.
@@ -1102,7 +1105,10 @@ export class App {
     const pinching = (): boolean => fingers.size >= 2 && !!this.scene?.pinch;
     const pinchState = (): { d: number; mid: [number, number] } => {
       const [a, b] = [...fingers.values()];
-      return { d: Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+      return {
+        d: Math.hypot(a[0] - b[0], a[1] - b[1]),
+        mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+      };
     };
     this.canvas.addEventListener("pointerdown", (ev) => {
       // The first gesture is what lets an AudioContext start at all.

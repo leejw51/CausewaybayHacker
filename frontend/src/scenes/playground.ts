@@ -61,6 +61,18 @@ import {
   nextCodeTheme,
   setCodeTheme,
 } from "../ui/codetheme";
+import {
+  COMPUTER_FACE,
+  COMPUTER_KEY,
+  COMPUTER_NAME,
+  SAYS,
+  getComputer,
+  nextComputer,
+  setComputer,
+  showComputer,
+} from "../ui/computer";
+import { RetroScreen } from "../gfx/retroscreen";
+import { drawMonitor } from "../ui/monitor";
 import { Coder } from "../ui/agent/coder";
 import {
   CODE_FACE_NAME,
@@ -509,6 +521,8 @@ export class PlaygroundScene implements Scene {
   private t = 0;
   /** The typing effects, over the editor. See `ui/codefx.ts`. */
   private fx: CodeFx | null = null;
+  /** The old computer's tube over the editor (`gfx/retroscreen.ts`). */
+  private retro: RetroScreen | null = null;
   /** The Rust coder: the AI agent that flies over the code (`ui/agent/coder.ts`). */
   private coder: Coder | null = null;
   private readonly benchIn = new Tween(seconds("panel"));
@@ -813,6 +827,40 @@ export class PlaygroundScene implements Scene {
   }
 
   /**
+   * Which old computer the pad is on (`ui/computer.ts`): its paper, its face,
+   * its tube and its room, all at once, with the power-on to show it.
+   *
+   * The face goes with the machine because a green-phosphor Apple in VT323 is
+   * a costume, not a computer — and it stays a face the person can change
+   * after, on the button beside this one. "Normal" leaves the face alone.
+   */
+  private async cycleComputer(): Promise<void> {
+    const from = getComputer();
+    const next = nextComputer();
+    if (next !== "normal") {
+      const face = COMPUTER_FACE[next];
+      // Fetched first, as `cycleFace` does, and a press while it downloads
+      // is dropped rather than skipping a machine.
+      await loadCodeFace(face);
+      if (getComputer() !== from) return;
+      setCodeFace(face);
+      writePref(CODE_FACE_KEY, face);
+    }
+    setComputer(next);
+    writePref(COMPUTER_KEY, next);
+    this.app.remeasure();
+    this.retro?.power(next, true);
+    this.saveNote = t("pg.computer", { name: this.computerName() });
+    if (next === "normal") this.app.chip.blip();
+    else this.app.chip.start();
+  }
+
+  private computerName(): string {
+    const c = getComputer();
+    return c === "normal" ? t("pg.computerNormal") : COMPUTER_NAME[c];
+  }
+
+  /**
    * POSTER: the pad as one square PNG, signed by the wallet, saved to disk.
    *
    * The signature is EIP-191 over **the source and only the source**, made
@@ -1023,7 +1071,14 @@ export class PlaygroundScene implements Scene {
       // Says the face it is **in**, like every other toggle on this screen.
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
       // The paper under the code, saying which it is on, like the face.
-      { id: "theme", label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark") },
+      // Dim on an old computer: the machine brings its own paper.
+      {
+        id: "theme",
+        label: t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark"),
+        dim: getComputer() !== "normal",
+      },
+      // The machine, saying which it is.
+      { id: "computer", label: this.computerName() },
     ];
   }
 
@@ -1088,6 +1143,7 @@ export class PlaygroundScene implements Scene {
     // The local mirror first, because it is instant and it is the copy that
     // survives a server that is not answering.
     this.restoreLocal();
+    showComputer(true);
     this.mount();
     void this.refreshList();
     // Only when there is nothing local worth keeping. Loading the server's
@@ -1113,6 +1169,9 @@ export class PlaygroundScene implements Scene {
     this.overlay?.destroy();
     this.fx?.destroy();
     this.fx = null;
+    this.retro?.destroy();
+    this.retro = null;
+    showComputer(false);
     this.coder?.leave();
     this.coder = null;
     this.stdinOverlay?.destroy();
@@ -1130,6 +1189,10 @@ export class PlaygroundScene implements Scene {
     this.editor = new Editor(this.held.lang, this.held.source, () => this.touched());
     this.editor.onEnter = () => this.autoEnter();
     this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
+    // The tube straight over the code, under the sparks and the fields.
+    this.retro?.destroy();
+    this.retro = new RetroScreen(this.app.overlay, this.app.layout, this.editor.dom);
+    this.retro.power(getComputer(), false);
     // After the editor, so it is painted over it; before the other overlays,
     // which are fields a person clicks into and must stay on top of it.
     this.fx?.destroy();
@@ -1469,6 +1532,9 @@ export class PlaygroundScene implements Scene {
       // The log streamed in pinned to its tail; the answer is read from the
       // top, and scrolling back up after every RUN was the chore.
       this.outputToTop = true;
+      const machine = getComputer();
+      if (res.run.outcome !== "ok" && machine !== "normal")
+        this.retro?.say(SAYS[machine][res.run.outcome]);
       if (res.run.outcome === "ok") this.app.chip.coin();
       // No screen shake here, on purpose *and* because it could not land:
       // `App.shake` refuses while the overlay has children, and this screen
@@ -1862,6 +1928,10 @@ export class PlaygroundScene implements Scene {
       this.flipTheme();
       return;
     }
+    if (hit.id === "computer") {
+      void this.cycleComputer();
+      return;
+    }
     if (hit.id === "fontdown" || hit.id === "fontup") {
       this.sizeFont(hit.id === "fontup" ? 1 : -1);
       return;
@@ -1895,6 +1965,7 @@ export class PlaygroundScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.fx?.frame(dt);
+    this.retro?.frame(dt);
     this.coder?.syncRoom();
     this.coder?.update(dt);
     this.benchIn.update(dt);
@@ -2053,7 +2124,12 @@ export class PlaygroundScene implements Scene {
    */
   private drawRoom(g: Ctx): void {
     const { layout } = this.app;
-    const room = this.app.assets?.picture("bg_playground", layout.isPortrait());
+    // Each old computer has its own room; until it has arrived, the usual one.
+    const machine = getComputer();
+    const room =
+      (machine !== "normal"
+        ? this.app.assets?.picture(`bg_playground_${machine}`, layout.isPortrait())
+        : null) ?? this.app.assets?.picture("bg_playground", layout.isPortrait());
     if (!room) return;
     const k = Math.max(layout.vw / room.naturalWidth, layout.vh / room.naturalHeight);
     const aw = room.naturalWidth * k;
@@ -2064,7 +2140,9 @@ export class PlaygroundScene implements Scene {
       g.drawImage(room, (layout.vw - aw) / 2, (layout.vh - ah) / 2, aw, ah),
     );
     g.restore();
-    fill(g, Theme.void, 0, 0, layout.vw, layout.vh, 0.5);
+    // An old computer's room is lit by its screen, and is the point of it:
+    // less of the night pulled over it.
+    fill(g, Theme.void, 0, 0, layout.vw, layout.vh, machine === "normal" ? 0.5 : 0.25);
   }
 
   /**
@@ -2585,14 +2663,29 @@ export class PlaygroundScene implements Scene {
     } else {
       this.outputRect = [0, 0, 0, 0];
     }
-    well(g, pad, top, editorW, editorH, codeWellFace());
-    const editorRect: Rect = [pad + 4, top + 4, editorW - 8, editorH - 8];
+    const editorRect = this.screen(g, [pad, top, editorW, editorH]);
     this.editorRect = editorRect;
-    if (this.editor) this.overlay?.place(editorRect, fonts.codeSm.size);
-    else this.overlay?.hide();
+    if (this.editor) {
+      this.overlay?.place(editorRect, fonts.codeSm.size);
+      this.retro?.place(editorRect);
+    } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
     if (panel) this.coder?.drawPanel(g, panel, s);
     else this.coder?.panel.hideFields();
+  }
+
+  /**
+   * What the code sits in: the sunken well, or — on an old computer — that
+   * computer's monitor, casing, chin and all. Returns where the editor goes.
+   */
+  private screen(g: Ctx, rect: Rect): Rect {
+    const machine = getComputer();
+    if (machine !== "normal") {
+      const [x, y, w, h] = drawMonitor(g, rect, machine, this.t, this.stage !== "idle");
+      return [x + 2, y + 2, w - 4, h - 4];
+    }
+    well(g, rect[0], rect[1], rect[2], rect[3], codeWellFace());
+    return [rect[0] + 4, rect[1] + 4, rect[2] - 8, rect[3] - 8];
   }
 
   /** The editor, the stdin box, the buttons and whatever the program said. */
@@ -2749,11 +2842,11 @@ export class PlaygroundScene implements Scene {
     }
     editorH = Math.max(60, editorH);
 
-    well(g, inner[0], inner[1], colW, editorH, codeWellFace());
-    const editorRect: Rect = [inner[0] + 4, inner[1] + 4, colW - 8, editorH - 8];
+    const editorRect = this.screen(g, [inner[0], inner[1], colW, editorH]);
     this.editorRect = editorRect;
     if (this.editor && this.benchIn.finished) {
       this.overlay?.place(editorRect, fonts.codeSm.size);
+      this.retro?.place(editorRect);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
 

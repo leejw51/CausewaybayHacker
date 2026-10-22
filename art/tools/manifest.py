@@ -81,6 +81,11 @@ ORDER = [
     "badge_cleared", "badge_locked",
     # The playground: the one room in the game with no problem in it.
     "bg_playground", "bg_playground_p",
+    # ...and the same desk on three old computers, one per COMPUTER setting
+    # (frontend/src/ui/computer.ts).
+    "bg_playground_apple2", "bg_playground_apple2_p",
+    "bg_playground_msx", "bg_playground_msx_p",
+    "bg_playground_amiga", "bg_playground_amiga_p",
     # The poster (frontend/src/ui/poster.ts): a square night street for the
     # sleeve, and the wax seal the credits are stamped with.
     "bg_poster", "poster_seal",

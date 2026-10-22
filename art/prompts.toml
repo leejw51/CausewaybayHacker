@@ -1735,3 +1735,63 @@ generated = "2026-10-19"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art painted background. TALL PORTRAIT composition. The floor above a photocopy shop in Causeway Bay, Hong Kong, after hours: a narrow night studio where the advanced sheets are pinned up, seen straight on. The upper half of the tall frame is a cork wall crowded with pinned reference sheets made only of coloured bars, and a whiteboard covered only in abstract coloured boxes joined by arrows; the lower half holds a desk with three glowing monitors showing only abstract coloured blocks, a tall server rack blinking with tiny cyan and violet lights, a desk lamp pooling amber light over a mechanical keyboard and a mug, and a sleepy cat curled on top of the rack. Rain streaks a window at the side and through it a slice of neon street whose sign boxes are plain glowing violet, cyan and red rectangles with nothing inside them. Cool violet and cyan inside against a warm amber lamp. Chunky hard-edged pixels, heavy dithering, strong dark outlines, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. The floor is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering on any sign, screen, board, poster, page or slip of paper — every sheet of paper and every screen is covered only in abstract coloured bars and blocks, never characters. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_playground_apple2_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A late-night 1983 hacker's bedroom lit almost only by the glow of a green phosphor monitor. On a wooden desk: a beige 8-bit home computer with a built-in keyboard and two stacked beige floppy disk drives on top, a small monochrome monitor whose blank screen glows bright green with scanlines, a fanned stack of 5.25-inch floppy disks, a joystick, a tangle of ribbon cable, a mug of cold tea, a dot-matrix printer with a curl of tractor-feed paper spilling to the floor. Posters with no writing, a model rocket, a dark window with a rainy neon city outside. Deep shadows in dark blue-black, everything else rimmed with green light. Exciting, secret, electric. TALL PORTRAIT composition. The glowing monitor and computer fill the middle of the frame, the wall and window above, the floor flat and level across the bottom fifth."""
+
+[[asset]]
+name = "bg_playground_msx"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A bright 1985 East Asian kid's bedroom after school. On a low desk: a slim black 8-bit home computer with a chunky keyboard and a game cartridge plugged into its top slot, connected to a small CRT television whose blank screen glows a deep royal blue, a cassette data recorder, a stack of game cartridges in colourful boxes with no writing, a pair of joypads, a bowl of instant noodles, a desk lamp, sliding paper screen door, a window with a sunset over dense apartment blocks. Palette of saturated primaries — royal blue, magenta, yellow, cyan, white — like a 1980s arcade flyer. Cheerful, buzzing, full of energy. Seen straight on from across the room, the computer and its glowing monitor large and centred, the floor flat and level across the bottom fifth of the frame."""
+
+[[asset]]
+name = "bg_playground_apple2"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A late-night 1983 hacker's bedroom lit almost only by the glow of a green phosphor monitor. On a wooden desk: a beige 8-bit home computer with a built-in keyboard and two stacked beige floppy disk drives on top, a small monochrome monitor whose blank screen glows bright green with scanlines, a fanned stack of 5.25-inch floppy disks, a joystick, a tangle of ribbon cable, a mug of cold tea, a dot-matrix printer with a curl of tractor-feed paper spilling to the floor. Posters with no writing, a model rocket, a dark window with a rainy neon city outside. Deep shadows in dark blue-black, everything else rimmed with green light. Exciting, secret, electric. Seen straight on from across the room, the computer and its glowing monitor large and centred, the floor flat and level across the bottom fifth of the frame."""
+
+[[asset]]
+name = "bg_playground_msx_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A bright 1985 East Asian kid's bedroom after school. On a low desk: a slim black 8-bit home computer with a chunky keyboard and a game cartridge plugged into its top slot, connected to a small CRT television whose blank screen glows a deep royal blue, a cassette data recorder, a stack of game cartridges in colourful boxes with no writing, a pair of joypads, a bowl of instant noodles, a desk lamp, sliding paper screen door, a window with a sunset over dense apartment blocks. Palette of saturated primaries — royal blue, magenta, yellow, cyan, white — like a 1980s arcade flyer. Cheerful, buzzing, full of energy. TALL PORTRAIT composition. The glowing monitor and computer fill the middle of the frame, the wall and window above, the floor flat and level across the bottom fifth."""
+
+[[asset]]
+name = "bg_playground_amiga_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A 1988 demoscene bedroom studio at dusk. On a desk: a cream-white wedge-shaped 16-bit home computer with the keyboard built in and a floppy slot on its side, a boxy cream colour monitor whose blank screen glows an intense blue with an orange and white glow, a two-button mouse on a mouse mat, 3.5-inch floppy disks in a plastic box, a pair of big headphones, a small sound sampler, a MIDI keyboard, a lava lamp, a red-and-white checkered bouncing ball toy on the shelf, copper-bar rainbow light gradients reflected on the wall. Palette of deep blue, orange, white and black with rainbow copper stripes. Cool, rad, creative. TALL PORTRAIT composition. The glowing monitor and computer fill the middle of the frame, the wall and window above, the floor flat and level across the bottom fifth."""
+
+[[asset]]
+name = "bg_playground_amiga"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-22"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A 1988 demoscene bedroom studio at dusk. On a desk: a cream-white wedge-shaped 16-bit home computer with the keyboard built in and a floppy slot on its side, a boxy cream colour monitor whose blank screen glows an intense blue with an orange and white glow, a two-button mouse on a mouse mat, 3.5-inch floppy disks in a plastic box, a pair of big headphones, a small sound sampler, a MIDI keyboard, a lava lamp, a red-and-white checkered bouncing ball toy on the shelf, copper-bar rainbow light gradients reflected on the wall. Palette of deep blue, orange, white and black with rainbow copper stripes. Cool, rad, creative. Seen straight on from across the room, the computer and its glowing monitor large and centred, the floor flat and level across the bottom fifth of the frame."""
