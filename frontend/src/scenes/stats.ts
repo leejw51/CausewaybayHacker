@@ -25,7 +25,7 @@
  * fills in what has been earned.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf, width, wrap } from "../engine/text";
+import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
 import { clipped, fill, type Ctx, type Rect } from "../engine/ui";
 import {
@@ -264,7 +264,18 @@ export class StatsScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     header(g, this.app, T("stats.title"));
-    const f = frame(layout, layout.isPortrait() ? 0.38 : 0.34, 0.03);
+    let f = frame(layout, layout.isPortrait() ? 0.38 : 0.34, 0.03);
+    if (!f.portrait) {
+      // Side by side on a short window the nav wrapped to two rows at a
+      // fingertip's height and sat on the record. Wider, until it is one.
+      const sm = ensureFonts(f.scale).stationSm;
+      const touch = layout.minTouchH();
+      const one = auxHeight(sm, 1e6, touch);
+      for (const split of [0.42, 0.48]) {
+        if (auxHeight(sm, f.left[2] - 12 - 16, touch) <= one) break;
+        f = frame(layout, split, 0.03);
+      }
+    }
     this.tabs.reset();
     this.rows.reset();
 
@@ -605,8 +616,12 @@ export class StatsScene implements Scene {
     g.fillStyle = css(Theme.dim);
     printf(g, fonts.station, `${m.count}×`, x, y + pad, w - pad, "right");
 
-    const pipY = y + pad + fonts.station.height + Math.round(5 * s);
+    // The pips and their line share one slot, `stationSm` tall, as
+    // `mistakeRowH` budgets it: the line used to be centred on the pips, and
+    // where its font is taller than they are it rose into the title.
+    const slotY = y + pad + fonts.station.height + Math.round(5 * s);
     const pipR = Math.max(4, Math.round(7 * s));
+    const pipY = slotY + Math.max(0, Math.round((fonts.stationSm.height - pipR) / 2));
     const pipGap = Math.round(5 * s);
     const done = Math.round(tamedFraction(m) * LEARNED_AT);
     for (let i = 0; i < LEARNED_AT; i++) {
@@ -616,20 +631,21 @@ export class StatsScene implements Scene {
     }
     const lineX = x + pad + LEARNED_AT * (pipR * 2 + pipGap) + Math.round(8 * s);
     g.fillStyle = css(accent);
+    const lineW = Math.max(Math.round(40 * s), x + w - pad - lineX);
     printf(
       g,
       fonts.stationSm,
-      tamedLine(m),
+      elide(fonts.stationSm, tamedLine(m), lineW),
       lineX,
-      pipY + Math.round((pipR - fonts.stationSm.height) / 2),
-      Math.max(Math.round(40 * s), x + w - pad - lineX),
+      slotY,
+      lineW,
       "left",
     );
 
     // What to drill to fix it (§5.6), and where it last happened. The concepts
     // are the server's own answer to "what should I go and read", so they are
     // printed rather than summarised.
-    const tailY = pipY + pipR + Math.round(6 * s);
+    const tailY = slotY + Math.max(pipR, fonts.stationSm.height) + Math.round(6 * s);
     const concepts = m.concepts.length > 0 ? m.concepts.join(" · ") : T("stats.noConcepts");
     const tailW = w - pad * 2;
     // The quest id is the door and it goes on the right, measured, so that a
@@ -640,7 +656,15 @@ export class StatsScene implements Scene {
       const door = `→ ${m.example_quest_id}`;
       const doorW = Math.min(width(fonts.small, door), Math.round(tailW * 0.55));
       g.fillStyle = css(Theme.cyan, 0.75);
-      printf(g, fonts.small, door, x + pad + tailW - doorW, tailY, doorW, "right");
+      printf(
+        g,
+        fonts.small,
+        elide(fonts.small, door, doorW),
+        x + pad + tailW - doorW,
+        tailY,
+        doorW,
+        "right",
+      );
       conceptW = tailW - doorW - Math.round(10 * s);
     }
     g.fillStyle = css(Theme.cream, 0.55);

@@ -528,6 +528,21 @@ describe("roadColumn", () => {
     }
   });
 
+  it("brings seven roads down to their names, record first, before one runs under the buttons", () => {
+    // A phone: seven roads, a fingertip's floor that does not fit.
+    const TEXT = 26;
+    for (const panel of [
+      [0, 0, 360, 420],
+      [0, 0, 400, 330],
+    ] as [number, number, number, number][]) {
+      const col = roadColumn(panel, 7, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE, TEXT);
+      const last = col.rows[6];
+      expect(last[1] + last[3]).toBeLessThanOrEqual(col.buttons[1]);
+      expect(col.rows[0][3]).toBeGreaterThanOrEqual(TEXT);
+      if (col.record[3] > 0) expect(col.record[1]).toBeGreaterThanOrEqual(last[1] + last[3]);
+    }
+  });
+
   it("gives the roads a finger's height before the tile takes more", () => {
     const col = roadColumn(LAND, 3, GAP, REC, FLOOR, MIN_ROW, PLAY, TILE);
     expect(col.rows[0][3]).toBe(MIN_ROW);

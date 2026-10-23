@@ -25,7 +25,7 @@
 import type { App, Scene } from "../app";
 import { ensureFonts, print, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme, type RGBA } from "../engine/theme";
-import { clipped, fill, pixBtn, well, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, fill, pixBtn, well, type Ctx, type Rect } from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -324,7 +324,20 @@ export class SearchScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     header(g, this.app, t("search.title"));
-    const f = frame(layout, layout.isPortrait() ? 0.42 : 0.34, 0.03);
+    let f = frame(layout, layout.isPortrait() ? 0.42 : 0.34, 0.03);
+    if (f.portrait) {
+      // On a phone the chips wrap to a fingertip's height, row on row, and in
+      // 42 % of the window the land and road rows were drawn under the nav.
+      // The ask takes what it measures; the results keep the rest.
+      const need = this.askH(f.left[2], f.scale, true);
+      if (need > f.left[3]) f = frame(layout, Math.min(0.72, need / (f.body[3] - f.pad)), 0.03);
+    } else {
+      // Side by side on a short window, wider instead: fewer chip rows.
+      for (const split of [0.42, 0.5, 0.58]) {
+        if (this.askH(f.left[2], f.scale, false) <= f.left[3]) break;
+        f = frame(layout, split, 0.03);
+      }
+    }
     this.chips.reset();
     this.hitBtns.reset();
 
@@ -332,6 +345,64 @@ export class SearchScene implements Scene {
     arriving(g, f, "right", this.rightIn, () => this.drawHits(g, f.right, f.scale));
 
     footer(g, layout, t("search.footer", { aux: AUX_HINT() }));
+  }
+
+  /** The chip rows, in order: how, land, road, state. */
+  private chipRows(): Array<{
+    label: string;
+    items: Array<{ id: string; label: string; on: boolean }>;
+  }> {
+    return [
+      {
+        label: t("search.how"),
+        items: MODES.map((m) => ({
+          id: `mode:${m}`,
+          label:
+            m === "unified"
+              ? t("search.unified")
+              : m === "bm25"
+                ? t("search.text")
+                : t("search.meaning"),
+          on: m === this.mode,
+        })),
+      },
+      {
+        label: t("search.land"),
+        items: LANDS().map((l) => ({ id: l.id, label: l.label, on: l.value === this.filterLand })),
+      },
+      {
+        label: t("search.road"),
+        items: CATS().map((c) => ({ id: c.id, label: c.label, on: c.value === this.filterCat })),
+      },
+      {
+        label: t("search.state"),
+        items: STATES().map((st) => ({
+          id: st.id,
+          label: st.label,
+          on: st.value === this.filterState,
+        })),
+      },
+    ];
+  }
+
+  /**
+   * How tall the ask panel must be, `w` wide, for everything on it to sit
+   * above the nav — the mode's sentence too, when `withLine`. `drawAsk`'s
+   * arithmetic, measured before anything is drawn.
+   */
+  private askH(w: number, s: number, withLine: boolean, oneLine = false): number {
+    const fonts = ensureFonts(s);
+    const touch = this.app.layout.minTouchH();
+    const iw = w - 12 - 16;
+    const bar = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+    const gap = Math.round(8 * s);
+    const fieldH = Math.max(touch, fonts.small.height + Math.round(14 * s));
+    const btnH = Math.max(touch, fonts.button.height + 20);
+    let h = (oneLine ? Math.max(fieldH, btnH) : fieldH + gap + btnH) + gap * 2;
+    for (const row of this.chipRows()) h += this.chipRowLayout(row.items, iw, s).h;
+    if (withLine) h += wrap(fonts.small, MODE_LINE[this.mode](), iw).length * fonts.small.height;
+    h += gap * 2 + auxHeight(fonts.stationSm, iw, touch);
+    return h + 14 + bar + 16;
   }
 
   private drawAsk(g: Ctx, rect: Rect, s: number): void {
@@ -344,22 +415,31 @@ export class SearchScene implements Scene {
     // login screen and the editor use, because a canvas has no caret and no
     // clipboard and a search box needs both.
     const fieldH = Math.max(this.app.layout.minTouchH(), fonts.small.height + Math.round(14 * s));
-    well(g, x, y, w, fieldH);
-    this.fieldRect = [x + 4, y + 4, w - 8, fieldH - 8];
+    const btnH = Math.max(this.app.layout.minTouchH(), fonts.button.height + 20);
+    // On a window too short for the filters under it, the box and its two
+    // buttons share one line: on a phone held sideways that line was the
+    // difference between the filters showing and not.
+    const oneLine = this.askH(rect[2], s, false) > rect[3];
+    const goW = btnBox(fonts.button, [t("search.search")], 0, btnPad(fonts.button), btnH)[0];
+    const clrW = btnBox(fonts.button, [t("search.clear")], 0, btnPad(fonts.button), btnH)[0];
+    const fieldW = oneLine ? w - goW - clrW - gap * 2 : w;
+    well(g, x, y, fieldW, oneLine ? Math.max(fieldH, btnH) : fieldH);
+    this.fieldRect = [x + 4, y + 4, fieldW - 8, (oneLine ? Math.max(fieldH, btnH) : fieldH) - 8];
 
     // The one action, and the way to empty the box, side by side under it.
-    const btnH = Math.max(this.app.layout.minTouchH(), fonts.button.height + 20);
-    const by = y + fieldH + gap;
-    const half = Math.floor((w - gap) * 0.62);
+    const by = oneLine ? y : y + fieldH + gap;
+    const bx = oneLine ? x + fieldW + gap : x;
+    const bw = oneLine ? goW + clrW + gap : w;
+    const half = oneLine ? goW : Math.floor((w - gap) * 0.62);
     const goLabel = this.busy ? "…" : t("search.search");
-    pixBtn(g, fonts.button, x, by, half, btnH, goLabel, {
+    pixBtn(g, fonts.button, bx, by, half, btnH, goLabel, {
       lit: !this.busy,
       hover: this.chips.hovered === "go",
       dim: this.busy,
     });
-    this.chips.add({ id: "go", rect: [x, by, half, btnH], label: goLabel, dim: this.busy });
-    const clearX = x + half + gap;
-    const clearW = w - half - gap;
+    this.chips.add({ id: "go", rect: [bx, by, half, btnH], label: goLabel, dim: this.busy });
+    const clearX = bx + half + gap;
+    const clearW = bw - half - gap;
     pixBtn(g, fonts.button, clearX, by, clearW, btnH, t("search.clear"), {
       quiet: true,
       hover: this.chips.hovered === "clear",
@@ -367,61 +447,34 @@ export class SearchScene implements Scene {
     this.chips.add({ id: "clear", rect: [clearX, by, clearW, btnH], label: t("search.clear") });
 
     let cy = by + btnH + gap * 2;
-    cy = this.drawChipRow(
-      g,
-      t("search.how"),
-      MODES.map((m) => ({
-        id: `mode:${m}`,
-        label:
-          m === "unified"
-            ? t("search.unified")
-            : m === "bm25"
-              ? t("search.text")
-              : t("search.meaning"),
-        on: m === this.mode,
-      })),
-      [x, cy, w, 0],
-      s,
-    );
+    const navF = fonts.stationSm;
+    const touch = this.app.layout.minTouchH();
+    const navH = auxHeight(navF, w, touch);
+    const [how, ...filters] = this.chipRows();
+    cy = this.drawChipRow(g, how.label, how.items, [x, cy, w, 0], s);
     // What the chosen mode does, under the chips it belongs to. The three
     // rankings are the substance of §8 and a player who cannot tell them apart
     // will leave the default alone for ever — which is fine, but it should be a
-    // choice rather than a shrug.
-    g.fillStyle = css(Theme.cream, 0.6);
+    // choice rather than a shrug. Only when the filters still fit under it:
+    // on a phone held sideways the sentence is what gives way.
+    const filtersH = filters.reduce((n, r) => n + this.chipRowLayout(r.items, w, s).h, 0);
     const lines = wrap(fonts.small, MODE_LINE[this.mode](), w);
-    for (let i = 0; i < lines.length && cy + fonts.small.height < y + h; i++) {
+    const lineRoom = Math.floor((y + h - navH - gap - filtersH - gap - cy) / fonts.small.height);
+    g.fillStyle = css(Theme.cream, 0.6);
+    for (let i = 0; i < Math.min(lines.length, lineRoom); i++) {
       printf(g, fonts.small, lines[i], x, cy, w, "left");
       cy += fonts.small.height;
     }
     cy += gap;
-
-    cy = this.drawChipRow(
-      g,
-      t("search.land"),
-      LANDS().map((l) => ({ id: l.id, label: l.label, on: l.value === this.filterLand })),
-      [x, cy, w, 0],
-      s,
-    );
-    cy = this.drawChipRow(
-      g,
-      t("search.road"),
-      CATS().map((c) => ({ id: c.id, label: c.label, on: c.value === this.filterCat })),
-      [x, cy, w, 0],
-      s,
-    );
-    cy = this.drawChipRow(
-      g,
-      t("search.state"),
-      STATES().map((st) => ({ id: st.id, label: st.label, on: st.value === this.filterState })),
-      [x, cy, w, 0],
-      s,
-    );
+    // A row that would run into the nav is left off rather than drawn under
+    // it: on a phone held sideways there is not room for all four.
+    for (const row of filters) {
+      if (cy + this.chipRowLayout(row.items, w, s).h > y + h - navH) break;
+      cy = this.drawChipRow(g, row.label, row.items, [x, cy, w, 0], s);
+    }
 
     // The nav sits on the floor of the panel, not after the chips: it is the
     // way out and it has to be in the same place on all three screens.
-    const navF = fonts.stationSm;
-    const touch = this.app.layout.minTouchH();
-    const navH = auxHeight(navF, w, touch);
     auxRow(this.nav, navF, [x, y + h - navH, w, navH], "search", touch);
     drawAux(g, this.nav, navF);
 
@@ -432,6 +485,32 @@ export class SearchScene implements Scene {
     else this.overlay.hide();
   }
 
+  /** Where a row of pills goes in `w`, relative to its top-left, and its height. */
+  private chipRowLayout(
+    items: ReadonlyArray<{ label: string }>,
+    w: number,
+    s: number,
+  ): { at: Array<[number, number, number]>; h: number; pillH: number; labelW: number } {
+    const f = ensureFonts(s).stationSm;
+    const pad = Math.round(7 * s);
+    const gap = Math.round(5 * s);
+    const pillH = Math.max(this.app.layout.minTouchH(), f.height + Math.round(10 * s));
+    const labelW = width(f, t("search.state")) + pad;
+    const at: Array<[number, number, number]> = [];
+    let cx = labelW + gap;
+    let cy = 0;
+    for (const item of items) {
+      const cw = width(f, item.label) + pad * 2;
+      if (cx + cw > w && cx > labelW + gap) {
+        cx = labelW + gap;
+        cy += pillH + gap;
+      }
+      at.push([cx, cy, cw]);
+      cx += cw + gap;
+    }
+    return { at, h: cy + pillH + Math.round(6 * s), pillH, labelW };
+  }
+
   /** A labelled row of small pills. Painted here; hit-tested by `chips`. */
   private drawChipRow(
     g: Ctx,
@@ -440,33 +519,23 @@ export class SearchScene implements Scene {
     rect: Rect,
     s: number,
   ): number {
-    const fonts = ensureFonts(s);
-    const f = fonts.stationSm;
+    const f = ensureFonts(s).stationSm;
     const [x, y, w] = rect;
-    const pad = Math.round(7 * s);
-    const gap = Math.round(5 * s);
-    const h = Math.max(this.app.layout.minTouchH(), f.height + Math.round(10 * s));
-    const labelW = width(f, t("search.state")) + pad;
+    const { at, h: rowH, pillH: h, labelW } = this.chipRowLayout(items, w, s);
     g.fillStyle = css(Theme.dim);
     printf(g, f, label, x, y + Math.round((h - f.height) / 2), labelW, "left");
-
-    let cx = x + labelW + gap;
-    let cy = y;
-    for (const item of items) {
-      const cw = width(f, item.label) + pad * 2;
-      if (cx + cw > x + w && cx > x + labelW + gap) {
-        cx = x + labelW + gap;
-        cy += h + gap;
-      }
+    items.forEach((item, i) => {
+      const [dx, dy, cw] = at[i];
+      const cx = x + dx;
+      const cy = y + dy;
       const hot = this.chips.hovered === item.id;
       fill(g, item.on ? Theme.coin : Theme.ink, cx, cy, cw, h, item.on ? 1 : hot ? 0.8 : 0.5);
       fill(g, item.on ? Theme.wood : Theme.dim, cx, cy + h - 2, cw, 2, item.on ? 1 : 0.6);
       g.fillStyle = css(item.on ? Theme.ink : hot ? Theme.cream : Theme.cyan);
       printf(g, f, item.label, cx, cy + Math.round((h - f.height) / 2), cw, "center");
       this.chips.add({ id: item.id, rect: [cx, cy, cw, h], label: item.label });
-      cx += cw + gap;
-    }
-    return cy + h + Math.round(6 * s);
+    });
+    return y + rowH;
   }
 
   private drawHits(g: Ctx, rect: Rect, s: number): void {

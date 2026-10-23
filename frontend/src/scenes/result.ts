@@ -372,7 +372,18 @@ export class ResultScene implements Scene {
           ? t("result.stillGood")
           : t("result.notYet"),
     );
-    const whole = frame(layout, 0.42, 0.05);
+    let whole = frame(layout, 0.42, 0.05);
+    if (whole.portrait) {
+      // Held upright, the verdict is a share of the window, and on a phone
+      // 42 % of it was shorter than the stamp and the facts under it: TESTS
+      // and COMPILE were drawn across the panel's foot and into the next.
+      // It takes what it measures, and the run below it the rest.
+      const bar = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+      const need = this.leftHeight(s, fonts, ok) + 14 + bar + 16;
+      if (need > whole.left[3]) {
+        whole = frame(layout, Math.min(0.7, need / (whole.body[3] - whole.pad)), 0.05);
+      }
+    }
     // The button band is measured before the panels are placed: at the
     // default type size in portrait "TRY AGAIN" and "BACK TO THE MAP" wrap to
     // two rows, and a band sized for one drew the second under the footer,
@@ -466,9 +477,14 @@ export class ResultScene implements Scene {
       //
       // It gets its own row. Landing it on the stars was the review's point:
       // the payoff of the loop read as a collision between two of its parts.
-      const stampW = Math.min(left[2] * 0.42, 128 * s);
+      // And no bigger than what is left over the facts: on a phone held
+      // sideways the panel is shorter than the stamp, and the facts were
+      // pushed out of its foot.
+      const facts = (3 + (this.attempt.exit_code ? 1 : 0)) * fonts.small.height;
+      const room = left[1] + left[3] - y - facts - fonts.stationSm.height - Math.round(24 * s);
+      const stampW = Math.max(0, Math.min(left[2] * 0.42, 128 * s, room));
       const land = this.stamp.out;
-      if (this.stamp.raw > 0) {
+      if (this.stamp.raw > 0 && stampW >= 24 * s) {
         g.save();
         g.globalAlpha = Math.min(1, this.stamp.raw * 3);
         const cx = left[0] + left[2] / 2;

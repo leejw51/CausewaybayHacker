@@ -31,6 +31,15 @@ const TOUCH_READABLE = 0.8;
 const TOUCH_BOOST_MAX = 1.5;
 /** The smallest thing a finger can be expected to hit, in CSS pixels. */
 const TOUCH_TARGET = 40;
+/**
+ * The same, on a window too short for it. A phone held sideways in a browser
+ * is under four hundred CSS pixels tall, and at forty a column of five
+ * buttons was half of it: filters were hidden and roads squeezed to slivers
+ * to make room. Thirty-two is still a fingertip.
+ */
+const TOUCH_TARGET_SHORT = 32;
+/** Under this many CSS pixels tall, a window is short. */
+const SHORT_CSS_H = 480;
 
 /**
  * How lopsided a window has to be before its shape is an *answer* rather than
@@ -55,6 +64,8 @@ export class Layout {
   scale = 1;
   /** CSS pixels per virtual pixel: how big things are to a finger or an eye. */
   cssScale = 1;
+  /** The canvas's height in CSS pixels, as last measured. */
+  cssH = Infinity;
   /** Where the virtual canvas sits inside the window, in device pixels. */
   ox = 0;
   oy = 0;
@@ -223,7 +234,9 @@ export class Layout {
    * on it. Zero where there are no fingers.
    */
   minTouchH(): number {
-    return this.touch ? Math.ceil(TOUCH_TARGET / this.cssScale) : 0;
+    if (!this.touch) return 0;
+    const target = this.cssH < SHORT_CSS_H ? TOUCH_TARGET_SHORT : TOUCH_TARGET;
+    return Math.ceil(target / this.cssScale);
   }
 
   /**
@@ -282,6 +295,7 @@ export class Layout {
       this.canvas.height !== wh;
     this.scale = scale;
     this.cssScale = cssScale;
+    this.cssH = ch;
     this.vw = vw;
     this.vh = vh;
     this.dw = ww;

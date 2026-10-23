@@ -151,25 +151,63 @@ export function roadColumn(
   minRowH: number,
   playH: number,
   tileFull: number,
+  textH = floorH,
 ): RoadColumn {
   const [x, y, w, h] = panel;
   // What the column needs with the tile at full height and every road at
   // its floor: if even that overflows, the tile gives.
   const fixed = recH + playH + gap * 4 + roads * (floorH + gap);
   const tight = fixed + Math.max(playH, tileFull) > h;
-  const tileH = tight ? playH : Math.max(playH, tileFull);
-  const tile: Rect = [x, y, w, tileH];
   const buttons: Rect = [x, y + h - playH, w, playH];
-  // The record sits under the roads, not between them and the tile: the
-  // first road is CHEATSHEET, and it reads straight after the playground —
-  // the two main things on this screen, one under the other.
-  const record: Rect = [x, buttons[1] - gap * 2 - recH, w, recH];
-  const rowsTop = y + tileH + gap * 2;
-  const rowsBottom = record[1] - gap;
-  const share = Math.floor((rowsBottom - rowsTop) / Math.max(1, roads)) - gap;
-  const rowH = Math.max(floorH, Math.min(minRowH, share));
-  const rows: Rect[] = [];
-  for (let i = 0; i < roads; i++) rows.push([x, rowsTop + i * (rowH + gap), w, rowH]);
+  const lay = (tileH: number, cells: number) => {
+    // The record sits under the roads, not between them and the tile: the
+    // first road is CHEATSHEET, and it reads straight after the playground —
+    // the two main things on this screen, one under the other.
+    const rowsTop = y + tileH + (tileH > 0 ? gap * 2 : 0);
+    const perLine = (rec: number, lines: number): number =>
+      Math.floor((buttons[1] - gap * 2 - rec - gap - rowsTop) / Math.max(1, lines));
+    // `floorH` is the height a road would like; `textH`, the least it can be
+    // and still hold its name. Seven roads on a phone do not get the first in
+    // one column, and a road drawn over AUTO SELECT is a road nobody can
+    // press: so the roads go two abreast, then three, then the record line
+    // gives up its place, then the gaps between the roads close, and a road
+    // is never given more than the column has.
+    let cols = 1;
+    if (cells > 3 && perLine(recH, cells) - gap < floorH) cols = 2;
+    if (cols === 2 && cells > 4 && perLine(0, Math.ceil(cells / 2)) - gap < textH) cols = 3;
+    const lines = Math.ceil(cells / cols);
+    const rec = perLine(recH, lines) - gap >= textH ? recH : 0;
+    const record: Rect = [x, buttons[1] - gap * 2 - rec, w, rec];
+    const per = perLine(rec, lines);
+    const rowGap = per - gap >= textH ? gap : Math.max(1, Math.min(gap, per - textH));
+    const share = per - rowGap;
+    const rowH = Math.max(1, share >= floorH ? Math.min(minRowH, share) : share);
+    const colW = Math.floor((w - gap * (cols - 1)) / cols);
+    const rows: Rect[] = [];
+    for (let i = 0; i < cells; i++) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      rows.push([x + c * (colW + gap), rowsTop + r * (rowH + rowGap), colW, rowH]);
+    }
+    return { record, rows, cols, rowH };
+  };
+  const tileH = tight ? playH : Math.max(playH, tileFull);
+  const laid = lay(tileH, roads);
+  // A phone held sideways: even three abreast the roads come out shorter
+  // than their names. The tile gives up its band and takes the first cell
+  // of the grid instead — a playground the size of a road is still a door.
+  if (tight && laid.cols === 3 && laid.rowH < textH) {
+    const folded = lay(0, roads + 1);
+    return {
+      tile: folded.rows[0],
+      record: folded.record,
+      rows: folded.rows.slice(1),
+      buttons,
+      tight,
+    };
+  }
+  const tile: Rect = [x, y, w, tileH];
+  const { record, rows } = laid;
   return { tile, record, rows, buttons, tight };
 }
 
@@ -722,12 +760,21 @@ export class LandsScene implements Scene {
     });
 
     g.fillStyle = css(chosen ? accent : Theme.dim);
+    // One line, always: on a phone "270 중 0 클리어 ★0" wrapped and its
+    // second line was drawn under the plate. Too wide, it says the numbers
+    // alone.
+    const full =
+      rec.total > 0
+        ? t("lands.record", { cleared: rec.cleared, total: rec.total, stars: rec.stars })
+        : "—";
+    const recText =
+      width(fonts.stationSm, full) <= inner[2]
+        ? full
+        : elide(fonts.stationSm, `${rec.cleared}/${rec.total} ★${rec.stars}`, inner[2]);
     printf(
       g,
       fonts.stationSm,
-      rec.total > 0
-        ? t("lands.record", { cleared: rec.cleared, total: rec.total, stars: rec.stars })
-        : "—",
+      recText,
       inner[0],
       inner[1] + inner[3] - fonts.stationSm.height,
       inner[2],
@@ -1134,7 +1181,19 @@ export class LandsScene implements Scene {
       // coder hovering over it. See `roadColumn` for the order and the fit.
       const tileFull = Math.max(playH, Math.round(Math.min(150 * s, right[3] * 0.3)));
       const floorH = fonts.button.height + Math.round(14 * s);
-      const col = roadColumn(right, cats.length, gap, recH, floorH, minRowH, playH, tileFull);
+      // The least a road may be: its name in the small face, padded.
+      const textH = fonts.stationSm.height + Math.round(6 * s);
+      const col = roadColumn(
+        right,
+        cats.length,
+        gap,
+        recH,
+        floorH,
+        minRowH,
+        playH,
+        tileFull,
+        textH,
+      );
       const tight = col.tight;
       const rowH = col.rows[0]?.[3] ?? floorH;
 
@@ -1146,40 +1205,43 @@ export class LandsScene implements Scene {
         label: t("lands.codePlayground"),
       });
 
-      const [recX, recY] = col.record;
-      fill(g, Theme.navy, recX, recY, right[2], recH, 0.9);
-      fill(g, landColour(this.land), recX, recY, Math.round(3 * s), recH);
-      g.fillStyle = css(Theme.cream);
-      printf(
-        g,
-        fonts.stationSm,
-        rec.total > 0
-          ? t("lands.clearedOf", { cleared: rec.cleared, total: rec.total })
-          : t("lands.nothingYet"),
-        right[0] + Math.round(12 * s),
-        recY + Math.round(7 * s),
-        right[2] - Math.round(24 * s),
-        "left",
-      );
-      g.fillStyle = css(Theme.coin);
-      printf(
-        g,
-        fonts.stationSm,
-        `★ ${rec.stars}`,
-        right[0],
-        recY + Math.round(7 * s),
-        right[2] - Math.round(12 * s),
-        "right",
-      );
-      if (rec.total > 0) {
-        fill(
+      const [recX, recY, , recShown] = col.record;
+      // Given up to the roads when the column is short (see `roadColumn`).
+      if (recShown > 0) {
+        fill(g, Theme.navy, recX, recY, right[2], recH, 0.9);
+        fill(g, landColour(this.land), recX, recY, Math.round(3 * s), recH);
+        g.fillStyle = css(Theme.cream);
+        printf(
           g,
-          Theme.admit,
-          right[0],
-          recY + recH - 2,
-          Math.round((right[2] * rec.cleared) / rec.total),
-          2,
+          fonts.stationSm,
+          rec.total > 0
+            ? t("lands.clearedOf", { cleared: rec.cleared, total: rec.total })
+            : t("lands.nothingYet"),
+          right[0] + Math.round(12 * s),
+          recY + Math.round(7 * s),
+          right[2] - Math.round(24 * s),
+          "left",
         );
+        g.fillStyle = css(Theme.coin);
+        printf(
+          g,
+          fonts.stationSm,
+          `★ ${rec.stars}`,
+          right[0],
+          recY + Math.round(7 * s),
+          right[2] - Math.round(12 * s),
+          "right",
+        );
+        if (rec.total > 0) {
+          fill(
+            g,
+            Theme.admit,
+            right[0],
+            recY + recH - 2,
+            Math.round((right[2] * rec.cleared) / rec.total),
+            2,
+          );
+        }
       }
 
       // The rows share what the column has, under the tile and the record
@@ -1217,12 +1279,13 @@ export class LandsScene implements Scene {
       // nine pixels, which is the whole reason the rows disagreed.
       const colTw = Math.max(
         Math.round(120 * s),
-        Math.round(right[2] * 0.58) - Math.round(8 * s) - Math.round(16 * s),
+        Math.round((col.rows[0]?.[2] ?? right[2]) * 0.58) - Math.round(8 * s) - Math.round(16 * s),
       );
       const inlineAll = nameW + countW + Math.round(8 * s) <= colTw;
 
-      let y = col.rows[0]?.[1] ?? col.tile[1] + col.tile[3] + gap * 2;
-      for (const c of cats) {
+      cats.forEach((c, ci) => {
+        // Where this road goes: one column, or two abreast on a short one.
+        const [rowX, y, barW] = col.rows[ci];
         // Nothing is *locked* (PROTOCOL §4.7): a road with streets in it is a
         // road you may walk down today, whatever you have cleared. `open` is
         // still read, but it no longer means "not yet" — it means the pack did
@@ -1233,9 +1296,8 @@ export class LandsScene implements Scene {
         const id = `cat:${c.category}`;
         if (!this.glow.has(id)) this.glow.set(id, 0);
         const lit = this.glow.get(id) ?? 0;
-        const barW = right[2];
         const slide = Math.round(lit * 8 * s);
-        const rx = right[0] + slide;
+        const rx = rowX + slide;
         const accent = landColour(this.land);
 
         fill(g, empty ? Theme.dim : Theme.navy, rx, y, barW, rowH, empty ? 0.35 : 0.9);
@@ -1333,9 +1395,18 @@ export class LandsScene implements Scene {
         }
 
         const tx = rx + Math.round(14 * s);
-        const tw = Math.max(Math.round(120 * s), textW - Math.round(28 * s));
+        const tw = Math.min(
+          barW - Math.round(20 * s),
+          Math.max(Math.round(120 * s), textW - Math.round(28 * s)),
+        );
         const lineH = fonts.small.height;
-        const titleY = y + Math.round(12 * s);
+        // Centred in a row cut down to its name, so the name is not stood on
+        // the row's bottom edge; and below the button face's height, said in
+        // the small one, elided, rather than over the road under it.
+        const nameFont =
+          rowH >= fonts.button.height + Math.round(4 * s) ? fonts.button : fonts.stationSm;
+        const titleY =
+          y + Math.max(0, Math.min(Math.round(12 * s), Math.round((rowH - nameFont.height) / 2)));
         // The name and the count share a line only while both fit: "POKROČILÉ"
         // ran into its "0/17" in Czech, so the count drops under the name
         // when the two would touch.
@@ -1351,7 +1422,7 @@ export class LandsScene implements Scene {
         const countBelow = !inlineAll && twoLines;
         const showCount = inlineAll || twoLines;
         g.fillStyle = css(empty ? Theme.dim : lead ? Theme.coin : Theme.cream);
-        printf(g, fonts.button, catName, tx, titleY, tw, "left");
+        printf(g, nameFont, elide(nameFont, catName, tw), tx, titleY, tw, "left");
         // What the road is, from the bible. Only when the row is tall enough
         // to hold it — in a short portrait window the count is what matters.
         const lineY =
@@ -1420,12 +1491,11 @@ export class LandsScene implements Scene {
         }
         this.catBtns.add({
           id,
-          rect: [right[0], y, barW, rowH],
+          rect: [rowX, y, barW, rowH],
           label: "",
           dim: empty,
         });
-        y += rowH + gap;
-      }
+      });
 
       // The one button on this screen that answers "I do not know what to
       // practise". It asks the server rather than guessing, because the
