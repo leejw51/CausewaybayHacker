@@ -724,11 +724,9 @@ function Playground:run()
     self.ran_tint = outcome == "ok" and Theme.green
       or outcome == "compile_error" and Theme.bad or Theme.gold
     Juice.trigger("pg:ran")
-    -- An old computer has its own words for a run that did not finish, and
-    -- puts them up on the tube for a few seconds. The scene's own words stay
-    -- the terminal's (`OUTCOME`); these are the machine's, and live with it.
+    -- Show the compiler message inside the selected machine’s error screen.
     if self.retro then
-      self.retro:say(Computer.says(Computer.get(), payload.run and payload.run.outcome))
+      self.retro:say(Computer.says(Computer.get(), outcome, payload.run))
     end
     -- No accepted/rejected chime either way. Nothing was judged.
     SFX.play("move")

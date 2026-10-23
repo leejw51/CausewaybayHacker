@@ -461,7 +461,20 @@ function Retro:paint(machine, w, h, t, age)
 end
 
 function Retro:paint_alert(machine, grid, age)
-  local lines = self.alert.lines
+  local lines = {}
+  local width, limit = grid.cols - 4, math.max(1, grid.rows - 5)
+  for _, line in ipairs(self.alert.lines) do
+    local chars = {}
+    for ch in line:gmatch("[%z\1-\127\194-\244][\128-\191]*") do chars[#chars + 1] = ch end
+    if #chars == 0 then lines[#lines + 1] = "" end
+    for i = 1, #chars, width do
+      lines[#lines + 1] = table.concat(chars, "", i, math.min(#chars, i + width - 1))
+    end
+  end
+  if #lines > limit then
+    for i = #lines, limit + 1, -1 do lines[i] = nil end
+    lines[limit] = "... more in output"
+  end
   local tube = Computer.TUBE[machine]
   if machine == "amiga" then
     -- The Guru: black, a red box that blinks, red text centred in it.
@@ -484,7 +497,7 @@ function Retro:paint_alert(machine, grid, age)
   -- The 8-bits print it under the code they were running and go back to the
   -- prompt: the line, and the cursor.
   ink(tube.ink)
-  local row = math.max(1, math.floor(grid.rows / 2) - 1)
+  local row = math.max(1, math.floor((grid.rows - #lines - 2) / 2))
   for i, l in ipairs(lines) do put(grid, 0, row + i - 1, l) end
   local prompt = machine == "apple2" and "]" or "Ok"
   put(grid, 0, row + #lines, prompt)

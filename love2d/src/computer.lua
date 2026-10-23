@@ -228,7 +228,25 @@ M.SAYS = {
 
 --- What `machine` says about a run that ended with `outcome`, or nil -- for
 --- "normal", for a run that went fine, and for an outcome it has no words for.
-function M.says(machine, outcome)
+function M.says(machine, outcome, run)
+  if M.SAYS[machine] and outcome == "compile_error" and run then
+    local message = run.stderr or ""
+    if not message:find("%S") then
+      local diagnostics = {}
+      for _, d in ipairs(run.diagnostics or {}) do
+        local where = type(d.line) == "number" and (" (" .. d.line ..
+          (type(d.col) == "number" and (":" .. d.col) or "") .. ")") or ""
+        diagnostics[#diagnostics + 1] = (d.kind or "error") ..
+          (type(d.code) == "string" and (" " .. d.code) or "") .. where .. ": " .. d.message
+      end
+      message = table.concat(diagnostics, "\n")
+    end
+    if not message:find("%S") then message = "Compilation failed (no compiler message returned)." end
+    message = message:gsub("\27%[[0-9;]*m", ""):gsub("\r", ""):gsub("\t", "    "):gsub("\n+$", "")
+    local lines = {}
+    for line in (message .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
+    return lines
+  end
   local says = M.SAYS[machine]
   return says and says[outcome] or nil
 end

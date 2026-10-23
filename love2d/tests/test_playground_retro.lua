@@ -14,6 +14,20 @@ return function()
 
   T.section("playground — the old computers")
 
+  T.case("retro compile failures show actual compiler output on every machine", function()
+    for _, machine in ipairs({ "msx", "apple2", "amiga" }) do
+      T.same(Computer.says(machine, "compile_error", { stderr = "error: unknown foo\nmain.rs:3:5\n" }),
+        { "error: unknown foo", "main.rs:3:5" })
+      T.same(Computer.says(machine, "compile_error", { stderr = "error: missing semicolon" }),
+        { "error: missing semicolon" })
+      T.same(Computer.says(machine, "compile_error", { stderr = "", diagnostics = {
+        { kind = "error", code = "E0425", message = "cannot find foo", line = 3, col = 5 },
+      } }), { "error E0425 (3:5): cannot find foo" })
+      T.same(Computer.says(machine, "compile_error", { stderr = "" }),
+        { "Compilation failed (no compiler message returned)." })
+    end
+  end)
+
   T.case("the COMPUTER button walks NORMAL, APPLE ][, MSX, AMIGA and round", function()
     local was = Computer.get()
     Computer.set("normal")

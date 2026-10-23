@@ -181,3 +181,25 @@ export const SAYS: Record<Exclude<Computer, "normal">, Record<Outcome, string[]>
     ],
   },
 };
+
+/** Actual compiler output, retaining machine-specific messages for other failures. */
+export function runMessage(
+  machine: Exclude<Computer, "normal">,
+  run: import("../net/protocol").PlaygroundRun,
+): string[] {
+  if (run.outcome === "ok") return [];
+  if (run.outcome !== "compile_error") return SAYS[machine][run.outcome];
+  const message =
+    run.stderr.trim() ||
+    run.diagnostics
+      .map(
+        (d) =>
+          `${d.kind}${d.code ? " " + d.code : ""}${d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`}: ${d.message}`,
+      )
+      .join("\n");
+  return (message || "Compilation failed (no compiler message returned).")
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .replace(/\r/g, "")
+    .replace(/\t/g, "    ")
+    .split("\n");
+}

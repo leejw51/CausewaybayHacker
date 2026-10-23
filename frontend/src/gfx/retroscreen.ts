@@ -603,7 +603,18 @@ export class RetroScreen {
   }
 
   private paintAlert(g: CanvasRenderingContext2D, machine: Machine, grid: Grid, age: number): void {
-    const lines = this.alert!.lines;
+    const width = grid.cols - 4;
+    const limit = Math.max(1, grid.rows - 5);
+    const wrapped = this.alert!.lines.flatMap((line) => {
+      const chars = Array.from(line);
+      const rows: string[] = [];
+      do {
+        rows.push(chars.splice(0, width).join(""));
+      } while (chars.length);
+      return rows;
+    });
+    const lines = wrapped.slice(0, limit);
+    if (wrapped.length > limit) lines[limit - 1] = "... more in output";
     const tube = TUBE[machine];
     if (machine === "amiga") {
       // The Guru: black, a red box that blinks, red text centred in it.
@@ -626,7 +637,7 @@ export class RetroScreen {
     // The 8-bits print it under the code they were running and go back to
     // the prompt: the line, a beep's worth of bright, and the cursor.
     g.fillStyle = css(tube.ink);
-    const row = Math.max(1, Math.floor(grid.rows / 2) - 1);
+    const row = Math.max(1, Math.floor((grid.rows - lines.length - 2) / 2));
     lines.forEach((l, i) => put(g, grid, 0, row + i, l));
     const prompt = machine === "apple2" ? "]" : "Ok";
     put(g, grid, 0, row + lines.length, prompt);
