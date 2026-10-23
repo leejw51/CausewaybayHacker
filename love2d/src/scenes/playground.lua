@@ -1903,6 +1903,7 @@ end
 -- -------------------------------------------------------------------- input
 
 function Playground:textinput(text)
+  if self.retro then self.retro.alert = nil end
   -- Nothing reaches the program while the question is open; the T or K that
   -- answered it is not a character of anybody's code.
   if self.conflict then return end
@@ -2334,6 +2335,8 @@ function Playground:commit_rename()
 end
 
 function Playground:keypressed(key, mods)
+  -- Reveal the code immediately and let this same key continue to the editor.
+  if self.retro then self.retro.alert = nil end
   mods = mods or {}
   local cmd = mods.ctrl or mods.gui
 

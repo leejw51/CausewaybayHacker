@@ -26,7 +26,7 @@
  * screen, the banner types itself out, and the screen fades into the editor.
  * Switching to "normal" plays the power-off — the picture collapses to a line
  * and then a dot. A failed RUN puts the machine's own error up over the
- * code for a few seconds; on the Amiga that is a Guru Meditation, with its
+ * code until a key is pressed or a few seconds pass; on the Amiga that is a Guru Meditation, with its
  * red box blinking.
  *
  * Without WebGL none of this exists and the CSS half carries the theme on
@@ -362,6 +362,9 @@ export class RetroScreen {
   private alert: { lines: string[]; at: number } | null = null;
   private rect: Rect = [0, 0, 0, 0];
   private placed = false;
+  private readonly dismissAlert = (): void => {
+    this.alert = null;
+  };
 
   constructor(
     host: HTMLElement,
@@ -369,6 +372,9 @@ export class RetroScreen {
     /** The editor it sits on: hidden whenever that is. */
     private readonly under: HTMLElement,
   ) {
+    // Capture also sees keys handled by CodeMirror. Keep the event intact so
+    // the same keystroke can continue editing immediately.
+    window.addEventListener("keydown", this.dismissAlert, true);
     this.canvas.className = "cwb-retro";
     this.overlay = new Overlay(host, layout, this.canvas);
     // Straight after the editor, so the tube is over the code and under
@@ -471,6 +477,7 @@ export class RetroScreen {
   }
 
   destroy(): void {
+    window.removeEventListener("keydown", this.dismissAlert, true);
     this.texture?.dispose();
     this.material?.dispose();
     // Given back now, not when the collector gets round to it: a context per
