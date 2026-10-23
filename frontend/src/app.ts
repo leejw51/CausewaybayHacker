@@ -1066,8 +1066,8 @@ export class App {
   // -- input ---------------------------------------------------------------
 
   private wirePointer(): void {
-    const send = (ev: PointerEvent, phase: "down" | "move" | "up") => {
-      const v = this.layout.toVirtual(ev.clientX, ev.clientY);
+    const send = (ev: PointerEvent, phase: "down" | "move" | "up", at?: [number, number]) => {
+      const v = this.layout.toVirtual(at?.[0] ?? ev.clientX, at?.[1] ?? ev.clientY);
       if (!v) return;
       const m = this.modal;
       if (m) {
@@ -1136,8 +1136,14 @@ export class App {
     });
     const lift = (ev: PointerEvent): void => {
       const was = pinching();
+      const last = fingers.get(ev.pointerId);
       fingers.delete(ev.pointerId);
-      if (!was) send(ev, "up");
+      // Mobile Safari can lift a finger at (0, 0): seen on the iPad
+      // simulator, where every tap's `pointerup` said so. A button that fires
+      // on the up, and checks the finger is still on it, never fired. Where
+      // the finger last was is where it lifted.
+      const lost = ev.pointerType === "touch" && ev.clientX === 0 && ev.clientY === 0;
+      if (!was) send(ev, "up", lost ? last : undefined);
     };
     this.canvas.addEventListener("pointerup", lift);
     this.canvas.addEventListener("pointercancel", lift);

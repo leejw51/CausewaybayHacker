@@ -817,7 +817,8 @@ export interface Responses {
   "code.format": { source: string; changed: boolean; problem?: string };
   "playground.run": { run: PlaygroundRun };
   "playground.save": { snippet: Snippet };
-  "playground.list": { snippets: SnippetBrief[] };
+  /** `limit`: how many pads the shelf holds; absent from an older server. */
+  "playground.list": { snippets: SnippetBrief[]; limit?: number };
   "playground.load": { snippet: Snippet };
   "playground.delete": Record<string, never>;
   "playground.chat.list": { messages: ChatMessage[] };

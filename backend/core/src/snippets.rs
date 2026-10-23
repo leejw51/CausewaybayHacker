@@ -17,7 +17,7 @@ use crate::time::now_stamp;
 /// An autosave timer plus an unbounded table is a disk-filling bug waiting for
 /// a stuck client, so both dimensions are capped and both refusals say what
 /// the limit is. The numbers are in `docs/decisions.md` with the reasoning.
-pub const MAX_SNIPPETS_PER_USER: i64 = 64;
+pub const MAX_SNIPPETS_PER_USER: i64 = 1000;
 /// The same 256 KiB `quest.submit` accepts. One number for "a source file this
 /// server will take" is easier to hold in your head than two.
 pub const MAX_SNIPPET_BYTES: usize = 256 * 1024;

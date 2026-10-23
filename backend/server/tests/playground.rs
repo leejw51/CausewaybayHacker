@@ -410,6 +410,11 @@ async fn snippets_save_load_list_and_delete() {
 
     let listed = client.ok("playground.list", json!({})).await;
     assert_eq!(listed["snippets"].as_array().unwrap().len(), 1);
+    // The shelf's size travels with it, for the client's capacity bar.
+    assert_eq!(
+        listed["limit"].as_i64(),
+        Some(cwbhacker_core::snippets::MAX_SNIPPETS_PER_USER)
+    );
     assert_eq!(
         listed["snippets"][0]["bytes"].as_i64(),
         Some(HELLO.len() as i64)

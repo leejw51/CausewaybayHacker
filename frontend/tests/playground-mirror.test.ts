@@ -154,3 +154,23 @@ describe("whether the server's copy of the pad changed elsewhere", () => {
     expect(snippetDiffers({ ...saved, stdin: "3\n" }, saved)).toBe(true);
   });
 });
+
+/**
+ * A full shelf answered every new pad's autosave with `bad_request` and a
+ * sentence naming the limit, and the screen said only "could not save". The
+ * reason has to reach the player, or they cannot tell a full shelf from a
+ * dropped connection.
+ */
+describe("a refused save", () => {
+  const save = SOURCE.slice(SOURCE.indexOf("private async save("));
+  const body = save.slice(0, save.indexOf("\n  }\n"));
+
+  it("shows the server's reason for a bad_request", () => {
+    expect(body).toContain('e.payload.code === "bad_request"');
+    expect(body).toContain('t("pg.saveRefused", { why: e.payload.message })');
+  });
+
+  it("keeps the generic line for everything else", () => {
+    expect(body).toContain('t("pg.saveFailed")');
+  });
+});

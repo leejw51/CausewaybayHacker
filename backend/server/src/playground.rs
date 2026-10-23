@@ -182,7 +182,12 @@ pub fn run(
 pub fn list(state: &Shared, session: &Session) -> Result<serde_json::Value> {
     let address = session.address()?;
     let conn = state.store.conn();
-    Ok(json!({ "snippets": snippets::list(&conn, address)? }))
+    // The shelf's size with its contents, so a client can draw how full it
+    // is without hard-coding a number the server is free to change.
+    Ok(json!({
+        "snippets": snippets::list(&conn, address)?,
+        "limit": snippets::MAX_SNIPPETS_PER_USER,
+    }))
 }
 
 pub fn load(
