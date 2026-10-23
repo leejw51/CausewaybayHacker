@@ -672,7 +672,7 @@ described them — a client had to discover their shapes by probing, which is
 not how a contract should work:
 
 ```json
-→ playground.list    { }                  ← { "snippets": [ SnippetBrief, … ] }   newest first
+→ playground.list    { }                  ← { "snippets": [ SnippetBrief, … ], "limit": 1000 }   newest first
 → playground.load    { "id": "pg_…" }     ← { "snippet": Snippet }
 → playground.delete  { "id": "pg_…" }     ← { }
 ```
@@ -681,7 +681,7 @@ not how a contract should work:
 whether an id exists at all is none of that user's business, and the two codes
 together would let someone enumerate what other people have saved.
 
-Caps are per user and both refusals name the limit: **64 snippets, 256 KiB
+Caps are per user and both refusals name the limit: **1000 snippets, 256 KiB
 each** — the same ceiling as a submission, because it is the same question
 ("a source file this server will take") asked twice.
 

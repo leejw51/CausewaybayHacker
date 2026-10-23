@@ -23,16 +23,7 @@
  * or this one's over the top of it (`remoteSaveAction`, `resolveConflict`).
  */
 import type { App, Scene } from "../app";
-import {
-  elide,
-  ensureFonts,
-  inkBox,
-  inkCentreY,
-  printf,
-  width,
-  wrap,
-  type Font,
-} from "../engine/text";
+import { elide, ensureFonts, inkCentreY, printf, width, wrap, type Font } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import { burstPlan } from "../engine/burst";
 import { remoteSaveAction } from "../net/remote";
@@ -392,6 +383,20 @@ export class PlaygroundScene implements Scene {
   private query = "";
 
   private snippets: SnippetBrief[] = [];
+  /**
+   * How many pads the shelf holds, as the server says in `playground.list`.
+   * The bar under the list is drawn against it; null until an answer says.
+   */
+  private shelfLimit: number | null = null;
+  /** BACKUP is packing a zip; a second press while it does is dropped. */
+  private backingUp = false;
+  /** CLEAR ALL is deleting; nothing else touches the shelf meanwhile. */
+  private clearing = false;
+  /**
+   * CLEAR ALL asks twice: the first press arms it until this moment (from
+   * `this.t`), and only a second press before then deletes anything.
+   */
+  private clearArmedUntil = 0;
   private held: Held = { id: null, name: SCRATCH, lang: "rust", source: STARTER.rust, stdin: "" };
   /** The unsaved pad's name, translated. The stored `name` stays as it is. */
   private heldName(): string {
@@ -442,7 +447,7 @@ export class PlaygroundScene implements Scene {
   /** POSTER is a render and a file write; a second press mid-way is ignored. */
   private postering = false;
   /** A POSTER or READER press waiting for its `pointerup`; see `pointer`. */
-  private armed: "poster" | "reader" | null = null;
+  private armed: "poster" | "reader" | "backup" | null = null;
   /** DISK READER's file picker. Made once; the browser owns the dialogue. */
   private readonly diskEl: HTMLInputElement;
   /**
@@ -503,6 +508,19 @@ export class PlaygroundScene implements Scene {
   private outputDrag: { y: number; scroll: number } | null = null;
   /** Wheel travel not yet a whole line: a trackpad's steps, kept to add up. */
   private outputWheel = 0;
+  /**
+   * The pad list, scrolled: pixels from the top, how far it can go, and
+   * where it was last drawn. Sixty-odd pads do not fit a column, and rows
+   * past the bottom used to be simply not drawn.
+   */
+  private listScroll = 0;
+  private listOverflow = 0;
+  private listRect: Rect = [0, 0, 0, 0];
+  /**
+   * A finger down on the list. It scrolls once it has moved past a few
+   * pixels; until then it may still be a tap, which opens the row on the up.
+   */
+  private listDrag: { y: number; scroll: number; moved: boolean; row: string | null } | null = null;
   /** Where the editor was last drawn, for an effect over it. */
   private editorRect: Rect = [0, 0, 0, 0];
   /**
@@ -1352,6 +1370,7 @@ export class PlaygroundScene implements Scene {
     try {
       const res = await this.app.client.request("playground.list", {});
       this.snippets = res.snippets;
+      this.shelfLimit = res.limit ?? null;
     } catch (e) {
       // A server without §4.9c yet: the scratchpad still works, it is just
       // this tab's until the calls land. Say so rather than showing nothing.
@@ -1502,10 +1521,14 @@ export class PlaygroundScene implements Scene {
       // Not a disaster: the local mirror holds the text and the next timer
       // will try again. It is still said out loud, because "saved" and "not
       // saved" must never look the same.
+      // A refusal names its reason (a full shelf, an oversized file), and
+      // the player can only act on it if they are told which one it was.
       this.saveNote =
         e instanceof WireError && e.payload.code === "not_found"
           ? t("pg.localOnly")
-          : t("pg.saveFailed");
+          : e instanceof WireError && e.payload.code === "bad_request"
+            ? t("pg.saveRefused", { why: e.payload.message })
+            : t("pg.saveFailed");
     } finally {
       this.saving = false;
       landed();
@@ -1765,6 +1788,96 @@ export class PlaygroundScene implements Scene {
     }
   }
 
+  /**
+   * BACKUP: every pad on the shelf, fetched whole and packed into one zip —
+   * JSONL, CSV and Markdown of the lot, and each pad as its own file
+   * (`ui/padbackup.ts`). One file rather than three or a thousand, because a
+   * browser asks before the second download and a share sheet takes a list
+   * badly. Fired on the `pointerup`, like POSTER, for the same activation.
+   */
+  private async backup(): Promise<void> {
+    if (this.backingUp || this.clearing) return;
+    this.backingUp = true;
+    this.saveNote = t("pg.backingUp");
+    try {
+      // What is being typed belongs in the backup too.
+      await this.inflight;
+      await this.save();
+      const list = (await this.app.client.request("playground.list", {})).snippets;
+      const pads: Snippet[] = [];
+      // A few at a time: one at a time is a round trip per pad, and all at
+      // once is a thousand frames on the socket in the same instant.
+      for (let i = 0; i < list.length; i += 8) {
+        const got = await Promise.all(
+          list.slice(i, i + 8).map((b) => this.app.client.request("playground.load", { id: b.id })),
+        );
+        pads.push(...got.map((r) => r.snippet));
+      }
+      const at = new Date();
+      const { backupZip, backupFileName } = await import("../ui/padbackup");
+      const { saveFiles } = await import("../ui/savefile");
+      const file = backupFileName(at);
+      const how = await saveFiles(
+        [{ bytes: backupZip(pads, at), name: file, type: "application/zip" }],
+        this.app.layout.touch,
+      );
+      this.saveNote =
+        how === "shared"
+          ? t("pg.backupShared", { n: pads.length })
+          : t("pg.backupSaved", { n: pads.length, file });
+      this.app.chip.blip();
+    } catch (e) {
+      console.warn("backup:", e);
+      this.saveNote = e instanceof WireError ? playerText(e.payload.code) : t("pg.backupFailed");
+      this.app.chip.fail();
+    } finally {
+      this.backingUp = false;
+    }
+  }
+
+  /** Whether CLEAR ALL has been pressed once and is waiting for the second. */
+  private clearArmed(): boolean {
+    return this.t < this.clearArmedUntil;
+  }
+
+  /**
+   * CLEAR ALL: every pad on the shelf, deleted. The first press only arms
+   * it — the label turns into the question — and a second within a few
+   * seconds does it. What is on the screen stays on the screen, as a new
+   * unsaved pad, the same as DELETE leaves it.
+   */
+  private async clearAll(): Promise<void> {
+    if (this.clearing || this.backingUp || this.conflict) return;
+    if (!this.clearArmed()) {
+      this.clearArmedUntil = this.t + 4;
+      this.saveNote = t("pg.clearAsk");
+      this.app.chip.select();
+      return;
+    }
+    this.clearArmedUntil = 0;
+    this.clearing = true;
+    let gone = 0;
+    try {
+      await this.inflight;
+      const list = (await this.app.client.request("playground.list", {})).snippets;
+      for (const b of list) {
+        await this.app.client.request("playground.delete", { id: b.id });
+        gone++;
+      }
+      this.padSerial++;
+      this.held.id = null;
+      this.saveNote = t("pg.cleared", { n: gone });
+      this.app.chip.blip();
+    } catch (e) {
+      // Some may have gone before the one that failed: the list says which.
+      this.saveNote = e instanceof WireError ? playerText(e.payload.code) : t("pg.deleteFailed");
+      this.app.chip.fail();
+    } finally {
+      this.clearing = false;
+      void this.refreshList();
+    }
+  }
+
   // -- input ---------------------------------------------------------------
 
   key(name: string, ev: KeyboardEvent): void {
@@ -1836,6 +1949,15 @@ export class PlaygroundScene implements Scene {
     // A finger on the output: drag to scroll it. There is no wheel on a
     // tablet, and a panel that can scroll and cannot be scrolled shows the
     // first screen of a compiler's answer and nothing after it.
+    if (phase === "move" && this.listDrag !== null) {
+      const d = this.listDrag;
+      if (!d.moved && Math.abs(y - d.y) > 8) d.moved = true;
+      if (d.moved) {
+        this.listScroll = Math.max(0, Math.min(this.listOverflow, d.scroll - (y - d.y)));
+        this.rows.hovered = null;
+      }
+      return;
+    }
     if (phase === "move" && this.outputDrag !== null) {
       const lineH = ensureFonts(this.app.layout.uiScale()).codeSm.height;
       const moved = Math.round((y - this.outputDrag.y) / lineH);
@@ -1849,6 +1971,12 @@ export class PlaygroundScene implements Scene {
     }
     if (phase === "up") {
       this.outputDrag = null;
+      // A finger that never moved was a tap on the row it went down on.
+      const list = this.listDrag;
+      this.listDrag = null;
+      if (list && !list.moved && list.row && this.rows.hit(x, y)?.id === list.row) {
+        void this.load(list.row.slice(5));
+      }
       // The two buttons that open something of the browser's fire here, on
       // the way *up*, not on the way down like the rest. A finger's
       // `pointerdown` grants no user activation — only its `pointerup` does
@@ -1859,6 +1987,7 @@ export class PlaygroundScene implements Scene {
       this.armed = null;
       if (armed && (this.buttons.hit(x, y) ?? this.rows.hit(x, y))?.id === armed) {
         if (armed === "poster") void this.poster();
+        else if (armed === "backup") void this.backup();
         else this.diskEl.click();
       }
       return;
@@ -1871,6 +2000,12 @@ export class PlaygroundScene implements Scene {
     if (phase !== "down") return;
     if (this.outputOverflow > 0 && inRect(x, y, this.outputRect)) {
       this.outputDrag = { y, scroll: this.outputScroll };
+      return;
+    }
+    // On the pad list: maybe a drag, maybe a tap. Decided on the move or up.
+    if (inRect(x, y, this.listRect)) {
+      const row = this.rows.hit(x, y)?.id ?? null;
+      this.listDrag = { y, scroll: this.listScroll, moved: false, row };
       return;
     }
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
@@ -1902,7 +2037,7 @@ export class PlaygroundScene implements Scene {
       else this.app.chip.select();
       return;
     }
-    if (hit.id === "poster" || hit.id === "reader") {
+    if (hit.id === "poster" || hit.id === "reader" || hit.id === "backup") {
       // Fired on the up, above, where the browser will let it open anything.
       this.armed = hit.id;
       return;
@@ -1957,6 +2092,7 @@ export class PlaygroundScene implements Scene {
     else if (hit.id === "save") void this.save();
     else if (hit.id === "new") void this.fresh();
     else if (hit.id === "delete") void this.remove();
+    else if (hit.id === "clearall") void this.clearAll();
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
     else if (isLang(hit.id)) this.setLang(hit.id);
     else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
@@ -1985,6 +2121,10 @@ export class PlaygroundScene implements Scene {
 
   wheel(dy: number, x: number, y: number): void {
     if (this.focus && this.coder?.wheel(dy, x, y)) return;
+    if (!this.focus && inRect(x, y, this.listRect)) {
+      this.listScroll = Math.max(0, Math.min(this.listOverflow, this.listScroll + dy));
+      return;
+    }
     if (inRect(x, y, this.outputRect)) {
       // Same convention as the quest console: positive dy is "further into
       // the past", so it *increases* how far back from the live tail we are.
@@ -2007,6 +2147,9 @@ export class PlaygroundScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
+    // Set again by `drawRows` when the list is on screen; in CODE it is not,
+    // and a press where it used to be must not be taken for the list.
+    this.listRect = [0, 0, 0, 0];
     this.drawRoom(g);
     if (this.focus) {
       this.buttons.reset();
@@ -2169,6 +2312,7 @@ export class PlaygroundScene implements Scene {
       { id: "new", label: t("pg.new") },
       { id: "rename", label: t("pg.rename") },
       ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
+      ...this.shelfItems(),
     ];
     const labels = listItems.map((b) => b.label);
     const listGap = Math.round(6 * s);
@@ -2205,8 +2349,10 @@ export class PlaygroundScene implements Scene {
       const bh = buttonsH(cw);
       placeButtons(cx, y, cw, bh);
       y += bh + pad;
+      // One line here: stacked, the pane is a quarter of the window and a
+      // bar under its label ran off the bottom of it.
+      y += this.drawShelf(g, body, s, cx, y, cw, true) + pad;
       const bottom = inner[1] + inner[3];
-      this.drawNote(g, body, cx, y, cw, bottom - y);
       if (this.saveNote) this.drawSaveNote(g, body, s, cx, bottom, cw);
       return;
     }
@@ -2215,57 +2361,25 @@ export class PlaygroundScene implements Scene {
     // anything above them is drawn.
     const listH = buttonsH(inner[2]);
     const listTop = inner[1] + inner[3] - listH;
+    // The shelf's bar sits on the buttons, so how full it is is read beside
+    // the two buttons that empty it.
+    const shelfTop = listTop - pad - this.shelfH(body, s);
 
-    // The rule, stated once, where it cannot be missed. It is the opposite of
-    // the quest screen's rule and the player has to be told which one they are
-    // standing on. It gives up its room to the search box first.
-    //
-    // The box is always offered, however few pads there are. It once hid
-    // itself under five, on the grounds that four pads are read in one
-    // glance — and then it was gone exactly when somebody looked for it, and
-    // nobody could tell whether the list had a search at all.
-    const noteTop = inner[1];
-    const noteH = Math.max(0, listTop - pad - findH - pad - pad - noteTop);
-    let y = this.drawNote(g, body, inner[0], noteTop, inner[2], noteH) + pad;
+    // The search box first, always offered however few pads there are: it
+    // once hid itself under five, and then it was gone exactly when somebody
+    // looked for it. The "not part of your record" note that sat above it is
+    // gone; it took half the column on an iPad.
+    let y = inner[1];
 
     placeSearch(inner[0], y, inner[2]);
     y += findH + pad;
 
-    const room = Math.max(0, listTop - pad - y);
+    const room = Math.max(0, shelfTop - pad - y);
     this.drawRows(g, body, s, inner[0], y, inner[2], room);
+    this.drawShelf(g, body, s, inner[0], shelfTop, inner[2]);
     if (this.saveNote) this.drawSaveNote(g, body, s, inner[0], y + room, inner[2]);
 
     placeButtons(inner[0], listTop, inner[2], listH);
-  }
-
-  /**
-   * The rule, clipped to its room rather than trusted to stop: a Hangul line
-   * inks below the nominal line height it is measured by, so "does the next
-   * line fit?" let half a row of glyphs through and the buttons were drawn
-   * across the middle of them. Returns where the last line drawn ends.
-   */
-  private drawNote(g: Ctx, body: Font, x: number, top: number, w: number, h: number): number {
-    let y = top;
-    if (h <= 0) return y;
-    g.fillStyle = css(Theme.cream, 0.7);
-    clipped(g, x, top, w, h, () => {
-      // Laid out on the **taller** of the nominal line box and what these
-      // lines actually ink. The body face is Latin-only, so a Hangul line is
-      // served by a fallback whose ink is half again the height it was
-      // measured by: stepping by the nominal box let a line in that did not
-      // fit, and the clip then sliced its glyphs through the middle.
-      const lines = wrap(body, t("pg.notScored"), w);
-      const step = lines.reduce((n, l) => {
-        const ink = inkBox(body, l);
-        return Math.max(n, ink.asc + ink.desc);
-      }, body.height);
-      for (const line of lines) {
-        if (y + step > top + h) break;
-        printf(g, body, line, x, y, w, "left");
-        y += step;
-      }
-    });
-    return y;
   }
 
   /** The saved pads, one row each, clipped to the room they are given. */
@@ -2281,11 +2395,19 @@ export class PlaygroundScene implements Scene {
     const fonts = ensureFonts(s);
     const pad = Math.round(8 * s);
     const rowH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
+    const shown = this.visibleSnippets();
+    this.listRect = [x, y, w, Math.max(0, room)];
+    this.listOverflow = Math.max(0, shown.length * rowH - room);
+    this.listScroll = Math.max(0, Math.min(this.listScroll, this.listOverflow));
     clipped(g, x, y, w, Math.max(0, room), () => {
-      let ry = y;
-      const shown = this.visibleSnippets();
+      let ry = y - this.listScroll;
       for (const snip of shown) {
-        if (ry + rowH > y + room) break;
+        // Off the top or off the bottom: not drawn, and not a target either.
+        if (ry + rowH <= y) {
+          ry += rowH;
+          continue;
+        }
+        if (ry >= y + room) break;
         const id = `snip:${snip.id}`;
         const open = snip.id === this.held.id;
         const hover = this.rows.hovered === id;
@@ -2317,8 +2439,20 @@ export class PlaygroundScene implements Scene {
           w - Math.round(8 * s),
           "right",
         );
-        this.rows.add({ id, rect: [x, ry, w, rowH - 2], label: snip.name });
+        // Only the part of the row inside the list takes a tap: a row half
+        // under the search box must not open when the box is pressed.
+        const top = Math.max(ry, y);
+        const bottom = Math.min(ry + rowH - 2, y + room);
+        if (bottom > top) this.rows.add({ id, rect: [x, top, w, bottom - top], label: snip.name });
         ry += rowH;
+      }
+      if (this.listOverflow > 0) {
+        // A thumb on the right edge, sized and placed by how much is hidden:
+        // without it nothing says the list goes on.
+        const trackW = Math.max(3, Math.round(4 * s));
+        const thumbH = Math.max(rowH / 2, (room * room) / (room + this.listOverflow));
+        const thumbY = y + ((room - thumbH) * this.listScroll) / this.listOverflow;
+        fill(g, Theme.coin, x + w - trackW, thumbY, trackW, thumbH, 0.7);
       }
       if (shown.length === 0) {
         g.fillStyle = css(Theme.dim);
@@ -2333,6 +2467,74 @@ export class PlaygroundScene implements Scene {
         );
       }
     });
+  }
+
+  /** BACKUP and CLEAR ALL, the two buttons that act on the whole shelf. */
+  private shelfItems(): { id: string; label: string; dim?: boolean; strong?: boolean }[] {
+    const empty = this.snippets.length === 0;
+    return [
+      { id: "backup", label: t("pg.backup"), dim: this.backingUp || empty },
+      {
+        id: "clearall",
+        label: this.clearArmed() ? t("pg.clearSure") : t("pg.clearAll"),
+        dim: this.clearing || (empty && !this.clearArmed()),
+        strong: this.clearArmed(),
+      },
+    ];
+  }
+
+  /** "PADS 64 / 1000", for the bar and the status line alike. */
+  private shelfLabel(): string {
+    return t("pg.shelf", { n: this.snippets.length, max: this.shelfLimit ?? "?" });
+  }
+
+  /**
+   * How full the shelf is: a label and a bar, `w` wide from `x, y` — the bar
+   * under the label, or beside it on one line when `inline` (the CODE status
+   * strip has the height of one line and no more). Gold while there is room,
+   * red from nine-tenths, so a full shelf is seen before the autosave it
+   * refuses. Returns the height it took.
+   */
+  private drawShelf(
+    g: Ctx,
+    body: Font,
+    s: number,
+    x: number,
+    y: number,
+    w: number,
+    inline = false,
+  ): number {
+    const barH = Math.max(4, Math.round(6 * s));
+    const gap = Math.round(3 * s);
+    const n = this.snippets.length;
+    const max = this.shelfLimit;
+    const frac = max ? Math.min(1, n / max) : 0;
+    const hot = max !== null && n >= max * 0.9;
+    const label = this.shelfLabel();
+    g.fillStyle = css(hot ? Theme.red : Theme.cream, 0.8);
+    let bx = x;
+    let by = y + body.height + gap;
+    let bw = w;
+    if (inline) {
+      const lw = Math.min(Math.ceil(width(body, label)), Math.round(w * 0.6));
+      printf(g, body, elide(body, label, lw), x, y, lw, "left");
+      bx = x + lw + gap * 2;
+      bw = Math.max(0, w - lw - gap * 2);
+      by = y + Math.round((body.height - barH) / 2);
+    } else {
+      printf(g, body, elide(body, label, w), x, y, w, "left");
+    }
+    if (bw > 2) {
+      well(g, bx, by, bw, barH);
+      const fw = Math.max(2, (bw - 2) * frac);
+      if (frac > 0) fill(g, hot ? Theme.red : Theme.coin, bx + 1, by + 1, fw, barH - 2);
+    }
+    return inline ? body.height : body.height + gap + barH;
+  }
+
+  /** What `drawShelf` will take, for a layout that measures before drawing. */
+  private shelfH(body: Font, s: number): number {
+    return body.height + Math.round(3 * s) + Math.max(4, Math.round(6 * s));
   }
 
   /**
@@ -2446,6 +2648,7 @@ export class PlaygroundScene implements Scene {
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
       { id: "new", label: t("pg.new"), dim: this.conflict !== null },
       { id: "rename", label: t("pg.rename") },
+      ...this.shelfItems(),
       // In and out of the screen. Nothing on a canvas can be selected with a
       // mouse, so without these the code and the compiler's answer cannot
       // leave it at all — which is what somebody pasting into an assistant
@@ -2498,7 +2701,11 @@ export class PlaygroundScene implements Scene {
     // **One line, elided.** `printf` wraps, the strip reserves the height of a
     // single line, and a long note — `이 서버에는 아직 저장되지 않습니다…` — put
     // its second line over the top of the editor.
-    const statusW = layout.vw - pad * 2 - Math.round(8 * s);
+    // The shelf's bar at the right end of the line, so how full it is shows
+    // in CODE as well as beside the list.
+    const shelfW = Math.round(260 * s);
+    this.drawShelf(g, f, s, layout.vw - pad - shelfW, statusY, shelfW, true);
+    const statusW = layout.vw - pad * 3 - shelfW - Math.round(8 * s);
     const shown = elide(f, status, statusW);
     g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
     printf(g, f, shown, pad + Math.round(8 * s), statusY, statusW, "left");

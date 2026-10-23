@@ -2816,7 +2816,8 @@ and they want pinning in the contract:
 visible at the signature.
 
 **The caps.** An autosave timer against an unbounded table is a disk-filling
-bug waiting for a stuck client, so: **64 snippets per user** and **256 KiB per
+bug waiting for a stuck client, so: **64 snippets per user** (since raised to
+1000 — see 2026-10-23) and **256 KiB per
 snippet**, names truncated at 80 characters. 64 is more scratchpads than anyone
 keeps and small enough that a runaway client hits a wall in minutes rather than
 filling a disk overnight; 256 KiB is the same limit `quest.submit` already has,
@@ -7918,3 +7919,41 @@ sheets pinned up, rain on the window — generated with Grok through the same
 `art/prompts.toml`, no text anywhere in the picture. The LÖVE client knows
 the road (lists, labels, blurbs, background, the brief-only layout) but has
 none of the effects yet, by the user's call.
+
+## 2026-10-23 — The playground shelf holds 1000 pads, and a refusal says why
+
+64 pads was "more scratchpads than anyone keeps" for about three weeks: a
+player filled it with ordinary scratch work, and from then on every new pad's
+autosave was refused with `bad_request`. The client showed its generic
+"could not save" line, so the one sentence that named the limit never reached
+a screen.
+
+**The cap is 1000** (`MAX_SNIPPETS_PER_USER`). It still bounds a runaway
+client — 1000 × 256 KiB is a quarter of a gigabyte per user at the very
+worst — while being far past what a person fills by hand. A full shelf still
+saves the pads already on it; only a new one is refused.
+
+**A `bad_request` on save is shown with the server's own reason**
+(`pg.saveRefused`, `{why}`), so a full shelf or an oversized file reads as
+what it is, and the player knows to delete a pad rather than retry.
+
+**BACKUP, CLEAR ALL and a capacity bar.** `playground.list` now carries
+`limit`, and a bar under the pad list (and at the right of the CODE status
+line) reads `PADS n / limit`, red from nine-tenths. BACKUP fetches every pad
+and writes **one zip** — `pads.jsonl`, `pads.csv`, `pads.md` and each pad as
+`pads/NN-name/main.<ext>` (+ `stdin.txt`) — stored, not deflated, with UTF-8
+names (`ui/zip.ts`, no dependency). One file because a browser asks before a
+second download. It fires on the `pointerup`, like POSTER. CLEAR ALL deletes
+every pad, but only on a second press within four seconds; the first turns the
+label into `SURE? CLEAR ALL` and says to back up first.
+
+**The pad list scrolls, and the note above it is gone.** Rows past the bottom
+of the list were simply not drawn, so on an iPad sixty pads showed as ten. The
+list now scrolls by pixels — a finger drag (past 8 px; short of that it is a
+tap, which opens the row on the up), the wheel, and a thumb on the right edge
+says there is more. The "Nothing here is part of your record" note took half
+the column on an iPad and was removed at the user's request, with its
+string. Mobile Safari on the iPad simulator
+lifts every touch at `(0, 0)`; `app.ts` now uses the finger's last position
+for such a lift, or nothing that fires on the up and checks it is still on its
+button — the list's tap, BACKUP, POSTER — ever fired there.

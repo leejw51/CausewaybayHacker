@@ -59,6 +59,8 @@ import { lua } from "@codemirror/legacy-modes/mode/lua";
 import { StreamLanguage, type Language } from "@codemirror/language";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import qrcode from "qrcode-generator";
+import { saveFiles } from "./savefile";
+import { crc32 } from "./zip";
 import type { Lang } from "../net/protocol";
 import type { Assets } from "../engine/assets";
 import { fontAt, type Font } from "../engine/text";
@@ -608,22 +610,8 @@ export function qrModules(text: string): boolean[][] {
 
 // -- PNG text chunks (pure) ----------------------------------------------------
 
-let crcTable: Uint32Array | null = null;
-
-/** CRC-32 as PNG specifies it (ISO 3309, reflected, `0xEDB88320`). */
-export function crc32(bytes: Uint8Array): number {
-  if (!crcTable) {
-    crcTable = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      crcTable[n] = c >>> 0;
-    }
-  }
-  let c = 0xffffffff;
-  for (const b of bytes) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
+// One table for the PNG chunks here and the zip a pad backup is packed in.
+export { crc32 } from "./zip";
 
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -1310,29 +1298,5 @@ export async function savePoster(
   files: readonly PosterFile[],
   touch: boolean,
 ): Promise<"shared" | "saved"> {
-  const blobs = files.map((f) => new File([f.bytes as BlobPart], f.name, { type: f.type }));
-  if (touch && typeof navigator.share === "function") {
-    try {
-      if (navigator.canShare?.({ files: blobs })) {
-        await navigator.share({ files: blobs });
-        return "shared";
-      }
-    } catch (e) {
-      // A dismissed sheet is a choice, not a failure; anything else falls
-      // through to the download, which works everywhere.
-      if ((e as { name?: string }).name === "AbortError") return "shared";
-    }
-  }
-  for (const file of blobs) {
-    const url = URL.createObjectURL(file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }
-  return "saved";
+  return saveFiles(files, touch);
 }
