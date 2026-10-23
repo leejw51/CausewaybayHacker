@@ -129,6 +129,16 @@ describe("the virtual canvas", () => {
     expect(desktop.minTouchH()).toBe(0);
   });
 
+  it("asks a finger for less on a window too short for forty pixels", () => {
+    // A phone held sideways in a browser: under four hundred CSS pixels tall.
+    const sideways = measured(874, 370, 3, true);
+    expect(sideways.minTouchH() * sideways.cssScale).toBeGreaterThanOrEqual(32);
+    expect(sideways.minTouchH() * sideways.cssScale).toBeLessThan(33);
+    // Upright, the full forty.
+    const upright = measured(402, 716, 3, true);
+    expect(upright.minTouchH() * upright.cssScale).toBeGreaterThanOrEqual(40);
+  });
+
   it("keeps a pinned orientation when the window disagrees", () => {
     windowOf(1280, 720, 1);
     const l = new Layout(canvasOf(1280, 720));

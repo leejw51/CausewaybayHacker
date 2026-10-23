@@ -365,7 +365,20 @@ export class AiScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     header(g, this.app, T("ai.title"));
-    const f = frame(layout, layout.isPortrait() ? 0.44 : 0.36, 0.03);
+    let f = frame(layout, layout.isPortrait() ? 0.44 : 0.36, 0.03);
+    if (f.portrait) {
+      // On a phone the land chips wrap to two rows at a fingertip's height,
+      // and in 44 % of the window they were laid over REPEAT and SPACED. The
+      // chooser takes what it measures, the coach the rest.
+      const need = this.chooserH(f.left[2], f.scale);
+      if (need > f.left[3]) f = frame(layout, Math.min(0.62, need / (f.body[3] - f.pad)), 0.03);
+    } else {
+      // Side by side on a short window, wider instead: fewer chip rows.
+      for (const split of [0.42, 0.48, 0.55]) {
+        if (this.chooserH(f.left[2], f.scale) <= f.left[3]) break;
+        f = frame(layout, split, 0.03);
+      }
+    }
     this.picks.reset();
     this.acts.reset();
 
@@ -375,23 +388,37 @@ export class AiScene implements Scene {
     footer(g, layout, T("ai.footer", { aux: AUX_HINT() }));
   }
 
-  private drawChooser(g: Ctx, rect: Rect, s: number): void {
-    const fonts = ensureFonts(s);
-    const inner = titledPanel(g, rect, T("ai.question"), Theme.coin);
-    const [x, y, w, h] = inner;
-    const touch = this.app.layout.minTouchH();
-    const navH = auxHeight(fonts.stationSm, w, touch);
-    const btnH = Math.max(touch, fonts.button.height + 20);
-    const floor = y + h - navH - btnH - Math.round(18 * s);
+  /** The least a mode plate may be: its title, padded — less on a short window. */
+  private plateMin(s: number): number {
+    const short = this.app.layout.minTouchH() > 0 && this.app.layout.cssH < 480;
+    return ensureFonts(s).station.height + Math.round((short ? 12 : 20) * s);
+  }
 
-    // The one filter §4.16 offers. ANY is the default and is drawn as a choice
-    // rather than as the absence of one.
-    //
-    // **Measured before the plates, and wrapped.** With six lands the row is
-    // seven chips, and TYPESCRIPT alone is ten letters: in a portrait panel it
-    // ran off the right edge, and the last land had a hit box outside the
-    // panel. So the chips are laid out first, onto as many rows as they need,
-    // and the mode plates share out what those rows leave.
+  /**
+   * How tall the chooser panel must be, `w` wide, for the plates at their
+   * least, the chips, START and the aux row to fit without one drawn over
+   * another — `drawChooser`'s arithmetic, measured before anything is drawn.
+   */
+  private chooserH(w: number, s: number): number {
+    const fonts = ensureFonts(s);
+    const touch = this.app.layout.minTouchH();
+    // `titledPanel`'s chrome.
+    const iw = w - 12 - 16;
+    const barH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+    const navH = auxHeight(fonts.stationSm, iw, touch);
+    const btnH = Math.max(touch, fonts.button.height + 20);
+    const gap = Math.round(8 * s);
+    const plates = MODES.length * this.plateMin(s) + gap * MODES.length;
+    const inner = plates + this.chips(iw, s).chipsH + Math.round(18 * s) + btnH + navH;
+    return inner + 14 + barH + 16;
+  }
+
+  /**
+   * The land chips, laid onto as many rows as they need in `w`. ANY first.
+   */
+  private chips(w: number, s: number) {
+    const fonts = ensureFonts(s);
+    const touch = this.app.layout.minTouchH();
     const chipH = Math.max(touch, fonts.stationSm.height + Math.round(10 * s));
     const chipGap = Math.round(5 * s);
     const labelW = width(fonts.stationSm, T("ai.land")) + Math.round(8 * s);
@@ -416,36 +443,64 @@ export class AiScene implements Scene {
     }));
     // Where each chip goes, relative to the first row's top-left.
     const placed: Array<{ dx: number; dy: number }> = [];
-    {
-      let px = labelW;
-      let py = 0;
-      for (const c of chips) {
-        if (px + c.cw > w && px > labelW) {
-          px = labelW;
-          py += chipH + chipGap;
-        }
-        placed.push({ dx: px, dy: py });
-        px += c.cw + chipGap;
+    let px = labelW;
+    let py = 0;
+    for (const c of chips) {
+      if (px + c.cw > w && px > labelW) {
+        px = labelW;
+        py += chipH + chipGap;
       }
+      placed.push({ dx: px, dy: py });
+      px += c.cw + chipGap;
     }
     const chipsH = (placed.length ? placed[placed.length - 1].dy : 0) + chipH;
+    return { chips, placed, chipsH, chipH, labelW };
+  }
+
+  private drawChooser(g: Ctx, rect: Rect, s: number): void {
+    const fonts = ensureFonts(s);
+    const inner = titledPanel(g, rect, T("ai.question"), Theme.coin);
+    const [x, y, w, h] = inner;
+    const touch = this.app.layout.minTouchH();
+    const navH = auxHeight(fonts.stationSm, w, touch);
+    const btnH = Math.max(touch, fonts.button.height + 20);
+    const floor = y + h - navH - btnH - Math.round(18 * s);
+
+    // The one filter §4.16 offers. ANY is the default and is drawn as a choice
+    // rather than as the absence of one.
+    //
+    // **Measured before the plates, and wrapped.** With six lands the row is
+    // seven chips, and TYPESCRIPT alone is ten letters: in a portrait panel it
+    // ran off the right edge, and the last land had a hit box outside the
+    // panel. So the chips are laid out first, onto as many rows as they need,
+    // and the mode plates share out what those rows leave.
+    const { chips, placed, chipsH, chipH, labelW } = this.chips(w, s);
 
     const gap = Math.round(8 * s);
     const plateH = Math.max(
-      Math.round(60 * s),
-      // The 34 was always the one row's reserve; a second row adds its own.
-      Math.floor(
-        (floor - y - gap * (MODES.length - 1) - Math.round(34 * s) - (chipsH - chipH)) /
-          MODES.length,
-      ),
+      this.plateMin(s),
+      // The chips' own height, measured: a fixed 34 for the first row was
+      // short of a fingertip's chip, and the plates took what it lacked.
+      Math.floor((floor - y - gap * (MODES.length - 1) - chipsH - gap) / MODES.length),
     );
     let cy = y;
-    for (const m of MODES) {
-      this.drawModePlate(g, m, [x, cy, w, plateH], s);
-      cy += plateH + gap;
+    if (this.chooserH(rect[2], s) > rect[3]) {
+      // Too short for three plates one under another and every chip (a
+      // phone held sideways): the plates go side by side, a title each.
+      const pw = Math.floor((w - gap * (MODES.length - 1)) / MODES.length);
+      const ph = this.plateMin(s);
+      MODES.forEach((m, i) => this.drawModePlate(g, m, [x + i * (pw + gap), y, pw, ph], s));
+      cy = y + ph + gap;
+    } else {
+      for (const m of MODES) {
+        this.drawModePlate(g, m, [x, cy, w, plateH], s);
+        cy += plateH + gap;
+      }
     }
 
-    const chipY = Math.min(cy, floor - chipsH);
+    // Under the plates, never over them; on a window too short for every
+    // row, the rows that would run into START are not drawn.
+    const chipY = cy;
     g.fillStyle = css(Theme.dim);
     printf(
       g,
@@ -459,6 +514,7 @@ export class AiScene implements Scene {
     chips.forEach(({ id, label, value, cw }, i) => {
       const cx = x + placed[i].dx;
       const rowY = chipY + placed[i].dy;
+      if (rowY + chipH > floor + Math.round(10 * s)) return;
       const on = value === this.landFilter;
       const hot = this.picks.hovered === id;
       fill(g, on ? Theme.coin : Theme.ink, cx, rowY, cw, chipH, on ? 1 : hot ? 0.8 : 0.5);
@@ -502,9 +558,11 @@ export class AiScene implements Scene {
     fill(g, accent, x, y, Math.round(4 * s), h, on ? 1 : 0.6);
     fill(g, accent, x, y + h - 2, w, 2, on ? 1 : 0.35);
     const pad = Math.round(10 * s);
+    // Centred in a plate cut down to its title.
+    const top = Math.min(pad, Math.max(0, Math.round((h - fonts.station.height) / 2)));
     g.fillStyle = css(on ? Theme.coin : hot ? Theme.cream : Theme.dim);
-    printf(g, fonts.station, MODE_TITLE(m), x + pad, y + pad, w - pad * 2, "left");
-    const lineY = y + pad + fonts.station.height + Math.round(4 * s);
+    printf(g, fonts.station, MODE_TITLE(m), x + pad, y + top, w - pad * 2, "left");
+    const lineY = y + top + fonts.station.height + Math.round(4 * s);
     const fits = Math.floor((y + h - Math.round(8 * s) - lineY) / fonts.small.height);
     if (fits >= 1) {
       const all = wrap(fonts.small, MODE_LINE(m), w - pad * 2);

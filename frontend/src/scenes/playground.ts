@@ -448,6 +448,8 @@ export class PlaygroundScene implements Scene {
   private postering = false;
   /** A POSTER or READER press waiting for its `pointerup`; see `pointer`. */
   private armed: "poster" | "reader" | "backup" | null = null;
+  /** The bench showed only the live land's button, which cycles. */
+  private langsFolded = false;
   /** DISK READER's file picker. Made once; the browser owns the dialogue. */
   private readonly diskEl: HTMLInputElement;
   /**
@@ -2094,8 +2096,12 @@ export class PlaygroundScene implements Scene {
     else if (hit.id === "delete") void this.remove();
     else if (hit.id === "clearall") void this.clearAll();
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
-    else if (isLang(hit.id)) this.setLang(hit.id);
-    else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
+    else if (isLang(hit.id)) {
+      // Folded to the live land, the one button steps through them.
+      if (this.langsFolded && hit.id === this.held.lang) {
+        this.setLang(LANGS[(LANGS.indexOf(hit.id) + 1) % LANGS.length]);
+      } else this.setLang(hit.id);
+    } else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
   }
 
   update(dt: number): void {
@@ -2169,7 +2175,25 @@ export class PlaygroundScene implements Scene {
     // side of a bench whose editor was already the thing running out of room.
     // The list is short names and two buttons; a quarter of the screen was
     // mostly empty panel, in either orientation.
-    const f = frame(layout, layout.isPortrait() ? 0.22 : 0.2, 0);
+    let f = frame(layout, layout.isPortrait() ? 0.22 : 0.2, 0);
+    if (f.portrait) {
+      // Stacked, a fixed share of the window is a guess about what the side
+      // pane holds, and a phone lost it: at a fingertip's height NEW / RENAME
+      // / BACKUP / CLEAR ALL wrap to three rows, and BACKUP was drawn over
+      // the bench below. The panel takes what that pane measures, then.
+      const need = this.stackedListH(f.left[2], f.scale);
+      const room = f.body[3] - f.pad;
+      if (need > f.left[3]) f = frame(layout, Math.min(0.5, need / room), 0);
+    } else {
+      // Side by side on a short window the column is a fifth of the width and
+      // its five buttons wrap to three rows under a fingertip's floor, which
+      // ran them off the panel's foot. Wider, a little at a time, until
+      // they and one row of pads fit.
+      for (const split of [0.24, 0.28, 0.32]) {
+        if (this.columnListH(f.left[2], f.scale) <= f.left[3]) break;
+        f = frame(layout, split, 0);
+      }
+    }
     const s = f.scale;
     this.buttons.reset();
     this.rows.reset();
@@ -2298,6 +2322,61 @@ export class PlaygroundScene implements Scene {
    * title bar, and even `stationSm` at the CJK floor left a Korean rule
    * taking half the column above four names.
    */
+  /** NEW, RENAME, DELETE when a pad is held, and the shelf's two. */
+  private listItems(): { id: string; label: string; dim?: boolean; strong?: boolean }[] {
+    return [
+      { id: "new", label: t("pg.new") },
+      { id: "rename", label: t("pg.rename") },
+      ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
+      ...this.shelfItems(),
+    ];
+  }
+
+  /** What the list's buttons take, wrapped into a column `w` wide. */
+  private listButtonsH(s: number, w: number): number {
+    const fonts = ensureFonts(s);
+    const minH = this.app.layout.minTouchH();
+    const labels = this.listItems().map((b) => b.label);
+    const [, bh] = btnBox(fonts.tool, labels, 0, btnPad(fonts.tool), minH);
+    const n = rowsIn(fonts.tool, labels, w, minH);
+    return n * bh + (n - 1) * Math.round(6 * s);
+  }
+
+  /**
+   * How tall the stacked list panel must be, `w` wide, for its side pane —
+   * search, buttons, shelf bar — to fit inside it. `drawList`'s stacked
+   * arithmetic, measured before anything is drawn.
+   */
+  private stackedListH(w: number, s: number): number {
+    const fonts = ensureFonts(s);
+    const body = fonts.tool;
+    const pad = Math.round(8 * s);
+    const minH = this.app.layout.minTouchH();
+    const findH = Math.max(minH, body.height + Math.round(14 * s));
+    const rowH = Math.max(minH, body.height + Math.round(14 * s));
+    const barH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+    // `titledPanel`'s chrome, then the search line, a row of pads, and the
+    // buttons across the whole width.
+    const innerW = w - 12 - 16;
+    const pane = findH + pad + rowH + pad + this.listButtonsH(s, innerW);
+    return pane + 14 + barH + 16;
+  }
+
+  /** The side-by-side list's least height, `w` wide: `drawList`'s column. */
+  private columnListH(w: number, s: number): number {
+    const fonts = ensureFonts(s);
+    const body = fonts.tool;
+    const pad = Math.round(8 * s);
+    const minH = this.app.layout.minTouchH();
+    const findH = Math.max(minH, body.height + Math.round(14 * s));
+    const rowH = Math.max(minH, body.height + Math.round(14 * s));
+    const barH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
+    const innerW = w - 12 - 16;
+    const pane =
+      findH + pad + rowH + pad + this.shelfH(body, s) + pad + this.listButtonsH(s, innerW);
+    return pane + 14 + barH + 16;
+  }
+
   private drawList(g: Ctx, rect: Rect, s: number, stacked: boolean): void {
     const fonts = ensureFonts(s);
     // The code's size, like the bench's buttons: the list holds names, and
@@ -2308,20 +2387,9 @@ export class PlaygroundScene implements Scene {
     const minH = this.app.layout.minTouchH();
     const findH = Math.max(minH, body.height + Math.round(14 * s));
 
-    const listItems = [
-      { id: "new", label: t("pg.new") },
-      { id: "rename", label: t("pg.rename") },
-      ...(this.held.id ? [{ id: "delete", label: t("pg.delete") }] : []),
-      ...this.shelfItems(),
-    ];
-    const labels = listItems.map((b) => b.label);
-    const listGap = Math.round(6 * s);
+    const listItems = this.listItems();
     // What the NEW / RENAME / DELETE rows take in a column `w` wide.
-    const buttonsH = (w: number): number => {
-      const [, bh] = btnBox(fonts.tool, labels, 0, btnPad(fonts.tool), minH);
-      const n = rowsIn(fonts.tool, labels, w, minH);
-      return n * bh + (n - 1) * listGap;
-    };
+    const buttonsH = (w: number): number => this.listButtonsH(s, w);
     // NEW, RENAME and whichever of DELETE applies, laid by the row helper so
     // three of them wrap in a narrow column instead of the third being
     // painted over the second's last letter.
@@ -2333,27 +2401,42 @@ export class PlaygroundScene implements Scene {
     };
 
     if (stacked) {
-      // Stacked, the panel is a quarter of the window and one column of it
-      // was rule, search, rows and buttons in turn — the rows got what was
-      // left, a row and a half. Two panes instead: the pads down the left
-      // at full height, everything that acts on them down the right.
+      // Stacked, the panel is a band across the window. The search box and
+      // how full the shelf is share its first line, the pads take the
+      // middle, and the buttons run along its foot at the panel's full
+      // width — in a side column of their own they wrapped to three rows on
+      // a phone, and BACKUP was drawn over the bench below.
       const gap = pad;
-      const listW = Math.round((inner[2] - gap) * 0.56);
-      const cx = inner[0] + listW + gap;
-      const cw = inner[2] - listW - gap;
-      this.drawRows(g, body, s, inner[0], inner[1], listW, inner[3]);
-
-      let y = inner[1];
-      placeSearch(cx, y, cw);
-      y += findH + pad;
-      const bh = buttonsH(cw);
-      placeButtons(cx, y, cw, bh);
-      y += bh + pad;
-      // One line here: stacked, the pane is a quarter of the window and a
-      // bar under its label ran off the bottom of it.
-      y += this.drawShelf(g, body, s, cx, y, cw, true) + pad;
+      const findW = Math.round((inner[2] - gap) * 0.56);
+      const bh = buttonsH(inner[2]);
       const bottom = inner[1] + inner[3];
-      if (this.saveNote) this.drawSaveNote(g, body, s, cx, bottom, cw);
+      placeSearch(inner[0], inner[1], findW);
+      // The note, when there is one, says itself where the shelf's bar is:
+      // under the rows it covered the only one a phone has room for.
+      if (this.saveNote) {
+        this.drawSaveNote(
+          g,
+          body,
+          s,
+          inner[0] + findW + gap,
+          inner[1] + findH,
+          inner[2] - findW - gap,
+        );
+      } else {
+        this.drawShelf(
+          g,
+          body,
+          s,
+          inner[0] + findW + gap,
+          inner[1] + Math.round((findH - body.height) / 2),
+          inner[2] - findW - gap,
+          true,
+        );
+      }
+      const rowsTop = inner[1] + findH + pad;
+      const room = Math.max(0, bottom - bh - pad - rowsTop);
+      this.drawRows(g, body, s, inner[0], rowsTop, inner[2], room);
+      placeButtons(inner[0], bottom - bh, inner[2], bh);
       return;
     }
 
@@ -2955,7 +3038,7 @@ export class PlaygroundScene implements Scene {
       return { land, label, bw, bh };
     });
     const langH = langBoxes[0].bh;
-    const shownLangs = langBoxes.filter((b) => this.tools.keeps({ id: b.land, label: b.label }));
+    let shownLangs = langBoxes.filter((b) => this.tools.keeps({ id: b.land, label: b.label }));
     const flowGap = Math.round(bf.size * 0.5);
     // The filter box heads the band's first row; the buttons flow after it.
     const filterW = this.tools.width(bf);
@@ -3027,6 +3110,17 @@ export class PlaygroundScene implements Scene {
       const room = inner[3] - bandFor(actions) - minStdin - (wide ? gap * 2 : minOut + gap * 3);
       if (room >= editorFloor) break;
       actions = [...core, ...optional.slice(0, optional.length - 1 - drop)];
+    }
+    // Last, the lands: ten of them are two rows on a phone, and with every
+    // optional button gone the editor could still be one line. They fold to
+    // the live one, which steps to the next land when pressed.
+    this.langsFolded = false;
+    if (
+      !filtering &&
+      inner[3] - bandFor(actions) - minStdin - (wide ? gap * 2 : minOut + gap * 3) < editorFloor
+    ) {
+      shownLangs = langBoxes.filter((b) => b.land === this.held.lang);
+      this.langsFolded = true;
     }
     const bandH = bandFor(actions);
     actions = this.tools.filter(actions);
