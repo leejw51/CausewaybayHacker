@@ -117,9 +117,9 @@ M.PALETTE = {
       type = hex("#8cf098"),
       string = hex("#ffb0b0"),
       number = hex("#ffcf6a"),
-      comment = hex("#b4b4ff"),
+      comment = hex("#e0e0ff"),
       macro = hex("#42ebf5"),
-      punct = hex("#dcdcdc"),
+      punct = hex("#ffffff"),
     },
     pane = {
       paper = hex("#5455ed"),
@@ -129,7 +129,7 @@ M.PALETTE = {
       select = hex("#c95bba", 0.6),
       caret = hex("#ffffff"),
       match = hex("#ffffff"),
-      ghost = hex("#ffffff", 0.45),
+      ghost = hex("#ffffff", 0.75),
       hole = hex("#ff5554"),
       scroll = hex("#ffffff", 0.3),
       glow = hex("#c8d2ff", 0.22),
@@ -178,8 +178,8 @@ M.TUBE = {
   -- A colour television on the RF lead: softer lines, a shadow mask, fringing.
   msx = {
     paper = { 84 / 255, 85 / 255, 237 / 255 }, ink = { 1, 1, 1 }, cols = 40,
-    scan = 0.2, scan_px = 3, mask = 0.12, bloom = 0.55, curve = 0.14,
-    noise = 0.08, roll = 0.05, fringe = 0.6,
+    scan = 0.1, scan_px = 3, mask = 0.05, bloom = 0.55, curve = 0.14,
+    noise = 0.03, roll = 0.025, fringe = 0.6,
   },
   -- A 1084S: sharp, interlaced PAL, Workbench blue.
   amiga = {

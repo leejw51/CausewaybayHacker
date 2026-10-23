@@ -491,17 +491,15 @@ body {
   --cwb-syn-type: #8cf098;
   --cwb-syn-string: #ffb0b0;
   --cwb-syn-number: #ffcf6a;
-  --cwb-syn-comment: #b4b4ff;
-  --cwb-syn-operator: #dcdcdc;
+  --cwb-syn-comment: #e0e0ff;
+  --cwb-syn-operator: #ffffff;
   --cwb-syn-invalid: #ff5554;
   --cwb-syn-caret: #ffffff;
   background: #5455ed;
 }
 :root[data-computer="msx"] .cwb-editor .cm-editor {
   color: #ffffff;
-  text-shadow:
-    0 0 1px rgba(255, 255, 255, 0.7),
-    0 0 6px rgba(200, 210, 255, 0.45);
+  text-shadow: 0 0 2px rgba(200, 210, 255, 0.3);
 }
 :root[data-computer="msx"] .cwb-editor .cm-gutters {
   background: #4646c8;
@@ -529,7 +527,7 @@ body {
 }
 :root[data-computer="msx"] .cwb-editor .cwb-hint,
 :root[data-computer="msx"] .cwb-editor .cwb-ghost {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* Amiga: Workbench 1.3's four colours — blue, white, black, orange — and
@@ -549,7 +547,7 @@ body {
 }
 :root[data-computer="amiga"] .cwb-editor .cm-editor {
   color: #ffffff;
-  text-shadow: none;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.2);
 }
 :root[data-computer="amiga"] .cwb-editor .cm-gutters {
   background: #ffffff;
