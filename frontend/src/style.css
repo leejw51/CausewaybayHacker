@@ -438,19 +438,19 @@ body {
 /* Apple ][: one green phosphor, every colour a brightness of it. */
 :root[data-computer="apple2"] .cwb-editor {
   --cwb-syn-keyword: #c8ffc8;
-  --cwb-syn-name: #48ff78;
+  --cwb-syn-name: #80ff9c;
   --cwb-syn-fn: #98ffb0;
   --cwb-syn-type: #78ff98;
-  --cwb-syn-string: #30d860;
+  --cwb-syn-string: #68f58c;
   --cwb-syn-number: #b0ffc0;
-  --cwb-syn-comment: #1f8c40;
-  --cwb-syn-operator: #38c860;
+  --cwb-syn-comment: #62cf80;
+  --cwb-syn-operator: #80e89c;
   --cwb-syn-invalid: #ffffff;
-  --cwb-syn-caret: #48ff78;
+  --cwb-syn-caret: #80ff9c;
   background: #050c07;
 }
 :root[data-computer="apple2"] .cwb-editor .cm-editor {
-  color: #48ff78;
+  color: #80ff9c;
   text-shadow:
     0 0 1px rgba(72, 255, 120, 0.9),
     0 0 6px rgba(72, 255, 120, 0.55),
@@ -458,23 +458,23 @@ body {
 }
 :root[data-computer="apple2"] .cwb-editor .cm-gutters {
   background: #040a06;
-  color: #1f8c40;
-  border-right-color: #1f8c40;
+  color: #62cf80;
+  border-right-color: #62cf80;
 }
 :root[data-computer="apple2"] .cwb-editor .cm-activeLine {
   background: rgba(72, 255, 120, 0.06);
 }
 :root[data-computer="apple2"] .cwb-editor .cm-activeLineGutter {
   background: rgba(72, 255, 120, 0.12);
-  color: #48ff78;
+  color: #80ff9c;
 }
 :root[data-computer="apple2"] .cwb-editor .cm-cursor {
-  border-left-color: #48ff78;
+  border-left-color: #80ff9c;
 }
 :root[data-computer="apple2"] .cwb-editor .cm-matchingBracket {
   color: #050c07 !important;
-  background: #48ff78;
-  outline-color: #48ff78;
+  background: #80ff9c;
+  outline-color: #80ff9c;
 }
 :root[data-computer="apple2"] .cwb-editor .cm-selectionBackground,
 :root[data-computer="apple2"] .cwb-editor .cm-content ::selection {
@@ -482,7 +482,7 @@ body {
 }
 :root[data-computer="apple2"] .cwb-editor .cwb-hint,
 :root[data-computer="apple2"] .cwb-editor .cwb-ghost {
-  color: rgba(72, 255, 120, 0.4);
+  color: rgba(128, 255, 156, 0.7);
 }
 
 /* MSX: SCREEN 0, white on the TMS9918's dark blue, the VDP's colours for
@@ -538,14 +538,14 @@ body {
 /* Amiga: Workbench 1.3's four colours — blue, white, black, orange — and
    Topaz. */
 :root[data-computer="amiga"] .cwb-editor {
-  --cwb-syn-keyword: #ff8800;
+  --cwb-syn-keyword: #ffcc70;
   --cwb-syn-name: #ffffff;
   --cwb-syn-fn: #aee8ff;
   --cwb-syn-type: #ffd060;
   --cwb-syn-string: #a8ffb0;
   --cwb-syn-number: #ffd060;
-  --cwb-syn-comment: #80a8d8;
-  --cwb-syn-operator: #e0e0e0;
+  --cwb-syn-comment: #c4e4ff;
+  --cwb-syn-operator: #ffffff;
   --cwb-syn-invalid: #ff2200;
   --cwb-syn-caret: #ff8800;
   background: #0055aa;
@@ -583,7 +583,7 @@ body {
 }
 :root[data-computer="amiga"] .cwb-editor .cwb-hint,
 :root[data-computer="amiga"] .cwb-editor .cwb-ghost {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .cwb-hidden {

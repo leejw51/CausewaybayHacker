@@ -87,27 +87,27 @@ M.hex = hex
 M.PALETTE = {
   apple2 = {
     code = {
-      text = hex("#48ff78"),
+      text = hex("#80ff9c"),
       keyword = hex("#c8ffc8"),
       type = hex("#78ff98"),
-      string = hex("#30d860"),
+      string = hex("#68f58c"),
       number = hex("#b0ffc0"),
-      comment = hex("#1f8c40"),
+      comment = hex("#62cf80"),
       macro = hex("#98ffb0"),
-      punct = hex("#38c860"),
+      punct = hex("#80e89c"),
     },
     pane = {
       paper = hex("#050c07"),
       gutter = hex("#040a06"),
-      gutter_ink = hex("#1f8c40"),
-      active = hex("#48ff78", 0.06),
-      select = hex("#48ff78", 0.3),
-      caret = hex("#48ff78"),
-      match = hex("#48ff78"),
-      ghost = hex("#48ff78", 0.4),
+      gutter_ink = hex("#62cf80"),
+      active = hex("#80ff9c", 0.06),
+      select = hex("#80ff9c", 0.3),
+      caret = hex("#80ff9c"),
+      match = hex("#80ff9c"),
+      ghost = hex("#80ff9c", 0.7),
       hole = hex("#ffffff"),
-      scroll = hex("#48ff78", 0.3),
-      glow = hex("#48ff78", 0.3),
+      scroll = hex("#80ff9c", 0.3),
+      glow = hex("#80ff9c", 0.3),
     },
   },
   msx = {
@@ -138,13 +138,13 @@ M.PALETTE = {
   amiga = {
     code = {
       text = hex("#ffffff"),
-      keyword = hex("#ff8800"),
+      keyword = hex("#ffcc70"),
       type = hex("#ffd060"),
       string = hex("#a8ffb0"),
       number = hex("#ffd060"),
-      comment = hex("#80a8d8"),
+      comment = hex("#c4e4ff"),
       macro = hex("#aee8ff"),
-      punct = hex("#e0e0e0"),
+      punct = hex("#ffffff"),
     },
     pane = {
       paper = hex("#0055aa"),
@@ -156,7 +156,7 @@ M.PALETTE = {
       select = hex("#ff8800", 0.45),
       caret = hex("#ff8800"),
       match = hex("#ff8800"),
-      ghost = hex("#ffffff", 0.45),
+      ghost = hex("#ffffff", 0.75),
       hole = hex("#ff2200"),
       scroll = hex("#ffffff", 0.3),
       glow = hex("#ffa03c", 0.18),
@@ -172,7 +172,7 @@ M.TUBE = {
   -- A green P1 phosphor monochrome monitor: heavy lines, lots of glow, no mask.
   apple2 = {
     paper = { 0.02, 0.05, 0.03 }, ink = { 0.25, 1.0, 0.45 }, cols = 40,
-    scan = 0.32, scan_px = 3, mask = 0, bloom = 1.1, curve = 0.18,
+    scan = 0.14, scan_px = 3, mask = 0, bloom = 1.1, curve = 0.18,
     noise = 0.06, roll = 0.07, fringe = 0,
   },
   -- A colour television on the RF lead: softer lines, a shadow mask, fringing.
@@ -184,7 +184,7 @@ M.TUBE = {
   -- A 1084S: sharp, interlaced PAL, Workbench blue.
   amiga = {
     paper = { 0, 85 / 255, 170 / 255 }, ink = { 1, 1, 1 }, cols = 64,
-    scan = 0.22, scan_px = 2, mask = 0.08, bloom = 0.45, curve = 0.1,
+    scan = 0.10, scan_px = 2, mask = 0.04, bloom = 0.45, curve = 0.1,
     noise = 0.04, roll = 0.04, fringe = 0.3,
   },
 }
