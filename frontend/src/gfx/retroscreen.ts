@@ -165,7 +165,7 @@ void main() {
 
   // -- vignette and glass ------------------------------------------------
   float v = smoothstep(0.35, 0.95, length(cc * vec2(1.05, 1.15)) * 1.25);
-  out_ = over(vec4(0.0, 0.0, 0.0, v * 0.55), out_);
+  out_ = over(vec4(0.0, 0.0, 0.0, v * mix(0.08, 0.55, uScreen)), out_);
   float glare = smoothstep(0.55, 0.0, length((uv - vec2(0.18, 0.86)) * vec2(1.0, 1.8)));
   out_ += vec4(vec3(glare * 0.05), 0.0);
   // Rounded corners of the tube, in the bezel's black.
