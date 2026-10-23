@@ -107,7 +107,7 @@ export const TUBE: Record<Exclude<Computer, "normal">, Tube> = {
     paper: [0.02, 0.05, 0.03],
     ink: [0.25, 1.0, 0.45],
     cols: 40,
-    scan: 0.32,
+    scan: 0.14,
     scanPx: 3,
     mask: 0,
     bloom: 1.1,
@@ -121,13 +121,13 @@ export const TUBE: Record<Exclude<Computer, "normal">, Tube> = {
     paper: [84 / 255, 85 / 255, 237 / 255],
     ink: [1, 1, 1],
     cols: 40,
-    scan: 0.2,
+    scan: 0.1,
     scanPx: 3,
-    mask: 0.12,
+    mask: 0.05,
     bloom: 0.55,
     curve: 0.14,
-    noise: 0.08,
-    roll: 0.05,
+    noise: 0.03,
+    roll: 0.025,
     fringe: 0.6,
   },
   // A 1084S: sharp, interlaced PAL, Workbench blue.
@@ -135,9 +135,9 @@ export const TUBE: Record<Exclude<Computer, "normal">, Tube> = {
     paper: [0, 85 / 255, 170 / 255],
     ink: [1, 1, 1],
     cols: 64,
-    scan: 0.22,
+    scan: 0.10,
     scanPx: 2,
-    mask: 0.08,
+    mask: 0.04,
     bloom: 0.45,
     curve: 0.1,
     noise: 0.04,
@@ -181,3 +181,25 @@ export const SAYS: Record<Exclude<Computer, "normal">, Record<Outcome, string[]>
     ],
   },
 };
+
+/** Actual compiler output, retaining machine-specific messages for other failures. */
+export function runMessage(
+  machine: Exclude<Computer, "normal">,
+  run: import("../net/protocol").PlaygroundRun,
+): string[] {
+  if (run.outcome === "ok") return [];
+  if (run.outcome !== "compile_error") return SAYS[machine][run.outcome];
+  const message =
+    run.stderr.trim() ||
+    run.diagnostics
+      .map(
+        (d) =>
+          `${d.kind}${d.code ? " " + d.code : ""}${d.line === null ? "" : ` (${d.line}${d.col === null ? "" : ":" + d.col})`}: ${d.message}`,
+      )
+      .join("\n");
+  return (message || "Compilation failed (no compiler message returned).")
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .replace(/\r/g, "")
+    .replace(/\t/g, "    ")
+    .split("\n");
+}

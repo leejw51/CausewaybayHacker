@@ -87,27 +87,27 @@ M.hex = hex
 M.PALETTE = {
   apple2 = {
     code = {
-      text = hex("#48ff78"),
+      text = hex("#b0ffbe"),
       keyword = hex("#c8ffc8"),
       type = hex("#78ff98"),
-      string = hex("#30d860"),
+      string = hex("#a0ffb0"),
       number = hex("#b0ffc0"),
-      comment = hex("#1f8c40"),
+      comment = hex("#92efa4"),
       macro = hex("#98ffb0"),
-      punct = hex("#38c860"),
+      punct = hex("#80e89c"),
     },
     pane = {
       paper = hex("#050c07"),
       gutter = hex("#040a06"),
-      gutter_ink = hex("#1f8c40"),
-      active = hex("#48ff78", 0.06),
-      select = hex("#48ff78", 0.3),
-      caret = hex("#48ff78"),
-      match = hex("#48ff78"),
-      ghost = hex("#48ff78", 0.4),
+      gutter_ink = hex("#92efa4"),
+      active = hex("#b0ffbe", 0.06),
+      select = hex("#b0ffbe", 0.3),
+      caret = hex("#b0ffbe"),
+      match = hex("#b0ffbe"),
+      ghost = hex("#b0ffbe", 0.7),
       hole = hex("#ffffff"),
-      scroll = hex("#48ff78", 0.3),
-      glow = hex("#48ff78", 0.3),
+      scroll = hex("#b0ffbe", 0.3),
+      glow = hex("#b0ffbe", 0.3),
     },
   },
   msx = {
@@ -117,9 +117,9 @@ M.PALETTE = {
       type = hex("#8cf098"),
       string = hex("#ffb0b0"),
       number = hex("#ffcf6a"),
-      comment = hex("#b4b4ff"),
+      comment = hex("#e0e0ff"),
       macro = hex("#42ebf5"),
-      punct = hex("#dcdcdc"),
+      punct = hex("#ffffff"),
     },
     pane = {
       paper = hex("#5455ed"),
@@ -129,7 +129,7 @@ M.PALETTE = {
       select = hex("#c95bba", 0.6),
       caret = hex("#ffffff"),
       match = hex("#ffffff"),
-      ghost = hex("#ffffff", 0.45),
+      ghost = hex("#ffffff", 0.75),
       hole = hex("#ff5554"),
       scroll = hex("#ffffff", 0.3),
       glow = hex("#c8d2ff", 0.22),
@@ -138,13 +138,13 @@ M.PALETTE = {
   amiga = {
     code = {
       text = hex("#ffffff"),
-      keyword = hex("#ff8800"),
+      keyword = hex("#ffcc70"),
       type = hex("#ffd060"),
       string = hex("#a8ffb0"),
       number = hex("#ffd060"),
-      comment = hex("#80a8d8"),
+      comment = hex("#c4e4ff"),
       macro = hex("#aee8ff"),
-      punct = hex("#e0e0e0"),
+      punct = hex("#ffffff"),
     },
     pane = {
       paper = hex("#0055aa"),
@@ -156,7 +156,7 @@ M.PALETTE = {
       select = hex("#ff8800", 0.45),
       caret = hex("#ff8800"),
       match = hex("#ff8800"),
-      ghost = hex("#ffffff", 0.45),
+      ghost = hex("#ffffff", 0.75),
       hole = hex("#ff2200"),
       scroll = hex("#ffffff", 0.3),
       glow = hex("#ffa03c", 0.18),
@@ -172,19 +172,19 @@ M.TUBE = {
   -- A green P1 phosphor monochrome monitor: heavy lines, lots of glow, no mask.
   apple2 = {
     paper = { 0.02, 0.05, 0.03 }, ink = { 0.25, 1.0, 0.45 }, cols = 40,
-    scan = 0.32, scan_px = 3, mask = 0, bloom = 1.1, curve = 0.18,
+    scan = 0.14, scan_px = 3, mask = 0, bloom = 1.1, curve = 0.18,
     noise = 0.06, roll = 0.07, fringe = 0,
   },
   -- A colour television on the RF lead: softer lines, a shadow mask, fringing.
   msx = {
     paper = { 84 / 255, 85 / 255, 237 / 255 }, ink = { 1, 1, 1 }, cols = 40,
-    scan = 0.2, scan_px = 3, mask = 0.12, bloom = 0.55, curve = 0.14,
-    noise = 0.08, roll = 0.05, fringe = 0.6,
+    scan = 0.1, scan_px = 3, mask = 0.05, bloom = 0.55, curve = 0.14,
+    noise = 0.03, roll = 0.025, fringe = 0.6,
   },
   -- A 1084S: sharp, interlaced PAL, Workbench blue.
   amiga = {
     paper = { 0, 85 / 255, 170 / 255 }, ink = { 1, 1, 1 }, cols = 64,
-    scan = 0.22, scan_px = 2, mask = 0.08, bloom = 0.45, curve = 0.1,
+    scan = 0.10, scan_px = 2, mask = 0.04, bloom = 0.45, curve = 0.1,
     noise = 0.04, roll = 0.04, fringe = 0.3,
   },
 }
@@ -228,7 +228,25 @@ M.SAYS = {
 
 --- What `machine` says about a run that ended with `outcome`, or nil -- for
 --- "normal", for a run that went fine, and for an outcome it has no words for.
-function M.says(machine, outcome)
+function M.says(machine, outcome, run)
+  if M.SAYS[machine] and outcome == "compile_error" and run then
+    local message = run.stderr or ""
+    if not message:find("%S") then
+      local diagnostics = {}
+      for _, d in ipairs(run.diagnostics or {}) do
+        local where = type(d.line) == "number" and (" (" .. d.line ..
+          (type(d.col) == "number" and (":" .. d.col) or "") .. ")") or ""
+        diagnostics[#diagnostics + 1] = (d.kind or "error") ..
+          (type(d.code) == "string" and (" " .. d.code) or "") .. where .. ": " .. d.message
+      end
+      message = table.concat(diagnostics, "\n")
+    end
+    if not message:find("%S") then message = "Compilation failed (no compiler message returned)." end
+    message = message:gsub("\27%[[0-9;]*m", ""):gsub("\r", ""):gsub("\t", "    "):gsub("\n+$", "")
+    local lines = {}
+    for line in (message .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
+    return lines
+  end
   local says = M.SAYS[machine]
   return says and says[outcome] or nil
 end

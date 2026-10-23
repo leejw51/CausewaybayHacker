@@ -26,7 +26,7 @@
  * screen, the banner types itself out, and the screen fades into the editor.
  * Switching to "normal" plays the power-off — the picture collapses to a line
  * and then a dot. A failed RUN puts the machine's own error up over the
- * code for a few seconds; on the Amiga that is a Guru Meditation, with its
+ * code until a key is pressed or a few seconds pass; on the Amiga that is a Guru Meditation, with its
  * red box blinking.
  *
  * Without WebGL none of this exists and the CSS half carries the theme on
@@ -165,7 +165,7 @@ void main() {
 
   // -- vignette and glass ------------------------------------------------
   float v = smoothstep(0.35, 0.95, length(cc * vec2(1.05, 1.15)) * 1.25);
-  out_ = over(vec4(0.0, 0.0, 0.0, v * 0.55), out_);
+  out_ = over(vec4(0.0, 0.0, 0.0, v * mix(0.08, 0.55, uScreen)), out_);
   float glare = smoothstep(0.55, 0.0, length((uv - vec2(0.18, 0.86)) * vec2(1.0, 1.8)));
   out_ += vec4(vec3(glare * 0.05), 0.0);
   // Rounded corners of the tube, in the bezel's black.
@@ -362,6 +362,9 @@ export class RetroScreen {
   private alert: { lines: string[]; at: number } | null = null;
   private rect: Rect = [0, 0, 0, 0];
   private placed = false;
+  private readonly dismissAlert = (): void => {
+    this.alert = null;
+  };
 
   constructor(
     host: HTMLElement,
@@ -369,6 +372,9 @@ export class RetroScreen {
     /** The editor it sits on: hidden whenever that is. */
     private readonly under: HTMLElement,
   ) {
+    // Capture also sees keys handled by CodeMirror. Keep the event intact so
+    // the same keystroke can continue editing immediately.
+    window.addEventListener("keydown", this.dismissAlert, true);
     this.canvas.className = "cwb-retro";
     this.overlay = new Overlay(host, layout, this.canvas);
     // Straight after the editor, so the tube is over the code and under
@@ -471,6 +477,7 @@ export class RetroScreen {
   }
 
   destroy(): void {
+    window.removeEventListener("keydown", this.dismissAlert, true);
     this.texture?.dispose();
     this.material?.dispose();
     // Given back now, not when the collector gets round to it: a context per
@@ -596,7 +603,18 @@ export class RetroScreen {
   }
 
   private paintAlert(g: CanvasRenderingContext2D, machine: Machine, grid: Grid, age: number): void {
-    const lines = this.alert!.lines;
+    const width = grid.cols - 4;
+    const limit = Math.max(1, grid.rows - 5);
+    const wrapped = this.alert!.lines.flatMap((line) => {
+      const chars = Array.from(line);
+      const rows: string[] = [];
+      do {
+        rows.push(chars.splice(0, width).join(""));
+      } while (chars.length);
+      return rows;
+    });
+    const lines = wrapped.slice(0, limit);
+    if (wrapped.length > limit) lines[limit - 1] = "... more in output";
     const tube = TUBE[machine];
     if (machine === "amiga") {
       // The Guru: black, a red box that blinks, red text centred in it.
@@ -619,7 +637,7 @@ export class RetroScreen {
     // The 8-bits print it under the code they were running and go back to
     // the prompt: the line, a beep's worth of bright, and the cursor.
     g.fillStyle = css(tube.ink);
-    const row = Math.max(1, Math.floor(grid.rows / 2) - 1);
+    const row = Math.max(1, Math.floor((grid.rows - lines.length - 2) / 2));
     lines.forEach((l, i) => put(g, grid, 0, row + i, l));
     const prompt = machine === "apple2" ? "]" : "Ok";
     put(g, grid, 0, row + lines.length, prompt);

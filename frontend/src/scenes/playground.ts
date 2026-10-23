@@ -65,7 +65,7 @@ import {
   COMPUTER_FACE,
   COMPUTER_KEY,
   COMPUTER_NAME,
-  SAYS,
+  runMessage,
   getComputer,
   nextComputer,
   setComputer,
@@ -1534,7 +1534,7 @@ export class PlaygroundScene implements Scene {
       this.outputToTop = true;
       const machine = getComputer();
       if (res.run.outcome !== "ok" && machine !== "normal")
-        this.retro?.say(SAYS[machine][res.run.outcome]);
+        this.retro?.say(runMessage(machine, res.run));
       if (res.run.outcome === "ok") this.app.chip.coin();
       // No screen shake here, on purpose *and* because it could not land:
       // `App.shake` refuses while the overlay has children, and this screen
