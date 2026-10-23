@@ -20,6 +20,8 @@ local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 local CRT = require("src.crt")
 local SFX = require("src.sfx")
 local Store = require("src.store")
@@ -122,8 +124,31 @@ function App.new(opts)
     category = nil,
     quest_id = nil,
     last_attempt = nil,
+    -- The settings sheet (`UI.displayControls`), opened by the footer's ⚙
+    -- or F9, drawn over every scene from `draw`.
+    settings_open = false,
+    -- Seconds since the last scene change, for the fade-in between two
+    -- screens; nil once it is over.
+    transition = nil,
   }, App)
   return self
+end
+
+--- How far through its level a player is, 0..1, for the footer's bar.
+---
+--- PROTOCOL §5.1: the level sits on the triangular curve — level `L`
+--- starts at `100 · (L-1) · L / 2` XP and spans `100 · L`. The server's own
+--- `xp_into_level` wins when it is on the record; the curve is the fallback
+--- for a server that has not said.
+function App.xp_fraction(user)
+  if type(user) ~= "table" or user.xp == nil then return 0 end
+  local level = math.max(1, math.floor(tonumber(user.level) or 1))
+  local xp = tonumber(user.xp) or 0
+  local into = tonumber(user.xp_into_level)
+  if into == nil then into = xp - 100 * (level - 1) * level / 2 end
+  local span = 100 * level
+  if span <= 0 then return 0 end
+  return math.max(0, math.min(1, into / span))
 end
 
 function App:log(level, message)
@@ -220,6 +245,15 @@ function App:load()
   -- applied on the second is a screen that visibly re-lays itself.
   local face = Store.saved_face()
   if face then Assets.setCodeFace(face) end
+  -- **Neo둥근모 by default** (`docs/love2d-ui.md` §type): the one interface
+  -- face, at 16 / 32 / 48, half the width of Press Start 2P so titles stop
+  -- wrapping. A face chosen with F8 is remembered and wins; Press Start 2P
+  -- stays on the cycle as ARCADE, and on the logo whatever is chosen.
+  local ui_face = os.getenv("CWBH_UI_FACE") or Store.saved_ui_face() or "dunggeunmo"
+  if ui_face then Assets.setUiFace(ui_face) end
+  -- The playground's old computer and its two switches, for the same reason.
+  require("src.scenes.playground").restore_prefs(Store.saved_pg_prefs(),
+    Store.saved_computer())
   local code_theme = Store.saved_code_theme()
   if code_theme then Theme.setCodeTheme(code_theme) end
 
@@ -301,7 +335,11 @@ function App:load()
     elseif self.scene_name == "login" then
       self:go("lands")
     end
-    self:toast(("welcome, %s"):format(payload.user and payload.user.name or "hacker"))
+    -- No "welcome, name" toast: it sat over whatever the player was about
+    -- to press. The footer's LV and XP count up from zero on arrival
+    -- instead, and the name is in the settings sheet.
+    Juice.forget("footer:")
+    Juice.counter("footer:xp", 0)
   end)
 
   -- PROTOCOL §6 rule 5: the map is refetched, never trusted across a drop.
@@ -313,10 +351,12 @@ function App:load()
 
   self.session:on("award", function(payload)
     -- §4.20: purely presentational, and an unknown `kind` is ignored.
-    if payload.kind == "badge" or payload.kind == "stamp"
-      or payload.kind == "level" or payload.kind == "streak" then
+    -- The `cleared` stamp is not toasted: the result card *is* that news,
+    -- and a "CLEARED" slip sliding over it said the same thing twice.
+    if payload.kind == "badge" or payload.kind == "level" or payload.kind == "streak"
+      or (payload.kind == "stamp" and payload.id ~= "cleared") then
       SFX.play("stamp")
-      self:toast(tostring(payload.title or payload.id))
+      self:toast(tostring(payload.title or payload.id), nil, "good")
     end
   end)
 
@@ -361,6 +401,10 @@ function App:go(name, params)
   local scene = require(path).new(self)
   self.scene = scene
   self.scene_name = name
+  -- The fade between two screens: the new one comes up from the felt over
+  -- `Theme.motion.transition` while its own cards deal in. No wipe.
+  self.transition = 0
+  self.settings_open = false
   -- LÖVE delivers `textinput` for a printable key *after* `keypressed` for
   -- the same physical press. A scene opened by a letter — S for search, P for
   -- the playground, Q for a category — would otherwise receive that letter as
@@ -393,17 +437,30 @@ function App:back()
   end
 end
 
-function App:toast(text, seconds)
+--- Say something briefly, at the top centre (`UI.pushToast`). `kind` is
+--- `"info"` (default), `"good"`, `"bad"` or `"warn"`. `toast_text` and
+--- `toast_left` are kept for the drive scripts that read them.
+--- `id`, when given, names a slip that a later toast with the same id
+--- replaces: a setting cycled four times is one slip, not four.
+function App:toast(text, seconds, kind, id)
   self.toast_text = text
-  self.toast_left = seconds or 3.2
+  self.toast_left = seconds or Theme.motion.toastHold
+  UI.pushToast(text, { seconds = seconds, kind = kind, id = id })
 end
 
 function App:update(dt)
   Layout.flush()
   CRT.update(dt)
+  Juice.update(dt)
+  Fx.update(dt)
+  UI.updateToasts(dt)
   self.client:update(dt)
   if self.toast_left > 0 then
     self.toast_left = math.max(0, self.toast_left - dt)
+  end
+  if self.transition then
+    self.transition = self.transition + dt
+    if self.transition >= Theme.motion.transition or Anim.frozen() then self.transition = nil end
   end
   if self.scene and self.scene.update then self.scene:update(dt) end
   -- Cleared at the end of the frame, so exactly the keystroke that opened the
@@ -411,15 +468,39 @@ function App:update(dt)
   self.swallow_textinput = false
 end
 
+--- Where the toast dock starts: 12 px under the scene's header, which it
+--- declares as `header_h` (a number or a method), else the top edge.
+function App:toast_top()
+  local scene = self.scene
+  if not scene then return 0 end
+  local h = scene.header_h
+  if type(h) == "function" then h = h(scene) end
+  return tonumber(h) or 0
+end
+
 function App:draw()
   if self.scene and self.scene.draw then
     self.scene:draw()
   else
-    love.graphics.clear(Theme.void)
+    love.graphics.clear(Theme.felt)
   end
-  CRT.draw(self.scene_name == "quest" and 0.35 or 1)
-  UI.toast(self.toast_text, math.min(1, self.toast_left / 0.5),
-    self.scene and self.scene.toast_lift and self.scene:toast_lift() or 0)
+  Fx.draw()
+  if self.transition then
+    local k = math.min(1, self.transition / Theme.motion.transition)
+    UI.setColor(Theme.felt, 1 - k)
+    love.graphics.rectangle("fill", 0, 0, Layout.vw, Layout.vh)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+  -- The scanlines, light over code: legibility wins on the two screens
+  -- somebody reads a program on.
+  local reading = self.scene_name == "quest" or self.scene_name == "playground"
+  CRT.draw(reading and 0.15 or 1)
+  if self.settings_open then
+    self.display_rects = UI.displayControls(self:display_state())
+  else
+    self.display_rects = nil
+  end
+  UI.drawToasts(self:toast_top())
 end
 
 --- The modifier keys held right now.
@@ -442,10 +523,49 @@ end
 App.mods = mods
 
 function App:keypressed(key)
+  -- The settings sheet takes every key while it is up: ESC or F9 closes
+  -- it, and nothing underneath it is driven by accident.
+  if self.settings_open then
+    if key == "escape" or key == "f9" then self:close_settings() end
+    return
+  end
   if self.scene and self.scene.keypressed then
     if self.scene:keypressed(key, mods()) then return end
   end
   if key == "escape" then self:back() end
+  -- F8: the interface face, as on the web. **After** the scene, not before:
+  -- the quest screen has had F8 for its log since before there was a face to
+  -- choose, and a key that stops doing what somebody learned it does is a
+  -- worse loss than one screen where this one is a button away.
+  if key == "f8" then self:cycle_ui_face() end
+  -- F9: the settings sheet, for the same reason after the scene (the quest
+  -- hands F9 to `$EDITOR`; there, the ⚙ in the footer is the way in).
+  if key == "f9" then self:open_settings() end
+end
+
+function App:open_settings()
+  if self.settings_open then return end
+  SFX.play("select")
+  UI.modalReset("settings")
+  self.settings_open = true
+end
+
+function App:close_settings()
+  if not self.settings_open then return end
+  SFX.play("back")
+  self.settings_open = false
+  self.display_rects = nil
+end
+
+--- The next interface face, for every screen at once, and remember it. F8,
+--- and whatever chip a screen offers for it (`"FONT %s"` is translated).
+---
+--- The toast names the face by its own name, like the language toast does.
+function App:cycle_ui_face()
+  local face = Assets.cycleUiFace()
+  Store.set_ui_face(face)
+  self:toast(I18n.t("font: %s", Assets.UI_FACE_NAME[face]), nil, nil, "ui-face")
+  return face
 end
 
 function App:textinput(text)
@@ -456,9 +576,14 @@ end
 function App:mousepressed(x, y, button)
   local vx, vy = Layout.toVirtual(x, y)
   if not vx then return end
-  -- The footer's display controls are global chrome and are tested first; a
-  -- press that lands on one is consumed and never reaches the scene.
+  -- The settings sheet and the footer's ⚙ are global chrome and are tested
+  -- first; a press that lands on either is consumed and never reaches the
+  -- scene. While the sheet is up, a press anywhere else closes it.
   if button == 1 and self:display_pressed(vx, vy) then return end
+  if self.settings_open then
+    if button == 1 then self:close_settings() end
+    return
+  end
   if self.scene and self.scene.mousepressed then self.scene:mousepressed(vx, vy, button) end
 end
 
@@ -524,9 +649,12 @@ end
 --- looking at and the action a press performs can never come from two
 --- different ideas of the state.
 function App:display_state()
+  local authed = (self.session and self.session.authed) and true or false
   return {
-    -- Signed in: the row grows a fifth button, the way out.
-    authed = (self.session and self.session.authed) and true or false,
+    -- Signed in: the sheet grows an account row and the way out.
+    authed = authed,
+    name = authed and self.session:display_name() or nil,
+    address = authed and self.session:short_address() or nil,
     fullscreen = Layout.fullscreen,
     -- "auto" | "portrait" | "landscape" — the *state*, pin included.
     orientation = Layout.orientationLabel(),
@@ -537,6 +665,9 @@ function App:display_state()
     font_label = Layout.fontLabel(),
     lang = I18n.lang,
     lang_code = I18n.code(),
+    ui_face = Assets.UI_FACE_NAME[Assets.uiFace()] or "ARCADE",
+    code_face = Assets.CODE_FACE_NAME[Assets.codeFace()] or "IOSEVKA",
+    sound = SFX.enabled and true or false,
   }
 end
 
@@ -551,45 +682,89 @@ end
 --- things. The keys are not replaced; this is the half of the feature a
 --- player can see.
 function App:display_pressed(x, y)
-  local rects = self.display_rects
-  if not rects then return false end
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
-  if inside(rects.fullscreen) then
-    SFX.play("select")
-    self:toast(Layout.toggleFullscreen() and "fullscreen" or "window")
+  -- The ⚙, on every footer.
+  if not self.settings_open and inside(UI.gear_rect) then
+    UI.press("footer:gear", UI.gear_rect, { sfx = false })
+    self:open_settings()
     return true
   end
-  if inside(rects.orient) then
-    SFX.play("select")
-    self:toast("orientation: " .. Layout.cycleOrientation())
+  local rects = self.display_rects
+  if not (self.settings_open and rects) then return false end
+  local function hit(id)
+    if inside(rects[id]) then
+      UI.press("settings:" .. id, rects[id], { sfx = false })
+      return true
+    end
+    return false
+  end
+  if inside(rects.close) then
+    self:close_settings()
     return true
   end
-  if inside(rects.font) then
+  if hit("fullscreen") then
+    SFX.play("select")
+    self:toast(Layout.toggleFullscreen() and "fullscreen" or "window", nil, nil, "window")
+    return true
+  end
+  if hit("orient") then
+    SFX.play("select")
+    self:toast("orientation: " .. Layout.cycleOrientation(), nil, nil, "orientation")
+    return true
+  end
+  if hit("font") then
     SFX.play("select")
     Layout.cycleFont()
-    self:toast("type size " .. Layout.fontLabel())
+    self:toast("type size " .. Layout.fontLabel(), nil, nil, "type-size")
     return true
   end
-  if inside(rects.lang) then
+  if hit("lang") then
     SFX.play("select")
     self:set_lang(I18n.cycle())
     return true
   end
-  if inside(rects.logout) then
+  if hit("face") then
+    SFX.play("select")
+    self:cycle_ui_face()
+    return true
+  end
+  if hit("codeface") then
+    SFX.play("select")
+    local face = Assets.cycleCodeFace()
+    Store.set_face(face)
+    self:toast(I18n.t("code: %s", Assets.CODE_FACE_NAME[face] or face), nil, nil, "code-face")
+    return true
+  end
+  if hit("sound") then
+    self:toast(SFX.toggle() and "sound on" or "sound off", nil, nil, "sound")
+    return true
+  end
+  if hit("copy") then
+    local address = self.session and self.session.address and self.session:address()
+    if address and love.system and love.system.setClipboardText then
+      love.system.setClipboardText(address)
+      self:toast(I18n.t("address copied"), nil, "good")
+    end
+    return true
+  end
+  if hit("logout") then
     self:logout()
     return true
   end
-  return false
+  -- Inside the sheet but on nothing: swallowed, so the scene under it is
+  -- not driven; outside it, the caller closes the sheet.
+  return inside(rects.sheet)
 end
 
 --- Sign out, from any screen.
 ---
 --- The browser client's address chip does this (`frontend/src/ui/chrome.ts`:
 --- the wallet *is* the account, so the thing showing who you are is the
---- thing that stops being you). Here the verb sits in the footer's control
---- row beside the other four, drawn only while signed in — this client had
+--- thing that stops being you). Here the verb is the last row of the ⚙
+--- settings sheet, under the account it signs out, shown only while signed
+--- in — this client had
 --- a login with a server field, a phrase and a name, and no way back to it
 --- short of deleting the store by hand.
 ---
@@ -611,6 +786,8 @@ function App:logout()
   self.client.auto_reconnect = true
   self.client:connect()
   self.toast_left = 0
+  UI.clearToasts()
+  self.settings_open = false
   return true
 end
 
@@ -622,7 +799,7 @@ end
 function App:set_lang(code)
   I18n.set(code)
   Store.set_lang(I18n.lang)
-  self:toast(I18n.name())
+  self:toast(I18n.name(), nil, nil, "language")
   return I18n.lang
 end
 
@@ -634,26 +811,45 @@ end
 --- one piece of chrome every screen already draws. A scene added tomorrow
 --- gets them by calling `app:footer`, which it has to do anyway, and cannot
 --- forget them. `tests/test_screens.lua` asserts that every scene does.
-function App:footer(hint)
-  local left = hint or ""
-  if self.session and self.session.authed then
-    local xp = self.session.xp_label and self.session:xp_label() or nil
-    left = ("%s  %s   %s"):format(self.session:display_name(), self.session:short_address(), left)
-    if xp then left = xp .. "  " .. left end
-  end
+--- `hint` is the scene's key list, in priority order: a string
+--- (`"SPACE start   F10 story"`) or a list of `{ key =, verb = }`; the
+--- footer shows the longest prefix that fits. `opts.bare` is the title
+--- card's: no bar, no status, only the ⚙.
+---
+--- **One line, never two.** What used to be here — name, address and the
+--- level all on the hint's row, wrapped when it did not fit — is the thing
+--- the spec names first: three rows of chrome on every screen. The level
+--- and the XP bar stay (they are the game's score); the name and address
+--- are in the settings sheet, where they are needed only when they are.
+function App:footer(hint, opts)
+  opts = opts or {}
   local state = self:display_state()
-  -- **First**, because this is also what decides whether the buttons can
-  -- wear their labels at this canvas width, and the answer has to be settled
-  -- before anything is drawn with it.
+  -- Kept: the controls cost the footer nothing now, and the number says so.
   local reserve = UI.displayReserve(state)
-  -- Kept so a drive script can ask whether this screen's own hint fits in the
-  -- room it was given, which is the question a translation actually raises.
-  -- `last_reserve` is what the control row costs; `last_room` is what the
-  -- hint was actually given, which since the split is very nearly the whole
-  -- width.
-  self.last_hint, self.last_reserve = left, reserve
-  self.last_room = UI.footer(left, self.client and self.client.state or "idle")
-  self.display_rects = UI.displayControls(state)
+  local status = nil
+  if self.session and self.session.authed and self.session.user then
+    local user = self.session.user
+    -- The XP counts up to the server's number over 600 ms rather than
+    -- jumping, on arrival and after every clear.
+    local shown = Juice.counter("footer:xp", tonumber(user.xp) or 0, { dur = Theme.motion.count })
+    status = {
+      level = tonumber(user.level) or 1,
+      xp = user.xp ~= nil and shown or nil,
+      frac = App.xp_fraction(user),
+    }
+  end
+  -- `last_hint` stays a string (`tests/drive/language.lua` measures it);
+  -- `last_room` is the width the hints were given.
+  if type(hint) == "table" then
+    local parts = {}
+    for _, it in ipairs(hint) do parts[#parts + 1] = (it.key or "") .. " " .. (it.verb or "") end
+    self.last_hint = table.concat(parts, "   ")
+  else
+    self.last_hint = hint or ""
+  end
+  self.last_reserve = reserve
+  self.last_room = UI.footer(hint, self.client and self.client.state or "idle", status,
+    { bare = opts.bare, gear_hot = self.settings_open })
 end
 
 return App

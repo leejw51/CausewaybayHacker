@@ -137,4 +137,170 @@ return function()
     end
     Layout.font = was
   end)
+  T.section("fonts — the web's code faces and interface faces")
+
+  -- Every case here sets a face and must put the defaults back, or the rest
+  -- of the suite is measured in whatever the last loop left behind.
+  local function restore(code, ui)
+    Assets.setCodeFace(code)
+    Assets.setUiFace(ui)
+  end
+
+  T.case("every code face has a name, a measured size and a weight", function()
+    T.eq(#Assets.CODE_FACES, 15, "the web's fifteen, in the web's order")
+    T.eq(Assets.CODE_FACES[1], "game")
+    T.eq(Assets.CODE_FACES[#Assets.CODE_FACES], "radon")
+    for _, face in ipairs(Assets.CODE_FACES) do
+      T.ok(type(Assets.CODE_FACE_NAME[face]) == "string", face .. " has a name")
+      local scale = Assets.CODE_FACE_SCALE[face]
+      T.ok(type(scale) == "number" and scale > 0.5 and scale <= 1,
+        face .. " has a size factor: " .. tostring(scale))
+      T.ok(Assets.CODE_FACE_WEIGHT[face] == "normal"
+        or Assets.CODE_FACE_WEIGHT[face] == "bold", face .. " has a weight")
+    end
+    -- A few of the table's numbers, so a re-tune by eye fails here.
+    T.eq(Assets.CODE_FACE_SCALE.iosevka, 0.68)
+    T.eq(Assets.CODE_FACE_SCALE.courier, 0.98)
+    T.eq(Assets.CODE_FACE_SCALE.apple2, 0.64)
+    T.eq(Assets.CODE_FACE_SCALE.radon, 0.77)
+    -- No synthetic bold in LÖVE: the bold weight is the Bold file.
+    T.eq(Assets.CODE_FACE_WEIGHT.courier, "bold")
+    T.ok(Assets.COURIER_FILE:find("Bold", 1, true), "Courier is the Bold cut")
+  end)
+
+  T.case("every shipped code face loads, and is drawn in itself", function()
+    local was = Assets.codeFace()
+    for _, face in ipairs(Assets.CODE_FACES) do
+      if face == "courier" then
+        -- A system face: on a machine without it, VT323 draws instead and
+        -- the pane still works.
+        Assets.setCodeFace(face)
+        T.ok(Assets.mono(28):getWidth("fn main()") > 0, "courier draws either way")
+      else
+        T.ok(Assets.hasCodeFace(face), face .. " is in assets/fonts")
+        Assets.setCodeFace(face)
+        T.eq(Assets.codeFace(), face)
+        -- One advance across ASCII is the reason each was picked, and it
+        -- has to survive every size the type steps ask for: a pixel face
+        -- hinted off its grid can give `i` 7 px and `W` 8.
+        for _, n in ipairs({ 14, 16, 18, 22, 28, 36 }) do
+          local font = Assets.mono(n)
+          T.eq(font:getWidth("i"), font:getWidth("W"),
+            ("%s is fixed-width at %d"):format(face, n))
+          T.eq(font:getWidth("0O1lI;"), 6 * font:getWidth("i"),
+            ("%s at %d: six letters, six cells"):format(face, n))
+        end
+      end
+    end
+    Assets.setCodeFace(was)
+  end)
+
+  T.case("a code face is set at its measured size, in whole pixels", function()
+    for _, n in ipairs({ 16, 18, 22, 28, 40 }) do
+      T.eq(Assets.mono_px(n, "game") % 8, 0, "VT323 stays on the grid")
+      for _, face in ipairs(Assets.CODE_FACES) do
+        local grid = Assets.CODE_FACE_GRID[face]
+        if grid then
+          -- A pixel face lands on a whole multiple of its own grid, and
+          -- within one step of its measured size.
+          local px = Assets.mono_px(n, face)
+          T.eq(px % grid, 0, ("%s at %d is on its %d px grid"):format(face, n, grid))
+          T.ok(math.abs(px - n * Assets.CODE_FACE_SCALE[face]) <= grid,
+            ("%s at %d: %d px is within a step of measured"):format(face, n, px))
+        elseif face ~= "game" then
+          T.eq(Assets.mono_px(n, face),
+            math.max(8, math.floor(n * Assets.CODE_FACE_SCALE[face] + 0.5)),
+            ("%s at %d"):format(face, n))
+        end
+      end
+    end
+    -- The bug the table exists to prevent: Iosevka snapped up to VT323's
+    -- size is a third bigger to the eye at the same step.
+    T.ok(Assets.mono_px(18, "iosevka") < Assets.mono_px(18, "game"),
+      "Iosevka is set smaller than VT323 at the same step")
+  end)
+
+  T.case("every code face still draws every language", function()
+    local was = Assets.codeFace()
+    local chars = corpus()
+    for _, face in ipairs(Assets.CODE_FACES) do
+      Assets.setCodeFace(face)
+      local font = Assets.mono(18)
+      local missing = {}
+      for _, ch in ipairs(chars) do
+        if not font:hasGlyphs(ch) then missing[#missing + 1] = ch end
+      end
+      T.eq(#missing, 0, face .. " cannot draw: " .. table.concat(missing, " "))
+    end
+    Assets.setCodeFace(was)
+  end)
+
+  T.case("every interface face loads, and still draws every language", function()
+    local was = Assets.uiFace()
+    T.eq(#Assets.UI_FACES, 5)
+    T.eq(Assets.UI_FACES[1], "game", "the game's own face is the default")
+    local chars = corpus()
+    for _, face in ipairs(Assets.UI_FACES) do
+      local spec = Assets.UI_FACE_SPEC[face]
+      T.ok(spec and type(Assets.UI_FACE_NAME[face]) == "string", face .. " is named")
+      if spec.file then
+        T.ok(love.filesystem.getInfo(spec.file), spec.file .. " is shipped")
+      end
+      Assets.setUiFace(face)
+      for _, size in ipairs({ 16, 32 }) do
+        local font = Assets.font(size)
+        local missing = {}
+        for _, ch in ipairs(chars) do
+          if not font:hasGlyphs(ch) then missing[#missing + 1] = ch end
+        end
+        T.eq(#missing, 0, ("%s at %d cannot draw: %s")
+          :format(face, size, table.concat(missing, " ")))
+      end
+      T.ok(Assets.body(30):hasGlyphs("한글中文čř"), face .. "'s body face too")
+    end
+    Assets.setUiFace(was)
+  end)
+
+  T.case("an interface face is set at its measured multiple of the label", function()
+    local was = Assets.uiFace()
+    Assets.setUiFace("game")
+    local game = Assets.font(16)
+    for _, face in ipairs({ "dos", "comic" }) do
+      Assets.setUiFace(face)
+      local f = Assets.font(16)
+      T.ok(f ~= game, face .. " is a different font object")
+      -- Press Start 2P is square; a swapped face is set larger and ends up
+      -- narrower, which is the whole of the measurement.
+      T.ok(f:getHeight() > game:getHeight() - 1, face .. " keeps the label's height")
+      T.ok(f:getWidth("SETTINGS") < game:getWidth("SETTINGS"),
+        face .. " is narrower than Press Start 2P")
+    end
+    Assets.setUiFace(was)
+  end)
+
+  T.case("the two choices cycle and wrap, and do not move each other", function()
+    local code, ui = Assets.codeFace(), Assets.uiFace()
+    Assets.setCodeFace("radon")
+    T.eq(Assets.cycleCodeFace(), "game", "the code cycle wraps")
+    T.eq(Assets.cycleCodeFace(), "iosevka")
+    Assets.setUiFace("comic")
+    T.eq(Assets.cycleUiFace(), "game", "the interface cycle wraps")
+    T.eq(Assets.codeFace(), "iosevka", "and leaves the code face alone")
+    Assets.setUiFace("nonsense")
+    T.eq(Assets.uiFace(), "game", "a face that is not one is ignored")
+    restore(code, ui)
+  end)
+
+  T.case("the interface face is remembered, apart from the code face", function()
+    local Store = require("src.store")
+    T.eq(Store.replay({}).ui_face, nil)
+    local folded = Store.replay({
+      { kind = "uiface.set", face = "dos" },
+      { kind = "face.set", face = "victor" },
+      { kind = "uiface.set", face = "galmuri" },
+    })
+    T.eq(folded.ui_face, "galmuri", "the last choice wins")
+    T.eq(folded.face, "victor", "and the code face is its own record")
+    T.eq(Store.replay({ { kind = "uiface.set", face = 7 } }).ui_face, nil)
+  end)
 end

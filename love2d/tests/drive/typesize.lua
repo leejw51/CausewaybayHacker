@@ -4,9 +4,9 @@
 --
 -- Bigger type in a fixed pane is where wrapping, the line-number gutter and
 -- `ensure_visible` are all tested at once, so this takes the largest step
--- through both code panes — the quest editor and the playground — in both
--- orientations and in fullscreen, and asserts the three things that would
--- actually break:
+-- through the one code pane left — the playground (a quest is a four-choice
+-- pick now; `typesweep.lua` has its choices) — in both orientations and in
+-- fullscreen, and asserts the three things that would actually break:
 --
 --   * **the pane still has rows.** A line height that outgrew the pane would
 --     give `rows = 0`, and `math.max(1, …)` would hide it as one row of a
@@ -45,10 +45,11 @@ local seen = {}
 --- watching that, so this wraps `UI.text` from the test side (no production
 --- change) and records every unwrapped draw that ran off the edge.
 -- Keyed by type step, because the question is not "does anything ever clip"
--- but "does it clip at a size a player did not ask for". Step 1 is the
--- default and step 2 is one press; those must be clean. Steps 3 and 4 are a
--- deliberate request for type this big on a canvas this small, and prose that
--- runs past the edge there is reported rather than failed.
+-- but "does it clip at a size a player did not ask for". Step 2 (1.0) is the
+-- default, step 1 (0.75) is smaller still and step 3 is one press up; those
+-- must be clean. Step 4 is a deliberate request for type this big on a
+-- canvas this small, and prose that runs past the edge there is reported
+-- rather than failed.
 local overflow = {}
 local function watch_text()
   local UI = require("src.ui")
@@ -102,7 +103,10 @@ local function probe(tag)
   end
 end
 
---- The middle of one of the three footer chips, as the draw recorded it.
+--- The middle of one of the display controls, as the draw recorded it.
+--- They live in the settings sheet now (`docs/love2d-ui.md` §4), which
+--- `App:open_settings` puts up; `sheet_steps` opens it before the click and
+--- closes it after, because the sheet takes every key and click while up.
 local function chip(name)
   return function(app)
     local r = app.display_rects and app.display_rects[name]
@@ -111,13 +115,31 @@ local function chip(name)
   end
 end
 
+--- Open the sheet, click `name`, close the sheet: three steps, each gated
+--- on `when` so a skipped click skips its sheet too.
+local function sheet_steps(name, when)
+  return {
+    { until_ = function(app)
+        if not app.settings_open then app:open_settings() end
+        return app.display_rects ~= nil
+      end, when = when, timeout = 5 },
+    { click = chip(name), when = when },
+    -- Closed whatever `when` says now: the click may have been the one that
+    -- made `when` false, and a sheet left up eats every key after it.
+    { until_ = function(app)
+        if app.settings_open then app:close_settings() end
+        return true
+      end, timeout = 5 },
+    { wait = 0.25 },
+  }
+end
+
 --- Click the type chip until it reaches `want`, however many steps that is.
 local function set_step(want)
   local out = {}
+  local when = function() return require("src.layout").font ~= want end
   for _ = 1, 4 do
-    out[#out + 1] = { click = chip("font"),
-      when = function() return require("src.layout").font ~= want end }
-    out[#out + 1] = { wait = 0.25 }
+    for _, step in ipairs(sheet_steps("font", when)) do out[#out + 1] = step end
   end
   return out
 end
@@ -164,17 +186,17 @@ add_all(set_step(4))
 add({ until_ = probe("playground/4 land"), timeout = 5 })
 add({ shot = "T1-playground-big-landscape.png" })
 
-add({ click = chip("orient") })
+add_all(sheet_steps("orient"))
 add({ wait = 1.0 })
 add({ until_ = probe("playground/4 port"), timeout = 5 })
 add({ shot = "T2-playground-big-portrait.png" })
 
-add({ click = chip("fullscreen") })
+add_all(sheet_steps("fullscreen"))
 add({ wait = 1.8 })
 add({ until_ = probe("playground/4 port full"), timeout = 5 })
 add({ shot = "T3-playground-big-portrait-full.png" })
 
-add({ click = chip("fullscreen") })
+add_all(sheet_steps("fullscreen"))
 add({ wait = 1.8 })
 add({ orient = "landscape" })
 add({ wait = 1.0 })
@@ -184,6 +206,11 @@ add_all(set_step(1))
 add({ until_ = probe("playground/1 land again"), timeout = 5 })
 
 -- ----------------------------------------------------------------- the quest
+--
+-- A quest is a four-choice pick now (SPEC §0) and has no editor to probe:
+-- what the type step can break there is the four choices, and
+-- `tests/drive/typesweep.lua` walks them at steps 1, 2 and 4 in both
+-- orientations. This script goes on to the screens made of labels.
 
 add({ key = "escape" })
 add({ until_ = function(app)
@@ -194,52 +221,12 @@ add({ until_ = function(app)
     end, timeout = 10 })
 add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end,
       timeout = 15 })
-add({ until_ = function(app)
-      for i, n in ipairs(app.scene.nodes) do
-        if n.state ~= "locked" then app.scene.cursor = i; return true end
-      end
-      return true
-    end, timeout = 3 })
-add({ key = "return" })
-add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end,
-      timeout = 20 })
-add({ wait = 0.5 })
-add({ key = "a", mods = { ctrl = true } })
-add({ key = "backspace" })
-add({ text = SOURCE })
-add({ key = "end" })
-add({ wait = 0.3 })
-add_all(set_step(1))
-add({ until_ = probe("quest/1 land"), timeout = 5 })
-
-add_all(set_step(4))
-add({ until_ = probe("quest/4 land"), timeout = 5 })
-add({ shot = "T4-quest-big-landscape.png" })
-
-add({ click = chip("orient") })
-add({ wait = 1.0 })
-add({ until_ = probe("quest/4 port"), timeout = 5 })
-add({ shot = "T5-quest-big-portrait.png" })
-
-add({ click = chip("fullscreen") })
-add({ wait = 1.8 })
-add({ until_ = probe("quest/4 port full"), timeout = 5 })
-add({ shot = "T6-quest-big-portrait-full.png" })
-
-add({ click = chip("fullscreen") })
-add({ wait = 1.8 })
-add({ orient = "landscape" })
-add({ wait = 1.0 })
-add_all(set_step(1))
-add({ until_ = probe("quest/1 land again"), timeout = 5 })
 
 -- ------------------------------------------------- the screens made of labels
 
 -- `lands` and `map` are not code panes; they are headings, cards and chips,
 -- and step 4 is three presses away from the default. Portrait is the hard
 -- shape because it is the narrow one.
-add({ key = "escape" })
-add({ until_ = scene("map"), timeout = 15 })
 add_all(set_step(4))
 add({ orient = "portrait" })
 add({ wait = 1.2 })
@@ -269,6 +256,10 @@ add({ shot = "TA-lands-big-portrait.png" })
 -- And the controls themselves are still reachable at the far end of the
 -- ladder, on the narrow shape. They were not: see `chip_h` in `src/ui.lua`.
 add({ until_ = function(app)
+    if not app.settings_open then app:open_settings() end
+    return app.display_rects ~= nil
+  end, timeout = 5 })
+add({ until_ = function(app)
     local L = require("src.layout")
     local bad = {}
     for _, name in ipairs({ "fullscreen", "orient", "font", "lang" }) do
@@ -288,26 +279,27 @@ add({ until_ = function(app)
     print("the four display controls are all on-canvas at step 4, portrait")
     return true
   end, timeout = 5 })
+add({ until_ = function(app) app:close_settings(); return true end, timeout = 5 })
 
 -- The same four screens at the **default** step, which is the size a player
 -- who never touches the control sees. A clip here is a defect; a clip at the
 -- far end of the ladder is a preference meeting a small canvas.
-add_all(set_step(1))
+add_all(set_step(require("src.layout").DEFAULT_FONT))
 add({ wait = 0.8 })
-add({ until_ = probe("lands/1 port"), timeout = 5 })
+add({ until_ = probe("lands/default port"), timeout = 5 })
 add({ key = "return" })
 add({ until_ = scene("categories"), timeout = 15 })
 add({ wait = 0.8 })
-add({ until_ = probe("categories/1 port"), timeout = 5 })
+add({ until_ = probe("categories/default port"), timeout = 5 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end,
       timeout = 15 })
 add({ wait = 0.8 })
-add({ until_ = probe("map/1 port"), timeout = 5 })
+add({ until_ = probe("map/default port"), timeout = 5 })
 add({ key = "t" })
 add({ until_ = scene("stats"), timeout = 15 })
 add({ wait = 1.0 })
-add({ until_ = probe("stats/1 port"), timeout = 5 })
+add({ until_ = probe("stats/default port"), timeout = 5 })
 add({ key = "escape" })
 add({ until_ = scene("map"), timeout = 10 })
 add({ orient = "landscape" })
@@ -348,7 +340,6 @@ add({ until_ = function()
     -- The step really did change the size, and really did come back.
     for _, pair in ipairs({
       { "playground/1 land", "playground/4 land" },
-      { "quest/1 land", "quest/4 land" },
     }) do
       local small, big = seen[pair[1]], seen[pair[2]]
       if not (small and big and big.code > small.code) then
@@ -362,7 +353,6 @@ add({ until_ = function()
     end
     for _, pair in ipairs({
       { "playground/1 land", "playground/1 land again" },
-      { "quest/1 land", "quest/1 land again" },
     }) do
       local before, after = seen[pair[1]], seen[pair[2]]
       if not (before and after and before.code == after.code) then
@@ -381,7 +371,7 @@ add({ until_ = function()
       table.sort(over)
       if #over == 0 then
         print(("step %d: nothing ran off the canvas"):format(step))
-      elseif step <= 2 then
+      elseif step <= 3 then
         print(("FAIL: step %d is the default (or one press from it) and %d "
           .. "strings ran off the canvas:"):format(step, #over))
         for _, line in ipairs(over) do print("    " .. line) end

@@ -2,14 +2,15 @@
 --
 -- ## Two sources, in order
 --
--- 1. **`art/`**, at the root of this repository — the 32 assets PM generated,
---    listed in `art/manifest.json` in `CausewaybayGolang`'s shape, with a
---    measured `box` on every sprite. This is the real art and it wins.
--- 2. **`love2d/assets/`** — the placeholder set copied from
---    `CausewaybayGolang/love2d/assets/`, still there for the handful of names
---    `art/` does not carry (`fx_star`, `fx_confetti`, `ui_coin`,
---    `sprite_clerk`, `bg_flat`). Those are JPEGs on a magenta screen with no
---    alpha channel, so they go through `knockout`.
+-- 1. **`art/`**, at the root of this repository — the generated set, listed
+--    in `art/manifest.json` in `CausewaybayGolang`'s shape, with a measured
+--    `box` on every sprite. This is the real art and it wins, and it now
+--    carries every name a scene asks for, the old placeholders included
+--    (`fx_star`, `fx_confetti`, `ui_coin`, `sprite_clerk`, `bg_flat`,
+--    `bg_night`).
+-- 2. **`love2d/assets/`** — only the two map backgrounds, `map_bg` and
+--    `map_bg_p`, the fallback `src/scenes/map.lua` names behind a land's own
+--    map when `art/` is not readable.
 --
 -- **The `art/` assets are pre-processed to binary alpha and must not go
 -- through `knockout`.** Flooding a correctly-cut sprite would eat any dark
@@ -35,27 +36,34 @@ local A = { images = {}, box = {}, strip = {}, quads = {}, fonts = {},
   missing = {}, sources = {} }
 
 -- Placeholder files under `love2d/assets/`. A name here is used only when
--- `art/manifest.json` does not carry it.
+-- `art/manifest.json` does not carry it — which, since `art/` took over the
+-- rest, means the map fallback for `map_rust` / `map_go` and nothing else.
 local PLACEHOLDERS = {
-  bg_flat = "assets/bg_flat.png",
-  bg_night = "assets/bg_night.png",
-  sprite_clerk = "assets/sprite_clerk.png",
-  fx_star = "assets/fx_star.png",
-  fx_confetti = "assets/fx_confetti.png",
-  ui_coin = "assets/ui_coin.png",
-  -- Kept as a fallback for `map_rust` / `map_go` if `art/` is not readable.
   map_bg = "assets/map_bg.png",
   map_bg_p = "assets/map_bg_p.png",
 }
 
--- The placeholders that need the magenta screen flooded out. Nothing from
--- `art/` is in this list, and nothing from `art/` ever should be.
-local KNOCKOUT = {
-  sprite_clerk = true, fx_star = true, fx_confetti = true, ui_coin = true,
-}
+-- The placeholders that need the magenta screen flooded out. Empty now: the
+-- magenta-screen JPEGs it was for all come from `art/`, cut to alpha. Kept
+-- as the place to name one, so `knockout` is never run on `art/` by
+-- accident — nothing from `art/` should ever be in this list.
+local KNOCKOUT = {}
 
 local FONT_FILE = "assets/fonts/PressStart2P-Regular.ttf"
 local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
+
+-- ------------------------------------------------------------------- faces
+--
+-- Two choices, one for the code panes and one for the rest of the screen,
+-- ported from `frontend/src/engine/text.ts` (`CODE_FACES`, `UI_FACES`) with
+-- the web's names, order and **measured** sizes. The size tables are the
+-- whole reason a face swap does not look like a mistake: they were taken
+-- from each face's cap height and advance, not judged by eye, so they are
+-- copied here number for number rather than re-tuned.
+--
+-- LÖVE 11.5 reads neither WOFF nor WOFF2, so `assets/fonts/` carries each as
+-- TrueType or OpenType, converted with fontTools; `CREDITS.txt` there says
+-- what was subset and what was shipped as it came.
 
 --- The faces a code pane can be set in, in the order the button cycles them.
 ---
@@ -67,15 +75,67 @@ local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
 --- code. Iosevka separates all five, fits half again as much on a line, and
 --- is what a programmer's editor looks like. The cycle button is unchanged
 --- and the choice is remembered, so anyone who prefers the terminal face
---- sets it once. Subset to what a code pane can hold, so the pair costs
---- 125 KB rather than a megabyte. Both SIL OFL 1.1.
-A.CODE_FACES = { "game", "iosevka", "jetbrains" }
-A.CODE_FACE_NAME = { game = "VT323", iosevka = "IOSEVKA", jetbrains = "JETBRAINS" }
+--- sets it once.
+---
+--- The twelve after the first three are the web's, in the web's order: three
+--- pixel faces that are also interface faces, Comic Mono, Courier New Bold,
+--- three home computers, and four outline faces. Every one has a single
+--- advance across ASCII. The ones only a code pane uses are subset to what a
+--- code pane holds, like Iosevka; a glyph a subset lacks is drawn by VT323
+--- and then Unifont behind it.
+A.CODE_FACES = {
+  "game", "iosevka", "jetbrains", "dos", "dunggeunmo", "galmuri", "comic",
+  "courier", "apple2", "msx", "amiga", "victor", "victorscript", "fantasque",
+  "radon",
+}
+
+--- What to call each on the button. Its own name, not a description.
+A.CODE_FACE_NAME = {
+  game = "VT323",
+  iosevka = "IOSEVKA",
+  jetbrains = "JETBRAINS",
+  dos = "DOS",
+  dunggeunmo = "DUNGGEUNMO",
+  galmuri = "GALMURI",
+  comic = "COMIC",
+  courier = "COURIER NEW BOLD",
+  apple2 = "APPLE II",
+  msx = "MSX",
+  amiga = "AMIGA TOPAZ",
+  victor = "VICTOR MONO",
+  victorscript = "VICTOR MONO ITALIC",
+  fantasque = "FANTASQUE",
+  radon = "RADON HANDWRITING",
+}
+
+--- Courier New is a **system** face and is never shipped: the one face every
+--- Mac already has. Read from where macOS keeps it, through plain `io.open`
+--- (`love.filesystem` cannot see outside the game), and VT323 stands in on a
+--- machine without it — the web's stack does the same with `Courier, VT323`.
+A.COURIER_FILE = "/System/Library/Fonts/Supplemental/Courier New Bold.ttf"
+
 local CODE_FILE = {
   game = MONO_FILE,
   iosevka = "assets/fonts/Iosevka-Code.ttf",
   jetbrains = "assets/fonts/JetBrainsMono-Code.ttf",
+  dos = "assets/fonts/IBM-VGA-8x16.ttf",
+  -- The Code cut, not the interface one: the same 8×16 cell with a slashed
+  -- zero and the punctuation a program needs told apart.
+  dunggeunmo = "assets/fonts/neodgm_code.ttf",
+  galmuri = "assets/fonts/GalmuriMono11.ttf",
+  comic = "assets/fonts/ComicMono.ttf",
+  courier = A.COURIER_FILE,
+  apple2 = "assets/fonts/PRNumber3.ttf",
+  msx = "assets/fonts/MSX1-Code.ttf",
+  amiga = "assets/fonts/TopazUnicode-Code.ttf",
+  victor = "assets/fonts/VictorMono-Code.otf",
+  -- The italic is the cursive, and is its own face here as on the web, so
+  -- nothing downstream has to carry a style along with the name.
+  victorscript = "assets/fonts/VictorMonoItalic-Code.otf",
+  fantasque = "assets/fonts/FantasqueSansMono-Code.ttf",
+  radon = "assets/fonts/MonaspaceRadon-Code.otf",
 }
+
 --- How big to draw each face, against the size asked for.
 ---
 --- **Not every face is the same size at the same size.** VT323 is a terminal
@@ -84,20 +144,150 @@ local CODE_FILE = {
 --- the swap *loses* columns, which is the opposite of the reason to offer it.
 --- Each face is drawn at the size that matches VT323's apparent size, and
 --- then the comparison is the one worth making.
-local CODE_SCALE = { game = 1, iosevka = 0.68, jetbrains = 0.68 }
+A.CODE_FACE_SCALE = {
+  game = 1,
+  iosevka = 0.68,
+  jetbrains = 0.68,
+  -- The four below are matched on cap height to VT323 (0.56 em), from the
+  -- same measurement as `UI_FACE_SPEC`.
+  dos = 0.85,
+  dunggeunmo = 0.85,
+  galmuri = 0.62,
+  comic = 0.78,
+  -- Courier New: cap 0.571 em, advance 0.6 em.
+  courier = 0.98,
+  -- The three home computers are pixel faces with a 0.875 em cap height.
+  -- Apple II is Kreative's PR Number 3, the //e's 80-column text; MSX is the
+  -- 8×8 cell of an MSX1's SCREEN 1; Amiga is the A500's Topaz.
+  apple2 = 0.64,
+  msx = 0.64,
+  amiga = 0.64,
+  -- Victor Mono: cap 0.727 em, advance 0.545 em. Its italic is the cursive.
+  victor = 0.77,
+  victorscript = 0.77,
+  -- Fantasque Sans Mono: cap 0.625 em, advance 0.518 em.
+  fantasque = 0.9,
+  -- Monaspace Radon, the handwritten one: cap 0.73 em, advance 0.62 em.
+  radon = 0.77,
+}
+local CODE_SCALE = A.CODE_FACE_SCALE
+
+--- The weight each code face is drawn at. Courier New at its regular weight
+--- is a hairline beside the pixel faces round it; the bold cut is the one
+--- that holds up on the dark pane. LÖVE has no synthetic bold, so a `bold`
+--- here is a promise about the *file* — `COURIER_FILE` is the Bold cut — and
+--- `tests/test_fonts.lua` holds the two to each other.
+A.CODE_FACE_WEIGHT = {}
+for _, face in ipairs(A.CODE_FACES) do A.CODE_FACE_WEIGHT[face] = "normal" end
+A.CODE_FACE_WEIGHT.courier = "bold"
+
+--- How each code face is rasterised, where it is not the `"mono"` every face
+--- here was drawn with before.
+---
+--- `"normal"` is for the outline faces — a cursive or a handwriting drawn
+--- aliased comes out as a staircase — and gets antialiasing and a linear
+--- filter, as it does in a browser.
+---
+--- `"light"` is for four pixel faces whose own hinting does not survive a
+--- size off their grid: at 18 px `"mono"` gives PR Number 3 an `i` of 7 and a
+--- `W` of 8, which in a code pane is a column that wanders. Light hinting
+--- leaves the advances alone, so every cell is one width at every size
+--- (measured 8 to 40 px), and keeps the nearest filter of a pixel face.
+local HINTING = {
+  comic = "normal", courier = "normal", victor = "normal",
+  victorscript = "normal", fantasque = "normal", radon = "normal",
+  galmuri = "light", apple2 = "light", msx = "light", amiga = "light",
+}
+
 local code_face = "iosevka"
 
---- Which face `A.mono` hands back. Clears the cache: the sizes already made
---- are the old face at those sizes.
-function A.setCodeFace(face)
-  if not CODE_FILE[face] or face == code_face then return end
-  code_face = face
+--- The faces the whole interface can be set in, in the order F8 cycles them.
+---
+--- `game` is Press Start 2P and stays the default. The others are one face
+--- put in front of it, so Press Start 2P still stands behind for a glyph the
+--- face lacks — DOS VGA has no `č`, Comic Mono no Hangul — and Unifont behind
+--- both; Neo둥근모 and Galmuri carry Hangul and draw Korean themselves.
+A.UI_FACES = { "game", "dos", "dunggeunmo", "galmuri", "comic" }
+
+--- What each is called in the toast. Its own name.
+A.UI_FACE_NAME = {
+  game = "ARCADE",
+  dos = "DOS",
+  dunggeunmo = "DUNGGEUNMO",
+  galmuri = "GALMURI",
+  comic = "COMIC",
+}
+
+--- The web's `UI_FACE_SPEC`, measured (cap height and advance of each face
+--- at 100 px in Chromium). Press Start 2P is a square face — cap height and
+--- advance both a full em — so a face swapped into its roles is set larger
+--- to keep a label's height, and ends up narrower. `pixel` is against Press
+--- Start 2P, for every label (`A.font`); `body` is against VT323, for the
+--- prose roles the web draws in VT323 (`A.body`).
+A.UI_FACE_SPEC = {
+  game = { file = nil, pixel = 1, body = 1 },
+  -- IBM VGA 8x16: cap 0.625 em, advance 0.5 em.
+  dos = { file = "assets/fonts/IBM-VGA-8x16.ttf", pixel = 1.25, body = 0.9 },
+  -- Neo둥근모: the same 8x16 cell, and Hangul in it.
+  dunggeunmo = { file = "assets/fonts/neodgm.ttf", pixel = 1.25, body = 0.9 },
+  -- Galmuri11: cap 0.917 em on a 12-pixel grid, proportional Latin. Set a
+  -- little over its cap-height match: its strokes are one pixel, and at the
+  -- matched size a brief in it read smaller than the same brief in VT323.
+  galmuri = { file = "assets/fonts/Galmuri11.ttf", pixel = 1, body = 0.75 },
+  -- Comic Mono: cap 0.715 em, advance 0.545 em.
+  comic = { file = "assets/fonts/ComicMono.ttf", pixel = 1.2, body = 0.78,
+    hinting = "normal" },
+}
+
+local ui_face = "game"
+
+--- Forget every cached face whose key starts with one of `prefixes`: the
+--- sizes already made are the old face at those sizes.
+local function drop(prefixes)
   for key in pairs(A.fonts) do
-    if key:sub(1, 1) == "m" then A.fonts[key] = nil end
+    if prefixes:find(key:sub(1, 1), 1, true) then A.fonts[key] = nil end
   end
 end
 
+--- Which face `A.mono` hands back.
+function A.setCodeFace(face)
+  if not CODE_FILE[face] or face == code_face then return end
+  code_face = face
+  drop("m")
+end
+
 function A.codeFace() return code_face end
+
+--- Which face `A.font` and `A.body` hand back.
+function A.setUiFace(face)
+  if not A.UI_FACE_SPEC[face] or face == ui_face then return end
+  ui_face = face
+  drop("pb")
+end
+
+function A.uiFace() return ui_face end
+
+--- The face after `face` in `list`, wrapping; the first if `face` is not in it.
+local function after(list, face)
+  for i, name in ipairs(list) do
+    if name == face then return list[(i % #list) + 1] end
+  end
+  return list[1]
+end
+
+--- Move to the next code face and return its name. The cycle the two code
+--- screens' buttons share, so neither keeps its own copy of the order.
+function A.cycleCodeFace()
+  A.setCodeFace(after(A.CODE_FACES, code_face))
+  return code_face
+end
+
+--- Move to the next interface face and return its name. F8.
+function A.cycleUiFace()
+  A.setUiFace(after(A.UI_FACES, ui_face))
+  return ui_face
+end
+
 --- GNU Unifont, 5.1 MB, taken whole from `CausewaybayOffice/love2d`.
 ---
 --- **One face for every script this interface speaks.** 58,909 glyphs — the
@@ -346,67 +536,207 @@ end
 
 A.cjk_font = cjk_font
 
---- Attach Unifont behind `font`, so anything the Latin face cannot draw is
---- drawn rather than shown as a box.
+--- The bytes of a face file, read once and kept: every size of a face is
+--- made from the same `FileData`, and Galmuri is not something to read off
+--- the disk again for each one.
 ---
---- **Two faces, not one, and the fallback is per-glyph.** Press Start 2P
---- keeps drawing the ASCII range, so English is pixel for pixel what it has
---- always been; Korean, Japanese, Chinese and Cantonese come out of Unifont.
---- Czech could come from either — both faces have `č ř š ž ů ě` — and it
---- comes from Press Start 2P because that face wins wherever it has the
---- glyph, which is what keeps a Czech sentence looking like the rest of the
---- game rather than like a fallback.
-local function with_fallback(font, size)
-  local cjk = cjk_font(size)
-  if cjk and font.setFallbacks then pcall(font.setFallbacks, font, cjk) end
+--- A path starting with `/` is outside the game — the system's Courier New —
+--- and goes through plain `io.open`, the way `read_art` reaches `art/`.
+--- `false` is cached for a file that is not there, so a missing face is asked
+--- about once and not on every frame.
+local face_data = {}
+local function face_file(path)
+  if not path then return nil end
+  if face_data[path] == nil then
+    local ok, data = pcall(function()
+      if path:sub(1, 1) == "/" then
+        local fh = io.open(path, "rb")
+        if not fh then return false end
+        local bytes = fh:read("*a")
+        fh:close()
+        return love.filesystem.newFileData(bytes, path:match("[^/]+$"))
+      end
+      if not love.filesystem.getInfo(path) then return false end
+      return love.filesystem.newFileData(path)
+    end)
+    face_data[path] = (ok and data) or false
+  end
+  return face_data[path] or nil
+end
+
+--- Is `face` (a code face) really there, or would it be drawn in VT323?
+--- Courier New on a machine without it is the only one that should say no.
+function A.hasCodeFace(face)
+  return face_file(CODE_FILE[face]) ~= nil
+end
+
+--- A face from `path` at `size`, or nil. `"mono"` hinting and a nearest
+--- filter unless `hinting` says otherwise (`HINTING`); a `"normal"` face is
+--- antialiased and filtered linearly.
+local function make(path, size, hinting)
+  local data = face_file(path)
+  if not data then return nil end
+  hinting = hinting or "mono"
+  local ok, font = pcall(love.graphics.newFont, data, size, hinting)
+  if not ok or not font then return nil end
+  if hinting == "normal" then font:setFilter("linear", "linear")
+  else font:setFilter("nearest", "nearest") end
   return font
 end
 
---- A Press Start 2P face at `size`, cached. `size` is snapped to the grid.
+--- Attach faces behind `font`, so anything it cannot draw is drawn rather
+--- than shown as a box. `behind` is the game face that stands next in line
+--- (Press Start 2P behind an interface face, VT323 behind a code face), or
+--- nil when `font` already is that face; Unifont is always last.
 ---
---- Press Start 2P is the game's voice and is used for every label. The code
---- editor uses `A.mono` instead, because a player has to read their own
---- program in it and an 8×8 pixel face at 11px is not that.
+--- **The fallback is per-glyph.** Press Start 2P keeps drawing the ASCII
+--- range, so English is pixel for pixel what it has always been; Korean,
+--- Japanese, Chinese and Cantonese come out of Unifont. Czech could come from
+--- either — both faces have `č ř š ž ů ě` — and it comes from Press Start 2P
+--- because that face wins wherever it has the glyph, which is what keeps a
+--- Czech sentence looking like the rest of the game rather than like a
+--- fallback.
+local function with_fallback(font, size, behind)
+  local cjk = cjk_font(size)
+  if font.setFallbacks then
+    if behind and cjk then pcall(font.setFallbacks, font, behind, cjk)
+    elseif behind then pcall(font.setFallbacks, font, behind)
+    elseif cjk then pcall(font.setFallbacks, font, cjk) end
+  end
+  return font
+end
+
+--- The game's own two faces at exactly `size`, with nothing behind them: the
+--- faces that stand *behind* a chosen one. Cached under their own keys so a
+--- face change does not drop them.
+local function game_face(file, prefix, size)
+  local key = prefix .. size
+  if A.fonts[key] == nil then
+    A.fonts[key] = make(file, size) or false
+  end
+  return A.fonts[key] or nil
+end
+
+--- The interface face at `size`, cached. Every label is drawn in it.
+---
+--- In the default `game` face it is Press Start 2P, and `size` is snapped to
+--- the grid. Another face is set at its measured multiple of the size asked
+--- for (`UI_FACE_SPEC.pixel`), in whole pixels, as the web does it; snapping
+--- that onto Press Start 2P's grid as well would undo the measurement.
+---
+--- Press Start 2P is the game's voice. The code editor uses `A.mono`
+--- instead, because a player has to read their own program in it and an
+--- 8×8 pixel face at 11px is not that.
 function A.font(size)
-  size = A.snap8(size)
-  local key = "p" .. size
+  local spec = A.UI_FACE_SPEC[ui_face]
+  if spec.file then
+    size = math.max(8, math.floor((tonumber(size) or 8) * spec.pixel + 0.5))
+  else
+    size = A.snap8(size)
+  end
+  local key = "p" .. size .. ui_face
   if not A.fonts[key] then
-    local font
-    if love.filesystem.getInfo(FONT_FILE) then
-      font = love.graphics.newFont(FONT_FILE, size, "mono")
+    local font = spec.file and make(spec.file, size, spec.hinting)
+    if font then
+      A.fonts[key] = with_fallback(font, size,
+        game_face(FONT_FILE, "g", A.snap8(size)))
     else
-      font = love.graphics.newFont(size)
+      font = make(FONT_FILE, size) or love.graphics.newFont(size)
+      font:setFilter("nearest", "nearest")
+      A.fonts[key] = with_fallback(font, size)
     end
-    font:setFilter("nearest", "nearest")
-    A.fonts[key] = with_fallback(font, size)
   end
   return A.fonts[key]
 end
 
---- The editor face: VT323, a terminal font that is still a pixel font.
+--- The interface's **body** face at `size`: VT323 in the game face, the
+--- chosen face at its body multiple (`UI_FACE_SPEC.body`) otherwise.
 ---
---- Snapped to the same grid, and carrying the same fallback: a player can
---- paste a Chinese comment into the editor, and a box where a character
---- should be would look like the client had corrupted their program.
-function A.mono(size)
-  size = A.snap8(math.max(8, math.floor(size * (CODE_SCALE[code_face] or 1))))
-  local key = "m" .. size .. code_face
+--- The web draws its prose roles — briefs, bubbles, help — in VT323 and its
+--- chrome in Press Start 2P, and a face swap is measured against each. This
+--- client draws its labels in `A.font`; this is here for a screen that wants
+--- the web's body role, and it follows the interface face, not the code one.
+function A.body(size)
+  local spec = A.UI_FACE_SPEC[ui_face]
+  size = math.max(8, math.floor((tonumber(size) or 8) * spec.body + 0.5))
+  local key = "b" .. size .. ui_face
   if not A.fonts[key] then
-    local font
-    -- The chosen face, or the game's own if the file is not there: a client
-    -- built without the code faces still draws code.
-    local file = CODE_FILE[code_face] or MONO_FILE
-    if not love.filesystem.getInfo(file) then file = MONO_FILE end
-    if love.filesystem.getInfo(file) then
-      font = love.graphics.newFont(file, size, "mono")
+    local font = spec.file and make(spec.file, size, spec.hinting)
+    if font then
+      A.fonts[key] = with_fallback(font, size, game_face(MONO_FILE, "v", size))
     else
-      font = love.graphics.newFont(size)
+      font = make(MONO_FILE, size) or love.graphics.newFont(size)
+      A.fonts[key] = with_fallback(font, size)
     end
-    font:setFilter("nearest", "nearest")
-    A.fonts[key] = with_fallback(font, size)
   end
   return A.fonts[key]
 end
+
+--- The pixel faces' own grids: the em, in pixels, each was drawn on.
+---
+--- **A pixel face is only legible at a whole multiple of its grid.** The
+--- three home computers are 8×8 designs (cap 7 of 8 rows, which is the web's
+--- "0.875 em"), the DOS and 둥근모 faces 8×16, GalmuriMono 12. Set at its
+--- measured 0.64 of an 18 px request, PR Number 3 lands on 12 px — one and a
+--- half screen pixels per design pixel — and its seven-row capitals come out
+--- as grey mush, which on screen read as "far too small" though the cap
+--- height matched VT323's to the pixel. So the measured size picks the
+--- multiple and the grid decides the pixels: the nearest multiple, leaning up
+--- (a quarter of a step past one is enough to take the next), never under
+--- one. A browser gets away without this because it draws at the device's
+--- resolution; this client draws on its own pixel grid and then scales.
+local PIXEL_GRID = {
+  dos = 16, dunggeunmo = 16, galmuri = 12, apple2 = 8, msx = 8, amiga = 8,
+}
+A.CODE_FACE_GRID = PIXEL_GRID
+
+--- The pixel size `A.mono(size)` rasterises the chosen code face at.
+function A.mono_px(size, face)
+  face = face or code_face
+  size = tonumber(size) or 8
+  if face == "game" then return A.snap8(math.max(8, math.floor(size))) end
+  local want = size * (CODE_SCALE[face] or 1)
+  local grid = PIXEL_GRID[face]
+  if grid then
+    return grid * math.max(1, math.floor(want / grid + 0.75))
+  end
+  return math.max(8, math.floor(want + 0.5))
+end
+
+--- The code face at `size`: whichever the player chose (`A.setCodeFace`).
+---
+--- VT323 is snapped to the grid, as it always was. Every other face is set
+--- at its measured multiple (`CODE_FACE_SCALE`), in whole pixels: snapping
+--- 0.68 × 18 up to 16 is what drew Iosevka a third larger than VT323 at the
+--- same step, and the table exists so that a swap does not do that.
+---
+--- Carrying VT323 and Unifont behind it: a player can paste a Chinese comment
+--- into the editor, and a box where a character should be would look like
+--- the client had corrupted their program.
+function A.mono(size)
+  size = A.mono_px(size)
+  local key = "m" .. size .. code_face
+  if not A.fonts[key] then
+    -- The chosen face, or the game's own if the file is not there: a client
+    -- built without the code faces, or a machine without Courier New, still
+    -- draws code.
+    local font = code_face ~= "game"
+      and make(CODE_FILE[code_face], size, HINTING[code_face])
+    if font then
+      A.fonts[key] = with_fallback(font, size, game_face(MONO_FILE, "v", size))
+    else
+      font = make(MONO_FILE, size) or love.graphics.newFont(size)
+      A.fonts[key] = with_fallback(font, size)
+    end
+  end
+  return A.fonts[key]
+end
+
+--- The names the playground and the quest screens are written against: the
+--- code face and the interface face, each respecting the player's choice.
+A.code_font = A.mono
+A.ui_font = A.font
+A.body_font = A.body
 
 -- ------------------------------------------------------------------ drawing
 

@@ -2,12 +2,13 @@
 --
 --   make -C love2d drive SCRIPT=tests/drive/logout.lua ARGS="--home $(mktemp -d)"
 --
--- Signs in, walks to the playground, presses the footer's LOGOUT chip, and
--- checks what the browser client promises for the same verb: the token is
--- gone here and on disk, the socket is fresh and anonymous, the login screen
--- is up with its server field, phrase field and name, and says why — and
--- that signing in again from there works. Run it against a scratch home so
--- it is a throwaway token it forgets, not yours.
+-- Signs in, walks to the playground, opens the settings sheet (F9 — LOG OUT
+-- lives there now, not in the footer) and presses LOG OUT, then checks what
+-- the browser client promises for the same verb: the token is gone here and
+-- on disk, the socket is fresh and anonymous, the login screen is up with
+-- its server field, phrase field and name, and says why — and that signing
+-- in again from there works. Run it against a scratch home so it is a
+-- throwaway token it forgets, not yours.
 
 local steps = {}
 local function add(t) steps[#steps + 1] = t end
@@ -35,11 +36,13 @@ add({ until_ = function(app) return app.scene_name == "lands" end, note = "signe
 add({ until_ = function(app) app:go("playground"); return true end, timeout = 5 })
 add({ until_ = function(app) return app.scene_name == "playground" end, note = "the playground", timeout = 10 })
 add({ wait = 0.5 })
+add({ key = "f9", note = "open the settings sheet" })
+add({ wait = 0.4 })
 add({ until_ = function(app)
       local r = app.display_rects and app.display_rects.logout
-      check(r ~= nil, "no LOGOUT chip in the footer while signed in")
+      check(r ~= nil, "no LOG OUT button in the settings sheet while signed in")
       return r ~= nil
-    end, note = "the chip is drawn", timeout = 5 })
+    end, note = "the button is drawn", timeout = 5 })
 add({ shot = "L1-logout-chip.png" })
 add({ click = function(app) local r = app.display_rects.logout; return { r.x + r.w / 2, r.y + r.h / 2 } end })
 add({ until_ = function(app) return app.scene_name == "login" end, note = "back at login", timeout = 10 })
@@ -52,7 +55,7 @@ add({ until_ = function(app)
       local kept = Store.load_session(app.session.server or app.server)
       check(kept == nil or kept.token == nil, "the token is still on disk")
       check(s.status == require("src.i18n").t("signed out"), "the login screen does not say why: " .. tostring(s.status))
-      check(not (app.display_rects and app.display_rects.logout), "LOGOUT is still drawn while signed out")
+      check(not (app.display_rects and app.display_rects.logout), "LOG OUT is still drawn while signed out")
       check(s.server ~= nil and s.server ~= "", "the server field is empty")
       return true
     end, timeout = 5 })

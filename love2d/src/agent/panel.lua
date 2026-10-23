@@ -99,10 +99,10 @@ end
 
 --- The words for one line of the room, and the colour to draw them in.
 local function tone_of(item)
-  if item.role == "you" then return Theme.cyan end
-  if item.role == "tool" then return Theme.withAlpha(Theme.cream, 0.5) end
-  if item.role == "error" then return Theme.coin end
-  return Theme.cream
+  if item.role == "you" then return Theme.blue end
+  if item.role == "tool" then return Theme.mute end
+  if item.role == "error" then return Theme.gold end
+  return Theme.text
 end
 
 local function label_of(item)
@@ -110,6 +110,73 @@ local function label_of(item)
   if item.role == "tool" then return I18n.t("TOOL") end
   if item.role == "error" then return I18n.t("PROBLEM") end
   return Prefs.PROVIDER_NAME[Prefs.provider()] or I18n.t("CODER")
+end
+
+--- A button's width for its widest label: the kit's padding each side.
+local function button_w(labels, padx)
+  local w = 0
+  for _, label in ipairs(labels) do w = math.max(w, (UI.buttonSize(label, { padx = padx }))) end
+  return math.ceil(w)
+end
+
+--- A row's height on this canvas: what the button face needs.
+local function button_h()
+  local _, h = UI.buttonSize("A")
+  return math.max(Theme.control.chip + Theme.space.xs, h)
+end
+
+--- Lay `items` (each with `w`) into rows `w` wide, `gap` apart. Pure.
+local function flow(items, w, gap)
+  local rows, line, bx = {}, {}, 0
+  for _, item in ipairs(items) do
+    if #line > 0 and bx + item.w > w then
+      rows[#rows + 1] = line
+      line, bx = {}, 0
+    end
+    line[#line + 1] = { item = item, x = bx }
+    bx = bx + item.w + gap
+  end
+  if #line > 0 then rows[#rows + 1] = line end
+  return rows
+end
+
+--- A row (or rows) of buttons from `x, y`, by measurement; when the rows
+--- would not fit `max_h`, one row of equal shares instead, so every verb
+--- stays on the panel. Returns the height taken. `id_of(item)` keys the
+--- rect; `state_of(item)` is the button state.
+local function button_rows(self, items, x, y, w, max_h, h, id_of, state_of, prefix)
+  local gap = Theme.space.sm
+  local sized = {}
+  for i, item in ipairs(items) do
+    sized[i] = { item = item, w = button_w(item.every or { item.label }) }
+  end
+  local rows = flow(sized, w, gap)
+  local total = #rows * h + (#rows - 1) * gap
+  if total > max_h then
+    -- Equal shares on one row: cramped, but on the panel.
+    local bw = math.floor((w - (#items - 1) * gap) / #items)
+    rows = { {} }
+    for i, item in ipairs(items) do
+      rows[1][i] = { item = { item = item, w = bw }, x = (i - 1) * (bw + gap) }
+    end
+    total = h
+  end
+  for ri, row in ipairs(rows) do
+    local ry = y + (ri - 1) * (h + gap)
+    for _, cell in ipairs(row) do
+      local item = cell.item.item
+      local r = { x = x + cell.x, y = ry, w = cell.item.w, h = h }
+      UI.button(r.x, r.y, r.w, r.h, item.label, state_of(item), nil,
+        { id = prefix .. id_of(item), variant = item.variant or "secondary" })
+      if state_of(item) ~= "disabled" then self.rects[id_of(item)] = r end
+    end
+  end
+  return total
+end
+
+--- A text well: the kit's well with a gold edge while it has the caret.
+local function well(x, y, w, h, hot)
+  UI.card(x, y, w, h, { variant = "well", pad = 0, edge = hot and Theme.gold or nil })
 end
 
 function Panel:draw(rect, opts)
@@ -120,205 +187,94 @@ function Panel:draw(rect, opts)
   -- Kept for the hit test: a press anywhere on the panel is the panel's, so
   -- the scene behind it never takes a click through the glass.
   self.frame = rect
-  UI.panel(rect.x, rect.y, rect.w, rect.h)
+  UI.card(rect.x, rect.y, rect.w, rect.h, { pad = 0, strip = Theme.gold })
 
-  local pad = 8
+  local pad = Theme.space.md
   local x = rect.x + pad
   local w = rect.w - pad * 2
-  local y = rect.y + pad
-  local row = UI.lineHeight(8) + 10
+  local y = rect.y + Theme.stripH + pad
+  local bottom = rect.y + rect.h - pad
+  local lead = UI.lead("label")
 
   -- The title: who is being spoken to, and on what.
   local provider = Prefs.provider()
-  -- **A short panel spends its height on the conversation.** In CODE the room
-  -- is a column beside the editor and in the framed view it is a quarter of
-  -- the window; either can be too short for chrome that assumed a page. Under
-  -- this, the model's name goes back to SETUP where it is edited anyway and
-  -- the tabs take the smaller row.
+  -- **A short panel spends its height on the conversation.** Under this the
+  -- model's name goes back to SETUP, where it is edited anyway.
   local compact = rect.h < 420
-  local title = ("%s · %s"):format(I18n.t("RUST CODER"),
-    Prefs.PROVIDER_NAME[provider] or provider)
-  UI.text(title, x, y, UI.fitSize(title, w, 8, 5), Theme.coin)
-  y = y + UI.lineHeight(8) + 2
+  local title = ("%s · %s"):format(I18n.t("RUST CODER"), Prefs.PROVIDER_NAME[provider] or provider)
+  UI.label(title, x, y, "label", { color = Theme.gold, width = w, ellipsis = true })
+  y = y + lead + Theme.space.xs
   if not compact then
-    -- Which model, under the name: it is the thing most worth knowing after
-    -- who is being spoken to, and it is too long to sit on the same line.
-    local model = Prefs.model(provider)
-    UI.text(model, x, y, UI.fitSize(model, w, 7, 5), Theme.withAlpha(Theme.cream, 0.55))
-    y = y + UI.lineHeight(7) + 2
+    UI.label(Prefs.model(provider), x, y, "label", { color = Theme.mute, width = w, ellipsis = true })
+    y = y + lead + Theme.space.xs
   end
-  y = y + 4
-  local trow = compact and (UI.lineHeight(7) + 10) or row
+  y = y + Theme.space.xs
 
   -- **The room comes first.** What the panel is for is the conversation and
-  -- the line you type in, so the height those need is taken out here and the
-  -- tabs get what is left. A panel too short for both drew its field through
-  -- the CLOSE button.
-  local need_below = (row - 6) + row + 3 * (UI.lineHeight(7) + 1) + 20
-  local header_room = (rect.y + rect.h - 8) - y - need_below
+  -- the line you type in, so the least they need is taken out here and the
+  -- tabs get what is left.
+  local chip_h = Theme.control.chip
+  local gap = Theme.space.sm
+  local need_below = 40 + gap + button_h() * 2 + gap + Theme.space.lg
+  local header_room = bottom - y - need_below
 
-  -- The provider tabs, in as many columns as the panel can hold a name in.
-  -- Six across a narrow room gave each of them forty pixels, and `ANTHROPIC`
-  -- came out as two stacked syllables.
-  local columns = math.max(2, math.min(6, math.floor(w / 96)))
-  local tab_w = math.floor((w - (columns - 1) * 4) / columns)
-  -- **One size for the row, from its widest name.** `UI.button` fits each
-  -- label to its own box, so a row of five came out at five different sizes —
-  -- `ANTHROPIC` small, `GROK` large — which reads as a ransom note rather
-  -- than a set of tabs.
-  local tab_size = 7
+  -- The provider tabs as chips, flowing by measurement; SETUP and CLOSE are
+  -- two more chips of the same row.
+  local chips = {}
   for _, name in ipairs(Prefs.PROVIDERS) do
-    tab_size = math.min(tab_size, UI.fitSize(Prefs.PROVIDER_NAME[name], tab_w - 8, 7, 4))
+    chips[#chips + 1] = { id = "tab:" .. name, label = Prefs.PROVIDER_NAME[name] or name,
+      selected = provider == name }
   end
-  local tab_rows = math.ceil((#Prefs.PROVIDERS + 2) / columns)
-  if header_room < tab_rows * trow then
-    -- No room for a grid of them: one button that says who is being spoken
-    -- to and moves to the next one when pressed, and SETUP and CLOSE beside
-    -- it. Every provider is still reachable, in one row instead of three.
-    local third = math.floor((w - 8) / 3)
-    for index, id in ipairs({ "cycle", "setup", "close" }) do
-      local r = { x = x + (index - 1) * (third + 4), y = y, w = third, h = trow - 6 }
-      local label = id == "cycle" and (Prefs.PROVIDER_NAME[provider] or provider)
-        or I18n.t(id == "setup" and "SETUP" or "CLOSE")
-      UI.button(r.x, r.y, r.w, r.h, label,
-        (id == "setup" and self.view == "setup") and "hot" or "normal", 7)
-      self.rects[id] = r
+  chips[#chips + 1] = { id = "setup", label = I18n.t("SETUP"), selected = self.view == "setup" }
+  chips[#chips + 1] = { id = "close", label = I18n.t("CLOSE") }
+  for _, chip in ipairs(chips) do chip.w = UI.chipWidth(chip.label) end
+  local rows = flow(chips, w, gap)
+  if #rows * (chip_h + gap) - gap > header_room then
+    -- No room for a grid of them: one chip that says who is being spoken
+    -- to and moves to the next one when pressed, with SETUP and CLOSE
+    -- beside it. Every provider is still reachable.
+    chips = {
+      { id = "cycle", label = Prefs.PROVIDER_NAME[provider] or provider, selected = true },
+      { id = "setup", label = I18n.t("SETUP"), selected = self.view == "setup" },
+      { id = "close", label = I18n.t("CLOSE") },
+    }
+    local total = 0
+    for _, chip in ipairs(chips) do chip.w = UI.chipWidth(chip.label); total = total + chip.w end
+    if total + gap * 2 > w then
+      local share = math.floor((w - gap * 2) / 3)
+      for _, chip in ipairs(chips) do chip.w = share end
     end
-    y = y + trow + 2
-    if self.view == "setup" then
-      self:draw_setup(rect, x, y, w, row)
-    else
-      self:draw_chat(rect, x, y, w, row)
+    rows = flow(chips, w, gap)
+  end
+  for ri, row in ipairs(rows) do
+    local ry = y + (ri - 1) * (chip_h + gap)
+    for _, cell in ipairs(row) do
+      local chip = cell.item
+      UI.chip(x + cell.x, ry, chip.label, { selected = chip.selected, w = chip.w })
+      self.rects[chip.id] = { x = x + cell.x, y = ry, w = chip.w, h = chip_h }
     end
-    return
   end
-  local tx = x
-  for _, name in ipairs(Prefs.PROVIDERS) do
-    if tx + tab_w > x + w then
-      tx = x
-      y = y + trow
-    end
-    -- `hot` is this client's word for the one that is chosen.
-    local state = provider == name and "hot" or "normal"
-    local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
-    UI.button(r.x, r.y, r.w, r.h, Prefs.PROVIDER_NAME[name], state, tab_size)
-    self.rects["tab:" .. name] = r
-    tx = tx + tab_w + 4
-  end
-  if tx + tab_w > x + w then
-    tx = x
-    y = y + row
-  end
-  -- SETUP and CLOSE are two more cells of the same grid: a row of their own
-  -- is a row the conversation does not get, and on a short window the
-  -- conversation was three lines tall.
-  for _, verb in ipairs({ "setup", "close" }) do
-    if tx + tab_w > x + w then
-      tx = x
-      y = y + trow
-    end
-    local r = { x = tx, y = y, w = tab_w, h = trow - 6 }
-    local hot = verb == "setup" and self.view == "setup"
-    UI.button(r.x, r.y, r.w, r.h, I18n.t(verb == "setup" and "SETUP" or "CLOSE"),
-      hot and "hot" or "normal", tab_size)
-    self.rects[verb] = r
-    tx = tx + tab_w + 4
-  end
-  y = y + trow + 2
+  y = y + #rows * (chip_h + gap)
 
   if self.view == "setup" then
-    self:draw_setup(rect, x, y, w, row)
+    self:draw_setup(rect, x, y, w, bottom)
   else
-    self:draw_chat(rect, x, y, w, row)
+    self:draw_chat(rect, x, y, w, bottom)
   end
 end
 
-function Panel:draw_chat(rect, x, y, w, row)
-  local bottom = rect.y + rect.h - 8
+function Panel:draw_chat(rect, x, y, w, bottom)
+  local lead = UI.lead("label")
+  local font = UI.font("label")
+  local gap = Theme.space.sm
+  local bh = button_h()
+
   -- From the bottom up: the verbs, then the line you type in, then whatever
   -- height is left is the room. A room that took what it liked left no field.
-  local verbs_y = bottom - (row - 6)
-  local field_y = verbs_y - row
-  local status_h = self.status and (UI.lineHeight(7) + 4) or 0
-  local well_h = math.max(40, field_y - y - 6 - status_h)
-
-  UI.well(x, y, w, well_h, Theme.navy)
-  love.graphics.setScissor(x + 2, y + 2, w - 4, well_h - 4)
-  -- Measured before it is drawn, so the **newest line is the one on screen**.
-  -- A room that drew from the top showed the first thing ever said and hid
-  -- the answer that just arrived, which is the wrong end of a conversation.
-  local line_h = UI.lineHeight(7) + 1
-  local wrapped, total = {}, 0
-  for index, item in ipairs(self.items) do
-    local head = label_of(item)
-    local body = item.text or ""
-    if item.photo_url then body = body .. "  " .. I18n.t("[picture]") end
-    if item.edited then body = body .. "  " .. I18n.t("(edited)") end
-    local lines = UI.wrap(head .. ": " .. body, w - 20, 7)
-    wrapped[index] = lines
-    total = total + #lines * line_h + 6
-  end
-  -- `scroll` is how far *back* the reader has gone, 0 at the newest.
-  local iy = y + 6
-  if total > well_h - 12 then iy = y + well_h - 6 - total + self.scroll end
-  local shown = 0
-  if #self.items == 0 then
-    UI.paragraph(
-      I18n.t("Nothing said yet. Ask about the code, or type a brief and press WRITE."),
-      x + 8, iy, w - 16, 7, Theme.withAlpha(Theme.cream, 0.45))
-  end
-  for index, item in ipairs(self.items) do
-    local lines = wrapped[index]
-    local h = #lines * line_h + 4
-    if iy + h > y and iy < y + well_h then
-      if self.selected == index then
-        UI.setColor(Theme.cyan, 0.15)
-        love.graphics.rectangle("fill", x + 4, iy - 2, w - 8, h)
-        love.graphics.setColor(1, 1, 1, 1)
-      end
-      local ly = iy
-      for _, line in ipairs(lines) do
-        UI.text(line, x + 8, ly, 7, tone_of(item))
-        ly = ly + line_h
-      end
-      -- Clipped to the well, because this rect is what a press is tested
-      -- against: a row half-scrolled out of the top used to take clicks from
-      -- above the panel, where it was not drawn and could not be seen.
-      local top = math.max(iy - 2, y + 2)
-      local bottom = math.min(iy - 2 + h, y + well_h - 2)
-      if bottom - top > 8 then
-        self.rects["msg:" .. index] = { x = x + 4, y = top, w = w - 8, h = bottom - top }
-      end
-      shown = shown + 1
-    end
-    iy = iy + h + 2
-  end
-  love.graphics.setScissor()
-  -- How far back the wheel may go: everything that is above the fold.
-  self.extent = math.max(0, total - (well_h - 12))
-
-  if self.status then
-    UI.text(self.status, x, y + well_h + 2, 7, Theme.withAlpha(Theme.coin, 0.9))
-  end
-
-  -- The line you type in.
-  local field_r = { x = x, y = field_y, w = w, h = row - 6 }
-  UI.well(field_r.x, field_r.y, field_r.w, field_r.h,
-    self.focus == "input" and Theme.cyan or Theme.navy)
-  local text = self.input
-  if text == "" and self.focus ~= "input" then
-    UI.text(I18n.t("ask the coder, or say what to write…"), field_r.x + 6,
-      field_r.y + 5, 7, Theme.withAlpha(Theme.cream, 0.4))
-  else
-    local caret = self.focus == "input" and "_" or ""
-    UI.text(self:tail(text .. caret, field_r.w - 12), field_r.x + 6, field_r.y + 5, 7, Theme.cream)
-  end
-  self.rects["input"] = field_r
-
   -- The verbs. STOP is live only while it is busy; IMAGE only where the
   -- provider can draw and the pad has a room.
   local verbs = {
-    { id = "send", label = I18n.t("SEND") },
+    { id = "send", label = I18n.t("SEND"), variant = "primary" },
     { id = "write", label = I18n.t("WRITE") },
     { id = "review", label = I18n.t("REVIEW") },
     { id = "image", label = I18n.t("IMAGE"), dim = not self.can_image },
@@ -328,70 +284,155 @@ function Panel:draw_chat(rect, x, y, w, row)
   if self.selected then
     verbs = {
       { id = "edit", label = I18n.t("EDIT") },
-      { id = "delete", label = I18n.t("DELETE") },
+      { id = "delete", label = I18n.t("DELETE"), variant = "danger" },
       { id = "unpick", label = I18n.t("BACK") },
     }
   end
-  local vw = math.floor((w - (#verbs - 1) * 4) / #verbs)
-  local verb_size = 7
-  for _, verb in ipairs(verbs) do
-    verb_size = math.min(verb_size, UI.fitSize(verb.label, vw - 8, 7, 4))
+  -- Measured first, so the room knows what the verbs will take: rows by
+  -- measurement when they fit in half the panel, one cramped row when not.
+  local sized = {}
+  for i, verb in ipairs(verbs) do sized[i] = { w = button_w({ verb.label }) } end
+  local verb_rows = #flow(sized, w, gap)
+  local verbs_h = verb_rows * bh + (verb_rows - 1) * gap
+  local room = bottom - y
+  if verbs_h > room * 0.45 then verbs_h = bh end
+  local verbs_y = bottom - verbs_h
+  local field_h = bh
+  local field_y = verbs_y - gap - field_h
+  local status_h = self.status and (lead + Theme.space.xs) or 0
+  local well_h = math.max(40, field_y - gap - status_h - y)
+
+  well(x, y, w, well_h, false)
+  love.graphics.setScissor(x + 1, y + 1, math.max(0, w - 2), math.max(0, well_h - 2))
+  -- Measured before it is drawn, so the **newest line is the one on screen**.
+  local inner = w - Theme.space.lg
+  local wrapped, total = {}, 0
+  for index, item in ipairs(self.items) do
+    local head = label_of(item)
+    local body = item.text or ""
+    if item.photo_url then body = body .. "  " .. I18n.t("[picture]") end
+    if item.edited then body = body .. "  " .. I18n.t("(edited)") end
+    local lines = UI.wrapWith(head .. ": " .. body, inner, font)
+    wrapped[index] = lines
+    total = total + #lines * lead + Theme.space.xs
   end
-  local vx = x
-  for _, verb in ipairs(verbs) do
-    local r = { x = vx, y = verbs_y, w = vw, h = row - 6 }
-    UI.button(r.x, r.y, r.w, r.h, verb.label, verb.dim and "disabled" or "normal", verb_size)
-    if not verb.dim then self.rects[verb.id] = r end
-    vx = vx + vw + 4
+  -- `scroll` is how far *back* the reader has gone, 0 at the newest.
+  local iy = y + gap
+  if total > well_h - gap * 2 then iy = y + well_h - gap - total + self.scroll end
+  love.graphics.setFont(font)
+  if #self.items == 0 then
+    local hint = I18n.t("Nothing said yet. Ask about the code, or type a brief and press WRITE.")
+    for i, line in ipairs(UI.wrapWith(hint, inner, font)) do
+      UI.label(line, x + gap, iy + (i - 1) * lead, "label", { color = Theme.mute })
+    end
   end
+  for index, item in ipairs(self.items) do
+    local lines = wrapped[index]
+    local h = #lines * lead
+    if iy + h > y and iy < y + well_h then
+      if self.selected == index then
+        UI.setColor(Theme.cardHi, 0.7)
+        UI.rrect("fill", x + Theme.space.xs, iy - 2, w - Theme.space.xs * 2, h + 4, Theme.radiusSm)
+        love.graphics.setColor(1, 1, 1, 1)
+      end
+      for li, line in ipairs(lines) do
+        UI.label(line, x + gap, iy + (li - 1) * lead, "label", { color = tone_of(item) })
+      end
+      -- Clipped to the well, because this rect is what a press is tested
+      -- against: a row half-scrolled out of the top must not take clicks
+      -- from above the panel.
+      local top = math.max(iy - 2, y + 2)
+      local foot = math.min(iy + h + 2, y + well_h - 2)
+      if foot - top > 8 then
+        self.rects["msg:" .. index] = { x = x + Theme.space.xs, y = top, w = w - Theme.space.xs * 2, h = foot - top }
+      end
+    end
+    iy = iy + h + Theme.space.xs
+  end
+  love.graphics.setScissor()
+  -- How far back the wheel may go: everything that is above the fold.
+  self.extent = math.max(0, total - (well_h - gap * 2))
+
+  if self.status then
+    UI.label(self.status, x, y + well_h + Theme.space.xs, "label",
+      { color = Theme.gold, width = w, ellipsis = true })
+  end
+
+  -- The line you type in.
+  local field_r = { x = x, y = field_y, w = w, h = field_h }
+  well(field_r.x, field_r.y, field_r.w, field_r.h, self.focus == "input")
+  local ty = field_y + math.floor((field_h - lead) / 2)
+  local text = self.input
+  if text == "" and self.focus ~= "input" then
+    UI.label(I18n.t("ask the coder, or say what to write…"), field_r.x + gap, ty, "label",
+      { color = Theme.mute, width = w - gap * 2, ellipsis = true })
+  else
+    local caret = self.focus == "input" and "_" or ""
+    UI.label(self:tail(text .. caret, field_r.w - gap * 2), field_r.x + gap, ty, "label")
+  end
+  self.rects["input"] = field_r
+
+  button_rows(self, verbs, x, verbs_y, w, verbs_h, bh,
+    function(v) return v.id end,
+    function(v) return v.dim and "disabled" or "normal" end, "agent:")
 end
 
-function Panel:draw_setup(rect, x, y, w, row)
+function Panel:draw_setup(rect, x, y, w, bottom)
   local provider = Prefs.provider()
   local needs = Prefs.needs_key(provider)
-  local label_h = UI.lineHeight(7) + 4
+  local lead = UI.lead("label")
+  local gap = Theme.space.sm
+  local font = UI.font("label")
 
-  -- **Three rows, measured from the floor.** The key, the model and the two
-  -- switches are what somebody came to SETUP to press, so the height is
-  -- divided between them before anything is drawn and every position below
-  -- comes out of that one division. Laid out downwards from the top instead,
-  -- a short panel drew the key field straight through the model row and put
-  -- the switches off the bottom edge, where they could be seen and not
-  -- pressed.
-  local bottom = rect.y + rect.h - 8
-  local gaps = 12
-  local room = bottom - y
+  -- **Measured from the floor.** The three switches, the model row and the
+  -- key field are what somebody came to SETUP to press, so their heights are
+  -- taken before anything is drawn; the captions, the note and the list of
+  -- models get what is left, in that order of giving way.
+  local switches = {
+    { id = "auto", label = I18n.t("AUTO") .. ": " .. (Prefs.auto() and I18n.t("ON") or I18n.t("OFF")),
+      every = { I18n.t("AUTO") .. ": " .. I18n.t("ON"), I18n.t("AUTO") .. ": " .. I18n.t("OFF") },
+      on = Prefs.auto() },
+    -- Whether an answer is also left in the file as a comment
+    -- (`src/agent/notes.lua`).
+    { id = "notes", label = I18n.t("COMMENT") .. ": " .. (Prefs.notes() and I18n.t("ON") or I18n.t("OFF")),
+      every = { I18n.t("COMMENT") .. ": " .. I18n.t("ON"), I18n.t("COMMENT") .. ": " .. I18n.t("OFF") },
+      on = Prefs.notes() },
+    { id = "shown", label = I18n.t("CODER") .. ": " .. (Prefs.shown() and I18n.t("ON") or I18n.t("OFF")),
+      every = { I18n.t("CODER") .. ": " .. I18n.t("ON"), I18n.t("CODER") .. ": " .. I18n.t("OFF") },
+      on = Prefs.shown() },
+  }
+  local sized = {}
+  for i, s in ipairs(switches) do sized[i] = { w = button_w(s.every) } end
+  local switch_rows = #flow(sized, w, gap)
+
+  local field_h = button_h()
   local labels = true
-  local field_h = math.floor((room - gaps - 2 * label_h) / 3)
-  if field_h < UI.lineHeight(7) + 8 then
-    -- No room for the captions: the key field says what it wants when it is
-    -- empty, and MODEL sits next to a button that says MODELS.
-    labels = false
-    field_h = math.floor((room - gaps) / 3)
+  local function need(fh, with_labels, rows)
+    return (with_labels and lead * 2 or 0) + fh * 2 + gap * 2 + rows * fh + (rows - 1) * gap
   end
-  field_h = math.max(14, math.min(row - 6, field_h))
-
-  local switches_y = bottom - field_h
-  local model_y = switches_y - 6 - field_h
-  local model_label_y = labels and (model_y - label_h) or model_y
-  local key_y = labels and (y + label_h) or y
-  -- Whatever the arithmetic above left, the key row sits above the model row
-  -- and not through it.
-  key_y = math.min(key_y, model_label_y - 6 - field_h)
+  local room = bottom - y
+  if need(field_h, labels, switch_rows) > room then labels = false end
+  if need(field_h, labels, switch_rows) > room then field_h = lead + Theme.space.sm end
+  if need(field_h, labels, switch_rows) > room then switch_rows = 1 end
+  local switches_h = switch_rows * field_h + (switch_rows - 1) * gap
+  local switches_y = bottom - switches_h
+  local model_y = switches_y - gap - field_h
+  local model_label_y = labels and (model_y - lead) or model_y
+  local key_y = labels and (y + lead) or y
+  -- Whatever the arithmetic above left, the key row sits above the model
+  -- row and not through it.
+  key_y = math.min(key_y, model_label_y - gap - field_h)
   key_y = math.max(key_y, y)
 
   -- The key, at the top, with its label when there is room for one.
   if labels then
-    UI.text(needs and I18n.t("API KEY") or I18n.t("HOST"), x, key_y - label_h, 7,
-      Theme.withAlpha(Theme.cream, 0.6))
+    UI.label(needs and I18n.t("API KEY") or I18n.t("HOST"), x, key_y - lead, "label", { color = Theme.mute })
   end
-
   local key_r = { x = x, y = key_y, w = w, h = field_h }
-  UI.well(key_r.x, key_r.y, key_r.w, key_r.h,
-    self.focus == "key" and Theme.cyan or Theme.navy)
+  well(key_r.x, key_r.y, key_r.w, key_r.h, self.focus == "key")
   local shown
   if self.focus == "key" then
-    shown = self:tail(self.field .. "_", key_r.w - 12)
+    shown = self:tail(self.field .. "_", key_r.w - gap * 2)
   elseif Prefs.key(provider) ~= "" then
     shown = needs and Prefs.mask(Prefs.key(provider)) or Prefs.key(provider)
   elseif needs then
@@ -399,85 +440,75 @@ function Panel:draw_setup(rect, x, y, w, row)
   else
     shown = Prefs.OLLAMA_DEFAULT_HOST
   end
-  UI.text(shown, key_r.x + 6, key_r.y + 5, 7,
-    Prefs.key(provider) == "" and self.focus ~= "key"
-      and Theme.withAlpha(Theme.cream, 0.4) or Theme.cream)
+  UI.label(shown, key_r.x + gap, key_y + math.floor((field_h - lead) / 2), "label",
+    { color = (Prefs.key(provider) == "" and self.focus ~= "key") and Theme.mute or Theme.text,
+      width = w - gap * 2, ellipsis = true })
   self.rects["key"] = key_r
-  y = key_y + field_h + 6
+  y = key_y + field_h + gap
 
   -- Where it goes, said plainly — but only when saying it does not cost the
-  -- list its last line. A provider key on a game's screen deserves one
-  -- sentence about where it is kept, and a panel too short to hold the
-  -- sentence is a panel that needs its buttons more.
+  -- list its last line.
   local note = I18n.t("Kept on this machine only, and sent to the provider that issued it. Never to the game server.")
-  local note_h = UI.lineHeight(7) * #UI.wrap(note, w, 7)
+  local note_lines = UI.wrapWith(note, w, font)
+  local note_h = #note_lines * lead
   if model_label_y - y > note_h + 40 then
-    y = y + UI.paragraph(note, x, y, w, 7, Theme.withAlpha(Theme.cream, 0.45)) + 6
+    for i, line in ipairs(note_lines) do
+      UI.label(line, x, y + (i - 1) * lead, "label", { color = Theme.mute })
+    end
+    y = y + note_h + gap
   end
 
   -- What the provider answered, in whatever room is left between the key and
   -- the model row. Dropped entirely when there is none.
-  local list_h = model_label_y - y - 6
+  local list_h = model_label_y - y - gap
   if self.models and #self.models > 0 and list_h >= 40 then
-    UI.well(x, y, w, list_h, Theme.navy)
-    love.graphics.setScissor(x + 2, y + 2, w - 4, list_h - 4)
-    local my = y + 4 - self.scroll
+    well(x, y, w, list_h, false)
+    love.graphics.setScissor(x + 1, y + 1, math.max(0, w - 2), math.max(0, list_h - 2))
+    local my = y + Theme.space.xs - self.scroll
     for index, id in ipairs(self.models) do
-      local h = UI.lineHeight(7) + 4
-      if my + h > y and my < y + list_h then
-        UI.text(id, x + 8, my, 7, id == Prefs.model(provider) and Theme.coin or Theme.cream)
-        self.rects["model:" .. index] = { x = x + 4, y = my - 2, w = w - 8, h = h }
+      if my + lead > y and my < y + list_h then
+        UI.label(id, x + gap, my, "label",
+          { color = id == Prefs.model(provider) and Theme.gold or Theme.text, width = w - gap * 2, ellipsis = true })
+        self.rects["model:" .. index] = { x = x + Theme.space.xs, y = math.max(my, y + 1),
+          w = w - Theme.space.xs * 2, h = math.min(lead, y + list_h - 1 - math.max(my, y + 1)) }
       end
-      my = my + h
+      my = my + lead
     end
     love.graphics.setScissor()
     self.extent = math.max(0, (my + self.scroll) - (y + list_h))
-  elseif self.status and list_h >= UI.lineHeight(7) then
-    UI.paragraph(self.status, x, y, w, 7, Theme.withAlpha(Theme.coin, 0.9), 2)
+  elseif self.status and list_h >= lead then
+    local lines = UI.wrapWith(self.status, w, font)
+    for i = 1, math.min(#lines, math.floor(list_h / lead), 2) do
+      UI.label(lines[i], x, y + (i - 1) * lead, "label", { color = Theme.gold })
+    end
   end
 
   -- The model, named and chosen.
   if labels then
-    UI.text(I18n.t("MODEL"), x, model_label_y, 7, Theme.withAlpha(Theme.cream, 0.6))
+    UI.label(I18n.t("MODEL"), x, model_label_y, "label", { color = Theme.mute })
   end
-  local fetch_w = math.min(math.floor(w * 0.4), math.max(72, UI.textWidth(I18n.t("MODELS"), 7) + 24))
-  local model_r = { x = x, y = model_y, w = w - fetch_w - 4, h = field_h }
-  UI.well(model_r.x, model_r.y, model_r.w, model_r.h,
-    self.focus == "model" and Theme.cyan or Theme.navy)
+  local fetch_w = math.min(math.floor(w * 0.4), button_w({ I18n.t("MODELS") }))
+  local model_r = { x = x, y = model_y, w = w - fetch_w - gap, h = field_h }
+  well(model_r.x, model_r.y, model_r.w, model_r.h, self.focus == "model")
   local model_text = self.focus == "model" and (self.model_field .. "_") or Prefs.model(provider)
-  UI.text(self:tail(model_text, model_r.w - 12), model_r.x + 6, model_r.y + 5, 7, Theme.cream)
+  UI.label(self:tail(model_text, model_r.w - gap * 2), model_r.x + gap,
+    model_y + math.floor((field_h - lead) / 2), "label")
   self.rects["model"] = model_r
   local fetch_r = { x = x + w - fetch_w, y = model_y, w = fetch_w, h = field_h }
-  UI.button(fetch_r.x, fetch_r.y, fetch_r.w, fetch_r.h, I18n.t("MODELS"), "normal", 7)
+  UI.button(fetch_r.x, fetch_r.y, fetch_r.w, fetch_r.h, I18n.t("MODELS"), "normal", nil,
+    { id = "agent:fetch", padx = Theme.space.sm })
   self.rects["fetch"] = fetch_r
 
-  -- And the three switches, on the floor. Thirds rather than halves since
-  -- COMMENT joined them: a switch that says only "ON" is a switch nobody can
-  -- read, so each keeps its name and they share the width evenly.
-  local third = math.floor((w - 8) / 3)
-  local auto_r = { x = x, y = switches_y, w = third, h = field_h }
-  UI.button(auto_r.x, auto_r.y, auto_r.w, auto_r.h,
-    I18n.t("AUTO") .. ": " .. (Prefs.auto() and I18n.t("ON") or I18n.t("OFF")),
-    Prefs.auto() and "hot" or "normal", 7)
-  self.rects["auto"] = auto_r
-  -- Whether an answer is also left in the file as a comment
-  -- (`src/agent/notes.lua`).
-  local notes_r = { x = x + third + 4, y = switches_y, w = third, h = field_h }
-  UI.button(notes_r.x, notes_r.y, notes_r.w, notes_r.h,
-    I18n.t("COMMENT") .. ": " .. (Prefs.notes() and I18n.t("ON") or I18n.t("OFF")),
-    Prefs.notes() and "hot" or "normal", 7)
-  self.rects["notes"] = notes_r
-  local shown_r = { x = x + (third + 4) * 2, y = switches_y, w = w - (third + 4) * 2,
-    h = field_h }
-  UI.button(shown_r.x, shown_r.y, shown_r.w, shown_r.h,
-    I18n.t("CODER") .. ": " .. (Prefs.shown() and I18n.t("ON") or I18n.t("OFF")),
-    Prefs.shown() and "hot" or "normal", 7)
-  self.rects["shown"] = shown_r
+  -- And the switches, on the floor, each saying the state it is in.
+  button_rows(self, switches, x, switches_y, w, switches_h, field_h,
+    function(s) return s.id end,
+    function(s) return s.on and "hot" or "normal" end, "agent:")
 end
 
 --- The end of a long line, which is the part being typed.
 function Panel:tail(text, width)
-  while UI.textWidth(text, 7) > width and #text > 1 do
+  local font = UI.font("label")
+  while font:getWidth(text) > width and #text > 1 do
     text = text:sub(2)
   end
   return text

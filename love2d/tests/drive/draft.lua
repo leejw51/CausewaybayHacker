@@ -5,7 +5,7 @@
 -- Type into a quest, press RUN, walk back to the map, walk back in — the text
 -- must be there. Then run this **again**: the second launch types nothing and
 -- still finds it, which is the half that proves the draft lives on the server
--- and not in this process. `tests/drive/solve.lua` is its other half.
+-- and not in this process.
 --
 -- One account for both launches, or the check proves nothing: a draft is per
 -- player, and a different mnemonic is a different player. Run it with its own

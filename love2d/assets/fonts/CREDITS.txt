@@ -1,0 +1,50 @@
+Fonts shipped with the Causewaybay Hacker LÖVE client, and where they come from.
+
+The same faces as frontend/public/fonts (see CREDITS.txt there). LÖVE 11.5
+cannot read WOFF or WOFF2, so each was converted back to TrueType/OpenType
+with fontTools; the ones only a code pane uses were subset to the range
+Iosevka-Code.ttf carries, and the Hangul faces to Latin plus the 2,350
+syllables of KS X 1001. A glyph a subset lacks is drawn by the faces behind
+it (VT323 or Press Start 2P, then GNU Unifont).
+
+PressStart2P-Regular.ttf   Press Start 2P, CodeMan38            SIL OFL 1.1   PressStart2P-OFL.txt
+VT323-Regular.ttf          VT323, Peter Hull                    SIL OFL 1.1   VT323-OFL.txt
+Iosevka-Code.ttf           Iosevka (subset), Belleve Invis      SIL OFL 1.1   Iosevka-OFL.txt
+JetBrainsMono-Code.ttf     JetBrains Mono (subset), JetBrains   SIL OFL 1.1   JetBrainsMono-OFL.txt
+unifont.otf                GNU Unifont                          GPL2+ w/ font exception, OFL 1.1
+                                                                unifont-LICENSE.txt
+
+IBM-VGA-8x16.ttf           "Web437 IBM VGA 8x16" from The Ultimate Oldschool PC
+                           Font Pack v2.2 by VileR, https://int10h.org/oldschool-pc-fonts/
+                           CC BY-SA 4.0                         OldschoolPC-CC-BY-SA-4.0.txt
+                           Converted from WOFF to TrueType; otherwise unmodified.
+neodgm.ttf                 Neo둥근모 (NeoDunggeunmo) v1.601,
+neodgm_code.ttf            Neo둥근모 Code, Eunbin Jeong (Dalgona),
+                           https://github.com/neodgm/neodgm     SIL OFL 1.1   neodgm-OFL.txt
+                           Subset to Latin and KS X 1001 Hangul.
+Galmuri11.ttf              Galmuri11 and GalmuriMono11 v2.40.4, Lee Minseo (quiple),
+GalmuriMono11.ttf          https://github.com/quiple/galmuri    SIL OFL 1.1   Galmuri-OFL.txt
+                           Subset to Latin and KS X 1001 Hangul.
+ComicMono.ttf              Comic Mono, dtinth (from Comic Shanns by Shannon Miwa),
+                           https://github.com/dtinth/comic-mono-font  MIT  ComicMono-MIT.txt
+PRNumber3.ttf              PR Number 3 (Apple II 80-column text), Kreative Korporation /
+                           Kreative Software, https://kreativekorp.com/software/fonts/apple2/
+                           Kreative Software Relay Fonts Free Use License 1.2f
+                                                                Kreative-FreeLicense.txt
+                           Shipped byte-for-byte as downloaded; the licence forbids changes.
+MSX1-Code.ttf              MSX1 Korean v0.0.1 (pre-alpha), Noah Burney,
+                           https://github.com/nwah/korean-msx-font   SIL OFL 1.1   MSX1Korean-OFL.txt
+                           Subset to Latin and punctuation, and its vertical metrics set to
+                           the glyphs' own extent (the original's line box is two ems).
+TopazUnicode-Code.ttf      Topaz Unicode KS13 (Amiga 500 Topaz), Screwtape,
+                           https://gitlab.com/Screwtapello/topaz-unicode   ISC   TopazUnicode-ISC.txt
+VictorMono-Code.otf        Victor Mono v1.5.6 (subset), Rune Bjørnerås,
+VictorMonoItalic-Code.otf  https://github.com/rubjo/victor-mono  SIL OFL 1.1   VictorMono-OFL.txt
+FantasqueSansMono-Code.ttf Fantasque Sans Mono v1.8.0 (subset), Jany Belluz,
+                           https://github.com/belluzj/fantasque-sans  SIL OFL 1.1  FantasqueSansMono-OFL.txt
+MonaspaceRadon-Code.otf    Monaspace Radon v1.400 (subset), GitHub Next,
+                           https://github.com/githubnext/monaspace  SIL OFL 1.1   Monaspace-OFL.txt
+
+Courier New Bold is not shipped. It is a system face, read at run time from
+/System/Library/Fonts/Supplemental/ on macOS, and VT323 stands in for it on
+a machine without it.

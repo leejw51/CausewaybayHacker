@@ -31,7 +31,7 @@ local Layout = {
   pinned = false,
   fullscreen = false,
   --- The type-size step, an index into `FONT_STEPS`. See `DEFAULT_FONT`
-  --- for why it starts on the second rung rather than the first.
+  --- for why it starts on the second rung.
   font = 2,
   --- Overrides CWBH_FULLSCREEN when set. "desktop" | "exclusive".
   fullscreenPref = nil,
@@ -81,25 +81,41 @@ Layout.TEXT_BASE = 2
 --- state each, say which one they are in, and the whole control is one
 --- button that a player can hit without aiming.
 ---
---- Step 1 is the size this client has always drawn, so a store written
---- before this control existed comes back looking exactly as it did.
+--- **One step under the authored size, two over it.** 1.0 is the authored
+--- ladder doubled (`TEXT_BASE`) and is the default; 0.75 is for a player who
+--- wants more on the screen still; 1.5 and 2.0 are for big type. What was
+--- 2.5 went: it was the step that printed `PICK A LAND` wider than a portrait
+--- canvas, and nobody needs a fifth of the screen per word.
 ---
---- **Halves, not arbitrary fractions.** Every size in this client is rounded
---- onto an 8-pixel grid, so a step of 1.25 and a step of 1.55 both land a
---- 16 px label on 24 px and the control would have two positions that did
---- nothing. Halves move every size by exactly one or two grid cells.
-Layout.FONT_STEPS = { 1.0, 1.5, 2.0, 2.5 }
+--- **No arbitrary fractions.** Every size in this client is rounded onto an
+--- 8-pixel grid, so a step of 1.25 and a step of 1.55 both land a 16 px
+--- label on 24 px and the control would have two positions that did
+--- nothing. 0.75 is the one quarter-step, and it earns its place on the
+--- grid: an authored 10 goes 20 → 15 → **16** px (24 at 1.0), 7 goes to 8,
+--- 14 to 24 (32 at 1.0). An authored 8 stays on 16, which is the floor a
+--- label is still readable at.
+---
+--- `src/store.lua` (`DISPLAY_V`) maps the index a store wrote under the old
+--- `{ 1.0, 1.5, 2.0, 2.5 }` onto this one by multiplier.
+Layout.FONT_STEPS = { 0.75, 1.0, 1.5, 2.0 }
 
 --- The step a fresh install opens on.
 ---
---- **2, not 1.** Step 1 is the size this client was authored at, and on a
---- laptop window in landscape it reads. In portrait — the shape a tall window
---- or a rotated panel gives — the canvas stretches along the long axis and
---- the same 16 px label is a smaller fraction of a taller frame; the report
---- was "the font is too small in vertical mode", and it was. Step 2 is one
---- grid cell up (16 → 24 px) and reads in both shapes. A player who prefers
---- the authored size presses the button once; a store that already carries a
---- chosen step keeps it, as `Layout.load` always did.
+--- **1, again.** It was 2, because portrait at step 1 was reported as too
+--- small: on a 1080×1920 panel the canvas is half again as big as the design
+--- and a 24 px label was a sliver of it. Step 2 fixed that by making the type
+--- half again as big *everywhere*, and on the window most people play in — a
+--- laptop, 1280×720 — that put a 10-px-authored label at 32 px, the land
+--- picker's nine columns on top of each other, and a quest that showed three
+--- of its four answers. The next report was "the font is too large, taking
+--- too much space", and that was right too.
+---
+--- What the first report needed was type that grows with a **tall** canvas,
+--- not type that is bigger on every canvas, and `Layout.growth` is that now.
+--- So the default, 1.0, is 24 px for an authored 10 in every landscape
+--- window — a laptop's 1280×720 and a 1920×1080 fullscreen alike — and 32
+--- on the 1080×1920 the first report came from. It is index 2 because 0.75
+--- sits under it; F12 cycles 0.75 → 1.0 → 1.5 → 2.0.
 Layout.DEFAULT_FONT = 2
 
 local FULLSCREEN_TYPES = { desktop = true, exclusive = true }
@@ -371,12 +387,12 @@ end
 --- each derived this expression themselves, which is how the two panes would
 --- have drifted the first time one of them was tuned.
 ---
---- `uiScale()` is deliberately **not** in here any more. It is a fraction —
---- 1.5 at 1080×1920 — and multiplying a pixel face by 1.5 is the one thing
---- every reference in this family says not to do. `Assets.snap8` rounds what
---- comes out of here onto the 8-pixel grid, so the sizes are 16, 24, 32, 48.
+--- `growth()` is in here, and that is not the old `uiScale()` mistake come
+--- back: that one *drew* a pixel face at 1.5, which resamples every glyph.
+--- This asks for a bigger size, and `Assets.snap8` rounds what comes out
+--- onto the 8-pixel grid, so the face is still drawn at 16, 24, 32 or 48.
 function Layout.codeSize(base)
-  return math.max(8, math.floor((base or 18) * Layout.fontScale()))
+  return math.max(8, math.floor((base or 18) * Layout.fontScale() * Layout.growth()))
 end
 
 --- The largest code size at or below the player's step that still leaves
@@ -416,12 +432,42 @@ end
 --- at another wraps wrong in a way nothing notices until a sentence is cut in
 --- half.
 ---
---- No `uiScale()` here either, for the same reason, and it is worth being
---- explicit about what replaced it: the canvas still stretches, so a bigger
---- window still shows *more*; what it no longer does is show the same amount
---- smaller.
+--- And `growth()`, for the same reason as `codeSize`: the canvas stretches,
+--- so a bigger window shows more, but a canvas bigger than the design in
+--- *both* directions also gets type to match, rather than the same amount of
+--- it drawn smaller. In landscape `growth()` is 1 and this is just the
+--- authored size, doubled, times the step.
 function Layout.ui(size)
-  return math.max(8, math.floor((size or 10) * Layout.TEXT_BASE * Layout.fontScale()))
+  return math.max(8, math.floor((size or 10) * Layout.TEXT_BASE * Layout.fontScale() * Layout.growth()))
+end
+
+--- How much bigger than the design the canvas is, **as a factor on type**.
+---
+--- In portrait, `uiScale()`: 1 on anything up to the design size, and up to
+--- `MAX_STRETCH` on a canvas that really is bigger in both directions, like
+--- the 1080×1920 portrait panel `DEFAULT_FONT` was once raised for.
+---
+--- A fraction here is safe for the reason a fraction in the *draw* is not:
+--- what comes out of `Layout.ui` and `codeSize` is a size to ask a face
+--- for, and `Assets.snap8` rounds it onto the 8-pixel grid before any glyph
+--- is rasterised. The face is drawn at a size it has; it is never scaled.
+---
+--- **Landscape is always 1.** The web multiplies by `uiScale` in both
+--- orientations, and this did too, for one round: on a 1920×1080 fullscreen
+--- `uiScale` is 1.5, so an authored 10 was 30 → 32 px — the old step 2's
+--- type reached by another road — and the report came straight back: "ui
+--- fonts seems too large". A wider landscape canvas is for *more* of the
+--- screen, the map and the code and the output, not for bigger furniture
+--- round the same amount. A capped growth (say 1.15, still snapping a 10 to
+--- 24) was considered and is not worth having: it moves a few sizes on the
+--- 8-pixel grid and none of them in a way anybody asked for.
+---
+--- Portrait keeps it, because a portrait canvas half again as tall as the
+--- design is exactly the 1080×1920 case `DEFAULT_FONT` describes, where a
+--- 24 px label was a sliver of the frame.
+function Layout.growth()
+  if Layout.mode ~= "portrait" then return 1 end
+  return Layout.uiScale()
 end
 
 --- The old two-way toggle, kept because the drive scripts and the tests ask
@@ -534,16 +580,17 @@ function Layout.updateViewport()
   Layout.ensureCanvas()
 end
 
---- **Do not use this for type.** Kept because it is still the honest answer
---- to "how much bigger than the authored design is this canvas", which the
---- measurement in `docs/decisions.md` is expressed in — but it is a
---- *fraction* (1.5 at 1080×1920), and multiplying a pixel face by a fraction
---- is the whole of the bug this client was reported for: the glyphs are
---- resampled, so the type reads soft, and soft reads as smaller still.
+--- **Do not draw type at this.** It is the honest answer to "how much bigger
+--- than the authored design is this canvas", which the measurement in
+--- `docs/decisions.md` is expressed in — but it is a *fraction* (1.5 at
+--- 1080×1920), and drawing a pixel face scaled by a fraction is the whole of
+--- the bug this client was once reported for: the glyphs are resampled, so
+--- the type reads soft, and soft reads as smaller still.
 ---
---- `Layout.ui` is what type goes through now. It doubles the authored size
---- and `Assets.snap8` rounds it onto the 8-pixel grid both faces are drawn
---- on, so every size asked for is a size the face actually has.
+--- Type goes through `Layout.ui` and `Layout.codeSize`, which *ask* for a
+--- size this much bigger (`Layout.growth`) and let `Assets.snap8` round it
+--- onto the 8-pixel grid both faces are drawn on, so every size asked for is
+--- a size the face actually has.
 ---
 --- It is still right for **art**. `src/scenes/map.lua` scales its node
 --- markers and Mei by it, because a drawn picture resamples cleanly and a
@@ -623,6 +670,30 @@ end
 function Layout.safe(pad)
   pad = pad or 16
   return pad, pad, Layout.vw - pad * 2, Layout.vh - pad * 2
+end
+
+--- The widest a screen lays its content out at. Past this the canvas is
+--- wider than the design (a 1920 fullscreen is a 1920 canvas), and a card
+--- stretched to 1900 px hugs the top-left of a sea of felt; bounded, the
+--- content keeps its authored proportions and sits in the middle.
+Layout.MAX_CONTENT_W = Theme.maxContentW
+
+--- The screen gutter: 24 in landscape, 16 upright (the spec's §1.3).
+function Layout.gutter()
+  return Layout.mode == "portrait" and Theme.space.lg or Theme.space.xl
+end
+
+--- A content rect no wider than `maxw` (default `MAX_CONTENT_W`), centred
+--- across the canvas, inset by the gutter, and — unless `top`/`bottom` say
+--- otherwise — running from the header band to the footer band. Returns
+--- `x, y, w, h`.
+function Layout.bounded(maxw, top, bottom)
+  local g = Layout.gutter()
+  local w = math.min(maxw or Layout.MAX_CONTENT_W, Layout.vw - g * 2)
+  local x = math.floor((Layout.vw - w) / 2)
+  local y = top or g
+  local b = bottom or (Layout.vh - g)
+  return x, y, w, math.max(0, b - y)
 end
 
 return Layout

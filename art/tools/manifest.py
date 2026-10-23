@@ -104,6 +104,13 @@ ORDER = [
     "shackle_break", "fx_shards",
     # The editor's own effects: rubble for a deleted character, dust for ENTER.
     "fx_bricks", "fx_dust",
+    # The LÖVE client's catch-up round: real art for the names it used to
+    # load from love2d/assets/ placeholders (bg_flat, bg_night, sprite_clerk),
+    # the STATS wall, and three stretchable frames — a quiz card, an answer
+    # button and a title signboard — drawn nine-slice by love2d/src/artframe.lua.
+    "bg_flat", "bg_night", "sprite_clerk",
+    "bg_stats", "bg_stats_p",
+    "ui_quiz_card", "ui_quiz_choice", "ui_plaque",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the

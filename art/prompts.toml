@@ -1795,3 +1795,91 @@ generated = "2026-10-22"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art painted background, TRUE PIXEL ART with large visible square pixels, a limited palette, checkerboard dithering where tones meet, thick dark outlines, flat blocks of colour, hard stepped edges. NOT smooth, NOT airbrushed, NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no logos, no brand names anywhere — every label, key and screen is blank. A 1988 demoscene bedroom studio at dusk. On a desk: a cream-white wedge-shaped 16-bit home computer with the keyboard built in and a floppy slot on its side, a boxy cream colour monitor whose blank screen glows an intense blue with an orange and white glow, a two-button mouse on a mouse mat, 3.5-inch floppy disks in a plastic box, a pair of big headphones, a small sound sampler, a MIDI keyboard, a lava lamp, a red-and-white checkered bouncing ball toy on the shelf, copper-bar rainbow light gradients reflected on the wall. Palette of deep blue, orange, white and black with rainbow copper stripes. Cool, rad, creative. Seen straight on from across the room, the computer and its glowing monitor large and centred, the floor flat and level across the bottom fifth of the frame."""
+
+# ---------------------------------------------------------------------------
+# The LÖVE client's catch-up round (2026-10-23). bg_flat, bg_night and
+# sprite_clerk replace the magenta-screen JPEG placeholders in love2d/assets/
+# (art/ wins over them in love2d/src/assets.lua). The three ui_* frames are
+# drawn nine-slice by love2d/src/artframe.lua, so each asks for a border of
+# even width with nothing in the middle of an edge and a flat, blank face.
+
+[[asset]]
+name = "ui_quiz_card"
+kind = "sprite"
+aspect = "4:3"
+size = [192, 144]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art user interface quiz card frame, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A single rectangular game dialogue box seen perfectly flat-on and square to the frame, filling almost the whole image: a thick dark ink-black outer outline, a bright gold bevelled border band of even width on all four sides, a small round gold rivet in each of the four corners, and a flat plain deep midnight navy blue face filling the whole middle that is completely blank, evenly coloured and empty with absolutely nothing on it. The border is the same thickness on every side and has no ornament in the middle of any edge, so it can be stretched. Just the box and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "ui_quiz_choice"
+kind = "sprite"
+aspect = "16:9"
+size = [256, 64]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art user interface answer button, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A single LONG THIN horizontal rounded-corner game button seen perfectly flat-on, four times as wide as it is tall, spanning almost the full width of the image: a thick dark ink-black outline, a teal and cyan bevelled border band of even width all the way round with a lighter top edge and a darker bottom edge, and a flat plain dark slate blue face filling the middle that is completely blank, evenly coloured and empty with absolutely nothing on it. No icon, no arrow, no ornament in the middle of any edge, so it can be stretched. Just the button and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_flat"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background in the style of Super Mario World and Wonder Boy in Monster World: SATURATED colours, high contrast. A quiet Causeway Bay, Hong Kong tenement ROOFTOP at golden late afternoon: rooftop water tanks on steel legs, a laundry line with shirts, potted plants and a folding stool, a low parapet wall, a tangle of TV aerials, and behind it a calm skyline of coral, mint and cream tower blocks under a clear deep cobalt sky with a few chunky white clouds. Uncluttered and calm, with lots of quiet sky in the upper half so text can sit over it. The rooftop floor is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines on every object, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere — every sign and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_night"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background in the style of Super Mario World and Wonder Boy in Monster World: SATURATED colours, high contrast. Causeway Bay, Hong Kong at 23:00 on a weeknight, seen from the pavement: a deep indigo night sky, tenement blocks with warm yellow lit windows, blank glowing vertical shop sign panels in red, jade green, cyan and amber jutting over the street, a closed roller shutter, a lit convenience store front glowing warm white, a parked green and cream minibus, puddles reflecting the signs, overhead tram wires. Moody but colourful, with dark calm areas so text can sit over it. The pavement is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines on every object, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere — every sign and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "sprite_clerk"
+kind = "sprite"
+aspect = "1:1"
+size = [128, 128]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art character sprite, full body, standing, facing the viewer, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A friendly Hong Kong convenience store night-shift clerk, a young man with short black hair and round glasses, wearing a green and orange striped shop uniform polo shirt with a blank name badge, dark trousers and white sneakers, one hand raised in a cheerful wave, the other holding a paper cup of milk tea. Chibi proportions with a big head, like a Super Mario RPG townsperson. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_stats"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-10-23"
+rerolls = 1
+note = "First roll put little Mario-like figurines on the trophy shelf. The reroll names trophies and medals only and forbids figures."
+prompt = """\
+16-bit SNES pixel art painted background in the style of Super Mario World and Wonder Boy in Monster World: SATURATED colours, high contrast, warm lamp light. Inside Mei's tiny Hong Kong flat at night, a cosy study wall seen straight on: a big cork pinboard covered in blank index cards, blank certificates and string, a wooden shelf holding only small gold trophy cups, gold medals hanging on coloured ribbons, NO figurines, NO toys, NO characters and NO people anywhere in the picture, a wall calendar with every page blank, a desk lamp glowing amber, a window at the side showing a blue night skyline with lit windows. Calm, with the middle of the wall uncluttered enough for text to sit over it. The wooden floor is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines on every object, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere — every sign and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "bg_stats_p"
+kind = "bg"
+aspect = "2:3"
+size = [768, 1152]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background, TALL PORTRAIT composition, in the style of Super Mario World and Wonder Boy in Monster World: SATURATED colours, high contrast, warm lamp light. Inside Mei's tiny Hong Kong flat at night, a tall study wall seen straight on: a tall cork pinboard covered in blank index cards and blank certificates joined by string, a wooden shelf of small gold trophies, medals hanging on ribbons, a wall calendar with every page blank, a desk lamp glowing amber, a narrow window showing a blue night skyline with lit windows at the top. Calm, with the middle of the wall uncluttered enough for text to sit over it. The wooden floor is flat and level and runs unbroken across the bottom fifth of the frame. Chunky hard-edged pixels, heavy dithering, strong dark outlines on every object, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradients, no drop shadow, no bevel. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere — every sign and screen is completely blank. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "ui_plaque"
+kind = "sprite"
+aspect = "16:9"
+size = [384, 96]
+generated = "2026-10-23"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art user interface title signboard, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A single WIDE SHORT horizontal Hong Kong shop sign board seen perfectly flat-on, four times as wide as it is tall, spanning almost the full width of the image: a thick dark ink-black outline, a carved dark red lacquered wooden frame with a thin gold inner trim of even width on all four sides, a small gold stud at each of the four corners, and a flat plain dark brown wooden face filling the whole middle that is completely blank, evenly coloured and empty with absolutely nothing on it. No ornament in the middle of any edge, so it can be stretched. Just the sign board and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""

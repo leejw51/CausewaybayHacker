@@ -19,29 +19,29 @@
 --
 -- ## Seven panels, not the browser's eight
 --
--- The browser gives the SKYNET sentences a panel of their own over
--- `bg_datacentre`. This client does not, for two reasons:
+-- The browser gives the SKYNET sentences a panel of their own over the
+-- machine room. This client does not, for two reasons:
 --
---   * `bg_datacentre` is **where the ending happens** (`docs/story.md` §6 —
---     the rack in the basement of the Chow Yei Ching Building). Showing it in
---     the first two minutes spends the one room the last screen has.
---   * The brief's seven paintings are the opening's own art, and the SKYNET
+--   * that room is **where the ending happens** (`docs/story.md` §6).
+--     Showing it in the first two minutes spends the one room the last
+--     screen has;
+--   * the brief's seven paintings are the opening's own art, and the SKYNET
 --     lines are *about* the street the `open_tills` panel is looking down.
 --
 -- So the tills panel turns cold halfway through instead: `cold_from` is the
--- line the type changes colour on, the panel's spine goes cyan with it, and
+-- line the type changes colour on, the card's spine goes blue with it, and
 -- the sting fires on that character. The beat is still the beat; it is one
 -- shot instead of two.
 --
--- ## The caption box grows upward from a fixed foot
+-- ## The look (`docs/love2d-ui.md`)
 --
--- Every one of the fourteen `open_*` panels was composed with its **lower
--- fifth left quiet** — plain floor, plain ground, plain shadow — so a caption
--- has somewhere to live in both orientations without covering the picture. A
--- box measured down from a fraction of the height drifts out of that band as
--- the canvas grows; a box that grows upward from a fixed foot stays in it.
--- The foot is measured off `UI.footerHeight()`, so the panel cannot end up
--- underneath the status strip at the larger type steps.
+-- The painting is **contained**, never cropped: a felt letterbox rather
+-- than a laptop screen cut in half. The caption is a card, centred and at
+-- most 880 wide, in the reading face, with the beat's colour as its spine,
+-- the page dots inside it and a keycap saying how to skip. It grows upward
+-- from a fixed foot above the footer — every one of the fourteen `open_*`
+-- panels was composed with its lower fifth left quiet, and a card that
+-- grows up from a fixed foot stays in that band.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -51,6 +51,8 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Store = require("src.store")
 local Ease = require("src.ease")
+local Anim = require("src.anim")
+local Juice = require("src.juice")
 
 local Story = {}
 Story.__index = Story
@@ -142,6 +144,8 @@ function Story.new(app)
     ticked = 0,
     leaving = false,
     replay = false,
+    -- No header: the toast dock sits at the top edge.
+    header_h = 0,
   }, Story)
 end
 
@@ -151,6 +155,7 @@ function Story:enter(params)
   -- a replay is not the first time, so the flag is already set.
   self.replay = (params or {}).replay == true
   self.list = beats()
+  Juice.forget("story:")
 end
 
 --- Out, now, whatever is on screen.
@@ -170,7 +175,7 @@ function Story:beat()
   return self.list and self.list[self.i] or nil
 end
 
---- The beat's text, wrapped to the panel, as one flat list of lines, each
+--- The beat's text, wrapped to the card, as one flat list of lines, each
 --- carrying the colour it is set in and its own **characters**.
 ---
 --- Characters, not bytes, and that is not a detail:
@@ -186,10 +191,11 @@ end
 ---     every language it is told in.
 function Story:lines_for(beat)
   local _, _, inner = self:panel_rect(true)
+  local font = UI.readFont()
   local out = {}
   for index, line in ipairs(beat.lines) do
     local cold = beat.cold_from ~= nil and index >= beat.cold_from
-    for _, wrapped in ipairs(UI.wrap(line, inner, 8)) do
+    for _, wrapped in ipairs(UI.wrapWith(line, inner, font)) do
       local chars = UI.chars(wrapped)
       out[#out + 1] = { text = wrapped, chars = chars, n = #chars, cold = cold }
     end
@@ -253,28 +259,28 @@ function Story:next()
   self.ticked = 0
 end
 
---- How far apart two lines of the caption sit.
----
---- `UI.lineHeight(8)` on its own is 16 px at the first type step, which is
---- exactly the height of the glyphs — so two lines of prose touch. Four
---- pixels of leading is the difference between a paragraph and a wall.
+--- How far apart two lines of the caption sit: the reading face's lead.
 function Story.leading()
-  return UI.lineHeight(8) + 4
+  local _, lead = UI.readHeight("x", 100)
+  return lead
 end
 
---- The caption box: x, y, inner width, height. `measuring` skips the line
---- count, which is what `lines_for` needs to avoid asking itself.
+--- The caption card: x, y, inner width, height, width. `measuring` skips
+--- the line count, which is what `lines_for` needs to avoid asking itself.
 function Story:panel_rect(measuring)
   local vw, vh = Layout.vw, Layout.vh
-  local w = math.min(vw - 40, 980)
+  local g = Layout.gutter()
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  local w = math.min(vw - g * 2, 880)
   local x = math.floor((vw - w) / 2)
-  local inner = w - 28
-  if measuring then return x, 0, inner, 0 end
+  local inner = w - Theme.landStripeH - pad * 2
+  if measuring then return x, 0, inner, 0, w end
   local beat = self:beat()
   local rows = beat and #self:lines_for(beat) or 0
-  local h = math.max(56, rows * Story.leading() + 26)
-  -- Above the status strip, whatever the type step has done to its height.
-  local foot = vh - UI.footerHeight() - 26
+  -- The rows, then the dots and the keycap on one line under them.
+  local h = pad + math.max(1, rows) * Story.leading() + Theme.space.md + Theme.control.keycap + pad
+  -- Above the footer, whatever the type step has done to the card.
+  local foot = vh - UI.footerHeight() - Theme.space.xl
   return x, foot - h, inner, h, w
 end
 
@@ -285,16 +291,33 @@ function Story:bg_name(name)
   return name
 end
 
+--- The painting, contained in the canvas with felt bars rather than cropped
+--- to it. Returns false when there is no such painting.
+local function contain(name, vw, vh, alpha)
+  local image = Assets.image(name)
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local s = math.min(vw / iw, vh / ih)
+  local w, h = iw * s, ih * s
+  -- A cover of a rect that already has the painting's aspect is a contain,
+  -- and it carries the alpha the cross-fade needs.
+  return Assets.cover(name, math.floor((vw - w) / 2), math.floor((vh - h) / 2), math.ceil(w), math.ceil(h), nil, alpha)
+end
+
 function Story:draw()
   local vw, vh = Layout.vw, Layout.vh
   local beat = self:beat()
   local prev = self.i > 1 and self.list[self.i - 1] or nil
   local cut = math.min(1, self.beat_t / CUT)
 
+  UI.setColor(Theme.felt)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
   if beat then
     -- The outgoing painting stays until the incoming one has covered it, so
     -- there is never a frame of nothing between two beats.
-    if prev and cut < 1 then Assets.cover(self:bg_name(prev.bg), 0, 0, vw, vh) end
+    if prev and cut < 1 then contain(self:bg_name(prev.bg), vw, vh) end
     if beat.cut == "iris" and cut < 1 then
       -- A stencil rather than a shader, the same call the map's iris makes:
       -- a shader is another thing to fail on somebody's driver.
@@ -304,40 +327,35 @@ function Story:draw()
         love.graphics.circle("fill", vw / 2, vh * 0.42, r, 64)
       end, "replace", 1)
       love.graphics.setStencilTest("equal", 1)
-      Assets.cover(self:bg_name(beat.bg), 0, 0, vw, vh)
+      contain(self:bg_name(beat.bg), vw, vh)
       love.graphics.setStencilTest()
       if r > 2 then
-        UI.setColor(Theme.coin, 0.4)
+        UI.setColor(Theme.gold, 0.4)
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", vw / 2, vh * 0.42, r, 64)
         love.graphics.setColor(1, 1, 1, 1)
       end
     else
-      Assets.cover(self:bg_name(beat.bg), 0, 0, vw, vh,
-        nil, beat.cut == "fade" and Ease.cosineOut(cut) or 1)
+      contain(self:bg_name(beat.bg), vw, vh, beat.cut == "fade" and Ease.cosineOut(cut) or 1)
     end
   else
     Assets.cover(Layout.isPortrait() and "title_bg_p" or "title_bg", 0, 0, vw, vh)
-    UI.setColor(Theme.void, 0.6)
+    UI.setColor(Theme.felt, 0.6)
     love.graphics.rectangle("fill", 0, 0, vw, vh)
     love.graphics.setColor(1, 1, 1, 1)
   end
 
-  -- A veil into the lower half, so type over a bright morning street is type
-  -- on something rather than type in front of something. A light one: the
-  -- panels were composed with a quiet lower fifth, so it only has to take the
-  -- edge off — anything heavier and the art made for this sequence is behind
-  -- a curtain.
+  -- A veil into the lower half, so a card over a bright morning street sits
+  -- on something rather than in front of something. A light one: the
+  -- panels were composed with a quiet lower fifth, so it only has to take
+  -- the edge off. Banded rather than smooth — LÖVE has no gradient
+  -- primitive — with a curve steep at the bottom and nearly nothing at the
+  -- top, so the first band cannot be seen arriving.
   local band = math.floor(vh * 0.58)
   local steps = 28
   local top = vh - band
   for i = 0, steps - 1 do
-    -- Banded rather than smooth: LÖVE has no gradient primitive, and
-    -- twenty-eight steps over pixel art is a gradient. The curve is steep at
-    -- the bottom and nearly nothing at the top, so the first band cannot be
-    -- seen arriving — a veil whose leading edge is a visible line across the
-    -- painting is worse than no veil.
-    UI.setColor(Theme.void, 0.72 * ((i + 1) / steps) ^ 2.2)
+    UI.setColor(Theme.felt, 0.72 * ((i + 1) / steps) ^ 2.2)
     love.graphics.rectangle("fill", 0, top + band * i / steps,
       vw, math.ceil(band / steps) + 1)
   end
@@ -348,81 +366,99 @@ function Story:draw()
   else
     self:draw_logo()
   end
-  self:draw_pips()
 
-  self.app:footer(I18n.t("ANY KEY  SKIP"))
+  self.app:footer({ { key = "SPACE", verb = I18n.t("skip") } })
 end
 
+--- The caption card: the typed lines, the page dots and the skip keycap.
 function Story:draw_panel(beat, cut)
   local x, y, inner, h, w = self:panel_rect()
   local lines = self:lines_for(beat)
   local lh = Story.leading()
-  -- The plate arrives with the cut rather than after it, so the beat is one
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  -- The card arrives with the cut rather than after it, so the beat is one
   -- movement instead of a picture and then a box.
   local k = Ease.cosineOut(cut)
+  local cold = beat.cold_from ~= nil and self.stung
+  local spine = cold and Theme.blue or Theme.gold
 
   love.graphics.push()
   love.graphics.translate(0, (1 - k) * 18)
-  UI.setColor(Theme.ink, 0.82 * k)
-  love.graphics.rectangle("fill", x, y, w, h)
-  -- The spine says which half of the beat is speaking: gold while it is the
-  -- street, cyan once it is the thing that took the street.
-  local cold = beat.cold_from ~= nil and self.stung
-  UI.setColor(cold and Theme.cyan or Theme.coin, k)
-  love.graphics.rectangle("fill", x, y, 4, h)
-  love.graphics.setColor(1, 1, 1, 1)
-
+  UI.card(x, y, w, h, { stripe = spine, alpha = k, pad = 0 })
+  local font = UI.readFont()
+  love.graphics.setFont(font)
+  local tx = x + Theme.landStripeH + pad
   local left = math.floor(self.typed)
-  local ly = y + 13
+  local ly = y + pad
   for _, line in ipairs(lines) do
     local take = math.max(0, math.min(line.n, left))
     -- Whole characters only — see `lines_for`.
     local shown = take > 0 and table.concat(line.chars, "", 1, take) or ""
     left = left - line.n - 1
-    local colour = line.cold and Theme.cyan or Theme.cream
+    local colour = line.cold and Theme.blue or Theme.text
+    local gy = ly + math.floor((lh - font:getHeight()) / 2)
     if shown ~= "" then
-      UI.text(shown, x + 14, ly, 8, Theme.withAlpha(colour, k))
+      UI.setColor(colour, k)
+      love.graphics.print(shown, tx, gy)
     end
     -- The caret sits at the end of whatever is being typed right now, and
     -- blinks on the beat clock — never on `os.time()`, or a captured frame
     -- would differ from run to run.
     if take > 0 and take < line.n and math.floor(self.beat_t * 3) % 2 == 0 then
       UI.setColor(colour, k)
-      love.graphics.rectangle("fill", x + 14 + UI.textWidth(shown, 8), ly + 2,
-        7, UI.lineHeight(8) - 4)
-      love.graphics.setColor(1, 1, 1, 1)
+      love.graphics.rectangle("fill", tx + font:getWidth(shown) + 1, gy + 2, 2, font:getHeight() - 4)
     end
+    love.graphics.setColor(1, 1, 1, 1)
     ly = ly + lh
   end
+
+  -- Under the lines: where you are in seven beats on the left — a sequence
+  -- with no visible end is a sequence people skip on principle — and how
+  -- to skip it on the right.
+  local row = y + h - pad - Theme.control.keycap
+  self:draw_pips(tx, row + math.floor((Theme.control.keycap - 6) / 2), k)
+  local verb = I18n.t("skip")
+  local kw = UI.keycapWidth("SPACE")
+  local vw_ = UI.labelWidth(verb, "label")
+  local kx = x + w - pad - vw_ - Theme.space.sm - kw
+  UI.keycap(kx, row, "SPACE", { alpha = k })
+  UI.label(verb, kx + kw + Theme.space.sm, row + math.floor((Theme.control.keycap - 3 - UI.lead("label")) / 2), "label",
+    { color = Theme.mute, alpha = k })
   love.graphics.pop()
 end
 
+--- The closing card: the name, as the title card sets it.
 function Story:draw_logo()
   local vw, vh = Layout.vw, Layout.vh
   local k = Ease.cosineOut(math.min(1, self.beat_t / CUT))
-  local title = 28
-  while title > 8 and UI.textWidth("CAUSEWAYBAY", title) > vw - 40 do title = title - 4 end
-  local line = UI.lineHeight(title)
+  local first, second = I18n.t("CAUSEWAYBAY"), I18n.t("HACKER")
+  local px = 48
+  while px > 16 and UI.logoFont(px):getWidth(first) > vw - 48 do px = px - 8 end
+  local font = UI.logoFont(px)
+  local gap = Theme.space.md
   local y = vh * 0.32 + (1 - k) * 20
-  UI.text(I18n.t("CAUSEWAYBAY"), 0, y, title, Theme.withAlpha(Theme.coin, k), "center", vw)
-  UI.text(I18n.t("HACKER"), 0, y + line * 1.4, title,
-    Theme.withAlpha(Theme.land.rust, k), "center", vw)
+  love.graphics.setFont(font)
+  local function line(text, ly, color)
+    UI.setColor(Theme.edge, 0.9 * k)
+    love.graphics.printf(text, 4, ly + 4, vw, "center")
+    UI.setColor(color, k)
+    love.graphics.printf(text, 0, ly, vw, "center")
+  end
+  line(first, y, Theme.gold)
+  line(second, y + font:getHeight() + gap, Theme.land.rust)
+  love.graphics.setColor(1, 1, 1, 1)
   local pulse = 0.45 + 0.55 * Ease.cosine((self.t * 1.4) % 1)
-  UI.text(I18n.t("PRESS ANY KEY"), 0, vh * 0.58, 10,
-    Theme.withAlpha(Theme.coin, pulse), "center", vw)
+  UI.label(I18n.t("PRESS ANY KEY"), 0, math.floor(vh * 0.58), "title",
+    { width = vw, align = "center", color = Theme.gold, alpha = pulse * k })
 end
 
---- Where you are in seven beats. A sequence with no visible end is a sequence
---- people skip on principle.
-function Story:draw_pips()
-  local vw, vh = Layout.vw, Layout.vh
+--- The page dots, at `(x, y)`: the current beat gold, the rest mute.
+function Story:draw_pips(x, y, alpha)
   local total = Story.BEATS + 1
   local pw, gap = 10, 6
-  local x = math.floor((vw - (total * pw + (total - 1) * gap)) / 2)
-  local y = vh - UI.footerHeight() - 14
   for i = 1, total do
-    UI.setColor(i == self.i and Theme.coin or Theme.withAlpha(Theme.dim, 0.7))
-    love.graphics.rectangle("fill", x + (i - 1) * (pw + gap), y, pw, 4)
+    UI.setColor(i == self.i and Theme.gold or Theme.withAlpha(Theme.mute, 0.6), alpha)
+    UI.rrect("fill", x + (i - 1) * (pw + gap), y, pw, 6, 3)
   end
   love.graphics.setColor(1, 1, 1, 1)
 end

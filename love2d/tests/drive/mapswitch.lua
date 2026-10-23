@@ -162,9 +162,18 @@ add({ until_ = function(app)
     end, note = "the map remembered where it was left", timeout = 10 })
 add({ shot = "M5-back-at-start.png" })
 
--- And Q wraps: basic -> advanced -> hacker -> the first road, one press
--- each, never past the end.
-for _, want in ipairs({ "advanced", "hacker", Land.roads("rust")[1] }) do
+-- And Q wraps: from basic, every road RUST has after it in turn (advanced,
+-- hacker, frameworks), then the first road, one press each, never past the
+-- end. Taken from `Land.roads` rather than written out, so a road added to
+-- RUST (FRAMEWORKS was) is one more press here and not a stale list.
+local q_roads = {}
+do
+  local roads = Land.roads("rust")
+  local at
+  for i, road in ipairs(roads) do if road == "basic" then at = i end end
+  for k = 1, #roads - at + 1 do q_roads[k] = roads[(at + k - 1) % #roads + 1] end
+end
+for _, want in ipairs(q_roads) do
   add({ key = "q" })
   add({ until_ = loaded, timeout = 12 })
   add({ until_ = function(app)

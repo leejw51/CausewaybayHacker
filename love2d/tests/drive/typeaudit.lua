@@ -3,6 +3,7 @@
 --   make -C love2d drive SCRIPT=tests/drive/typeaudit.lua
 --   make -C love2d drive SCRIPT=tests/drive/typeaudit.lua ARGS="--home $(mktemp -d)"
 --   LANG_CODE=ja make -C love2d drive SCRIPT=tests/drive/typeaudit.lua
+--   LANG_CODE=ko UI_FACE=dunggeunmo CODE_FACE=apple2 make -C love2d drive …
 --
 -- `typesize.lua` already watches the **canvas** edge, and that is the loudest
 -- fault and not the common one. Type that is too big for its panel does not
@@ -30,6 +31,15 @@
 -- published test vector, so it needs the server.
 
 local WANT = os.getenv("LANG_CODE") or "ko"
+
+-- The interface face and the code face, the same way: one per run, named by
+-- the web's ids (`Assets.UI_FACES`, `Assets.CODE_FACES`). A face set larger
+-- than Press Start 2P to keep a label's height (DOS and 둥근모 at 1.25×) is
+-- exactly the kind of change that cuts a string its box was sized for.
+-- Set for this run only and not saved, so an audit does not change what the
+-- player sees next launch.
+local FACE = os.getenv("UI_FACE")
+local CODE = os.getenv("CODE_FACE")
 
 local MNEMONIC = "legal winner thank year wave sausage worth useful legal winner "
   .. "thank yellow"
@@ -163,6 +173,10 @@ add({ until_ = function(app) return app.scene_name == "login" or app.session.aut
 add({ until_ = function(app)
       app:set_lang(WANT)
       print("language: " .. require("src.i18n").name())
+      local Assets = require("src.assets")
+      if FACE then Assets.setUiFace(FACE) end
+      if CODE then Assets.setCodeFace(CODE) end
+      print(("faces: interface %s, code %s"):format(Assets.uiFace(), Assets.codeFace()))
       return true
     end, timeout = 5 })
 add({ until_ = here("login"), when = scene("login"), timeout = 5 })
@@ -246,7 +260,9 @@ add({ until_ = function()
       for _, r in pairs(bad) do rows[#rows + 1] = r end
       table.sort(rows, function(a, b) return a.by > b.by end)
       print("")
-      print(("== %s: %d draws measured, %d that did not fit =="):format(WANT, drawn, #rows))
+      local Assets = require("src.assets")
+      print(("== %s, %s face: %d draws measured, %d that did not fit =="):format(
+        WANT, Assets.uiFace(), drawn, #rows))
       for _, r in ipairs(rows) do
         print(("  %-4s %-22s %3dpx  by %5.1fpx  %s"):format(
           r.kind, r.tag, r.size or 0, r.by, r.text))

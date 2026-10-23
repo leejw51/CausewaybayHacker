@@ -253,14 +253,18 @@ add({ until_ = function(app)
     end, note = "the face changed the glyphs", timeout = 5 })
 add({ shot = "PA-code-face.png" })
 -- Back to the default face, so the shots below are the usual screen: the
--- third click closes the three-face cycle, and that it did is asserted
--- rather than assumed.
-add({ click = function(app) local r = pg(app).big_rects.face
-      return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ wait = 0.4 })
+-- clicks that are left close the cycle, however many faces it has (three,
+-- and then six with the old computers' faces), and that they did is
+-- asserted rather than assumed.
+local face_count = #require("src.assets").CODE_FACES
+for _ = 3, face_count do
+  add({ click = function(app) local r = pg(app).big_rects.face
+        return { r.x + r.w / 2, r.y + r.h / 2 } end })
+  add({ wait = 0.3 })
+end
 add({ until_ = function(app)
       check(require("src.assets").codeFace() == "iosevka",
-        "three clicks did not bring the face back round to iosevka")
+        face_count .. " clicks did not bring the face back round to iosevka")
       return true
     end, timeout = 5 })
 

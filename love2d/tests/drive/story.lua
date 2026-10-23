@@ -122,7 +122,10 @@ add({ click = function(app)
       local b, v = s.story_button, s.view
       assert(b, "no STORY button was drawn")
       assert(v, "the login panel drew no view to scroll")
-      return { v.x + b.w / 2, v.y + b.y + b.h / 2 - (s.scroll or 0) }
+      -- Through the screen's own mapping of a hit rect: the button is
+      -- right-aligned in its row now, so its `x` is not the view's.
+      local r = s:screen_rect(b)
+      return { r.x + r.w / 2, r.y + r.h / 2 }
     end, when = function() return first_run end })
 add({ until_ = scene("story"), note = "the replay", timeout = 5,
       when = function() return first_run end })

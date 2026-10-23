@@ -448,6 +448,11 @@ function Session:apply_xp(xp)
   if type(xp) ~= "table" or not self.user then return end
   if xp.total then self.user.xp = xp.total end
   if xp.level then self.user.level = xp.level end
+  -- The level's own pair moves with the grant, or goes: `App.xp_fraction`
+  -- prefers `xp_into_level` to the curve, and the sign-in's 0 left on the
+  -- record drew an empty bar under a footer that said 50 XP.
+  self.user.xp_into_level = xp.into_level
+  self.user.xp_for_next = xp.for_next
 end
 
 --- "LV 3 · 425 XP" for the header, or nil when the server has not said.

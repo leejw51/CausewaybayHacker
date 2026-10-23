@@ -7,16 +7,33 @@
 --
 -- The mistakes list is the point of the whole game (SPEC §7): the compiler's
 -- own error identity, kept, so `stats.mistakes` has something to count.
+--
+-- ## The screen (docs/love2d-ui.md, the spec's §3.7)
+--
+-- One content-sized card, centred in the bounded width and in the height:
+-- the verdict in the display role (on the ribbon art for a win), the quest's
+-- title, three stars that pop in one by one, the XP counting up with the
+-- level bar filling after it, one line of figures, the line that was picked
+-- in a code well, and NEXT / RETRY / MAP as primary / secondary / ghost. A
+-- failed verdict wears a red rule and opens WHAT WENT WRONG and the failing
+-- case in place. The attempt id and the rest of the cases are behind
+-- DETAILS. Confetti rains from the card's top edge on a clear.
+--
+-- Every entrance is `Juice` keyed state, forgotten on `enter`, so it does
+-- not depend on a wall-clock delta that a fullscreen round trip or a frozen
+-- animation clock can leave behind (the QA run saw the old banner stuck off
+-- the top once).
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
 local Assets = require("src.assets")
 local UI = require("src.ui")
 local I18n = require("src.i18n")
-local Ease = require("src.ease")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
-local Celebrate = require("src.celebrate")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
+local SFX = require("src.sfx")
 
 local Result = {}
 Result.__index = Result
@@ -31,8 +48,13 @@ local VERDICT_LABEL = {
   internal_error = "INTERNAL ERROR",
 }
 
+--- When each star pops, seconds after the card lands, and the gap between.
+Result.STAR_AT = 0.3
+Result.STAR_GAP = 0.14
+
 function Result.new(app)
-  return setmetatable({ app = app, t = 0, scroll = 0 }, Result)
+  return setmetatable({ app = app, t = 0, scroll = 0, details = false, header_h = 0,
+    buttons = {}, star_heard = {} }, Result)
 end
 
 function Result:enter(params)
@@ -41,13 +63,21 @@ function Result:enter(params)
   self.xp = params.xp
   self.quest = params.quest
   self.log = params.log
+  self.source = params.source
   self.t = 0
+  self.scroll = 0
+  self.details = false
+  self.hover = nil
   self.started = Anim.now()
-  -- The clear's light: planned on the frame the stamp lands, so the fanfare
+  -- The clear's light: planned on the frame the card lands, so the fanfare
   -- never plays before the thing it celebrates arrives.
-  self.fx = nil
   self.fx_at = nil
+  self.star_heard = {}
   self.next_id = nil
+  -- No toast on the verdict: the CLEARED award used to land on the buttons.
+  UI.clearToasts()
+  Juice.forget("result:")
+  Juice.counter("result:xp", 0)
   self:find_next()
 end
 
@@ -78,45 +108,34 @@ function Result:find_next()
     end)
 end
 
---- RETRY, NEXT and MAP — the three ways off this screen, each with its key
---- printed on it. NEXT is lit after an acceptance, RETRY after anything
---- else, and NEXT is absent on the last node of a map.
+--- The three ways off this screen, in order, each with its key and its
+--- variant — NEXT / MAP / RETRY as primary / secondary / ghost after an
+--- acceptance with somewhere to go (the next quest is the forward action);
+--- RETRY / MAP / NEXT otherwise. NEXT is absent on the last node.
 ---
---- Laid into rows of `width`: at the largest type step three labels are
---- wider than a portrait panel, and a button that did not fit used to be a
---- button that was not drawn. The label size steps down to 7 first; what
---- still does not fit on one row starts another.
-function Result:button_rows(width, accepted)
-  local wanted = {
-    { id = "retry", label = "RETRY  [ENTER]", state = accepted and "normal" or "hot",
-      act = function() self:retry() end },
-  }
-  if self.next_id then
-    wanted[#wanted + 1] = { id = "next", label = "NEXT  [N]",
-      state = accepted and "hot" or "normal", act = function() self:next_quest() end }
+--- Pure, so a test can hold the rule without a window.
+function Result.button_specs(accepted, has_next)
+  local out = {}
+  local next_ = { id = "next", label = "NEXT", key = "N" }
+  local retry = { id = "retry", label = "RETRY", key = "ENTER" }
+  local map = { id = "map", label = "MAP", key = "ESC", variant = "secondary" }
+  if accepted and has_next then
+    next_.variant, retry.variant = "primary", "ghost"
+    out[1], out[2], out[3] = next_, map, retry
+  else
+    retry.variant, next_.variant = "primary", "ghost"
+    out[1], out[2] = retry, map
+    if has_next then out[3] = next_ end
   end
-  wanted[#wanted + 1] = { id = "map", label = "MAP  [ESC]", state = "normal",
-    act = function() self.app:back() end }
+  return out
+end
 
-  local size = UI.CHIP_SIZE
-  while size > 7 do
-    local total = -10
-    for _, b in ipairs(wanted) do total = total + UI.textWidth(b.label, size) + 28 + 10 end
-    if total <= width then break end
-    size = size - 1
+--- Kept for callers: the specs above, as rows of one.
+function Result:button_rows(width, accepted)
+  local rows = {}
+  for _, b in ipairs(Result.button_specs(accepted, self.next_id ~= nil)) do
+    rows[#rows + 1] = { b }
   end
-  local rows, row, used = {}, {}, 0
-  for _, b in ipairs(wanted) do
-    b.size = size
-    b.w = math.min(width, UI.textWidth(b.label, size) + 28)
-    if #row > 0 and used + 10 + b.w > width then
-      rows[#rows + 1] = row
-      row, used = {}, 0
-    end
-    row[#row + 1] = b
-    used = used + (#row > 1 and 10 or 0) + b.w
-  end
-  if #row > 0 then rows[#rows + 1] = row end
   return rows
 end
 
@@ -125,7 +144,7 @@ function Result:retry()
   self.app:go("quest", { quest_id = self.attempt and self.attempt.quest_id or self.app.quest_id })
 end
 
---- NEXT: the node after this one, straight into its editor.
+--- NEXT: the node after this one, straight into its card.
 function Result:next_quest()
   if not self.next_id then return end
   self.app:go("quest", { quest_id = self.next_id })
@@ -140,6 +159,33 @@ function Result:update(dt)
   self.t = self.t + dt
 end
 
+--- A gold star, drawn, for a checkout without `fx_star`.
+local function star(cx, cy, r, colour, alpha)
+  UI.setColor(colour, alpha)
+  love.graphics.polygon("fill", cx, cy - r, cx + r / 2.6, cy - r / 3, cx + r, cy - r / 3,
+    cx + r / 2.2, cy + r / 5, cx + r / 1.6, cy + r, cx, cy + r / 2,
+    cx - r / 1.6, cy + r, cx - r / 2.2, cy + r / 5, cx - r, cy - r / 3, cx - r / 2.6, cy - r / 3)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- The source as rows for the well: the picked line, or the first lines
+--- of a program. Nil when there is nothing short enough to show.
+local function source_rows(source, font, inner)
+  if type(source) ~= "string" or source:match("^%s*$") then return nil end
+  local Quiz = require("src.quiz")
+  local measure = function(s) return font:getWidth(s) end
+  local rows = Quiz.code_wrap(source, inner, measure)
+  if #rows > 6 then
+    local cut = {}
+    for i = 1, 5 do cut[i] = rows[i] end
+    cut[6] = "⋮"
+    rows = cut
+  end
+  return rows
+end
+
+--- The whole card, measured and drawn in one pass per block kind, so the
+--- draw and the hit test read one arrangement.
 function Result:draw()
   local vw, vh = Layout.vw, Layout.vh
   -- The quest's own plate, dimmed (docs/art.md §5), so the result reads as
@@ -147,300 +193,332 @@ function Result:draw()
   local land = (self.quest and self.quest.land) or self.app.land or "rust"
   Assets.cover(require("src.scenes.quest").backdrop(land,
     (self.quest and self.quest.category) or self.app.category), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.82)
+  local portrait = Layout.isPortrait()
+  UI.setColor(Theme.felt, portrait and 0.84 or 0.78)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
 
+  local pad = portrait and Theme.space.lg or Theme.space.xl
+  local bx, by, bw, bh = UI.bounded(nil, Theme.space.lg, vh - UI.footerHeight() - Theme.space.lg)
   local a = self.attempt
+  self.buttons = {}
   if not a then
-    UI.text(I18n.t("no attempt"), 0, vh / 2, 12, Theme.dim, "center", vw)
-    self.app:footer(I18n.t("ESC map"))
+    local w = math.min(480, bw)
+    local x = bx + math.floor((bw - w) / 2)
+    local cx, cy, cw = UI.card(x, by + math.floor(bh / 2) - 40, w, pad * 2 + UI.lead("label"), { pad = pad })
+    UI.label(I18n.t("no attempt"), cx, cy, "label", { width = cw, align = "center", color = Theme.mute })
+    self.app:footer({ { key = "ESC", verb = I18n.t("map") } })
     return
   end
 
-    local accepted = a.verdict == "accepted"
+  local accepted = a.verdict == "accepted"
   -- A run should never reach this screen — `src/scenes/quest.lua` keeps them
   -- in place — but if one ever did, it must not be dressed as a verdict.
-  -- §4.9b: a run is for the player, a submit is for the record.
   local is_run = a.mode == "run"
-  local color = is_run and Theme.cyan or (Theme.verdict[a.verdict] or Theme.dim)
+  local colour = is_run and Theme.blue or (accepted and Theme.green or Theme.redA)
+  local word = is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or tostring(a.verdict):upper())
+  local gained = (self.xp and self.xp.gained) or 0
+  local show_stars = accepted and not is_run
+  local code_font = Assets.mono(Layout.codeSize(Theme.type.code))
+  local code_lh = code_font:getHeight()
 
-  -- The banner drops in (docs/art.md §7's clear sequence, in miniature), and
-  -- a verdict that is not an acceptance shakes as it lands. Small: this is
-  -- punctuation on a rejection, not a punishment, and the panel below it
-  -- holds still so the compiler's words stay readable.
-  local drop = Ease.expOut(math.min(1, self.t / 0.45))
-  -- The banner is as tall as its own word plus air: a hard 56 held an 18 px
-  -- label at the first type step and cut it at every step above.
-  local banner_h = math.max(56, UI.lineHeight(18) + 20)
-  -- It lands 16 px under the top edge, from fully above it.
-  local by = -banner_h + drop * (banner_h + 16)
-  local sx, sy = 0, 0
+  -- The card's width and its blocks, measured.
+  local w = math.min(portrait and bw or 640, bw)
+  local x = bx + math.floor((bw - w) / 2)
+  local cw = w - pad * 2
+  local inner_well = cw - Theme.space.sm * 2 - 6
+  local blocks = {}
+  local function add(kind, h, extra)
+    local b = extra or {}
+    b.kind, b.h = kind, h
+    blocks[#blocks + 1] = b
+  end
+  add("verdict", UI.lead("display") + (show_stars and Theme.space.sm or 0))
+  if self.quest and self.quest.title then add("title", UI.lead("title")) end
+  if show_stars then add("stars", 56) end
+  if gained > 0 then
+    add("xp", UI.lead("display") + Theme.space.sm + 8 + Theme.space.xs + UI.lead("label"))
+  elseif accepted and not is_run then
+    add("note", UI.readHeight(I18n.t("already cleared — stars keep the best run"), cw))
+  end
+  add("figures", UI.lead("label") * (Clock.verdict_note(a) and 2 or 1))
+  local rows = source_rows(self.source, code_font, inner_well)
+  if rows then add("well", #rows * code_lh + Theme.space.sm * 2, { rows = rows }) end
   if not accepted and not is_run then
-    sx, sy = Anim.shake(self:age(), { duration = 0.34, amount = 5 })
-  end
-  love.graphics.push()
-  love.graphics.translate(sx, sy)
-  UI.setColor(color, 0.92)
-  love.graphics.rectangle("fill", 0, by, vw, banner_h)
-  UI.setColor(Theme.ink)
-  love.graphics.setLineWidth(3)
-  love.graphics.rectangle("line", 0, by, vw, banner_h)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(is_run and "SAMPLE RUN" or (VERDICT_LABEL[a.verdict] or a.verdict:upper()),
-    0, by + math.floor((banner_h - UI.lineHeight(18)) / 2), 18, Theme.cream, "center", vw)
-  love.graphics.pop()
-
-  local pad = Layout.isPortrait() and 14 or 60
-  local x = pad
-  local y = by + banner_h + 20
-  local w = vw - pad * 2
-  -- Down to the footer, whatever the type step has made of its height, with
-  -- one caption's worth of room under the panel for the attempt id.
-  local foot = UI.footerHeight() + UI.lineHeight(7) + 12
-  UI.panel(x, y, w, vh - y - foot, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = color })
-  -- The buttons' rows, at the display controls' height, kept clear at the
-  -- bottom of the panel: the verdict scrolls, the way on does not. Laid out
-  -- first, because how many rows they need decides where the verdict ends.
-  local bh = UI.chipHeight()
-  local rows = self:button_rows(w - 24, accepted)
-  local row_h = #rows * (bh + 8) + 12
-  love.graphics.setScissor(x + 4, y + 4, w - 8, vh - y - foot - 8 - row_h)
-  local cx = x + 16
-  local cy = y + 12 - self.scroll
-  local column = w - 32
-  local indent = column - 16
-
-  if self.quest then
-    cy = cy + UI.text(self.quest.title or "", cx, cy, 12, Theme.coin) + 6
-  end
-
-  cy = cy + UI.text(("TESTS  %d / %d"):format(a.tests_passed or 0, a.tests_total or 0),
-    cx, cy, 10, Theme.cream) + 6
-  -- §4.8b: whether the submit beat the clock. Recorded, never enforced —
-  -- the quest stayed open and a late clear still counts.
-  local timing = Clock.verdict_note(a)
-  if timing then
-    cy = cy + UI.text(timing, cx, cy, 9,
-      a.within_limit and Theme.admit or Theme.coin, "left", column) + 6
-  end
-
-  -- **Given the column, like everything else in this stack.** These three
-  -- were the only draws in the panel with no width, which means no wrap —
-  -- and this one is the longest line the screen has: `COMPILE 1595ms   RUN
-  -- 0ms   EXIT 1` ran a hundred pixels past the right edge of the *canvas*
-  -- in portrait, in all six languages. Not past the panel: past the window.
-  -- The other two are translated sentences, which is the same fault waiting
-  -- for a longer language.
-  cy = cy + UI.text(I18n.t("COMPILE %dms   RUN %dms   EXIT %s",
-    a.compile_ms or 0, a.run_ms or 0,
-    a.exit_code == nil and "-" or tostring(a.exit_code)), cx, cy, 8,
-    Theme.withAlpha(Theme.cream, 0.75), "left", column) + 10
-
-  -- SPEC §0: the node is stamped CLEARED, for good.
-  if is_run then
-    cy = cy + UI.text(I18n.t("a run never clears a node — SUBMIT does"), cx, cy, 8,
-      Theme.withAlpha(Theme.cyan, 0.9), "left", column) + 10
-  elseif a.cleared then
-    UI.setColor(Theme.admit, 0.25)
-    love.graphics.rectangle("fill", cx, cy, w - 32, 34)
-    -- **The beat.** `Anim.stamp` returns nil for the first fifth of a second
-    -- and then lands the word oversize and settles it. An instant stamp
-    -- reads as a state change; a held one reads as a verdict, which is what
-    -- it is.
-    local stamp_scale, stamp_alpha = Anim.stamp(self:age(), { hold = 0.26 })
-    if stamp_scale then
-      local label = "CLEARED"
-      local font_size = 12
-      local lw = UI.textWidth(label, font_size)
-      if not self.fx_at then
-        self.fx_at = self:age()
-        self.fx_x, self.fx_y = cx + 10 + lw / 2, cy + 17
-        if self.xp and (self.xp.gained or 0) > 0 then
-          self.fx = Celebrate.plan(self.fx_x, self.fx_y, math.min(vw, vh) * 0.42, 28)
-        end
+    if a.mistakes and #a.mistakes > 0 then
+      local h = UI.lead("label") + Theme.space.xs
+      for _, m in ipairs(a.mistakes) do
+        h = h + UI.lead("label") + UI.readHeight(m.message or "", cw, 4) + Theme.space.sm
       end
-      love.graphics.push()
-      love.graphics.translate(cx + 10 + lw / 2, cy + 17)
-      love.graphics.scale(stamp_scale, stamp_scale)
-      UI.text(label, -lw / 2, -7, font_size, Theme.withAlpha(Theme.admit, stamp_alpha))
-      love.graphics.pop()
-      if stamp_scale <= 1.2 then
-        UI.stars(cx + w - 32 - 3 * 15, cy + 9, a.stars or 0, 12)
-      end
+      add("mistakes", h)
     end
-    cy = cy + 42
-  elseif accepted then
-    cy = cy + UI.text(I18n.t("already cleared — stars keep the best run"), cx, cy, 8,
-      Theme.withAlpha(Theme.cream, 0.7)) + 10
-    -- Practice: the number and the coin, not the fireworks (§4.9 — a
-    -- re-clear pays a fifth of the clear, at most ten times).
-    if not self.fx_at and self.xp and (self.xp.gained or 0) > 0 and self:age() > 0.3 then
-      self.fx_at = self:age()
-      self.fx_x, self.fx_y = cx + (w - 32) / 2, cy + 8
-      self.fx = nil
-    end
-  end
-
-  if a.mistakes and #a.mistakes > 0 then
-    cy = cy + UI.text(I18n.t("WHAT WENT WRONG"), cx, cy, 9, Theme.red) + 6
-    for _, m in ipairs(a.mistakes) do
-      local head = ("%s%s"):format(m.kind, m.code and (" [" .. m.code .. "]") or "")
-      cy = cy + UI.text(head, cx, cy, 9, Theme.brick) + 3
-      for _, line in ipairs(UI.wrap(m.message or "", indent, 8)) do
-        cy = cy + UI.text("  " .. line, cx, cy, 8, Theme.cream) + 2
-      end
-      if m.line then
-        cy = cy + UI.text(("  line %d%s"):format(m.line, m.col and (":" .. m.col) or ""),
-          cx, cy, 7, Theme.withAlpha(Theme.cream, 0.6)) + 2
-      end
-      cy = cy + 6
-    end
-    cy = cy + 4
-  end
-
-  if a.cases and #a.cases > 0 then
-    cy = cy + UI.text(I18n.t("CASES"), cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
-    for _, case in ipairs(a.cases) do
-      local mark = case.passed and "PASS" or "FAIL"
-      cy = cy + UI.text(("%s  %s%s"):format(mark, case.name,
-        case.visible and "" or "  (hidden)"), cx, cy, 8,
-        case.passed and Theme.admit or Theme.red) + 3
+    for _, case in ipairs(a.cases or {}) do
       if case.visible and not case.passed then
-        for _, pair in ipairs({ { "want", case.expect }, { "got ", case.got } }) do
-          if pair[2] then
-            for _, line in ipairs(UI.wrap(pair[1] .. " " .. tostring(pair[2]):gsub("\n", "⏎"),
-              indent, 7)) do
-              cy = cy + UI.text("  " .. line, cx, cy, 7,
-                Theme.withAlpha(Theme.cream, 0.8)) + 2
-            end
-          end
+        local want = Assets.mono(Layout.codeSize(Theme.type.code))
+        local lines = 2 + select(2, tostring(case.expect or ""):gsub("\n", "")) + select(2, tostring(case.got or ""):gsub("\n", ""))
+        add("case", UI.lead("label") + Theme.space.xs + math.min(8, lines) * want:getHeight() + Theme.space.sm * 2, { case = case })
+        break
+      end
+    end
+  end
+  -- DETAILS: the attempt id, every case and the stderr, folded behind a
+  -- ghost button sized by the kit (a wide canvas sets it in a bigger face).
+  local details_w, details_h = UI.buttonSize(I18n.t("DETAILS"), { h = UI.lead("label") + Theme.space.sm, key = "D" })
+  local detail_h = details_h
+  if self.details then
+    detail_h = detail_h + Theme.space.xs + UI.lead("label")
+    for _ in ipairs(a.cases or {}) do detail_h = detail_h + UI.lead("label") end
+    if a.stderr and a.stderr ~= "" then
+      local n = select(2, (a.stderr .. "\n"):gsub("\n", ""))
+      detail_h = detail_h + Theme.space.sm + math.min(12, n) * code_lh + Theme.space.sm * 2
+    end
+  end
+  add("details", detail_h)
+
+  local specs = Result.button_specs(accepted, self.next_id ~= nil)
+  local buttons_h = portrait and (Theme.control.buttonL + Theme.rowGap + Theme.control.buttonM) or Theme.control.buttonL
+  local content = 0
+  for i, b in ipairs(blocks) do content = content + b.h + (i > 1 and Theme.space.lg or 0) end
+  local total = content + Theme.space.xl + buttons_h
+  local card_h = math.min(total + pad * 2, bh)
+  local y = by + math.floor(math.max(0, bh - card_h) / 2)
+
+  -- The card arrives from 24 below with a little overshoot.
+  local k = Juice.enter("result:card", { dur = 0.3, ease = "outBack" })
+  local alpha = math.min(1, k * 1.5)
+  y = y + math.floor((1 - k) * 24)
+  local cx, cy = UI.card(x, y, w, card_h, { strip = colour, pad = pad, alpha = alpha })
+  self.card = { x = x, y = y, w = w, h = card_h }
+
+  -- The scrolling part: everything above the buttons.
+  local room = card_h - pad * 2 - Theme.space.xl - buttons_h
+  local overflow = math.max(0, content - room)
+  self.scroll = math.max(0, math.min(self.scroll, overflow))
+  self.overflow = overflow
+  love.graphics.setScissor(x, cy - 2, w, room + 4)
+  local ly = cy - self.scroll
+  local landed = Juice.entered("result:card")
+  for i, b in ipairs(blocks) do
+    if i > 1 then ly = ly + Theme.space.lg end
+    if b.kind == "verdict" then
+      -- A win gets `art/fx_ribbon` behind its word, straddling the card's
+      -- top edge; a failure does not — a ribbon round WRONG ANSWER would be
+      -- celebrating it. The ribbon is cut to the word.
+      local ribbon = show_stars and Assets.image("fx_ribbon")
+      local tw = UI.labelWidth(word, "display")
+      if ribbon then
+        local box = Assets.box.fx_ribbon or { minx = 0, maxx = ribbon:getWidth() - 1 }
+        local ink_w = box.maxx - box.minx + 1
+        local ink_h = box.miny and (box.maxy - box.miny + 1) or ribbon:getHeight()
+        local rw = math.min(w + 32, tw / 0.6 + 48)
+        local sx = rw / ink_w
+        local sy = math.min(sx, (UI.lead("display") + 28) / ink_h)
+        local oy = box.miny and (box.miny + box.maxy + 1) / 2 or ribbon:getHeight() / 2
+        love.graphics.setColor(1, 1, 1, alpha)
+        love.graphics.draw(ribbon, x + w / 2, ly + UI.lead("display") / 2, 0, sx, sy,
+          (box.minx + box.maxx + 1) / 2, oy)
+        love.graphics.setColor(1, 1, 1, 1)
+      end
+      UI.label(word, cx, ly, "display", { width = cw, align = "center", ellipsis = true,
+        color = ribbon and Theme.edge or colour, alpha = alpha, shadow = not ribbon })
+    elseif b.kind == "title" then
+      UI.label(self.quest.title, cx, ly, "title", { width = cw, align = "center", ellipsis = true, alpha = alpha })
+    elseif b.kind == "stars" then
+      -- Three, popping in one by one once the card has landed, each with a
+      -- rising note; the ones not earned stay small and grey.
+      local size = 48
+      local gap = Theme.space.lg
+      local sx0 = cx + math.floor((cw - (3 * size + 2 * gap)) / 2) + size / 2
+      for s = 1, 3 do
+        local earned = s <= (a.stars or 0)
+        local ks = landed and Juice.enter("result:star" .. s,
+          { delay = Result.STAR_AT + (s - 1) * Result.STAR_GAP, dur = 0.22, ease = "outBack" }) or 0
+        if earned and ks > 0 and not self.star_heard[s] then
+          self.star_heard[s] = true
+          SFX.play("coin")
+          Fx.burst(sx0 + (s - 1) * (size + gap), ly + size / 2 + 4, "stars", { n = 0.5 })
+        end
+        local scale = earned and ks or 0.6
+        local sa = earned and ks or 0.25
+        local px, py = sx0 + (s - 1) * (size + gap), ly + size / 2 + 4
+        if scale > 0.01 and not Assets.marker("fx_star", px, py, size * scale, { alpha = sa * alpha }) then
+          star(px, py, size * scale / 2, Theme.gold, sa * alpha)
         end
       end
-      cy = cy + 4
+    elseif b.kind == "xp" then
+      -- "+50 XP" counts up after the stars; the level bar fills after it.
+      local ready = landed and (not show_stars or Juice.entered("result:star3"))
+      local shown, moving = Juice.counter("result:xp", ready and gained or 0, { dur = Theme.motion.count })
+      local label = (a.cleared or not accepted) and I18n.t("+%d XP", shown) or I18n.t("PRACTICE +%d XP", shown)
+      local pop = 1 + 0.08 * (moving and 1 or 0)
+      love.graphics.push()
+      love.graphics.translate(cx + cw / 2, ly + UI.lead("display") / 2)
+      love.graphics.scale(pop, pop)
+      love.graphics.translate(-(cx + cw / 2), -(ly + UI.lead("display") / 2))
+      UI.label(label, cx, ly, "display", { width = cw, align = "center", color = Theme.gold, alpha = alpha * (ready and 1 or 0.35) })
+      love.graphics.pop()
+      local bar_y = ly + UI.lead("display") + Theme.space.sm
+      local user = self.app.session and self.app.session.user
+      local frac = (ready and not moving) and require("src.app").xp_fraction(user) or 0
+      local fill = Juice.follow("result:bar", frac, { speed = 6 })
+      local bar_w = math.min(240, cw)
+      UI.bar(cx + math.floor((cw - bar_w) / 2), bar_y, bar_w, 8, fill, Theme.gold)
+      local lv = I18n.t("LV %d", (self.xp and self.xp.level) or (user and user.level) or 1)
+      if self.xp and self.xp.level_up then lv = I18n.t("LEVEL %d", self.xp.level or 1) end
+      UI.label(lv, cx, bar_y + 8 + Theme.space.xs, "label",
+        { width = cw, align = "center", color = (self.xp and self.xp.level_up) and Theme.pink or Theme.mute, alpha = alpha })
+    elseif b.kind == "note" then
+      UI.read(I18n.t("already cleared — stars keep the best run"), cx, ly, cw, { color = Theme.mute, align = "center" })
+    elseif b.kind == "figures" then
+      UI.label(I18n.t("TESTS %d / %d · COMPILE %dms · RUN %dms", a.tests_passed or 0, a.tests_total or 0,
+        a.compile_ms or 0, a.run_ms or 0), cx, ly, "label", { width = cw, align = "center", color = Theme.mute, ellipsis = true, alpha = alpha })
+      local timing = Clock.verdict_note(a)
+      if timing then
+        UI.label(timing, cx, ly + UI.lead("label"), "label",
+          { width = cw, align = "center", color = a.within_limit and Theme.green or Theme.gold, ellipsis = true, alpha = alpha })
+      end
+    elseif b.kind == "well" then
+      UI.card(cx, ly, cw, b.h, { variant = "well", pad = 0, alpha = alpha })
+      love.graphics.setFont(code_font)
+      local ty = ly + Theme.space.sm
+      for _, line in ipairs(b.rows) do
+        UI.setColor(line == "⋮" and Theme.mute or Theme.text, 0.92 * alpha)
+        love.graphics.print(line, cx + Theme.space.sm + 6, ty)
+        ty = ty + code_lh
+      end
+      love.graphics.setColor(1, 1, 1, 1)
+    elseif b.kind == "mistakes" then
+      local my = ly
+      my = my + UI.label(I18n.t("WHAT WENT WRONG"), cx, my, "label", { color = Theme.redA, caps = true }) + Theme.space.xs
+      for _, m in ipairs(a.mistakes) do
+        local head = ("%s%s%s"):format(m.kind or "", m.code and (" [" .. m.code .. "]") or "",
+          m.line and ("  · line " .. tostring(m.line)) or "")
+        my = my + UI.label(head, cx, my, "label", { width = cw, ellipsis = true, color = Theme.text })
+        my = my + UI.read(m.message or "", cx, my, cw, { maxLines = 4, color = Theme.text }) + Theme.space.sm
+      end
+    elseif b.kind == "case" then
+      local case = b.case
+      local my = ly
+      my = my + UI.label(("FAIL  %s"):format(tostring(case.name or "")), cx, my, "label", { color = Theme.redA, width = cw, ellipsis = true }) + Theme.space.xs
+      local lines = {}
+      for _, pair in ipairs({ { "want", case.expect }, { "got ", case.got } }) do
+        for line in (tostring(pair[2] or "") .. "\n"):gmatch("(.-)\n") do
+          lines[#lines + 1] = { pair[1], line }
+        end
+      end
+      local wh = math.min(8, #lines) * code_lh + Theme.space.sm * 2
+      UI.card(cx, my, cw, wh, { variant = "well", pad = 0 })
+      love.graphics.setFont(code_font)
+      local ty = my + Theme.space.sm
+      for i = 1, math.min(8, #lines) do
+        UI.setColor(lines[i][1] == "want" and Theme.green or Theme.redA, 0.9)
+        love.graphics.print(lines[i][1], cx + Theme.space.sm + 6, ty)
+        UI.setColor(Theme.text, 0.92)
+        love.graphics.print(lines[i][2], cx + Theme.space.sm + 6 + code_font:getWidth("want  "), ty)
+        ty = ty + code_lh
+      end
+      love.graphics.setColor(1, 1, 1, 1)
+    elseif b.kind == "details" then
+      -- The fold: a ghost button with the id and the cases behind it.
+      local dw, dh = details_w, details_h
+      local r = { x = cx + math.floor((cw - dw) / 2), y = ly, w = dw, h = dh }
+      UI.button(r.x, r.y, r.w, r.h, I18n.t("DETAILS"), self.hover == "details" and "hot" or "normal", nil,
+        { variant = "ghost", id = "result:details", key = "D", lift = 0, alpha = alpha })
+      self.buttons[#self.buttons + 1] = { id = "details", x = r.x, y = r.y, w = r.w, h = r.h,
+        act = function() self.details = not self.details end }
+      if self.details then
+        local dy = ly + dh + Theme.space.xs
+        dy = dy + UI.label(tostring(a.id or ""), cx, dy, "label", { width = cw, ellipsis = true, color = Theme.mute })
+        for _, case in ipairs(a.cases or {}) do
+          dy = dy + UI.label(("%s  %s%s"):format(case.passed and "PASS" or "FAIL", tostring(case.name or ""),
+            case.visible and "" or "  (hidden)"), cx, dy, "label",
+            { width = cw, ellipsis = true, color = case.passed and Theme.green or Theme.redA })
+        end
+        if a.stderr and a.stderr ~= "" then
+          dy = dy + Theme.space.sm
+          local n = math.min(12, select(2, (a.stderr .. "\n"):gsub("\n", "")))
+          UI.card(cx, dy, cw, n * code_lh + Theme.space.sm * 2, { variant = "well", pad = 0 })
+          love.graphics.setFont(code_font)
+          UI.setColor(Theme.text, 0.85)
+          local ty = dy + Theme.space.sm
+          local shown = 0
+          for line in (a.stderr .. "\n"):gmatch("(.-)\n") do
+            if shown >= n then break end
+            love.graphics.print(UI.ellipsizeWith(line, inner_well, code_font), cx + Theme.space.sm + 6, ty)
+            ty = ty + code_lh
+            shown = shown + 1
+          end
+          love.graphics.setColor(1, 1, 1, 1)
+        end
+      end
     end
+    ly = ly + b.h
   end
-
-  if a.stderr and a.stderr ~= "" then
-    cy = cy + 6
-    cy = cy + UI.text(I18n.t("STDERR"), cx, cy, 9, Theme.withAlpha(Theme.cream, 0.7)) + 6
-    local font = Assets.mono(Layout.codeSize(16))
-    love.graphics.setFont(font)
-    UI.setColor(Theme.withAlpha(Theme.cream, 0.85))
-    for line in (a.stderr .. "\n"):gmatch("(.-)\n") do
-      love.graphics.print(line, cx, cy)
-      cy = cy + font:getHeight()
-    end
-    love.graphics.setColor(1, 1, 1, 1)
-  end
-
-  self.content_height = cy - (y + 12 - self.scroll)
   love.graphics.setScissor()
-
-  self.buttons = {}
-  local by = vh - foot - 10 - #rows * (bh + 8) + 8
-  for _, row in ipairs(rows) do
-    local bx = x + 12
-    for _, b in ipairs(row) do
-      UI.button(bx, by, b.w, bh, b.label, b.state, b.size)
-      self.buttons[#self.buttons + 1] =
-        { id = b.id, x = bx, y = by, w = b.w, h = bh, act = b.act }
-      bx = bx + b.w + 10
-    end
-    by = by + bh + 8
+  if overflow > 0 then
+    if self.scroll > 0 then UI.scrollFade(cx, cy, cw, Theme.card, "top") end
+    if self.scroll < overflow then UI.scrollFade(cx, cy + room - Theme.space.xl, cw, Theme.card, "bottom") end
+    UI.scrollbar(x + w - pad / 2 - 3, cy, room, room / content, self.scroll / overflow)
   end
 
-  UI.text(a.id or "", x + 10, vh - foot + 6, 7, Theme.withAlpha(Theme.cream, 0.4))
-  self:draw_celebration(vw, vh, x + w / 2, y + (vh - y - foot) * 0.42)
-  self.app:footer(I18n.t("ENTER next/retry   N next   ESC map   ARROWS scroll"))
+  -- The buttons, pinned under the scrolling part: centred in landscape;
+  -- upright NEXT (or RETRY) takes the width and the other two share a row.
+  local byy = cy + room + Theme.space.xl
+  local function draw_button(spec, rx, ry, rw, rh)
+    local state = self.hover == spec.id and "hot" or "normal"
+    UI.button(rx, ry, rw, rh, I18n.t(spec.label), state, nil,
+      { variant = spec.variant, id = "result:" .. spec.id, key = spec.key, alpha = alpha })
+    self.buttons[#self.buttons + 1] = { id = spec.id, x = rx, y = ry, w = rw, h = rh,
+      act = function() self:act(spec.id) end }
+  end
+  if portrait then
+    draw_button(specs[1], cx, byy, cw, Theme.control.buttonL)
+    local n = #specs - 1
+    if n > 0 then
+      local bw2 = math.floor((cw - Theme.rowGap * (n - 1)) / n)
+      for i = 2, #specs do
+        draw_button(specs[i], cx + (i - 2) * (bw2 + Theme.rowGap), byy + Theme.control.buttonL + Theme.rowGap, bw2, Theme.control.buttonM)
+      end
+    end
+  else
+    local widths, total_w = {}, 0
+    for i, spec in ipairs(specs) do
+      local need_w = UI.buttonSize(I18n.t(spec.label), { h = Theme.control.buttonL, key = spec.key })
+      widths[i] = math.max(spec.variant == "primary" and 160 or 120, need_w)
+      total_w = total_w + widths[i] + (i > 1 and Theme.rowGap or 0)
+    end
+    local scale = total_w > cw and cw / total_w or 1
+    local rx = cx + math.floor((cw - total_w * scale) / 2)
+    for i, spec in ipairs(specs) do
+      local bw2 = math.floor(widths[i] * scale)
+      draw_button(spec, rx, byy, bw2, Theme.control.buttonL)
+      rx = rx + bw2 + Theme.rowGap
+    end
+  end
+
+  -- The confetti, once, from the card's top edge on a clear.
+  if not self.fx_at and landed and show_stars and (a.cleared or gained > 0) then
+    self.fx_at = self:age()
+    Fx.burst(x + w / 2, y, "confetti", { n = 2, area = { w, 2 } })
+    SFX.play("accepted")
+  end
+
+  local hints = {}
+  for _, spec in ipairs(specs) do
+    hints[#hints + 1] = { key = spec.key, verb = I18n.t(spec.id) }
+  end
+  self.app:footer(hints)
 end
 
---- The clear, painted over everything: the flash, the streaks with their
---- tails, the XP arriving, the level over it. Closed-form like the rest of
---- the client's motion — every position is a function of the age since the
---- stamp landed (`src/celebrate.lua`, the browser's plan number for number).
-function Result:draw_celebration(vw, vh, px, py)
-  if not self.fx_at then return end
-  local age = self:age() - self.fx_at
-  local fx = self.fx
-  local xp = self.xp
-
-  if fx then
-    local flash = Celebrate.flash_alpha(age, fx.flash)
-    if flash > 0 then
-      UI.setColor(Theme.cream, flash)
-      love.graphics.rectangle("fill", 0, 0, vw, vh)
-    end
-    -- Light adds: two streaks crossing are brighter where they cross.
-    love.graphics.setBlendMode("add")
-    for _, r in ipairs(fx.rings) do
-      local ra = age - r.delay
-      if ra >= 0 and ra <= r.life then
-        local u = ra / r.life
-        UI.setColor(r.color, (1 - u) * (r.glow and 0.35 or 0.8))
-        love.graphics.setLineWidth(math.max(1, r.radius * 0.05 * (1 - u)))
-        love.graphics.circle("line", r.x, r.y, r.radius * Ease.expOut(u))
-      end
-    end
-    for _, c in ipairs(fx.comets) do
-      local ca = age - c.delay
-      if ca >= 0 and ca <= c.life then
-        local hx, hy, ha = Celebrate.at(c, ca)
-        local pts = Celebrate.trail(c, ca)
-        for i = 2, #pts do
-          local k = (i - 1) / (#pts - 1)
-          UI.setColor(c.color, ha * k * k * 0.9)
-          love.graphics.setLineWidth(math.max(1, c.width * k))
-          love.graphics.line(pts[i - 1][1], pts[i - 1][2], pts[i][1], pts[i][2])
-        end
-        love.graphics.setColor(1, 1, 1, ha)
-        love.graphics.circle("fill", hx, hy, math.max(1, c.width * 0.55))
-      end
-    end
-    love.graphics.setBlendMode("alpha")
-    love.graphics.setLineWidth(1)
-    love.graphics.setColor(1, 1, 1, 1)
+--- A button, by id.
+function Result:act(id)
+  for _, b in ipairs(self.buttons or {}) do
+    if b.id == id then UI.press("result:" .. id, b, { sfx = false }) end
   end
-
-  local gained = (xp and xp.gained) or 0
-  if gained <= 0 then return end
-  -- The number: from far too big, counting up as it lands.
-  local u = Ease.clamp((age - 0.1) / 0.7, 0, 1)
-  local size = 18
-  local lh = UI.lineHeight(size)
-  if u > 0 then
-    local scale, alpha = Celebrate.zoom_in(u)
-    local label = (self.attempt and self.attempt.cleared)
-      and I18n.t("+%d XP", Celebrate.count_up(0, gained, u))
-      or I18n.t("PRACTICE +%d XP", Celebrate.count_up(0, gained, u))
-    local lw = UI.textWidth(label, size)
-    love.graphics.push()
-    love.graphics.translate(px, py)
-    love.graphics.scale(scale, scale)
-    UI.text(label, -lw / 2, -lh / 2, size, Theme.withAlpha(Theme.coin, alpha))
-    love.graphics.pop()
-    if u >= 1 then
-      local settle = Ease.clamp((age - 0.8) * 3, 0, 1)
-      UI.text(I18n.t("%d XP · LEVEL %d", xp.total or 0, xp.level or 1),
-        0, py + lh / 2 + 6, 8, Theme.withAlpha(Theme.cream, 0.9 * settle), "center", vw)
-    end
-  end
-  -- The level, slammed in over the number and let go.
-  if xp.level_up then
-    local ui = Ease.clamp((age - 0.63) / 0.46, 0, 1)
-    local uo = Ease.clamp((age - 0.63 - 1.6) / 0.7, 0, 1)
-    if ui > 0 and uo < 1 then
-      local s1, a1 = Celebrate.zoom_in(ui)
-      local s2, a2 = Celebrate.zoom_out(uo)
-      local label = I18n.t("LEVEL %d", xp.level or 1)
-      local lw = UI.textWidth(label, size)
-      love.graphics.push()
-      love.graphics.translate(px, py + lh * 1.6)
-      love.graphics.scale(s1 * s2, s1 * s2)
-      UI.text(label, -lw / 2, -lh / 2, size, Theme.withAlpha(Theme.pink, a1 * a2))
-      love.graphics.pop()
-    end
-  end
+  if id == "next" then self:next_quest()
+  elseif id == "retry" then self:retry()
+  elseif id == "map" then self.app:back()
+  elseif id == "details" then self.details = not self.details end
 end
 
 function Result:keypressed(key)
@@ -448,20 +526,15 @@ function Result:keypressed(key)
   -- with somewhere to go, RETRY otherwise.
   if key == "return" or key == "kpenter" then
     if self.attempt and self.attempt.verdict == "accepted" and self.next_id then
-      self:next_quest()
+      self:act("next")
     else
-      self:retry()
+      self:act("retry")
     end
     return true
   end
-  if key == "n" then
-    self:next_quest()
-    return true
-  end
-  if key == "m" then
-    self.app:back()
-    return true
-  end
+  if key == "n" then self:act("next"); return true end
+  if key == "m" then self:act("map"); return true end
+  if key == "d" then self:act("details"); return true end
   if key == "up" then self.scroll = math.max(0, self.scroll - 30); return true end
   if key == "down" then self.scroll = self.scroll + 30; return true end
   if key == "pageup" then self.scroll = math.max(0, self.scroll - 200); return true end
@@ -469,9 +542,16 @@ function Result:keypressed(key)
   return false
 end
 
+function Result:mousemoved(x, y)
+  self.hover = nil
+  for _, b in ipairs(self.buttons or {}) do
+    if UI.inside(b, x, y) then self.hover = b.id end
+  end
+end
+
 function Result:mousepressed(x, y)
   for _, b in ipairs(self.buttons or {}) do
-    if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
+    if UI.inside(b, x, y) then
       b.act()
       return
     end

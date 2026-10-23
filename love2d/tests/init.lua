@@ -28,12 +28,15 @@ local PURE = {
   "tests.test_clock",
   "tests.test_playground",
   "tests.test_playground_sync",
+  "tests.test_playground_retro",
   "tests.test_agent",
   "tests.test_poster",
   "tests.test_screens",
   "tests.test_walk",
   "tests.test_mapswitch",
   "tests.test_lands",
+  "tests.test_quiz",
+  "tests.test_faces",
   "tests.test_editor",
   "tests.test_fxplan",
   "tests.test_celebrate",
@@ -41,6 +44,7 @@ local PURE = {
   "tests.test_username",
   "tests.test_edits",
   "tests.test_stats",
+  "tests.test_juice",
 }
 
 --- Suites that need a LÖVE graphics context.
@@ -48,6 +52,10 @@ local GRAPHICAL = {
   "tests.test_layout",
   "tests.test_fonts",
   "tests.test_poster_render",
+  "tests.test_artframe",
+  "tests.test_faces_render",
+  "tests.test_header",
+  "tests.test_quest_ui",
 }
 
 function M.run()

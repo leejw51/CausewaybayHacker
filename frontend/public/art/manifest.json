@@ -2272,6 +2272,90 @@
           "maxy": 39
         }
       ]
+    },
+    {
+      "name": "bg_flat",
+      "file": "bg_flat.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_night",
+      "file": "bg_night.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "sprite_clerk",
+      "file": "sprite_clerk.png",
+      "w": 128,
+      "h": 128,
+      "box": {
+        "cx": 63.0,
+        "feet": 121.0,
+        "h": 114.0,
+        "minx": 19,
+        "miny": 7,
+        "maxx": 107,
+        "maxy": 120
+      }
+    },
+    {
+      "name": "bg_stats",
+      "file": "bg_stats.jpg",
+      "w": 1152,
+      "h": 768
+    },
+    {
+      "name": "bg_stats_p",
+      "file": "bg_stats_p.jpg",
+      "w": 768,
+      "h": 1152
+    },
+    {
+      "name": "ui_quiz_card",
+      "file": "ui_quiz_card.png",
+      "w": 192,
+      "h": 144,
+      "box": {
+        "cx": 95.0,
+        "feet": 131.0,
+        "h": 119.0,
+        "minx": 10,
+        "miny": 12,
+        "maxx": 180,
+        "maxy": 130
+      }
+    },
+    {
+      "name": "ui_quiz_choice",
+      "file": "ui_quiz_choice.png",
+      "w": 256,
+      "h": 64,
+      "box": {
+        "cx": 127.5,
+        "feet": 60.0,
+        "h": 57.0,
+        "minx": 34,
+        "miny": 3,
+        "maxx": 221,
+        "maxy": 59
+      }
+    },
+    {
+      "name": "ui_plaque",
+      "file": "ui_plaque.png",
+      "w": 384,
+      "h": 96,
+      "box": {
+        "cx": 191.5,
+        "feet": 90.0,
+        "h": 85.0,
+        "minx": 35,
+        "miny": 5,
+        "maxx": 348,
+        "maxy": 89
+      }
     }
   ]
 }

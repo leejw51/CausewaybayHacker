@@ -462,6 +462,43 @@ return function()
     wipe(dir)
   end)
 
+  T.case("the old default type step comes forward to the new one", function()
+    -- `Layout.DEFAULT_FONT` went from 2 to 1 (v2), and then the ladder went
+    -- from { 1.0, 1.5, 2.0, 2.5 } to { 0.75, 1.0, 1.5, 2.0 } (v3), so the
+    -- default 1.0 is index 2 again. A record written before the display
+    -- version holds the step whether or not anyone chose it, so an
+    -- unversioned 2 is read as the old default and becomes the new one.
+    local function font_of(record)
+      record.kind = "display.set"
+      return Store.replay({ record }).display.font
+    end
+    T.eq(font_of({ mode = "portrait", font = 2 }), 2, "an old default 2 becomes 1.0, index 2")
+    T.eq(font_of({ mode = "portrait", font = 1 }), 2, "v1's 1.0 is v3's index 2")
+    T.eq(font_of({ mode = "portrait", font = 3 }), 4, "v1's 2.0, chosen, is kept as 2.0")
+    T.eq(font_of({ mode = "portrait", font = 4 }), 4, "2.5 is gone; the largest step is next to it")
+    T.eq(font_of({ mode = "portrait" }), nil, "no step is still no opinion")
+    -- v2: the same ladder, and its 2 was a choice — 1.5, one place along.
+    T.eq(font_of({ v = 2, mode = "portrait", font = 1 }), 2, "v2's 1.0 is v3's index 2")
+    T.eq(font_of({ v = 2, mode = "portrait", font = 2 }), 3,
+      "a 2 written at v2 was a choice of 1.5, and keeps it")
+    T.eq(font_of({ v = 2, mode = "portrait", font = 3 }), 4)
+    -- v3 means what it says.
+    for step = 1, 4 do
+      T.eq(font_of({ v = 3, mode = "portrait", font = step }), step, "v3 step " .. step)
+    end
+
+    -- And through the file: what this binary writes carries the version, so
+    -- a player who picks step 1 now gets step 1 back next launch.
+    local dir = scratch()
+    Store.open({ dir = dir })
+    Store.save_display({ mode = "landscape", pinned = false, font = 1 })
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.load_display().font, 1, "a versioned 1, the smallest step, survives a relaunch")
+    Store.reset()
+    wipe(dir)
+  end)
+
   T.section("store — the opening, watched once")
 
   T.case("the flag is remembered, and it is one-way", function()
@@ -637,5 +674,42 @@ return function()
     T.eq(Store.set_server("ws://a:1/ws"), true, "writes are accepted")
     T.eq(Store.saved_server(), "ws://a:1/ws", "and readable for this run")
     Store.reset()
+  end)
+  T.section("store — the playground's computer and its two switches")
+
+  T.case("the computer and AUTO-RUN / STDERR survive a relaunch", function()
+    local dir = scratch()
+    Store.open({ dir = dir })
+    T.eq(Store.saved_computer(), nil, "a fresh store has no computer")
+    T.eq(Store.saved_pg_prefs(), nil, "and no switches")
+    Store.set_computer("msx")
+    -- AUTO-RUN's default is on, so `false` is the value worth proving.
+    Store.set_pg_prefs({ auto_run = false, stderr = true })
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.saved_computer(), "msx")
+    local prefs = Store.saved_pg_prefs()
+    T.eq(prefs.auto_run, false, "a stored false comes back false, not nil")
+    T.eq(prefs.stderr, true)
+    Store.set_computer("normal")
+    Store.set_pg_prefs({ auto_run = true, stderr = false })
+    Store.reset()
+    Store.open({ dir = dir })
+    T.eq(Store.saved_computer(), "normal", "the last choice wins")
+    T.eq(Store.saved_pg_prefs().auto_run, true)
+    T.eq(Store.saved_pg_prefs().stderr, false)
+    Store.reset()
+    wipe(dir)
+  end)
+
+  T.case("the playground records fold only what they really hold", function()
+    T.eq(Store.replay({ { kind = "computer.set", computer = 3 } }).computer, nil)
+    local folded = Store.replay({
+      { kind = "computer.set", computer = "apple2" },
+      { kind = "pgprefs.set", auto_run = "yes", stderr = false },
+    })
+    T.eq(folded.computer, "apple2")
+    T.eq(folded.pg_prefs.auto_run, nil, "a string is not a switch")
+    T.eq(folded.pg_prefs.stderr, false)
   end)
 end
