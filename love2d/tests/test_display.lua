@@ -195,17 +195,54 @@ return function()
 
   T.section("display — the type-size step")
 
-  T.case("a fresh install opens on step 2", function()
-    T.eq(Layout.DEFAULT_FONT, 2, "portrait at step 1 was reported as too small")
+  T.case("a fresh install opens on 1.0, with one smaller step under it", function()
+    T.eq(Layout.DEFAULT_FONT, 2, "index 2: 0.75 sits under it")
     T.ok(Layout.FONT_STEPS[Layout.DEFAULT_FONT], "the default is a real rung")
-    T.eq(Layout.FONT_STEPS[Layout.DEFAULT_FONT], 1.5, "one grid cell up from the authored size")
+    T.eq(Layout.FONT_STEPS[Layout.DEFAULT_FONT], 1.0,
+      "the authored size, doubled: 1.5 everywhere was reported as too large")
+    T.ok(Layout.FONT_STEPS[1] < 1.0, "a player can still go smaller")
+    T.eq(Layout.font, Layout.DEFAULT_FONT, "the module starts where a fresh install does")
+  end)
+
+  -- `Assets.snap8`, without loading the faces: this file runs headless.
+  local function snap8(n) return math.max(8, math.floor(n / 8 + 0.5) * 8) end
+
+  T.case("type grows with a tall portrait canvas, and never in landscape", function()
+    -- What step 2 used to be for: a 1080×1920 panel, where the canvas is
+    -- half again the design in both directions. Growth gives that panel its
+    -- bigger type without giving it to a laptop window as well.
+    Layout.storage = memory_storage()
+    Layout.setFont(Layout.DEFAULT_FONT)
+    Layout.mode = "landscape"
+    Layout.vw, Layout.vh = 1280, 720
+    T.eq(Layout.growth(), 1)
+    T.eq(snap8(Layout.ui(10)), 24, "a laptop window: the authored 10 is 24 px")
+    T.eq(snap8(Layout.ui(8)), 16)
+    T.eq(Layout.codeSize(18), 18)
+    Layout.vw, Layout.vh = 2560, 720
+    T.eq(Layout.growth(), 1, "wider but not taller shows more, not bigger")
+    -- The report: "ui fonts seems too large?", playing fullscreen on a
+    -- 1920×1080. `uiScale` there is 1.5, and growing by it put an authored
+    -- 10 on 32 px — the old step 2 by another road.
+    Layout.vw, Layout.vh = 1920, 1080
+    T.eq(Layout.growth(), 1, "a 1920×1080 fullscreen shows more, not bigger")
+    T.eq(snap8(Layout.ui(10)), 24, "the authored 10 is 24 px there too")
+    T.eq(Layout.codeSize(18), 18, "and the code is the size it is on a laptop")
+    Layout.mode = "portrait"
+    Layout.vw, Layout.vh = 1080, 1920
+    T.near(Layout.growth(), 1.5, 0.001)
+    T.eq(snap8(Layout.ui(10)), 32, "the panel the first report came from")
+    T.ok(snap8(Layout.ui(10)) > 24, "bigger there than on a laptop")
+    T.eq(Layout.codeSize(18), 27)
+    Layout.mode = "landscape"
+    Layout.vw, Layout.vh = 1280, 720
   end)
 
   T.case("the step cycles and wraps, and says which one it is in", function()
     Layout.storage = memory_storage()
     Layout.font = 1
     T.eq(Layout.fontLabel(), "1/4")
-    T.eq(Layout.fontScale(), 1.0, "step 1 is the size this client was authored at")
+    T.eq(Layout.fontScale(), 0.75, "step 1 is the one under the authored size")
     local seen = {}
     for _ = 1, #Layout.FONT_STEPS do seen[#seen + 1] = Layout.cycleFont() end
     T.same(seen, { 2, 3, 4, 1 }, "four steps and back to the start")
@@ -215,8 +252,23 @@ return function()
     for i = 1, #Layout.FONT_STEPS do
       Layout.setFont(i)
       T.eq(Layout.fontLabel(), i .. "/4")
-      T.ok(Layout.fontScale() >= 1.0)
+      T.ok(Layout.fontScale() >= 0.75)
     end
+  end)
+
+  T.case("the smallest step really is smaller on the 8-pixel grid", function()
+    -- A quarter-step can round onto the same cell as 1.0 and do nothing.
+    -- These are the sizes the client is actually drawn at, landscape.
+    Layout.storage = memory_storage()
+    Layout.mode, Layout.vw, Layout.vh = "landscape", 1280, 720
+    Layout.setFont(1)
+    local small = { snap8(Layout.ui(7)), snap8(Layout.ui(10)), snap8(Layout.ui(14)) }
+    Layout.setFont(2)
+    local normal = { snap8(Layout.ui(7)), snap8(Layout.ui(10)), snap8(Layout.ui(14)) }
+    T.same(small, { 8, 16, 24 })
+    T.same(normal, { 16, 24, 32 })
+    for i = 1, #small do T.ok(small[i] < normal[i], "every one of them moves a cell") end
+    Layout.setFont(Layout.DEFAULT_FONT)
   end)
 
   T.case("the steps only ever get bigger", function()
@@ -265,23 +317,25 @@ return function()
     Layout.storage = memory_storage()
     -- `uiScale` is 1 at the authored size, so the step is the whole factor.
     Layout.vw, Layout.vh, Layout.mode = 1280, 720, "landscape"
-    Layout.setFont(1)
+    Layout.setFont(2)
     T.eq(Layout.codeSize(18), 18)
     T.eq(Layout.codeSize(16), 16)
+    Layout.setFont(1)
+    T.eq(Layout.codeSize(18), 13, "0.75 of 18")
     Layout.setFont(4)
     T.eq(Layout.codeSize(18), math.floor(18 * Layout.FONT_STEPS[4]))
     T.ok(Layout.codeSize(18) > 18, "the largest step is visibly larger")
     -- Never small enough to be unreadable, whatever it is handed.
     T.ok(Layout.codeSize(1) >= 8)
     T.eq(Layout.codeSize(), Layout.codeSize(18), "18 is the default base")
-    Layout.setFont(1)
+    Layout.setFont(Layout.DEFAULT_FONT)
   end)
 
   -- Leave the module as the rest of the suite expects to find it.
   Layout.storage = nil
   Layout.pinned = false
   Layout.fullscreen = false
-  Layout.font = 1
+  Layout.font = Layout.DEFAULT_FONT
   Layout.vw, Layout.vh = 1280, 720
   Layout.mode = "landscape"
 end

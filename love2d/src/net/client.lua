@@ -361,6 +361,9 @@ end
 
 --- Read whatever the socket has and turn it into frames.
 function Client:drain()
+  -- `flush` runs first and a send that fails tears the transport down, so
+  -- there may be nothing to read from by the time this is called.
+  if not self.transport then return end
   while true do
     local bytes, err = self.transport:receive()
     if bytes == nil then

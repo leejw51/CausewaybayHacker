@@ -725,7 +725,13 @@ function Editor:indent(outdent)
   self.dirty = true
 end
 
---- Toggle `// ` on every selected line, the way every editor's ctrl-/ does.
+--- Each language's line comment. `//` was the only one, which made ctrl-/
+--- in a Python pad a syntax error; the browser's CodeMirror asks each
+--- language, and so does this.
+M.LINE_COMMENT = { python = "#", pytorch = "#", lua = "--" }
+
+--- Toggle the language's line comment on every selected line, the way every
+--- editor's ctrl-/ does.
 function Editor:toggle_comment()
   if self.read_only then return end
   self:bump()
@@ -733,21 +739,106 @@ function Editor:toggle_comment()
   l1 = l1 or self.line
   l2 = l2 or self.line
   self:push_undo(false)
+  local mark = M.LINE_COMMENT[self.lang] or "//"
+  local quoted = mark:gsub("%p", "%%%0")
   local all_commented = true
   for l = l1, l2 do
-    if self.lines[l]:match("%S") and not self.lines[l]:match("^%s*//") then
+    if self.lines[l]:match("%S") and not self.lines[l]:match("^%s*" .. quoted) then
       all_commented = false
     end
   end
   for l = l1, l2 do
     if all_commented then
-      self.lines[l] = self.lines[l]:gsub("^(%s*)// ?", "%1")
+      self.lines[l] = self.lines[l]:gsub("^(%s*)" .. quoted .. " ?", "%1")
     elseif self.lines[l]:match("%S") then
-      self.lines[l] = self.lines[l]:gsub("^(%s*)", "%1// ")
+      self.lines[l] = self.lines[l]:gsub("^(%s*)", "%1" .. (mark:gsub("%%", "%%%%")) .. " ")
     end
   end
   self.col = math.min(self.col, #self.lines[self.line] + 1)
   self.dirty = true
+end
+
+--- The lines the caret or the selection touches. A selection that ends at
+--- column 1 of a line does not take that line, as in every editor.
+function Editor:touched_lines()
+  local l1, _, l2, c2 = self:selection()
+  if not l1 then return self.line, self.line end
+  if l2 > l1 and c2 == 1 then l2 = l2 - 1 end
+  return l1, l2
+end
+
+--- ALT-UP / ALT-DOWN: the touched lines swap places with the one above or
+--- below, carrying the caret and the selection with them.
+function Editor:move_lines(dir)
+  if self.read_only then return false end
+  local l1, l2 = self:touched_lines()
+  if (dir < 0 and l1 <= 1) or (dir > 0 and l2 >= #self.lines) then return false end
+  self:bump()
+  self:push_undo(false)
+  if dir < 0 then
+    local above = table.remove(self.lines, l1 - 1)
+    table.insert(self.lines, l2, above)
+  else
+    local below = table.remove(self.lines, l2 + 1)
+    table.insert(self.lines, l1, below)
+  end
+  self.line = self.line + dir
+  if self.anchor then self.anchor.line = self.anchor.line + dir end
+  self.dirty = true
+  return true
+end
+
+--- SHIFT-ALT-UP / SHIFT-ALT-DOWN: the touched lines, copied above or below,
+--- with the caret on the copy.
+function Editor:copy_lines(dir)
+  if self.read_only then return false end
+  local l1, l2 = self:touched_lines()
+  self:bump()
+  self:push_undo(false)
+  local n = l2 - l1 + 1
+  for i = 0, n - 1 do
+    table.insert(self.lines, l2 + 1 + i, self.lines[l1 + i])
+  end
+  if dir > 0 then
+    self.line = self.line + n
+    if self.anchor then self.anchor.line = self.anchor.line + n end
+  end
+  self.dirty = true
+  return true
+end
+
+--- SHIFT-CTRL-K: the touched lines, gone.
+function Editor:delete_lines()
+  if self.read_only then return false end
+  local l1, l2 = self:touched_lines()
+  self:bump()
+  self:push_undo(false)
+  local gone = {}
+  for _ = l1, l2 do gone[#gone + 1] = table.remove(self.lines, l1) end
+  if #self.lines == 0 then self.lines[1] = "" end
+  self.anchor = nil
+  self.line = math.min(l1, #self.lines)
+  self.col = math.min(self.col, #self.lines[self.line] + 1)
+  self.dirty = true
+  emit(self, { kind = "erase", line = self.line, col = self.col,
+    text = table.concat(gone, "\n") .. "\n", tones = { "text" } })
+  return true
+end
+
+--- Backspace or delete by a word (or, `to_edge`, to the line's start or
+--- end): the motion extends a selection and the ordinary key deletes it, so
+--- the rubble, the undo step and the pair rules are the ordinary ones.
+function Editor:delete_by(dir, to_edge)
+  if self.read_only then return end
+  if not self:has_selection() then
+    if to_edge then
+      self:prepare_motion(true)
+      if dir < 0 then self.col = 1 else self.col = #self.lines[self.line] + 1 end
+    else
+      self:move(dir < 0 and "left" or "right", { extend = true, word = true })
+    end
+  end
+  if dir < 0 then self:backspace() else self:delete_forward() end
 end
 
 -- ------------------------------------------------------------------- motion
@@ -1529,6 +1620,20 @@ function Editor:keypressed(key, mods)
   end
   if cmd and key == "home" then self:move("doc_start", { extend = shift }); return true end
   if cmd and key == "end" then self:move("doc_end", { extend = shift }); return true end
+
+  -- The line commands CodeMirror's default keymap gives the browser's
+  -- editor: move a line, copy it, delete it.
+  if mods.alt and not cmd and (key == "up" or key == "down") then
+    local dir = key == "up" and -1 or 1
+    if shift then self:copy_lines(dir) else self:move_lines(dir) end
+    return true
+  end
+  if cmd and shift and key == "k" then self:delete_lines(); return true end
+  -- By a word with ALT (or CTRL off a Mac); to the edge of the line with ⌘.
+  if (key == "backspace" or key == "delete") and (mods.alt or mods.ctrl or mods.gui) then
+    self:delete_by(key == "backspace" and -1 or 1, mods.gui and not mods.alt)
+    return true
+  end
 
   if key == "left" then self:move("left", { extend = shift, word = word }); return true end
   if key == "right" then self:move("right", { extend = shift, word = word }); return true end

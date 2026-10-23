@@ -1,10 +1,10 @@
--- The code pane's THEME button, on both code screens.
+-- The code pane's THEME button, and that it is one remembered preference.
 --
 --   make -C love2d drive SCRIPT=tests/drive/theme.lua ARGS="--home $(mktemp -d)"
 --
--- Into the playground's CODE, LIGHT by the button, a picture; then a quest's
--- CODE, which must already be LIGHT — it is one preference — a picture, and
--- DARK again by the button there.
+-- Into the playground's CODE, LIGHT by the button, a picture; then out of the
+-- playground and back, where it must still be LIGHT — it is one preference,
+-- and it is stored — a picture, and DARK again by the button.
 
 local Theme = require("src.theme")
 local steps = {}
@@ -52,41 +52,33 @@ add({ until_ = function()
       return true end, timeout = 5 })
 add({ shot = "T2-playground-light.png" })
 
--- A quest, in CODE: the same preference, so already light.
+-- Out and back in: the same preference, so still light. This used to be a
+-- quest's CODE, but a quest is a four-choice pick now (SPEC §0) and has no
+-- editor to put in CODE; the playground is the one code screen left, and
+-- what the step proved — the choice is one preference, not a scene's — is
+-- proved by leaving the scene and coming back, and by the store.
 add({ until_ = function(app) app:go("lands"); return true end, timeout = 5 })
-add({ until_ = function(app) return app.scene_name == "lands" and app.scene.lands ~= nil end,
-      timeout = 10 })
-add({ until_ = function(app)
-      for i, land in ipairs(app.scene.lands or {}) do
-        if land.land == "rust" then app.scene.cursor = i; app.scene.land = "rust" end
-      end
-      return app.scene.land == "rust" end, note = "RUST land", timeout = 5 })
-add({ key = "return" })
-add({ until_ = function(app) return app.scene_name == "categories" and app.scene.categories end,
-      timeout = 10 })
-add({ key = "return" })
-add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end, timeout = 10 })
-add({ until_ = function(app)
-      app.scene.cursor = 1; app.scene.at = 1; app.scene.walk = nil; return true end, timeout = 3 })
-add({ key = "return" })
-add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end,
-      timeout = 20 })
-add({ wait = 0.6 })
-add({ click = function(app) local r = app.scene.code_rect
+add({ until_ = function(app) return app.scene_name == "lands" end, timeout = 10 })
+add({ until_ = function(app) app:go("playground"); return true end, timeout = 5 })
+add({ until_ = scene("playground"), note = "the playground again", timeout = 10 })
+add({ wait = 0.5 })
+add({ click = function(app) local r = app.scene.code_button_rect
       return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ until_ = function(app) return app.scene.code_mode end, note = "CODE", timeout = 5 })
+add({ until_ = function(app) return app.scene.big == true end, note = "CODE again", timeout = 5 })
 add({ wait = 0.4 })
 add({ until_ = function(app)
-      check(Theme.codeTheme() == "light", "the quest did not keep the playground's choice")
-      check((app.scene.code_rects or {}).theme ~= nil, "no THEME button in the quest's CODE")
+      check(Theme.codeTheme() == "light", "the playground forgot its own choice")
+      check(require("src.store").saved_code_theme() == "light", "LIGHT was not stored")
+      check((app.scene.big_rects or {}).theme ~= nil, "no THEME button in CODE")
       return true end, timeout = 5 })
-add({ shot = "T3-quest-light.png" })
-add({ click = press(function(app) return app.scene.code_rects end, "theme") })
+add({ shot = "T3-playground-light-again.png" })
+add({ click = press(function(app) return app.scene.big_rects end, "theme") })
 add({ wait = 0.4 })
 add({ until_ = function()
-      check(Theme.codeTheme() == "dark", "THEME did not turn the quest dark again")
+      check(Theme.codeTheme() == "dark", "THEME did not turn it dark again")
+      check(require("src.store").saved_code_theme() == "dark", "DARK was not stored")
       return true end, timeout = 5 })
-add({ shot = "T4-quest-dark.png" })
+add({ shot = "T4-playground-dark.png" })
 
 add({ until_ = function()
       print("code theme: " .. (fail and "FAILED" or "0 failures"))

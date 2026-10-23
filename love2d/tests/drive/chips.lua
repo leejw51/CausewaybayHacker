@@ -1,5 +1,5 @@
--- The display buttons: how big they actually are, in every language and both
--- orientations.
+-- The display controls (the settings sheet's rows): how big they actually are,
+-- in every language and both orientations.
 --
 --   make -C love2d drive SCRIPT=tests/drive/chips.lua
 --
@@ -30,12 +30,15 @@ local function measure(tag)
     local UI = require("src.ui")
     local Layout = require("src.layout")
     local I18n = require("src.i18n")
-    local r = app.display_rects
-    if not r then
-      print("FAIL: no display controls on " .. tag)
-      fail = true
-      return true
+    -- The controls live in the settings sheet now (`docs/love2d-ui.md`
+    -- §footer): open it, let a frame draw the rows, then measure them.
+    if not app.settings_open then
+      app:open_settings()
+      return false
     end
+    local r = app.display_rects
+    if not r then return false end
+    app:close_settings()
     local widest, total, left = 0, 0, math.huge
     for _, id in ipairs({ "fullscreen", "orient", "font", "lang" }) do
       local box = r[id]

@@ -20,6 +20,20 @@
 -- node the player can walk into is a lie that costs them the quest they came
 -- for. A node further along the route is drawn as what it is — one they have
 -- not done yet.
+--
+-- ## The look (`docs/love2d-ui.md`)
+--
+-- The header is a bar of chips: the land as a badge in its colour with its
+-- mascot, the other lands as their mascots, the roads as chips with the
+-- current one gold, and RESET THIS ROAD as a ghost at the right end. The
+-- chips wrap to a second row when the canvas is narrow rather than squeeze;
+-- the chrome never moves with F12, so the row can never overprint itself.
+-- The node card is a card: the number, the title on one line with an
+-- ellipsis (the quest id is gone — it wrapped), a status chip, the stars,
+-- the difficulty pips, the attempts, PLAY as the screen's one primary
+-- button, and the road's bar. Docked top-right in landscape; a sheet above
+-- the footer in portrait, with the map stopping above it so no half-node
+-- peeks out from under it.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -29,6 +43,8 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Ease = require("src.ease")
 local Anim = require("src.anim")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 local Land = require("src.land")
 
 local Map = {}
@@ -70,6 +86,8 @@ function Map.new(app)
     -- "game" thing available for the least work, because it says the two
     -- screens are the same place in a way a cut never can.
     iris = nil,     -- { started, x, y, quest_id }
+    hover = nil,    -- what the pointer is over: "back", "reset", "play", a land, a road
+    header_h = UI.headerHeight(),
   }, Map)
 end
 
@@ -84,6 +102,7 @@ function Map:enter(params)
     end),
   }
 
+  Juice.forget("map:")
   self:refresh()
 end
 
@@ -150,7 +169,7 @@ function Map:switch(land, category)
   self:refresh()
 end
 
---- The lands the switcher offers — the header's buttons and TAB — in SPEC
+--- The lands the switcher offers — the header's chips and TAB — in SPEC
 --- §0's order: the ones the server reported in `world.lands` (§4.6, kept by
 --- the session from whichever screen asked last), or every land the client
 --- knows when it has not heard yet. A land this client knows and the server
@@ -257,6 +276,7 @@ function Map:refresh()
       self.at = self.cursor
       self.walk = nil
       self.adjacency = nil
+      Juice.forget("map:card")
     end)
 end
 
@@ -346,15 +366,15 @@ end
 
 --- The button asks; it does not act.
 ---
---- There is no reusable confirm in this client — `src/scenes/login.lua` is a
---- screen of its own and `src/scenes/quest.lua` arms with a second press —
---- so this is a panel drawn by the scene that raised it. The road, the count
---- and the total are copied out **now**, so the sentence on screen keeps
---- naming the road it was opened for even if something else moves underneath.
+--- The question is a modal (`UI.modal`) drawn by the scene that raised it.
+--- The road, the count and the total are copied out **now**, so the
+--- sentence on screen keeps naming the road it was opened for even if
+--- something else moves underneath.
 function Map:ask_reset()
   if self.iris or self.walk then return end
   if not Map.reset_offered(self.tally) then return end
   SFX.play("move")
+  UI.modalReset("map:reset")
   self.confirm_reset = {
     road = Map.road_name(self.land, self.category),
     cleared = self.tally.cleared,
@@ -405,6 +425,9 @@ function Map:apply_progress(payload)
     if payload.state == "cleared" then
       self.stamped[payload.quest_id] = 0
       SFX.play("stamp")
+      -- A clear pays out on the map: coins from the node that was stamped.
+      local x, y = self:node_xy(node)
+      Fx.burst(x, y, "coins")
     end
   end
   -- §4.19 may still carry `unlocked`; with nothing locked it is a no-op, but
@@ -423,10 +446,17 @@ end
 
 --- Where a node sits on screen. The plate is drawn `cover`-style, so the
 --- 0..1 coordinates map onto the *drawn* rectangle, not the window.
+---
+--- Under the header, which is one row of chips or two (`draw_header`) —
+--- measured on the last draw, so the nodes never sit under a row of road
+--- chips — and, upright, above the node card's sheet, so no node is ever
+--- half under it.
 function Map:plate_rect()
   local vw, vh = Layout.vw, Layout.vh
-  local top, bottom = 56, 46
-  return 0, top, vw, vh - top - bottom
+  local top = math.max(UI.headerHeight(), self.header_h or 0)
+  local bottom = UI.footerHeight()
+  if Layout.isPortrait() then bottom = bottom + self:card_height() end
+  return 0, top, vw, math.max(1, vh - top - bottom)
 end
 
 function Map:node_xy(node)
@@ -449,6 +479,7 @@ function Map:open_node()
   local node = self:node_at(self.cursor)
   if not node then return end
   if self.iris then return end
+  UI.press("map:play", self.play_rect, { sfx = false })
   SFX.play("select")
   -- The iris closes on the node, then the quest screen opens. `update` does
   -- the handover, so a player who presses again lands immediately (see
@@ -636,10 +667,24 @@ function Map.haze(land)
   return Theme.haze[land] or Theme.haze.rust
 end
 
+--- The scene's key hints, in priority order: the footer keeps the longest
+--- prefix that fits.
+function Map:hints()
+  if self.confirm_reset then return I18n.t("ESC keep my progress   CLICK to reset") end
+  -- Any key lands her; SPACE is the one the cap names.
+  if self.walk then return { { key = "SPACE", verb = I18n.t("skip") } } end
+  -- **Not a listing of TAB and Q.** Those two switch the land and the road,
+  -- and both are chips in this screen's own header — the row that exists
+  -- precisely so the switch is visible.
+  return I18n.t("ENTER play   ARROWS node   T stats   P playground   ESC back")
+end
+
 function Map:draw()
   local vw, vh = Layout.vw, Layout.vh
   local px, py, pw, ph = self:plate_rect()
 
+  UI.setColor(Theme.felt)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
   Assets.cover(Assets.pick(Map.plate_names(self.land, Layout.isPortrait())),
     px, py, pw, ph)
   love.graphics.setColor(Map.haze(self.land))
@@ -650,9 +695,8 @@ function Map:draw()
   -- foreground layer for an **elevation** — a street seen from the side — and
   -- every full-screen plate in this client is either a top-down town or a
   -- room. A slung cable over a top-down town is a cable lying in the road: it
-  -- crossed six nodes and two streets and read as damage. The two elevation
-  -- plates that would suit it, `title_bg` and `bg_street`, already have their
-  -- catenary painted in. The asset stays unused on purpose.
+  -- crossed six nodes and two streets and read as damage. The asset stays
+  -- unused on purpose.
 
   self:draw_agents()
   self:draw_edges()
@@ -662,79 +706,67 @@ function Map:draw()
   self:draw_header()
 
   local node = self:node_at(self.cursor)
+  self.play_rect = nil
   if node then
     self:draw_node_card(node)
   elseif self.error then
-    UI.text(self.error, 0, vh / 2, 10, Theme.red, "center", vw)
+    UI.label(self.error, 0, math.floor(vh / 2), "label", { width = vw, align = "center", color = Theme.redA })
   elseif not self.nodes then
-    UI.text(I18n.t("asking the server…"), 0, vh / 2, 10,
-      Theme.withAlpha(Theme.cream, 0.7), "center", vw)
+    UI.label(I18n.t("asking the server…"), 0, math.floor(vh / 2), "label",
+      { width = vw, align = "center", color = Theme.mute })
   end
 
   self:draw_iris()
   self:draw_confirm()
 
-  if self.confirm_reset then
-    self.app:footer(I18n.t("ESC keep my progress   CLICK to reset"))
-    return
-  end
-
-  self.app:footer(I18n.t(self.walk
-    and "ANY KEY skip"
-    -- **Not a second listing of TAB and Q.** Those two switch the land and
-    -- the category, and both are buttons in this screen's own header a couple
-    -- of centimetres above — the row that exists precisely so the switch is
-    -- visible. Repeating them here made the longest hint in the client, the
-    -- only one still clipping in Korean at the readable type ladder, and it
-    -- bought nothing the header does not already say.
-    or "ARROWS node   ENTER play   P playground   T stats   ESC back"))
+  self.app:footer(self:hints())
 end
 
---- The confirm panel, over the map it is about.
+--- The confirm sheet, over the map it is about.
 ---
 --- **Enter does not take the destructive button.** ESC, ENTER and SPACE all
 --- land on KEEP MY PROGRESS — a player who reached for the key that has
 --- meant "yes, go on" on every other screen in this client keeps their road —
 --- and RESET IT is reached by pointing at it, which is a thing nobody does by
---- reflex. KEEP is the lit button for the same reason.
+--- reflex. KEEP is the lit button for the same reason, and RESET IT wears
+--- the danger colour.
 function Map:draw_confirm()
   if not self.confirm_reset then return end
-  local vw, vh = Layout.vw, Layout.vh
   local ask = self.confirm_reset
-
-  -- The map goes dim rather than away: the road being talked about is the
-  -- one behind the panel, and a player deciding wants to see it.
-  UI.setColor(Theme.void, 0.82)
-  love.graphics.rectangle("fill", 0, 0, vw, vh)
-  love.graphics.setColor(1, 1, 1, 1)
-
-  local title_size, body_size, button_size = 12, 8, 9
-  local w = math.min(vw - 32, 460)
-  local pad = 16
   local body = Map.reset_body(ask.road, ask.cleared, ask.total)
-  local lines = UI.wrap(body, w - pad * 2, body_size)
-  local step = UI.lineHeight(body_size) + 2
-  local title_h = UI.lineHeight(title_size)
-  local bh = math.max(32, UI.lineHeight(button_size) + 14)
-  local h = pad + title_h + 10 + #lines * step + 14 + bh + pad
-  local x = math.floor((vw - w) / 2)
-  local y = math.floor((vh - h) / 2)
-
-  UI.panel(x, y, w, h, { tint = Theme.red })
-  UI.text(I18n.t("WALK IT AGAIN?"), x, y + pad, title_size, Theme.coin, "center", w)
-  UI.paragraph(body, x + pad, y + pad + title_h + 10, w - pad * 2, body_size,
-    Theme.cream)
-
-  local gap = 10
-  local keep_w = math.floor((w - pad * 2 - gap) / 2)
-  local row = y + h - pad - bh
-  local keep = { x = x + pad, y = row, w = keep_w, h = bh }
-  local go = { x = keep.x + keep_w + gap, y = row,
-    w = w - pad * 2 - keep_w - gap, h = bh }
-  UI.button(keep.x, keep.y, keep.w, keep.h, I18n.t("KEEP MY PROGRESS"),
-    "hot", button_size)
-  UI.button(go.x, go.y, go.w, go.h, I18n.t("RESET IT"), nil, button_size)
-  self.confirm_rects = { keep = keep, go = go }
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  local w = math.min(520, Layout.vw - pad * 2)
+  local inner = w - pad * 2
+  local body_h = UI.readHeight(body, inner)
+  -- The two buttons share a row when their labels fit it, else they stack.
+  local keep_label, go_label = I18n.t("KEEP MY PROGRESS"), I18n.t("RESET IT")
+  local keep_need, bh = UI.buttonSize(keep_label)
+  local go_need = UI.buttonSize(go_label)
+  bh = math.max(Theme.control.buttonM, bh)
+  local gap = Theme.space.md
+  local stacked = keep_need + gap + go_need > inner
+  local rows_h = stacked and (bh * 2 + gap) or bh
+  local x, y, cw, ch, close, sheet = UI.modal({ id = "map:reset", title = I18n.t("WALK IT AGAIN?"),
+    strip = Theme.redA, w = w, h = body_h + Theme.space.lg + rows_h })
+  love.graphics.setScissor(x, y, cw, ch)
+  UI.read(body, x, y, cw)
+  local keep, go
+  if stacked then
+    keep = { x = x, y = y + ch - rows_h, w = cw, h = bh }
+    go = { x = x, y = y + ch - bh, w = cw, h = bh }
+  else
+    local row = y + ch - bh
+    local keep_w = math.max(keep_need, math.floor((cw - gap) / 2))
+    keep = { x = x, y = row, w = keep_w, h = bh }
+    go = { x = x + keep_w + gap, y = row, w = cw - keep_w - gap, h = bh }
+  end
+  local px, py = UI.pointer()
+  UI.button(keep.x, keep.y, keep.w, keep.h, keep_label,
+    UI.inside(go, px, py) and "normal" or "hot", nil, { variant = "secondary", id = "map:keep" })
+  UI.button(go.x, go.y, go.w, go.h, go_label,
+    UI.inside(go, px, py) and "hot" or "normal", nil, { variant = "danger", id = "map:go" })
+  love.graphics.setScissor()
+  self.confirm_rects = { keep = keep, go = go, close = close, sheet = sheet }
 end
 
 --- The iris: everything outside a shrinking circle goes to ink.
@@ -762,167 +794,169 @@ function Map:draw_iris()
   love.graphics.setColor(1, 1, 1, 1)
 end
 
---- The header: two land buttons, three category tabs, the count.
+--- A mascot inside a `box` square, standing on `bottom`.
+local function mascot(name, x, bottom, box, opts)
+  if not name then return false end
+  local b = Assets.box[name]
+  local image = Assets.image(name)
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local ink_w = (b and b.w and b.w > 0) and b.w or iw
+  local ink_h = (b and b.h and b.h > 0) and b.h or ih
+  local height = box
+  if ink_w > ink_h then height = box * ink_h / ink_w end
+  return Assets.sprite(name, x, bottom, height, opts)
+end
+
+--- The header: the land badge, the other lands' mascots, the road chips
+--- and RESET THIS ROAD, measured from the type in them and wrapped onto a
+--- second (or third) row rather than squeezed.
 ---
 --- The switch has to be **visible**. A keybinding nobody can see is not a
 --- feature, and the whole reason for this row is that reaching HACKER used to
 --- cost a trip out to two other screens. `CausewaybayGolang` puts "the three
---- big buttons" for its language tracks on its map for the same reason; these
---- are the same idea with this game's two lands and three categories.
+--- big buttons" for its language tracks on its map for the same reason.
 ---
---- RESET THIS ROAD sits at the right end, apart from the switches and only
---- when there is something to undo. It is measured into the row's budget
---- like everything else here, so the tabs shrink around it rather than run
---- underneath it.
+--- What gives way, in order, when the first row is too narrow: the ‹ BACK
+--- ghost (ESC still works), then RESET moves to the row after the roads;
+--- the roads wrap into as many rows as they need. Nothing is ever cut to
+--- its first three letters, and every chip is a hit target.
 function Map:draw_header()
   local vw = Layout.vw
-  -- **Every number in this row is measured from the type in it.** It was
-  -- authored against a 10 px land label and an 8 px category tab in a 56 px
-  -- band; at twice that ladder the two land buttons overlapped each other and
-  -- the three category tabs ran off the end of the row.
-  local land_size, cat_size, tag_size = 10, 8, 7
-  local label_h = UI.lineHeight(land_size)
-  local bh = math.max(38, label_h + 18)
-  local h = bh + 18
-  UI.setColor(Theme.ink, 0.88)
-  love.graphics.rectangle("fill", 0, 0, vw, h)
-  love.graphics.setColor(1, 1, 1, 1)
+  local g = Layout.gutter()
+  local chip_h = Theme.control.chip
+  local pitch = chip_h + Theme.space.sm
+  local gap = Theme.space.sm
+  local room = vw - g * 2
+  local band = UI.headerHeight()
 
   self.land_rects = {}
   self.category_rects = {}
   -- Cleared every frame: a hit rect that outlives the button it belonged to
   -- is a reset that fires from a blank piece of header.
   self.reset_rect = nil
-  self.header_h = h
+  self.back_rect = nil
 
-  -- What the row needs if nothing is squeezed, and what it actually has.
   local LANDS = self:lands()
-  local mascot = bh - 10
-  local land_w = 0
-  for _, land in ipairs(LANDS) do
-    land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(Land.name(land)), land_size) + 10)
-  end
-  local CATEGORIES = Land.roads(self.land)
-  local cat_w = 0
-  for _, category in ipairs(CATEGORIES) do
-    cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)
-  end
-  local tab_tag = UI.textWidth("TAB", tag_size) + 8
-  local q_tag = UI.textWidth("Q", tag_size) + 8
-  local reset_label = I18n.t("RESET THIS ROAD")
+  local ROADS = Land.roads(self.land)
   local offer_reset = Map.reset_offered(self.tally)
-  local reset_w = offer_reset and (UI.textWidth(reset_label, cat_size) + 16) or 0
-  local reset_gap = offer_reset and 12 or 0
-  local wanted = 10 + #LANDS * (land_w + 6) + tab_tag
-    + #CATEGORIES * (cat_w + 4) + q_tag + reset_gap + reset_w + 10
-  -- Too narrow for all of it — a portrait canvas in a language with wide
-  -- glyphs — so the two key tags go first and then everything shrinks
-  -- proportionally. Shrinking is the last resort, not the first.
-  local show_tags = wanted <= vw
-  if not show_tags then
-    wanted = wanted - tab_tag - q_tag
-    tab_tag, q_tag = 0, 0
-  end
-  -- Then the type steps down, land and category together, before any
-  -- width is squeezed: squeezing first gave the four land names most of
-  -- the row and left the category tabs to shrink to nothing.
-  while wanted > vw and land_size > 5 do
-    land_size = land_size - 1
-    cat_size = math.max(4, cat_size - 1)
-    label_h = UI.lineHeight(land_size)
-    land_w = 0
-    for _, land in ipairs(LANDS) do
-      land_w = math.max(land_w, mascot + 8 + UI.textWidth(I18n.t(Land.name(land)), land_size) + 10)
-    end
-    cat_w = 0
-    for _, category in ipairs(CATEGORIES) do
-      cat_w = math.max(cat_w, UI.textWidth(I18n.t(Land.category_label(category)), cat_size) + 16)
-    end
-    if offer_reset then reset_w = UI.textWidth(reset_label, cat_size) + 16 end
-    wanted = 10 + #LANDS * (land_w + 6) + tab_tag + #CATEGORIES * (cat_w + 4)
-      + q_tag + reset_gap + reset_w + 10
-  end
-  if wanted > vw then
-    local squeeze = (vw - 20 - #LANDS * 6 - #CATEGORIES * 4 - reset_gap)
-      / math.max(1, #LANDS * land_w + #CATEGORIES * cat_w + reset_w)
-    land_w = math.floor(land_w * squeeze)
-    cat_w = math.floor(cat_w * squeeze)
-    reset_w = math.floor(reset_w * squeeze)
-  end
+  local reset_label = I18n.t("RESET THIS ROAD")
+  -- Sized from `UI.buttonSize`: a button never shrinks its label, and on a
+  -- wide canvas the label is 24, not 16.
+  local reset_w, reset_h = UI.buttonSize(reset_label)
+  if not offer_reset then reset_w = 0 end
+  local back_label = "‹ " .. I18n.t("BACK")
+  local back_w, back_h = UI.buttonSize(back_label)
+  back_h = math.max(Theme.control.buttonM, back_h)
+  local mascot_box = chip_h - 8
 
-  local x = 10
-  local by = (h - bh) / 2
+  -- The land badge: the mascot and the name in the land's colour.
+  local name = I18n.t(Land.name(self.land))
+  local badge_w = Theme.space.md + mascot_box + Theme.space.sm + UI.labelWidth(name, "label") + Theme.space.md
+  local lands_w = badge_w
   for _, land in ipairs(LANDS) do
-    local on = land == self.land
-    local tint = Theme.land[land] or Theme.coin
-    UI.setColor(on and tint or Theme.withAlpha(Theme.dim, 0.45))
-    love.graphics.rectangle("fill", x, by, land_w, bh)
-    love.graphics.setLineWidth(2)
-    UI.setColor(on and Theme.cream or Theme.withAlpha(Theme.cream, 0.3))
-    love.graphics.rectangle("line", x + 1, by + 1, land_w - 2, bh - 2)
-    love.graphics.setColor(1, 1, 1, 1)
-    Assets.sprite(Land.mascot(land), x + 4 + mascot / 2, by + bh - 4, mascot,
-      { alpha = on and 1 or 0.45 })
-    -- At the size that fits the button, before the scissor cuts: `RU` and
-    -- `C+` were what the largest type step left of the land names.
-    local name = I18n.t(Land.name(land))
-    local fit = UI.fitSize(name, land_w - mascot - 12, land_size, 3)
-    love.graphics.setScissor(x, by, land_w, bh)
-    UI.text(name, x + mascot + 6, by + (bh - UI.lineHeight(fit)) / 2, fit,
-      on and Theme.ink or Theme.withAlpha(Theme.cream, 0.55))
-    love.graphics.setScissor()
-    self.land_rects[land] = { x = x, y = by, w = land_w, h = bh }
-    x = x + land_w + 6
+    if land ~= self.land then lands_w = lands_w + gap + chip_h end
   end
 
-  if show_tags then
-    UI.text(I18n.t("TAB"), x, by, tag_size, Theme.withAlpha(Theme.cream, 0.4))
-    x = x + tab_tag
-  end
+  local with_back = back_w + gap + lands_w + (offer_reset and (gap + reset_w) or 0) <= room
+  local reset_on_first = offer_reset and (lands_w + gap + reset_w <= room)
 
-  local ch = math.max(28, UI.lineHeight(cat_size) + 12)
-  local cy = (h - ch) / 2
-  for _, category in ipairs(CATEGORIES) do
-    local on = category == self.category
-    UI.setColor(on and Theme.panel or Theme.withAlpha(Theme.dim, 0.4))
-    love.graphics.rectangle("fill", x, cy, cat_w, ch)
-    love.graphics.setLineWidth(2)
-    UI.setColor(on and Theme.coin or Theme.withAlpha(Theme.cream, 0.25))
-    love.graphics.rectangle("line", x + 1, cy + 1, cat_w - 2, ch - 2)
-    love.graphics.setColor(1, 1, 1, 1)
-    local label = I18n.t(Land.category_label(category))
-    local fit = UI.fitSize(label, cat_w - 8, cat_size, 3)
-    love.graphics.setScissor(x, cy, cat_w, ch)
-    UI.text(label, x + (cat_w - UI.textWidth(label, fit)) / 2,
-      cy + (ch - UI.lineHeight(fit)) / 2, fit,
-      on and Theme.ink or Theme.withAlpha(Theme.cream, 0.6))
-    love.graphics.setScissor()
-    self.category_rects[category] = { x = x, y = cy, w = cat_w, h = ch }
-    x = x + cat_w + 4
+  -- The road chips: on the first row after the lands when the whole header
+  -- fits one row (a wide canvas), else wrapped into rows of their own.
+  local roads_w = -gap
+  for _, road in ipairs(ROADS) do
+    roads_w = roads_w + math.min(UI.chipWidth(I18n.t(Land.category_label(road))), room) + gap
   end
-  if show_tags then
-    UI.text("Q", x + 2, cy, tag_size, Theme.withAlpha(Theme.cream, 0.4))
-    x = x + q_tag
+  local lead_w = (with_back and (back_w + gap) or 0) + lands_w + Theme.space.lg
+  local one_row = lead_w + roads_w + (offer_reset and (gap + reset_w) or 0) <= room
+  local rows = { {} }
+  local x = one_row and lead_w or 0
+  for _, road in ipairs(ROADS) do
+    local label = I18n.t(Land.category_label(road))
+    local w = math.min(UI.chipWidth(label), room)
+    if x > (one_row and lead_w or 0) and x + w > room then
+      rows[#rows + 1] = {}
+      x = 0
+    end
+    rows[#rows][#rows[#rows] + 1] = { road = road, label = label, w = w, x = x }
+    x = x + w + gap
   end
-
-  -- RESET THIS ROAD, at the far right and only where the server's count says
-  -- there is something to take away. Right-aligned rather than next in the
-  -- flow so that a destructive button never ends up shoulder to shoulder
-  -- with the tab the player was aiming for.
-  if offer_reset and reset_w > 12 then
-    local rw = math.min(reset_w, vw - 10 - x)
-    if rw > 12 then
-      local rx = vw - 10 - rw
-      local rh = math.max(28, UI.lineHeight(cat_size) + 12)
-      local ry = (h - rh) / 2
-      UI.button(rx, ry, rw, rh, reset_label, nil, cat_size)
-      self.reset_rect = { x = rx, y = ry, w = rw, h = rh }
+  local reset_row = nil
+  if offer_reset and not reset_on_first then
+    -- At the end of the last road row when it fits there, else a row of
+    -- its own: the button is always on the screen.
+    local last = rows[#rows]
+    local used = last[#last].x + last[#last].w
+    if used + gap + reset_w <= room then
+      reset_row = #rows
+    else
+      rows[#rows + 1] = {}
+      reset_row = #rows
     end
   end
 
-  -- The count used to be a walk over `self.nodes` here. It is the server's
-  -- now (`world.map`), and it is drawn on the node card with its bar rather
-  -- than twice on one screen — see `draw_node_card`.
+  -- The rows are the chips' pitch; a reset button taller than a chip gets
+  -- the room it needs on its row.
+  pitch = math.max(pitch, reset_h + Theme.space.sm)
+  local extra = #rows - (one_row and 1 or 0)
+  local h = band + extra * pitch
+  self.header_h = h
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  -- Row one: back, the badge, the mascots, reset.
+  local y = math.floor((band - chip_h) / 2)
+  x = g
+  if with_back then
+    local bh = back_h
+    self.back_rect = { x = x, y = math.floor((band - bh) / 2), w = back_w, h = bh }
+    UI.button(self.back_rect.x, self.back_rect.y, back_w, bh, back_label,
+      self.hover == "back" and "hot" or "normal", nil, { variant = "ghost", id = "map:back" })
+    x = x + back_w + gap
+  end
+  local tint = Theme.land[self.land] or Theme.gold
+  UI.setColor(Theme.shadowOf(tint) == Theme.edge and Theme.darken(tint, 0.45) or Theme.shadowOf(tint))
+  UI.rrect("fill", x, y + Theme.chipShadowDy, badge_w, chip_h, Theme.radiusInner)
+  UI.setColor(tint)
+  UI.rrect("fill", x, y, badge_w, chip_h, Theme.radiusInner)
+  UI.stroke(x, y, badge_w, chip_h, Theme.radiusInner, Theme.edge)
+  local bob = Anim.bob(self.t, { amount = 1.5, phase = Land.phase(self.land) })
+  mascot(Land.mascot(self.land), x + Theme.space.md + mascot_box / 2, y + chip_h - 4 + bob, mascot_box)
+  UI.label(name, x + Theme.space.md + mascot_box + Theme.space.sm, y + math.floor((chip_h - UI.lead("label")) / 2),
+    "label", { color = Theme.edge, shadow = false })
+  self.land_rects[self.land] = { x = x, y = y, w = badge_w, h = chip_h }
+  x = x + badge_w + gap
+  for _, land in ipairs(LANDS) do
+    if land ~= self.land then
+      local hot = self.hover == land
+      UI.chip(x, y, "", { w = chip_h, hot = hot })
+      mascot(Land.mascot(land), x + chip_h / 2, y + chip_h - 4, mascot_box, { alpha = hot and 1 or 0.7 })
+      self.land_rects[land] = { x = x, y = y, w = chip_h, h = chip_h }
+      x = x + chip_h + gap
+    end
+  end
+  local function reset_at(rx, ry)
+    -- Centred on the chip row it shares.
+    ry = ry + math.floor((chip_h - reset_h) / 2)
+    self.reset_rect = { x = rx, y = ry, w = reset_w, h = reset_h }
+    UI.button(rx, ry, reset_w, reset_h, reset_label, self.hover == "reset" and "hot" or "normal", nil,
+      { variant = "ghost", id = "map:reset", lift = 1, sway = false })
+  end
+  if reset_on_first then reset_at(vw - g - reset_w, y) end
+
+  -- The road rows: the first shares the lands' row on a wide canvas.
+  for r, row in ipairs(rows) do
+    local ry = band + (r - 1 - (one_row and 1 or 0)) * pitch
+    if one_row and r == 1 then ry = y end
+    for _, c in ipairs(row) do
+      local on = c.road == self.category
+      UI.chip(g + c.x, ry, c.label, { selected = on, hot = self.hover == c.road, w = c.w })
+      self.category_rects[c.road] = { x = g + c.x, y = ry, w = c.w, h = chip_h }
+    end
+    if reset_row == r then reset_at(vw - g - reset_w, ry) end
+  end
 end
 
 function Map:draw_edges()
@@ -938,9 +972,9 @@ function Map:draw_edges()
       -- The route, lit as far as the player has got. Not a gate: the dim
       -- half is "you have not been here yet", not "you may not go".
       local lit = na.state == "cleared"
-      UI.setColor(Theme.ink, 0.55)
+      UI.setColor(Theme.edge, 0.55)
       love.graphics.line(ax, ay + 2, bx, by + 2)
-      UI.setColor(lit and Theme.coin or Theme.withAlpha(Theme.cream, 0.45))
+      UI.setColor(lit and Theme.gold or Theme.withAlpha(Theme.text, 0.45))
       love.graphics.line(ax, ay, bx, by)
     end
   end
@@ -973,18 +1007,25 @@ local function marker_for(node)
   return "node_quest"
 end
 
+--- The size a marker is drawn at: a picture, so it grows with the canvas
+--- (`uiScale` is still right for art), and never smaller than its number
+--- needs — the label is the fixed label role, and the coin is scaled to
+--- hold it rather than the other way round.
+function Map:marker_size(node)
+  local scale = Layout.uiScale()
+  local base = (node.kind == "boss" and 44 or 34) * scale
+  local label_w = UI.labelWidth(tostring(node.node), "label")
+  return math.max(base, label_w / 0.6)
+end
+
 function Map:draw_nodes()
   if not self.nodes then return end
-  -- **Art**, not type. A node marker is a picture, and a picture on a canvas
-  -- half again as tall should be half again as big — that is the one thing
-  -- `uiScale` is still right for. Type went the other way this round: see
-  -- `Layout.uiScale`'s note for why a pixel face may not be multiplied by 1.5.
-  local scale = Layout.uiScale()
   local next_i = Map.next_index(self.nodes)
+  local font = UI.font("label")
   for i, node in ipairs(self.nodes) do
     local x, y = self:node_xy(node)
     local selected = i == self.cursor
-    local base = (node.kind == "boss" and 44 or 34) * scale
+    local base = self:marker_size(node)
     -- Every node breathes, a little, on its own phase; the selected one
     -- breathes harder. A board of perfectly still markers is the same
     -- "this is a menu" signal as a perfectly still mascot.
@@ -995,58 +1036,81 @@ function Map:draw_nodes()
     })
     local size = base
     if selected then
-      size = size + 4 * scale * Ease.cosine((self.t * 1.6) % 1)
+      size = size + 4 * Layout.uiScale() * Ease.cosine((self.t * 1.6) % 1)
     end
 
     -- A shadow grounds it. Without one a bobbing marker looks like it is
     -- sliding rather than lifting.
-    UI.setColor(Theme.ink, 0.30)
+    UI.setColor(Theme.edge, 0.30)
     love.graphics.ellipse("fill", x, y + size * 0.34, size * 0.30, size * 0.10)
     love.graphics.setColor(1, 1, 1, 1)
     y = y + bob
 
     local drew = Assets.marker(marker_for(node), x, y, size)
     if not drew then
-      -- No art: the old coloured disc, so the map still works.
+      -- No art: a coloured disc, so the map still works.
       local r = size * 0.38
-      local fill = Theme.panel
-      if node.state == "cleared" then fill = Theme.admit end
-      if node.kind == "boss" then fill = Theme.brick end
-      UI.setColor(Theme.ink)
+      local fill = Theme.gold
+      if node.state == "cleared" then fill = Theme.green end
+      if node.kind == "boss" then fill = Theme.redA end
+      UI.setColor(Theme.edge)
       love.graphics.circle("fill", x, y, r + 3)
       UI.setColor(fill)
       love.graphics.circle("fill", x, y, r)
     end
 
-    local label = tostring(node.node)
-    local nw = UI.textWidth(label, 9)
-    UI.text(label, x - nw / 2, y - 5, 9, Theme.ink)
-
     -- A cleared node wears the stamp (SPEC §0: stamped CLEARED, for good).
     -- The sprite is a wordless ring by design — `docs/design-review.md` says
-    -- the word is printed over it at runtime so it can be translated.
+    -- the word is printed over it at runtime so it can be translated — and
+    -- the word is printed only where the ring is big enough to hold it;
+    -- otherwise the number is, so a cleared coin still says which it is.
+    local stamped = false
     if node.state == "cleared" then
       -- A practised node wears the stamp in another colour (the ring tinted
       -- cyan) with its count on the rim: a street played again is a
       -- different kind of done, and the map should say so at a glance.
       local tint = Map.stamp_color(node.practised)
-      if Assets.marker("stamp_cleared", x, y, size * 1.15, { color = tint }) then
-        local w = UI.textWidth("CLEARED", 6)
-        UI.text(I18n.t("CLEARED"), x - w / 2, y - 3, 6, Theme.cream)
+      local ring = size * 1.15
+      if Assets.marker("stamp_cleared", x, y, ring, { color = tint }) then
+        local word = I18n.t("CLEARED")
+        local ww = font:getWidth(word)
+        if ww <= ring * 0.8 then
+          stamped = true
+          love.graphics.setFont(font)
+          UI.setColor(Theme.text)
+          love.graphics.print(word, math.floor(x - ww / 2), math.floor(y - font:getHeight() / 2))
+          love.graphics.setColor(1, 1, 1, 1)
+        end
       else
-        UI.setColor(tint and Theme.cyan or Theme.admit)
+        UI.setColor(tint and Theme.cyan or Theme.green)
         love.graphics.circle("line", x, y, size * 0.5)
         love.graphics.setColor(1, 1, 1, 1)
       end
+    end
+
+    -- The number, in the label role: fixed, so it cannot outgrow its coin,
+    -- and over the stamp, so the stamp cannot hide it.
+    if not stamped then
+      local label = tostring(node.node)
+      love.graphics.setFont(font)
+      UI.setColor(Theme.edge)
+      love.graphics.print(label, math.floor(x - font:getWidth(label) / 2), math.floor(y - font:getHeight() / 2))
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+
+    if node.state == "cleared" then
       if (node.practised or 0) > 0 then
         local tag = ("×%d"):format(node.practised)
-        local tw = UI.textWidth(tag, 6) + 4
-        UI.setColor(Theme.ink, 0.9)
-        love.graphics.rectangle("fill", x + size * 0.22, y + size * 0.26, tw, UI.lineHeight(6) + 2)
+        local tw = font:getWidth(tag) + Theme.space.sm
+        local th = font:getHeight() + 2
+        local tx, ty = x + size * 0.22, y + size * 0.26
+        UI.setColor(Theme.edge, 0.9)
+        UI.rrect("fill", tx, ty, tw, th, Theme.radiusSm)
         UI.setColor(Theme.cyan, 0.9)
-        love.graphics.rectangle("fill", x + size * 0.22 + 1, y + size * 0.26 + 1, tw - 2, UI.lineHeight(6))
+        UI.rrect("fill", tx + 1, ty + 1, tw - 2, th - 2, Theme.radiusSm - 1)
+        UI.setColor(Theme.edge)
+        love.graphics.print(tag, tx + Theme.space.xs, ty + 1)
         love.graphics.setColor(1, 1, 1, 1)
-        UI.text(tag, x + size * 0.22 + 2, y + size * 0.26 + 1, 6, Theme.ink)
       end
     end
 
@@ -1071,14 +1135,14 @@ function Map:draw_nodes()
     local age = self.stamped[node.quest_id]
     if age and age < 0.9 then
       local k = Ease.expOut(age / 0.9)
-      UI.setColor(Theme.coin, 1 - k)
+      UI.setColor(Theme.gold, 1 - k)
       love.graphics.setLineWidth(3)
       love.graphics.circle("line", x, y, size * 0.5 + 34 * k)
       love.graphics.setColor(1, 1, 1, 1)
     end
 
     if selected then
-      UI.setColor(Theme.coin)
+      UI.setColor(Theme.gold)
       love.graphics.setLineWidth(2)
       love.graphics.circle("line", x, y, size * 0.62)
       love.graphics.setColor(1, 1, 1, 1)
@@ -1121,7 +1185,7 @@ function Map:draw_mei()
   local height = 46 * Layout.uiScale()
 
   -- A soft shadow so she sits on the plate rather than floating over it.
-  UI.setColor(Theme.ink, 0.28)
+  UI.setColor(Theme.edge, 0.28)
   love.graphics.ellipse("fill", x, y + 2, height * 0.20, height * 0.07)
   love.graphics.setColor(1, 1, 1, 1)
 
@@ -1132,124 +1196,144 @@ function Map:draw_mei()
   end
 end
 
-function Map:draw_node_card(node)
-  local vw, vh = Layout.vw, Layout.vh
+--- `requires` is the suggested route, and saying so is the whole point: it
+--- answers "where next" without ever being a refusal. The node to do first,
+--- when there is one still open.
+function Map:suggested_after(node)
+  if not node or node.state == "cleared" or not node.requires or #node.requires == 0 then return nil end
+  local after = node.requires[1]
+  local blocker = self.by_id[after] and self.nodes[self.by_id[after]]
+  if blocker and blocker.state ~= "cleared" then return after end
+  return nil
+end
+
+--- The node card's height: the sum of its rows at the roles, so the sheet
+--- is as tall as what it says and the plate above it knows where to stop.
+--- With `node`, the landscape card adds the suggested-route line when the
+--- node has one; the portrait sheet never does (it is already the map's
+--- third), so the plate's height is the same whichever node is under the
+--- cursor.
+function Map:card_height(node)
   local portrait = Layout.isPortrait()
-  local w = portrait and (vw - 24) or math.min(460, vw - 40)
-  -- Tall enough for the last row. The difficulty bar and the "needs …" line
-  -- were both added after this number was first picked, and the blocker — the
-  -- one thing a locked node has to tell you — was the line that fell off.
-  -- Measured from its four rows of type rather than fixed at 112: the title,
-  -- the id, the state, and the difficulty/stars row, plus a last line for the
-  -- suggested route.
-  local title_h, id_h = UI.lineHeight(11), UI.lineHeight(7)
-  local state_h, meta_h = UI.lineHeight(9), UI.lineHeight(7)
-  -- The boss portrait's width is needed before the height, because the
-  -- title wraps around it — and the title's line count decides the height.
+  local pad = portrait and Theme.space.lg or Theme.space.xl
+  local h = pad + UI.lead("label") + Theme.space.xs + UI.lead("title") + Theme.space.md
+  if portrait then
+    -- The stars, the pips and the attempts share a line.
+    h = h + math.max(Theme.space.xl, UI.lead("label")) + Theme.space.lg
+  else
+    h = h + Theme.control.chip + Theme.space.md + UI.lead("label") + Theme.space.lg
+    if node and self:suggested_after(node) then h = h + UI.lead("label") + Theme.space.sm end
+  end
+  h = h + Theme.control.buttonL + Theme.space.lg + 8 + pad
+  return h
+end
+
+--- The node card: where it sits. Docked top-right in landscape; a sheet
+--- above the footer upright.
+function Map:card_rect(node)
+  local vw, vh = Layout.vw, Layout.vh
+  local h = self:card_height(node)
+  if Layout.isPortrait() then
+    local g = Layout.gutter()
+    return { x = g, y = vh - UI.footerHeight() - h, w = vw - g * 2, h = h }
+  end
+  local bx, by, bw = UI.bounded(nil, (self.header_h or UI.headerHeight()) + Theme.space.lg)
+  local w = math.min(360, bw)
+  return { x = bx + bw - w, y = by, w = w, h = h }
+end
+
+function Map:draw_node_card(node)
+  local portrait = Layout.isPortrait()
+  local r = self:card_rect(node)
+  local pad = portrait and Theme.space.lg or Theme.space.xl
+  local k = Juice.enter("map:card", { dur = Theme.motion.enter, delay = 0.08 })
+  local alpha = math.min(1, k * 1.5)
+  local y = r.y + (1 - k) * 24
+  UI.card(r.x, y, r.w, r.h, { strip = Theme.land[self.land] or Theme.gold, stripH = Theme.landStripeH,
+    alpha = alpha, pad = 0 })
+  local x = r.x + pad
+  local right = r.x + r.w - pad
+  local inner = right - x
+  local cy = y + pad
+
+  -- The boss gets its portrait, standing on the card's content rows. It is
+  -- the thing the premise is named after and it was drawn exactly like node 5.
   local boss_w = 0
-  if node.kind == "boss" then
-    local boss = BOSS[self.land .. "." .. self.category]
-    if boss and Assets.image(boss) then boss_w = 78 end
+  local boss = node.kind == "boss" and BOSS[self.land .. "." .. self.category] or nil
+  if boss and Assets.image(boss) and not portrait then
+    boss_w = 88
+    Assets.sprite(boss, right - boss_w / 2 + Theme.space.sm, cy + UI.lead("label") + UI.lead("title") + Theme.space.md + Theme.control.chip, 96, { alpha = alpha })
   end
-  -- The card's own width, minus the boss portrait when there is one. A quest
-  -- title is content and can be any length, so this is the one line on the
-  -- screen that must be given a width rather than trusted to be short — and
-  -- the card has to be as tall as the lines that width makes of it, or the
-  -- second line of the title is printed through the id (portrait, step 4).
-  local title_w = w - 24 - boss_w
-  -- The road's progress rides on the title's row, right-aligned, and the
-  -- title wraps around whatever width it took. Half the row at most: a
-  -- title is content and this is chrome.
-  local tally = self.tally
-    and Map.tally_label(self.tally.cleared, self.tally.total, title_w * 0.5,
-      function(text) return UI.textWidth(text, 7) end)
-    or nil
-  local tally_w = tally and (UI.textWidth(tally, 7) + 10) or 0
-  title_w = title_w - tally_w
-  local title = ("%02d  %s"):format(node.node, node.title or "")
-  local title_lines = math.max(1, #UI.wrap(title, title_w, 11))
-  local id_lines = math.max(1, #UI.wrap(node.quest_id or "", title_w, 7))
-  -- The two rows under the id each hold a left thing and a right thing —
-  -- the state and the stars, the difficulty and the attempts. When the
-  -- pair would touch, the right thing takes a row of its own: `OPEN` was
-  -- printed through `STARS` and `DIFFICULTY` through `0 ATTEMPTS` at the
-  -- largest type step.
-  local star = math.max(10, math.floor(UI.lineHeight(7) * 0.8))
-  local pip = math.max(6, math.floor(star * 0.6))
-  local state_w = UI.textWidth(I18n.t((node.state or "?"):upper()), 9)
-  local stars_w = UI.textWidth(I18n.t("STARS") .. " ", 7) + 3 * (star + 3)
-  local split3 = state_w + stars_w + 16 > title_w
-  local diff_w = UI.textWidth(I18n.t("DIFFICULTY") .. " ", 7) + UI.pipsWidth(pip)
-  local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
-  local split4 = diff_w + UI.textWidth(attempts, 8) + 16 > title_w
-  local row3_h = state_h + (split3 and (meta_h + 4) or 0)
-  local row4_h = math.max(meta_h, UI.lineHeight(8)) + (split4 and (UI.lineHeight(8) + 4) or 0)
-  local h = 10 + title_lines * title_h + 2 + id_lines * id_h + 6 + row3_h + 6
-    + row4_h + 6 + id_h + 8
-  local x = portrait and 12 or (vw - w - 16)
-  local y = vh - h - UI.footerHeight() - 10
 
-  UI.panel(x, y, w, h, {
-    fill = Theme.withAlpha(Theme.navy, 0.94),
-    tint = Theme.land[self.land],
-  })
-  -- The boss gets its portrait, standing on the card's baseline. It is the
-  -- thing the premise is named after and it was drawn exactly like node 5.
-  if boss_w > 0 then
-    Assets.sprite(BOSS[self.land .. "." .. self.category], x + w - boss_w / 2 - 6, y + h - 8, h - 24)
-  end
-  local color = Theme.cream
-  local r1 = y + 10
-  local r2 = r1 + title_lines * title_h + 2
-  local r3 = r2 + id_lines * id_h + 6
-  local r3b = split3 and (r3 + state_h + 4) or r3
-  local r4 = r3 + row3_h + 6
-  local r4b = split4 and (r4 + math.max(meta_h, UI.lineHeight(8)) + 4) or r4
-  UI.text(title, x + 12, r1, 11, color, "left", title_w)
+  -- Row one: the number, and the road's tally.
+  local number = ("%02d"):format(node.node or 0)
+  UI.label(number, x, cy, "label", { color = Theme.mute, alpha = alpha })
+  local tally = self.tally and Map.tally_label(self.tally.cleared, self.tally.total,
+    inner - boss_w - UI.labelWidth(number, "label") - Theme.space.md,
+    function(text) return UI.labelWidth(text, "label") end) or nil
   if tally then
-    local tx = x + 12 + title_w + 10
-    UI.text(tally, tx, r1, 7, Theme.withAlpha(color, 0.85), "left", tally_w)
-    -- The same fact without reading: a two-pixel bar under the words.
-    local bw = UI.textWidth(tally, 7)
-    local by = r1 + UI.lineHeight(7) + 2
-    UI.setColor(Theme.dim, 0.5)
-    love.graphics.rectangle("fill", tx, by, bw, 2)
-    UI.setColor(Theme.admit)
-    love.graphics.rectangle("fill", tx, by,
-      math.floor(bw * self.tally.cleared / math.max(1, self.tally.total)), 2)
-    love.graphics.setColor(1, 1, 1, 1)
+    UI.label(tally, x, cy, "label", { color = Theme.mute, width = inner - boss_w, align = "right", alpha = alpha })
   end
-  UI.text(node.quest_id or "", x + 12, r2, 7, Theme.withAlpha(color, 0.6),
-    "left", title_w)
+  cy = cy + UI.lead("label") + Theme.space.xs
 
+  -- The title: one line, an ellipsis, never a wrap.
   local practised = node.practised or 0
-  local state_color = ({ open = Theme.coin, cleared = Theme.admit })[node.state]
-    or Theme.cream
-  if node.state == "cleared" and practised > 0 then state_color = Theme.cyan end
-  UI.text(node.state == "cleared" and practised > 0
-    and I18n.t("CLEARED · PRACTISED ×%d", practised)
-    or I18n.t((node.state or "?"):upper()), x + 12, r3, 9, state_color)
-  -- Difficulty is a segmented bar; stars are stars. Two scales, two shapes,
-  -- and a row of text between them (design review §4).
-  local dl = I18n.t("DIFFICULTY") .. " "
-  UI.text(dl, x + 12, r4, 7, Theme.withAlpha(color, 0.6))
-  UI.pips(x + 12 + UI.textWidth(dl, 7), r4, node.difficulty or 1, pip)
-  local ax = split4 and (x + 12) or (x + w - 12 - boss_w - UI.textWidth(attempts, 8))
-  UI.text(attempts, ax, r4b, 8, Theme.withAlpha(color, 0.7))
-  local sl = I18n.t("STARS") .. " "
-  local stx = split3 and (x + 12 + UI.textWidth(sl, 7)) or (x + w - 12 - boss_w - 3 * (star + 3))
-  UI.text(sl, stx - UI.textWidth(sl, 7), r3b, 7, Theme.withAlpha(color, 0.6))
-  UI.stars(stx, r3b, node.stars or 0, star)
+  local status_w = 0
+  local status, status_color
+  if node.state == "cleared" and practised > 0 then
+    status, status_color = I18n.t("CLEARED · PRACTISED ×%d", practised), Theme.cyan
+  elseif node.state == "cleared" then
+    status, status_color = I18n.t("CLEARED"), Theme.green
+  else
+    status, status_color = I18n.t((node.state or "?"):upper()), nil
+  end
+  if portrait then
+    status_w = UI.chipWidth(status) + Theme.space.md
+    UI.chip(right - status_w + Theme.space.md, cy + math.floor((UI.lead("title") - Theme.control.chip) / 2), status,
+      { color = status_color, selected = status_color == nil, alpha = alpha })
+  end
+  UI.label(node.title or "", x, cy, "title", { width = inner - boss_w - status_w, ellipsis = true, alpha = alpha })
+  cy = cy + UI.lead("title") + Theme.space.md
 
-  -- `requires` is the suggested route, and saying so is the whole point: it
-  -- answers "where next" without ever being a refusal.
-  if node.state ~= "cleared" and node.requires and #node.requires > 0 then
-    local after = node.requires[1]
-    local blocker = self.by_id[after] and self.nodes[self.by_id[after]]
-    if blocker and blocker.state ~= "cleared" then
-      UI.text(I18n.t("SUGGESTED AFTER %s", after), x + 12, y + h - 8 - id_h, 7,
-        Theme.withAlpha(Theme.cyan, 0.8))
+  if portrait then
+    -- The stars, the pips and the attempts, on one line.
+    local line_h = math.max(Theme.space.xl, UI.lead("label"))
+    UI.stars(x, cy + math.floor((line_h - 24) / 2), node.stars or 0, 24)
+    local px = x + 3 * 27 + Theme.space.lg
+    UI.pips(px, cy + math.floor((line_h - 12) / 2), node.difficulty or 1, 6)
+    local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
+    UI.label(attempts, px + UI.pipsWidth(6) + Theme.space.lg, cy + math.floor((line_h - UI.lead("label")) / 2), "label",
+      { color = Theme.mute, width = right - (px + UI.pipsWidth(6) + Theme.space.lg), align = "right", ellipsis = true, alpha = alpha })
+    cy = cy + line_h + Theme.space.lg
+  else
+    -- The status chip, with the stars at the right.
+    UI.chip(x, cy, status, { color = status_color, selected = status_color == nil, alpha = alpha })
+    UI.stars(right - boss_w - 3 * 27, cy + math.floor((Theme.control.chip - 24) / 2), node.stars or 0, 24)
+    cy = cy + Theme.control.chip + Theme.space.md
+    -- The difficulty pips, and the attempts at the right.
+    UI.pips(x, cy + math.floor((UI.lead("label") - 12) / 2), node.difficulty or 1, 6)
+    local attempts = I18n.t("%d ATTEMPTS", node.attempts or 0)
+    UI.label(attempts, x + UI.pipsWidth(6) + Theme.space.lg, cy, "label",
+      { color = Theme.mute, width = right - boss_w - (x + UI.pipsWidth(6) + Theme.space.lg), align = "right", ellipsis = true, alpha = alpha })
+    cy = cy + UI.lead("label") + Theme.space.lg
+    -- Where next, when the route says: on the card, before PLAY.
+    local after = self:suggested_after(node)
+    if after then
+      cy = cy + UI.label(I18n.t("SUGGESTED AFTER %s", after), x, cy - Theme.space.sm, "label",
+        { color = Theme.mute, width = inner, ellipsis = true, alpha = alpha })
     end
+  end
+
+  -- PLAY: the screen's one primary button, ENTER inside it.
+  local play = { x = x, y = cy, w = inner, h = Theme.control.buttonL }
+  self.play_rect = play
+  UI.button(play.x, play.y, play.w, play.h, I18n.t("PLAY"), self.hover == "play" and "hot" or "normal", nil,
+    { variant = "primary", id = "map:play", key = "ENTER", alpha = alpha })
+  cy = cy + Theme.control.buttonL + Theme.space.lg
+
+  -- The road's bar: the same fact as the tally, without reading.
+  if self.tally then
+    UI.bar(x, cy, inner, 8, self.tally.cleared / math.max(1, self.tally.total), Theme.gold)
   end
 end
 
@@ -1294,9 +1378,9 @@ function Map:wheelmoved(_, dy)
 end
 
 function Map:keypressed(key)
-  -- The confirm panel takes the whole keyboard while it is up. Not politeness:
+  -- The confirm sheet takes the whole keyboard while it is up. Not politeness:
   -- TAB and Q left live under it would let the player switch land, and then
-  -- RESET IT would clear a road the panel never named.
+  -- RESET IT would clear a road the sheet never named.
   if self.confirm_reset then
     if key == "escape" or key == "return" or key == "kpenter" or key == "space" then
       self:cancel_reset()
@@ -1330,6 +1414,23 @@ function Map:keypressed(key)
   return false
 end
 
+function Map:mousemoved(x, y)
+  local function inside(r)
+    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+  end
+  self.hover = nil
+  if self.confirm_reset then return end
+  if inside(self.back_rect) then self.hover = "back"; return end
+  if inside(self.reset_rect) then self.hover = "reset"; return end
+  if inside(self.play_rect) then self.hover = "play"; return end
+  for land, rect in pairs(self.land_rects or {}) do
+    if inside(rect) then self.hover = land; return end
+  end
+  for category, rect in pairs(self.category_rects or {}) do
+    if inside(rect) then self.hover = category; return end
+  end
+end
+
 function Map:mousepressed(x, y)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
@@ -1337,14 +1438,27 @@ function Map:mousepressed(x, y)
   if self.confirm_reset then
     local rects = self.confirm_rects or {}
     if inside(rects.go) then
+      UI.press("map:go", rects.go, { sfx = false })
       self:do_reset()
     else
-      -- KEEP, and anywhere off the panel. A click that missed is not a yes.
+      -- KEEP, the ×, and anywhere off the sheet. A click that missed is not
+      -- a yes.
+      if inside(rects.keep) then UI.press("map:keep", rects.keep, { sfx = false }) end
       self:cancel_reset()
     end
     return
   end
-  if inside(self.reset_rect) then self:ask_reset(); return end
+  if inside(self.back_rect) then
+    UI.press("map:back", self.back_rect, { sfx = false })
+    self.app:back()
+    return
+  end
+  if inside(self.reset_rect) then
+    UI.press("map:reset", self.reset_rect, { sfx = false })
+    self:ask_reset()
+    return
+  end
+  if inside(self.play_rect) then self:open_node(); return end
   for land, rect in pairs(self.land_rects or {}) do
     if inside(rect) then self:switch(land, self.category); return end
   end
@@ -1354,7 +1468,8 @@ function Map:mousepressed(x, y)
   if not self.nodes then return end
   for i, node in ipairs(self.nodes) do
     local nx, ny = self:node_xy(node)
-    if (x - nx) ^ 2 + (y - ny) ^ 2 <= 22 * 22 then
+    local reach = math.max(22, self:marker_size(node) * 0.6)
+    if (x - nx) ^ 2 + (y - ny) ^ 2 <= reach * reach then
       if self.walk then
         self:skip_walk()
         return

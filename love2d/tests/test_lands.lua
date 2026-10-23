@@ -202,17 +202,24 @@ return function()
         local tile = scene:tile_rect()
         local cards = scene:card_rects()
         local band = scene:button_rects().weakest
-        local title_bottom = 24 + UI.lineHeight(Lands.title_size(Layout.vw))
-        T.ok(tile.y >= title_bottom, tag .. ": the tile is under the title")
+        -- The playground is a card in the grid now (the tenth slot in
+        -- landscape, the first row upright), AUTO SELECT sits in the
+        -- header, and the grid lives between the header and the footer.
+        local header = UI.headerHeight()
+        local function overlap(a, b)
+          return a.x < b.x + b.w and b.x < a.x + a.w and a.y < b.y + b.h and b.y < a.y + a.h
+        end
+        T.ok(tile.y >= header, tag .. ": the tile is under the header")
         T.ok(tile.x >= 0 and tile.x + tile.w <= Layout.vw, tag .. ": the tile is inside the canvas, across")
-        T.ok(tile.h >= Lands.band_height() * 1.8 - 1, tag .. ": the tile is taller than a button")
+        T.ok(tile.h >= 36, tag .. ": the tile is big enough to press")
         for i, c in ipairs(cards) do
-          T.ok(c.y >= tile.y + tile.h, tag .. (": card %d starts under the tile"):format(i))
-          T.ok(c.y + c.h <= band.y, tag .. (": card %d ends above the band"):format(i))
+          T.ok(c.y >= header, tag .. (": card %d is under the header"):format(i))
+          T.nope(overlap(c, tile), tag .. (": card %d is clear of the tile"):format(i))
+          T.ok(c.y + c.h <= Lands.band_top(), tag .. (": card %d ends above the footer"):format(i))
           T.ok(c.h > 0, tag .. (": card %d has height"):format(i))
         end
-        T.ok(tile.y + tile.h < band.y, tag .. ": the tile is clear of the band")
-        T.ok(band.y + band.h <= Layout.vh, tag .. ": the band is inside the canvas")
+        T.ok(tile.y + tile.h <= Lands.band_top(), tag .. ": the tile is above the footer")
+        T.ok(band.y >= 0 and band.y + band.h <= header, tag .. ": AUTO SELECT sits in the header")
       end
     end
     Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh

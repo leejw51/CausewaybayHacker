@@ -180,4 +180,68 @@ return function()
       "the old width made TYPESCRIPT draw smaller than the rest")
     Layout.font = was_font
   end)
+
+  T.section("playground — the toolbar: every button visible, none cut")
+
+  T.case("the footer's hints come in priority order", function()
+    local Playground = require("src.scenes.playground")
+    local scene = setmetatable({}, { __index = Playground })
+    local keys = {}
+    for i, it in ipairs(scene:hints()) do keys[i] = it.key end
+    T.same(keys, { "F5", "F2", "CTRL-S", "ESC", "TAB", "CTRL-N" })
+  end)
+
+  T.case("every toolbar button is as wide as its widest label, on a narrow canvas and a wide one", function()
+    if not (love and love.graphics) then
+      T.skip("toolbar fit", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Playground = require("src.scenes.playground")
+    local UI = require("src.ui")
+    local Layout = require("src.layout")
+    local Theme = require("src.theme")
+    local Editor = require("src.editor")
+    local scene = Playground.new({ session = { request = function() return true end, on = function() return {} end,
+      off_all = function() end }, toast = function() end })
+    scene.editor = Editor.new({})
+    local was_vw = Layout.vw
+    for _, vw in ipairs({ 1280, 1920 }) do
+      Layout.vw = vw
+      for _, view in ipairs({ "bench", "code" }) do
+        local groups = scene:tool_groups(view)
+        local seen = {}
+        for _, group in ipairs(groups) do
+          for _, item in ipairs(group) do
+            seen[item.id] = true
+            local w = Playground.tool_w(item)
+            for _, label in ipairs(item.every or { item.label }) do
+              local need = UI.buttonSize(label, { key = item.key })
+              T.ok(w >= need, ("%s at %d: %s needs %d, has %d"):format(view, vw, label, need, w))
+            end
+          end
+        end
+        -- The browser's set, every one of them.
+        for _, id in ipairs({ "run", "autorun", "stderr", "format", "agent", "undo", "redo", "save", "new",
+          "rename", "copycode", "pastecode", "copyout", "copyin", "pastein", "poster", "reader",
+          "fontdown", "fontup", "face", "uifont", "theme", "computer" }) do
+          T.ok(seen[id], view .. " shows " .. id)
+        end
+        T.ok(seen[view == "bench" and "code" or "lang"], view .. " shows its own way out")
+        -- Laid into a band, nothing overlaps and nothing but a lone
+        -- oversize button runs past the edge.
+        local band_w = math.min(Theme.maxContentW, vw - 48)
+        local rows = Playground.flow(groups, 0, band_w, Playground.filter_w() + Theme.space.sm)
+        T.ok(#rows >= 2, ("%s at %d wraps into %d rows"):format(view, vw, #rows))
+        for ri, row in ipairs(rows) do
+          local last = -1
+          for _, cell in ipairs(row) do
+            T.ok(cell.x >= last, "cells do not overlap")
+            last = cell.x + cell.w
+            if #row > 1 then T.ok(cell.x + cell.w <= band_w + 0.5, ("row %d fits %d"):format(ri, band_w)) end
+          end
+        end
+      end
+    end
+    Layout.vw = was_vw
+  end)
 end

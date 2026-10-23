@@ -278,6 +278,38 @@ local function stored_fullscreen(record)
   return nil
 end
 
+--- The version `display.set` records are written at. Bumped when what a
+--- stored value *means* changes, so an old record can be read for what it
+--- meant then rather than for what the same number means now.
+---
+---   * **2** — the default type step went from 2 to 1 (`Layout.DEFAULT_FONT`).
+---   * **3** — the steps went from `{ 1.0, 1.5, 2.0, 2.5 }` to
+---     `{ 0.75, 1.0, 1.5, 2.0 }`, so every index means a different size.
+Store.DISPLAY_V = 3
+
+--- The index, under v3's `{ 0.75, 1.0, 1.5, 2.0 }`, of each step an older
+--- record wrote under `{ 1.0, 1.5, 2.0, 2.5 }` — the **same multiplier**,
+--- moved one place along. 2.5 has no v3 step; it comes back as 2.0, the
+--- largest there is, which is the nearest thing to what was chosen.
+local V2_STEP = { [1] = 2, [2] = 3, [3] = 4, [4] = 4 }
+
+--- The type-size step a `display.set` record holds, read for its version.
+---
+--- A record from before the version (no `v`) that says step 2 was almost
+--- always nobody's choice: step 2 was the default, and `Layout.save` writes
+--- the step on every orientation or fullscreen press, so a player who never
+--- touched the size has it on disk all the same. Those come forward to the
+--- default, 1.0, which is the smaller type somebody asked for. Any other
+--- step was somebody pressing the button, and keeps its multiplier.
+local function display_font(record)
+  local font = tonumber(record.font)
+  local v = tonumber(record.v) or 1
+  if not font then return nil end
+  if v < 2 and font == 2 then return 2 end
+  if v < 3 then return V2_STEP[math.floor(font)] or font end
+  return font
+end
+
 --- Fold a list of records into live state.
 ---
 --- A pure function of the records, so the replay can be tested without a
@@ -322,7 +354,7 @@ function Store.replay(records)
         -- the fullscreen pin already travel on, rather than a second write
         -- path: they are one setting — "how this window is set up" — and two
         -- records would mean two ways for them to disagree.
-        font = tonumber(record.font),
+        font = display_font(record),
       }
     elseif kind == "face.set" and type(record.face) == "string" then
       -- **Its own record, like the language and for the same reason.** Which
@@ -334,6 +366,24 @@ function Store.replay(records)
     elseif kind == "theme.set" and type(record.theme) == "string" then
       -- The code pane's light or dark, beside the face and for its reason.
       folded.theme = record.theme
+    elseif kind == "uiface.set" and type(record.face) == "string" then
+      -- The interface face (F8), beside the code face and for its reason,
+      -- and a record of its own rather than a field on `face.set`: the two
+      -- are separate choices and one must not rewrite the other.
+      folded.ui_face = record.face
+    elseif kind == "computer.set" and type(record.computer) == "string" then
+      -- The playground's old computer (`src/computer.lua`), beside the faces
+      -- and for their reason: a choice about the person, not the window.
+      folded.computer = record.computer
+    elseif kind == "pgprefs.set" then
+      -- The playground's AUTO-RUN and STDERR, one record for the pair. Each
+      -- field only when it really is a boolean, and **not** through
+      -- `x and y or nil`, which reads a stored `false` back as nil — and
+      -- AUTO-RUN's whole point is that `false` is a choice.
+      local prefs = {}
+      if type(record.auto_run) == "boolean" then prefs.auto_run = record.auto_run end
+      if type(record.stderr) == "boolean" then prefs.stderr = record.stderr end
+      folded.pg_prefs = prefs
     elseif kind == "lang.set" and type(record.lang) == "string" then
       -- **Its own record, not a field on `display.set`.** The orientation,
       -- the fullscreen pin and the type size are one setting — how this
@@ -442,6 +492,12 @@ function Store.fold(record)
     state.face = folded.face
   elseif record.kind == "theme.set" then
     state.theme = folded.theme
+  elseif record.kind == "uiface.set" then
+    state.ui_face = folded.ui_face
+  elseif record.kind == "computer.set" then
+    state.computer = folded.computer
+  elseif record.kind == "pgprefs.set" then
+    state.pg_prefs = folded.pg_prefs
   elseif record.kind == "lang.set" then
     state.lang = folded.lang
   elseif record.kind == "story.seen" then
@@ -739,6 +795,7 @@ end
 function Store.save_display(record)
   return Store.append({
     kind = "display.set",
+    v = Store.DISPLAY_V,
     mode = record.mode,
     pinned = record.pinned and true or false,
     fullscreen = record.fullscreen,
@@ -764,6 +821,35 @@ end
 
 function Store.set_face(face)
   return Store.append({ kind = "face.set", face = face })
+end
+
+--- The face the interface is drawn in (`Assets.UI_FACES`), across launches.
+function Store.saved_ui_face()
+  return state and state.ui_face or nil
+end
+
+function Store.set_ui_face(face)
+  return Store.append({ kind = "uiface.set", face = face })
+end
+
+--- The playground's old computer (`Computer.COMPUTERS`), across launches.
+function Store.saved_computer()
+  return state and state.computer or nil
+end
+
+function Store.set_computer(computer)
+  return Store.append({ kind = "computer.set", computer = computer })
+end
+
+--- The playground's AUTO-RUN and STDERR switches, as `{ auto_run, stderr }`
+--- with only the fields ever saved, or nil if neither has been.
+function Store.saved_pg_prefs()
+  return state and state.pg_prefs or nil
+end
+
+function Store.set_pg_prefs(prefs)
+  return Store.append({ kind = "pgprefs.set",
+    auto_run = prefs.auto_run == true, stderr = prefs.stderr == true })
 end
 
 --- The code pane's theme, "dark" or "light", across launches.

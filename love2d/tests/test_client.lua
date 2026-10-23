@@ -57,6 +57,17 @@ return function()
     T.ok(server.frames[2].payload:find('"payload":{}', 1, true))
   end)
 
+  T.case("a send that fails tears down without the read that follows crashing", function()
+    local c, server = connected()
+    server.send = function() return nil, "broken pipe" end
+    c:request("ping", {}, function() end)
+    -- `update` flushes, fails, drops the transport, then drains: the drain
+    -- used to dereference the transport it had just lost.
+    local ok, err = pcall(function() c:update() end)
+    T.ok(ok, "update survived: " .. tostring(err))
+    T.ok(c.state ~= "open", "the connection is down after the failed send")
+  end)
+
   T.case("ids are unique and follow the c-N convention", function()
     local c, server = connected()
     local seen = {}

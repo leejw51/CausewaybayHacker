@@ -1039,6 +1039,75 @@ return function()
 
   T.section("editor — no love in the model")
 
+  T.section("editor — the browser's line commands")
+
+  local function fresh(text, lang)
+    local e = editor.new({})
+    e.lang = lang or "rust"
+    e:set_text(text)
+    return e
+  end
+
+  T.case("ctrl-/ comments in each language's own mark, and takes it off again", function()
+    for lang, mark in pairs({ rust = "//", python = "#", lua = "--", go = "//" }) do
+      local e = fresh("  a\nb", lang)
+      e:select_all()
+      e:toggle_comment()
+      T.eq(e:text(), "  " .. mark .. " a\n" .. mark .. " b", lang .. " comments")
+      e:toggle_comment()
+      T.eq(e:text(), "  a\nb", lang .. " uncomments")
+    end
+  end)
+
+  T.case("ALT-UP / ALT-DOWN move the line, and stop at the ends", function()
+    local e = fresh("a\nb\nc")
+    T.nope(e:move_lines(-1), "line 1 has nowhere up to go")
+    T.ok(e:move_lines(1))
+    T.eq(e:text(), "b\na\nc")
+    T.eq(e.line, 2, "the caret goes with it")
+    e.line = 3
+    T.nope(e:move_lines(1), "the last line has nowhere down to go")
+  end)
+
+  T.case("SHIFT-ALT-DOWN copies the line and lands on the copy", function()
+    local e = fresh("a\nb")
+    e:copy_lines(1)
+    T.eq(e:text(), "a\na\nb")
+    T.eq(e.line, 2)
+    e.line = 1
+    e:copy_lines(-1)
+    T.eq(e:text(), "a\na\na\nb")
+    T.eq(e.line, 1, "copying up leaves the caret on the upper one")
+  end)
+
+  T.case("SHIFT-CTRL-K deletes the touched lines, and the last leaves one empty", function()
+    local e = fresh("only")
+    e:delete_lines()
+    T.same(e.lines, { "" })
+    e = fresh("a\nb\nc")
+    -- A selection that ends at column 1 does not take that line.
+    e.anchor = { line = 1, col = 1 }
+    e.line, e.col = 2, 1
+    local l1, l2 = e:touched_lines()
+    T.eq(l1, 1) T.eq(l2, 1)
+    e:delete_lines()
+    T.eq(e:text(), "b\nc")
+  end)
+
+  T.case("ALT-BACKSPACE takes a word, and is one undo step", function()
+    local e = fresh("foo bar baz")
+    e.col = 12
+    e:keypressed("backspace", { alt = true })
+    T.eq(e:text(), "foo bar ")
+    e:undo()
+    T.eq(e:text(), "foo bar baz")
+    -- The undo brings the word's selection back with it, as CodeMirror's does.
+    e:clear_selection()
+    e.col = 1
+    e:keypressed("delete", { ctrl = true })
+    T.eq(e:text(), " bar baz")
+  end)
+
   T.case("src/editor.lua does not reference love", function()
     T.no_love("src/editor.lua")
   end)

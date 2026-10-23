@@ -12,7 +12,10 @@
 --   * **compiler output does not speak in the failure register.** No red, no
 --     `Theme.verdict` colours, no banner. A compile error here is information,
 --     not a judgement, and the outcome line says "did not compile" the way a
---     terminal would.
+--     terminal would. The one deliberate exception: the output card's header
+--     flashes for 600 ms when a run comes back -- green when it ran, the
+--     danger colour (`Theme.bad`) when the build did not go through -- and
+--     is cream again before anybody has read it. A moment, not a verdict.
 --   * **the word "wrong" does not appear**, and neither does FAIL, ERROR as a
 --     headline, or anything else that implies there was a right answer. There
 --     is no answer here; there is only what the program did.
@@ -44,6 +47,7 @@ local CodePane = require("src.codepane")
 local CodeFx = require("src.codefx")
 local CoderM = require("src.agent.coder")
 local Anim = require("src.anim")
+local Juice = require("src.juice")
 local runlog = require("src.net.runlog")
 
 local Playground = {}
@@ -54,6 +58,9 @@ local Poster = require("src.poster")
 local Reader = require("src.diskreader")
 local Wallet = require("src.wallet")
 local Store = require("src.store")
+local Computer = require("src.computer")
+local RetroScreen = require("src.retroscreen")
+local Monitor = require("src.retromonitor")
 
 -- TAB walks the languages in the lands' order, and the starter is the same
 -- program in each: the smallest thing that compiles and prints, so the desk
@@ -207,6 +214,33 @@ local OUTCOME = {
   output_limit = "printed too much",
 }
 
+-- AUTO-RUN and STDERR, the browser's two switches beside RUN.
+--
+--   * **AUTO-RUN** runs the pad on every ENTER typed in the editor, so the
+--     answer on screen follows the code a line at a time. On unless somebody
+--     turned it off, as in the browser.
+--   * **STDERR** shows the program's stderr and the compiler's notes. Off
+--     unless somebody turned it on: the output is then what the program
+--     printed, and the compiler only when the build failed -- warnings,
+--     panics' backtraces and the compiler's progress chatter stay out of the
+--     way of the answer.
+--
+-- On the module rather than the scene, so they outlive a visit to the map,
+-- and in the store (`pgprefs.set`), so they outlive the program: `App:load`
+-- reads them back through `Playground.restore_prefs`.
+Playground.PREFS = { auto_run = true, stderr = false }
+
+--- The saved switches and the saved computer, put back before the first
+--- frame. Only fields that were saved: a store that never heard of STDERR
+--- leaves it at its default rather than at nil.
+function Playground.restore_prefs(prefs, computer)
+  if type(prefs) == "table" then
+    if type(prefs.auto_run) == "boolean" then Playground.PREFS.auto_run = prefs.auto_run end
+    if type(prefs.stderr) == "boolean" then Playground.PREFS.stderr = prefs.stderr end
+  end
+  if computer then Computer.set(computer) end
+end
+
 -- How long an untouched buffer waits before it is saved. Long enough that
 -- typing does not generate traffic, short enough that nobody loses a thought.
 Playground.AUTOSAVE_S = 4
@@ -269,6 +303,31 @@ function Playground.new(app)
     -- choice made for them by a timer.
     conflict = nil,
     conflict_rects = nil,
+    -- An ENTER landed while a run was out (AUTO-RUN): run once more when it
+    -- is back, so the answer on screen is for the code on screen and not
+    -- for a line ago.
+    run_again = false,
+    -- The output pane, scrolled: lines back from the tail, as the browser
+    -- counts them, so the same moment stays put while more streams in.
+    out_scroll = 0,
+    out_overflow = 0,
+    -- The box at the head of the toolbars that narrows them to the buttons
+    -- named in it (`Playground.filter_keeps`). One for the bench and CODE,
+    -- so a filter set on one is still set on the other.
+    tools_query = "",
+    -- The old computer's tube over the editor (`src/retroscreen.lua`).
+    retro = nil,
+    -- What the pointer is over: `"tool:<id>"`, `"list:<id>"`, `"pad:<i>"`,
+    -- `"lang"`, `"computer"`, `"name"` or `"done"`. The kit's buttons lift
+    -- under it.
+    hover = nil,
+    -- The toolbar's rects by id, whichever view drew them last.
+    tool_rects = nil,
+    -- The colour the output header flashes when a run comes back.
+    ran_tint = nil,
+    -- When the editor last scrolled, for the scrollbar's fade.
+    last_scroll = nil,
+    scrolled_at = nil,
   }, Playground)
 end
 
@@ -308,6 +367,12 @@ function Playground:enter()
   }
   self.coder = CoderM.new(self.app, self:agent_host())
   self.coder:mount(self.editor)
+  -- Arriving with a machine already picked only warms the tube up; the
+  -- banner is for the moment it is chosen.
+  self.retro = self.retro or RetroScreen.new()
+  self.retro:power(Computer.get(), false)
+  -- The kit's motion state for this screen starts over on every visit.
+  Juice.forget("pg:")
   self:list()
 end
 
@@ -357,6 +422,9 @@ end
 
 function Playground:leave()
   if self.coder then self.coder:leave() end
+  -- The shader and its canvas are given back with the screen: the tube is
+  -- the playground's, and nothing else draws it.
+  if self.retro then self.retro:release() end
   -- The stamp's key does not outlive the screen.
   Wallet.forget(self, "secret")
   self.stamp_edit, self.disk_edit = nil, nil
@@ -386,7 +454,7 @@ end
 --- the server said "too fast" to all of them. That was invisible while saves
 --- always worked; the coder's room hangs off this id, and it asks for a save
 --- the moment somebody says something in a pad that has never had one.
-function Playground:save()
+function Playground:save(explicit)
   if not self.editor then return end
   -- Not while another device's save is waiting on a choice: this would be
   -- KEEP MINE, chosen by the autosave or by leaving the screen.
@@ -431,6 +499,9 @@ function Playground:save()
     self.saved_at = Anim.now()
     self.editor.dirty = false
     self.dirty_at = nil
+    -- A save somebody asked for says so, briefly; the autosave is quiet and
+    -- the dirty dot going out is its whole announcement.
+    if explicit then self:say(I18n.t("saved"), "good") end
     self:list()
     if again then self:save() end
   end)
@@ -456,7 +527,8 @@ function Playground:load(index)
     self.dirty_at = nil
     self.result = nil
     self.log = nil
-    self.note = "opened " .. tostring(snippet.name)
+    self.out_scroll = 0
+    self:say("opened " .. tostring(snippet.name))
     SFX.play("select")
   end)
 end
@@ -472,7 +544,7 @@ function Playground:delete(index)
       self.snippet_id = nil
       self.name = nil
     end
-    self.note = "deleted"
+    self:say("deleted")
     self:list()
   end)
 end
@@ -520,7 +592,7 @@ function Playground:resolve_conflict(choice)
   self.conflict_rects = nil
   if choice == "theirs" then
     self:take_snippet(snippet)
-    self.note = I18n.t("took the other device's version")
+    self:say(I18n.t("took the other device's version"))
   else
     self.editor.dirty = true
     self:save()
@@ -551,12 +623,13 @@ function Playground:remote_saved(snippet)
   end
   if action == "apply" then
     self:take_snippet(snippet)
-    self.note = I18n.t("updated on another device")
+    self:say(I18n.t("updated on another device"))
   else
     -- A second save from over there while the question is open replaces
     -- the first: "theirs" is always their latest.
     self.conflict = snippet
-    self.note = I18n.t("saved on another device: choose which version to keep")
+    self:say(I18n.t("saved on another device: choose which version to keep"), "warn")
+    UI.modalReset("pg:conflict")
   end
   self:list()
   -- The effect: a burst over the code and a chime, so a change that arrived
@@ -576,7 +649,7 @@ function Playground:new_snippet()
   self.editor.dirty = false
   self.result = nil
   self.log = nil
-  self.note = I18n.t("a fresh page")
+  self:say(I18n.t("a fresh page"))
   SFX.play("select")
 end
 
@@ -593,7 +666,7 @@ function Playground:toggle_lang()
     self.editor:set_text(STARTER[self.lang])
     self.editor.dirty = false
   end
-  self.note = Land.name(self.lang)
+  self:say(Land.name(self.lang))
   SFX.play("move")
 end
 
@@ -623,6 +696,7 @@ function Playground:run()
   self.elapsed_ms = 0
   self.note = nil
   self.problem = nil
+  self.out_scroll = 0
   SFX.play("submit")
 
   self.app.session:request("playground.run", {
@@ -637,13 +711,131 @@ function Playground:run()
       -- about the program.
       self.note = why.player
       self:tell_agent_run(nil)
+      self:drain_run_again()
       return
     end
     self.result = payload.run
+    -- The log streamed in pinned to its tail; the answer is read from the
+    -- top, and scrolling back up after every RUN was the chore.
+    self.out_to_top = true
+    -- The output header flashes for a moment: green when it ran, the danger
+    -- colour when the build did not go through, gold for the rest.
+    local outcome = payload.run and payload.run.outcome
+    self.ran_tint = outcome == "ok" and Theme.green
+      or outcome == "compile_error" and Theme.bad or Theme.gold
+    Juice.trigger("pg:ran")
+    -- An old computer has its own words for a run that did not finish, and
+    -- puts them up on the tube for a few seconds. The scene's own words stay
+    -- the terminal's (`OUTCOME`); these are the machine's, and live with it.
+    if self.retro then
+      self.retro:say(Computer.says(Computer.get(), payload.run and payload.run.outcome))
+    end
     -- No accepted/rejected chime either way. Nothing was judged.
     SFX.play("move")
     self:tell_agent_run(payload.run)
+    self:drain_run_again()
   end)
+end
+
+--- The run AUTO-RUN queued while one was out, now that it is back.
+function Playground:drain_run_again()
+  if not self.run_again then return end
+  self.run_again = false
+  if self.conflict then return end
+  self:run()
+end
+
+--- ENTER in the editor, with AUTO-RUN on. A run already out is not
+--- interrupted; one more follows it, for the code as it is by then.
+function Playground:auto_enter()
+  if not Playground.PREFS.auto_run or self.conflict then return end
+  if self.running then self.run_again = true else self:run() end
+end
+
+--- AUTO-RUN or STDERR, flipped.
+function Playground:toggle_pref(which)
+  local prefs = Playground.PREFS
+  prefs[which] = not prefs[which]
+  if which == "stderr" then self.out_scroll = 0 end
+  Store.set_pg_prefs(prefs)
+  SFX.play("select")
+end
+
+--- What each switch says: the state it is **in**, like every toggle here.
+function Playground.auto_label()
+  return Playground.PREFS.auto_run and I18n.t("AUTO-RUN ON") or I18n.t("AUTO-RUN OFF")
+end
+
+function Playground.stderr_label()
+  return Playground.PREFS.stderr and I18n.t("STDERR ON") or I18n.t("STDERR OFF")
+end
+
+--- Whether the output pane shows stderr (and the compiler's notes) for
+--- `result`: with STDERR on, always; off, only for a build that failed,
+--- where the compiler's words are the whole answer. The browser's
+--- `loud = showStderr || r?.outcome === "compile_error"`.
+function Playground.loud(result)
+  return Playground.PREFS.stderr == true
+    or (result ~= nil and result.outcome == "compile_error")
+end
+
+--- One step of the code's type size, down or up: the F-key's cycle, as two
+--- buttons for a screen with no F-keys. `Layout.setFont` keeps the step.
+function Playground:size_font(dir)
+  local step = (Layout.font or 1) + dir
+  if not Layout.FONT_STEPS[step] then return end
+  Layout.setFont(step)
+  self:say("type size " .. Layout.fontLabel())
+  SFX.play("select")
+end
+
+-- ------------------------------------------------------- the old computers
+
+--- The machine's name on its button. "NORMAL" is a word, so it is translated;
+--- the others are names, so they are not.
+function Playground.computer_label()
+  local c = Computer.get()
+  return Computer.NAME[c] or I18n.t("NORMAL")
+end
+
+--- Every label the COMPUTER button can wear, so it is sized for the widest.
+function Playground.computer_labels()
+  local out = { I18n.t("NORMAL") }
+  for _, c in ipairs(Computer.COMPUTERS) do
+    if Computer.NAME[c] then out[#out + 1] = Computer.NAME[c] end
+  end
+  return out
+end
+
+--- Which old computer the pad is on (`src/computer.lua`): its paper, its
+--- face, its tube and its room, all at once, with the power-on to show it.
+---
+--- The face goes with the machine because a green-phosphor Apple in Iosevka
+--- is a costume, not a computer -- and it stays a face the person can change
+--- after, on the button beside this one. "Normal" leaves the face alone, and
+--- so does a machine whose face this client does not carry.
+function Playground:cycle_computer()
+  local next_computer = Computer.next()
+  local face = Computer.FACE[next_computer]
+  if face and Assets.CODE_FACE_NAME[face] then
+    Assets.setCodeFace(face)
+    Store.set_face(face)
+  end
+  Computer.set(next_computer)
+  Store.set_computer(next_computer)
+  self.retro = self.retro or RetroScreen.new()
+  self.retro:power(next_computer, true)
+  self:say(I18n.t("computer %s"):format(Playground.computer_label()))
+  SFX.play(next_computer == "normal" and "select" or "coin")
+end
+
+--- The code pane's colours: the machine's, on an old computer, or the
+--- theme's. Read once per draw, and never written back into `Theme` -- the
+--- quest screen shares those tables and is never a machine.
+function Playground.palette()
+  local p = Computer.PALETTE[Computer.get()]
+  if p then return p.code, p.pane end
+  return Theme.code, Theme.pane
 end
 
 --- The coder asked for the RUN it is watching; hand it the report exactly
@@ -674,7 +866,7 @@ function Playground:format()
     if not ok then
       if payload.code == "not_found" then
         self.format_unsupported = true
-        self.note = I18n.t("FORMAT is not on this server yet")
+        self:say(I18n.t("FORMAT is not on this server yet"), "warn")
       else
         self.note = why.player
       end
@@ -687,12 +879,12 @@ function Playground:format()
       return
     end
     if payload.changed == false then
-      self.note = I18n.t("already tidy")
+      self:say(I18n.t("already tidy"))
       self:tell_agent_format({ changed = false })
       return
     end
     self.editor:replace_all(payload.source or self.editor:text())
-    self.note = "formatted"
+    self:say("formatted", "good")
     self:tell_agent_format({ changed = true })
   end)
 end
@@ -700,6 +892,7 @@ end
 function Playground:update(dt)
   self.t = self.t + dt
   if self.fx then self.fx:update(dt) end
+  if self.retro then self.retro:update(dt) end
   if self.coder then
     -- The whole screen is the coder's sky, minus whatever the panel took.
     self.coder:fly({ 0, 0, Layout.vw, Layout.vh }, self.agent_rect)
@@ -719,85 +912,286 @@ function Playground:update(dt)
 end
 
 -- ------------------------------------------------------------------ drawing
+--
+-- The chrome is the kit's (`docs/love2d-ui.md`): a header bar, one toolbar
+-- band of measured buttons under it, then cards — the pads' list, the
+-- editor with its code well and STDIN well, and the output with its own
+-- header — inside `UI.bounded()`. CODE is the same toolbar over an editor
+-- that takes the full width. The code itself is the hero and the chrome
+-- recedes; what moves is the kit's motion (a lifted button, a pressed one,
+-- a toast) and nothing in the code pane except the caret.
 
---- The header band's height, measured from the two lines of type in it —
---- the same rule as `Quest:header_h`, for the same reason: it was a hard
---- 46 px, which fitted a 14 px title over a 7 px name, and at the doubled
---- ladder the name was printed through the title.
---- What the TAB caption needs at the right end of the header strip.
---- How much of the foot of the screen is spoken for, so a banner does not
---- land on the coder's room. The room is only at the bottom when the window
---- is upright; beside the editor it is in nobody's way.
-function Playground:toast_lift()
-  local r = self.agent_rect
-  if not r then return 0 end
-  -- Where the banner would land, against where the room is. Beside the
-  -- editor on a wide window the two never meet; upright the room is the foot
-  -- of the screen and the banner would sit on its buttons.
-  local band = Layout.vh - UI.footerHeight() - 60
-  if r.y + r.h < band then return 0 end
-  return math.max(0, (Layout.vh - UI.footerHeight()) - r.y + 8)
-end
-
-function Playground:header_tab_reserve()
-  return UI.textWidth(I18n.t("TAB"), 7) + 16
-end
-
---- How wide the header's strip of buttons wants to be, so the title can be
---- fitted into what is left of the line rather than under it.
-function Playground:header_strip_w()
-  local total = math.max(64, UI.textWidth(Land.name(self.lang), UI.CHIP_SIZE) + 28)
-    + 12 + self:header_tab_reserve()
-  for _, label in ipairs({ I18n.t("CODE"), I18n.t("AGENT"), I18n.t("RENAME"),
-    I18n.t("POSTER"), I18n.t("DISK READER") }) do
-    local w = math.max(64, UI.textWidth(label, UI.CHIP_SIZE) + 24)
-    -- The same floor the strip itself stops at: a button that would not be
-    -- drawn is not room the title has to give up.
-    if total + w > (Layout.vw - 200) then break end
-    total = total + w + 8
-  end
-  return total
-end
-
+--- The header band: the kit's height (`App:toast_top` reads this).
 function Playground:header_h()
-  return math.max(46, 8 + UI.lineHeight(14) + 2 + UI.lineHeight(7) + 8)
+  return UI.headerHeight()
 end
 
-function Playground:panes()
-  local vw, vh = Layout.vw, Layout.vh
-  local top = self:header_h()
-  local bottom = UI.footerHeight() + 8
-  local pad = 10
-  if Layout.isPortrait() then
-    -- Stacked, the browser's way: the pads on top at a quarter of the
-    -- height, then the bench. The list used to have no width at all in
-    -- portrait, which left a phone with no way to open a second pad.
-    local h = vh - top - bottom
-    -- A quarter, or what the title, the search field, three rows and the
-    -- buttons need — whichever is more, up to two fifths: at the largest
-    -- type step a quarter held one row of the list it exists to show.
-    local need = 8 + UI.lineHeight(8) + 6 + (UI.lineHeight(7) + 14)
-      + 3 * (UI.lineHeight(7) + 10) + 6 + UI.chipHeight() + 12
-    local list_h = math.max(math.floor((h - pad * 2) * 0.26),
-      math.min(math.floor(h * 0.4), need))
-    local rest = h - list_h - pad * 2
-    local code_h = math.floor(rest * 0.6)
-    return
-      { x = pad, y = top + list_h + pad, w = vw - pad * 2, h = code_h },
-      { x = pad, y = top + list_h + pad + code_h + pad, w = vw - pad * 2,
-        h = rest - code_h },
-      { x = pad, y = top, w = vw - pad * 2, h = list_h }
+--- Say something briefly: a toast, and the status line keeps the words for
+--- the pane. Guarded, because the headless suites hand the scene an app
+--- with no dock.
+function Playground:say(text, kind)
+  if self.app and self.app.toast then
+    self.app:toast(text, nil, kind)
+  else
+    self.note = text
   end
-  -- Wide enough for its own title at the current type, never more than
-  -- a third of the canvas: at the largest type step 18 % was six letters.
-  local list_w = math.min(math.floor(vw * 0.3),
-    math.max(190, UI.textWidth(I18n.t("SNIPPETS"), 8) + 40))
-  local rest = vw - list_w - pad * 3
+end
+
+--- Whether the status line has anything to say beyond the file: a note, or
+--- a field that is open on it. The bench draws it only then; CODE, which
+--- has no card header to name the file, always does.
+function Playground:status_live()
+  return self.note ~= nil or self.focus == "stamp" or self.focus == "disk" or self.focus == "name"
+end
+
+--- The footer's hints, in priority order: the footer keeps the longest
+--- prefix that fits, so the key somebody needs most is first.
+function Playground:hints()
+  local items = UI.parseHint(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
+  local rank = { F5 = 1, F2 = 2, ["CTRL-S"] = 3, ESC = 4, TAB = 5, ["CTRL-N"] = 6 }
+  table.sort(items, function(a, b)
+    return (rank[a.key] or 9) < (rank[b.key] or 9)
+  end)
+  return items
+end
+
+--- The room: the machine's own, until it has arrived, then the usual one,
+--- under the felt. An old computer's room is lit by its screen and is the
+--- point of it, so less of the night is pulled over it.
+function Playground:draw_room()
+  local vw, vh = Layout.vw, Layout.vh
+  local portrait = Layout.isPortrait()
+  local mine, mine_wide = Computer.room(Computer.get(), portrait)
+  local name = Assets.pick(mine or "", mine_wide or "",
+    portrait and "bg_playground_p" or "bg_playground",
+    "bg_playground", "bg_datacentre", "bg_flat")
+  Assets.cover(name, 0, 0, vw, vh)
+  local scrim = portrait and 0.8 or 0.72
+  if mine and Assets.image(mine) or (mine_wide and Assets.image(mine_wide)) then
+    scrim = 0.4
+  end
+  UI.setColor(Theme.felt, scrim)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- Which machine the pad is on, or nil on NORMAL.
+local function machine_on()
+  local c = Computer.get()
+  return Computer.NAME[c] and c or nil
+end
+
+--- What the file chip says: the file, and the pad's name when it has one.
+function Playground:file_label()
+  local file = ({ rust = "main.rs", go = "main.go", cpp = "main.cpp", python = "main.py",
+    pytorch = "main.py", typescript = "main.ts", zig = "main.zig", lua = "main.lua" })[self.lang]
+    or "main"
+  if self.focus == "name" then return (self.name_edit or "") .. "_" end
+  local name = self.name and tostring(self.name) or I18n.t("unsaved")
+  return file .. " · " .. name
+end
+
+--- The header bar. `view` is `"bench"` or `"code"`: CODE puts DONE on the
+--- left. On the right, measured first so the title gives way: the language
+--- chip with its TAB keycap, and the machine chip, gold when a machine is
+--- on. The title is cut to what is left, never printed through.
+function Playground:draw_header(view)
+  local vw = Layout.vw
+  local h = self:header_h()
+  local g = Layout.gutter()
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local chip_h = Theme.control.chip
+  local cy = math.floor((h - chip_h) / 2)
+  local x = g
+  self.done_rect = nil
+  if view == "code" then
+    local label = I18n.t("DONE")
+    local bw, bh = UI.buttonSize(label, { key = "ESC" })
+    bh = math.max(Theme.control.buttonM, bh)
+    local r = { x = x, y = math.floor((h - bh) / 2), w = bw, h = bh }
+    UI.button(r.x, r.y, r.w, r.h, label, self.hover == "done" and "hot" or "normal", nil,
+      { variant = "secondary", id = "pg:done", key = "ESC" })
+    self.done_rect = r
+    x = x + bw + Theme.space.lg
+  end
+
+  -- The right block, laid right to left.
+  local right = vw - g
+  local lang = Land.name(self.lang)
+  local lw = UI.chipWidth(lang)
+  local lx = right - lw
+  UI.chip(lx, cy, lang, { selected = true, hot = self.hover == "lang" })
+  self.lang_rect = { x = lx, y = cy, w = lw, h = chip_h }
+  local kw = UI.keycapWidth("TAB")
+  local kx = lx - Theme.space.sm - kw
+  UI.keycap(kx, cy + math.floor((chip_h - Theme.control.keycap) / 2), "TAB")
+  right = kx - Theme.space.lg
+  local machine = machine_on()
+  local mlabel = Playground.computer_label()
+  local mw = UI.chipWidth(mlabel)
+  if right - mw > x + 120 then
+    UI.chip(right - mw, cy, mlabel, { selected = machine ~= nil, hot = self.hover == "computer" })
+    self.machine_rect = { x = right - mw, y = cy, w = mw, h = chip_h }
+    right = right - mw - Theme.space.lg
+  else
+    self.machine_rect = nil
+  end
+
+  -- The title, then the file chip in what is left.
+  local title = I18n.t("PLAYGROUND")
+  local room = right - x
+  local tw = math.min(UI.labelWidth(title, "title"), room)
+  UI.label(title, x, math.floor((h - UI.lead("title")) / 2), "title",
+    { width = room, ellipsis = true })
+  local fx = x + tw + Theme.space.lg
+  local flabel = self:file_label()
+  local fw = UI.chipWidth(flabel)
+  self.name_rect = nil
+  if fx + fw <= right then
+    UI.chip(fx, cy, flabel, { hot = self.focus == "name" or self.hover == "name" })
+    if self.editor and self.editor.dirty and self.focus ~= "name" then
+      UI.setColor(Theme.gold)
+      love.graphics.circle("fill", fx + fw + 6, cy + chip_h / 2, 3, 8)
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+    self.name_rect = { x = fx, y = cy, w = fw, h = chip_h }
+  end
+end
+
+--- The status line under the toolbar: the file, the name, whether it is
+--- safe on the server, and the last note — or the key field / the path
+--- field while one is open. One line, cut with "…".
+function Playground:draw_status(x, y, w)
+  local info = self:file_label()
+  if self.editor and self.editor.dirty then info = info .. "  ·" end
+  local color = Theme.mute
+  if self.focus == "stamp" then
+    info = ("%s   %s_"):format(I18n.t("POSTER"), (self.stamp_edit or ""):gsub("%S", "*"))
+    color = Theme.gold
+  elseif self.focus == "disk" then
+    info = ("%s   %s_"):format(I18n.t("DISK READER"), self.disk_edit or "")
+    color = Theme.gold
+  elseif self.focus == "name" then
+    color = Theme.gold
+  elseif self.note then
+    info = info .. "   " .. tostring(self.note)
+  end
+  UI.label(info, x, y, "label", { color = color, width = w, ellipsis = true })
+  return UI.lead("label")
+end
+
+--- The STDIN well: the label at the left, the text after it; real lines
+--- when there is height for them. `stdin_rect` is the hit target.
+function Playground:draw_stdin(x, y, w, h)
+  local hot = self.focus == "stdin"
+  UI.card(x, y, w, h, { variant = "well", pad = 0, edge = hot and Theme.gold or nil })
+  local label = I18n.t("STDIN")
+  local pad = Theme.space.md
+  local lead = UI.lead("label")
+  local font = Assets.mono(Layout.codeSize(16))
+  local stacked = h >= lead + font:getHeight() + pad * 2
+  local tx, ty
+  if stacked then
+    UI.label(label, x + pad, y + Theme.space.sm, "label", { color = Theme.mute, caps = true })
+    tx, ty = x + pad, y + Theme.space.sm + lead + 2
+  else
+    UI.label(label, x + pad, y + math.floor((h - lead) / 2), "label", { color = Theme.mute, caps = true })
+    tx, ty = x + pad + UI.labelWidth(label, "label") + pad, y + math.floor((h - font:getHeight()) / 2)
+  end
+  love.graphics.setFont(font)
+  UI.setColor(Theme.text)
+  love.graphics.setScissor(x + 2, y + 1, math.max(0, w - 4), math.max(0, h - 2))
+  if stacked then
+    local lh = font:getHeight()
+    local yy = ty
+    local text = (self.stdin or "") .. (hot and "_" or "")
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+      if yy + lh > y + h - 4 then break end
+      love.graphics.print(line, tx, yy)
+      yy = yy + lh
+    end
+  else
+    local shown = (self.stdin or ""):gsub("\n", "⏎")
+    if hot then shown = shown .. "_" end
+    love.graphics.print(shown, tx, ty)
+  end
+  love.graphics.setScissor()
+  love.graphics.setColor(1, 1, 1, 1)
+  self.stdin_rect = { x = x, y = y, w = w, h = h }
+end
+
+--- The bench's arrangement — one function, read by the draw and by the
+--- click. Returns the code, output and list rects, and the band the
+--- toolbar takes.
+function Playground:panes()
+  local portrait = Layout.isPortrait()
+  local header = self:header_h()
+  -- The code is the hero: on a wide canvas the bench takes a wider bound
+  -- than the kit's default, so the editor gets the room a 1920 screen has
+  -- rather than 340 px of street each side.
+  local wide = Layout.vw >= Theme.wideCanvas
+  local cx, cy, cw, ch = UI.bounded(wide and Playground.WIDE_BOUND or nil, header + Theme.space.lg,
+    Layout.vh - UI.footerHeight() - Theme.space.lg)
+  local tools_h = self:tools_h("bench", cw)
+  local status_h = self:status_live() and (Theme.space.sm + UI.lead("label")) or 0
+  local band = { x = cx, y = cy, w = cw, h = tools_h + status_h }
+  local top = cy + band.h + Theme.space.md
+  local h = math.max(0, cy + ch - top)
+  local gap = Theme.gap
+  if portrait then
+    -- Stacked, the browser's way: the pads on top, then the bench, then
+    -- the output. The list is as tall as what it holds, up to three pads,
+    -- never more than three tenths; the code gets most of the rest.
+    local row = Theme.control.chip + Theme.space.xs
+    local shown = math.max(1, math.min(3, #(self.snippets or {})))
+    -- Upright the list is compact: its buttons share the title row.
+    local need = Theme.space.md + Playground.tool_h() + Theme.space.sm
+      + (self:searchable() and (Theme.control.chip + Theme.space.sm) or 0)
+      + shown * row + Theme.space.sm
+    local list_h = math.min(math.floor(h * 0.3), need)
+    local rest = h - list_h - gap * 2
+    -- The output is a drawer: a quarter until something has run, then
+    -- two fifths, so the compiler's answer can be read without CODE.
+    local has_out = (self.result ~= nil) or (self.log ~= nil) or self.running
+    local code_h = math.floor(rest * (has_out and 0.6 or 0.75))
+    return
+      { x = cx, y = top + list_h + gap, w = cw, h = code_h },
+      { x = cx, y = top + list_h + gap + code_h + gap, w = cw, h = rest - code_h },
+      { x = cx, y = top, w = cw, h = list_h },
+      band
+  end
+  local list_w = wide and 300 or math.max(200, math.min(240, math.floor(cw * 0.2)))
+  local out_w = wide and 420 or math.floor((cw - list_w - gap * 2) * 0.32)
+  local code_w = cw - list_w - out_w - gap * 2
   return
-    { x = pad + list_w + pad, y = top, w = math.floor(rest * 0.56), h = vh - top - bottom },
-    { x = pad + list_w + pad + math.floor(rest * 0.56) + pad, y = top,
-      w = rest - math.floor(rest * 0.56) - pad, h = vh - top - bottom },
-    { x = pad, y = top, w = list_w, h = vh - top - bottom }
+    { x = cx + list_w + gap, y = top, w = code_w, h = h },
+    { x = cx + list_w + gap + code_w + gap, y = top, w = out_w, h = h },
+    { x = cx, y = top, w = list_w, h = h },
+    band
+end
+
+--- The bench's bound on a wide canvas (`Theme.wideCanvas` and up): the
+--- gutters and little else.
+Playground.WIDE_BOUND = 1760
+
+--- The code's pixel size for a glass `h` tall: the type step's size, and on
+--- a wide canvas never drawn under `WIDE_CODE_PX` -- 16 px code beside 24 px
+--- button labels read as a footnote. Asked of the face's own scale
+--- (`Assets.CODE_FACE_SCALE`), so an outline face lands on 18 real pixels
+--- and a pixel face snaps to its grid as it always did.
+Playground.WIDE_CODE_PX = 18
+
+function Playground.code_px(h)
+  local size = Layout.codeSizeFor(18, h, 6)
+  if Layout.vw >= Theme.wideCanvas then
+    local scale = Assets.CODE_FACE_SCALE[Assets.codeFace()] or 1
+    size = math.max(size, math.ceil(Playground.WIDE_CODE_PX / scale))
+  end
+  return size
 end
 
 function Playground:draw()
@@ -805,139 +1199,85 @@ function Playground:draw()
   if self.conflict then self:draw_conflict() end
 end
 
---- "Saved on another device -- which one?", over everything, until answered.
+--- "Saved on another device -- which one?", a modal until answered.
 ---
 --- Modal on purpose: the keys and the pointer go to the two answers and to
 --- nothing else (`keypressed`, `textinput`, `mousepressed`), because an
 --- editor that can still be typed into while the question is open makes the
 --- answer out of date as it is given.
 function Playground:draw_conflict()
-  local vw, vh = Layout.vw, Layout.vh
-  UI.setColor(Theme.void, 0.72)
-  love.graphics.rectangle("fill", 0, 0, vw, vh)
-  love.graphics.setColor(1, 1, 1, 1)
-
-  local w = math.min(vw - 32, 620)
-  local pad = 16
-  local title = I18n.t("SAVED ON ANOTHER DEVICE")
   local body = I18n.t("This pad was just saved on another device, and you have unsaved changes here. Take the other device's version, or keep yours and save it over theirs?")
-  local lines = UI.wrap(body, w - 2 * pad, 8)
-  local line_h = UI.lineHeight(8) + 4
-  local bh = UI.chipHeight()
-  local title_h = UI.lineHeight(10)
-  local h = pad + title_h + 12 + #lines * line_h + 16 + bh + pad
-  local x = math.floor((vw - w) / 2)
-  local y = math.floor((vh - h) / 2)
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.96), tint = Theme.coin })
-  local ty = y + pad
-  UI.text(title, x + pad, ty, UI.fitSize(title, w - 2 * pad, 10, 6), Theme.coin)
-  ty = ty + title_h + 12
-  for _, line in ipairs(lines) do
-    UI.text(line, x + pad, ty, 8, Theme.cream)
-    ty = ty + line_h
+  local portrait = Layout.isPortrait()
+  local w = portrait and (Layout.vw - Theme.space.lg * 2) or 620
+  local pad = portrait and Theme.space.lg or Theme.space.xl
+  local inner = w - pad * 2
+  local theirs_l, mine_l = I18n.t("TAKE THEIRS  T"), I18n.t("KEEP MINE  K")
+  local tw, bh = UI.buttonSize(theirs_l)
+  local mw = UI.buttonSize(mine_l)
+  bh = math.max(Theme.control.buttonM, bh)
+  local body_h = UI.readHeight(body, inner)
+  local x, y, cw, _, _, sheet = UI.modal({ id = "pg:conflict", title = I18n.t("SAVED ON ANOTHER DEVICE"),
+    w = w, h = body_h + Theme.space.lg + bh * 2 + Theme.space.sm })
+  y = y + UI.read(body, x, y, cw) + Theme.space.lg
+  local gap = Theme.space.md
+  local bw = math.floor((cw - gap) / 2)
+  local stacked = tw > bw or mw > bw
+  local theirs, mine
+  if stacked then
+    theirs = { x = x, y = y, w = cw, h = bh }
+    mine = { x = x, y = y + bh + Theme.space.sm, w = cw, h = bh }
+  else
+    theirs = { x = x, y = y, w = bw, h = bh }
+    mine = { x = x + bw + gap, y = y, w = bw, h = bh }
   end
-  local gap = 12
-  local bw = math.floor((w - 2 * pad - gap) / 2)
-  local by = y + h - pad - bh
-  local theirs = { x = x + pad, y = by, w = bw, h = bh }
-  local mine = { x = x + pad + bw + gap, y = by, w = bw, h = bh }
-  UI.button(theirs.x, theirs.y, theirs.w, theirs.h, I18n.t("TAKE THEIRS  T"), "hot", UI.CHIP_SIZE)
-  UI.button(mine.x, mine.y, mine.w, mine.h, I18n.t("KEEP MINE  K"), "normal", UI.CHIP_SIZE)
+  -- The sheet was measured for one row; a second row stays inside it
+  -- because the modal clamps its height to the window, not to the rows.
+  if sheet and mine.y + mine.h > sheet.y + sheet.h - pad then
+    mine.y = sheet.y + sheet.h - pad - bh
+    theirs.y = mine.y - Theme.space.sm - bh
+  end
+  UI.button(theirs.x, theirs.y, theirs.w, theirs.h, theirs_l, "normal", nil,
+    { variant = "primary", id = "pg:theirs" })
+  UI.button(mine.x, mine.y, mine.w, mine.h, mine_l, "normal", nil,
+    { variant = "secondary", id = "pg:mine" })
   self.conflict_rects = { theirs = theirs, mine = mine }
 end
 
+--- The felt behind the header and the toolbar when a machine is on, so the
+--- MSX's room never sits under a label.
+function Playground:draw_band_scrim(bottom)
+  if not machine_on() then return end
+  UI.setColor(Theme.felt, 0.85)
+  love.graphics.rectangle("fill", 0, 0, Layout.vw, bottom)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
 function Playground:draw_bench()
-  local vw, vh = Layout.vw, Layout.vh
-  Assets.cover(Assets.pick(
-    Layout.isPortrait() and "bg_playground_p" or "bg_playground",
-    "bg_playground", "bg_datacentre", "bg_flat"), 0, 0, vw, vh)
-  -- Lighter than every other screen's scrim. DESIGN made `bg_playground` and
-  -- deliberately nothing else — it is the room the game opens in, and a dim
-  -- that hid it would be drawing the one asset this screen has and then
-  -- covering it up.
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.52)
-  love.graphics.rectangle("fill", 0, 0, vw, vh)
-  love.graphics.setColor(1, 1, 1, 1)
+  self:draw_room()
+  local code, out, list, band = self:panes()
+  self:draw_band_scrim(band.y + band.h + Theme.space.sm)
+  self:draw_header("bench")
 
-  local head = self:header_h()
-  UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, head)
-  love.graphics.setColor(1, 1, 1, 1)
-  -- **The title is what gives way.** Upright, the strip of buttons reaches
-  -- back across this line and the two were drawn through each other; the
-  -- name of the screen you are already on is the least of what is on it, so
-  -- it is fitted to whatever the buttons left.
-  local title = I18n.t("PLAYGROUND")
-  local title_room = math.max(120, vw - 24 - self:header_strip_w())
-  local ty = 8 + UI.text(title, 12, 8, UI.fitSize(title, title_room, 14, 7), Theme.cyan) + 2
-  local shown = self.name and tostring(self.name) or I18n.t("unsaved")
-  if self.focus == "name" then shown = (self.name_edit or "") .. "_" end
-  UI.text(shown, 12, ty, 7,
-    self.focus == "name" and Theme.coin or Theme.withAlpha(Theme.cream, 0.55))
-
-  -- The language, as a toggle rather than a menu. Sized from its label and
-  -- set at the display controls' height, with its key to the left of it —
-  -- measured, so `TAB` is next to the button and not under it.
-  local lh = UI.chipHeight()
-  local lw = math.max(64, UI.textWidth(Land.name(self.lang), UI.CHIP_SIZE) + 28)
-  local lx = vw - lw - 12
-  local ly = math.floor((head - lh) / 2)
-  UI.button(lx, ly, lw, lh, Land.name(self.lang), "normal", UI.CHIP_SIZE)
-  self.lang_rect = { x = lx, y = ly, w = lw, h = lh }
-
-  -- CODE and RENAME, left of the language. Laid right to left so they sit
-  -- against it however wide their own labels measure, and dropped rather
-  -- than overlapped when the header has no room for them — the name and the
-  -- language are what this strip is for.
-  -- **Right of the TAB caption, not over it.** The strip and the captions
-  -- share this line, and laying the buttons from the language's left edge put
-  -- the first of them straight through `TAB` and the `saved` notice on a
-  -- window with no room to spare.
-  local tab_reserve = self:header_tab_reserve()
-  local rx = lx - 8 - tab_reserve
-  self.code_button_rect, self.rename_rect, self.poster_rect, self.reader_rect = nil, nil, nil, nil
-  self.agent_button_rect = nil
-  for _, item in ipairs({
-    { id = "code", label = I18n.t("CODE") },
-    { id = "agent", label = I18n.t("AGENT") },
-    { id = "rename", label = I18n.t("RENAME") },
-    -- Out as a picture, and back in: dropped first when the header is short.
-    { id = "poster", label = I18n.t("POSTER") },
-    { id = "reader", label = I18n.t("DISK READER") },
-  }) do
-    local w = math.max(64, UI.textWidth(item.label, UI.CHIP_SIZE) + 24)
-    if rx - w < 200 then break end
-    rx = rx - w
-    UI.button(rx, ly, w, lh, item.label, "normal", UI.CHIP_SIZE)
-    local rect = { x = rx, y = ly, w = w, h = lh }
-    if item.id == "code" then self.code_button_rect = rect
-    elseif item.id == "agent" then self.agent_button_rect = rect
-    elseif item.id == "rename" then self.rename_rect = rect
-    elseif item.id == "poster" then self.poster_rect = rect
-    else self.reader_rect = rect end
-    rx = rx - 8
-  end
-  local tab = I18n.t("TAB")
-  local tab_x = lx - UI.textWidth(tab, 7) - 8
-  local cap_y = math.floor((head - UI.lineHeight(7)) / 2)
-  UI.text(tab, tab_x, cap_y, 7, Theme.withAlpha(Theme.cream, 0.4))
-
-  if self.saved_at and Anim.now() - self.saved_at < 2.2 then
-    local text = "saved"
-    UI.text(text, tab_x - UI.textWidth(text, 7) - 10, cap_y, 7,
-      Theme.withAlpha(Theme.admit, 0.9))
+  local tools_h, rects = self:draw_tools(band.x, band.y, band.w, "bench")
+  self.bench_rects = rects
+  self.big_rects = nil
+  -- The rects the drives and the old hit test know by name.
+  self.code_button_rect = rects.code
+  self.rename_rect = rects.rename
+  self.poster_rect = rects.poster
+  self.reader_rect = rects.reader
+  self.agent_button_rect = rects.agent
+  if self:status_live() then
+    self:draw_status(band.x, band.y + tools_h + Theme.space.sm, band.w)
   end
 
-  local code, out, list = self:panes()
-  if list.w > 0 then self:draw_snippets(list) end
-  self:draw_code(code)
+  if list.h > 0 then self:draw_snippets(list) end
+  self:draw_code(code, false)
   self:draw_output(out)
 
   if self.fx then self.fx:draw() end
-  -- **The room is not a sliver.** In the framed view the output column is a
-  -- fifth of the window, which is a fine width for a compiler message and far
-  -- too narrow for a conversation, so the panel takes the code and output
-  -- panes together and the list stays where it is.
+  -- **The room is not a sliver.** The panel takes the code and output panes
+  -- together and the list stays where it is.
   local body = {
     x = code.x,
     y = math.min(code.y, out.y),
@@ -945,13 +1285,9 @@ function Playground:draw_bench()
     h = math.max(code.y + code.h, out.y + out.h) - math.min(code.y, out.y),
   }
   self:draw_agent(body, not Layout.isPortrait())
-  self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
+  self.app:footer(self:hints())
 end
 
---- CODE: one strip of controls, and the editor under it.
----
---- The display chips are the footer's, which every screen draws, so
---- fullscreen and orientation are here without this screen owning them.
 --- Every label the CODE screen's language button can wear: each language's
 --- name (`Land.LANGS`, the list TAB walks), so the button is as wide as the
 --- longest of them and every language is drawn at the same size.
@@ -961,279 +1297,66 @@ function Playground.lang_labels()
   return out
 end
 
---- How wide a CODE button is at type size `at`: its widest label, measured
---- in the face `UI.button` draws it in, plus the padding. `draw_big` lays the
---- band out with this, and `tests/test_playground.lua` asks it too.
+--- How wide a legacy-sized button is at authored size `at`: its widest
+--- label plus the padding. The toolbar measures in the label role now
+--- (`Playground.tool_w`); this is kept for `tests/test_playground.lua`.
 function Playground.button_w(labels, at)
   local w = 0
   for _, label in ipairs(labels) do w = math.max(w, UI.textWidth(label, at) + 16) end
   return w
 end
 
+--- CODE: the editor and the toolbar, and nothing else. Full width.
 function Playground:draw_big()
   local vw, vh = Layout.vw, Layout.vh
-  Assets.cover(Assets.pick(
-    Layout.isPortrait() and "bg_playground_p" or "bg_playground",
-    "bg_playground", "bg_datacentre", "bg_flat"), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.72)
-  love.graphics.rectangle("fill", 0, 0, vw, vh)
-  love.graphics.setColor(1, 1, 1, 1)
+  self:draw_room()
+  local g = Layout.gutter()
+  local x, w = g, vw - g * 2
+  local y = self:header_h() + Theme.space.md
+  local tools_h = self:tools_h("code", w)
+  local status_h = UI.lead("label")
+  self:draw_band_scrim(y + tools_h + Theme.space.sm + status_h + Theme.space.sm)
+  self:draw_header("code")
 
-  local pad = 8
-  local bh = UI.chipHeight()
-  local cap_h = UI.lineHeight(7)
-
-  -- DONE in the corner, then the writing controls from the left. Measured
-  -- from the widest label each can wear so a button does not change width
-  -- when its own state changes.
-  local done = I18n.t("DONE")
-  local dw = math.max(72, UI.textWidth(done, 8) + 20)
-  local dx = vw - dw - pad
-
-  local items = {
-    -- Literals, as the framed strip has them: these are key names with a
-    -- word in front, and the suite asks for a translation of every string
-    -- that goes through `I18n.t`.
-    { id = "run", label = self.running and "RUNNING…" or "RUN  F5",
-      every = { "RUNNING…", "RUN  F5" },
-      state = self.running and "disabled" or "hot" },
-    { id = "format", label = self.formatting and "…" or "FORMAT F2",
-      every = { "FORMAT F2" },
-      state = self.format_unsupported and "disabled" or "normal" },
-    -- The Rust coder. Next to RUN because it is the other thing that acts
-    -- on the program rather than on the file.
-    { id = "agent", label = I18n.t("AGENT"), every = { I18n.t("AGENT") },
-      state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
-    -- The editor's own undo stack (`src/editor.lua`), as buttons -- the
-    -- steps ctrl-Z takes, for a touch screen that has no ctrl. Not the
-    -- quest screen's UNDO/REDO, which walk the server's per-quest stack:
-    -- a scratchpad has no server stack and wants none; the pad is saved.
-    { id = "undo", label = I18n.t("UNDO"), every = { I18n.t("UNDO") },
-      state = #self.editor.undo_stack > 0 and "normal" or "disabled" },
-    { id = "redo", label = I18n.t("REDO"), every = { I18n.t("REDO") },
-      state = #self.editor.redo_stack > 0 and "normal" or "disabled" },
-    { id = "save", label = I18n.t("SAVE"), every = { I18n.t("SAVE") }, state = "normal" },
-    { id = "rename", label = I18n.t("RENAME"), every = { I18n.t("RENAME") }, state = "normal" },
-    -- In and out of the screen. Nothing on a canvas can be selected with a
-    -- mouse, so without these the code and the compiler's answer cannot leave
-    -- it at all -- which is what somebody pasting into an assistant and
-    -- pasting the reply back needs.
-    { id = "copycode", label = I18n.t("COPY CODE"), every = { I18n.t("COPY CODE") },
-      state = "normal" },
-    { id = "pastecode", label = I18n.t("PASTE"), every = { I18n.t("PASTE") }, state = "normal" },
-    -- The face code is drawn in, cycled. Says the face it is **in**, like
-    -- every other toggle on this strip.
-    { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()],
-      every = { "JETBRAINS" }, state = "normal" },
-    -- Light or dark, for the code pane alone. The same: it says the one
-    -- it is **in**.
-    { id = "theme", label = Playground.theme_label(),
-      every = { I18n.t("DARK"), I18n.t("LIGHT") }, state = "normal" },
-    { id = "copyin", label = I18n.t("COPY INPUT"), every = { I18n.t("COPY INPUT") },
-      state = (self.stdin or "") ~= "" and "normal" or "disabled" },
-    { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
-      state = "normal" },
-    { id = "copyout", label = I18n.t("COPY OUTPUT"), every = { I18n.t("COPY OUTPUT") },
-      -- Parenthesised, and it matters: `a or b and c or d` binds as
-      -- `a or ((b and c) or d)`, so after a run this handed `UI.button` the
-      -- result *table* where it wanted the word "normal".
-      state = (self.result or self.log) and "normal" or "disabled" },
-    -- Out of the screen as a picture, signed; and a picture back in, checked.
-    { id = "poster", label = I18n.t("POSTER"), every = { I18n.t("POSTER") },
-      state = self.postering and "disabled" or "normal" },
-    { id = "reader", label = I18n.t("DISK READER"), every = { I18n.t("DISK READER") },
-      state = "normal" },
-    -- Measured from every language's name, not from one: sized for
-    -- "PYTHON", TYPESCRIPT only fitted by drawing a step smaller than the
-    -- rest. The name is `Land.name`'s (C++, never CPP), the same on the
-    -- button as in the list it is measured from.
-    { id = "lang", label = Land.name(self.lang), every = Playground.lang_labels(),
-      state = "normal" },
-  }
-  -- **Wrapped, not truncated.** The row used to stop at the first button that
-  -- did not fit and simply never draw the rest: at eleven controls that is
-  -- most of them, gone with no way to reach what they do.
-  -- **Two rows at most, and the type gives way before the editor does.**
-  -- Eleven controls at the caption size is three rows on a 1000-wide window,
-  -- and three rows of chrome is the whole of what CODE was built to hand to
-  -- the code: the drive measured it giving the editor no more room than the
-  -- framed screen did. So the labels shrink a step at a time until the band
-  -- is two rows, exactly as the bench sheds buttons.
-  -- **Down to the floor `UI.button` already fits a label to, not 5.** Sizes
-  -- snap to the 8 px grid (`Assets.snap8`), so at the default step (1.5×)
-  -- 6, 5 and 4 all draw at 16 px, and sixteen controls at 16 px are three
-  -- rows on a 1000-wide window whatever the loop does: the drive measured
-  -- CODE handing the editor 11 rows against the framed screen's 12. Only 3
-  -- reaches the 8 px face — the size step 1 already ends on here.
-  local size, rows = 8, {}
-  local function lay(at)
-    local out, line, bx = {}, {}, pad
-    for _, item in ipairs(items) do
-      local w = Playground.button_w(item.every, at)
-      -- The first row keeps clear of DONE in the corner; the rest have it all.
-      local limit = (#out == 0) and (dx - pad) or (vw - pad)
-      if #line > 0 and bx + w > limit then
-        out[#out + 1] = line
-        line, bx = {}, pad
-      end
-      line[#line + 1] = { item = item, w = w, x = bx }
-      bx = bx + w + 6
-    end
-    if #line > 0 then out[#out + 1] = line end
-    return out
-  end
-  rows = lay(size)
-  while #rows > 2 and size > 3 do
-    size = size - 1
-    rows = lay(size)
-  end
-
-  local band = #rows * bh + (#rows - 1) * 6
-  local strip = pad + math.max(band, bh) + 3 + cap_h + 4
-  UI.setColor(Theme.ink, 0.86)
-  love.graphics.rectangle("fill", 0, 0, vw, strip)
-  UI.setColor(Theme.withAlpha(Theme.dim, 0.5))
-  love.graphics.rectangle("fill", 0, strip, vw, 1)
-  love.graphics.setColor(1, 1, 1, 1)
-
-  UI.button(dx, pad, dw, bh, done, "normal", 8)
-  self.done_rect = { x = dx, y = pad, w = dw, h = bh }
-
-  self.big_rects = {}
-  for ri, r in ipairs(rows) do
-    local by = pad + (ri - 1) * (bh + 6)
-    for _, cell in ipairs(r) do
-      UI.button(cell.x, by, cell.w, bh, cell.item.label, cell.item.state, size)
-      self.big_rects[cell.item.id] = { x = cell.x, y = by, w = cell.w, h = bh }
-    end
-  end
-
-  -- Which file, what it is called, and whether it is safe on the server.
-  local name = self.name and tostring(self.name) or I18n.t("unsaved")
-  if self.focus == "name" then name = (self.name_edit or "") .. "_" end
-  local info = ("%s   %s%s"):format(Land.name(self.lang), name,
-    self.editor.dirty and "   ·" or "")
-  local hot = self.focus == "name"
-  -- The key field and the path field take this line while they are open:
-  -- the key masked, the way the login screen masks it.
-  if self.focus == "stamp" then
-    info = ("%s   %s_"):format(I18n.t("POSTER"), (self.stamp_edit or ""):gsub("%S", "*"))
-    hot = true
-  elseif self.focus == "disk" then
-    info = ("%s   %s_"):format(I18n.t("DISK READER"), self.disk_edit or "")
-    hot = true
-  elseif self.note then
-    info = info .. "   " .. tostring(self.note)
-  end
-  -- One line, elided: a saved poster's path is long, and a line that wraps
-  -- here walks down over the editor.
-  info = Poster.elide(info, vw - pad * 2 - 8, function(t) return UI.textWidth(t, 7) end)
-  UI.text(info, pad + 4, pad + math.max(band, bh) + 3, 7,
-    hot and Theme.coin or Theme.withAlpha(Theme.cream, 0.5))
+  local _, rects = self:draw_tools(x, y, w, "code")
+  self.big_rects = rects
+  self.bench_rects = nil
+  self:draw_status(x, y + tools_h + Theme.space.sm, w)
+  local top = y + tools_h + Theme.space.sm + status_h + Theme.space.md
 
   -- **Beside the code when the window is wide, under it when it is tall.**
-  -- A landscape window has width to spare and height to spare nothing: output
-  -- stacked under the editor there costs a quarter of the few lines the screen
-  -- has. Upright it is the other way round, and a column of output beside the
-  -- code would be too narrow to read a compiler error in.
-  -- **One line of stdin, kept.** CODE exists to give the editor the window,
-  -- and this is the one thing it cannot take back from it: a scratchpad has
-  -- no test cases, so this box is the only way a program that reads anything
-  -- is fed at all. One line rather than the framed screen's row, with its
-  -- label beside it rather than over it.
-  -- **Input and output keep each other company, across the short axis.**
-  -- Wide window: the output is a column beside the code and stdin sits at the
-  -- top of it, so the editor keeps its width. Tall window: the output is a
-  -- band under the code and stdin takes the left of it, so the editor keeps
-  -- its height. Either way the pair costs the editor one dimension, not two.
-  local field_font = Assets.mono(Layout.ui(8))
-  local fed_h = math.max(field_font:getHeight() + 8, UI.lineHeight(7) + 8)
-  local label = I18n.t("STDIN")
-  local label_w = UI.textWidth(label, 7) + 14
-  -- `h` because the box is not always one line: set beside the output it
-  -- matches the output's height, so the pair reads as one band rather than as
-  -- a full panel with a sliver next to it.
-  local function fed(x, y, w, h)
-    h = h or fed_h
-    UI.setColor(Theme.void, 0.9)
-    love.graphics.rectangle("fill", x, y, w, h)
-    love.graphics.setLineWidth(2)
-    UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
-    love.graphics.rectangle("line", x + 1, y + 1, w - 2, h - 2)
-    love.graphics.setColor(1, 1, 1, 1)
-    -- **The label goes over the field when there is a field to go over.**
-    -- Beside it, `표준 입력` is two thirds of a narrow box's width and the
-    -- input is typed into the third that is left. On a single line there is
-    -- no room above, so there it stays alongside.
-    local stacked = h >= fed_h * 1.6
-    love.graphics.setColor(1, 1, 1, 1)
-    local tx, ty
-    if stacked then
-      UI.text(label, x + 6, y + 3, 7, Theme.withAlpha(Theme.cream, 0.5))
-      tx, ty = x + 6, y + 3 + UI.lineHeight(7) + 2
-    else
-      UI.text(label, x + 6, y + math.floor((fed_h - UI.lineHeight(7)) / 2), 7,
-        Theme.withAlpha(Theme.cream, 0.5))
-      tx, ty = x + label_w, y + math.floor((fed_h - field_font:getHeight()) / 2)
-    end
-    love.graphics.setFont(field_font)
-    UI.setColor(Theme.cream)
-    local caret = self.focus == "stdin"
-    if stacked then
-      -- Real lines when there is height for them, so multi-line input reads
-      -- as what it is rather than as a row of pilcrows.
-      local line_h = field_font:getHeight()
-      local yy = ty
-      local text = (self.stdin or "") .. (caret and "_" or "")
-      for line in (text .. "\n"):gmatch("(.-)\n") do
-        if yy + line_h > y + h - 4 then break end
-        love.graphics.print(line, tx, yy)
-        yy = yy + line_h
-      end
-    else
-      local shown = (self.stdin or ""):gsub("\n", "⏎")
-      if caret then shown = shown .. "_" end
-      love.graphics.print(shown, tx, ty)
-    end
-    love.graphics.setColor(1, 1, 1, 1)
-    self.stdin_rect = { x = x, y = y, w = w, h = h }
-  end
-
+  -- Input and output keep each other company across the short axis: wide,
+  -- the output is a column beside the code and stdin sits at the top of it;
+  -- tall, the output is a band under the code and stdin takes the left of
+  -- it. Nothing run yet: stdin is a strip under the code.
   local has_out = (self.result ~= nil) or (self.log ~= nil) or self.running
   local wide = not Layout.isPortrait()
-  local top = strip + 6
-  local body_w = vw - pad * 2
-  -- Nothing run yet: no column or band to join, so a line of its own. Never
-  -- hidden — it is the only way a program that reads is fed at all.
-  if not has_out then
-    fed(pad, top, body_w)
-    top = top + fed_h + 5
-  end
-  local body_h = vh - top - UI.footerHeight() - 6
+  local gap = Theme.gap
+  local body_h = vh - top - UI.footerHeight() - Theme.space.lg
+  local fed_h = Theme.control.buttonM
   if has_out and wide then
-    local out_w = math.floor(body_w * 0.38)
-    local x = pad + body_w - out_w
-    -- A share of the column rather than a single line: input is usually
-    -- several lines -- a count and then the numbers -- and a box that shows
-    -- one of them is a box you cannot check what you typed in.
+    local out_w = math.floor(w * 0.36)
+    local ox = x + w - out_w
     local in_h = math.max(fed_h, math.floor(body_h * 0.26))
-    fed(x, top, out_w, in_h)
-    self:draw_code({ x = pad, y = top, w = body_w - out_w - pad, h = body_h }, true)
-    self:draw_output({ x = x, y = top + in_h + 5, w = out_w, h = body_h - in_h - 5 })
+    self:draw_code({ x = x, y = top, w = w - out_w - gap, h = body_h }, true)
+    self:draw_stdin(ox, top, out_w, in_h)
+    self:draw_output({ x = ox, y = top + in_h + Theme.space.sm, w = out_w, h = body_h - in_h - Theme.space.sm })
   elseif has_out then
-    local band_h = math.max(fed_h, math.floor(body_h * 0.28))
-    local y = top + body_h - band_h
-    local in_w = math.floor(body_w * 0.4)
-    fed(pad, y, in_w, band_h)
-    self:draw_code({ x = pad, y = top, w = body_w, h = body_h - band_h - pad }, true)
-    self:draw_output({ x = pad + in_w + pad, y = y, w = body_w - in_w - pad, h = band_h })
+    local band_h = math.max(fed_h, math.floor(body_h * 0.3))
+    local by = top + body_h - band_h
+    local in_w = math.floor(w * 0.4)
+    self:draw_code({ x = x, y = top, w = w, h = body_h - band_h - gap }, true)
+    self:draw_stdin(x, by, in_w, band_h)
+    self:draw_output({ x = x + in_w + Theme.space.sm, y = by, w = w - in_w - Theme.space.sm, h = band_h })
   else
-    self:draw_code({ x = pad, y = top, w = body_w, h = body_h }, true)
+    self:draw_code({ x = x, y = top, w = w, h = body_h - fed_h - Theme.space.sm }, true)
+    self:draw_stdin(x, top + body_h - fed_h, w, fed_h)
+    self.out_rect = nil
   end
 
   if self.fx then self.fx:draw() end
-  self:draw_agent({ x = pad, y = top, w = body_w, h = body_h }, wide)
-  self.app:footer(I18n.t("F5 run   F2 format   TAB lang   CTRL-S save   CTRL-N new   ESC back"))
+  self:draw_agent({ x = x, y = top, w = w, h = body_h }, wide)
+  self.app:footer(self:hints())
 end
 
 --- The coder's panel, and then the coder itself.
@@ -1251,10 +1374,6 @@ function Playground:draw_agent(body, wide)
   if self.coder.panel.open then
     local rect
     if wide then
-      -- **Half, not a third.** The room is a conversation and the editor is
-      -- the program; on a wide window both want a column a sentence can turn
-      -- a corner in, and the pads' list on the left is already paying for
-      -- itself.
       local w = math.max(320, math.floor(body.w * 0.52))
       rect = { x = body.x + body.w - w, y = body.y, w = w, h = body.h }
     else
@@ -1267,188 +1386,259 @@ function Playground:draw_agent(body, wide)
   self.coder:draw()
 end
 
+--- The pads' list: a card with the search well, a row per pad with its
+--- land's stripe, and NEW / RENAME / DELETE at the foot.
 function Playground:draw_snippets(rect)
-  UI.panel(rect.x, rect.y, rect.w, rect.h, {
-    fill = Theme.withAlpha(Theme.navy, 0.9),
-    tint = self.focus == "snippets" and Theme.coin or Theme.cyan,
-  })
-  UI.text(I18n.t("SNIPPETS"), rect.x + 10, rect.y + 8,
-    UI.fitSize(I18n.t("SNIPPETS"), rect.w - 20, 8, 5), Theme.withAlpha(Theme.cream, 0.7))
-  local y = rect.y + 8 + UI.lineHeight(8) + 6
-  -- A row is the label's own height plus air: `20` was the row at a 7 px
-  -- label, and at the doubled ladder the names printed over each other.
-  local row = UI.lineHeight(7) + 10
-
-  -- What the buttons at the foot of this panel take, measured before
-  -- anything above them is drawn — in portrait this panel is a quarter of
-  -- the window and the rows ran straight under them. NEW, RENAME, and
-  -- DELETE only while a saved pad is open: the browser's three.
+  local focused = self.focus == "snippets"
+  UI.card(rect.x, rect.y, rect.w, rect.h, { pad = 0, strip = focused and Theme.gold or nil })
+  local pad = Theme.space.md
+  local x, w = rect.x + pad, rect.w - pad * 2
+  local y = rect.y + pad + (focused and Theme.stripH or 0)
+  local lead = UI.lead("label")
+  -- The buttons: NEW, RENAME, and DELETE only while a saved pad is open.
+  -- Upright they share the title row, so the list is as short as what it
+  -- holds; on the bench they are the foot of the card.
   local items = {
     { id = "new", label = I18n.t("NEW") },
     { id = "rename", label = I18n.t("RENAME") },
   }
   if self.snippet_id then items[#items + 1] = { id = "delete", label = I18n.t("DELETE") } end
-  local bh = UI.chipHeight()
-  local gap = 6
+  local bh = Playground.tool_h()
+  local gap = Theme.space.sm
   local widths, total = {}, 0
   for i, item in ipairs(items) do
-    widths[i] = math.max(56, UI.textWidth(item.label, UI.CHIP_SIZE) + 20)
+    widths[i] = math.ceil((UI.buttonSize(item.label)))
     total = total + widths[i]
   end
   total = total + gap * (#items - 1)
-  -- One row when they fit across, else one under the other.
-  local across = total <= rect.w - 12
-  local rows_of = across and 1 or #items
-  local foot_h = rows_of * bh + (rows_of - 1) * gap
-  local foot_y = rect.y + rect.h - 6 - foot_h
+  local title = I18n.t("SNIPPETS")
+  local title_w = UI.labelWidth(title, "label")
+  local beside = Layout.isPortrait() and total + title_w + Theme.space.lg <= w
   self.list_rects = {}
-  local bx, by = rect.x + 6, foot_y
-  for i, item in ipairs(items) do
-    local w = across and widths[i] or rect.w - 12
-    UI.button(bx, by, w, bh, item.label,
-      self.hover == "list:" .. item.id and "hot" or "normal", UI.CHIP_SIZE)
-    self.list_rects[item.id] = { x = bx, y = by, w = w, h = bh }
-    if across then bx = bx + w + gap else by = by + bh + gap end
+  local function button(item, r)
+    UI.button(r.x, r.y, r.w, r.h, item.label,
+      self.hover == "list:" .. item.id and "hot" or "normal", nil,
+      { id = "pg:list:" .. item.id, variant = item.id == "delete" and "danger" or "secondary" })
+    self.list_rects[item.id] = r
+  end
+  local foot_y
+  if beside then
+    UI.label(title, x, y + math.floor((bh - lead) / 2), "label", { color = Theme.mute, caps = true })
+    local bx = x + w - total
+    for i, item in ipairs(items) do
+      button(item, { x = bx, y = y, w = widths[i], h = bh })
+      bx = bx + widths[i] + gap
+    end
+    y = y + bh + Theme.space.sm
+    foot_y = rect.y + rect.h - pad
+  else
+    UI.label(title, x, y, "label", { color = Theme.mute, caps = true, width = w, ellipsis = true })
+    y = y + lead + Theme.space.sm
+    local across = total <= w
+    local rows_of = across and 1 or #items
+    local foot_h = rows_of * bh + (rows_of - 1) * gap
+    foot_y = rect.y + rect.h - pad - foot_h
+    if foot_y > y then
+      local bx, by = x, foot_y
+      for i, item in ipairs(items) do
+        local bw = across and widths[i] or w
+        button(item, { x = bx, y = by, w = bw, h = bh })
+        if across then bx = bx + bw + gap else by = by + bh + gap end
+      end
+    else
+      foot_y = rect.y + rect.h - pad
+    end
   end
 
-  -- The search field, once there are enough pads to be worth hunting through.
+  -- The search well, once there are enough pads to be worth hunting through.
   self.find_rect = nil
   if self:searchable() then
-    local fh = UI.lineHeight(7) + 8
-    UI.setColor(Theme.void, 0.9)
-    love.graphics.rectangle("fill", rect.x + 6, y, rect.w - 12, fh)
-    love.graphics.setLineWidth(2)
-    UI.setColor(self.focus == "find" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
-    love.graphics.rectangle("line", rect.x + 7, y + 1, rect.w - 14, fh - 2)
-    love.graphics.setColor(1, 1, 1, 1)
+    local fh = Theme.control.chip
+    local hot = self.focus == "find"
+    UI.card(x, y, w, fh, { variant = "well", pad = 0, edge = hot and Theme.gold or nil })
     local shown = (self.query or "") ~= "" and self.query or I18n.t("SEARCH")
-    if self.focus == "find" then shown = (self.query or "") .. "_" end
-    UI.text(shown, rect.x + 12, y + 4, 7,
-      (self.query or "") ~= "" and Theme.cream or Theme.withAlpha(Theme.cream, 0.45))
-    self.find_rect = { x = rect.x + 6, y = y, w = rect.w - 12, h = fh }
-    y = y + fh + 6
+    if hot then shown = (self.query or "") .. "_" end
+    UI.label(shown, x + Theme.space.sm, y + math.floor((fh - lead) / 2), "label",
+      { color = (self.query or "") ~= "" and Theme.text or Theme.mute, width = w - Theme.space.sm * 2, ellipsis = true })
+    self.find_rect = { x = x, y = y, w = w, h = fh }
+    y = y + fh + Theme.space.sm
   end
 
-  -- The rows scroll to keep the cursor in view: a list that only showed
-  -- its first screen was a list whose sixth pad could not be opened.
+  -- The rows scroll to keep the cursor in view.
+  local row = Theme.control.chip + Theme.space.xs
   local hits = self:visible_snippets()
-  local room = math.max(0, math.floor((foot_y - 6 - y) / row))
+  local room = math.max(0, math.floor((foot_y - Theme.space.sm - y) / row))
   local at = 1
   for k, hit in ipairs(hits) do
     if hit.index == self.cursor then at = k end
   end
   local first = math.max(1, math.min(at - room + 1, #hits - room + 1))
   self.snippet_rects = {}
+  local shown_n = 0
   for k = first, math.min(#hits, first + room - 1) do
     local i, brief = hits[k].index, hits[k].brief
     local here = brief.id == self.snippet_id
-    local under = self.focus == "snippets" and i == self.cursor
-    if here or under then
-      UI.setColor(Theme.coin, here and 0.22 or 0.1)
-      love.graphics.rectangle("fill", rect.x + 4, y - 2, rect.w - 8, row)
-      love.graphics.setColor(1, 1, 1, 1)
+    local under = focused and i == self.cursor
+    local hot = self.hover == "pad:" .. i
+    local a = Juice.follow("pg:pad" .. i, (hot or under) and 1 or 0, { speed = 18 })
+    local fill = here and Theme.cardHi or Theme.bar
+    if a > 0 then fill = Theme.mix(fill, Theme.cardHi, a) end
+    UI.setColor(fill)
+    UI.rrect("fill", x, y, w, row - Theme.space.xs, Theme.radiusInner)
+    if under or here then
+      UI.stroke(x, y, w, row - Theme.space.xs, Theme.radiusInner, under and Theme.gold or Theme.edge)
     end
-    -- The land's colour along the left edge, the browser's way, so a Go
-    -- pad and a Rust pad are told apart before the name is read.
-    UI.setColor(Theme.land[brief.lang] or Theme.dim, 0.9)
-    love.graphics.rectangle("fill", rect.x + 4, y - 2, 3, row)
-    love.graphics.setColor(1, 1, 1, 1)
-    -- The land's initial, right-aligned inside the panel, and the name
-    -- given what is left of the row: it used to be placed 14 px from the
-    -- edge whatever its width, and at the doubled ladder hung outside.
+    -- The land's colour along the left edge, the browser's way.
+    UI.setColor(Theme.land[brief.lang] or Theme.mute, 0.9)
+    UI.rrect("fill", x, y, 6 + Theme.radiusInner, row - Theme.space.xs, Theme.radiusInner)
+    UI.setColor(fill)
+    love.graphics.rectangle("fill", x + 6, y, Theme.radiusInner, row - Theme.space.xs)
     local initial = tostring(brief.lang):sub(1, 1):upper()
-    local iw = UI.textWidth(initial, 7)
+    local iw = UI.labelWidth(initial, "label")
     local label = tostring(brief.name or brief.id)
-    while UI.textWidth(label, 7) > rect.w - 30 - iw and #label > 3 do
-      label = label:sub(1, -2)
-    end
-    UI.text(label, rect.x + 12, y + 2, 7,
-      here and Theme.coin or Theme.withAlpha(Theme.cream, 0.85))
-    UI.text(initial, rect.x + rect.w - 10 - iw, y + 2, 7,
-      Theme.withAlpha(Theme.cream, 0.4))
-    self.snippet_rects[i] = { x = rect.x, y = y - 2, w = rect.w, h = row }
+    local ty = y + math.floor((row - Theme.space.xs - lead) / 2)
+    UI.label(label, x + 6 + Theme.space.sm, ty, "label",
+      { color = here and Theme.gold or Theme.text, width = w - 6 - Theme.space.sm * 3 - iw, ellipsis = true })
+    UI.label(initial, x + w - Theme.space.sm - iw, ty, "label", { color = Theme.mute })
+    self.snippet_rects[i] = { x = x, y = y, w = w, h = row - Theme.space.xs }
     y = y + row
+    shown_n = shown_n + 1
   end
+  love.graphics.setColor(1, 1, 1, 1)
+  if #hits > room and room > 0 then
+    UI.scrollbar(rect.x + rect.w - pad - 6, y - shown_n * row, shown_n * row,
+      room / #hits, (first - 1) / math.max(1, #hits - room), { alpha = 0.7 })
+  end
+  local empty
   if not self.snippets then
-    UI.text("…", rect.x + 10, y, 8, Theme.dim)
+    empty = "…"
   elseif #self.snippets == 0 then
-    UI.paragraph(I18n.t("nothing saved yet"), rect.x + 10, y, rect.w - 20, 7,
-      Theme.withAlpha(Theme.cream, 0.45))
+    empty = I18n.t("nothing saved yet")
   elseif #hits == 0 then
-    UI.paragraph(I18n.t("no pad by that name"), rect.x + 10, y, rect.w - 20, 7,
-      Theme.withAlpha(Theme.cream, 0.45))
+    empty = I18n.t("no pad by that name")
+  end
+  if empty and y + lead <= foot_y then
+    local font = UI.font("label")
+    local lines = UI.wrapWith(empty, w, font)
+    for i, line in ipairs(lines) do
+      if y + i * lead > foot_y then break end
+      UI.label(line, x, y + (i - 1) * lead, "label", { color = Theme.mute })
+    end
   end
 end
 
 --- The editor.
 ---
---- `bare` leaves off the strip under it — the stdin field, RUN and FORMAT and
---- the line count — because in CODE those controls are along the top and the
---- whole of the rest of the window is for the code.
+--- On the bench it is a card: a header row with the file, the name and the
+--- count, the code well, and the STDIN well under it. In CODE (`bare`) the
+--- well takes the rect and CODE draws stdin itself. On an old computer the
+--- card gives way to the machine's monitor, which takes the code rows, and
+--- the STDIN well stays the game's under it.
 function Playground:draw_code(rect, bare)
-  UI.well(rect.x, rect.y, rect.w, rect.h,
-    self.focus == "editor" and Theme.coin or Theme.cyan)
+  local machine = machine_on()
+  local code_c, pane_c = Playground.palette()
+  local pad = Theme.space.md
+  local lead = UI.lead("label")
+  local head_h = bare and 0 or (lead + Theme.space.lg)
+  local fed_h = bare and 0 or Theme.control.buttonM
+  -- The code is served first: a pane too short for a monitor is a plain
+  -- well, and a pane too short for the STDIN well drops it.
+  local strip = bare and 0 or (fed_h + Theme.space.sm)
+  if not bare and rect.h - head_h - strip < 3 * lead then strip = 0; fed_h = 0 end
+  if machine and rect.h - head_h - strip < 90 then
+    machine = nil
+    code_c, pane_c = Theme.code, Theme.pane
+  end
 
-  -- The strip under the code — the stdin field, the two buttons, and the
-  -- line count — measured from what is in it. It was a hard 64 px: a 7 px
-  -- caption over a 22 px field and a 24 px button, and at the doubled ladder
-  -- the caption printed through the field and `FORMAT F2` wrapped inside
-  -- its own button.
-  --
-  -- Measured **first**, because what is left over decides how big the code
-  -- can be drawn: none of it depends on the code font.
-  local cap_h = UI.lineHeight(7)
-  local field_font = Assets.mono(Layout.ui(8))
-  local field_h = field_font:getHeight() + 6
-  local bh = UI.chipHeight()
-  local row_h = math.max(field_h, bh)
-  local strip = 6 + cap_h + 2 + row_h + 4 + cap_h + 6
-  if bare then strip = 0 end
+  local area
+  if machine then
+    -- The monitor takes the card's place over the code rows; the strip
+    -- under them stays the game's.
+    area = Monitor.draw({ x = rect.x, y = rect.y, w = rect.w, h = rect.h - strip }, machine, self.t, self.running)
+    if fed_h > 0 then
+      self:draw_stdin(rect.x, rect.y + rect.h - fed_h, rect.w, fed_h)
+    end
+  elseif bare then
+    UI.card(rect.x, rect.y, rect.w, rect.h, { variant = "well", pad = 0,
+      edge = self.focus == "editor" and Theme.withAlpha(Theme.gold, 0.6) or nil })
+    area = { x = rect.x + 2, y = rect.y + 2, w = rect.w - 4, h = rect.h - 4 }
+  else
+    UI.card(rect.x, rect.y, rect.w, rect.h, { pad = 0 })
+    -- The header row: the file and the name, and the size at the right.
+    local hy = rect.y + Theme.space.sm
+    local count = I18n.t("%d lines   %d bytes%s", self.editor:line_count(), #self.editor:text(), "")
+    local cw = UI.labelWidth(count, "label")
+    UI.label(count, rect.x + rect.w - pad - cw, hy, "label", { color = Theme.mute })
+    local file = self:file_label()
+    UI.label(file, rect.x + pad, hy, "label",
+      { color = self.focus == "name" and Theme.gold or Theme.text,
+        width = rect.w - pad * 3 - cw, ellipsis = true })
+    if self.editor.dirty and self.focus ~= "name" then
+      local fw = math.min(UI.labelWidth(file, "label"), rect.w - pad * 3 - cw)
+      UI.setColor(Theme.gold)
+      love.graphics.circle("fill", rect.x + pad + fw + Theme.space.sm, hy + lead / 2, 3, 8)
+      love.graphics.setColor(1, 1, 1, 1)
+    end
+    local wy = rect.y + head_h
+    local wh = rect.h - head_h - strip - pad
+    UI.card(rect.x + pad, wy, rect.w - pad * 2, wh, { variant = "well", pad = 0,
+      edge = self.focus == "editor" and Theme.withAlpha(Theme.gold, 0.6) or nil })
+    area = { x = rect.x + pad + 2, y = wy + 2, w = rect.w - pad * 2 - 4, h = wh - 4 }
+    if fed_h > 0 then
+      self:draw_stdin(rect.x + pad, rect.y + rect.h - pad - fed_h + Theme.space.xs, rect.w - pad * 2, fed_h - Theme.space.xs)
+    end
+  end
 
-  local font = Assets.mono(Layout.codeSizeFor(18, rect.h - strip - 12, 6))
+  local font = Assets.mono(Playground.code_px(area.h - 6))
   local line_h = font:getHeight()
   -- The trailing space is not decoration: `%4d` right-aligns, so without
   -- it the last digit of the line number touches the first character of an
-  -- unindented line and `1` reads as part of `fn`.
+  -- unindented line.
   local gutter = font:getWidth("0000 ")
-  local rows = math.max(1, math.floor((rect.h - strip - 12) / line_h))
+  local rows = math.max(1, math.floor((area.h - 6) / line_h))
   self.editor:ensure_visible(rows)
-  -- And across. The gutter and the two margins are not the text's room.
   self.editor:ensure_visible_across(function(s) return font:getWidth(s) end,
-    rect.w - gutter - 20)
+    area.w - gutter - 14 - 10)
   local shift = self.editor.scroll_x or 0
   self.visible_rows = rows
   self.code_rect = rect
+  self.glass_rect = area
   self.line_h = line_h
   self.gutter = gutter
   self.mono_font = font
+  -- The scrollbar shows while the page moves and fades 800 ms after.
+  local now = love.timer.getTime()
+  if self.editor.scroll ~= self.last_scroll then
+    self.last_scroll = self.editor.scroll
+    self.scrolled_at = now
+  end
 
-  love.graphics.setScissor(rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
-  -- The light theme's page, over the code rows only: the strip under them is
-  -- the game's, and stays the game's colour.
-  if Theme.pane.paper then
-    UI.setColor(Theme.pane.paper)
-    love.graphics.rectangle("fill", rect.x + 3, rect.y + 3, rect.w - 6, rect.h - strip - 6)
+  area.w, area.h = math.max(0, area.w), math.max(0, area.h)
+  love.graphics.setScissor(area.x, area.y, area.w, area.h)
+  if pane_c.paper then
+    UI.setColor(pane_c.paper)
+    love.graphics.rectangle("fill", area.x, area.y, area.w, area.h)
   end
   love.graphics.setFont(font)
-  -- **The leftover goes above the text, not below it.** A pane is a whole
-  -- number of lines and a rectangle is not, so up to a line's worth of height
-  -- is left over. Left at the bottom it is an empty row under the last line —
-  -- while a line is hidden off the top, because the scroll counts only whole
-  -- rows. What a person sees is a page that moved one line before it had to.
-  -- Given to the top instead, a scrolled pane fills to its bottom border and
-  -- the slack reads as the margin it is. A file that fits the pane is not
-  -- scrolled and keeps its slack at the foot, where an unstarted page wants
-  -- it.
-  local slack = math.max(0, (rect.h - strip - 12) - rows * line_h)
-  local x0 = rect.x + 8
-  local y0 = rect.y + 6 + (self.editor.scroll > 0 and slack or 0)
+  -- The leftover goes above the text when the pane is scrolled, so a
+  -- scrolled pane fills to its bottom edge; an unscrolled page keeps its
+  -- slack at the foot.
+  local slack = math.max(0, (area.h - 6) - rows * line_h)
+  local x0 = area.x + 5
+  local y0 = area.y + 3 + (self.editor.scroll > 0 and slack or 0)
   self.pane:frame(rect, font, gutter, x0, y0, line_h, rows)
   local state = "code"
   for i = 1, self.editor.scroll do
     _, state = Editor.highlight(self.editor.lines[i] or "", state, self.editor.lang)
   end
   local sel_l1, sel_c1, sel_l2, sel_c2 = self.editor:selection()
+  local glow = pane_c.glow
+  -- The caret: a soft block that breathes rather than snaps, on the game's
+  -- screens; the inverse-video block every one of the three machines drew,
+  -- blinking at the browser's 1.06 s, on a machine.
+  local blink = (now % 1.06) < 0.6
+  local caret_a = Juice.follow("pg:caret", blink and 1 or 0, { speed = 14 })
+  local caret_on = self.focus == "editor" and (machine and blink or caret_a > 0.02)
 
   for row = 1, rows do
     local index = self.editor.scroll + row
@@ -1456,211 +1646,258 @@ function Playground:draw_code(rect, bare)
     if not line then break end
     local y = y0 + (row - 1) * line_h
     if index == self.editor.line then
-      UI.setColor(Theme.pane.active)
-      love.graphics.rectangle("fill", rect.x + 3, y, rect.w - 6, line_h)
+      UI.setColor(pane_c.active)
+      love.graphics.rectangle("fill", area.x, y, area.w, line_h)
     end
     if sel_l1 and index >= sel_l1 and index <= sel_l2 then
       local from = (index == sel_l1) and sel_c1 or 1
       local to = (index == sel_l2) and sel_c2 or (#line + 1)
       local sx = x0 + gutter - shift + font:getWidth(line:sub(1, from - 1))
-      UI.setColor(Theme.pane.select)
+      UI.setColor(pane_c.select)
       love.graphics.rectangle("fill", sx, y,
         math.max(2, font:getWidth(line:sub(from, to - 1))), line_h)
     end
-    -- The line numbers do not move with the text: they are a ruler, and a
-    -- ruler that slides is not one. Painted over whatever scrolled under it.
-    UI.setColor(Theme.pane.gutter)
-    love.graphics.rectangle("fill", rect.x + 3, y, gutter + 5, line_h)
-    UI.setColor(self.pane:gutter_color(index))
-    love.graphics.print(("%4d"):format(index), x0, y)
     local spans
     spans, state = Editor.highlight(line, state, self.editor.lang)
     local cx = x0 + gutter - shift
     for _, span in ipairs(spans) do
-      UI.setColor(Theme.code[span.kind] or Theme.cream)
+      local colour = code_c[span.kind] or code_c.text or Theme.text
+      if glow and not span.text:match("^%s*$") then
+        love.graphics.setColor(colour[1], colour[2], colour[3], glow[4])
+        love.graphics.print(span.text, cx - 1, y)
+        love.graphics.print(span.text, cx + 1, y)
+      end
+      UI.setColor(colour)
       love.graphics.print(span.text, cx, y)
       cx = cx + font:getWidth(span.text)
     end
-    if index == self.editor.line and self.focus == "editor"
-      and (love.timer.getTime() * 2) % 2 < 1.2 then
-      UI.setColor(Theme.pane.caret)
-      love.graphics.rectangle("fill",
-        x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1)), y, 2, line_h)
+    -- The line numbers are a ruler: painted after the text, so a line
+    -- scrolled sideways slides under them.
+    UI.setColor(pane_c.gutter)
+    love.graphics.rectangle("fill", area.x, y, gutter + 5, line_h)
+    if pane_c.gutter_rule then
+      UI.setColor(pane_c.gutter_rule)
+      love.graphics.rectangle("fill", area.x + gutter + 3, y, 2, line_h)
+    end
+    local ink, ink_a = self.pane:gutter_color(index)
+    if pane_c.gutter_ink and ink ~= Theme.brick then ink, ink_a = pane_c.gutter_ink, 1 end
+    if index == self.editor.line and ink ~= Theme.brick and not pane_c.gutter_ink then
+      ink, ink_a = Theme.text, 0.9
+    end
+    UI.setColor(ink, ink_a)
+    love.graphics.print(("%4d"):format(index), x0, y)
+    if index == self.editor.line and caret_on then
+      local kx = x0 + gutter - shift + font:getWidth(line:sub(1, self.editor.col - 1))
+      local under = line:sub(self.editor.col):match("^[%z\1-\127\194-\244][\128-\191]*") or ""
+      local kw = font:getWidth(under ~= "" and under or " ")
+      if machine then
+        UI.setColor(pane_c.caret)
+        love.graphics.rectangle("fill", kx, y, kw, line_h)
+        if under ~= "" and pane_c.paper then
+          UI.setColor(pane_c.paper)
+          love.graphics.print(under, kx, y)
+        end
+      else
+        UI.setColor(pane_c.caret, 0.35 * caret_a)
+        love.graphics.rectangle("fill", kx, y, kw, line_h)
+        UI.setColor(pane_c.caret, caret_a)
+        love.graphics.rectangle("fill", kx, y, 2, line_h)
+      end
     end
   end
-  self.pane:draw_brackets()
+  -- The bracket outlines read `Theme.pane.match`; on a machine that is the
+  -- machine's colour for the length of this one call.
+  local theme_pane = Theme.pane
+  Theme.pane = pane_c
+  local drew = pcall(self.pane.draw_brackets, self.pane)
+  Theme.pane = theme_pane
+  if not drew then self.pane:draw_brackets() end
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
-
-  if bare then
-    -- Nothing below the code: the rects the strip would have set must not
-    -- survive from the framed layout, or a tap lands on a button that is not
-    -- on the screen.
-    -- `stdin_rect` is not cleared: in CODE the field is drawn by `draw_big`,
-    -- above the editor rather than under it, and it owns that rect.
-    self.run_rect, self.format_rect = nil, nil
-    return
+  if not machine then
+    local total = #self.editor.lines
+    if total > rows then
+      local age = now - (self.scrolled_at or -10)
+      local alpha = age < 0.8 and 1 or math.max(0.25, 1 - (age - 0.8) / 0.4)
+      UI.scrollbar(area.x + area.w - 10, area.y + 4, area.h - 8, rows / total,
+        self.editor.scroll / math.max(1, total - rows), { alpha = alpha })
+    end
   end
-
-  -- stdin, and the buttons. The buttons are as wide as the widest label
-  -- they can wear, so RUN and RUNNING… are the same button.
-  local strip_top = rect.y + rect.h - strip
-  UI.text(I18n.t("STDIN"), rect.x + 8, strip_top + 6, 7, Theme.withAlpha(Theme.cream, 0.5))
-  local sy = strip_top + 6 + cap_h + 2
-  local bw = 0
-  for _, label in ipairs({ "RUN  F5", "RUNNING…", "FORMAT F2" }) do
-    bw = math.max(bw, UI.textWidth(label, 8) + 20)
-  end
-  -- Never wider than half the pane: the pair used to run off its left
-  -- edge, and `UI.button` fits the label to whatever width this leaves.
-  bw = math.min(bw, math.floor((rect.w - 24) / 2))
-  local field_w = math.max(60, rect.w - 12 - (bw * 2 + 16))
-  local fy = sy + math.floor((row_h - field_h) / 2)
-  UI.setColor(Theme.void, 0.9)
-  love.graphics.rectangle("fill", rect.x + 6, fy, field_w, field_h)
-  love.graphics.setLineWidth(2)
-  UI.setColor(self.focus == "stdin" and Theme.coin or Theme.withAlpha(Theme.cream, 0.3))
-  love.graphics.rectangle("line", rect.x + 7, fy + 1, field_w - 2, field_h - 2)
-  love.graphics.setColor(1, 1, 1, 1)
-  love.graphics.setFont(field_font)
-  UI.setColor(Theme.cream)
-  love.graphics.print((self.stdin:gsub("\n", "⏎")), rect.x + 12, fy + 3)
-  love.graphics.setColor(1, 1, 1, 1)
-  self.stdin_rect = { x = rect.x + 6, y = fy, w = field_w, h = field_h }
-
-  local by = sy + math.floor((row_h - bh) / 2)
-  local rx = rect.x + rect.w - bw - 8
-  UI.button(rx, by, bw, bh, self.running and "RUNNING…" or "RUN  F5",
-    self.running and "disabled" or "hot", 8)
-  self.run_rect = { x = rx, y = by, w = bw, h = bh }
-  local fx = rx - bw - 8
-  UI.button(fx, by, bw, bh, self.formatting and "…" or "FORMAT F2",
-    self.format_unsupported and "disabled" or "normal", 8)
-  self.format_rect = { x = fx, y = by, w = bw, h = bh }
-
-  local info = I18n.t("%d lines   %d bytes%s",
-    self.editor:line_count(), #self.editor:text(),
-    self.editor.dirty and "   ·" or "")
-  UI.text(info, rect.x + 8, sy + row_h + 4, 7, Theme.withAlpha(Theme.cream, 0.4))
+  -- The tube over the glass, after the code and after the scissor.
+  if self.retro then self.retro:draw(area) end
+  if bare then self.run_rect, self.format_rect = nil, nil end
 end
 
---- What the program did.
----
---- Deliberately flat: one outcome line, then stdout, then stderr. No banner,
---- no verdict colour, no red. §4.9c — nothing here is scored, and this is
---- where somebody writes something broken on purpose to see what the compiler
---- says.
+--- What the program did: a card with OUTPUT and the outcome in its header,
+--- a well of what it printed, a scrollbar. Deliberately flat: one outcome
+--- line, then stdout, then stderr. No banner, no verdict colour — §4.9c,
+--- nothing here is scored. The header does flash for a moment when a run
+--- comes back, green when it ran and in the danger colour when the build
+--- did not go through, and then it is cream again.
 function Playground:draw_output(rect)
-  -- Kept for the drives: where this pane landed is the only way a test can
-  -- ask whether it went beside the code or under it.
   self.out_rect = rect
-  UI.well(rect.x, rect.y, rect.w, rect.h, Theme.cyan)
-  local font = Assets.mono(Layout.codeSize(16))
-  local line_h = font:getHeight()
-  local y = rect.y + 8
+  UI.card(rect.x, rect.y, rect.w, rect.h, { pad = 0 })
+  local pad = Theme.space.md
+  local lead = UI.lead("label")
+  local head_h = lead + Theme.space.lg
+  local hy = rect.y + Theme.space.sm
+
+  -- The flash: the header row tinted for 600 ms after the reply.
+  local since = Juice.since("pg:ran")
+  if since and since < 0.6 and self.ran_tint then
+    UI.setColor(self.ran_tint, 0.4 * (1 - since / 0.6))
+    UI.rrect("fill", rect.x + 2, rect.y + 2, rect.w - 4, head_h, Theme.radius)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
 
   local head, colour
   if self.running then
     head = ("%s…  %dms"):format(tostring(self.stage or "queued"), math.floor(self.elapsed_ms))
-    colour = Theme.coin
+    colour = Theme.gold
   elseif self.result then
-    head = ("%s   %dms compile   %dms run   exit %s"):format(
-      I18n.t(OUTCOME[self.result.outcome] or tostring(self.result.outcome)),
-      self.result.compile_ms or 0, self.result.run_ms or 0,
-      self.result.exit_code == nil and "-" or tostring(self.result.exit_code))
-    -- `ok` gets a quiet green; everything else gets **cream**, not red. What
-    -- happened is information, and the register is a terminal's, not a
-    -- verdict screen's.
-    colour = self.result.outcome == "ok" and Theme.admit
-      or Theme.withAlpha(Theme.cream, 0.85)
+    head = I18n.t(OUTCOME[self.result.outcome] or tostring(self.result.outcome))
+    -- `ok` gets a quiet green; everything else gets **cream**, not red.
+    colour = self.result.outcome == "ok" and Theme.green or Theme.text
   else
     head = I18n.t("nothing has run yet")
-    colour = Theme.withAlpha(Theme.cream, 0.45)
+    colour = Theme.mute
   end
-  -- Every advance below is the line's own height: the constants they
-  -- replace (18, 10, 12) were written against 7 and 8 px type, and at the
-  -- doubled ladder each line was printed through the one above it.
-  local small = UI.lineHeight(7) + 2
-  y = y + UI.paragraph(head, rect.x + 10, y, rect.w - 20, 8, colour) + 4
-
-  if self.problem then
-    for _, line in ipairs(UI.wrap(self.problem, rect.w - 24, 7)) do
-      UI.text(line, rect.x + 10, y, 7, Theme.coin)
-      y = y + small
-    end
-  elseif self.note then
-    -- Two lines at most, the second elided: a saved poster's path is long,
-    -- and a note that wrapped for as long as it liked once ate the whole
-    -- pane and handed the scissor below a negative height.
-    local wrapped = UI.wrap(self.note, rect.w - 24, 7)
-    for i = 1, math.min(2, #wrapped) do
-      local line = wrapped[i]
-      if i == 2 and #wrapped > 2 then
-        line = Poster.elide(table.concat(wrapped, " ", 2), rect.w - 24,
-          function(t) return UI.textWidth(t, 7) end)
-      end
-      UI.text(line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cyan, 0.9))
-      y = y + small
-    end
-  end
-
-  love.graphics.setScissor(rect.x + 4, y, rect.w - 8, math.max(0, rect.y + rect.h - y - 6))
-  love.graphics.setFont(font)
-
-  local function block(label, text, alpha)
-    if not text or text == "" then return end
-    y = y + UI.text(label, rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.4)) + 4
-    love.graphics.setFont(font)
-    UI.setColor(Theme.cream, alpha)
-    for line in (text .. "\n"):gmatch("(.-)\n") do
-      love.graphics.print(line, rect.x + 10, y)
-      y = y + line_h
-    end
-    love.graphics.setColor(1, 1, 1, 1)
-    y = y + 6
-  end
-
+  local title = I18n.t("OUTPUT")
+  local tw = UI.labelWidth(title, "label")
+  local room = rect.w - pad * 3 - tw
   if self.result then
-    block("STDOUT", self.result.stdout, 1)
-    block("STDERR", self.result.stderr, 0.8)
-    if self.result.diagnostics and #self.result.diagnostics > 0 then
-      y = y + UI.text(I18n.t("WHAT THE COMPILER SAID"), rect.x + 10, y, 7,
-        Theme.withAlpha(Theme.cream, 0.4)) + 4
-      for _, d in ipairs(self.result.diagnostics) do
-        local head_line = ("%s%s"):format(d.kind or "",
-          d.code and (" [" .. d.code .. "]") or "")
-        UI.text(head_line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cyan, 0.9))
-        y = y + small
-        for _, line in ipairs(UI.wrap(d.message or "", rect.w - 34, 7)) do
-          UI.text("  " .. line, rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.8))
-          y = y + small
-        end
-        if d.line then
-          UI.text(("  line %d%s"):format(d.line, d.col and (":" .. d.col) or ""),
-            rect.x + 10, y, 7, Theme.withAlpha(Theme.cream, 0.45))
-          y = y + small
-        end
-        y = y + 4
+    -- The timing and the exit code follow the outcome when they fit, and
+    -- give way one at a time when they do not: the outcome is the answer.
+    local r = self.result
+    local ms = ("%dms"):format((r.compile_ms or 0) + (r.run_ms or 0))
+    local exit = "exit " .. (r.exit_code == nil and "-" or tostring(r.exit_code))
+    for _, candidate in ipairs({ head .. " · " .. ms .. " · " .. exit, head .. " · " .. exit, head }) do
+      if UI.labelWidth(candidate, "label") <= room then head = candidate; break end
+    end
+  end
+  UI.label(title, rect.x + pad, hy, "label", { color = Theme.mute, caps = true })
+  UI.label(head, rect.x + pad + tw + pad, hy, "label",
+    { color = colour, width = room, ellipsis = true, align = "right" })
+
+  local font = Assets.mono(Layout.codeSize(16))
+  local line_h = font:getHeight()
+  local wx, wy = rect.x + pad, rect.y + head_h
+  local ww, wh = rect.w - pad * 2, rect.h - head_h - pad
+  if wh < line_h + 8 then
+    self.out_body = nil
+    self.out_overflow = 0
+    return
+  end
+  UI.card(wx, wy, ww, wh, { variant = "well", pad = 0 })
+  local x, y = wx + Theme.space.sm, wy + Theme.space.sm
+  local text_w = ww - Theme.space.sm * 2 - 10
+  local bottom = wy + wh - Theme.space.sm
+
+  -- The format's problem, or the last note, above what the program said.
+  local out = {}
+  local function push(text, c)
+    for _, line in ipairs(Playground.wrap_mono(text, text_w,
+      function(t) return font:getWidth(t) end)) do
+      out[#out + 1] = { line, c }
+    end
+  end
+  if self.problem then
+    for line in (tostring(self.problem) .. "\n"):gmatch("(.-)\n") do push(line, Theme.gold) end
+    out[#out + 1] = { "", Theme.mute }
+  end
+  local function block(label, text, c)
+    if not text or text == "" then return end
+    if #out > 0 then out[#out + 1] = { "", Theme.mute } end
+    out[#out + 1] = { label, Theme.mute }
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+      if line ~= "" then push(line, c) end
+    end
+  end
+  local r = self.result
+  local loud = Playground.loud(r)
+  if r then
+    block("STDOUT", r.stdout, Theme.text)
+    if loud then block("STDERR", r.stderr, Theme.withAlpha(Theme.text, 0.8)) end
+    if loud and r.diagnostics and #r.diagnostics > 0 then
+      local lines = {}
+      for _, d in ipairs(r.diagnostics) do
+        local where = d.line and (" (" .. d.line .. (d.col and (":" .. d.col) or "") .. ")") or ""
+        lines[#lines + 1] = ("%s%s%s  %s"):format(d.kind or "",
+          d.code and (" [" .. d.code .. "]") or "", where, d.message or "")
       end
+      block(I18n.t("WHAT THE COMPILER SAID"), table.concat(lines, "\n"), Theme.blue)
     end
   elseif self.log then
-    -- Streaming, before the reply lands.
     for _, name in ipairs(self.log.order) do
-      local lines, tail = self.log:lines(name)
-      for _, line in ipairs(lines) do
-        love.graphics.setFont(font)
-        UI.setColor(Theme.cream, 0.85)
-        love.graphics.print(line, rect.x + 10, y)
-        y = y + line_h
-      end
-      if tail ~= "" then
-        love.graphics.print(tail, rect.x + 10, y)
-        y = y + line_h
+      if loud or name == "stdout" then
+        local lines, tail = self.log:lines(name)
+        for _, line in ipairs(lines) do push(line, Theme.withAlpha(Theme.text, 0.85)) end
+        if tail ~= "" then push(tail, Theme.withAlpha(Theme.text, 0.85)) end
       end
     end
+  end
+
+  local room = math.max(1, math.floor((bottom - y) / line_h))
+  self.out_body = { x = wx, y = wy, w = ww, h = wh }
+  love.graphics.setFont(font)
+  if #out == 0 then
+    self.out_overflow = 0
+    if r then
+      UI.setColor(Theme.mute)
+      love.graphics.print(I18n.t("the program wrote nothing"), x, y)
+    end
+    love.graphics.setColor(1, 1, 1, 1)
+    return
+  end
+  -- `out_scroll` counts lines back from the tail (0 = live), so the same
+  -- moment stays on screen as more output streams in.
+  self.out_overflow = math.max(0, #out - room)
+  if self.out_to_top and r then
+    self.out_to_top = false
+    self.out_scroll = self.out_overflow
+  end
+  local scroll = math.max(0, math.min(self.out_scroll or 0, self.out_overflow))
+  self.out_scroll = scroll
+  local last = #out - scroll
+  love.graphics.setScissor(wx + 1, wy + 1, math.max(0, ww - 2), math.max(0, wh - 2))
+  local ly = y
+  for i = math.max(1, last - room + 1), last do
+    UI.setColor(out[i][2])
+    love.graphics.print(out[i][1], x, ly)
+    ly = ly + line_h
   end
   love.graphics.setScissor()
   love.graphics.setColor(1, 1, 1, 1)
+  if self.out_overflow > 0 then
+    UI.scrollbar(wx + ww - 10, wy + 4, wh - 8, room / #out,
+      (last - room) / self.out_overflow, { alpha = 0.9 })
+  end
+end
+
+--- `text` broken into lines no wider than `width`, at spaces where it can
+--- and anywhere where it must: a compiler's path has no spaces in it.
+function Playground.wrap_mono(text, width, measure)
+  local lines = {}
+  local line = ""
+  for word in tostring(text):gmatch("%s*%S+") do
+    if line ~= "" and measure(line .. word) > width then
+      lines[#lines + 1] = line
+      line = word:gsub("^%s+", "")
+    else
+      line = line .. word
+    end
+    while measure(line) > width and #line > 1 do
+      local cut = #line
+      while cut > 1 and measure(line:sub(1, cut)) > width do cut = cut - 1 end
+      -- Not inside a UTF-8 character.
+      while cut > 1 and line:byte(cut + 1) and line:byte(cut + 1) >= 128
+        and line:byte(cut + 1) < 192 do cut = cut - 1 end
+      lines[#lines + 1] = line:sub(1, cut)
+      line = line:sub(cut + 1)
+    end
+  end
+  if line ~= "" or #lines == 0 then lines[#lines + 1] = line end
+  return lines
 end
 
 -- -------------------------------------------------------------------- input
@@ -1681,6 +1918,9 @@ function Playground:textinput(text)
     if #(self.name_edit or "") < 48 then self.name_edit = (self.name_edit or "") .. text end
   elseif self.focus == "find" then
     if #(self.query or "") < 48 then self.query = (self.query or "") .. text end
+  elseif self.focus == "tools" then
+    -- Room for a working set of words, not just one.
+    if #(self.tools_query or "") < 120 then self.tools_query = (self.tools_query or "") .. text end
   elseif self.focus == "stamp" then
     if #(self.stamp_edit or "") < 400 then self.stamp_edit = (self.stamp_edit or "") .. text end
   elseif self.focus == "disk" then
@@ -1755,7 +1995,7 @@ function Playground:cycle_face()
   local next_face = faces[(at % #faces) + 1]
   Assets.setCodeFace(next_face)
   require("src.store").set_face(next_face)
-  self.note = Assets.CODE_FACE_NAME[next_face]
+  self:say(Assets.CODE_FACE_NAME[next_face])
   SFX.play("select")
 end
 
@@ -1775,7 +2015,7 @@ function Playground:cycle_theme()
   local next_theme = themes[(at % #themes) + 1]
   Theme.setCodeTheme(next_theme)
   require("src.store").set_code_theme(next_theme)
-  self.note = Playground.theme_label()
+  self:say(Playground.theme_label())
   SFX.play("select")
 end
 
@@ -1820,32 +2060,32 @@ end
 function Playground:clip(which)
   if which == "code" then
     love.system.setClipboardText(self.editor and self.editor:text() or "")
-    self.note = I18n.t("copied")
+    self:say(I18n.t("copied"), "good")
   elseif which == "out" then
     local text = self:output_text()
-    if text == "" then self.note = I18n.t("nothing has run yet"); return end
+    if text == "" then self:say(I18n.t("nothing has run yet"), "warn"); return end
     love.system.setClipboardText(text)
-    self.note = I18n.t("copied")
+    self:say(I18n.t("copied"), "good")
   elseif which == "copyin" then
     local text = self.stdin or ""
-    if text == "" then self.note = I18n.t("nothing to copy"); return end
+    if text == "" then self:say(I18n.t("nothing to copy"), "warn"); return end
     love.system.setClipboardText(text)
-    self.note = I18n.t("copied")
+    self:say(I18n.t("copied"), "good")
   elseif which == "in" then
     -- Checked like the editor's paste is: an empty clipboard silently wiping
     -- the program's input is a button that looks like it worked.
     local text = love.system.getClipboardText() or ""
-    if text == "" then self.note = I18n.t("the clipboard is empty"); return end
+    if text == "" then self:say(I18n.t("the clipboard is empty"), "warn"); return end
     self.stdin = text
     self.editor.dirty = true
     self.dirty_at = Anim.now()
-    self.note = I18n.t("pasted")
+    self:say(I18n.t("pasted"), "good")
   elseif which == "paste" and self.editor then
     local text = love.system.getClipboardText() or ""
-    if text == "" then self.note = I18n.t("the clipboard is empty"); return end
+    if text == "" then self:say(I18n.t("the clipboard is empty"), "warn"); return end
     self.editor:set_text(text)
     self.editor.dirty = true
-    self.note = I18n.t("pasted")
+    self:say(I18n.t("pasted"), "good")
   end
   SFX.play("select")
 end
@@ -1901,7 +2141,7 @@ function Playground:poster()
   self.postering = false
   if not ok then
     self.app:log("warn", "poster: " .. tostring(err))
-    self.note = I18n.t("could not make the poster")
+    self:say(I18n.t("could not make the poster"), "warn")
     SFX.play("locked")
   end
 end
@@ -1981,7 +2221,7 @@ function Playground:make_poster(lib)
   end
   -- The PNG only: it is the one with the proof in the file, and the whole
   -- program in it whatever the length. A JPEG kept only what the label held.
-  self.note = ("%s · %s"):format(I18n.t("poster saved"), path)
+  self:say(("%s · %s"):format(I18n.t("poster saved"), path), "good")
   SFX.play("select")
 end
 
@@ -2070,13 +2310,13 @@ function Playground:read_disk_path(path)
   self.dirty_at = Anim.now()
   self.name = disk.title or Reader.name_from_file(path)
   if disk.verdict == "verified" then
-    self.note = I18n.t("disk read · written and signed by %s · verified"):format(short)
+    self:say(I18n.t("disk read · written and signed by %s · verified"):format(short), "good")
     SFX.play("select")
   elseif disk.verdict == "forged" then
-    self.note = I18n.t("disk read · the signature does NOT match %s"):format(short)
+    self:say(I18n.t("disk read · the signature does NOT match %s"):format(short), "warn")
     SFX.play("locked")
   else
-    self.note = I18n.t("disk read · unsigned · claims %s"):format(short)
+    self:say(I18n.t("disk read · unsigned · claims %s"):format(short))
     SFX.play("select")
   end
 end
@@ -2137,6 +2377,20 @@ function Playground:keypressed(key, mods)
     return true
   end
 
+  -- The toolbar filter owns every key while it is open, like the search
+  -- box: ESC empties it, ENTER hands the keys back to the code.
+  if self.focus == "tools" then
+    if key == "backspace" then
+      -- One character, not one byte: `필터` is typed in Korean too.
+      self.tools_query = (self.tools_query or ""):gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
+    elseif key == "escape" then
+      self.tools_query, self.focus = "", "editor"
+    elseif key == "return" or key == "kpenter" then
+      self.focus = "editor"
+    end
+    return true
+  end
+
   if self.focus == "stamp" or self.focus == "disk" then
     local field = self.focus == "stamp" and "stamp_edit" or "disk_edit"
     if key == "backspace" then
@@ -2168,12 +2422,14 @@ function Playground:keypressed(key, mods)
     return true
   end
 
+  -- The keys go through the same press as the buttons, so RUN pushes in and
+  -- sparks on F5 exactly as it does under a finger.
   if key == "f5" or (cmd and not mods.shift and (key == "return" or key == "kpenter")) then
-    self:run(); return true
+    self:press_tool("run"); return true
   end
-  if key == "f2" then self:format(); return true end
-  if cmd and key == "s" then self:save(); SFX.play("select"); return true end
-  if cmd and key == "n" then self:new_snippet(); return true end
+  if key == "f2" then self:press_tool("format"); return true end
+  if cmd and key == "s" then self:press_tool("save"); return true end
+  if cmd and key == "n" then self:press_tool("new"); return true end
   if key == "tab" and not cmd and self.focus ~= "editor" then
     self:toggle_lang(); return true
   end
@@ -2208,7 +2464,15 @@ function Playground:keypressed(key, mods)
     return true
   end
 
-  if self.editor:keypressed(key, mods) then return true end
+  if self.editor:keypressed(key, mods) then
+    -- AUTO-RUN: a bare ENTER typed into the code runs it, after the newline
+    -- is in. A chord is somebody else's ENTER (CTRL-ENTER is RUN already).
+    if (key == "return" or key == "kpenter") and self.focus == "editor"
+      and not (cmd or mods.shift or mods.alt) then
+      self:auto_enter()
+    end
+    return true
+  end
   return false
 end
 
@@ -2217,6 +2481,15 @@ function Playground:wheelmoved(_, dy)
     local mx, my = love.mouse.getPosition()
     local vx, vy = Layout.toVirtual(mx, my)
     if self.coder:wheelmoved(dy, vx, vy) then return end
+  end
+  -- Over the output, the output scrolls: up is back through what it said.
+  local mx, my = Layout.toVirtual(love.mouse.getPosition())
+  local o = self.out_rect
+  if o and (self.out_overflow or 0) > 0 and mx >= o.x and mx <= o.x + o.w
+    and my >= o.y and my <= o.y + o.h then
+    self.out_scroll = math.max(0, math.min(self.out_overflow,
+      (self.out_scroll or 0) + math.floor(dy * 3 + 0.5)))
+    return
   end
   if self.focus == "editor" then
     self.editor:scroll_by(-dy * 3, self.visible_rows or 20)
@@ -2227,73 +2500,62 @@ function Playground:mousepressed(x, y, button)
   local function inside(r)
     return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
-  -- The coder first: its panel is drawn over the screen and owns what is
-  -- under it, and a press on the sprite holds it still. A press anywhere else
-  -- lets a held sprite go and then **carries on** to whatever it was aimed
-  -- at, which is why this is not a plain "handled" gate.
   -- The question first, and only the question, while it is open.
   if self.conflict then
     local r = self.conflict_rects or {}
-    if inside(r.theirs) then self:resolve_conflict("theirs")
-    elseif inside(r.mine) then self:resolve_conflict("mine") end
+    if inside(r.theirs) then UI.press("pg:theirs", r.theirs, { sfx = false }); self:resolve_conflict("theirs")
+    elseif inside(r.mine) then UI.press("pg:mine", r.mine, { sfx = false }); self:resolve_conflict("mine") end
     return
   end
+  -- The coder next: its panel is drawn over the screen and owns what is
+  -- under it, and a press on the sprite holds it still. A press anywhere else
+  -- lets a held sprite go and then **carries on** to whatever it was aimed
+  -- at, which is why this is not a plain "handled" gate.
   if self.coder and self.coder:mousepressed(x, y, button) then return end
+  -- The header's chips, in either view.
+  if inside(self.lang_rect) then self:toggle_lang(); return end
+  if inside(self.machine_rect) then self:cycle_computer(); return end
+  if inside(self.name_rect) then self:start_rename(); return end
+  if inside(self.filter_rect) then self.focus = "tools"; return end
+  local shift = love.keyboard.isDown("lshift", "rshift")
   if self.big then
-    if inside(self.done_rect) then self.big = false; SFX.play("select"); return end
-    if inside((self.big_rects or {}).agent) then self.coder:toggle(); return end
-    local r = self.big_rects or {}
-    if inside(r.run) then self:run(); return end
-    if inside(r.format) then self:format(); return end
-    if inside(r.save) then self:save(); SFX.play("select"); return end
-    if inside(r.rename) then self:start_rename(); return end
-    if inside(r.undo) then self:step_history("undo"); return end
-    if inside(r.redo) then self:step_history("redo"); return end
-    if inside(r.copycode) then self:clip("code"); return end
-    if inside(r.pastecode) then self:clip("paste"); return end
-    if inside(r.copyout) then self:clip("out"); return end
-    if inside(r.face) then self:cycle_face(); return end
-    if inside(r.theme) then self:cycle_theme(); return end
-    if inside(r.copyin) then self:clip("copyin"); return end
-    if inside(r.pastein) then self:clip("in"); return end
-    if inside(r.poster) then self:poster(); return end
-    if inside(r.reader) then self:start_disk(); return end
-    -- CODE draws the stdin field itself, above the editor. Without this the
-    -- box took no caret and nothing could be typed into it.
+    if inside(self.done_rect) then
+      UI.press("pg:done", self.done_rect)
+      self.big = false
+      return
+    end
+    for id, rect in pairs(self.big_rects or {}) do
+      if inside(rect) and self:press_tool(id) then return end
+    end
+    -- CODE draws the stdin field itself. Without this the box took no caret
+    -- and nothing could be typed into it.
     if inside(self.stdin_rect) then self.focus = "stdin"; return end
-    if inside(r.lang) then self:toggle_lang(); return end
-    local shift = love.keyboard.isDown("lshift", "rshift")
     if self.pane:mousepressed(x, y, button, shift) then self.focus = "editor" end
     return
   end
   if inside(self.find_rect) then self.focus = "find"; return end
+  for id, rect in pairs(self.bench_rects or {}) do
+    if inside(rect) and self:press_tool(id) then return end
+  end
   local lr = self.list_rects or {}
-  if inside(lr.new) then self:new_snippet(); return end
-  if inside(lr.rename) then self:start_rename(); return end
+  if inside(lr.new) then UI.press("pg:list:new", lr.new, { sfx = false }); self:new_snippet(); return end
+  if inside(lr.rename) then UI.press("pg:list:rename", lr.rename); self:start_rename(); return end
   if inside(lr.delete) then
+    UI.press("pg:list:delete", lr.delete)
     for i, brief in ipairs(self.snippets or {}) do
       if brief.id == self.snippet_id then self:delete(i) end
     end
     return
   end
-  if inside(self.code_button_rect) then self.big = true; SFX.play("select"); return end
-  if inside(self.agent_button_rect) then self.coder:toggle(); return end
-  if inside(self.rename_rect) then self:start_rename(); return end
-  if inside(self.poster_rect) then self:poster(); return end
-  if inside(self.reader_rect) then self:start_disk(); return end
-  if inside(self.lang_rect) then self:toggle_lang(); return end
-  if inside(self.run_rect) then self:run(); return end
-  if inside(self.format_rect) then self:format(); return end
   if inside(self.stdin_rect) then self.focus = "stdin"; return end
   for i, rect in pairs(self.snippet_rects or {}) do
     if inside(rect) then
       self.focus = "snippets"
-      if self.cursor == i then self:load(i) else self.cursor = i end
+      if self.cursor == i then self:load(i) else self.cursor = i; SFX.play("move") end
       return
     end
   end
   -- Both shifts: the old hit test asked for the left one only.
-  local shift = love.keyboard.isDown("lshift", "rshift")
   if self.pane:mousepressed(x, y, button, shift) then
     self.focus = "editor"
     return
@@ -2301,21 +2563,496 @@ function Playground:mousepressed(x, y, button)
   if inside(select(1, self:panes())) then self.focus = "editor" end
 end
 
+--- What the pointer is over, so the kit's buttons lift under it.
 function Playground:mousemoved(x, y)
   -- A moving mouse slows the coder's wander, so it can be caught.
   if self.coder then self.coder:mousemoved(x, y) end
   if self.pane then self.pane:mousemoved(x, y) end
-  self.hover = nil
-  for id, r in pairs(self.list_rects or {}) do
-    if x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
-      self.hover = "list:" .. id
-    end
+  local function inside(r)
+    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
   end
+  local over = nil
+  for id, r in pairs(self.tool_rects or {}) do
+    if inside(r) then over = "tool:" .. id end
+  end
+  for id, r in pairs(self.list_rects or {}) do
+    if inside(r) then over = "list:" .. id end
+  end
+  for i, r in pairs(self.snippet_rects or {}) do
+    if inside(r) then over = "pad:" .. i end
+  end
+  if inside(self.lang_rect) then over = "lang" end
+  if inside(self.machine_rect) then over = "computer" end
+  if inside(self.name_rect) then over = "name" end
+  if inside(self.done_rect) then over = "done" end
+  self.hover = over
   if self.fx then self.fx:pointer(x, y) end
 end
 
 function Playground:mousereleased()
   if self.pane then self.pane:mousereleased() end
+end
+
+-- ------------------------------------------------------------ the toolbar
+--
+-- Every button the browser's playground has, visible, in its order, on the
+-- bench and in CODE alike: the filter box heads the first row and the
+-- buttons flow after it, wrapping by measurement into as many rows as they
+-- need. Grouped — run · edit · clipboard · tools · look · view — with a
+-- wider gap between groups than inside one. **Every button is as wide as
+-- the widest label it can wear**, measured in the label role `UI.button`
+-- draws it in, so nothing is ever cut to "…" and a toggle does not reflow
+-- the row when it flips.
+
+--- The size and look buttons: the code's type a step down and up, the code
+--- face, the interface face, the paper, and the machine.
+---
+--- `A-` and `A+` are literals, like `RUN`: they are a glyph and a sign.
+function Playground:look_items()
+  local machine = Computer.NAME[Computer.get()] ~= nil
+  local faces = {}
+  for _, name in ipairs(Assets.CODE_FACES) do faces[#faces + 1] = Assets.CODE_FACE_NAME[name] end
+  local ui_faces = {}
+  for _, name in ipairs(Assets.UI_FACES) do
+    ui_faces[#ui_faces + 1] = I18n.t("FONT %s", Assets.UI_FACE_NAME[name])
+  end
+  return {
+    { id = "fontdown", label = "A-", every = { "A-" },
+      state = Layout.FONT_STEPS[(Layout.font or 1) - 1] and "normal" or "disabled" },
+    { id = "fontup", label = "A+", every = { "A+" },
+      state = Layout.FONT_STEPS[(Layout.font or 1) + 1] and "normal" or "disabled" },
+    -- The face code is drawn in, cycled. Says the face it is **in**, like
+    -- every other toggle here.
+    { id = "face", label = Assets.CODE_FACE_NAME[Assets.codeFace()] or "?", every = faces,
+      state = "normal" },
+    -- The interface face (F8), for the person who asked for "font change"
+    -- and should not have to find the settings sheet for it.
+    { id = "uifont", label = I18n.t("FONT %s", Assets.UI_FACE_NAME[Assets.uiFace()] or "?"),
+      every = ui_faces, state = "normal" },
+    -- Light or dark, for the code pane alone. Dim on an old computer: the
+    -- machine brings its own paper.
+    { id = "theme", label = Playground.theme_label(),
+      every = { I18n.t("DARK"), I18n.t("LIGHT") }, state = machine and "disabled" or "normal" },
+    -- The machine, saying which it is.
+    { id = "computer", label = Playground.computer_label(),
+      every = Playground.computer_labels(), state = "normal" },
+  }
+end
+
+--- AUTO-RUN and STDERR, each saying the state it is in.
+function Playground:switch_items()
+  return {
+    { id = "autorun", label = Playground.auto_label(),
+      every = { I18n.t("AUTO-RUN ON"), I18n.t("AUTO-RUN OFF") }, state = "normal" },
+    { id = "stderr", label = Playground.stderr_label(),
+      every = { I18n.t("STDERR ON"), I18n.t("STDERR OFF") }, state = "normal" },
+  }
+end
+
+--- The toolbar's groups for `view` (`"bench"` or `"code"`), filtered by the
+--- box. The browser's order: run, then what acts on the file, the
+--- clipboard, the poster pair, the look of the code, and the way in or out
+--- of CODE.
+function Playground:tool_groups(view)
+  local editor = self.editor
+  local run = {
+    { id = "run", label = self.running and "RUNNING…" or "RUN", every = { "RUNNING…", "RUN" },
+      key = "F5", variant = "run", state = self.running and "disabled" or "normal" },
+  }
+  for _, item in ipairs(self:switch_items()) do run[#run + 1] = item end
+  run[#run + 1] = { id = "format", label = self.formatting and "…" or I18n.t("FORMAT"),
+    every = { I18n.t("FORMAT") }, key = "F2",
+    state = self.format_unsupported and "disabled" or "normal" }
+  local edit = {
+    -- The Rust coder. Next to RUN because it is the other thing that acts
+    -- on the program rather than on the file.
+    { id = "agent", label = I18n.t("AGENT"), every = { I18n.t("AGENT") },
+      state = (self.coder and self.coder.panel.open) and "hot" or "normal" },
+    -- The editor's own undo stack (`src/editor.lua`), as buttons -- the
+    -- steps ctrl-Z takes, for a touch screen that has no ctrl.
+    { id = "undo", label = I18n.t("UNDO"), every = { I18n.t("UNDO") },
+      state = (editor and #editor.undo_stack > 0) and "normal" or "disabled" },
+    { id = "redo", label = I18n.t("REDO"), every = { I18n.t("REDO") },
+      state = (editor and #editor.redo_stack > 0) and "normal" or "disabled" },
+    { id = "save", label = I18n.t("SAVE"), every = { I18n.t("SAVE") }, state = "normal" },
+    -- A fresh page. Dim while the other device's save waits on an answer.
+    { id = "new", label = I18n.t("NEW"), every = { I18n.t("NEW") },
+      state = self.conflict and "disabled" or "normal" },
+    { id = "rename", label = I18n.t("RENAME"), every = { I18n.t("RENAME") }, state = "normal" },
+  }
+  local clip = {
+    -- In and out of the screen. Nothing on a canvas can be selected with a
+    -- mouse, so without these the code and the compiler's answer cannot
+    -- leave it at all.
+    { id = "copycode", label = I18n.t("COPY CODE"), every = { I18n.t("COPY CODE") },
+      state = "normal" },
+    { id = "pastecode", label = I18n.t("PASTE"), every = { I18n.t("PASTE") }, state = "normal" },
+    { id = "copyout", label = I18n.t("COPY OUTPUT"), every = { I18n.t("COPY OUTPUT") },
+      state = (self.result or self.log) and "normal" or "disabled" },
+    { id = "copyin", label = I18n.t("COPY INPUT"), every = { I18n.t("COPY INPUT") },
+      state = (self.stdin or "") ~= "" and "normal" or "disabled" },
+    { id = "pastein", label = I18n.t("PASTE INPUT"), every = { I18n.t("PASTE INPUT") },
+      state = "normal" },
+  }
+  local tools = {
+    -- Out of the screen as a picture, signed; and a picture back in, checked.
+    { id = "poster", label = I18n.t("POSTER"), every = { I18n.t("POSTER") },
+      state = self.postering and "disabled" or "normal" },
+    { id = "reader", label = I18n.t("DISK READER"), every = { I18n.t("DISK READER") },
+      state = "normal" },
+  }
+  local look = self:look_items()
+  local way = {}
+  if view == "code" then
+    -- Measured from every language's name, not from one: sized for
+    -- "PYTHON", TYPESCRIPT only fitted by drawing a step smaller.
+    look[#look + 1] = { id = "lang", label = Land.name(self.lang), every = Playground.lang_labels(),
+      state = "normal" }
+  else
+    way[#way + 1] = { id = "code", label = I18n.t("CODE"), every = { I18n.t("CODE") }, state = "normal" }
+  end
+  local groups = {}
+  for _, group in ipairs({ run, edit, clip, tools, look, way }) do
+    local kept = self:filtered(group)
+    if #kept > 0 then groups[#groups + 1] = kept end
+  end
+  return groups
+end
+
+--- Only the buttons the filter box keeps.
+function Playground:filtered(items)
+  local q = self.tools_query or ""
+  if q == "" then return items end
+  local out = {}
+  for _, item in ipairs(items) do
+    if Playground.filter_keeps(q, item) then out[#out + 1] = item end
+  end
+  return out
+end
+
+--- How wide a button is: its widest label in the label role, the kit's
+--- padding each side, and its keycap when it wears one — exactly the room
+--- `UI.button` gives a label, so it is never cut.
+function Playground.tool_w(item)
+  local w = 0
+  for _, label in ipairs(item.every or { item.label }) do
+    w = math.max(w, (UI.buttonSize(label, { key = item.key })))
+  end
+  w = math.max(w, (UI.buttonSize(item.label, { key = item.key })))
+  return math.max(Theme.control.buttonM, math.ceil(w))
+end
+
+--- How tall a toolbar button is: what its face needs on this canvas, never
+--- under the kit's medium button.
+function Playground.tool_h()
+  local _, h = UI.buttonSize("A")
+  return math.max(Theme.control.buttonM, h)
+end
+
+--- How wide the filter box is: room for a short word. `at` is ignored; the
+--- box is set in the label role like the buttons beside it.
+function Playground.filter_w(at)
+  local font = UI.buttonFont()
+  return math.max(font:getWidth(I18n.t("FILTER")), font:getWidth("MMMMMMMM")) + Theme.space.lg
+end
+
+--- Lay `groups` into rows from `x`, `w` wide, the first row starting `lead`
+--- in (the filter box). Pure: returns the rows, each a list of
+--- `{ item, x, w }`. A group's buttons sit `space.sm` apart; groups sit
+--- `space.lg` apart; a button that does not fit starts the next row.
+function Playground.flow(groups, x, w, lead)
+  local rows, line = {}, {}
+  local bx = x + (lead or 0)
+  local limit = x + w
+  for _, group in ipairs(groups) do
+    for gi, item in ipairs(group) do
+      local iw = Playground.tool_w(item)
+      if #line > 0 and bx + iw > limit then
+        rows[#rows + 1] = line
+        line, bx = {}, x
+      end
+      line[#line + 1] = { item = item, x = bx, w = iw }
+      bx = bx + iw + (gi < #group and Theme.space.sm or Theme.space.lg)
+    end
+  end
+  if #line > 0 then rows[#rows + 1] = line end
+  if #rows == 0 then rows[1] = {} end
+  return rows
+end
+
+--- The height the toolbar takes at `w` wide, measured before anything
+--- under it is laid out.
+function Playground:tools_h(view, w)
+  local rows = Playground.flow(self:tool_groups(view), 0, w, Playground.filter_w() + Theme.space.sm)
+  local bh = Playground.tool_h()
+  return #rows * bh + (#rows - 1) * Theme.space.sm
+end
+
+--- The toolbar, drawn: the filter box, then the rows. Returns the height
+--- it took and the rects it drew, keyed by id.
+function Playground:draw_tools(x, y, w, view)
+  local fw = Playground.filter_w()
+  local rows = Playground.flow(self:tool_groups(view), x, w, fw + Theme.space.sm)
+  local bh = Playground.tool_h()
+  local rects = {}
+  self:draw_filter(x, y, fw, bh)
+  for ri, row in ipairs(rows) do
+    local ry = y + (ri - 1) * (bh + Theme.space.sm)
+    for _, cell in ipairs(row) do
+      local item = cell.item
+      local state = item.state or "normal"
+      if state ~= "disabled" and self.hover == "tool:" .. item.id then state = "hot" end
+      UI.button(cell.x, ry, cell.w, bh, item.label, state, nil,
+        { variant = item.variant or "secondary", id = "pg:" .. item.id, key = item.key })
+      rects[item.id] = { x = cell.x, y = ry, w = cell.w, h = bh }
+    end
+  end
+  self.tool_rects = rects
+  return #rows * bh + (#rows - 1) * Theme.space.sm, rects
+end
+
+--- The filter box, with what is typed in it or what it is for.
+function Playground:draw_filter(x, y, w, h)
+  local hot = self.focus == "tools"
+  UI.card(x, y, w, h, { variant = "well", pad = 0, edge = hot and Theme.gold or nil })
+  local q = self.tools_query or ""
+  local shown = q ~= "" and q or I18n.t("FILTER")
+  if hot then shown = q .. "_" end
+  local font, bold = UI.buttonFont()
+  shown = UI.ellipsizeWith(shown, w - Theme.space.sm * 2, font)
+  UI.buttonLabel(shown, x + Theme.space.sm, y + math.floor((h - font:getHeight()) / 2), font,
+    q ~= "" and Theme.text or Theme.mute, bold, {})
+  self.filter_rect = { x = x, y = y, w = w, h = h }
+end
+
+--- A button on the toolbar, pressed. Shared by the bench and CODE so the
+--- two can never disagree about what a button does. The push-in, the puff
+--- and the click come from `UI.press`; an action with a sound of its own
+--- keeps it.
+function Playground:press_tool(id)
+  local rect = self.tool_rects and self.tool_rects[id]
+  if id == "run" then
+    UI.press("pg:run", rect, { sfx = false })
+    self:run()
+  elseif id == "format" then UI.press("pg:format", rect, { sfx = false }); self:format()
+  elseif id == "autorun" then UI.press("pg:autorun", rect, { sfx = false }); self:toggle_pref("auto_run")
+  elseif id == "stderr" then UI.press("pg:stderr", rect, { sfx = false }); self:toggle_pref("stderr")
+  elseif id == "save" then UI.press("pg:save", rect); self:save(true)
+  elseif id == "new" then
+    if not self.conflict then UI.press("pg:new", rect, { sfx = false }); self:new_snippet() end
+  elseif id == "rename" then UI.press("pg:rename", rect); self:start_rename()
+  elseif id == "undo" or id == "redo" then UI.press("pg:" .. id, rect, { sfx = false }); self:step_history(id)
+  elseif id == "copycode" then UI.press("pg:copycode", rect, { sfx = false }); self:clip("code")
+  elseif id == "pastecode" then UI.press("pg:pastecode", rect, { sfx = false }); self:clip("paste")
+  elseif id == "copyout" then UI.press("pg:copyout", rect, { sfx = false }); self:clip("out")
+  elseif id == "copyin" then UI.press("pg:copyin", rect, { sfx = false }); self:clip("copyin")
+  elseif id == "pastein" then UI.press("pg:pastein", rect, { sfx = false }); self:clip("in")
+  elseif id == "fontdown" then UI.press("pg:fontdown", rect, { sfx = false }); self:size_font(-1)
+  elseif id == "fontup" then UI.press("pg:fontup", rect, { sfx = false }); self:size_font(1)
+  elseif id == "face" then UI.press("pg:face", rect, { sfx = false }); self:cycle_face()
+  elseif id == "uifont" then
+    UI.press("pg:uifont", rect)
+    if self.app and self.app.cycle_ui_face then self.app:cycle_ui_face() end
+  elseif id == "theme" then
+    -- The machine brings its own paper; the button says so by being dim.
+    if not Computer.NAME[Computer.get()] then UI.press("pg:theme", rect, { sfx = false }); self:cycle_theme() end
+  elseif id == "computer" then UI.press("pg:computer", rect, { sfx = false }); self:cycle_computer()
+  elseif id == "poster" then UI.press("pg:poster", rect, { sfx = false }); self:poster()
+  elseif id == "reader" then UI.press("pg:reader", rect); self:start_disk()
+  elseif id == "lang" then UI.press("pg:lang", rect, { sfx = false }); self:toggle_lang()
+  elseif id == "agent" then
+    UI.press("pg:agent", rect)
+    if self.coder then self.coder:toggle() end
+  elseif id == "code" then
+    UI.press("pg:code", rect)
+    self.big = true
+  else return false end
+  return true
+end
+
+-- ------------------------------------------------- the toolbar filter's words
+
+--- What each family of buttons *means*, in the words a person would reach
+--- for. The browser's `ui/toolfilter.ts`, word for word: a word that names a
+--- concept keeps every button of that concept, whatever its label says in
+--- the current language -- `글꼴` keeps A- / A+ and the face button, `ai`
+--- keeps the agent, `clipboard` keeps every copy and paste.
+Playground.FILTER_CONCEPTS = {
+  { words = { "run", "execute", "exec", "start", "play", "compile", "build", "실행", "돌려",
+      "컴파일", "빌드", "実行", "运行", "執行" },
+    ids = { "run", "autorun", "submit" } },
+  { words = { "copy", "clipboard", "복사", "클립보드", "コピー", "复制", "複製" }, ids = { "copy" } },
+  { words = { "paste", "clipboard", "붙여", "붙이", "클립보드", "貼り付け", "粘贴", "貼上" },
+    ids = { "paste" } },
+  { words = { "font", "text", "type", "size", "zoom", "bigger", "smaller", "글꼴", "글자", "폰트",
+      "크기", "확대", "축소", "フォント", "文字", "字体", "字型", "大小" },
+    ids = { "fontup", "fontdown", "face" } },
+  { words = { "theme", "dark", "light", "color", "colour", "night", "테마", "다크", "라이트",
+      "밝게", "어둡게", "색", "テーマ", "主题", "主題" },
+    ids = { "theme" } },
+  { words = { "ai", "agent", "ask", "help", "assistant", "claude", "gpt", "에이전트", "질문",
+      "물어", "도움", "인공지능", "エージェント", "助手", "智能" },
+    ids = { "agent", "copyask" } },
+  { words = { "undo", "redo", "history", "back", "revert", "되돌", "다시", "취소", "기록",
+      "元に戻す", "撤销", "復原" },
+    ids = { "undo", "redo", "clearstack" } },
+  { words = { "format", "pretty", "tidy", "indent", "정렬", "포맷", "들여쓰기", "整形", "格式" },
+    ids = { "format" } },
+  { words = { "output", "log", "console", "stderr", "error", "result", "출력", "로그", "콘솔",
+      "에러", "오류", "결과", "出力", "输出", "輸出", "日志" },
+    ids = { "copyout", "console", "stderr", "log" } },
+  { words = { "input", "stdin", "입력", "표준입력", "入力", "输入", "輸入" },
+    ids = { "copyin", "pastein" } },
+  { words = { "file", "save", "rename", "new", "scratch", "파일", "저장", "이름", "새로", "메모",
+      "ファイル", "保存", "文件", "檔案" },
+    ids = { "save", "rename", "new" } },
+  { words = { "share", "image", "picture", "poster", "qr", "export", "import", "공유", "이미지",
+      "사진", "포스터", "디스크", "読み込み", "分享", "图片" },
+    ids = { "poster", "reader" } },
+  { words = { "view", "layout", "screen", "panel", "full", "focus", "only", "side", "top",
+      "rotate", "orientation", "화면", "보기", "배치", "전체", "패널", "회전", "방향", "만",
+      "表示", "画面", "视图", "畫面" },
+    ids = { "stack", "briefonly", "codeonly", "focus", "code", "fullscreen", "orient", "unfocus" } },
+  { words = { "exit", "leave", "quit", "home", "map", "lobby", "나가", "나가기", "뒤로", "지도",
+      "로비", "홈", "戻る", "地图", "返回" },
+    ids = { "back", "lobby", "unfocus" } },
+  { words = { "language", "lang", "언어", "言語", "语言", "語言" },
+    ids = { "rust", "go", "cpp", "python", "pytorch", "typescript", "zig", "lua", "lang" } },
+  { words = { "reset", "clear", "clean", "wipe", "초기화", "지우", "리셋", "リセット", "重置",
+      "清除" },
+    ids = { "reset", "clearstack" } },
+  -- The old computers: a playground-only family the browser files under
+  -- "theme" by label alone. Named here so `retro` and `컴퓨터` find it.
+  { words = { "computer", "retro", "machine", "apple", "msx", "amiga", "컴퓨터", "레트로",
+      "コンピューター", "电脑", "電腦" },
+    ids = { "computer" } },
+}
+
+--- The characters of a UTF-8 string, one per entry.
+local function chars(text)
+  local out = {}
+  for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do out[#out + 1] = ch end
+  return out
+end
+
+--- The code point of one UTF-8 character.
+local function codepoint(ch)
+  local b1, b2, b3 = ch:byte(1, 3)
+  if not b2 then return b1 end
+  if b1 < 0xE0 then return (b1 - 0xC0) * 64 + (b2 - 0x80) end
+  if b1 < 0xF0 and b3 then return ((b1 - 0xE0) * 64 + (b2 - 0x80)) * 64 + (b3 - 0x80) end
+  return -1
+end
+
+local CHOSEONG = chars("ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ")
+
+--- Hangul syllables to their leading consonant, so `ㅂㅅ` finds 복사.
+local function choseong(text)
+  local out = {}
+  for _, ch in ipairs(chars(text)) do
+    local c = codepoint(ch)
+    if c >= 0xAC00 and c <= 0xD7A3 then
+      out[#out + 1] = CHOSEONG[math.floor((c - 0xAC00) / 588) + 1]
+    else
+      out[#out + 1] = ch
+    end
+  end
+  return table.concat(out)
+end
+
+local function only_jamo(word)
+  for _, ch in ipairs(chars(word)) do
+    local c = codepoint(ch)
+    if c < 0x3131 or c > 0x314E then return false end
+  end
+  return word ~= ""
+end
+
+local function has_hangul(word)
+  for _, ch in ipairs(chars(word)) do
+    local c = codepoint(ch)
+    if c >= 0xAC00 and c <= 0xD7A3 then return true end
+  end
+  return false
+end
+
+--- `cpcd` finds `copycode`: every letter, in order, with gaps allowed.
+local function subsequence(word, text)
+  local i = 1
+  for k = 1, #text do
+    if text:sub(k, k) == word:sub(i, i) then
+      i = i + 1
+      if i > #word then return true end
+    end
+  end
+  return false
+end
+
+--- The words of a filter query: split on spaces and commas, lower-cased.
+function Playground.filter_words(query)
+  local out = {}
+  local text = tostring(query or ""):lower():gsub("，", " "):gsub("、", " ")
+  for word in text:gmatch("[^%s,]+") do out[#out + 1] = word end
+  return out
+end
+
+--- The ids a word calls up through the concept table.
+local function concept_ids(word)
+  -- A word long enough to mean something: two letters, or one Hangul
+  -- syllable (`답`, `색`), which already carries a whole idea.
+  local n = #chars(word)
+  if n < 2 and not has_hangul(word) then return {} end
+  local out = {}
+  for _, c in ipairs(Playground.FILTER_CONCEPTS) do
+    for _, w in ipairs(c.words) do
+      if w:sub(1, #word) == word or (n >= 3 and word:sub(1, #w) == w) then
+        for _, id in ipairs(c.ids) do out[#out + 1] = id end
+        break
+      end
+    end
+  end
+  return out
+end
+
+--- Whether one word keeps one button.
+local function word_keeps(word, label, id)
+  if label:find(word, 1, true) or id:find(word, 1, true) then return true end
+  -- Hangul initials: `ㅂㅅ` is 복사, `ㅈㅈ` is 저장.
+  if only_jamo(word) then
+    return (choseong(label):gsub("%s+", "")):find(word, 1, true) ~= nil
+  end
+  -- The concept table: `글꼴` is A- / A+, `ai` is the agent.
+  for _, c in ipairs(concept_ids(word)) do
+    if id == c or id:sub(1, #c) == c then return true end
+  end
+  -- An abbreviation of the id: `cpcd` is copycode, `fup` is fontup.
+  return #word >= 3 and word:match("^[a-z]+$") ~= nil and subsequence(word, id)
+end
+
+--- Whether a button stays drawn under `query`.
+---
+--- Words are OR'd: a button stays when **any** word keeps it, because the box
+--- is for naming the handful of buttons you use. A word with a leading `-`
+--- takes away instead (`-font` hides the font buttons), and a query of only
+--- `-` words starts from every button. Nothing typed keeps everything.
+function Playground.filter_keeps(query, item)
+  local words = Playground.filter_words(query)
+  if #words == 0 then return true end
+  local label = tostring(item.label or ""):lower()
+  local id = tostring(item.id or ""):lower()
+  local plus = {}
+  for _, w in ipairs(words) do
+    if w:sub(1, 1) == "-" and #w > 1 then
+      if word_keeps(w:sub(2), label, id) then return false end
+    elseif w:sub(1, 1) ~= "-" then
+      plus[#plus + 1] = w
+    end
+  end
+  if #plus == 0 then return true end
+  for _, w in ipairs(plus) do
+    if word_keeps(w, label, id) then return true end
+  end
+  return false
 end
 
 return Playground

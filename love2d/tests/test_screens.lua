@@ -202,6 +202,46 @@ return function()
     Layout.font, Layout.mode = was_font, was_mode
   end)
 
+  T.case("nine land cards stay in their band, apart, and big enough to press", function()
+    if not (love and love.graphics) then
+      T.skip("land cards", "needs fonts, so needs LÖVE")
+      return
+    end
+    local Layout = require("src.layout")
+    local Lands = require("src.scenes.lands")
+    -- Nine, because that is what the server names now: at nine the
+    -- portrait stack is about forty pixels a card, and the rows that used
+    -- to be laid upwards from each card's bottom edge covered the title.
+    local lands = {}
+    for i = 1, 9 do lands[i] = { land = "rust", categories = {} } end
+    local self = setmetatable({ lands = lands }, Lands)
+    local was_font, was_mode, was_vw, was_vh = Layout.font, Layout.mode, Layout.vw, Layout.vh
+    for _, step in ipairs({ 1, 2, 4 }) do
+      Layout.font = step
+      for _, shape in ipairs({ { "landscape", 1280, 720 }, { "portrait", 720, 958 },
+          { "portrait", 720, 1280 }, { "portrait", 1080, 1920 } }) do
+        Layout.mode, Layout.vw, Layout.vh = shape[1], shape[2], shape[3]
+        local tag = ("step %d %s %dx%d"):format(step, shape[1], shape[2], shape[3])
+        local tile = self:tile_rect()
+        local rects, n = self:card_rects()
+        T.eq(n, 9, tag)
+        for i, r in ipairs(rects) do
+          -- The playground is a card in the grid, so the rule is "apart".
+          T.nope(r.x < tile.x + tile.w and tile.x < r.x + r.w and r.y < tile.y + tile.h and tile.y < r.y + r.h,
+            tag .. ": card " .. i .. " is clear of the playground tile")
+          T.ok(r.y + r.h <= Lands.band_top(), tag .. ": card " .. i .. " ends above AUTO SELECT")
+          T.ok(r.x >= 0 and r.x + r.w <= shape[2], tag .. ": card " .. i .. " is on the screen")
+          T.ok(r.h >= 36, tag .. (": card %d is %d tall, under a finger"):format(i, r.h))
+          local nx = rects[i + 1]
+          if nx then
+            T.ok(nx.x >= r.x + r.w or nx.y >= r.y + r.h, tag .. ": cards " .. i .. " and " .. (i + 1) .. " do not overlap")
+          end
+        end
+      end
+    end
+    Layout.font, Layout.mode, Layout.vw, Layout.vh = was_font, was_mode, was_vw, was_vh
+  end)
+
   T.case("the quest console is inside the well and clear of the buttons at every step", function()
     if not (love and love.graphics) then
       T.skip("quest console", "needs fonts, so needs LÖVE")

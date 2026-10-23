@@ -24,6 +24,15 @@
 --     resumed during the handshake still sees the card — it is the front
 --     door — but one press takes them to `lands`, not to a login screen.
 --
+-- ## The look (`docs/love2d-ui.md` §title)
+--
+-- The logo in Press Start 2P — the one place the arcade face is kept — with
+-- a solid edge shadow, settling in with a little overshoot; the plaque is
+-- the screen's **hero** frame (`ui_plaque`), the one gold art frame this
+-- screen is allowed, with a 2 px idle bob and the button's hover and press;
+-- WATCH STORY is a ghost under it. No caption, no key hints: the plaque is
+-- the hint. The footer is bare — only the ⚙.
+--
 -- ## The card waits for a person. Only a drive script gets the idle hand-over
 --
 -- Left alone with a player in front of it, the card waits. It used to give
@@ -37,19 +46,12 @@
 -- `timeout = 15` (which is also `src/drive.lua`'s default), and twenty of
 -- them do not know to press SPACE on a card that did not exist when they
 -- were written. So when `CWBH_DRIVE` names a script the card hands over
--- after `IDLE_OUT` seconds, as before: the boot screen hands over as soon as
--- the socket has answered (under a second on loopback), the card spends
--- eight of the fifteen, and login lands at about 8.5 s with nearly half the
--- budget unspent. Going to the *story* on idle instead would be more
--- faithful and costs the whole budget: the opening is ~40 s against a 15 s
--- wait.
+-- after `IDLE_OUT` seconds, as before.
 --
 -- **The idle clock is wall time, not summed `dt`.** `main.lua` caps `dt` at
 -- 0.05 and macOS throttles an occluded window to a couple of frames a second,
--- so a timer added up from `dt` runs twenty times slow — an eight-second card
--- behind another window would be an eighty-second one, and the drive budget
--- above would be blown by the very thing it was measured against.
--- `src/drive.lua` has the same paragraph; this is the same rule.
+-- so a timer added up from `dt` runs twenty times slow. `src/drive.lua` has
+-- the same paragraph; this is the same rule.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -58,7 +60,9 @@ local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Store = require("src.store")
-local Ease = require("src.ease")
+local Anim = require("src.anim")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 
 local Title = {}
 Title.__index = Title
@@ -73,12 +77,14 @@ function Title.driven()
 end
 
 function Title.new(app)
-  return setmetatable({ app = app, t = 0, leaving = false }, Title)
+  return setmetatable({ app = app, t = 0, leaving = false, hover = nil, header_h = 0 }, Title)
 end
 
 function Title:enter()
   self.t = 0
   self.since = love.timer.getTime()
+  -- The logo and the plaque deal in again every time the card is shown.
+  Juice.forget("title:")
 end
 
 --- Go.
@@ -101,9 +107,7 @@ function Title:start(idle)
   end
 end
 
---- The opening, asked for by name. See the header: this is the login
---- screen's `STORY` on the card, for the player who never reaches the login
---- screen. A replay, so the flag is left alone.
+--- The opening, asked for by name. A replay, so the flag is left alone.
 function Title:watch_story()
   if self.leaving then return end
   self.leaving = true
@@ -119,73 +123,122 @@ function Title:update(dt)
   end
 end
 
---- The largest size from the ladder at which `text` still fits the canvas.
----
---- The name is the one piece of type on this screen with no wrapping and no
---- clipping to fall back on, and it is drawn at eleven characters of Press
---- Start 2P — 616 px at the authored 28, and 1584 px at the largest type
---- step, which is wider than a portrait canvas. A screen whose own title runs
---- off both edges is the first thing a new player sees.
-local function fitting_size(text, width, ladder)
-  for _, size in ipairs(ladder) do
-    if UI.textWidth(text, size) <= width then return size end
+--- Where everything sits — **one function, read by the draw and by the
+--- click.** The spec's numbers at the design sizes (plaque L 400,440
+--- 480×88; P 140,760 440×88; story under it), as fractions of the canvas so
+--- a 1920 fullscreen and a 720×958 window keep the proportions.
+function Title:layout()
+  local w, h = Layout.vw, Layout.vh
+  local portrait = Layout.isPortrait()
+  local pw = math.min(portrait and 440 or 480, w - 80)
+  local ph = 88
+  local px = math.floor((w - pw) / 2)
+  local py = math.floor(h * (portrait and 0.594 or 0.611))
+  -- WATCH STORY sits in the footer's corner beside the ⚙, on a pill of the
+  -- bar colour: under the plaque it stood on the tram, where a ghost and a
+  -- keycap over the street art were all but invisible.
+  local sw, sh = UI.buttonSize(I18n.t("WATCH STORY"), { key = "F10" })
+  sw = math.max(200, sw)
+  sh = math.max(Theme.control.buttonM, sh)
+  local g = Layout.gutter()
+  local fh = UI.footerRow()
+  local sx = w - g - Theme.control.gear - Theme.space.lg - sw
+  local sy = h - fh + math.floor((fh - sh) / 2)
+  return {
+    logo_y = math.floor(h * (portrait and 0.28 or 0.36)),
+    plaque = { x = px, y = py, w = pw, h = ph },
+    story = { x = sx, y = sy, w = sw, h = sh },
+  }
+end
+
+--- The logo: Press Start 2P, two lines, a solid edge shadow four pixels
+--- down and right, settling in from slightly too big. The largest size at
+--- which the longer word fits the canvas.
+function Title:draw_logo(cy)
+  local w = Layout.vw
+  local first, second = I18n.t("CAUSEWAYBAY"), I18n.t("HACKER")
+  local px = 48
+  while px > 16 and UI.logoFont(px):getWidth(first) > w - 48 do px = px - 8 end
+  local font = UI.logoFont(px)
+  local gap = Theme.space.md
+  local block = font:getHeight() * 2 + gap
+  local k = Juice.enter("title:logo", { dur = 0.5, ease = "outBack" })
+  local scale = 1.25 - 0.25 * k
+  local alpha = math.min(1, k * 1.5)
+  local bob = Anim.bob(Anim.now(), { amount = 3, period = 3.2 })
+  local top = cy - block / 2 + bob
+  love.graphics.push()
+  love.graphics.translate(w / 2, cy)
+  love.graphics.scale(scale, scale)
+  love.graphics.translate(-w / 2, -cy)
+  love.graphics.setFont(font)
+  local function line(text, y, color)
+    UI.setColor(Theme.edge, 0.9 * alpha)
+    love.graphics.printf(text, 4, y + 4, w, "center")
+    UI.setColor(color, alpha)
+    love.graphics.printf(text, 0, y, w, "center")
   end
-  return ladder[#ladder]
+  line(first, top, Theme.gold)
+  line(second, top + font:getHeight() + gap, Theme.land.rust)
+  love.graphics.pop()
+  love.graphics.setColor(1, 1, 1, 1)
 end
 
 function Title:draw()
   local w, h = Layout.vw, Layout.vh
-  Assets.cover(Layout.isPortrait() and "title_bg_p" or "title_bg", 0, 0, w, h)
-  -- Lighter than the boot screen's veil: this is the establishing shot and
-  -- the plate is the art, but the name has to read over a bright morning.
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.5)
+  local portrait = Layout.isPortrait()
+  Assets.cover(portrait and "title_bg_p" or "title_bg", 0, 0, w, h)
+  -- Lighter than the spec's wash over a working screen: this is the
+  -- establishing shot and the plate is the art; the felt only has to let
+  -- the name read over a bright morning.
+  UI.setColor(Theme.felt, portrait and 0.62 or 0.55)
   love.graphics.rectangle("fill", 0, 0, w, h)
   love.graphics.setColor(1, 1, 1, 1)
+  Fx.ambient("dust", w, h)
+  Fx.drawAmbient()
 
-  local title = fitting_size("CAUSEWAYBAY", w - 40, { 28, 24, 20, 16, 12, 10, 8 })
-  local line = UI.lineHeight(title)
-  local y = h * (Layout.isPortrait() and 0.28 or 0.24)
-  UI.text(I18n.t("CAUSEWAYBAY"), 0, y, title, Theme.coin, "center", w)
-  UI.text(I18n.t("HACKER"), 0, y + line * 1.4, title, Theme.land.rust, "center", w)
+  local L = self:layout()
+  self:draw_logo(L.logo_y)
 
-  -- PRESS SPACE — the words a 16-bit game uses, on a plate of their own with
-  -- a gold rule that breathes. The line under it is where the screen admits
-  -- that it means any of them.
-  local label = I18n.t("PRESS SPACE")
-  local size = 12
-  local bh = math.max(44, UI.lineHeight(size) + 20)
-  local bw = math.min(w - 40, math.max(340, UI.textWidth(label, size) + 84))
-  local bx = math.floor((w - bw) / 2)
-  local by = math.floor(h * (Layout.isPortrait() and 0.60 or 0.62))
-  local pulse = 0.45 + 0.55 * Ease.cosine((self.t * 1.2) % 1)
-
-  UI.setColor(Theme.ink, 0.8)
-  love.graphics.rectangle("fill", bx, by, bw, bh)
-  UI.setColor(Theme.coin, pulse)
-  love.graphics.setLineWidth(2)
-  love.graphics.rectangle("line", bx + 1, by + 1, bw - 2, bh - 2)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(label, bx, by + (bh - UI.lineHeight(size)) / 2, size,
-    Theme.withAlpha(Theme.cream, 0.6 + 0.4 * pulse), "center", bw)
-  self.start_rect = { x = bx, y = by, w = bw, h = bh }
-
-  UI.text(I18n.t("— or click the plate —"), 0, by + bh + 18, 8,
-    Theme.withAlpha(Theme.cream, 0.7), "center", w)
+  -- The plaque: the hero frame with the button's own motion — lift, scale
+  -- and sway under the pointer, a push in on the click, a 2 px idle bob.
+  local p = L.plaque
+  local k = Juice.enter("title:plaque", { dur = 0.3, delay = 0.18, ease = "outBack" })
+  local hot = self.hover == "plaque" and 1 or 0
+  local a = Juice.follow("title:plaque", hot, { speed = 22 })
+  local press = Juice.pressed("press:title:plaque")
+  local bob = Anim.bob(Anim.now(), { amount = 2, period = 2 })
+  local py = p.y + (1 - k) * 24 - 2 * a + 4 * press + bob
+  local cx, cy = p.x + p.w / 2, py + p.h / 2
+  local sway = a > 0.01 and math.sin(Anim.now() * math.pi * 2 * Theme.motion.sway) * 1.5 * a * math.pi / 180 or 0
+  love.graphics.push()
+  love.graphics.translate(cx, cy)
+  love.graphics.rotate(sway)
+  love.graphics.scale(1 + 0.03 * a, 1 + 0.03 * a)
+  love.graphics.translate(-cx, -cy)
+  UI.card(p.x, py, p.w, p.h, { variant = "hero", art = "ui_plaque", alpha = math.min(1, k * 1.5),
+    shadowDy = Theme.shadowDy - press * 5, artScale = 0.75 })
+  local pulse = 0.72 + 0.28 * (0.5 - 0.5 * math.cos(self.t * 2.4))
+  UI.label(I18n.t("PRESS SPACE"), p.x, py + math.floor((p.h - UI.lead("title")) / 2), "title",
+    { width = p.w, align = "center", color = Theme.text, alpha = math.min(1, k * 1.5) * (hot > 0 and 1 or pulse) })
+  love.graphics.pop()
+  self.start_rect = { x = p.x, y = p.y, w = p.w, h = p.h }
 
   -- The way into the opening for somebody the card would otherwise send
-  -- straight past it. Small and below the fold of the plate: it is the one
-  -- control here that is not "start".
-  local slabel = I18n.t("STORY  [F10]")
-  local sw = math.max(140, UI.textWidth(slabel, 8) + 28)
-  local sh = math.max(30, UI.lineHeight(8) + 14)
-  local sx = math.floor((w - sw) / 2)
-  local sy = by + bh + 18 + UI.lineHeight(8) + 22
-  UI.button(sx, sy, sw, sh, slabel, "normal", 8)
-  self.story_rect = { x = sx, y = sy, w = sw, h = sh }
+  -- straight past it: a ghost, under the plaque.
+  local s = L.story
+  local ks = Juice.enter("title:story", { dur = 0.3, delay = 0.3, ease = "outCubic" })
+  local sy = s.y + (1 - ks) * 16
+  -- The pill: the bar colour, so the ghost and its keycap read over the art.
+  UI.card(s.x - Theme.space.sm, sy, s.w + Theme.space.sm * 2, s.h,
+    { variant = "flat", fill = Theme.bar, radius = s.h / 2, alpha = 0.92 * ks, pad = 0 })
+  UI.button(s.x, sy, s.w, s.h, I18n.t("WATCH STORY"),
+    self.hover == "story" and "hot" or "normal", nil,
+    { variant = "ghost", id = "title:story", key = "F10", alpha = ks })
+  self.story_rect = { x = s.x - Theme.space.sm, y = s.y, w = s.w + Theme.space.sm * 2, h = s.h }
 
-  -- "any key" is not in the hint: the card says it in full two lines up, and
-  -- at the default type step a portrait footer has room for three items.
-  self.app:footer(I18n.t("SPACE start   F10 story   L language"))
+  -- No hint line: the plaque says it. Only the ⚙, bottom right.
+  self.app:footer("", { bare = true })
 end
 
 local function inside(r, x, y)
@@ -197,6 +250,7 @@ function Title:keypressed(key)
   -- anything, and it returns true so `App:keypressed` does not treat ESC as
   -- "back" from a screen that has nowhere to go back to.
   if key == "space" then
+    UI.press("title:plaque", self.start_rect, { sfx = false })
     self:start(false)
     return true
   end
@@ -207,14 +261,22 @@ function Title:keypressed(key)
   return true
 end
 
+function Title:mousemoved(x, y)
+  if inside(self.story_rect, x, y) then self.hover = "story"
+  elseif inside(self.start_rect, x, y) then self.hover = "plaque"
+  else self.hover = nil end
+end
+
 function Title:mousepressed(x, y)
   -- The two plates, and nothing else. The rest of the card is a picture; a
   -- press on it is not a decision, and the card's job is to wait for one. A
-  -- press on the footer's display controls never gets here: `App:mousepressed`
-  -- tests those first and consumes them.
+  -- press on the footer's ⚙ never gets here: `App:mousepressed` tests it
+  -- first and consumes it.
   if inside(self.story_rect, x, y) then
+    UI.press("title:story", self.story_rect, { sfx = false })
     self:watch_story()
   elseif inside(self.start_rect, x, y) then
+    UI.press("title:plaque", self.start_rect, { sfx = false })
     self:start(false)
   end
 end

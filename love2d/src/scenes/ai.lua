@@ -14,13 +14,22 @@
 -- quest is drawn under it. A drill that showed the quest and hid the reason
 -- would be a playlist.
 --
+-- ## The look (`docs/love2d-ui.md`)
+--
+-- Three mode cards, full width, each with DESIGN's emblem at the right at
+-- its own aspect, the name in title-32 and what the plan selects in the
+-- reading face, two lines ending in "…". The chosen one lifts, wears the
+-- gold edge and sways under the pointer; the others sit. Under them one
+-- content-sized card: READY, the step with its reason as the headline, or
+-- the summary. Nothing here moves with F12 but the paragraphs.
+--
 -- ## While it does not exist
 --
--- A server built without the drills answers `unavailable` with `detail.milestone`. §3.3: that is
--- **not** `internal` — the screen says which chapter and offers no retry. The
--- three modes are still drawn and still describe themselves, because "what
--- will this do" is a question somebody can usefully have answered before the
--- thing exists.
+-- A server built without the drills answers `unavailable` with
+-- `detail.milestone`. §3.3: that is **not** `internal` — the screen says
+-- which chapter and offers no retry. The three modes are still drawn and
+-- still describe themselves, because "what will this do" is a question
+-- somebody can usefully have answered before the thing exists.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -28,6 +37,9 @@ local Assets = require("src.assets")
 local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
+local Anim = require("src.anim")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 local errors = require("src.net.errors")
 
 local Ai = {}
@@ -72,10 +84,13 @@ function Ai.new(app)
     error = nil,
     -- Whether the player has any history for a drill to be built from.
     mistakes = nil,
+    hover = nil,
+    header_h = UI.headerHeight(),
   }, Ai)
 end
 
 function Ai:enter()
+  Juice.forget("ai:")
   -- A drill over an empty record is an empty drill, and saying so before the
   -- player picks a mode is better than after.
   self.app.session:request("stats.mistakes", { limit = 5 }, function(ok, payload)
@@ -91,6 +106,7 @@ function Ai:plan()
   if self.busy then return end
   self.busy = true
   self.error = nil
+  UI.press("ai:mode" .. self.cursor, self.mode_rects and self.mode_rects[self.cursor], { sfx = false })
   SFX.play("select")
   self.app.session:request("ai.plan", {
     mode = self:mode(), land = self.app.land or "rust", size = 5,
@@ -131,6 +147,7 @@ function Ai:next()
       self.why = payload.why
       self.position = payload.position
       self.total = payload.total
+      Juice.forget("ai:step")
     end)
 end
 
@@ -147,6 +164,7 @@ end
 
 function Ai:play()
   if not self.quest then return end
+  UI.press("ai:play", self.play_rect, { sfx = false })
   SFX.play("select")
   self.app.quest_id = self.quest.id
   self.app.land = self.quest.land or self.app.land
@@ -160,255 +178,289 @@ end
 
 -- ------------------------------------------------------------------ drawing
 
+local function pad()
+  return Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+end
+
+--- A band of art at its own aspect, as tall as `h`, anchored to `right`,
+--- with a short fade on its left edge into `fill`. Returns its left edge.
+local function band(name, right, y, h, fill, alpha)
+  local image = Assets.image(name)
+  if not image then return right end
+  local iw, ih = image:getDimensions()
+  local s = h / ih
+  local ew = iw * s
+  local ex = right - ew
+  love.graphics.setColor(1, 1, 1, alpha)
+  love.graphics.draw(image, ex, y, 0, s, s)
+  local steps = 14
+  local fw = math.min(52, ew * 0.35)
+  for k = 0, steps - 1 do
+    UI.setColor(fill, alpha * (0.95 - k * (0.95 / steps)))
+    love.graphics.rectangle("fill", ex + k * (fw / steps), y, fw / steps + 1, h)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+  return ex
+end
+
+function Ai:draw_header()
+  local vw = Layout.vw
+  local h = self.header_h
+  local g = Layout.gutter()
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+  local back = "‹ " .. I18n.t("BACK")
+  local bw, bh = UI.buttonSize(back)
+  bh = math.max(Theme.control.buttonM, bh)
+  self.back_rect = { x = g, y = math.floor((h - bh) / 2), w = bw, h = bh }
+  UI.button(self.back_rect.x, self.back_rect.y, bw, bh, back,
+    self.hover == "back" and "hot" or "normal", nil, { variant = "ghost", id = "ai:back" })
+  local x = g + bw + Theme.space.lg
+  local title = I18n.t("AI MODE")
+  UI.label(title, x, math.floor((h - UI.lead("title")) / 2), "title")
+  x = x + UI.labelWidth(title, "title") + Theme.space.lg
+  -- Measured rather than guessed at: the caption is drawn only where it fits
+  -- after the title.
+  local note = I18n.t("built from your own record, not from a language model")
+  if x + UI.labelWidth(note, "label") <= vw - g then
+    UI.label(note, x, math.floor((h - UI.lead("label")) / 2), "label", { color = Theme.mute })
+  end
+end
+
 function Ai:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_datacentre", "bg_flat"), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.8)
+  UI.setColor(Theme.felt, Layout.isPortrait() and 0.8 or 0.72)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
+  Fx.ambient("neon", vw, vh)
+  Fx.drawAmbient()
 
-    local pad = Layout.isPortrait() and 12 or 46
-  local w = vw - pad * 2
-
-  -- The header band is as tall as its title (see `stats.lua`).
-  local head = math.max(44, UI.lineHeight(15) + 20)
-  local title_y = math.floor((head - UI.lineHeight(15)) / 2)
-  UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, head)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("AI MODE"), 12, title_y, 15, Theme.cyan)
-  -- Measured rather than guessed at: the title's width changes with
-  -- `uiScale`, and a fixed offset had the subtitle sitting on top of it.
-  local caption = I18n.t("built from your own record, not from a language model")
-  local cx = 12 + UI.textWidth("AI MODE", 15) + 16
-  if cx + UI.textWidth(caption, 7) < vw - 12 then
-    UI.text(caption, cx, math.floor((head - UI.lineHeight(7)) / 2), 7,
-      Theme.withAlpha(Theme.cream, 0.45))
-  end
-
-  local y = head + 10
-  y = self:draw_modes(pad, y, w) + 10
-
+  local x, y, w, h = UI.bounded(nil, self.header_h + Theme.space.lg, vh - UI.footerHeight() - Theme.space.lg)
+  local after = self:draw_modes(x, y, w, h) + Theme.gap
+  local room = y + h - after
+  -- The card under the modes measures itself as it draws; the modes read
+  -- that height next frame and give way to it (a step's reason can be
+  -- three lines of title). One frame late, which is within the deal-in.
   if self.drill and self.quest then
-    self:draw_step(pad, y, w, vh - y - UI.footerHeight() - 8)
+    self.panel_h = self:draw_step(x, after, w, room)
   elseif self.summary then
-    self:draw_summary(pad, y, w, vh - y - UI.footerHeight() - 8)
+    self.panel_h = self:draw_summary(x, after, w, room)
   else
-    self:draw_idle(pad, y, w, vh - y - UI.footerHeight() - 8)
+    self.panel_h = self:draw_idle(x, after, w, room)
   end
 
+  self:draw_header()
   self.app:footer(I18n.t("ARROWS mode   ENTER start   N next   F finish   ESC back"))
 end
 
---- The three plans, each with DESIGN's emblem for it.
----
---- **Stacked, in both orientations.** Three cards side by side left 226
---- pixels each in portrait, and a paragraph saying what a plan actually
---- selects does not fit in 206 of them — it wrapped to four lines and then
---- clipped, so the screen explained two of the three modes and cut the third
---- off mid-sentence. Full-width rows also make this screen look like the
---- lands and category screens, which are the same idea: a row, a picture, a
---- choice.
----
---- The emblems (`emblem_ai_weakness`, `_repeat`, `_spaced`) are 384x128 —
---- the same 3:1 as the category bands — so they are drawn the way
---- `categories.lua` worked out: at their own aspect, as tall as the row,
---- anchored **right** with a short fade on its left edge, and the words kept
---- in their own gutter beside it rather than on top of it.
---- The least the panel under the mode cards is ever given; see `draw_modes`.
-Ai.MIN_PANEL = 140
+--- The least the card under the mode cards is ever given; past that the
+--- modes go compact (their names alone).
+Ai.MIN_PANEL = 160
 
-function Ai:draw_modes(x, y, w)
-  -- Measured from the type, and tall enough for two lines of blurb. The
-  -- fixed 76 was right for an 11 px title over 7 px body; at twice that the
-  -- title sat on the first line of the blurb and the blurb sat on the row
-  -- below it.
-  local title_h, body_h = UI.lineHeight(11), UI.lineHeight(7)
-  local h = 8 + title_h + 6 + body_h * 2 + 8
-  local gap = 8
-  -- **Compact when the three would not leave the panel under them room.**
-  -- At the largest type step in a short landscape window three cards with
-  -- their blurbs are the whole height of the screen, and the panel that
-  -- says what the drill found — the point of the screen — was drawn under
-  -- the footer. Then the cards are their titles alone.
-  local bottom = Layout.vh - UI.footerHeight() - 8
-  local compact = y + #MODES * (h + gap) + Ai.MIN_PANEL > bottom
-  if compact then h = 8 + title_h + 8 end
+--- The three plans, each with DESIGN's emblem for it, as cards.
+function Ai:draw_modes(x, y, w, room)
+  local portrait = Layout.isPortrait()
+  local p = pad()
+  local gap = Theme.rowGap
+  local _, read_lead = UI.readHeight("x", 100)
+  -- Two lines of blurb; one when the three would not leave the card under
+  -- them room; the names alone when even that would not.
+  local need = math.max(Ai.MIN_PANEL, self.panel_h or 0)
+  local function fits(h) return #MODES * (h + gap) - gap + Theme.gap + need <= room end
+  local lines = 2
+  local h = Theme.space.lg + UI.lead("title") + Theme.space.xs + read_lead * 2 + Theme.space.lg
+  if portrait then h = math.max(120, h) else h = math.max(96, h) end
+  if not fits(h) then
+    lines = 1
+    h = Theme.space.lg + UI.lead("title") + Theme.space.xs + read_lead + Theme.space.lg
+  end
+  local compact = not fits(h)
+  if compact then h = Theme.space.sm + UI.lead("title") + Theme.space.sm end
   self.mode_rects = {}
+  local t = Anim.now()
   for i, mode in ipairs(MODES) do
     local my = y + (i - 1) * (h + gap)
+    local r = { x = x, y = my, w = w, h = h }
+    self.mode_rects[i] = r
     local on = i == self.cursor
-    UI.panel(x, my, w, h, {
-      fill = Theme.withAlpha(on and Theme.navy or Theme.ink, 0.92),
-      tint = on and Theme.coin or Theme.cyan,
-    })
+    local k = Juice.enter("ai:mode" .. i, { dur = Theme.motion.enter, delay = Juice.stagger(i, Theme.motion.stagger) })
+    local a = Juice.follow("ai:hot" .. i, (on or self.hover == i) and 1 or 0, { speed = 18 })
+    local press = Juice.pressed("press:ai:mode" .. i)
+    local alpha = math.min(1, k * 1.5)
+    local cy = my + (1 - k) * 24 - 6 * a + 4 * press
+    local cx, cyc = x + w / 2, cy + h / 2
+    local sway = (on and a > 0.01) and math.sin(t * math.pi * 2 * Theme.motion.sway + i) * 0.6 * a * math.pi / 180 or 0
+    love.graphics.push()
+    love.graphics.translate(cx, cyc)
+    love.graphics.rotate(sway)
+    love.graphics.scale(1 + 0.01 * a, 1 + 0.01 * a)
+    love.graphics.translate(-cx, -cyc)
+    UI.card(x, cy, w, h, { hot = a, selected = on, alpha = alpha, pad = 0, shadowDy = Theme.shadowDy - 5 * press })
+    local fill = Theme.mix(Theme.card, Theme.cardHi, a)
 
     -- The band first, so the words land on top of its fade and not under it.
-    local text_w = w - 20
+    -- Only when the words and the picture both fit: a band squeezed into
+    -- whatever is left over is not the picture DESIGN drew.
+    local art_left = x + w - Theme.space.xs
     local image = Assets.image("emblem_ai_" .. mode)
-    if image then
+    if image and not compact then
       local iw, ih = image:getDimensions()
-      local es = (h - 8) / ih
-      local ew = iw * es
-      -- Only when the words and the picture both fit. A band squeezed into
-      -- whatever is left over is not the picture DESIGN drew.
-      if w - ew >= 230 then
-        local ex = x + w - ew - 4
-        love.graphics.setScissor(x + 4, my + 4, w - 8, h - 8)
-        love.graphics.setColor(1, 1, 1, on and 1 or 0.7)
-        love.graphics.draw(image, ex, my + 4, 0, es, es)
-        -- **No left-edge fade here**, unlike `categories.lua`. That fade
-        -- exists to hide a hard cut, and these three emblems have 20 to 50
-        -- pixels of their own transparent margin before the ink starts
-        -- (`minx` 21, 48 and 31 of 384, in the manifest) — so there is no cut
-        -- to hide, and a strip of panel colour painted over empty canvas was
-        -- a visibly darker bar with a hard edge of its own. Looked at, not
-        -- assumed from the sibling screen.
-        love.graphics.setScissor()
-        love.graphics.setColor(1, 1, 1, 1)
-        text_w = w - ew - 30
+      local ew = iw * ((h - Theme.space.sm) / ih)
+      if w - ew >= 360 then
+        art_left = band("emblem_ai_" .. mode, x + w - Theme.space.xs, cy + Theme.space.xs, h - Theme.space.sm, fill, alpha * (on and 1 or 0.8))
       end
     end
-
-    UI.text(I18n.t(MODE_TEXT[mode].title), x + 10, my + 8, 11,
-      on and Theme.coin or Theme.cream)
-    local lines = UI.wrap(I18n.t(MODE_TEXT[mode].blurb), text_w, 7)
-    local body_top = my + 8 + title_h + 6
-    local room = compact and 0 or math.max(1, math.floor((my + h - 8 - body_top) / body_h))
-    for j = 1, math.min(room, #lines) do
-      UI.text(lines[j], x + 10, body_top + (j - 1) * body_h, 7,
-        Theme.withAlpha(Theme.cream, on and 0.85 or 0.5))
+    local tx = x + p
+    local tw = art_left - Theme.space.md - tx
+    local ty = compact and (cy + Theme.space.sm) or (cy + Theme.space.lg)
+    UI.label(I18n.t(MODE_TEXT[mode].title), tx, ty, "title", { color = on and Theme.gold or Theme.text, width = tw, ellipsis = true, alpha = alpha })
+    if not compact then
+      UI.read(I18n.t(MODE_TEXT[mode].blurb), tx, ty + UI.lead("title") + Theme.space.xs, tw,
+        { maxLines = lines, color = on and Theme.text or Theme.mute, alpha = alpha })
     end
-    self.mode_rects[i] = { x = x, y = my, w = w, h = h }
+    love.graphics.pop()
   end
   return y + #MODES * (h + gap) - gap
 end
 
-function Ai:draw_idle(x, y, w, h)
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.cyan })
-  local cy = y + 16
+--- A content-sized card: a strip, a heading in the title role, paragraphs
+--- in the reading face. Returns its height.
+local function note_card(x, y, w, title, color, paras, opts)
+  opts = opts or {}
+  local p = pad()
+  local inner = w - p * 2
+  local h = Theme.stripH + p + UI.lead("title") + Theme.space.sm
+  for _, para in ipairs(paras) do h = h + UI.readHeight(para.text, inner) + Theme.space.sm end
+  h = h + p - Theme.space.sm
+  local k = Juice.enter("ai:panel", { dur = Theme.motion.enter, delay = 0.16 })
+  local alpha = math.min(1, k * 1.5)
+  local cy = y + (1 - k) * 24
+  UI.card(x, cy, w, h, { strip = color, pad = 0, alpha = alpha })
+  local ty = cy + Theme.stripH + p
+  UI.label(title, x + p, ty, "title", { color = color, width = inner, ellipsis = true, alpha = alpha })
+  ty = ty + UI.lead("title") + Theme.space.sm
+  for _, para in ipairs(paras) do
+    ty = ty + UI.read(para.text, x + p, ty, inner, { color = para.color, alpha = alpha }) + Theme.space.sm
+  end
+  return h
+end
 
+function Ai:draw_idle(x, y, w, h)
   if self.unavailable then
-    -- Advanced by the line's own height: `18` was written against a 10 px
-    -- heading, and at the doubled ladder the paragraph printed through it.
-    cy = cy + UI.text(I18n.t("NOT BUILT YET"), x + 16, cy, 10, Theme.coin) + 6
+    -- §3.3: real, but not built yet. Said in the story's voice, with no retry
+    -- offered.
     local said = self.unavailable.milestone
       and I18n.t("A drill picked from your own mistakes, and a line saying "
         .. "why. It opens in chapter %s.", tostring(self.unavailable.milestone))
       or I18n.t("A drill picked from your own mistakes. Not in this build.")
-    for _, line in ipairs(UI.wrap(said, w - 40, 8)) do
-      cy = cy + UI.text(line, x + 16, cy, 8, Theme.cream) + 4
-    end
-    cy = cy + 8
-    for _, line in ipairs(UI.wrap(
-      I18n.t("The plan will be a fixed ordered list, so a reconnect resumes "
+    local paras = {
+      { text = said },
+      { text = I18n.t("The plan will be a fixed ordered list, so a reconnect resumes "
         .. "the same session rather than reshuffling it — and every step will "
-        .. "say why it was chosen."), w - 40, 7)) do
-      cy = cy + UI.text(line, x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.55)) + 3
-    end
-    if self.unavailable.message then
-      UI.text(self.unavailable.message, x + 16, y + h - 10 - UI.lineHeight(7), 7,
-        Theme.withAlpha(Theme.cream, 0.35))
-    end
-    return
+        .. "say why it was chosen."), color = Theme.mute },
+    }
+    if self.unavailable.message then paras[#paras + 1] = { text = self.unavailable.message, color = Theme.mute } end
+    return note_card(x, y, w, I18n.t("NOT BUILT YET"), Theme.gold, paras)
   end
-
   if self.error then
-    UI.text(self.error, x + 16, cy, 9, Theme.red)
-    return
+    return note_card(x, y, w, "!", Theme.redA, { { text = self.error } })
   end
-
   -- Somebody with no history. A drill over an empty record is an empty drill,
   -- and the useful thing is to say what fills it.
   if self.mistakes and #self.mistakes == 0 then
-    cy = cy + UI.text(I18n.t("NOTHING TO DRILL YET"), x + 16, cy, 10,
-      Theme.withAlpha(Theme.cream, 0.8)) + 6
-    for _, line in ipairs(UI.wrap(
-      I18n.t("This builds a session out of the mistakes you have actually "
+    return note_card(x, y, w, I18n.t("NOTHING TO DRILL YET"), Theme.gold, {
+      { text = I18n.t("This builds a session out of the mistakes you have actually "
         .. "made, so it needs you to have made some. Play a few streets — the "
-        .. "errors get classified as they happen — and come back."),
-      w - 40, 8)) do
-      cy = cy + UI.text(line, x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
-    end
-    return
+        .. "errors get classified as they happen — and come back.") },
+    })
   end
-
   if self.mistakes and #self.mistakes > 0 then
-    cy = cy + UI.text(I18n.t("READY"), x + 16, cy, 10, Theme.admit) + 6
     local top = self.mistakes[1]
-    for _, line in ipairs(UI.wrap(
-      I18n.t("Your most frequent is %s, %d times. Press ENTER and this will "
-        .. "find different shapes of it.", tostring(top.kind), top.count or 0),
-      w - 40, 8)) do
-      cy = cy + UI.text(line, x + 16, cy, 8, Theme.cream) + 4
-    end
-    return
+    return note_card(x, y, w, I18n.t("READY"), Theme.green, {
+      { text = I18n.t("Your most frequent is %s, %d times. Press ENTER and this will "
+        .. "find different shapes of it.", tostring(top.kind), top.count or 0) },
+    })
   end
-
-  UI.text(I18n.t("asking the server…"), x + 16, cy, 8, Theme.withAlpha(Theme.cream, 0.6))
+  return UI.label(I18n.t("asking the server…"), x, y, "label", { color = Theme.mute, width = w, align = "center" })
 end
 
 --- One step of a drill. The **reason** is the headline; the quest is under it.
 function Ai:draw_step(x, y, w, h)
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.coin })
-  local cy = y + 14
+  local p = pad()
+  local inner = w - p * 2
+  local k = Juice.enter("ai:step", { dur = Theme.motion.enter })
+  local alpha = math.min(1, k * 1.5)
+  local font = UI.font("title")
+  local why_lines = {}
+  if self.why and self.why ~= "" then
+    why_lines = UI.wrapWith(self.why, inner, font)
+    if #why_lines > 3 then
+      why_lines[3] = UI.ellipsizeWith(why_lines[3] .. "…", inner, font)
+      while #why_lines > 3 do why_lines[#why_lines] = nil end
+    end
+  end
+  local q = self.quest
+  local concepts = (q.concepts and #q.concepts > 0) and table.concat(q.concepts, " · ") or nil
+  local _, bh = UI.buttonSize(I18n.t("PLAY"), { key = "ENTER" })
+  bh = math.max(Theme.control.buttonM, bh)
+  local ch = Theme.stripH + p + UI.lead("label") + Theme.space.xs + #why_lines * UI.lead("title") + Theme.space.md
+    + UI.readHeight(tostring(q.title or q.id), inner) + UI.lead("label") + (concepts and UI.lead("label") or 0)
+    + Theme.space.lg + bh + Theme.space.lg + 8 + p
+  local cy0 = y + (1 - k) * 24
+  UI.card(x, cy0, w, ch, { strip = Theme.gold, pad = 0, alpha = alpha })
+  local cy = cy0 + Theme.stripH + p
 
   -- §4.16: `position` is 0-based (quests already behind you), so the label
   -- and the bar are `position + 1`.
   local at = (self.position or 0) + 1
-  local position = ("%d of %d"):format(at, self.total or 1)
-  UI.text(position, x + w - 16 - UI.textWidth(position, 8), cy, 8,
-    Theme.withAlpha(Theme.cream, 0.6))
-  UI.bar(x + 16, y + h - 22, w - 32, 7,
-    (self.total or 1) > 0 and at / self.total or 0, Theme.coin)
+  UI.label(("%d / %d"):format(at, self.total or 1), x + p, cy, "label", { color = Theme.mute, width = inner, align = "right", alpha = alpha })
+  UI.label(I18n.t(MODE_TEXT[self:mode()].title), x + p, cy, "label", { color = Theme.mute, alpha = alpha })
+  cy = cy + UI.lead("label") + Theme.space.xs
 
   -- The line that makes this a coach rather than a shuffle (§4.16). Largest
   -- thing on the screen, on purpose.
-  if self.why and self.why ~= "" then
-    for _, line in ipairs(UI.wrap(self.why, w - 40, 11)) do
-      cy = cy + UI.text(line, x + 16, cy, 11, Theme.coin) + 6
-    end
-    cy = cy + 8
+  for _, line in ipairs(why_lines) do
+    cy = cy + UI.label(line, x + p, cy, "title", { color = Theme.gold, alpha = alpha })
   end
-
-  cy = cy + UI.text(tostring(self.quest.title or self.quest.id), x + 16, cy, 10, Theme.cream) + 4
-  cy = cy + UI.text(tostring(self.quest.id), x + 16, cy, 7, Theme.withAlpha(Theme.cream, 0.45)) + 4
-  if self.quest.concepts and #self.quest.concepts > 0 then
-    cy = cy + UI.text(table.concat(self.quest.concepts, ", "), x + 16, cy, 7,
-      Theme.withAlpha(Theme.cyan, 0.85)) + 6
+  cy = cy + Theme.space.md
+  cy = cy + UI.read(tostring(q.title or q.id), x + p, cy, inner, { alpha = alpha })
+  cy = cy + UI.label(tostring(q.id), x + p, cy, "label", { color = Theme.mute, width = inner, ellipsis = true, alpha = alpha })
+  if concepts then
+    cy = cy + UI.label(concepts, x + p, cy, "label", { color = Theme.blue, width = inner, ellipsis = true, alpha = alpha })
   end
+  cy = cy + Theme.space.lg
 
-  -- Sized from their labels and set at the display controls' height, so
-  -- they are still buttons — and still legible — at every type step.
-  local bh = UI.chipHeight()
-  local by = y + h - 32 - bh
-  local pw = UI.textWidth("PLAY  [ENTER]", UI.CHIP_SIZE) + 28
-  local sw = UI.textWidth("SKIP  [N]", UI.CHIP_SIZE) + 28
-  UI.button(x + 16, by, pw, bh, "PLAY  [ENTER]", "hot", UI.CHIP_SIZE)
-  self.play_rect = { x = x + 16, y = by, w = pw, h = bh }
-  UI.button(x + 16 + pw + 10, by, sw, bh, "SKIP  [N]", "normal", UI.CHIP_SIZE)
-  self.next_rect = { x = x + 16 + pw + 10, y = by, w = sw, h = bh }
+  -- PLAY and SKIP, sized from their labels.
+  local pw = UI.buttonSize(I18n.t("PLAY"), { key = "ENTER" })
+  local sw = UI.buttonSize(I18n.t("SKIP"), { key = "N" })
+  pw = math.max(pw, 160)
+  self.play_rect = { x = x + p, y = cy, w = pw, h = bh }
+  self.next_rect = { x = x + p + pw + Theme.space.md, y = cy, w = sw, h = bh }
+  UI.button(self.play_rect.x, cy, pw, bh, I18n.t("PLAY"), self.hover == "play" and "hot" or "normal", nil,
+    { variant = "primary", id = "ai:play", key = "ENTER", alpha = alpha })
+  UI.button(self.next_rect.x, cy, sw, bh, I18n.t("SKIP"), self.hover == "next" and "hot" or "normal", nil,
+    { variant = "secondary", id = "ai:next", key = "N", alpha = alpha })
+  cy = cy + bh + Theme.space.lg
+  UI.bar(x + p, cy, inner, 8, (self.total or 1) > 0 and at / self.total or 0, Theme.gold)
+  return ch
 end
 
 function Ai:draw_summary(x, y, w, h)
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.admit })
-  local cy = y + 16
-  cy = cy + UI.text(I18n.t("DRILL FINISHED"), x + 16, cy, 11, Theme.admit) + 8
   local sm = self.summary
-  cy = cy + UI.text(I18n.t("attempted %d   cleared %d", sm.attempted or 0, sm.cleared or 0),
-    x + 16, cy, 9, Theme.cream) + 6
+  local paras = { { text = I18n.t("attempted %d   cleared %d", sm.attempted or 0, sm.cleared or 0) } }
   if sm.kinds_improved and #sm.kinds_improved > 0 then
-    UI.text(I18n.t("improved: ") .. table.concat(sm.kinds_improved, ", "), x + 16, cy, 8,
-      Theme.withAlpha(Theme.cyan, 0.9))
+    paras[#paras + 1] = { text = I18n.t("improved: ") .. table.concat(sm.kinds_improved, ", "), color = Theme.mute }
   end
+  return note_card(x, y, w, I18n.t("DRILL FINISHED"), Theme.green, paras)
 end
 
 -- -------------------------------------------------------------------- input
 
 --- The wheel moves the cursor, because on a desktop that is what a wheel is
---- for. Every screen in this client that has a list has one of these now: a
---- mouse that scrolled on four screens and did nothing on five reads as five
---- screens that are broken, not as four that are special.
+--- for.
 function Ai:wheelmoved(_, dy)
   if self.drill then return end
   self.cursor = ((self.cursor - 1 + (dy > 0 and -1 or 1)) % #MODES) + 1
@@ -426,23 +478,47 @@ function Ai:keypressed(key)
     if self.quest then self:play() else self:plan() end
     return true
   end
-  if key == "n" and self.drill then self:next(); return true end
+  if key == "n" and self.drill then
+    UI.press("ai:next", self.next_rect, { sfx = false })
+    self:next()
+    return true
+  end
   if key == "f" and self.drill then self:finish(); return true end
   return false
 end
 
-function Ai:mousepressed(x, y)
-  local function inside(r)
-    return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+local function inside(r, x, y)
+  return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
+function Ai:mousemoved(x, y)
+  self.hover = nil
+  if inside(self.back_rect, x, y) then self.hover = "back"; return end
+  if inside(self.play_rect, x, y) then self.hover = "play"; return end
+  if inside(self.next_rect, x, y) then self.hover = "next"; return end
+  for i, rect in ipairs(self.mode_rects or {}) do
+    if inside(rect, x, y) then self.hover = i; return end
   end
-  for i, rect in pairs(self.mode_rects or {}) do
-    if inside(rect) then
+end
+
+function Ai:mousepressed(x, y)
+  if inside(self.back_rect, x, y) then
+    UI.press("ai:back", self.back_rect, { sfx = false })
+    self.app:back()
+    return
+  end
+  if inside(self.play_rect, x, y) then self:play(); return end
+  if inside(self.next_rect, x, y) then
+    UI.press("ai:next", self.next_rect, { sfx = false })
+    self:next()
+    return
+  end
+  for i, rect in ipairs(self.mode_rects or {}) do
+    if inside(rect, x, y) then
       if self.cursor ~= i then self.cursor = i; SFX.play("move") else self:plan() end
       return
     end
   end
-  if inside(self.play_rect) then self:play(); return end
-  if inside(self.next_rect) then self:next(); return end
 end
 
 return Ai

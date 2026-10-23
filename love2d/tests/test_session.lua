@@ -454,4 +454,20 @@ return function()
     h2.session:try_resume()
     T.eq(n, 1)
   end)
+
+  T.section("session — §5.1b: an XpGain moves the level's own pair, not only the total")
+
+  T.case("the bar reads the grant, not the sign-in's stale xp_into_level", function()
+    local h = harness({})
+    h.session.user = { address = "0x1", xp = 0, level = 1, xp_into_level = 0, xp_for_next = 100 }
+    h.session:apply_xp({ gained = 50, total = 50, level = 1, into_level = 50, for_next = 100 })
+    T.eq(h.session.user.xp, 50)
+    T.eq(h.session.user.xp_into_level, 50)
+    T.eq(h.session.user.xp_for_next, 100)
+    -- A gain that does not carry the pair clears it, so the curve is used
+    -- rather than a number from before the grant.
+    h.session:apply_xp({ total = 120, level = 2 })
+    T.eq(h.session.user.xp_into_level, nil)
+    T.eq(h.session.user.level, 2)
+  end)
 end

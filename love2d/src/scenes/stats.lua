@@ -14,7 +14,7 @@
 -- have not done this in four submits" is a sentence about a person; "count:
 -- 6" is a row in a table. So it is drawn as a five-step track with the
 -- remaining steps visible — the shape says how far there is to go — and it is
--- said in words underneath.
+-- said in words beside it.
 --
 -- ## The shelf
 --
@@ -27,10 +27,19 @@
 -- ## And what it says to somebody with no history
 --
 -- A new player has no mistakes, and a mistakes list that renders zero rows
--- silently is worse than one that says why it is empty. Every panel here has
+-- silently is worse than one that says why it is empty. Every card here has
 -- a written empty state, and the one for mistakes is deliberately not an
 -- apology: having made no mistakes yet is the correct state for somebody who
 -- has just arrived.
+--
+-- ## The look (`docs/love2d-ui.md`)
+--
+-- A row of stat tiles (caption 16 over a value 48, counting up on first
+-- show); the LANDS card as a grid of tiles — mascot, name, bar, count — in
+-- real columns rather than a text block padded with spaces; the SHELF with
+-- its badges; the MISTAKES card with the drill list, or the history behind
+-- the H chip. One scrolling column, with a fade at the clipped edge, in both
+-- orientations. Nothing here moves with F12 except the reading face.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -40,6 +49,8 @@ local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
 local Ease = require("src.ease")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 local Land = require("src.land")
 
 local Stats = {}
@@ -55,26 +66,30 @@ Stats.SHELF_SLOTS = 8
 
 local KIND_BADGE = { badge = "badge_star", level = "badge_chevron", streak = "badge_flame" }
 
---- The per-land record, broken into the lines it will actually be drawn as.
+--- The per-land record, as the grid it is drawn as: rows of `cols` cells,
+--- each `{ land, name, cleared, total }`, in the order the server sent.
 ---
---- Two lands to a line. `UI.text` without a width goes through
---- `love.graphics.print`, which neither wraps nor clips, so a single joined
---- line of four lands runs off the panel and out of the window — which is
---- exactly what happened when `cpp` and `python` arrived. Breaking it here,
---- rather than in the draw call, is what lets a headless test check it.
+--- A pure function so a headless test can check what the drawing code
+--- cannot be trusted to get right on its own: that every land the server
+--- names reaches a cell (the bug this replaces dropped the ones past the
+--- panel's edge), that C++ is written C++, and that a row off the wire with
+--- a field missing reads as zero rather than taking the card down.
 ---
---- Returns an array of strings, one per line, and never `nil`.
-function Stats.land_lines(by_land)
-  local parts = {}
-  for _, land in ipairs(by_land or {}) do
-    parts[#parts + 1] = ("%s %d/%d"):format(
-      Land.name(land.land), land.cleared or 0, land.total or 0)
+--- Returns an array of rows, and never `nil`; an empty record is no rows.
+function Stats.land_grid(by_land, cols)
+  cols = math.max(1, math.floor(tonumber(cols) or 3))
+  local rows = {}
+  for i, land in ipairs(by_land or {}) do
+    local r = math.floor((i - 1) / cols) + 1
+    rows[r] = rows[r] or {}
+    rows[r][#rows[r] + 1] = {
+      land = land.land,
+      name = Land.name(land.land),
+      cleared = tonumber(land.cleared) or 0,
+      total = tonumber(land.total) or 0,
+    }
   end
-  local lines = {}
-  for i = 1, #parts, 2 do
-    lines[#lines + 1] = parts[i] .. (parts[i + 1] and ("     " .. parts[i + 1]) or "")
-  end
-  return lines
+  return rows
 end
 
 function Stats.new(app)
@@ -83,14 +98,18 @@ function Stats.new(app)
     summary = nil, mistakes = nil, awards = nil, history = nil,
     errors = {},
     scroll = 0,
+    scrolled_at = -10,
     tab = "mistakes",          -- "mistakes" | "history"
     t = 0,
     arrived = nil,
+    hover = nil,
+    header_h = UI.headerHeight(),
   }, Stats)
 end
 
 function Stats:enter()
   self.arrived = Anim.now()
+  Juice.forget("stats:")
   self:refresh()
 end
 
@@ -111,154 +130,271 @@ function Stats:update(dt)
   self.t = self.t + dt
 end
 
+function Stats:set_tab(tab)
+  if tab == self.tab then return end
+  self.tab = tab
+  SFX.play("move")
+end
+
 -- ------------------------------------------------------------------ drawing
+
+local function pad()
+  return Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+end
+
+--- A caption in the label role, mute, in caps.
+local function caption(text, x, y, w, alpha)
+  return UI.label(text, x, y, "label", { color = Theme.mute, caps = true, width = w, ellipsis = true, alpha = alpha })
+end
+
+function Stats:draw_header()
+  local vw = Layout.vw
+  local h = self.header_h
+  local g = Layout.gutter()
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+  local back = "‹ " .. I18n.t("BACK")
+  local bw, bh = UI.buttonSize(back)
+  bh = math.max(Theme.control.buttonM, bh)
+  self.back_rect = { x = g, y = math.floor((h - bh) / 2), w = bw, h = bh }
+  UI.button(self.back_rect.x, self.back_rect.y, bw, bh, back,
+    self.hover == "back" and "hot" or "normal", nil, { variant = "ghost", id = "stats:back" })
+  local x = g + bw + Theme.space.lg
+  local title = I18n.t("STATS")
+  UI.label(title, x, math.floor((h - UI.lead("title")) / 2), "title")
+  x = x + UI.labelWidth(title, "title") + Theme.space.sm
+  -- A trophy after the word, and the night-shift clerk who keeps the tally
+  -- waving from the right of the band. Decoration only: nothing if missing.
+  local ink = h - 16
+  Assets.marker("fx_trophy", x + ink / 2, h / 2, ink)
+  local right = vw - g
+  if Assets.image("sprite_clerk") then
+    Assets.sprite("sprite_clerk", right - ink * 0.4, h - 4, ink)
+    right = right - ink * 0.9 - Theme.space.md
+  end
+  -- The name moved here from the footer (the address is in the settings).
+  local session = self.app.session
+  if session and session.authed and session.display_name then
+    local who = session:display_name()
+    local ww = math.min(UI.labelWidth(who, "label"), right - x - ink - Theme.space.lg)
+    if ww > 40 then
+      UI.label(UI.ellipsizeWith(who, ww, UI.font("label")), right - ww,
+        math.floor((h - UI.lead("label")) / 2), "label", { color = Theme.mute })
+    end
+  end
+end
 
 function Stats:draw()
   local vw, vh = Layout.vw, Layout.vh
-  Assets.cover(Assets.pick("bg_datacentre", "bg_flat"), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.78)
+  -- Mei's own wall of pinned cards and trophies (`art/bg_stats`), which this
+  -- screen is; the data centre and the flat plate are the fallbacks.
+  local wall = Assets.pick(Layout.isPortrait() and "bg_stats_p" or "bg_stats", "bg_stats")
+  Assets.cover(wall or Assets.pick("bg_datacentre", "bg_flat"), 0, 0, vw, vh)
+  UI.setColor(Theme.felt, Layout.isPortrait() and 0.8 or 0.72)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
+  Fx.ambient("dust", vw, vh)
+  Fx.drawAmbient()
 
-    -- The header band is as tall as its title: 44 held a 15 px title at the
-  -- first type step and the title ran into the summary at every step above.
-  local head = math.max(44, UI.lineHeight(15) + 20)
-  UI.setColor(Theme.ink, 0.9)
-  love.graphics.rectangle("fill", 0, 0, vw, head)
-  love.graphics.setColor(1, 1, 1, 1)
-  UI.text(I18n.t("STATS"), 12, math.floor((head - UI.lineHeight(15)) / 2), 15, Theme.coin)
+  local x, y, w, h = UI.bounded(nil, self.header_h + Theme.space.lg, vh - UI.footerHeight() - Theme.space.lg)
+  self.view = { x = x, y = y, w = w, h = h }
 
-  local pad = Layout.isPortrait() and 12 or 46
-  local w = vw - pad * 2
-  local top = head + 8
-  local bottom = vh - UI.footerHeight() - 8
+  -- One column, scrolled. The column's height is what the last draw
+  -- measured; the first frame draws at 0 and measures.
+  local total = self.column_h or h
+  local max_scroll = math.max(0, total - h)
+  self.scroll = math.max(0, math.min(max_scroll, self.scroll))
+  local shown = Juice.follow("stats:scroll", self.scroll, { speed = 18 })
 
-  -- The column scrolls before the mistakes panel does. At the largest type
-  -- step in a short landscape window the summary and the shelf between
-  -- them are taller than the screen, and the mistakes panel — the point of
-  -- this screen — was left with a negative height (and a crash in
-  -- `setScissor`). So: the panel is never shorter than `MIN_MISTAKES`, the
-  -- arrow keys first lift the whole column up under the header until the
-  -- panel has that much, and only then scroll what is inside it.
-  local column_h = (self.summary_h or 0) + 10 + (self.shelf_h or 0) + 10
-  local overflow = math.max(0, column_h + Stats.MIN_MISTAKES - (bottom - top))
-  local lift = math.min(self.scroll, overflow)
-  local inner = self.scroll - lift
-
-  love.graphics.setScissor(0, head, vw, math.max(0, bottom - head))
-  local y = top - lift
-  local after = self:draw_summary(pad, y, w)
-  self.summary_h = after - y
-  y = after + 10
-  after = self:draw_shelf(pad, y, w)
-  self.shelf_h = after - y
-  y = after + 10
-  self:draw_mistakes(pad, y, w, math.max(Stats.MIN_MISTAKES, bottom - y), inner)
+  love.graphics.setScissor(0, y, vw, h)
+  local cy = y - shown
+  local bottom = self:draw_column(x, cy, w)
   love.graphics.setScissor()
+  self.column_h = bottom - cy
+  if shown > 0 then UI.scrollFade(x, y, w, Theme.felt, "top") end
+  if shown < max_scroll then UI.scrollFade(x, y + h - Theme.space.xl, w, Theme.felt, "bottom") end
+  if max_scroll > 0 then
+    local fade = math.max(0, math.min(1, 1 - (Anim.now() - self.scrolled_at - 0.8) / 0.4))
+    UI.scrollbar(x + w + Theme.space.sm - 6, y, h, h / total, shown / max_scroll, { alpha = fade })
+  end
 
+  self:draw_header()
   self.app:footer(I18n.t("R refresh   H history   ARROWS scroll   ESC back"))
 end
 
-function Stats:draw_summary(x, y, w)
-  -- Measured from the type it holds. Every offset in this panel used to be a
-  -- constant tuned against 7 px captions and 14 px figures; at twice that the
-  -- caption sat on the figure and the figure sat on the bar.
-  local cap_h, fig_h, land_h = UI.lineHeight(7), UI.lineHeight(14), UI.lineHeight(7)
-  -- The lands take as many lines as they need, two to a line. One line was
-  -- right while there were two lands and silently wrong at four: the row is
-  -- drawn with `print`, which does not wrap, so the last land ran off the
-  -- panel and out of the window.
-  local land_lines = math.max(1, #Stats.land_lines(self.summary and self.summary.by_land))
-  local h = 10 + cap_h + 2 + fig_h + 10 + 9 + 6 + land_h * land_lines + 8
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.navy, 0.94), tint = Theme.coin })
+--- The cards, top to bottom; returns the bottom edge.
+function Stats:draw_column(x, y, w)
+  local gap = Theme.gap
+  local portrait = Layout.isPortrait()
+  y = self:draw_tiles(x, y, w) + gap
+  if portrait then
+    y = self:draw_lands(x, y, w, 2) + gap
+    y = self:draw_shelf(x, y, w) + gap
+    y = self:draw_mistakes(x, y, w)
+    return y
+  end
+  -- Landscape: the lands on the left, the shelf and the mistakes on the right.
+  local lw = math.floor(w * 0.487)
+  local rx, rw = x + lw + gap, w - lw - gap
+  local left_bottom = self:draw_lands(x, y, lw, 3)
+  local ry = self:draw_shelf(rx, y, rw) + gap
+  local right_bottom = self:draw_mistakes(rx, ry, rw)
+  return math.max(left_bottom, right_bottom)
+end
+
+--- The stat tiles: a caption over a value that counts up on first show.
+function Stats:draw_tiles(x, y, w)
+  local portrait = Layout.isPortrait()
   local sm = self.summary
-  if not sm then
-    UI.text(self.errors["stats.summary"] and self.errors["stats.summary"].player
-      or I18n.t("asking the server…"), x, y + 32, 9,
-      self.errors["stats.summary"] and Theme.red or Theme.withAlpha(Theme.cream, 0.7),
-      "center", w)
-    return y + h
-  end
-
+  local gap = Theme.gap
   local cells = {
-    { I18n.t("CLEARED"), ("%d / %d"):format(sm.cleared or 0, sm.total or 0) },
-    { I18n.t("SUBMITS"), tostring(sm.attempts or 0) },
-    { I18n.t("ACCURACY"), ("%d%%"):format(math.floor((sm.accuracy or 0) * 100 + 0.5)) },
-    { I18n.t("STARS"), tostring(sm.stars or 0) },
-    -- Two forms, chosen at the call site and each translatable on its own.
-    -- Routing both through one "%d days" made English read "1 days", which is
-    -- the one language that must never be the casualty of adding five more.
-    { I18n.t("STREAK"), (sm.streak_days or 0) == 1
-      and I18n.t("%d day", 1) or I18n.t("%d days", sm.streak_days or 0) },
+    { "CLEARED", sm and (sm.cleared or 0) or nil, sm and (" / " .. tostring(sm.total or 0)) or nil },
+    { "SUBMITS", sm and (sm.attempts or 0) or nil },
+    { "ACCURACY", sm and math.floor((sm.accuracy or 0) * 100 + 0.5) or nil, "%" },
+    { "STARS", sm and (sm.stars or 0) or nil },
+    { "STREAK", sm and (sm.streak_days or 0) or nil, sm and ((sm.streak_days or 0) == 1 and I18n.t("%d day", 1) or I18n.t("%d days", sm.streak_days or 0)):gsub("^%d+%s*", " ") or nil },
   }
-  local cw = w / #cells
-  -- The figure at 14, unless a tile cannot hold it — "0 / 279" in a
-  -- portrait fifth at the doubled ladder — where it steps down rather than
-  -- wraps: `printf` breaks a figure that is wider than its column into two
-  -- lines, and the second line was printed through the lands underneath.
-  local fig = 14
-  for _, cell in ipairs(cells) do
-    while fig > 7 and UI.textWidth(cell[2], fig) > cw - 8 do fig = fig - 1 end
+  if portrait then
+    local user = self.app.session and self.app.session.user
+    cells[6] = { "LEVEL", user and tonumber(user.level) or nil }
   end
-  -- And when even 8 is too wide — a landscape fifth at the largest step —
-  -- the spaces go before the figure does: "2/278" rather than "2 /" over
-  -- "278".
-  if UI.textWidth(cells[1][2], fig) > cw - 8 then
-    cells[1][2] = ("%d/%d"):format(sm.cleared or 0, sm.total or 0)
-    while fig > 7 and UI.textWidth(cells[1][2], fig) > cw - 8 do fig = fig - 1 end
-  end
-  -- And the captions at the size all five fit their tiles: `CLEARED` was
-  -- wrapping to `CLEARE / D` over its own figure.
-  local cap = 7
-  for _, cell in ipairs(cells) do cap = math.min(cap, UI.fitSize(cell[1], cw - 6, 7, 5)) end
-  local fig_top = y + 10 + cap_h + 2 + (fig_h - UI.lineHeight(fig)) / 2
+  local cols = portrait and 2 or #cells
+  local tw = math.floor((w - gap * (cols - 1)) / cols)
+  local th = portrait and 96 or 104
+  local rows = math.ceil(#cells / cols)
   for i, cell in ipairs(cells) do
-    local cx = x + (i - 1) * cw
-    UI.text(cell[1], cx, y + 10, cap, Theme.withAlpha(Theme.cream, 0.55), "center", cw)
-    UI.text(cell[2], cx, fig_top, fig, Theme.cream, "center", cw)
+    local col, row = (i - 1) % cols, math.floor((i - 1) / cols)
+    local tx, ty = x + col * (tw + gap), y + row * (th + gap)
+    local k = Juice.enter("stats:tile" .. i, { dur = Theme.motion.enter, delay = Juice.stagger(i, Theme.motion.stagger) })
+    local alpha = math.min(1, k * 1.5)
+    local cy = ty + (1 - k) * 24
+    UI.card(tx, cy, tw, th, { pad = 0, alpha = alpha })
+    local p = Theme.space.lg
+    caption(I18n.t(cell[1]), tx + p, cy + p, tw - p * 2, alpha)
+    local vy = cy + p + UI.lead("label") + Theme.space.xs
+    if cell[2] == nil then
+      UI.label(self.errors["stats.summary"] and "!" or "…", tx + p, vy, "display", { color = Theme.mute, alpha = alpha })
+    else
+      local shown = Juice.counter("stats:count" .. i, cell[2], { dur = 0.5 })
+      local value = tostring(shown)
+      local vw_ = UI.labelWidth(value, "display")
+      local room = tw - p * 2
+      local suffix = cell[3]
+      -- The value in display 48 with its unit after it in label 16; a value
+      -- too wide for the tile steps down to the title face instead of
+      -- running under the next tile.
+      local role = "display"
+      local suffix_w = suffix and (UI.labelWidth(suffix, "label") + Theme.space.xs) or 0
+      if vw_ + suffix_w > room then role = "title"; vw_ = UI.labelWidth(value, role) end
+      if vw_ + suffix_w > room then suffix = nil end
+      local dy = vy + (UI.lead("display") - UI.lead(role))
+      UI.label(value, tx + p, dy, role, { alpha = alpha })
+      if suffix then
+        UI.label(suffix, tx + p + vw_ + Theme.space.xs, dy + UI.lead(role) - UI.lead("label") - 6, "label",
+          { color = Theme.mute, alpha = alpha, width = room - vw_ - Theme.space.xs, ellipsis = true })
+      end
+    end
   end
-  UI.bar(x + 14, y + 10 + cap_h + 2 + fig_h + 10, w - 28, 9,
-    (sm.total or 0) > 0 and (sm.cleared or 0) / sm.total or 0, Theme.admit)
+  return y + rows * (th + gap) - gap
+end
 
-  -- Per land, under the bar and on its own line: sharing a row with the
-  -- STREAK tile put two different numbers in the same place.
-  -- Two to a line. `UI.text` without a width uses `print`, which neither
-  -- wraps nor clips, so the line is broken here rather than left to run past
-  -- the panel edge — and the pairs keep the columns under each other.
-  local land_y = y + 10 + cap_h + 2 + fig_h + 10 + 9 + 6
-  for i, line in ipairs(Stats.land_lines(sm.by_land)) do
-    UI.text(line, x + 14, land_y + (i - 1) * land_h, 7,
-      Theme.withAlpha(Theme.cream, 0.55))
+--- A mascot inside a `box` square, standing on `bottom`.
+local function mascot(name, x, bottom, box, opts)
+  if not name then return false end
+  local b = Assets.box[name]
+  local image = Assets.image(name)
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local ink_w = (b and b.w and b.w > 0) and b.w or iw
+  local ink_h = (b and b.h and b.h > 0) and b.h or ih
+  local height = box
+  if ink_w > ink_h then height = box * ink_h / ink_w end
+  return Assets.sprite(name, x, bottom, height, opts)
+end
+
+--- The LANDS card: a grid of tiles, one per land the server named.
+function Stats:draw_lands(x, y, w, cols)
+  local p = pad()
+  local k = Juice.enter("stats:lands", { dur = Theme.motion.enter, delay = 0.2 })
+  local alpha = math.min(1, k * 1.5)
+  local sm = self.summary
+  local grid = Stats.land_grid(sm and sm.by_land, cols)
+  local inner = w - p * 2
+  local gap = Theme.rowGap
+  local tile_h = 64
+  local n = #grid
+  local body = n > 0 and (n * tile_h + (n - 1) * gap) or UI.lead("label")
+  local h = p + UI.lead("label") + Theme.space.sm + body + p
+  local cy = y + (1 - k) * 24
+  UI.card(x, cy, w, h, { pad = 0, alpha = alpha })
+  caption(I18n.t("LANDS"), x + p, cy + p, inner, alpha)
+  local ty = cy + p + UI.lead("label") + Theme.space.sm
+  if n == 0 then
+    UI.label(self.errors["stats.summary"] and self.errors["stats.summary"].player or I18n.t("asking the server…"),
+      x + p, ty, "label", { color = self.errors["stats.summary"] and Theme.redA or Theme.mute, width = inner, ellipsis = true, alpha = alpha })
+    return cy + h
   end
-  return y + h
+  local tw = math.floor((inner - gap * (cols - 1)) / cols)
+  local box = 40
+  for r, row in ipairs(grid) do
+    for c, cell in ipairs(row) do
+      local tx = x + p + (c - 1) * (tw + gap)
+      local yy = ty + (r - 1) * (tile_h + gap)
+      UI.card(tx, yy, tw, tile_h, { variant = "flat", fill = Theme.bar, pad = 0, alpha = alpha, radius = Theme.radiusInner })
+      local tint = Theme.land[cell.land] or Theme.mute
+      -- The land's colour as a stripe, never as text.
+      UI.setColor(tint, alpha)
+      UI.rrect("fill", tx, yy, Theme.landStripeH + Theme.radiusInner, tile_h, Theme.radiusInner)
+      UI.setColor(Theme.bar, alpha)
+      love.graphics.rectangle("fill", tx + Theme.landStripeH, yy, Theme.radiusInner, tile_h)
+      local mx = tx + Theme.landStripeH + Theme.space.sm + box / 2
+      if not mascot(Land.mascot(cell.land), mx, yy + tile_h - Theme.space.sm, box, { alpha = alpha }) then
+        UI.setColor(tint, 0.9 * alpha)
+        love.graphics.circle("fill", mx, yy + tile_h / 2, box * 0.3, 16)
+      end
+      local nx = tx + Theme.landStripeH + Theme.space.sm + box + Theme.space.sm
+      local right = tx + tw - Theme.space.md
+      local count = ("%d/%d"):format(cell.cleared, cell.total)
+      local cw = UI.labelWidth(count, "label")
+      local room = right - nx - cw - Theme.space.sm
+      local role = UI.labelWidth(cell.name, "title") <= room and "title" or "label"
+      UI.label(cell.name, nx, yy + Theme.space.sm + (role == "label" and 8 or 0), role,
+        { width = room, ellipsis = true, alpha = alpha })
+      UI.label(count, right - cw, yy + Theme.space.sm + 8, "label", { color = Theme.mute, alpha = alpha })
+      UI.bar(nx, yy + tile_h - Theme.space.sm - 6, right - nx, 6,
+        cell.total > 0 and cell.cleared / cell.total or 0, Theme.gold)
+    end
+  end
+  return cy + h
 end
 
 --- The shelf: what the player has, and sockets for what they do not.
 function Stats:draw_shelf(x, y, w)
-  local cap_h = UI.lineHeight(7)
-  local size = math.max(34, cap_h * 2)
-  -- Room for the caption, the row of sockets, and the line underneath that
-  -- says what the newest one is — which used to be drawn at `y + h - 16`
-  -- into space the panel did not have.
-  local h = 8 + cap_h + 6 + size + 6 + cap_h + 8
-  UI.panel(x, y, w, h, { fill = Theme.withAlpha(Theme.ink, 0.85), tint = Theme.withAlpha(Theme.coin, 0.5) })
-  UI.text(I18n.t("SHELF"), x + 12, y + 8, 7, Theme.withAlpha(Theme.cream, 0.5))
-
+  local p = pad()
+  local k = Juice.enter("stats:shelf", { dur = Theme.motion.enter, delay = 0.24 })
+  local alpha = math.min(1, k * 1.5)
+  local size, gap = 48, Theme.rowGap
+  local inner = w - p * 2
   local awards = self.awards
+  local slots = math.max(Stats.SHELF_SLOTS, awards and #awards or 0)
+  local per_row = math.max(1, math.floor((inner + gap) / (size + gap)))
+  local rows = math.ceil(slots / per_row)
+  local h = p + UI.lead("label") + Theme.space.sm + rows * (size + gap) - gap + Theme.space.sm + UI.lead("label") + p
+  local cy = y + (1 - k) * 24
+  UI.card(x, cy, w, h, { pad = 0, alpha = alpha })
+  caption(I18n.t("SHELF"), x + p, cy + p, inner, alpha)
+  local sy = cy + p + UI.lead("label") + Theme.space.sm
   if not awards then
-    UI.text("…", x + 12, y + 8 + cap_h + 4, 8, Theme.dim)
-    return y + h
+    UI.label("…", x + p, sy, "label", { color = Theme.mute, alpha = alpha })
+    return cy + h
   end
-
-  local gap = 8
-  local slots = math.max(Stats.SHELF_SLOTS, #awards)
-  local total = slots * (size + gap) - gap
-  local sx = x + math.max(12, (w - total) / 2)
-  local sy = y + 8 + cap_h + 6 + size / 2
-
   for i = 1, slots do
     local award = awards[i]
-    local cx = sx + (i - 1) * (size + gap) + size / 2
+    local col, row = (i - 1) % per_row, math.floor((i - 1) / per_row)
+    local cx = x + p + col * (size + gap) + size / 2
+    local yy = sy + row * (size + gap) + size / 2
     if award then
       -- The art for a specific award if it exists, otherwise the one for its
       -- kind. Nothing is invented: `stats.awards` said this was earned.
@@ -266,100 +402,109 @@ function Stats:draw_shelf(x, y, w)
       local art = Assets.pick(named, KIND_BADGE[award.kind] or "badge_star", "badge_cleared")
       -- A small arrival lift on the newest one.
       local lift = (i == 1 and self.arrived) and Ease.pulse(Anim.now() - self.arrived, 0.9) * 4 or 0
-      Assets.marker(art, cx, sy - lift, size)
+      Assets.marker(art, cx, yy - lift, size, { alpha = alpha })
     else
       -- The socket. DESIGN's point exactly: an empty recess reads as
       -- something to go and get, where a blank space reads as nothing.
-      Assets.marker("badge_slot", cx, sy, size, { alpha = 0.55 })
+      Assets.marker("badge_slot", cx, yy, size, { alpha = 0.55 * alpha })
     end
   end
-
+  local ly = cy + h - p - UI.lead("label")
   if #awards == 0 then
-    -- Given the panel's width. It is a sentence, and a sentence drawn with
-    -- no width is a sentence that leaves the screen — at the **default** type
-    -- step, not just at the largest.
-    UI.text(I18n.t("nothing on it yet — clear a street and the first one lands"),
-      x + 12, y + h - 8 - cap_h, 7, Theme.withAlpha(Theme.cream, 0.45),
-      "left", w - 24)
+    UI.label(I18n.t("nothing on it yet — clear a street and the first one lands"),
+      x + p, ly, "label", { color = Theme.mute, width = inner, ellipsis = true, alpha = alpha })
   else
     local newest = awards[1]
-    UI.text(tostring(newest.title or newest.id), x + 12, y + h - 8 - cap_h, 7,
-      Theme.coin, "left", w - 24)
+    UI.label(tostring(newest.title or newest.id), x + p, ly, "label",
+      { color = Theme.gold, width = inner, ellipsis = true, alpha = alpha })
   end
-  return y + h
+  return cy + h
 end
 
---- The least the mistakes panel is ever given, before the column above it
---- starts to scroll away instead. See `draw`.
-Stats.MIN_MISTAKES = 160
-
-function Stats:draw_mistakes(x, y, w, h, scroll)
+--- The MISTAKES card, or the history behind its chip. Content-sized: the
+--- column scrolls, not the card.
+function Stats:draw_mistakes(x, y, w)
+  local p = pad()
+  local k = Juice.enter("stats:mistakes", { dur = Theme.motion.enter, delay = 0.28 })
+  local alpha = math.min(1, k * 1.5)
+  local inner = w - p * 2
+  local cy0 = y + (1 - k) * 24
+  -- Measured by drawing: the rows are drawn once into the card's rect from
+  -- the last frame's height, and the height this frame measured is kept
+  -- for the next. The first frame of a list is one frame late, which is
+  -- within the deal-in.
+  local h = self.mistakes_h or 160
   local red = self.tab == "mistakes"
-  UI.panel(x, y, w, h, {
-    fill = Theme.withAlpha(Theme.navy, 0.94),
-    tint = red and Theme.brick or Theme.cyan,
-  })
-  -- Inside the column's own scissor, so a panel that runs under the footer
-  -- is clipped there rather than at its own bottom edge.
-  local sx, sy, sw, sh = love.graphics.getScissor()
-  love.graphics.intersectScissor(x + 4, y + 4, w - 8, h - 8)
-  local cy = y + 10 - (scroll or self.scroll)
+  UI.card(x, cy0, w, h, { pad = 0, alpha = alpha, strip = red and Theme.redA or Theme.blue })
+  local cy = cy0 + Theme.stripH + p
+
+  -- The two chips: MISTAKES and HISTORY.
+  self.tab_rects = {}
+  local cx = x + w - p
+  for _, tab in ipairs({ "history", "mistakes" }) do
+    local label = I18n.t(tab == "mistakes" and "MISTAKES" or "HISTORY")
+    local cw = UI.chipWidth(label)
+    cx = cx - cw
+    UI.chip(cx, cy, label, { selected = self.tab == tab, hot = self.hover == tab, alpha = alpha })
+    self.tab_rects[tab] = { x = cx, y = cy, w = cw, h = Theme.control.chip }
+    cx = cx - Theme.space.sm
+  end
+  local heading_w = cx - Theme.space.sm - (x + p)
 
   if self.tab == "history" then
-    self:draw_history_rows(x, cy, w)
-    love.graphics.setScissor(sx, sy, sw, sh)
-    return
-  end
+    UI.label(I18n.t("RECENT SUBMITS AND RUNS"), x + p, cy + math.floor((Theme.control.chip - UI.lead("label")) / 2), "label",
+      { color = Theme.blue, width = heading_w, ellipsis = true, alpha = alpha })
+    cy = cy + Theme.control.chip + Theme.space.md
+    cy = self:draw_history_rows(x + p, cy, inner, alpha)
+  else
+    UI.label(I18n.t("YOUR MISTAKES — THIS IS THE CURRICULUM"), x + p, cy + math.floor((Theme.control.chip - UI.lead("label")) / 2),
+      "label", { color = Theme.redA, width = heading_w, ellipsis = true, alpha = alpha })
+    cy = cy + Theme.control.chip + Theme.space.xs
+    cy = cy + UI.label(I18n.t("a kind leaves the drill after five clean submits"), x + p, cy, "label",
+      { color = Theme.mute, width = inner, ellipsis = true, alpha = alpha }) + Theme.space.md
 
-  cy = cy + UI.paragraph(I18n.t("YOUR MISTAKES — THIS IS THE CURRICULUM"), x + 14, cy,
-    w - 28, 9, Theme.brick) + 4
-  cy = cy + UI.paragraph(I18n.t("a kind leaves the drill after five clean submits"),
-    x + 14, cy, w - 28, 7, Theme.withAlpha(Theme.cream, 0.5)) + 12
-
-  if not self.mistakes then
-    UI.text(self.errors["stats.mistakes"] and self.errors["stats.mistakes"].player
-      or I18n.t("asking the server…"), x + 14, cy, 8,
-      Theme.withAlpha(Theme.cream, 0.6), "left", w - 28)
-    love.graphics.setScissor(sx, sy, sw, sh)
-    return
-  end
-
-  if #self.mistakes == 0 then
-    -- Not an apology. Nothing has gone wrong; there is simply nothing here
-    -- yet, and saying what would put something here is more use than silence.
-    for _, line in ipairs(UI.wrap(
-      I18n.t("Nothing yet. Every compiler error you make gets classified and "
+    if not self.mistakes then
+      local why = self.errors["stats.mistakes"]
+      cy = cy + UI.read(why and why.player or I18n.t("asking the server…"), x + p, cy, inner,
+        { color = why and Theme.redA or Theme.mute, alpha = alpha })
+    elseif #self.mistakes == 0 then
+      -- Not an apology. Nothing has gone wrong; there is simply nothing here
+      -- yet, and saying what would put something here is more use than silence.
+      cy = cy + UI.read(I18n.t("Nothing yet. Every compiler error you make gets classified and "
         .. "lands here, and the drills are built from it — so this fills up by "
-        .. "playing, not by trying to fill it up."), w - 40, 8)) do
-      cy = cy + UI.text(line, x + 14, cy, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
+        .. "playing, not by trying to fill it up."), x + p, cy, inner, { alpha = alpha })
+    else
+      for i, m in ipairs(self.mistakes) do
+        if i > 1 then
+          UI.setColor(Theme.line)
+          love.graphics.rectangle("fill", x + p, cy, inner, 1)
+          love.graphics.setColor(1, 1, 1, 1)
+          cy = cy + Theme.space.md
+        end
+        cy = self:draw_mistake(x + p, cy, inner, m, alpha) + Theme.space.md
+      end
+      cy = cy - Theme.space.md
     end
-    love.graphics.setScissor(sx, sy, sw, sh)
-    return
   end
-
-  for _, m in ipairs(self.mistakes) do
-    cy = self:draw_mistake(x, cy, w, m) + 14
-  end
-  love.graphics.setScissor(sx, sy, sw, sh)
+  self.mistakes_h = cy + p - cy0
+  return cy0 + self.mistakes_h
 end
 
 --- One mistake kind, with `cleared_since` given the weight it deserves.
-function Stats:draw_mistake(x, y, w, m)
+function Stats:draw_mistake(x, y, w, m, alpha)
   local since = math.max(0, math.floor(tonumber(m.cleared_since) or 0))
   local learned = since >= Stats.LEARNED_AT
 
-  local kind_h, note_h = UI.lineHeight(9), UI.lineHeight(8)
+  -- The kind, and how often, as a chip.
   local count = ("×%d"):format(m.count or 0)
-  UI.text(tostring(m.kind), x + 14, y, 9, learned and Theme.admit or Theme.brick,
-    "left", w - 28 - UI.textWidth(count, 9) - 8)
-  UI.text(count, x + w - 14 - UI.textWidth(count, 9), y, 9,
-    Theme.withAlpha(Theme.cream, 0.7))
-  y = y + kind_h + 4
+  local cw = UI.chipWidth(count)
+  UI.chip(x + w - cw, y + math.floor((UI.lead("title") - Theme.control.chip) / 2), count,
+    { color = learned and Theme.green or Theme.redA, alpha = alpha })
+  UI.label(tostring(m.kind), x, y, "title", { width = w - cw - Theme.space.md, ellipsis = true, alpha = alpha })
+  y = y + UI.lead("title") + Theme.space.xs
 
   if m.label and m.label ~= "" and m.label ~= m.kind then
-    for _, line in ipairs(UI.wrap(m.label, w - 44, 8)) do
-      y = y + UI.text(line, x + 22, y, 8, Theme.cream) + 2
-    end
+    y = y + UI.read(m.label, x, y, w, { maxLines = 2, alpha = alpha }) + Theme.space.xs
   end
 
   -- **The shackle, and the track.** `art/shackle_break` is a six-frame
@@ -372,29 +517,25 @@ function Stats:draw_mistake(x, y, w, m)
   -- where you are; only the five steps say how far there is to go, and
   -- dropping them to make room for the picture would have traded the more
   -- useful half for the prettier one.
-  local shackle = x + 34
+  local row_h = Theme.space.xl
+  local shackle = x + 12
   Assets.frame("shackle_break", math.min(since, Stats.LEARNED_AT) + 1,
-    shackle, y + 20, 19)
+    shackle, y + row_h - 2, 22, { alpha = alpha })
   if learned then
-    -- What is left of it. Static, on a row that is already in this state —
-    -- the stats screen renders what the server says and has no moment of
-    -- breaking to animate, and an effect with no event behind it would be
-    -- decoration pretending to be feedback.
-    Assets.marker("fx_shards", shackle + 16, y + 8, 20, { alpha = 0.85 })
+    Assets.marker("fx_shards", shackle + 16, y + 6, 20, { alpha = 0.85 * alpha })
   end
 
   local step, gap = 14, 5
-  local tx = x + 58
+  local tx = x + 36
   for i = 1, Stats.LEARNED_AT do
     local done = i <= since
-    UI.setColor(done and (learned and Theme.admit or Theme.coin)
-      or Theme.withAlpha(Theme.dim, 0.5))
-    love.graphics.rectangle("fill", tx + (i - 1) * (step + gap), y + 3, step, 8)
+    UI.setColor(done and (learned and Theme.green or Theme.gold) or Theme.withAlpha(Theme.mute, 0.45), alpha)
+    UI.rrect("fill", tx + (i - 1) * (step + gap), y + math.floor((row_h - 8) / 2), step, 8, 2)
   end
   love.graphics.setColor(1, 1, 1, 1)
 
-  y = y + 2
-  -- And in words, because the sentence is the motivating part.
+  -- And in words, because the sentence is the motivating part: beside the
+  -- track when it fits there, under it when it does not.
   local said
   if learned then
     said = I18n.t("learned — out of the drill")
@@ -405,101 +546,110 @@ function Stats:draw_mistake(x, y, w, m)
   else
     said = I18n.t("%d clean submits since — %d to go", since, Stats.LEARNED_AT - since)
   end
-  -- **Beside the five-step track when the sentence fits there, under it when
-  -- it does not.** The width used to be `math.max(40, …)`, which guarantees a
-  -- width and not a fit: where the track ate the row that floor handed a
-  -- translated sentence a column forty pixels wide, which is three Hangul
-  -- syllables. It did not overflow — it wrapped, into a tower that ran 191 px
-  -- past the bottom of the panel in Korean and Japanese against 22 px in
-  -- English, and the row below only ever cleared a single line of it.
-  --
-  -- So the sentence is measured against the room beside the track, and takes
-  -- the full width of the row underneath when that room cannot hold it.
-  -- `UI.paragraph` rather than `UI.text`, because `UI.text` returns one line's
-  -- height whatever it drew, and a row that advances by one line past a
-  -- sentence of four is how the tower stayed invisible.
-  local said_colour = learned and Theme.admit or Theme.coin
-  local said_x = tx + Stats.LEARNED_AT * (step + gap) + 10
-  local beside = x + w - 14 - said_x
-  local said_h
-  if beside >= UI.textWidth(said, 7) then
-    said_h = UI.paragraph(said, said_x, y + 3, beside, 7, said_colour)
+  local said_colour = learned and Theme.green or Theme.gold
+  local said_x = tx + Stats.LEARNED_AT * (step + gap) + Theme.space.sm
+  local beside = x + w - said_x
+  if UI.labelWidth(said, "label") <= beside then
+    UI.label(said, said_x, y + math.floor((row_h - UI.lead("label")) / 2), "label", { color = said_colour, alpha = alpha })
+    y = y + row_h
   else
-    -- From `x + 22` to the row's right margin at `x + w - 14`.
-    said_h = UI.lineHeight(7) + 2
-      + UI.paragraph(said, x + 22, y + 3 + UI.lineHeight(7) + 2, w - 36, 7, said_colour)
+    y = y + row_h + UI.label(said, x, y + row_h, "label", { color = said_colour, width = w, ellipsis = true, alpha = alpha })
   end
-  -- The shackle is taller than the track, and the sentence beside it is a
-  -- line of type that grows with the ladder — so this clears whichever of the
-  -- three is tallest rather than a number that was right for one of them.
-  y = y + math.max(22, said_h + 10, note_h + 8)
+  y = y + Theme.space.xs
 
   if m.concepts and #m.concepts > 0 then
-    y = y + UI.paragraph(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x + 22, y,
-      w - 44, 7, Theme.withAlpha(Theme.cyan, 0.85)) + 3
+    y = y + UI.label(I18n.t("drill: %s", table.concat(m.concepts, ", ")), x, y, "label",
+      { color = Theme.mute, width = w, ellipsis = true, alpha = alpha })
   end
   if m.example_quest_id then
-    y = y + UI.paragraph(I18n.t("last seen on %s", tostring(m.example_quest_id)), x + 22, y,
-      w - 44, 7, Theme.withAlpha(Theme.cream, 0.4)) + 2
+    y = y + UI.label(I18n.t("last seen on %s", tostring(m.example_quest_id)), x, y, "label",
+      { color = Theme.mute, width = w, ellipsis = true, alpha = alpha })
   end
   return y
 end
 
-function Stats:draw_history_rows(x, y, w)
-  y = y + UI.text(I18n.t("RECENT SUBMITS AND RUNS"), x + 14, y, 9, Theme.cyan,
-    "left", w - 28) + 12
+function Stats:draw_history_rows(x, y, w, alpha)
   if not self.history then
-    UI.text(I18n.t("asking the server…"), x + 14, y, 8,
-      Theme.withAlpha(Theme.cream, 0.6), "left", w - 28)
-    return
+    return y + UI.read(I18n.t("asking the server…"), x, y, w, { color = Theme.mute, alpha = alpha })
   end
   if #self.history == 0 then
-    for _, line in ipairs(UI.wrap(
-      I18n.t("Nothing here yet. Every run and every submit is kept — "
-        .. "including the ones that did not work, which are the ones worth "
-        .. "keeping."), w - 40, 8)) do
-      y = y + UI.text(line, x + 14, y, 8, Theme.withAlpha(Theme.cream, 0.7)) + 4
-    end
-    return
+    return y + UI.read(I18n.t("Nothing here yet. Every run and every submit is kept — "
+      .. "including the ones that did not work, which are the ones worth "
+      .. "keeping."), x, y, w, { alpha = alpha })
   end
-  for _, a in ipairs(self.history) do
-    local colour = a.verdict == "accepted" and Theme.admit
-      or Theme.withAlpha(Theme.cream, 0.8)
+  for i, a in ipairs(self.history) do
+    if i > 1 then
+      UI.setColor(Theme.line)
+      love.graphics.rectangle("fill", x, y, w, 1)
+      love.graphics.setColor(1, 1, 1, 1)
+      y = y + Theme.space.sm
+    end
+    local accepted = a.verdict == "accepted"
     -- §4.9b: a run is not an attempt at the record, and the row says which.
     local tag = a.mode == "run" and "run" or "submit"
-    UI.text(("%-6s %s"):format(tag, tostring(a.quest_id)), x + 14, y, 7, colour)
-    local right = ("%s  %d/%d"):format(tostring(a.verdict),
-      a.tests_passed or 0, a.tests_total or 0)
-    UI.text(right, x + w - 14 - UI.textWidth(right, 7), y, 7,
-      Theme.withAlpha(colour, 0.8))
-    y = y + UI.lineHeight(7) + 3
+    local tw = UI.chipWidth(tag)
+    UI.chip(x, y, tag, { alpha = alpha, color = a.mode == "run" and nil or Theme.bar })
+    local right = ("%s  %d/%d"):format(tostring(a.verdict), a.tests_passed or 0, a.tests_total or 0)
+    local rw = UI.labelWidth(right, "label")
+    local ly = y + math.floor((Theme.control.chip - UI.lead("label")) / 2)
+    UI.label(right, x + w - rw, ly, "label", { color = accepted and Theme.green or Theme.mute, alpha = alpha })
+    UI.label(tostring(a.quest_id), x + tw + Theme.space.md, ly, "label",
+      { width = w - tw - rw - Theme.space.md * 2, ellipsis = true, alpha = alpha })
+    y = y + Theme.control.chip
     if a.kinds and #a.kinds > 0 then
-      y = y + UI.text("  " .. table.concat(a.kinds, ", "), x + 14, y, 7,
-        Theme.withAlpha(Theme.brick, 0.8)) + 2
+      y = y + UI.label(table.concat(a.kinds, ", "), x + tw + Theme.space.md, y, "label",
+        { color = Theme.redA, width = w - tw - Theme.space.md, ellipsis = true, alpha = alpha })
     end
-    y = y + 4
+    y = y + Theme.space.sm
   end
+  return y - Theme.space.sm
 end
 
 -- -------------------------------------------------------------------- input
 
+function Stats:scroll_by(dy)
+  self.scroll = math.max(0, self.scroll + dy)
+  self.scrolled_at = Anim.now()
+end
+
 function Stats:keypressed(key)
   if key == "r" then self:refresh(); SFX.play("move"); return true end
   if key == "h" then
-    self.tab = self.tab == "mistakes" and "history" or "mistakes"
-    self.scroll = 0
-    SFX.play("move")
+    self:set_tab(self.tab == "mistakes" and "history" or "mistakes")
     return true
   end
-  if key == "up" then self.scroll = math.max(0, self.scroll - 28); return true end
-  if key == "down" then self.scroll = self.scroll + 28; return true end
-  if key == "pageup" then self.scroll = math.max(0, self.scroll - 180); return true end
-  if key == "pagedown" then self.scroll = self.scroll + 180; return true end
+  if key == "up" then self:scroll_by(-48); return true end
+  if key == "down" then self:scroll_by(48); return true end
+  if key == "pageup" then self:scroll_by(-240); return true end
+  if key == "pagedown" then self:scroll_by(240); return true end
   return false
 end
 
 function Stats:wheelmoved(_, dy)
-  self.scroll = math.max(0, self.scroll - dy * 28)
+  self:scroll_by(-dy * 48)
+end
+
+local function inside(r, x, y)
+  return r and x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h
+end
+
+function Stats:mousemoved(x, y)
+  self.hover = nil
+  if inside(self.back_rect, x, y) then self.hover = "back"; return end
+  for tab, r in pairs(self.tab_rects or {}) do
+    if inside(r, x, y) then self.hover = tab end
+  end
+end
+
+function Stats:mousepressed(x, y)
+  if inside(self.back_rect, x, y) then
+    UI.press("stats:back", self.back_rect, { sfx = false })
+    self.app:back()
+    return
+  end
+  for tab, r in pairs(self.tab_rects or {}) do
+    if inside(r, x, y) then self:set_tab(tab); return end
+  end
 end
 
 return Stats

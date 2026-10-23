@@ -101,6 +101,16 @@ local External = require("src.external")
 local Anim = require("src.anim")
 local Clock = require("src.clock")
 local Ease = require("src.ease")
+local Quiz = require("src.quiz")
+local Celebrate = require("src.celebrate")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
+-- The art round's nine-slice frames, when they are there; every call has a
+-- drawn fallback, so a checkout without them still draws the card.
+local ArtFrame = (function()
+  local ok, m = pcall(require, "src.artframe")
+  return ok and m or nil
+end)()
 
 local Quest = {}
 Quest.__index = Quest
@@ -205,7 +215,39 @@ function Quest.new(app)
     quiz_right = true,
     quiz_wrong = nil,
     quiz_wrong_at = nil,
+    -- Every line ruled out this visit (a struck row stays struck), when
+    -- each was struck, when the heading last said NOT THAT ONE, when the red
+    -- vignette ran, and when the right line started typing into the hole.
+    wrong_picks = {},
+    wrong_at = {},
+    not_that_at = nil,
+    vignette_at = nil,
+    fill_at = nil,
+    -- The header's buttons (HINT, MAP) and which one the pointer is over;
+    -- the brief card's own scroll beside the quiz card's `brief_scroll`.
+    hits = {},
+    hover = nil,
+    side_scroll = 0,
+    side_overflow = 0,
     choice_hits = {},
+    -- The card's moments, all on the scene clock `t`: the choice under the
+    -- pointer, when the four were dealt in, the frame's flash (red for a
+    -- miss, gold for a streak), the page's jolt on a miss (0..1, decaying),
+    -- the "×N COMBO" over a streak, and the verdict screen held back while
+    -- the right pick's fireworks play (`Quiz.HOLD`).
+    choice_hover = nil,
+    choice_in_at = nil,
+    choice_geom = {},
+    quiz_flash = nil,
+    quiz_jolt = 0,
+    quiz_combo = nil,
+    streak_at = nil,
+    result_hold = nil,
+    -- How far past its panel the brief runs, as last drawn, and a finger
+    -- dragging it: a press on a choice is a pick only if it comes back up
+    -- without having moved.
+    brief_overflow = 0,
+    brief_drag = nil,
     -- CODE: the editor with the screen to itself. The brief, the band and
     -- the console are one press away and the code is what the screen is for.
     code_mode = false,
@@ -286,6 +328,8 @@ function Quest:enter(params)
   -- Brackets close themselves — except under the ANSWER drill, where a `}`
   -- the editor typed for you is a divergence you did not make.
   self.editor.auto_close = not self.answer_on
+  -- The four deal in again on every visit.
+  Juice.forget("quest:")
 
   -- Taken back in `leave`: this scene is entered once per visit to a node,
   -- and a subscription that outlived it would keep this scene (and its whole
@@ -418,15 +462,32 @@ function Quest:refresh()
       return
     end
     self.quest = payload.quest
+    -- The road this quest is on, for the screens after it (the result's
+    -- NEXT asks the map by land and category): AUTO SELECT and a drive
+    -- script arrive here without having walked through the map.
+    if self.quest.land then self.app.land = self.quest.land end
+    if self.quest.category then self.app.category = self.quest.category end
     -- The quiz comes first on VERY BASIC; a cleared quest is past it.
-    self.quiz_right = not (self.quest.quiz and self.quest.state ~= "cleared")
+    self.quiz_right = not Quiz.starts_locked(self.quest.quiz, self.quest.state)
     -- CHEATSHEET is the quiz and nothing after it: the pick is the
     -- submission, so a cleared node can be answered again.
     if self:cheatsheet() then
       self.quiz_right = false
       self.focus = "brief"
     end
-    self.quiz_wrong = nil
+    -- A fresh quest deals its four in; a refresh of the same one (the
+    -- language changed) does not deal them again.
+    if self.quest.id ~= self.dealt_id then
+      self.dealt_id = self.quest.id
+      self.choice_in_at = self.t
+      self.quiz_wrong = nil
+      self.wrong_picks = {}
+      self.wrong_at = {}
+      self.fill_at = nil
+      self.not_that_at = nil
+      self.brief_scroll, self.side_scroll = 0, 0
+      Juice.forget("quest:choice")
+    end
     -- §4.8b: the clock arrives with the quest. `opened_at` and `deadline_at`
     -- are the server's and are the *same pair* on every later `quest.get`, so
     -- a reconnect shows one clock rather than starting a new one — which is
@@ -506,7 +567,9 @@ function Quest:execute(mode, picked)
   self.solve_note = nil
   self.stack_note = nil
   self.clear_armed = nil
-  SFX.play("submit")
+  -- A pick made its own noise the moment it was made (`pick`); the
+  -- server's reply to it is a confirmation, not a second event.
+  if not picked then SFX.play("submit") end
 
   -- The stack gets a step at the two moments the buffer already leaves this
   -- machine. A run or a submit is the clearest "I meant that" a player ever
@@ -525,7 +588,10 @@ function Quest:execute(mode, picked)
     self.stage = nil
     if not ok then
       -- A pick that reached no verdict is not taken: the four are open again.
-      if picked then self.quiz_right = false end
+      if picked then
+        self.quiz_right = false
+        self.fill_at = nil
+      end
       SFX.play("rejected")
       self.error = why.player
       -- §4.9b is newer than some servers. `not_found` on a run means the
@@ -548,7 +614,8 @@ function Quest:execute(mode, picked)
     end
 
     local attempt = payload.attempt
-    if attempt.verdict == "accepted" then SFX.play("accepted") else SFX.play("rejected") end
+    if attempt.verdict == "accepted" then SFX.play("accepted")
+    elseif not picked then SFX.play("rejected") end
     if picked and attempt.verdict ~= "accepted" then
       -- A wrong pick is recorded (it costs a star) and the four stay up —
       -- whatever this client made of the line, the server's word is final.
@@ -570,14 +637,25 @@ function Quest:execute(mode, picked)
     self.attempt = attempt
     self.app.last_attempt = attempt
     self.app.session:apply_xp(payload.xp)
-    self.app:go("result", {
+    local result = {
       attempt = attempt,
       -- §4.9: what this submit was worth and where it left the player.
       xp = payload.xp,
       quest = self.quest,
       log = self.log,
-      source = self.editor:text(),
-    })
+      -- A pick's source is the line picked, not the editor nobody saw.
+      source = picked or self.editor:text(),
+    }
+    if picked then
+      -- The fireworks get their moment before the verdict screen takes
+      -- over; `update` hands over when it is up, and a player who has
+      -- already left is not pulled back (a scene that is gone is not
+      -- updated).
+      self.quiz_right = true
+      self.result_hold = { at = self.t + Quiz.HOLD, result = result }
+      return
+    end
+    self.app:go("result", result)
   end)
 end
 
@@ -729,9 +807,11 @@ end
 
 function Quest:take_hint()
   if not self.quest then return end
-  -- CHEATSHEET's hints are authored but the road has no bench to open them
-  -- from, and a key must not buy one into a screen that cannot show it.
-  if self:cheatsheet() then SFX.play("locked"); return end
+  -- A quiz shows its hint in the brief card — but only a quest with hints
+  -- authored (and not under an interview) has one to buy. The HINT button
+  -- and the F7 footer hint are shown on the same condition.
+  if self:cheatsheet() and not self:hints_available() then SFX.play("locked"); return end
+  if self:cheatsheet() and self.hits.hint then UI.press("quest:hint", self.hits.hint, { sfx = false }) end
   local index = self.quest.hints_used or 0
   if index >= (self.quest.hints_total or 0) then
     self.app:toast(I18n.t("no more hints"))
@@ -1958,6 +2038,20 @@ function Quest:update(dt)
     self.elapsed_ms = self.elapsed_ms + dt * 1000
   end
   self:tick_stack(dt)
+  self:tick_quiz(dt)
+end
+
+--- The card's clocks: a held verdict is handed over once the burst has had
+--- its moment. No toast lands on the right state meanwhile (the server's
+--- CLEARED award is the one that used to): the green row is the clear.
+function Quest:tick_quiz(dt)
+  if self.quiz_jolt > 0 then self.quiz_jolt = math.max(0, self.quiz_jolt - dt * 2.4) end
+  local hold = self.result_hold
+  if hold then UI.clearToasts() end
+  if hold and self.t >= hold.at then
+    self.result_hold = nil
+    self.app:go("result", hold.result)
+  end
 end
 
 --- The idle push: 1.5 s after the typing stops, and never because a reply
@@ -2001,6 +2095,8 @@ end
 --- that ladder the id was printed through the title and the editor pane
 --- started underneath both.
 function Quest:header_h()
+  -- The quiz (and every quest before it has arrived) wears the kit's band.
+  if not self.quest or self:cheatsheet() then return UI.headerHeight() end
   return math.max(48, 8 + UI.lineHeight(13) + 2 + UI.lineHeight(7) + 8)
 end
 
@@ -2202,6 +2298,12 @@ function Quest:draw()
     self.app:footer(I18n.t("ESC done   F5 run   F2 format"))
     return
   end
+  -- Every quest with a quiz is picked (SPEC §0), on the card below; the
+  -- editor screen that follows is for the quests without one.
+  if not self.quest or self:cheatsheet() then
+    self:draw_quiz()
+    return
+  end
   local land = (self.quest and self.quest.land) or self.app.land or "rust"
   Assets.cover(Quest.backdrop(land, self.quest and self.quest.category
     or self.app.category), 0, 0, vw, vh)
@@ -2255,13 +2357,20 @@ function Quest:draw()
   end
 
   local brief, code = self:panes()
+  -- A wrong pick jolts the page: the brief, which is the card, moves; the
+  -- header and the footer stay where a player's eye left them.
+  local jx, jy = self:jolt_offset()
+  love.graphics.push()
+  love.graphics.translate(jx, jy)
   self:draw_brief(brief, tint)
+  love.graphics.pop()
   if code then self:draw_editor(code, tint) end
 
   if self:console_open() then
     self:draw_run_overlay(self.console_rect_drawn)
   end
   self.fx:draw()
+  self:draw_quiz_moments()
 
   -- **Not** a second listing of F5, F10 and F2. Those three are printed on
   -- the buttons they belong to, a few centimetres above this line — `RUN F5`,
@@ -2270,7 +2379,7 @@ function Quest:draw()
   -- in portrait once the display controls took the right-hand end of the
   -- strip. What is left is exactly the keys the screen does not otherwise
   -- say out loud.
-  self.app:footer(I18n.t(self:cheatsheet() and "PICK THE RIGHT LINE  (1–4)"
+  self.app:footer(I18n.t(self:cheatsheet() and "1–4  PICK   ESC  MAP"
     or "F6 reset   F7 hint   F8 log   F9 $EDITOR   ESC map"))
 end
 
@@ -2339,24 +2448,17 @@ function Quest:quiz_locked()
   return self.quest ~= nil and self.quest.quiz ~= nil and not self.quiz_right
 end
 
---- What picking choice `i` (1-based) means against `quiz` (`answer` is the
---- wire's 0-based index): "right", "wrong", or nil for no such choice.
+--- What picking choice `i` (1-based) means against `quiz`: "right", "wrong",
+--- or nil for no such choice. `Quiz.pick`, without the "already answered"
+--- half, under the name the tests have always called it by.
 function Quest.pick_result(quiz, i)
-  if not quiz or not quiz.choices or i < 1 or i > #quiz.choices then return nil end
-  return (i - 1) == (quiz.answer or -1) and "right" or "wrong"
+  local verdict = Quiz.pick(quiz, i, false)
+  if verdict == "ignored" then return nil end
+  return verdict
 end
 
---- The four wells, stacked from `y` in a column `w` wide: one rectangle per
---- choice, each as tall as its wrapped text needs and never shorter than a
---- fingertip. Pure — read by the draw and by the click.
-function Quest.choice_boxes(x, y, w, heights, gap)
-  local out = {}
-  for i, h in ipairs(heights) do
-    out[i] = { x = x, y = y, w = w, h = h }
-    y = y + h + (gap or 6)
-  end
-  return out
-end
+--- The four wells, stacked. `Quiz.boxes`; see `src/quiz.lua`.
+Quest.choice_boxes = Quiz.boxes
 
 --- Whether the pick is the answer — on every road now (SPEC §0): a quest
 --- with a quiz has no editor and nothing is typed. The name is the road it
@@ -2366,107 +2468,279 @@ function Quest:cheatsheet()
 end
 
 --- What stands in a quiz's program where the right choice was cut out.
-Quest.HOLE = "____"
+Quest.HOLE = Quiz.HOLE
 
---- The program around a quiz's hole, as the brief draws it: whole when it
---- is short, and cut to `before` lines above the hole and `after` below it
---- when it is long, with a `⋮` where lines were left out — the four choices
---- sit under it. Each line is `{ kind = "code"|"hole"|"cut", text = … }`.
---- The web client's `programLines` (frontend/src/ui/quiz.ts), line for line.
-function Quest.program_lines(program, before, after, whole)
-  before, after, whole = before or 22, after or 14, whole or 40
-  local text = tostring(program or ""):gsub("^\n+", ""):gsub("\n+$", "")
-  local lines = {}
-  for line in (text .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
-  local hole
-  for i, line in ipairs(lines) do
-    if hole == nil and line:match("^%s*(.-)%s*$") == Quest.HOLE then hole = i end
-  end
-  local function as(i)
-    return { kind = i == hole and "hole" or "code", text = lines[i] }
-  end
-  local out = {}
-  if #lines <= whole or not hole then
-    for i = 1, #lines do out[#out + 1] = as(i) end
-    return out
-  end
-  local from = math.max(1, hole - before)
-  local to = math.min(#lines, hole + after)
-  if from > 1 then out[#out + 1] = { kind = "cut", text = "⋮" } end
-  for i = from, to do out[#out + 1] = as(i) end
-  if to < #lines then out[#out + 1] = { kind = "cut", text = "⋮" } end
-  return out
+--- The program around a quiz's hole. `Quiz.program_lines`, the web's
+--- `programLines`, line for line.
+Quest.program_lines = Quiz.program_lines
+
+-- ------------------------------------------------------------- the quiz card
+--
+-- Every quest with a `quiz` is picked, not typed (SPEC §0), and this is the
+-- screen for it, built on the kit in `docs/love2d-ui.md` to the designer's
+-- quest spec (§3.6) and the mock `SPEC-comp-neodgm.png`:
+--
+--   * **Header** (56, 72 upright): the title in the display role, the road
+--     as a breadcrumb (`rust · cheatsheet · 01`), the clock in a slot of its
+--     own, and HINT / MAP as secondary buttons on the right. Roles never
+--     scale with F12, so the header cannot overprint itself at step 4.
+--   * **Landscape**: two columns inside `UI.bounded()`. Left, the card the
+--     screen is about (a gold top rule): the question, the code well with
+--     the hole lit, PICK THE RIGHT LINE and the four choices as full-width
+--     rows with their keycaps. Right: the brief card (blue rule) with the
+--     story, the brief on a program quiz, the CONCEPTS chips and any hint
+--     taken; under it the STARS / DIFFICULTY / HINTS card.
+--   * **Upright**: one column — the quiz card first, the brief under it,
+--     the stars card last — scrolled as a whole.
+--   * **A program quiz** shows a window of the program round its hole in
+--     the well, as many lines as the card has room for, so the hole and the
+--     four answers are always seen together (review #9: the hole used to be
+--     twenty lines below the fold). The full brief sits in the right card.
+--   * **F12** moves the code and reading faces only. When the four would
+--     not fit the card at the wanted code size the card steps the code down
+--     first (to a floor of 12 px), and only then scrolls, with a fade and a
+--     scrollbar; the hit boxes are cut to what is visible. The drive scripts
+--     (`tests/drive/typesweep.lua`, `quiz.lua`) read `choice_hits` and
+--     `brief_scroll` to prove it.
+--   * **A wrong pick** stays: the row goes `redD`, its code is struck
+--     through, "−1 ★" sits at its right, and its key does nothing for the
+--     rest of the attempt. The row shakes, shards fly, a red vignette runs
+--     round the screen for a beat (never a wash over the code), and the
+--     heading reads NOT THAT ONE — n LEFT for a moment.
+--   * **The right pick** goes `greenD`, the others dim and settle, the
+--     answer is typed into the hole in green, stars and confetti burst
+--     from the row, and the verdict screen waits `Quiz.HOLD` for it.
+
+--- The code face for the card: the chosen code face at the code role's
+--- size, which F12 moves (`Layout.codeSize`). `px` overrides it when the
+--- card has had to step the code down to keep the four on the screen.
+function Quest.quiz_font(px)
+  px = px or Layout.codeSize(Theme.type.code)
+  -- `Assets.mono` takes a size in the old VT323 register and scales each
+  -- face down to match its cap height, which puts "16" at eleven pixels.
+  -- The card wants the spec's sixteen: the scale is taken back out.
+  local face = Assets.codeFace and Assets.codeFace() or nil
+  local scale = (face and Assets.CODE_FACE_SCALE and Assets.CODE_FACE_SCALE[face]) or 1
+  return Assets.mono(px / scale)
 end
 
---- `UI.wrap` for code: each line keeps its indentation, which `UI.wrap`
---- folds away with the rest of the whitespace, and Go's tabs go in as four
---- spaces because the face draws a tab as nothing.
-function Quest.code_wrap(text, width, size)
-  local out = {}
-  for raw in (tostring(text):gsub("\t", "    ") .. "\n"):gmatch("(.-)\n") do
-    local lead, rest = raw:match("^( *)(.-)%s*$")
-    if rest == "" then
-      out[#out + 1] = ""
+--- Code wrapped to `width` in `font` (the card's face by default): each line
+--- keeps its indentation and a tab is four spaces. See `Quiz.code_wrap`.
+function Quest.code_wrap(text, width, font)
+  font = font or Quest.quiz_font()
+  return Quiz.code_wrap(text, width, function(s) return font:getWidth(s) end)
+end
+
+--- One line of code in `font`, in the highlighter's colours — or all in
+--- `colour` when the line is a state rather than code (dimmed, the hole).
+function Quest:code_line(font, text, x, y, colour, alpha)
+  love.graphics.setFont(font)
+  if colour then
+    UI.setColor(colour, alpha)
+    love.graphics.print(text, x, y)
+    love.graphics.setColor(1, 1, 1, 1)
+    return
+  end
+  local lang = Land.lang_of(self.quest, self.app.land)
+  local ok, spans = pcall(Editor.highlight, text, "code", lang)
+  if not ok or type(spans) ~= "table" then
+    UI.setColor(Theme.text, alpha)
+    love.graphics.print(text, x, y)
+    love.graphics.setColor(1, 1, 1, 1)
+    return
+  end
+  local cx = x
+  for _, span in ipairs(spans) do
+    UI.setColor(Theme.code[span.kind] or Theme.text, alpha)
+    love.graphics.print(span.text, cx, y)
+    cx = cx + font:getWidth(span.text)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- The padding inside a well, and the room its text has in a well `w` wide.
+local WELL_PAD = Theme.space.sm
+local function well_inner(w)
+  return w - WELL_PAD * 2 - 6
+end
+
+--- A fenced block's rows for a well: wrapped, the rows with the hole marked.
+local function fence_rows(text, inner, font)
+  local rows = {}
+  for _, line in ipairs(Quest.code_wrap(text, inner, font)) do
+    rows[#rows + 1] = { kind = Quiz.has_hole(line) and "hole" or "code", text = line }
+  end
+  return rows
+end
+
+--- A program's rows for a well: the window round the hole (`rows_max`
+--- lines, or the whole program when nothing is asked), each line wrapped.
+local function program_rows(program, inner, font, rows_max)
+  local rows = {}
+  local lines = rows_max and Quiz.window_lines(program, rows_max) or Quiz.program_lines(program)
+  for _, line in ipairs(lines) do
+    if line.kind == "cut" then
+      rows[#rows + 1] = line
     else
-      for _, piece in ipairs(UI.wrap(rest, math.max(24, width - UI.textWidth(lead, size)), size)) do
-        out[#out + 1] = lead .. piece
+      for _, piece in ipairs(Quest.code_wrap(line.text, inner, font)) do
+        rows[#rows + 1] = { kind = line.kind, text = piece }
       end
     end
   end
-  return out
+  return rows
 end
 
---- The program a quiz's choices fill, with its hole lit. Nothing on a sheet
---- road, whose brief carries its own snippet. Returns the y after it.
-function Quest:draw_program(x, y, column)
+--- The hole's light, across a row of a well: a band that breathes while it
+--- is a question and holds steady green once it is answered, with a bar at
+--- its left edge so it reads as *the* line even in a long program.
+function Quest:hole_band(x, y, w, h)
+  local colour = self.quiz_right and Theme.green or Theme.gold
+  UI.setColor(colour, Quiz.hole_alpha(self.t, self.quiz_right))
+  love.graphics.rectangle("fill", x + 2, y, w - 4, h)
+  UI.setColor(colour)
+  love.graphics.rectangle("fill", x + 2, y, 4, h)
+  love.graphics.setColor(1, 1, 1, 1)
+  return colour
+end
+
+--- The line that fills the hole once the quiz is answered: the right
+--- choice, typed in at `Quiz.TYPE_RATE` from the moment of the pick.
+function Quest:hole_fill()
+  local quiz = self.quest and self.quest.quiz
+  if not (self.quiz_right and quiz and quiz.choices) then return nil end
+  local answer = quiz.choices[(quiz.answer or 0) + 1]
+  if not answer then return nil end
+  local elapsed = self.fill_at and (self.t - self.fill_at) or 1e9
+  return Quiz.typed(tostring(answer), elapsed) or ""
+end
+
+--- A code well: `rows` in `font`, the hole row lit. Returns the height.
+function Quest:draw_well(x, y, w, rows, font)
+  local lh = font:getHeight()
+  local h = #rows * lh + WELL_PAD * 2
+  UI.card(x, y, w, h, { variant = "well", pad = 0 })
+  local cy = y + WELL_PAD
+  local tx = x + WELL_PAD + 6
+  local fill = self:hole_fill()
+  for _, row in ipairs(rows) do
+    if row.kind == "hole" then
+      local colour = self:hole_band(x, cy, w, lh)
+      local text = row.text
+      if fill then
+        -- The answer at the hole's own indentation, in green, as it types.
+        local lead = row.text:match("^( *)") or ""
+        text = UI.ellipsizeWith(lead .. fill, well_inner(w), font)
+      end
+      self:code_line(font, text, tx, cy, colour)
+    elseif row.kind == "cut" then
+      self:code_line(font, row.text, tx, cy, Theme.mute)
+    else
+      self:code_line(font, row.text, tx, cy, nil, 0.92)
+    end
+    cy = cy + lh
+  end
+  return h
+end
+
+--- The program a quiz's choices fill, with its hole lit, whole (a long one
+--- cut to the web's window). Kept for the editor-path brief. Returns the y
+--- after it.
+function Quest:draw_program(x, y, w)
   local quiz = self.quest and self.quest.quiz
   local program = quiz and quiz.program
   if type(program) ~= "string" or program == "" then return y end
-  local size = 7
-  local lh = UI.lineHeight(size) + 2
-  local rows = {}
-  for _, line in ipairs(Quest.program_lines(program)) do
-    for _, piece in ipairs(Quest.code_wrap(line.text, column - 12, size)) do
-      rows[#rows + 1] = { kind = line.kind, text = piece }
-    end
-  end
-  local h = #rows * lh + 8
-  love.graphics.setColor(Theme.ink[1], Theme.ink[2], Theme.ink[3], 0.6)
-  love.graphics.rectangle("fill", x, y, column, h)
-  local cy = y + 4
-  for _, row in ipairs(rows) do
-    local colour = row.kind == "cut" and Theme.dim or Theme.grass
-    if row.kind == "hole" then
-      colour = self.quiz_right and Theme.admit or Theme.coin
-      love.graphics.setColor(colour[1], colour[2], colour[3], 0.3)
-      love.graphics.rectangle("fill", x + 2, cy - 1, column - 4, lh)
-    end
-    UI.text(row.text, x + 6, cy, size, colour)
-    cy = cy + lh
-  end
-  love.graphics.setColor(1, 1, 1, 1)
-  return y + h + 8
+  local font = Quest.quiz_font()
+  return y + self:draw_well(x, y, w, program_rows(program, well_inner(w), font), font) + Theme.space.md
 end
 
---- One of the four, chosen.
+--- A fenced block of a brief, in the code face, its hole lit. Returns the
+--- y after it.
+function Quest:draw_snippet(text, x, y, w)
+  local font = Quest.quiz_font()
+  return y + self:draw_well(x, y, w, fence_rows(text, well_inner(w), font), font) + Theme.space.md
+end
+
+--- A paragraph block in the reading face: paragraphs apart by a line gap,
+--- bullets on their own lines. Returns the height; `measure` only measures.
+function Quest:prose(text, x, y, w, colour, measure)
+  local h = 0
+  for _, para in ipairs(Quiz.blocks_lines(text)) do
+    if para == "" then
+      h = h + Theme.space.sm
+    else
+      if measure then
+        h = h + (UI.readHeight(para, w))
+      else
+        h = h + UI.read(para, x, y + h, w, { color = colour })
+      end
+    end
+  end
+  return h
+end
+
+function Quest:prose_height(text, w)
+  return self:prose(text, 0, 0, w, nil, true)
+end
+
+--- The road a streak is counted on.
+function Quest:streak_key()
+  local q = self.quest or {}
+  return Quiz.streak_key(q.land or self.app.land, q.category or self.app.category)
+end
+
+--- Whether this quest has hints to give: authored ones, and not under an
+--- interview (which takes them away, PROTOCOL §4.9e).
+function Quest:hints_available()
+  local q = self.quest
+  return q ~= nil and (q.hints_total or 0) > 0 and not q.under_interview
+end
+
+--- How many of the four have been ruled out this visit.
+function Quest:misses()
+  local n = 0
+  for _ in pairs(self.wrong_picks or {}) do n = n + 1 end
+  return n
+end
+
+-- ----------------------------------------------------------------- the pick
+
+--- One of the four, chosen — by its key (1–4) or by a tap on its row.
+---
+--- The pick is the submission (SPEC §0): the server judges it and records
+--- it, a wrong one costing a star like any failed attempt. What this screen
+--- adds is the moment: a wrong row goes red and stays red, struck and dead;
+--- the right one goes green, the hole fills, and the verdict screen waits
+--- `Quiz.HOLD` for the burst.
 function Quest:pick(i)
-  local result = self.quest and Quest.pick_result(self.quest.quiz, i)
-  if not result or self.quiz_right then return end
+  if not self.quest then return end
+  if self:cheatsheet() and (self.running_mode or self.result_hold) then return end
+  local verdict = Quiz.pick(self.quest.quiz, i, self.quiz_right, self.wrong_picks)
+  if verdict == "ignored" then
+    if self:cheatsheet() and self.wrong_picks[i] then SFX.play("locked") end
+    return
+  end
   if self:cheatsheet() then
-    -- The pick is the submission: the server judges it and records it, and
-    -- the right one goes to the verdict screen like any clear.
-    if self.running_mode then return end
-    if result == "right" then
+    local geom = self.choice_geom[i]
+    UI.press("quest:choice" .. i, geom and geom.rect or nil, { sfx = false })
+    self:quiz_fx(verdict, i)
+    if verdict == "right" then
       self.quiz_right = true
       self.quiz_wrong = nil
+      self.fill_at = self.t
+      SFX.play("coin")
     else
+      self.wrong_picks[i] = true
+      self.wrong_at[i] = self.t
       self.quiz_wrong = i
-      self.quiz_wrong_at = Anim.now()
+      self.quiz_wrong_at = self.t
+      self.not_that_at = self.t
+      self.vignette_at = self.t
+      SFX.play("rejected")
     end
     self:execute("quest.submit", self.quest.quiz.choices[i])
     return
   end
-  if result == "right" then
+  if verdict == "right" then
     self.quiz_right = true
     self.quiz_wrong = nil
     SFX.play("select")
@@ -2474,63 +2748,740 @@ function Quest:pick(i)
     return
   end
   self.quiz_wrong = i
-  self.quiz_wrong_at = Anim.now()
+  self.quiz_wrong_at = self.t
   SFX.play("locked")
 end
 
---- The choices under the question. Returns the y after them and records
---- the hit boxes, cut to the panel, for `mousepressed`.
-function Quest:draw_choices(x, y, column, clip)
+--- The pick's moment: shards and smoke off a wrong row, stars and confetti
+--- off the right one, and the streak counted (the web's `sheetFx`).
+function Quest:quiz_fx(verdict, i)
+  local key = self:streak_key()
+  local first_try = next(self.wrong_picks) == nil
+  local geom = self.choice_geom[i]
+  local cx, cy
+  if geom then
+    cx, cy = geom.rect.x + geom.rect.w / 2, geom.rect.y + geom.rect.h / 2
+  end
+  if verdict == "wrong" then
+    Quiz.record(key, "wrong", first_try)
+    if cx then
+      Fx.burst(cx, cy, "shards", { n = 1 })
+      Fx.burst(cx, cy, "smoke", { n = 0.6 })
+    end
+    return
+  end
+  local streak = Quiz.record(key, "right", first_try)
+  self.streak_at = self.t
+  if cx then
+    Fx.burst(cx, cy, "stars", { n = first_try and 1.6 or 1 })
+    Fx.burst(cx, cy, "confetti", { n = first_try and 0.8 or 0.4, area = { geom.rect.w * 0.6, 4 } })
+    if streak >= 2 then
+      self.quiz_combo = { at = self.t, n = streak, x = cx, y = math.max(80, geom.rect.y - 24) }
+    end
+  end
+end
+
+-- ---------------------------------------------------------------- the rows
+
+--- A red star, for the "−1 ★" a wrong row wears: the faces have no ★.
+local function star(cx, cy, r, colour, alpha)
+  UI.setColor(colour, alpha)
+  love.graphics.polygon("fill", cx, cy - r, cx + r / 2.6, cy - r / 3, cx + r, cy - r / 3,
+    cx + r / 2.2, cy + r / 5, cx + r / 1.6, cy + r, cx, cy + r / 2,
+    cx - r / 1.6, cy + r, cx - r / 2.2, cy + r / 5, cx - r, cy - r / 3, cx - r / 2.6, cy - r / 3)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+--- The width "−1 ★" takes at the right of a row.
+local function minus_star_w()
+  return UI.labelWidth("-1", "title") + Theme.space.sm + 22 + Theme.space.sm
+end
+
+--- "−1 ★", right-aligned to `right`, rising into place over the first
+--- third of a second after the miss and staying.
+function Quest:draw_minus_star(right, y, h, alpha, i)
+  local u = 1
+  if self.wrong_at[i] then u = math.min(1, (self.t - self.wrong_at[i]) / 0.35) end
+  local k = Juice.ease.outCubic(u)
+  local dy = (1 - k) * 16
+  local a = alpha * k
+  local r = 11
+  local sx = right - r
+  star(sx, y + h / 2 + dy, r, Theme.redA, a)
+  local lw = UI.labelWidth("-1", "title")
+  UI.label("-1", sx - r - Theme.space.sm - lw, y + math.floor((h - UI.lead("title")) / 2) + dy, "title",
+    { color = Theme.redA, alpha = a })
+end
+
+--- Each choice wrapped into a row `w` wide: the lines and the row heights.
+function Quest:choice_wraps(w, font)
+  local quiz = self.quest and self.quest.quiz
+  local wraps, heights = {}, {}
+  if not quiz or type(quiz.choices) ~= "table" then return wraps, heights end
+  local lh = font:getHeight()
+  local function measure(s) return font:getWidth(s) end
+  local pad = Theme.space.md
+  local text_x = Theme.space.md + 36 + Theme.space.lg
+  local min_h = Layout.isPortrait() and 72 or 64
+  for i, c in ipairs(quiz.choices) do
+    local room = w - text_x - pad - (self.wrong_picks[i] and minus_star_w() or 0)
+    wraps[i] = Quiz.code_wrap(tostring(c), math.max(40, room), measure)
+    heights[i] = Quiz.row_height(#wraps[i], lh, pad, min_h)
+  end
+  return wraps, heights
+end
+
+--- The four rows' total height, stacked with `Theme.rowGap`.
+function Quest:choices_height(w, font)
+  local _, heights = self:choice_wraps(w, font)
+  local h = 0
+  for i, rh in ipairs(heights) do h = h + rh + (i > 1 and Theme.rowGap or 0) end
+  return h
+end
+
+--- The four choices, one column from `y`, each row sized to its code: a
+--- 36 px keycap with its number, the code at x+64, and the state's colours
+--- (spec §2.9). Records the hit boxes, cut to `clip`, and the geometry the
+--- burst needs. Returns the y after them.
+function Quest:draw_choices(x, y, w, clip, font)
   local quiz = self.quest and self.quest.quiz
   self.choice_hits = {}
-  if not quiz or not quiz.choices then return y end
-  local head = self.quiz_right and I18n.t("RIGHT") or I18n.t("PICK THE RIGHT LINE  (1–4)")
-  for _, line in ipairs(UI.wrap(head, column, 8)) do
-    y = y + UI.text(line, x, y, 8, self.quiz_right and Theme.admit or Theme.coin) + 3
-  end
-  y = y + 6
-  local size = 8
-  local wraps, heights = {}, {}
-  for i, text in ipairs(quiz.choices) do
-    -- A choice can be several lines of a program, indented.
-    wraps[i] = Quest.code_wrap((tostring(text):gsub("^\n+", ""):gsub("\n+$", "")),
-      column - 30, size)
-    heights[i] = math.max(36, #wraps[i] * (UI.lineHeight(size) + 2) + 14)
-  end
-  local boxes = Quest.choice_boxes(x, y, column, heights, 6)
-  local shake_x, shake_y = 0, 0
-  if self.quiz_wrong and self.quiz_wrong_at then
-    shake_x, shake_y = Anim.shake(Anim.now() - self.quiz_wrong_at, { duration = 0.34, amount = 4 })
-  end
+  self.choice_geom = {}
+  if not quiz or type(quiz.choices) ~= "table" then return y end
+  font = font or Quest.quiz_font()
+  local lh = font:getHeight()
+  local pad, cap = Theme.space.md, 36
+  local text_x = Theme.space.md + cap + Theme.space.lg
+  local wraps, heights = self:choice_wraps(w, font)
+  local boxes = Quiz.boxes(x, y, w, heights, Theme.rowGap)
+  local settle = Juice.follow("quest:settle", self.quiz_right and 1 or 0, { speed = 14 })
+  local bottom = y
   for i, box in ipairs(boxes) do
     local right = self.quiz_right and (i - 1) == quiz.answer
-    local wrong = self.quiz_wrong == i and self.quiz_wrong_at
-      and (Anim.now() - self.quiz_wrong_at) < 0.9
-    local dx, dy = 0, 0
-    if wrong then dx, dy = shake_x, shake_y end
-    UI.panel(box.x + dx, box.y + dy, box.w, box.h, {
-      fill = Theme.withAlpha(right and Theme.admit or wrong and Theme.red or Theme.ink,
-        (right or wrong) and 0.45 or 0.6),
-      tint = right and Theme.admit or wrong and Theme.red or Theme.withAlpha(Theme.coin, 0.6),
-    })
-    UI.text(tostring(i), box.x + dx + 8, box.y + dy + 7, size,
-      right and Theme.admit or wrong and Theme.red or Theme.coin)
-    local ty = box.y + dy + 7
+    local wrong = self.wrong_picks[i] == true
+    local dead = wrong or self.quiz_right or self.running_mode ~= nil
+    local hover = self.choice_hover == i and not dead
+    local state = right and "right" or wrong and "wrong" or (self.quiz_right and "dim")
+      or (hover and "hot") or "idle"
+    -- Dealt in from the right, one after another; lifted under the pointer;
+    -- pushed in on the pick; shaken on a miss. The hit box is where the row
+    -- rests, so a quick key is never a miss.
+    local k = Juice.enter("quest:choice" .. i, { delay = Juice.stagger(i, 0.05), dur = 0.22, ease = "outBack" })
+    local a = Juice.follow("quest:hot" .. i, hover and 1 or 0, { speed = 18 })
+    local press = Juice.pressed("press:quest:choice" .. i)
+    local dx = (1 - k) * 48
+    local dy = -3 * a + 4 * press
+    local alpha = math.min(1, k * 1.5)
+    if state == "dim" then
+      alpha = alpha * (1 - 0.6 * settle)
+      dy = dy + 4 * settle
+    end
+    if wrong and self.wrong_at[i] then
+      local sx = Anim.shake(self.t - self.wrong_at[i], { duration = Quiz.WRONG_LIFE, amount = 6 })
+      dx = dx + sx
+    end
+    local bx, by = box.x + dx, box.y + dy
+    local fill, edge, cap_fill = Theme.bar, Theme.edge, Theme.gold
+    if state == "wrong" then
+      fill, edge, cap_fill = Theme.redD, Theme.redA, Theme.redA
+    elseif state == "right" then
+      fill, edge, cap_fill = Theme.greenD, Theme.green, Theme.green
+    elseif state == "dim" then
+      cap_fill = Theme.mute
+    end
+    UI.card(bx, by, box.w, box.h, { fill = fill, edge = edge,
+      hot = (state == "idle" or state == "hot") and a or 0,
+      shadowDy = Theme.buttonShadowDy - 4 * press, alpha = alpha, pad = 0 })
+
+    -- The keycap: the digit that picks it, 36 square, title-32 ink on gold.
+    local cx, cy = bx + Theme.space.md, by + math.floor((box.h - cap) / 2)
+    UI.setColor(Theme.edge, alpha)
+    UI.rrect("fill", cx, cy + 3, cap, cap, Theme.radiusSm)
+    UI.setColor(cap_fill, alpha)
+    UI.rrect("fill", cx, cy, cap, cap, Theme.radiusSm)
+    UI.stroke(cx, cy, cap, cap, Theme.radiusSm, Theme.withAlpha(Theme.edge, alpha))
+    UI.label(Quiz.key_label(i), cx, cy + math.floor((cap - UI.lead("title")) / 2), "title",
+      { width = cap, align = "center", color = Theme.edge, alpha = alpha, shadow = false })
+
+    -- The code, struck through in red on a wrong row.
+    local tx = bx + text_x
+    local ty = by + math.floor((box.h - #wraps[i] * lh) / 2)
+    local lines = {}
     for _, line in ipairs(wraps[i]) do
-      UI.text(line, box.x + dx + 26, ty, size,
-        (self.quiz_right and not right) and Theme.dim or Theme.cream)
-      ty = ty + UI.lineHeight(size) + 2
+      self:code_line(font, line, tx, ty, state == "wrong" and Theme.mute or nil, alpha)
+      if state == "wrong" then
+        UI.setColor(Theme.redA, alpha)
+        love.graphics.rectangle("fill", tx, ty + math.floor(lh / 2) - 1, font:getWidth(line), 2)
+        love.graphics.setColor(1, 1, 1, 1)
+      end
+      lines[#lines + 1] = { x = tx, y = ty, text = line }
+      ty = ty + lh
     end
-    -- The hit box is the visible part: the brief scrolls, and a choice
-    -- scrolled out of the panel must not take a tap meant for the well.
-    local top = math.max(box.y, clip.y)
-    local bottom = math.min(box.y + box.h, clip.y + clip.h)
-    if bottom > top and not self.quiz_right then
-      self.choice_hits[i] = { x = box.x, y = top, w = box.w, h = bottom - top }
-    end
-    y = box.y + box.h + 6
+    if state == "wrong" then self:draw_minus_star(bx + box.w - pad, by, box.h, alpha, i) end
+
+    self.choice_geom[i] = {
+      rect = { x = box.x, y = box.y, w = box.w, h = box.h },
+      lines = lines,
+      cell = { math.max(1, font:getWidth("M")), lh },
+    }
+    -- The hit box is the visible part: the card scrolls, and a row scrolled
+    -- out of it must not take a tap meant for whatever is drawn there.
+    local visible = box
+    if clip then visible = Quiz.visible_box(box, clip) end
+    if visible and not self.quiz_right and not wrong then self.choice_hits[i] = visible end
+    bottom = math.max(bottom, box.y + box.h)
   end
-  return y + 4
+  return bottom
+end
+
+--- PICK THE RIGHT LINE, in gold — RIGHT in green once it is, NOT THAT ONE
+--- — n LEFT in red for a moment after a miss — with the streak at the right.
+--- Returns the y after it.
+function Quest:draw_quiz_heading(x, y, w)
+  local quiz = self.quest.quiz
+  local heading, colour = I18n.t("PICK THE RIGHT LINE"), Theme.gold
+  if self.quiz_right then
+    heading, colour = I18n.t("RIGHT"), Theme.green
+  elseif self.not_that_at and self.t - self.not_that_at < Quiz.NOT_THAT_LIFE then
+    heading = I18n.t("NOT THAT ONE · %d LEFT", Quiz.remaining(#(quiz.choices or {}), self.wrong_picks))
+    colour = Theme.redA
+  end
+  local streak = Quiz.streak(self:streak_key())
+  local sw = 0
+  if streak > 0 then
+    local label = I18n.t("STREAK ×%d", streak)
+    local lw = UI.labelWidth(label, "label")
+    sw = lw + Theme.space.lg
+    -- It swells as it grows, and goes pink past five.
+    local swell = 1
+    if self.streak_at then
+      swell = 1 + 0.5 * (1 - Ease.expOut(math.min(1, (self.t - self.streak_at) / 0.5)))
+    end
+    local lx, ly = x + w - lw, y + math.floor((UI.lead("title") - UI.lead("label")) / 2)
+    love.graphics.push()
+    love.graphics.translate(lx + lw / 2, ly + UI.lead("label") / 2)
+    love.graphics.scale(swell, swell)
+    love.graphics.translate(-(lx + lw / 2), -(ly + UI.lead("label") / 2))
+    UI.label(label, lx, ly, "label", { color = streak >= 5 and Theme.pink or Theme.gold })
+    love.graphics.pop()
+  end
+  UI.label(heading, x, y, "title", { width = w - sw, ellipsis = true, color = colour })
+  return y + UI.lead("title")
+end
+
+-- --------------------------------------------------------------- the cards
+
+--- The left card's blocks for a column `w` wide at code size `px`, with a
+--- program window of at most `rows_max` lines: `{ kind, h, … }` in order,
+--- and the total height with the gaps between them.
+function Quest:left_blocks(w, px, rows_max)
+  local quiz = self.quest.quiz
+  local font = Quest.quiz_font(px)
+  local lh = font:getHeight()
+  local inner = well_inner(w)
+  local blocks = {}
+  local has_program = type(quiz.program) == "string" and quiz.program ~= ""
+  if has_program then
+    local rows = program_rows(quiz.program, inner, font, rows_max)
+    blocks[#blocks + 1] = { kind = "well", rows = rows, h = #rows * lh + WELL_PAD * 2 }
+  else
+    for _, b in ipairs(Quiz.question_blocks(Quiz.blocks(self.quest.brief or ""))) do
+      if b.kind == "code" then
+        local rows = fence_rows(b.text, inner, font)
+        blocks[#blocks + 1] = { kind = "well", rows = rows, h = #rows * lh + WELL_PAD * 2 }
+      else
+        blocks[#blocks + 1] = { kind = "read", text = b.text, h = self:prose_height(b.text, w) }
+      end
+    end
+  end
+  blocks[#blocks + 1] = { kind = "heading", h = UI.lead("title") }
+  blocks[#blocks + 1] = { kind = "choices", h = self:choices_height(w, font) }
+  local total = 0
+  for i, b in ipairs(blocks) do total = total + b.h + (i > 1 and Theme.space.lg or 0) end
+  return blocks, total, font
+end
+
+--- The code size and the program window the left card is drawn with, for a
+--- column `w` wide with `room` of height (nil upright: content-sized).
+---
+--- The chrome gives way before the thing being read does, and the code
+--- gives way before the four do: at type step 4 the wanted size is 32 px,
+--- and four two-line choices under a question do not fit a 584 card. So
+--- the window round the hole is as many lines as fit after the four, never
+--- under three; when even that overflows, the code steps down two pixels at
+--- a time to a floor of 12; and whatever is left over scrolls.
+function Quest:left_fit(w, room)
+  local px = Layout.codeSize(Theme.type.code)
+  local quiz = self.quest.quiz
+  local has_program = type(quiz.program) == "string" and quiz.program ~= ""
+  local want_rows = Layout.isPortrait() and 9 or 11
+  if not room then
+    -- Upright: the well is capped at the spec's 420 px rather than the card.
+    local lh = Quest.quiz_font(px):getHeight()
+    return px, math.max(3, math.min(want_rows, math.floor((420 - WELL_PAD * 2) / lh)))
+  end
+  -- The spec's floor for code is 16; the smallest step authors 12.
+  local floor_px = math.min(16, px)
+  while true do
+    local font = Quest.quiz_font(px)
+    local lh = font:getHeight()
+    local fixed = UI.lead("title") + Theme.space.lg + self:choices_height(w, font)
+    local rows = want_rows
+    if has_program then
+      local free = room - fixed - Theme.space.lg - WELL_PAD * 2
+      rows = math.max(3, math.min(want_rows, math.floor(free / lh)))
+    end
+    local _, total = self:left_blocks(w, px, rows)
+    if total <= room or px <= floor_px then return px, rows end
+    px = math.max(floor_px, px - 2)
+  end
+end
+
+--- Back to the scissor the column is drawn under: the bounded area when
+--- the whole column scrolls (upright), none otherwise. A card's own scissor
+--- must never outlive its draw — one that did clipped the next frame's
+--- backdrop, header and footer to the last card drawn.
+function Quest:outer_scissor()
+  local o = self.outer
+  if o then love.graphics.setScissor(o.x, o.y, o.w, o.h) else love.graphics.setScissor() end
+end
+
+--- The quiz card: the question (or the program window), the well, the
+--- heading and the four. `max_h` caps it and scrolls what does not fit
+--- (`brief_scroll`); nil draws it content-sized (upright, where the column
+--- scrolls as a whole). `clip` is the rect the hit boxes are cut to.
+--- Returns the card's height.
+function Quest:draw_left(x, y, w, max_h, clip)
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  local cw = w - pad * 2
+  local px, rows = self:left_fit(cw, max_h and (max_h - pad * 2) or nil)
+  local blocks, total, font = self:left_blocks(cw, px, rows)
+  local card_h = total + pad * 2
+  if max_h then card_h = math.min(card_h, max_h) end
+  local inner_h = card_h - pad * 2
+  local scroll = 0
+  if max_h then
+    self.brief_overflow = math.max(0, total - inner_h)
+    self.brief_scroll = math.max(0, math.min(self.brief_scroll, self.brief_overflow))
+    scroll = self.brief_scroll
+  end
+  local cx, cy = UI.card(x, y, w, card_h, { strip = Theme.gold, pad = pad })
+  -- The content is clipped to the card's inside (and to the column's clip,
+  -- upright); the scissor is in canvas coordinates, as every scissor here.
+  local sx, sy, sw, sh = cx - Theme.space.sm, cy - 2, cw + Theme.space.sm * 2, inner_h + 4
+  if clip then
+    local x2 = math.min(sx + sw, clip.x + clip.w)
+    local y2 = math.min(sy + sh, clip.y + clip.h)
+    sx, sy = math.max(sx, clip.x), math.max(sy, clip.y)
+    sw, sh = math.max(0, x2 - sx), math.max(0, y2 - sy)
+  end
+  local region = { x = sx, y = sy, w = sw, h = sh }
+  love.graphics.setScissor(sx, sy, sw, sh)
+  local by = cy - scroll
+  for i, b in ipairs(blocks) do
+    if i > 1 then by = by + Theme.space.lg end
+    if b.kind == "well" then
+      self:draw_well(cx, by, cw, b.rows, font)
+    elseif b.kind == "read" then
+      self:prose(b.text, cx, by, cw, Theme.text)
+    elseif b.kind == "heading" then
+      self:draw_quiz_heading(cx, by, cw)
+    elseif b.kind == "choices" then
+      self:draw_choices(cx, by, cw, region, font)
+    end
+    by = by + b.h
+  end
+  self:outer_scissor()
+  if max_h and self.brief_overflow > 0 then
+    if scroll > 0 then UI.scrollFade(cx, cy, cw, Theme.card, "top") end
+    if scroll < self.brief_overflow then UI.scrollFade(cx, cy + inner_h - Theme.space.xl, cw, Theme.card, "bottom") end
+    UI.scrollbar(x + w - pad / 2 - 3, cy, inner_h, inner_h / total, scroll / self.brief_overflow)
+  end
+  return card_h
+end
+
+--- The brief card's blocks for a column `w` wide: the story (its short
+--- lead in gold), the brief on a program quiz (prose and sample wells), the
+--- CONCEPTS chips, and a hint once one is taken.
+function Quest:side_blocks(w)
+  local q = self.quest
+  local blocks = {}
+  local function read(text, colour)
+    if text and text ~= "" then
+      blocks[#blocks + 1] = { kind = "read", text = text, color = colour, h = self:prose_height(text, w) }
+    end
+  end
+  local lead, rest = Quiz.story_lead(q.story)
+  if lead then read(lead, Theme.gold) end
+  read(rest, lead and Theme.text or Theme.mute)
+  local quiz = q.quiz
+  if quiz and type(quiz.program) == "string" and quiz.program ~= "" then
+    local font = Quest.quiz_font()
+    local lh = font:getHeight()
+    for _, b in ipairs(Quiz.blocks(q.brief or "")) do
+      if b.kind == "code" then
+        local rows = fence_rows(b.text, well_inner(w), font)
+        blocks[#blocks + 1] = { kind = "well", rows = rows, font = font, h = #rows * lh + WELL_PAD * 2 }
+      else
+        read(b.text, Theme.text)
+      end
+    end
+  end
+  if q.concepts and #q.concepts > 0 then
+    -- Chips, wrapped into rows.
+    local rows, row, used = 1, 0, 0
+    for _, c in ipairs(q.concepts) do
+      local cw = UI.chipWidth(c)
+      if row > 0 and used + Theme.space.sm + cw > w then rows, used, row = rows + 1, 0, 0 end
+      used = used + (row > 0 and Theme.space.sm or 0) + cw
+      row = row + 1
+    end
+    blocks[#blocks + 1] = { kind = "concepts", rows = rows,
+      h = UI.lead("label") + Theme.space.xs + rows * Theme.control.chip + (rows - 1) * Theme.space.sm }
+  end
+  if self.hint then
+    blocks[#blocks + 1] = { kind = "hint", text = self.hint,
+      h = UI.lead("label") + Theme.space.xs + self:prose_height(self.hint, w) }
+  end
+  local total = 0
+  for i, b in ipairs(blocks) do total = total + b.h + (i > 1 and Theme.space.lg or 0) end
+  return blocks, total
+end
+
+--- The brief card (blue rule). `max_h` caps and scrolls it (`side_scroll`);
+--- nil draws it content-sized. Returns its height.
+function Quest:draw_side(x, y, w, max_h, clip)
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  local cw = w - pad * 2
+  local blocks, total = self:side_blocks(cw)
+  if #blocks == 0 then
+    self.side_overflow = 0
+    return 0
+  end
+  local card_h = total + pad * 2
+  if max_h then card_h = math.min(card_h, max_h) end
+  local inner_h = card_h - pad * 2
+  local scroll = 0
+  if max_h then
+    self.side_overflow = math.max(0, total - inner_h)
+    self.side_scroll = math.max(0, math.min(self.side_scroll, self.side_overflow))
+    scroll = self.side_scroll
+  else
+    self.side_overflow = 0
+  end
+  local cx, cy = UI.card(x, y, w, card_h, { strip = Theme.blue, pad = pad })
+  local sx, sy, sw, sh = cx - Theme.space.sm, cy - 2, cw + Theme.space.sm * 2, inner_h + 4
+  if clip then
+    local x2 = math.min(sx + sw, clip.x + clip.w)
+    local y2 = math.min(sy + sh, clip.y + clip.h)
+    sx, sy = math.max(sx, clip.x), math.max(sy, clip.y)
+    sw, sh = math.max(0, x2 - sx), math.max(0, y2 - sy)
+  end
+  love.graphics.setScissor(sx, sy, sw, sh)
+  local by = cy - scroll
+  for i, b in ipairs(blocks) do
+    if i > 1 then by = by + Theme.space.lg end
+    if b.kind == "read" then
+      self:prose(b.text, cx, by, cw, b.color)
+    elseif b.kind == "well" then
+      self:draw_well(cx, by, cw, b.rows, b.font)
+    elseif b.kind == "concepts" then
+      UI.label(I18n.t("CONCEPTS"), cx, by, "label", { color = Theme.mute, caps = true })
+      local chip_y = by + UI.lead("label") + Theme.space.xs
+      local used = 0
+      for _, c in ipairs(self.quest.concepts) do
+        local chw = UI.chipWidth(c)
+        if used > 0 and used + Theme.space.sm + chw > cw then
+          used = 0
+          chip_y = chip_y + Theme.control.chip + Theme.space.sm
+        end
+        if used > 0 then used = used + Theme.space.sm end
+        UI.chip(cx + used, chip_y, c, { color = Theme.blue })
+        used = used + chw
+      end
+    elseif b.kind == "hint" then
+      UI.label(I18n.t("HINT"), cx, by, "label", { color = Theme.gold, caps = true })
+      self:prose(b.text, cx, by + UI.lead("label") + Theme.space.xs, cw, Theme.text)
+    end
+    by = by + b.h
+  end
+  self:outer_scissor()
+  if max_h and self.side_overflow > 0 then
+    if scroll > 0 then UI.scrollFade(cx, cy, cw, Theme.card, "top") end
+    if scroll < self.side_overflow then UI.scrollFade(cx, cy + inner_h - Theme.space.xl, cw, Theme.card, "bottom") end
+    UI.scrollbar(x + w - pad / 2 - 3, cy, inner_h, inner_h / total, scroll / self.side_overflow)
+  end
+  return card_h
+end
+
+--- The stars card's height: a caption row and a 40 px row of figures.
+function Quest:stars_card_height()
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  return pad * 2 + UI.lead("label") + Theme.space.xs + 40
+end
+
+--- STARS · DIFFICULTY · HINTS: what a clear is worth right now (the
+--- server's cascade, SPEC §6.3 — the real count once it is cleared), the
+--- difficulty as pips, and the hints taken of those authored, only when
+--- there are any. A star lost to a miss drops out: smaller and grey.
+function Quest:draw_stars_card(x, y, w)
+  local q = self.quest
+  local pad = Layout.isPortrait() and Theme.space.lg or Theme.space.xl
+  local h = self:stars_card_height()
+  local cx, cy, cw = UI.card(x, y, w, h, { pad = pad })
+  local cols = { "stars", "difficulty" }
+  if self:hints_available() then cols[#cols + 1] = "hints" end
+  local col_w = math.floor(cw / #cols)
+  local fy = cy + UI.lead("label") + Theme.space.xs
+  local lit = q.state == "cleared" and (q.stars or 0)
+    or Quiz.stars_potential(self:misses(), q.hints_used or 0)
+  for i, col in ipairs(cols) do
+    local ox = cx + (i - 1) * col_w
+    if col == "stars" then
+      UI.label(I18n.t("STARS"), ox, cy, "label", { color = Theme.mute, caps = true })
+      for s = 1, 3 do
+        local on = s <= lit
+        local v = Juice.follow("quest:star" .. s, on and 1 or 0, { speed = 10 })
+        local size = 32 * (0.6 + 0.4 * v)
+        local sx, sy = ox + (s - 1) * 40 + 16, fy + 20
+        if not Assets.marker("fx_star", sx, sy, size, { alpha = 0.25 + 0.75 * v }) then
+          star(sx, sy, size / 2, Theme.gold, 0.25 + 0.75 * v)
+        end
+      end
+    elseif col == "difficulty" then
+      UI.label(I18n.t("DIFFICULTY"), ox, cy, "label", { color = Theme.mute, caps = true })
+      UI.pips(ox, fy + 8, q.difficulty or 1, 10)
+    else
+      UI.label(I18n.t("HINTS"), ox, cy, "label", { color = Theme.mute, caps = true })
+      UI.label(("%d / %d"):format(q.hints_used or 0, q.hints_total or 0), ox,
+        fy + math.floor((40 - UI.lead("title")) / 2), "title")
+    end
+  end
+  return h
+end
+
+-- -------------------------------------------------------------- the header
+
+--- The road, as a breadcrumb: `rust · cheatsheet · 01`.
+function Quest:breadcrumb()
+  local q = self.quest or {}
+  local parts = {}
+  local land = q.land or self.app.land
+  local category = q.category or self.app.category
+  if land then parts[#parts + 1] = tostring(land) end
+  if category then parts[#parts + 1] = (tostring(category):gsub("_", " ")) end
+  if q.node then parts[#parts + 1] = ("%02d"):format(tonumber(q.node) or 0) end
+  return table.concat(parts, " · ")
+end
+
+--- The header band: the title in the display role (title upright), the
+--- breadcrumb, the clock in its own slot, and HINT / MAP on the right.
+--- Laid out right to left, so nothing can print through anything else at
+--- any type step (review #8: the clock was centred on `vw / 2`).
+function Quest:draw_quiz_header()
+  local vw = Layout.vw
+  local h = UI.headerHeight()
+  local g = Layout.gutter()
+  local portrait = Layout.isPortrait()
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  self.hits = {}
+  local bh = Theme.control.buttonM
+  local by = math.floor((h - bh) / 2)
+  local right = vw - g
+  local function button(id, label, key, state)
+    -- Sized by the kit: a button never shrinks its label, and on a wide
+    -- canvas the label face is a bigger one.
+    local need_w, need_h = UI.buttonSize(label, { h = bh, key = key })
+    local bw = math.max(88, need_w)
+    local rh = math.max(bh, need_h)
+    local r = { x = right - bw, y = math.floor((h - rh) / 2), w = bw, h = rh }
+    UI.button(r.x, r.y, r.w, r.h, label, state, nil, { variant = "secondary", id = "quest:" .. id, key = key })
+    self.hits[id] = r
+    right = r.x - Theme.space.md
+  end
+  button("map", I18n.t("MAP"), "ESC", self.hover == "map" and "hot" or "normal")
+  if self:hints_available() then
+    local q = self.quest
+    local spent = (q.hints_used or 0) >= (q.hints_total or 0)
+    button("hint", I18n.t("HINT"), "F7", spent and "disabled" or (self.hover == "hint" and "hot" or "normal"))
+  end
+
+  -- The clock (PROTOCOL §4.8b), in a slot: calm for most of its life, a
+  -- pulse on arrival, on a phase crossing and in the last quarter.
+  local state = Clock.read(self.quest)
+  if state then
+    local now = Anim.now()
+    local colour = ({ calm = Theme.text, warning = Theme.gold, urgent = Theme.redA, overtime = Theme.redA })[state.phase] or Theme.text
+    local entrance = Ease.pulse(self.clock_arrived and (now - self.clock_arrived), 0.55)
+    local crossing = Ease.pulse(self.clock_crossed and (now - self.clock_crossed), state.phase == "overtime" and 0.9 or 0.5)
+    local urgency = Ease.attention(state.fraction)
+    local text = Clock.format(state)
+    local tw = UI.labelWidth(text, "title")
+    local grow = 1 + 0.25 * crossing + 0.3 * entrance + 0.08 * urgency
+    local cx, cy = right - tw / 2, h / 2
+    love.graphics.push()
+    love.graphics.translate(cx, cy)
+    love.graphics.scale(grow, grow)
+    love.graphics.translate(-cx, -cy)
+    UI.label(text, right - tw, math.floor((h - UI.lead("title")) / 2), "title", { color = colour })
+    love.graphics.pop()
+    right = right - tw - Theme.space.xl
+  end
+
+  -- The title, in whatever language the server sent it (content is
+  -- translated pack by pack, never here), and the breadcrumb beside it.
+  local title = self.quest and self.quest.title or (self.error or I18n.t("loading…"))
+  local role = portrait and "title" or "display"
+  local room = math.max(40, right - g)
+  local tw = math.min(UI.labelWidth(title, role), room)
+  local crumb = self:breadcrumb()
+  local crumb_w = UI.labelWidth(crumb, "label")
+  local ty = math.floor((h - UI.lead(role)) / 2)
+  if portrait then
+    -- Two lines upright: the title, the road under it.
+    local block = UI.lead(role) + UI.lead("label")
+    ty = math.floor((h - block) / 2)
+    UI.label(title, g, ty, role, { width = room, ellipsis = true,
+      color = self.error and not self.quest and Theme.redA or Theme.gold })
+    if crumb ~= "" then
+      UI.label(crumb, g, ty + UI.lead(role), "label", { width = room, ellipsis = true, color = Theme.mute })
+    end
+    return
+  end
+  UI.label(title, g, ty, role, { width = tw, ellipsis = true,
+    color = self.error and not self.quest and Theme.redA or Theme.gold })
+  if crumb ~= "" and tw + Theme.space.xl + crumb_w <= room then
+    UI.label(crumb, g + tw + Theme.space.xl, math.floor((h - UI.lead("label")) / 2), "label", { color = Theme.mute })
+  end
+end
+
+-- ------------------------------------------------------------- the screen
+
+--- The footer's keys, in priority order: the footer keeps the longest
+--- prefix that fits. F7 only when there is a hint to take.
+function Quest:quiz_hints()
+  local items = { { key = "1-4", verb = I18n.t("pick") } }
+  if self:hints_available() then items[#items + 1] = { key = "F7", verb = I18n.t("hint") } end
+  items[#items + 1] = { key = "ESC", verb = I18n.t("map") }
+  return items
+end
+
+--- The whole quiz screen. Also the loading and error states of every quest,
+--- since the header is the same one.
+function Quest:draw_quiz()
+  local vw, vh = Layout.vw, Layout.vh
+  local land = (self.quest and self.quest.land) or self.app.land or "rust"
+  Assets.cover(Quest.backdrop(land, self.quest and self.quest.category
+    or self.app.category), 0, 0, vw, vh)
+  UI.setColor(Theme.felt, Layout.isPortrait() and 0.8 or 0.72)
+  love.graphics.rectangle("fill", 0, 0, vw, vh)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  self:draw_quiz_header()
+  local portrait = Layout.isPortrait()
+  local top = UI.headerHeight() + Theme.space.lg
+  local bx, by, bw, bh = UI.bounded(nil, top, vh - UI.footerHeight() - Theme.space.lg)
+  self.bounds = { x = bx, y = by, w = bw, h = bh }
+
+  if not self.quest then
+    local pad = portrait and Theme.space.lg or Theme.space.xl
+    local k = Juice.enter("quest:loading", { dur = Theme.motion.enter })
+    local cx, cy, cw = UI.card(bx, by + (1 - k) * 24, bw, pad * 2 + UI.lead("label"),
+      { strip = self.error and Theme.redA or Theme.gold, pad = pad, alpha = math.min(1, k * 1.5) })
+    UI.label(self.error or I18n.t("asking the server…"), cx, cy, "label",
+      { width = cw, ellipsis = true, color = self.error and Theme.redA or Theme.mute })
+    self.choice_hits = {}
+    self.app:footer(self:quiz_hints())
+    return
+  end
+
+  if portrait then
+    -- One column, scrolled as a whole: the quiz card, the brief, the stars.
+    local clip = self.bounds
+    self.outer = clip
+    love.graphics.setScissor(bx, by, bw, bh)
+    local y = by - self.brief_scroll
+    y = y + self:draw_left(bx, y, bw, nil, clip)
+    local side = self:draw_side(bx, y + Theme.gap, bw, nil, clip)
+    if side > 0 then y = y + Theme.gap + side end
+    y = y + Theme.gap + self:draw_stars_card(bx, y + Theme.gap, bw)
+    love.graphics.setScissor()
+    self.outer = nil
+    local total = y + self.brief_scroll - by
+    self.brief_overflow = math.max(0, math.floor(total - bh))
+    self.brief_scroll = math.max(0, math.min(self.brief_scroll, self.brief_overflow))
+    if self.brief_overflow > 0 then
+      if self.brief_scroll > 0 then UI.scrollFade(bx, by, bw, Theme.felt, "top") end
+      if self.brief_scroll < self.brief_overflow then UI.scrollFade(bx, by + bh - Theme.space.xl, bw, Theme.felt, "bottom") end
+      UI.scrollbar(bx + bw - 6, by, bh, bh / total, self.brief_scroll / self.brief_overflow)
+    end
+  else
+    -- Two columns: the quiz card (744 of 1232), the brief and the stars.
+    local gap = Theme.space.xl
+    local lw = math.floor((bw - gap) * 0.617)
+    local rx, rw = bx + lw + gap, bw - lw - gap
+    self.left_rect = { x = bx, y = by, w = lw, h = bh }
+    self.side_rect = { x = rx, y = by, w = rw, h = bh }
+    self:draw_left(bx, by, lw, bh, self.left_rect)
+    local sh = self:stars_card_height()
+    local side = self:draw_side(rx, by, rw, bh - sh - Theme.gap, self.side_rect)
+    self:draw_stars_card(rx, by + (side > 0 and side + Theme.gap or 0), rw)
+  end
+
+  self:draw_quiz_moments()
+  self.app:footer(self:quiz_hints())
+end
+
+--- The page's jolt, in virtual pixels — the editor path's brief still asks;
+--- the quiz card no longer jolts the page (spec §4: an edge, not a wash).
+function Quest:jolt_offset()
+  local j = self.quiz_jolt or 0
+  if j <= 0.001 then return 0, 0 end
+  local k = j * j * 18
+  return math.floor(math.sin(self.t * 41.3) * k + 0.5), math.floor(math.sin(self.t * 57.9) * k * 0.7 + 0.5)
+end
+
+--- The card's screen-wide moments, over everything: the red vignette of a
+--- miss (an edge, never a wash over the code) and the "×N COMBO" of a
+--- streak, zooming in from far too big over the row that was right.
+function Quest:draw_quiz_moments()
+  local vw, vh = Layout.vw, Layout.vh
+  if self.vignette_at then
+    local u = (self.t - self.vignette_at) / 0.3
+    if u < 1 then
+      local a = 1 - u
+      love.graphics.setLineWidth(3)
+      for i = 0, 5 do
+        UI.setColor(Theme.redA, a * (0.9 - 0.14 * i))
+        love.graphics.rectangle("line", 1.5 + i * 3, 1.5 + i * 3, vw - 3 - i * 6, vh - 3 - i * 6)
+      end
+      love.graphics.setLineWidth(1)
+      love.graphics.setColor(1, 1, 1, 1)
+    else
+      self.vignette_at = nil
+    end
+  end
+  local combo = self.quiz_combo
+  if combo then
+    local hold = 0.6
+    local u = (self.t - combo.at) / hold
+    if u > 2.2 then self.quiz_combo = nil; return end
+    local scale, alpha = 1, 1
+    if u < 1 then scale, alpha = Celebrate.zoom_in(u)
+    elseif u >= 1.6 then scale, alpha = Celebrate.zoom_out((u - 1.6) / 0.6) end
+    local label = I18n.t("×%d COMBO", combo.n)
+    local lw = UI.labelWidth(label, "display")
+    love.graphics.push()
+    love.graphics.translate(combo.x, combo.y)
+    love.graphics.scale(scale, scale)
+    UI.label(label, -lw / 2, -UI.lead("display") / 2, "display",
+      { color = combo.n >= 5 and Theme.pink or Theme.gold, alpha = alpha })
+    love.graphics.pop()
+  end
 end
 
 function Quest:draw_brief(rect, tint)
@@ -2546,7 +3497,7 @@ function Quest:draw_brief(rect, tint)
   -- The prose at 8, or the first size under it that puts fourteen
   -- characters on a line: a brief column eight characters wide at the
   -- largest type step in landscape wrapped `tram-stop` as `tram-sto` / `p`.
-  local prose = UI.fitSize(("M"):rep(14), column, 8, 5)
+  local prose = UI.fitSize(("M"):rep(14), column, self:cheatsheet() and 7 or 8, 5)
   local indent = column - 10
 
   if self.error then
@@ -2575,14 +3526,74 @@ function Quest:draw_brief(rect, tint)
     end
     local picked = self:cheatsheet()
     if not picked then story() end
-    for _, line in ipairs(UI.wrap(self.quest.brief or "", column, prose)) do
-      y = y + UI.text(line, x, y, prose, Theme.cream) + 3
+    -- The brief is markdown (SPEC §2.1): its fences are drawn as code, in
+    -- the code face, and its `**` and backticks are taken out rather than
+    -- read aloud as punctuation (`Quiz.blocks`).
+    --
+    -- Wide and landscape, with a program to show, the panel is two columns
+    -- as on the web: the question and the program on the left, the four
+    -- choices at the top of the right with everything else under them. One
+    -- column put the fourth choice under the fold on a ten-line program,
+    -- and a HACKER program is eighty. The width it takes is measured: both
+    -- halves must hold a line of code at the card's own size.
+    local quiz = self.quest.quiz
+    local has_program = quiz ~= nil and type(quiz.program) == "string" and quiz.program ~= ""
+    local gutter = 16
+    local code_font = Quest.quiz_font()
+    local two = Quiz.two_columns(has_program, Layout.isPortrait(), column,
+      math.floor(code_font:getWidth(("M"):rep(40)) / 0.42) + gutter)
+    local left_w = two and math.floor((column - gutter) * 0.58) or column
+    local col_top = y
+    local left_end = 0
+    local wide = column
+    column = left_w
+    local choices_drawn = false
+    -- Portrait, with a program: the card comes first and the brief under
+    -- it. One column cannot hold a HACKER brief, its program and four
+    -- choices on one screen, and of the three the brief is the one a player
+    -- reads once — the hole and the four are what they look back and forth
+    -- between, so those are the two that share the screen.
+    local card_first = quiz ~= nil and has_program and Layout.isPortrait()
+    local function pick_up()
+      y = self:draw_program(x, y, column)
+      if two then
+        left_end = y
+        x = x + left_w + gutter
+        column = wide - left_w - gutter
+        indent = column - 10
+        y = col_top
+      end
+      y = self:draw_choices(x, y, column, rect)
+      choices_drawn = true
     end
-    y = y + 10
+    if card_first then pick_up(); y = y + 4 end
+    for _, block in ipairs(Quiz.blocks(self.quest.brief or "")) do
+      if block.kind == "code" then
+        -- A sheet question's snippet with the hole in it is part of the
+        -- question, and the four follow the question ("Which line is it?")
+        -- under it. Any other fence is a worked example, and a sheet's four
+        -- go *before* it, so a phone sees them without a scroll (the web's
+        -- rule, which put them before the snippet with the hole too).
+        local holed = Quiz.has_hole(block.text)
+        if quiz and not has_program and not choices_drawn and not holed then pick_up() end
+        y = self:draw_snippet(block.text, x, y, column)
+      else
+        for _, para in ipairs(Quiz.blocks_lines(block.text)) do
+          if para == "" then
+            y = y + 6
+          else
+            for _, line in ipairs(UI.wrap(para, column, prose)) do
+              y = y + UI.text(line, x, y, prose, Theme.cream) + 3
+            end
+          end
+        end
+        y = y + 8
+      end
+    end
+    y = y + 2
     -- The question was the brief; here is the program with its hole, and
     -- the four things that might go in it.
-    y = self:draw_program(x, y, column)
-    y = self:draw_choices(x, y, column, rect)
+    if quiz and not choices_drawn then pick_up() end
     if picked then story() end
 
     if self.quest.concepts and #self.quest.concepts > 0 then
@@ -2594,6 +3605,9 @@ function Quest:draw_brief(rect, tint)
     end
 
     local tests = self.quest.tests or {}
+    -- On a picked quest with nothing to show, the line is noise: a sheet
+    -- question has no tests at all, and "0 hidden" told nobody anything.
+    if not (picked and #(tests.visible or {}) == 0 and (tests.hidden_count or 0) == 0) then
     -- A `("…"):format(…)` call, which is why the sweep that found every
     -- `I18n.t` site walked past it: it does not look like a string being
     -- drawn until you read the line. Given a width for the same reason.
@@ -2612,6 +3626,7 @@ function Quest:draw_brief(rect, tint)
       end
       y = y + 4
     end
+    end
 
     if self.hint then
       y = y + 6
@@ -2623,9 +3638,28 @@ function Quest:draw_brief(rect, tint)
     local hints = I18n.t("hints %d/%d  (F7)",
       self.quest.hints_used or 0, self.quest.hints_total or 0)
     y = y + 10
-    UI.text(hints, x, y, 7, Theme.withAlpha(Theme.cream, 0.5))
+    y = y + UI.text(hints, x, y, 7, Theme.withAlpha(Theme.cream, 0.5))
+    y = math.max(y, left_end)
   end
   love.graphics.setScissor()
+
+  -- How far the brief runs past its panel, and a scrollbar when it does: a
+  -- panel that can scroll and does not say so is a panel whose bottom half
+  -- nobody finds. The scroll is held inside it, so a wheel spun past the
+  -- end does not leave the next spin a page of nothing to climb back.
+  local content = y + self.brief_scroll - (rect.y + 10)
+  self.brief_overflow = math.max(0, math.floor(content - (rect.h - 20)))
+  self.brief_scroll = math.max(0, math.min(self.brief_scroll, self.brief_overflow))
+  if self.brief_overflow > 0 then
+    local track = rect.h - 16
+    local thumb = math.max(16, track * track / (track + self.brief_overflow))
+    local u = self.brief_scroll / self.brief_overflow
+    UI.setColor(Theme.ink, 0.5)
+    love.graphics.rectangle("fill", rect.x + rect.w - 9, rect.y + 8, 4, track)
+    UI.setColor(Theme.coin)
+    love.graphics.rectangle("fill", rect.x + rect.w - 9, rect.y + 8 + (track - thumb) * u, 4, thumb)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
 end
 
 --- Where the seven buttons stand, and how much of the well they stand in.
@@ -3636,11 +4670,14 @@ function Quest:keypressed(key, mods)
   -- format, hint, solve, log, $EDITOR, the stack, the pane switch) do
   -- nothing here, and say so rather than fall through to a hidden buffer.
   if self:cheatsheet() then
-    local fkey = key == "f2" or key == "f5" or key == "f6" or key == "f7"
+    local fkey = key == "f2" or key == "f5" or key == "f6"
       or key == "f8" or key == "f9" or key == "f10"
     local chord = (mods.ctrl or mods.gui) and (key == "return" or key == "kpenter"
       or key == "f" or key == "z" or key == "tab")
-    if fkey or chord or key == "tab" then
+    -- Shift-F7 is SOLVE: the whole answer into an editor a quiz does not
+    -- have, priced as the largest hint. Plain F7 (a hint) stays open.
+    local solve = key == "f7" and mods.shift
+    if fkey or chord or solve or key == "tab" then
       SFX.play("locked")
       return true
     end
@@ -3722,6 +4759,9 @@ function Quest:keypressed(key, mods)
   end
 
   if self:quiz_locked() then
+    -- The keypad's digits with NUM LOCK off send no text; they pick too.
+    local kp = key:match("^kp([1-4])$")
+    if kp and not love.keyboard.hasTextInput() then self:pick(tonumber(kp)); return true end
     -- Digits arrive through `textinput`; the editing keys are refused while
     -- the editor is locked, and the rest (scroll, panes) still work.
     if key == "return" or key == "kpenter" or key == "backspace" or key == "delete"
@@ -3747,6 +4787,17 @@ function Quest:wheelmoved(_, dy)
   if self.coder then
     local vx, vy = Layout.toVirtual(love.mouse.getPosition())
     if self.coder:wheelmoved(dy, vx, vy) then return end
+  end
+  if self:cheatsheet() or not self.quest then
+    -- The column under the pointer scrolls: the brief card has its own
+    -- scroll beside the quiz card's in landscape.
+    local vx, vy = Layout.toVirtual(love.mouse.getPosition())
+    if self.side_rect and vx and UI.inside(self.side_rect, vx, vy) and not Layout.isPortrait() then
+      self.side_scroll = math.max(0, math.min(self.side_overflow or 0, self.side_scroll - dy * 30))
+    else
+      self.brief_scroll = math.max(0, math.min(self.brief_overflow or 0, self.brief_scroll - dy * 30))
+    end
+    return
   end
   if self.show_log and self.log then
     self.log_follow = false
@@ -3808,13 +4859,28 @@ function Quest:mousepressed(x, y, button)
   -- fire on the press and not the release, which is what makes a drag that
   -- started in the text and ended over SUBMIT harmless: the release does
   -- nothing at all.
-  if self:cheatsheet() then
-    -- No bench and no editor on this road: the four lines and the brief
-    -- are all there is to press.
+  if self:cheatsheet() or not self.quest then
+    -- No bench and no editor on this road: the header's two buttons, the
+    -- four rows and the cards are all there is to press. A finger on a
+    -- column that scrolls is a drag until it lifts: a press there is a
+    -- pick only if it comes back up without having moved, or a tablet could
+    -- never scroll past a choice.
+    self.focus = "brief"
+    local hits = self.hits or {}
+    if inside(hits.map) then
+      UI.press("quest:map", hits.map, { sfx = false })
+      self.app:back()
+      return
+    end
+    if inside(hits.hint) then self:take_hint(); return end
+    local column = Layout.isPortrait() and self.bounds or self.left_rect
+    if self.brief_overflow > 0 and inside(column) then
+      self.brief_drag = { y = y, scroll = self.brief_scroll, moved = false }
+      return
+    end
     for i, r in pairs(self.choice_hits or {}) do
       if inside(r) then self:pick(i); return end
     end
-    self.focus = "brief"
     return
   end
   if inside(self.solve_rect) then self:solve(); return end
@@ -3846,12 +4912,39 @@ function Quest:mousepressed(x, y, button)
 end
 
 function Quest:mousemoved(x, y)
+  local drag = self.brief_drag
+  if drag then
+    if math.abs(y - drag.y) > 8 then drag.moved = true end
+    if drag.moved then
+      self.brief_scroll = math.max(0, math.min(self.brief_overflow, drag.scroll - (y - drag.y)))
+    end
+  end
+  -- The choice under the pointer, lit.
+  local hover = nil
+  for i, r in pairs(self.choice_hits or {}) do
+    if x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then hover = i end
+  end
+  if hover ~= self.choice_hover and hover and not self.quiz_right then SFX.play("move") end
+  self.choice_hover = hover
+  -- And the header's buttons.
+  local hits = self.hits or {}
+  self.hover = (UI.inside(hits.hint, x, y) and "hint") or (UI.inside(hits.map, x, y) and "map") or nil
   if self.coder then self.coder:mousemoved(x, y) end
   if self.pane then self.pane:mousemoved(x, y) end
   self.fx:pointer(x, y)
 end
 
-function Quest:mousereleased()
+function Quest:mousereleased(x, y)
+  local drag = self.brief_drag
+  self.brief_drag = nil
+  if drag and not drag.moved and x then
+    for i, r in pairs(self.choice_hits or {}) do
+      if x >= r.x and x <= r.x + r.w and y >= r.y and y <= r.y + r.h then
+        self:pick(i)
+        break
+      end
+    end
+  end
   if self.pane then self.pane:mousereleased() end
 end
 

@@ -1,9 +1,39 @@
--- CATEGORY SELECT. The roads of one land (four, or REMIX's two), from
--- `world.lands`.
+-- CATEGORY SELECT. The roads of one land (seven, or REMIX's four), from
+-- `world.lands`, drawn as a column of cards led by CODE PLAYGROUND
+-- (`docs/love2d-ui.md`).
 --
 -- `open` is the server's word (§4.6: "false when the category's first node is
 -- still locked"), so a locked row is drawn locked and refuses to open. The
 -- client does not work out for itself whether the player has earned it.
+--
+-- ## The layout
+--
+--   * **CODE PLAYGROUND leads the column**, as it does in the browser client
+--     (`frontend/src/scenes/lands.ts`): the same card as a road, the same
+--     height and width, first in the list and the first thing the arrows
+--     land on — a gold stripe instead of the land's, the desk and the coder
+--     where a road keeps its emblem, and the P keycap where a road keeps its
+--     count. It is the main feature, and a player one step into a land
+--     should not have to go back out to find it. `P` still opens it from
+--     anywhere on the screen.
+--   * **A road is a card** with the land's stripe down its left edge, the
+--     name in title-32, the blurb in the reading face, the count as a chip
+--     on the right and a progress bar along the bottom. The road's emblem
+--     stands at the right edge beside the chip, at its own aspect, and only
+--     where it leaves the words alone. The two CHEATSHEET roads have no
+--     emblem, in either client, and are left clean rather than given one.
+--   * **The blurb takes the width it has.** In a tall window it sits under
+--     the name across the whole card, as many lines as the row holds; in a
+--     short one it runs after the name on one line and ends in "…"; and at
+--     the larger reading sizes, where a paragraph is bigger than the title
+--     beside it, the short rows leave it out.
+--
+-- `Categories.metrics` is the one arrangement the draw and the click both
+-- read, and `tests/test_screens.lua` asks it what the answer *is* at every
+-- type step and shape without drawing anything. The chrome never moves with
+-- F12 — only the blurb does — so what gives way when eight cards do not fit
+-- is the blurb, then the bar, and in landscape the column splits in two
+-- before a card is ever cut below its name.
 
 local Layout = require("src.layout")
 local Theme = require("src.theme")
@@ -12,6 +42,8 @@ local UI = require("src.ui")
 local I18n = require("src.i18n")
 local SFX = require("src.sfx")
 local Anim = require("src.anim")
+local Juice = require("src.juice")
+local Fx = require("src.fx")
 local Land = require("src.land")
 
 local Categories = {}
@@ -48,8 +80,14 @@ end
 
 function Categories.new(app)
   return setmetatable({
-    app = app, cursor = 1, categories = nil, error = nil,
-    picked_at = 0, pressed_at = nil,
+    app = app,
+    -- 0 is CODE PLAYGROUND; 1..n are the roads, in `ORDER`. The drive
+    -- scripts set `cursor = i` from `ipairs(categories)` and press ENTER, so
+    -- the roads keep their indices and the playground sits before 1.
+    cursor = 1,
+    categories = nil, error = nil,
+    picked_at = 0, hover = nil,
+    header_h = UI.headerHeight(),
   }, Categories)
 end
 
@@ -57,6 +95,7 @@ function Categories:enter(params)
   self.land = params.land or self.app.land or "rust"
   self.categories = params.categories and ordered(params.categories) or nil
   if not self.categories then self:refresh() end
+  Juice.forget("cats:")
 end
 
 function Categories:refresh()
@@ -69,7 +108,25 @@ function Categories:refresh()
   end)
 end
 
+--- The card's rect for slot `i` (0 is the playground).
+function Categories:card_rect(i)
+  local m = self.metrics or Categories.metrics(Layout.vw, Layout.vh, self.categories or {})
+  local x, y = Categories.row_at(m, i)
+  return { x = x, y = y, w = m.w, h = m.rh }
+end
+
+--- Mei's own desk (§4.9c), the same key as on the lands screen and the map.
+function Categories:open_playground()
+  UI.press("cats:row0", self:card_rect(0), { sfx = false })
+  SFX.play("select")
+  self.app:go("playground")
+end
+
 function Categories:choose()
+  if self.cursor == 0 then
+    self:open_playground()
+    return
+  end
   local cat = self.categories and self.categories[self.cursor]
   if not cat then return end
   if not cat.open then
@@ -77,376 +134,429 @@ function Categories:choose()
     self.app:toast(I18n.t("clear the category before it first"))
     return
   end
-  self.pressed_at = Anim.now()
+  UI.press("cats:row" .. self.cursor, self:card_rect(self.cursor), { sfx = false })
   SFX.play("select")
   self.app.category = cat.category
   self.app:go("map", { land = self.land, category = cat.category })
 end
 
---- The three category bands of one land.
----
---- Each row is `art/emblem_<land>_<category>.png`, a 384x128 band drawn
---- full-width.
----
---- **The trap, and it is worth stating.** DESIGN composed these with an empty
---- left quarter for the label, and `art/tools/process.py` then cropped to the
---- ink and re-centred — right for every other sprite in the pack, wrong for
---- these. The manifest's `box` proves it: `emblem_go_basic` has ink from
---- x=24 to x=359 of 384, so the reserved quarter is gone and the art now
---- fills the cell. So the label does not sit *on* the band; the band is inset
---- to the right of it, and the counts sit clear on the other side. Assuming
---- the empty quarter was still there would have put the word CATEGORY on top
---- of a crate of oranges.
---- Every measurement the rows are drawn from, taken from the type at the
---- current step. A function of the canvas and the rows rather than of the
---- scene, so `tests/test_screens.lua` can ask what the answer *is* at every
---- step without drawing anything.
----
----   * the gutter is the widest category name plus its padding, never less
----     than the authored share of the row, and never so wide that the
----     emblem has no band left — when the name alone needs the row, the
----     band gives way, because a name wrapped one letter to a line is not a
----     name;
----   * the row is as tall as the name, one line of blurb and the plates
----     need, and taller when the screen has the room — the blurb line is
----     given up when the rows would not otherwise fit (below);
----   * the counts plate is as wide as `NN / NN` at its size, and the right
----     margin follows it.
----   * **every row above the PLAYGROUND band.** Four roads at the largest
----     step in a 720-tall window need more than the screen has, and the
----     fourth was drawn under the button and the footer. So the title
----     gives way first (it names the land the player just picked), then the
----     blurb, and then the names and the counts step down together until
----     the rows fit — the type gives way, never the rows.
-local TITLE_SIZE, NAME_SIZE, COUNT_SIZE, BLURB_SIZE = 16, 13, 10, 7
-local TITLE_FLOOR, SIZE_FLOOR = 8, 5
+-- ------------------------------------------------------------------ layout
 
-local COL_GAP = 16
-
-local function measure(vw, vh, rows, title_step, step, blurb, tight, cols)
-  cols = cols or 1
-  local title_size = math.max(TITLE_FLOOR, TITLE_SIZE - title_step)
-  local name_size = math.max(SIZE_FLOOR, NAME_SIZE - step)
-  local count_size = math.max(SIZE_FLOOR, COUNT_SIZE - step)
-  -- Tight, the title moves up and the rows start closer under it: the
-  -- room seven roads need at the largest step comes from the top margin,
-  -- not from inside the rows.
-  local title_y = tight and 10 or 22
-  local title_h = UI.lineHeight(title_size)
-  local y0 = title_y + title_h + (tight and 8 or 18)
-  local pad = Layout.isPortrait() and 12 or 60
-  -- Seven roads (RUST, with the two sheet roads) at the largest type in a
-  -- 720-tall window do not fit in one column at any size: the last resort
-  -- is two, side by side, each this wide.
-  local w = math.floor((vw - pad * 2 - COL_GAP * (cols - 1)) / cols)
-
-  local name_h, blurb_h = UI.lineHeight(name_size), UI.lineHeight(BLURB_SIZE)
-  local plate_h = name_h + 8
-  -- The counts plate: the number, the bar under it, and air below; tight,
-  -- less air.
-  local count_h = UI.lineHeight(count_size) + 4 + 7 + (tight and 5 or 10)
-  -- The name as it is drawn — `VERY BASIC`, in the player's language — not
-  -- the id: `VERYBASIC` is a space narrower, and the gutter sized from it
-  -- wrapped VERY over BASIC and printed it through the blurb.
-  local widest = 0
-  for _, cat in ipairs(rows) do
-    widest = math.max(widest,
-      UI.textWidth(I18n.t(Land.category_label(cat.category)), name_size))
+--- The legacy authored sizes `tests/test_screens.lua` measures the rows
+--- against. The names are set in the title role and the counts in the
+--- label role, which never move with F12; these are the largest authored
+--- sizes that are no taller than those roles at the current step, so a row
+--- measured either way holds its type.
+local function authored_within(from, floor, role)
+  local limit = UI.font(role):getHeight()
+  for size = from, floor, -1 do
+    if UI.fontFor(size):getHeight() <= limit then return size end
   end
-  local count_w = math.max(76, UI.textWidth("00 / 00", count_size) + 16)
-  local right = count_w + 20
+  return floor
+end
 
-  local gutter = math.max(math.floor(math.min(150, w * 0.28)), widest + 28)
-  -- The band wants at least a square of the row; below that it is a sliver
-  -- of a painting and the name takes the width instead.
-  local band_min = 120
-  if gutter > w - right - band_min then gutter = w - right end
-  -- And when the name does not fit beside the counts either — the largest
-  -- type step in a narrow portrait — the counts go **under** the name, on
-  -- the row's second line, and the name gets the whole row.
-  local stacked = widest + 28 > w - right
-  if stacked then gutter = w - 12 end
-  local label_w = math.max(40, gutter - 24)
-  local count_y = stacked and (12 + name_h + 8) or (tight and 4 or 8)
+local COL_GAP = Theme.gap
+local ROW_GAP = Theme.rowGap
+--- The least room a blurb is drawn into beside the name: fewer pixels than
+--- this is three words and an ellipsis, which says less than nothing.
+local BLURB_MIN_W = 240
 
-  -- Rows: what the type needs, stretched to what the screen has.
-  local n = math.max(1, math.ceil(#rows / cols))
+--- One arrangement for a given column count; `fits` says whether every
+--- card ends above the footer.
+local function measure(vw, vh, rows, cols)
+  local g = Layout.gutter()
+  local header = UI.headerHeight()
+  local cw = math.min(Theme.maxContentW, vw - g * 2)
+  local cx = math.floor((vw - cw) / 2)
+  local y0 = header + Theme.space.lg
   local bottom = Categories.band_top(vh) - 10
-  local need = 12 + name_h + 4 + (blurb and blurb_h or 0) + 14
-  need = math.max(need, 8 + math.max(plate_h, count_h) + 8 + 22)
-  -- Tight, the last resort: the name and the counts plate with a few pixels
-  -- round them and no strip at the bottom — the badge moves beside the
-  -- plate instead. Five roads (RUST's FRAMEWORKS) at the largest type in a
-  -- 720-tall window did not fit any other way.
-  if tight then
-    need = math.max(12 + name_h + 14, 4 + math.max(plate_h, count_h) + 2)
-  end
-  if stacked then need = math.max(need, count_y + count_h + 10) end
-  local avail = math.floor((bottom - y0) / n) - 12
-  local rh = math.max(need, math.min(math.max(84, avail), math.max(128, need)))
-  rh = math.min(rh, math.max(need, avail))
 
-  -- Blurb lines that fit under the name inside the row, above the badge
-  -- strip at the bottom.
-  local blurb_y = 12 + name_h + 4
-  local blurb_lh = blurb_h + 2
-  local blurb_lines = math.max(0, math.floor((rh - blurb_y - 12) / blurb_lh))
-  -- Stacked, the blurb would run under the counts plate: it goes.
-  if stacked or not blurb then blurb_lines = 0 end
+  local title_h = UI.lead("title")
+  local title_y = math.floor((header - title_h) / 2)
+
+  local w = math.floor((cw - COL_GAP * (cols - 1)) / cols)
+  -- The playground and the roads, as slots of one column.
+  local slots = #rows + 1
+  local n = math.max(1, math.ceil(slots / cols))
+  local avail = math.floor((bottom - y0 + ROW_GAP) / n) - ROW_GAP
+
+  -- The type in the row, at the roles.
+  local name_size = authored_within(13, 5, "title")
+  local count_size = authored_within(10, 5, "label")
+  local widest = UI.labelWidth(I18n.t("CODE PLAYGROUND"), "title")
+  for _, cat in ipairs(rows) do
+    widest = math.max(widest, UI.labelWidth(I18n.t(Land.category_label(cat.category)), "title"))
+  end
+  -- The count chip: wide enough for `NN / NN` whichever way it is measured.
+  local count_w = math.max(UI.chipWidth("00 / 00"), UI.textWidth("00 / 00", 10),
+    UI.textWidth("00 / 00", count_size))
+  local count_h = Theme.control.chip
+
+  local pad = Theme.space.lg
+  local text_x = Theme.landStripeH + pad
+  local label_w = w - text_x - pad - count_w - Theme.space.md
+  -- A name wider than the room beside the chip takes the row, and the chip
+  -- moves down onto the bar's line.
+  local chip_below = widest > label_w
+  if chip_below then label_w = w - text_x - pad end
+
+  local _, read_lead = UI.readHeight("x", 100)
+  -- What a card needs: the name alone (the floor), the name with its bar,
+  -- and the name over a line of blurb with the bar.
+  local glyph_h = UI.font("title"):getHeight()
+  if I18n.is_cjk() then glyph_h = glyph_h + math.floor(glyph_h / 8) end
+  local floor_h = math.max(52, Theme.space.md + glyph_h + 14)
+  local bar_h = Theme.space.sm + title_h + Theme.space.sm + 8 + Theme.space.sm
+  local stacked_h = Theme.space.sm + title_h + Theme.space.xs + read_lead + Theme.space.sm + 8 + Theme.space.sm
+  if chip_below then
+    bar_h = math.max(bar_h, Theme.space.sm + title_h + Theme.space.sm + count_h + Theme.space.sm)
+    stacked_h = stacked_h + count_h - 8
+  end
+
+  -- **Content-sized.** A card is as tall as what it holds, up to the room
+  -- the column has: the name over one or two lines of blurb and the bar;
+  -- the name beside one line of blurb with the bar; the name alone.
+  local rh, blurb_lines, inline, label_blurb = floor_h, 0, false, false
+  local lines = math.min(2, math.floor((avail - (stacked_h - read_lead)) / read_lead))
+  if lines >= 1 then
+    rh = stacked_h + (lines - 1) * read_lead
+    blurb_lines = lines
+  elseif avail >= bar_h then
+    -- No line of the reading face fits. The row still holds its name and a
+    -- line of blurb at the legacy sizes (`tests/test_screens.lua` holds it
+    -- to that), and the blurb goes under the name in the label role when
+    -- that room is there — a paragraph face too big for the row is not a
+    -- reason to say nothing.
+    local legacy = Theme.space.md + UI.lineHeight(13) + Theme.space.xs + UI.lineHeight(7) + 14
+    rh = math.min(avail, math.max(bar_h, legacy))
+    inline = read_lead <= title_h and not chip_below
+    label_blurb = not inline and (rh - bar_h) >= UI.lead("label") + Theme.space.xs
+  else
+    rh = math.max(floor_h, avail)
+  end
+  local with_bar = rh >= bar_h
 
   return {
-    title_y = title_y, title_h = title_h, y0 = y0,
-    pad = pad, w = w, rh = rh, gutter = gutter, right = right,
-    label_w = label_w, plate_h = plate_h,
-    blurb_y = blurb_y, blurb_lh = blurb_lh, blurb_lines = math.min(blurb_lines, 3),
-    count_w = count_w, count_h = count_h, count_y = count_y,
-    stacked = stacked, tight = tight or false, widest = widest,
-    title_size = title_size, name_size = name_size, count_size = count_size,
-    blurb_size = BLURB_SIZE, bottom = bottom,
-    cols = cols, per_col = n,
-    -- Down the screen, and across: a name wider than its label column
-    -- (CHEATSHEET ADVANCED, at the largest step in portrait) does not fit
-    -- either, and the type steps down until it does.
-    fits = y0 + n * (rh + 12) - 12 <= bottom and widest <= label_w,
+    title_y = title_y, title_h = title_h, header = header,
+    x0 = cx, y0 = y0, pad = cx, cw = cw, w = w, rh = rh,
+    gutter = text_x, label_w = label_w, widest = widest,
+    count_w = count_w, count_h = count_h, chip_below = chip_below,
+    blurb_lines = blurb_lines, inline = inline, label_blurb = label_blurb, with_bar = with_bar,
+    read_lead = read_lead, bar_h = bar_h,
+    name_size = name_size, count_size = count_size,
+    cols = cols, per_col = n, slots = slots, bottom = bottom,
+    fits = y0 + n * (rh + ROW_GAP) - ROW_GAP <= bottom and widest <= label_w,
   }
 end
 
+--- Every measurement the screen is drawn from, for `rows` on a `vw × vh`
+--- canvas. One column while its cards keep their bar; in landscape two
+--- columns before the cards shrink to their names; then whatever fits.
 function Categories.metrics(vw, vh, rows)
   rows = rows or {}
-  local title_step = 0
-  local m = measure(vw, vh, rows, title_step, 0, true)
-  while not m.fits and title_step < TITLE_SIZE - TITLE_FLOOR do
-    title_step = title_step + 1
-    m = measure(vw, vh, rows, title_step, 0, true)
+  local one = measure(vw, vh, rows, 1)
+  if one.fits and one.with_bar then return one end
+  if not Layout.isPortrait() then
+    local two = measure(vw, vh, rows, 2)
+    if two.fits and two.with_bar then return two end
   end
-  if m.fits then return m end
-  m = measure(vw, vh, rows, title_step, 0, false)
-  local step = 0
-  while not m.fits and step < NAME_SIZE - SIZE_FLOOR do
-    step = step + 1
-    m = measure(vw, vh, rows, title_step, step, false)
-  end
-  if m.fits then return m end
-  -- Still over the band at the smallest type: give back the padding first,
-  -- and only then the size, so the names stay as large as they can.
-  step = 0
-  m = measure(vw, vh, rows, title_step, step, false, true)
-  while not m.fits and step < NAME_SIZE - SIZE_FLOOR do
-    step = step + 1
-    m = measure(vw, vh, rows, title_step, step, false, true)
-  end
-  if m.fits or Layout.isPortrait() then return m end
-  -- Landscape and still over: two columns, then three — each from the
-  -- largest type down, with padding and then without.
+  if one.fits or Layout.isPortrait() then return one end
   for cols = 2, 3 do
-    for _, tight in ipairs({ false, true }) do
-      for st = 0, NAME_SIZE - SIZE_FLOOR do
-        local c = measure(vw, vh, rows, title_step, st, false, tight, cols)
-        if c.fits then return c end
-      end
-    end
+    local c = measure(vw, vh, rows, cols)
+    if c.fits then return c end
   end
-  return m
+  return one
 end
 
---- Where row `i` (1-based) stands: its left edge and its top. One column, or
---- two filled top to bottom — read by the draw and by the click alike.
+--- Where slot `i` stands — 0 is CODE PLAYGROUND, 1.. the roads: its left
+--- edge and its top. One column, or two filled top to bottom — read by the
+--- draw and by the click alike.
 function Categories.row_at(m, i)
-  local col = math.floor((i - 1) / m.per_col)
-  local r = (i - 1) % m.per_col
-  return m.pad + col * (m.w + COL_GAP), m.y0 + r * (m.rh + 12)
+  local col = math.floor(i / m.per_col)
+  local r = i % m.per_col
+  return m.x0 + col * (m.w + COL_GAP), m.y0 + r * (m.rh + ROW_GAP)
 end
 
---- The band under the rows: one button, PLAYGROUND — the same desk the
---- lands screen and the map offer, so a player who came one step in does
---- not have to go back out to find it. `P` still works.
+--- The strip under the rows is gone — CODE PLAYGROUND leads the column now
+--- — and these two are kept for the callers that measure against them: the
+--- cards end a gap above the footer.
 function Categories.band_height()
-  return math.max(36, UI.lineHeight(10) + 18)
+  return 0
 end
 
 function Categories.band_top(vh)
-  return vh - UI.footerHeight() - 12 - Categories.band_height()
+  return vh - UI.footerHeight() - 14
 end
 
---- The button — one function, read by the draw and by the click.
-function Categories.button_rect(vw, vh)
-  local label = I18n.t("PLAYGROUND") .. "  P"
-  local pad = Layout.isPortrait() and 12 or 60
-  local bw = math.min(vw - pad * 2, math.max(220, UI.textWidth(label, 10) + 40))
+-- ----------------------------------------------------------------- drawing
+
+--- A mascot standing on `(x, bottom)` inside a `box` square.
+local function mascot(name, x, bottom, box, opts)
+  if not name then return false end
+  local b = Assets.box[name]
+  local image = Assets.image(name)
+  if not image then return false end
+  local iw, ih = image:getDimensions()
+  local ink_w = (b and b.w and b.w > 0) and b.w or iw
+  local ink_h = (b and b.h and b.h > 0) and b.h or ih
+  local height = box
+  if ink_w > ink_h then height = box * ink_h / ink_w end
+  return Assets.sprite(name, x, bottom, height, opts)
+end
+
+--- A band of art at its own aspect, as tall as `h`, anchored to `right`,
+--- with a short fade on its left edge into `fill`. Returns its left edge.
+local function band(name, right, y, h, fill, alpha)
+  local image = Assets.image(name)
+  if not image then return right end
+  local iw, ih = image:getDimensions()
+  local s = h / ih
+  local ew = iw * s
+  local ex = right - ew
+  love.graphics.setColor(1, 1, 1, alpha)
+  love.graphics.draw(image, ex, y, 0, s, s)
+  local steps = 14
+  local fw = math.min(52, ew * 0.35)
+  for k = 0, steps - 1 do
+    UI.setColor(fill, alpha * (0.95 - k * (0.95 / steps)))
+    love.graphics.rectangle("fill", ex + k * (fw / steps), y, fw / steps + 1, h)
+  end
+  love.graphics.setColor(1, 1, 1, 1)
+  return ex
+end
+
+--- The header band: ‹ BACK, the land's mascot and name, the land's total.
+function Categories:draw_header()
+  local vw = Layout.vw
+  local h = self.header_h or UI.headerHeight()
+  local g = Layout.gutter()
+  UI.card(0, 0, vw, h, { variant = "bar", pad = 0 })
+  UI.setColor(Theme.edge, 0.6)
+  love.graphics.rectangle("fill", 0, h - 2, vw, 2)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  local back = "‹ " .. I18n.t("BACK")
+  local bw, bh = UI.buttonSize(back)
+  bh = math.max(Theme.control.buttonM, bh)
+  self.back_rect = { x = g, y = math.floor((h - bh) / 2), w = bw, h = bh }
+  UI.button(self.back_rect.x, self.back_rect.y, bw, bh, back,
+    self.hover == "back" and "hot" or "normal", nil, { variant = "ghost", id = "cats:back" })
+
+  local x = g + bw + Theme.space.lg
+  local box = 40
+  local bob = Anim.bob(Anim.now(), { amount = 2, phase = Land.phase(self.land) })
+  mascot(Land.mascot(self.land), x + box / 2, math.floor((h + box) / 2) + bob, box)
+  x = x + box + Theme.space.md
+
+  local cleared, total = 0, 0
+  for _, cat in ipairs(self.categories or {}) do
+    cleared, total = cleared + (cat.cleared or 0), total + (cat.total or 0)
+  end
+  local count = self.categories and ("%d / %d"):format(cleared, total) or ""
+  local count_w = UI.labelWidth(count, "label")
+  UI.label(count, vw - g - count_w, math.floor((h - UI.lead("label")) / 2), "label", { color = Theme.mute })
+  UI.label(I18n.t("%s LAND", Land.name(self.land)), x, math.floor((h - UI.lead("title")) / 2), "title",
+    { width = vw - g - count_w - Theme.space.lg - x, ellipsis = true })
+end
+
+--- One card of the column, into slot `i`. `c` is what it shows:
+---
+---   `tint` (the stripe), `name`, `name_color`, `blurb`, `art` (a band name
+---   and `art_sprite` for a standing figure beside it), `count` (a chip
+---   label) or `key` (a keycap where the chip would be), `done`, `open`.
+function Categories:draw_card(m, i, c)
+  local t = Anim.now()
+  local selected = i == self.cursor
+  local k = Juice.enter("cats:row" .. i, { dur = Theme.motion.enter, delay = Juice.stagger(i + 1, Theme.motion.stagger) })
+  local hot = (selected or self.hover == i) and 1 or 0
+  local a = Juice.follow("cats:hot" .. i, hot, { speed = 18 })
+  local press = Juice.pressed("press:cats:row" .. i)
+  local x, ry0 = Categories.row_at(m, i)
+  local w, rh = m.w, m.rh
+  local y = ry0 + (1 - k) * 24 - 4 * a + 4 * press
+  local alpha = math.min(1, k * 1.5)
+  local cx, cy = x + w / 2, y + rh / 2
+  local scale = 1 + 0.015 * a
+  local sway = (selected and a > 0.01) and math.sin(t * math.pi * 2 * Theme.motion.sway + i) * 0.6 * a * math.pi / 180 or 0
+  love.graphics.push()
+  love.graphics.translate(cx, cy)
+  love.graphics.rotate(sway)
+  love.graphics.scale(scale, scale)
+  love.graphics.translate(-cx, -cy)
+
+  UI.card(x, y, w, rh, { stripe = c.tint, hot = a, selected = selected, alpha = alpha,
+    shadowDy = Theme.shadowDy - 5 * press, pad = 0 })
+  local fill = Theme.mix(Theme.card, Theme.cardHi, a)
+  local pad = Theme.space.lg
+  local tx = x + m.gutter
+  local right = x + w - pad
+  local color = c.name_color or (c.open and Theme.text or Theme.mute)
+
+  -- The chip (or the keycap), and the art beside it when there is room for
+  -- both it and the words.
+  local chip_x = right - m.count_w
+  local chip_y = m.chip_below and (y + rh - Theme.space.sm - m.count_h)
+    or (y + math.floor((rh - m.count_h) / 2))
+  if m.with_bar and not m.chip_below then chip_y = y + Theme.space.sm + math.floor((UI.lead("title") - m.count_h) / 2) end
+  if c.count then
+    UI.chip(chip_x, chip_y, c.count, { w = m.count_w, alpha = alpha,
+      color = c.done and Theme.green or (not c.open and Theme.bar or nil) })
+  elseif c.key then
+    local kw = UI.keycapWidth(c.key)
+    UI.keycap(right - kw, chip_y + math.floor((m.count_h - Theme.control.keycap) / 2), c.key, { alpha = alpha })
+  end
+
+  local art_left = (c.count and chip_x or (right - UI.keycapWidth(c.key or "P"))) - Theme.space.md
+  local art_h = rh - Theme.space.sm * 2
+  -- The words come first: the art takes what is left after the widest
+  -- name, and, when the blurb runs beside the name, after the blurb's
+  -- minimum too.
+  local need = tx + m.widest + Theme.space.xl
+  if m.inline and (c.blurb or "") ~= "" then
+    need = math.max(need, tx + UI.labelWidth(c.name, "title") + Theme.space.lg + BLURB_MIN_W)
+  end
+  if c.art and art_h >= 40 then
+    -- At its own aspect, as tall as the card or as wide as the room beside
+    -- the words, whichever is the tighter — a half-width column gets a
+    -- smaller picture, not none.
+    local image = Assets.image(c.art)
+    local eh = image and art_h or nil
+    if image then
+      local iw, ih = image:getDimensions()
+      eh = ih * math.min(art_h / ih, math.max(0, art_left - need) / iw)
+    end
+    if eh and eh >= 40 then
+      local ey = y + rh - Theme.space.sm - eh
+      art_left = band(c.art, art_left, ey, eh, fill, alpha * (c.open and 1 or 0.6))
+      if c.art_sprite and eh >= 56 then
+        -- The coder, hovering over the desk, engine on — when the card is
+        -- tall enough for a figure to read as one.
+        local size = math.floor(eh * 0.78)
+        local bob = Anim.bob(t, { amount = 3, period = 2.4 })
+        mascot(c.art_sprite, art_left + size * 0.45, ey + size + bob, size, { alpha = alpha })
+      end
+    elseif not image and c.art_sprite and art_left - art_h >= need then
+      -- No band on disk: the figure alone, standing where it would have been.
+      mascot(c.art_sprite, art_left - art_h / 2, y + rh - Theme.space.sm, art_h, { alpha = alpha })
+      art_left = art_left - art_h
+    end
+  end
+
+  -- The name, then the blurb: after it on one line, or under it.
+  local label_w = m.chip_below and (art_left - Theme.space.md - tx) or math.min(m.label_w, art_left - Theme.space.md - tx)
+  local ny = m.with_bar and (y + Theme.space.sm) or (y + math.floor((rh - UI.lead("title")) / 2))
+  UI.label(c.name, tx, ny, "title", { width = label_w, ellipsis = true, color = color, alpha = alpha })
+  local blurb = c.blurb or ""
+  if m.inline and blurb ~= "" then
+    local nw = math.min(label_w, UI.labelWidth(c.name, "title"))
+    local bx = tx + nw + Theme.space.lg
+    local bw = art_left - Theme.space.md - bx
+    if bw >= BLURB_MIN_W then
+      UI.read(blurb, bx, ny + math.floor((UI.lead("title") - m.read_lead) / 2), bw,
+        { maxLines = 1, color = Theme.mute, alpha = alpha })
+    end
+  elseif m.blurb_lines > 0 and blurb ~= "" then
+    local bw = art_left - Theme.space.md - tx
+    UI.read(blurb, tx, ny + UI.lead("title") + Theme.space.xs, bw,
+      { maxLines = m.blurb_lines, color = Theme.mute, alpha = alpha })
+  elseif m.label_blurb and blurb ~= "" then
+    UI.label(blurb, tx, ny + UI.lead("title") + Theme.space.xs, "label",
+      { color = Theme.mute, width = art_left - Theme.space.md - tx, ellipsis = true, alpha = alpha })
+  end
+
+  if m.with_bar and c.count then
+    local bar_right = m.chip_below and (chip_x - Theme.space.md) or (art_left - Theme.space.md)
+    UI.bar(tx, y + rh - Theme.space.sm - 8, math.max(40, bar_right - tx), 8,
+      c.fraction or 0, c.open and Theme.gold or Theme.mute)
+  end
+
+  if c.done then
+    Assets.marker("badge_cleared", chip_x - Theme.space.lg - 14, chip_y + m.count_h / 2, 28, { alpha = alpha })
+  elseif c.count and not c.open then
+    -- Only a category that genuinely cannot be entered. Nothing on the map
+    -- is locked (§4.7); this is for a pack that failed to import.
+    Assets.marker("badge_locked", chip_x - Theme.space.lg - 14, chip_y + m.count_h / 2, 24, { alpha = 0.85 * alpha })
+    UI.label(I18n.t("UNAVAILABLE"), tx, y + rh - Theme.space.sm - UI.lead("label"), "label",
+      { color = Theme.mute, alpha = alpha })
+  end
+  love.graphics.pop()
+end
+
+--- What the card for slot `i` shows.
+function Categories:card_spec(i)
+  if i == 0 then
+    return {
+      tint = Theme.gold, name = I18n.t("CODE PLAYGROUND"), name_color = Theme.gold,
+      blurb = I18n.t("write anything, run it — the Rust coder flies beside you"),
+      art = "emblem_playground", art_sprite = "agent_coder", key = "P", open = true,
+    }
+  end
+  local cat = self.categories[i]
+  local done = (cat.total or 0) > 0 and (cat.cleared or 0) >= cat.total
   return {
-    x = math.floor((vw - bw) / 2), y = Categories.band_top(vh),
-    w = bw, h = Categories.band_height(), label = label,
+    tint = Theme.land[self.land] or Theme.gold,
+    name = I18n.t(Land.category_label(cat.category)),
+    blurb = I18n.t(BLURB[cat.category] or ""),
+    art = ("emblem_%s_%s"):format(self.land, cat.category),
+    count = ("%d / %d"):format(cat.cleared or 0, cat.total or 0),
+    fraction = (cat.total or 0) > 0 and (cat.cleared or 0) / cat.total or 0,
+    done = done, open = cat.open,
   }
 end
 
 function Categories:draw()
   local vw, vh = Layout.vw, Layout.vh
   Assets.cover(Assets.pick("bg_times", "bg_flat"), 0, 0, vw, vh)
-  love.graphics.setColor(Theme.void[1], Theme.void[2], Theme.void[3], 0.7)
+  UI.setColor(Theme.felt, Layout.isPortrait() and 0.8 or 0.72)
   love.graphics.rectangle("fill", 0, 0, vw, vh)
   love.graphics.setColor(1, 1, 1, 1)
-
-    local tint = Theme.land[self.land] or Theme.coin
-  local t = Anim.now()
-
-  -- Every size on this screen is taken from the type it has to hold, at
-  -- the player's step. It used to be a set of numbers — a 150 px gutter, a
-  -- 40 px plate, rows starting at y=66 — that were right at the authored
-  -- size and wrong at every other: at step 4 in portrait the category name
-  -- was 65 px tall in a 150 px gutter, and wrapped one letter to a line.
-  -- The browser client measures the same way (`lands.ts`: the row is the
-  -- taller of a touch target and the type it holds).
-  local m = Categories.metrics(vw, vh, self.categories or {})
-
-  -- The land's own mascot beside the title, idling, so the screen says which
-  -- land it is without reading.
-  Assets.sprite(Land.mascot(self.land), 40, m.title_y + m.title_h * 0.9 + Anim.bob(t, { amount = 2 }),
-    math.max(44, m.title_h * 1.4))
-  UI.text(I18n.t("%s LAND", Land.name(self.land)), 72, m.title_y, m.title_size, tint)
+  Fx.ambient("dust", vw, vh)
+  Fx.drawAmbient()
 
   local rows = self.categories or {}
-  local pad, w, rh = m.pad, m.w, m.rh
-  local y = m.y0
+  local m = Categories.metrics(vw, vh, rows)
+  self.metrics = m
 
-  for i, cat in ipairs(rows) do
-    local selected = i == self.cursor
-    local lift = selected and Anim.lift(Anim.now() - self.picked_at) * 5 or 0
-    local push = (selected and self.pressed_at) and Anim.press(t - self.pressed_at) * 4 or 0
-    local pad, row_y = Categories.row_at(m, i)
-    y = row_y
-    local ry = y - lift + push
-
-    if selected then
-      UI.setColor(Theme.ink, 0.32)
-      love.graphics.rectangle("fill", pad + 4, ry + rh + 2, w - 8, 3 + lift)
-      love.graphics.setColor(1, 1, 1, 1)
-    end
-
-    UI.panel(pad, ry, w, rh, {
-      fill = Theme.withAlpha(cat.open and Theme.navy or Theme.ink, selected and 0.95 or 0.86),
-      tint = selected and Theme.coin or tint,
-    })
-
-    -- The label gutter on the left, then the band, then the counts.
-    local gutter, right = m.gutter, m.right
-    local band_x = pad + gutter
-    local band_w = w - gutter - right
-    -- **Adapted, not assumed.** The emblems are 384x128 — 3:1 — and DESIGN
-    -- sized that for the browser's category row. This row is nearer 9:1, so
-    -- `cover` scaled to the width and threw away two thirds of the picture
-    -- vertically: a horizontal slice of a tram. Instead the band is drawn at
-    -- its own aspect, as tall as the row, anchored to the **right** so it
-    -- never runs under the label, with the panel showing through beside it.
-    local emblem = ("emblem_%s_%s"):format(self.land, cat.category)
-    local image = Assets.image(emblem)
-    if m.stacked then
-      -- The name has the row; there is no band to draw a painting in.
-    elseif band_w > 40 and image then
-      local iw, ih = image:getDimensions()
-      local es = (rh - 8) / ih
-      local ew = iw * es
-      local ex = band_x + band_w - ew
-      love.graphics.setScissor(band_x, ry + 4, band_w, rh - 8)
-      love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.draw(image, ex, ry + 4, 0, es, es)
-      -- A short fade on its left edge so the art does not cut hard against
-      -- the panel it sits in.
-      for k = 0, 14 do
-        UI.setColor(Theme.navy, 0.95 - k * 0.068)
-        love.graphics.rectangle("fill", ex + k * 3, ry + 4, 3, rh - 8)
-      end
-      love.graphics.setScissor()
-      love.graphics.setColor(1, 1, 1, 1)
-    elseif band_w > 40 then
-      -- No art: the action mascot alone rather than a coloured hole.
-      Assets.sprite(("mascot_%s_%s"):format(self.land, cat.category),
-        band_x + band_w - 40, ry + rh - 8, rh - 20)
-    end
-
-    local color = cat.open and Theme.cream or Theme.dim
-    UI.setColor(Theme.ink, 0.55)
-    love.graphics.rectangle("fill", pad + 6, ry + 8, gutter - 4, m.plate_h)
-    love.graphics.setColor(1, 1, 1, 1)
-    -- The gutter plate's width, not the whole row: to its right is the
-    -- mascot, and a blurb given the row would be drawn underneath it.
-    local blurb_w = m.label_w
-    UI.text(I18n.t(Land.category_label(cat.category)), pad + 14, ry + 12, m.name_size, color, "left", blurb_w)
-    -- Only the blurb lines the row has room for, and none when it has room
-    -- for none: a blurb wrapped to eight lines is drawn through the plate
-    -- under it, and one clipped mid-sentence says less than nothing.
-    if m.blurb_lines > 0 then
-      local lines = UI.wrap(I18n.t(BLURB[cat.category] or ""), blurb_w, 7)
-      for k = 1, math.min(#lines, m.blurb_lines) do
-        UI.text(lines[k], pad + 14, m.blurb_y + ry + (k - 1) * m.blurb_lh, 7,
-          Theme.withAlpha(color, 0.75))
-      end
-    end
-
-    -- The counts sit on their own plate, because behind them is artwork and
-    -- a number over a painted crate is a number nobody can read.
-    local progress = ("%d / %d"):format(cat.cleared, cat.total)
-    local pw = m.count_w
-    UI.setColor(Theme.ink, 0.72)
-    local cy = ry + m.count_y
-    love.graphics.rectangle("fill", pad + w - 14 - pw, cy, pw, m.count_h)
-    love.graphics.setColor(1, 1, 1, 1)
-    UI.text(progress, pad + w - 14 - pw + (pw - UI.textWidth(progress, m.count_size)) / 2,
-      cy + 4, m.count_size, color)
-    UI.bar(pad + w - 14 - pw + 6, cy + 4 + UI.lineHeight(m.count_size) + 4, pw - 12, 7,
-      cat.total > 0 and cat.cleared / cat.total or 0,
-      cat.open and Theme.admit or Theme.dim)
-
-    -- The badge keeps clear of the counts plate, which sits at the bottom
-    -- right when the row is stacked.
-    -- Tight, there is no strip under the plate either: beside it, then.
-    local bx = (m.stacked or m.tight) and (pad + w - 14 - pw - 36) or (pad + w - 40)
-    if cat.total > 0 and cat.cleared >= cat.total then
-      Assets.marker("badge_cleared", bx, ry + rh - 22, 30)
-    elseif not cat.open then
-      -- Only a category that genuinely cannot be entered. Nothing on the map
-      -- is locked (§4.7); this is for a pack that failed to import.
-      Assets.marker("badge_locked", bx, ry + rh - 22, 26, { alpha = 0.85 })
-      UI.text(I18n.t("UNAVAILABLE"), pad + 14, ry + rh - 18, 7, Theme.dim)
-    end
-
-    y = y + rh + 12
+  -- The selected card last, so its lift is over its neighbours.
+  for i = 0, #rows do
+    if i ~= self.cursor then self:draw_card(m, i, self:card_spec(i)) end
   end
+  if self.cursor == 0 or rows[self.cursor] then
+    self:draw_card(m, self.cursor, self:card_spec(self.cursor))
+  end
+  self:draw_header()
 
   if #rows == 0 then
-    UI.text(self.error or "asking the server…", 0, vh / 2, 9,
-      self.error and Theme.red or Theme.withAlpha(Theme.cream, 0.7), "center", vw)
+    UI.label(self.error or I18n.t("asking the server…"), 0, math.floor(vh / 2), "label",
+      { width = vw, align = "center", color = self.error and Theme.redA or Theme.mute })
   end
-
-  local b = Categories.button_rect(vw, vh)
-  UI.button(b.x, b.y, b.w, b.h, b.label, self.hover and "hot" or "normal", 10)
 
   self.app:footer(I18n.t("ARROWS choose   ENTER go   P playground   ESC back"))
 end
 
+-- ------------------------------------------------------------------- input
+
 --- The wheel moves the cursor, because on a desktop that is what a wheel is
---- for. Every screen in this client that has a list has one of these now: a
---- mouse that scrolled on four screens and did nothing on five reads as five
---- screens that are broken, not as four that are special.
+--- for. Every screen in this client that has a list has one of these now.
 function Categories:wheelmoved(_, dy)
-  if not self.categories or #self.categories == 0 then return end
-  local n = #self.categories
-  self.cursor = ((self.cursor - 1 + (dy > 0 and -1 or 1)) % n) + 1
+  local n = self.categories and #self.categories or 0
+  self.cursor = (self.cursor + (dy > 0 and -1 or 1)) % (n + 1)
+  self.picked_at = Anim.now()
   SFX.play("move")
 end
 
 function Categories:keypressed(key)
-  local n = math.max(1, self.categories and #self.categories or 1)
+  local n = self.categories and #self.categories or 0
   if key == "up" or key == "left" then
-    self.cursor = ((self.cursor - 2) % n) + 1
+    self.cursor = (self.cursor - 1) % (n + 1)
     self.picked_at = Anim.now(); SFX.play("move"); return true
   end
   if key == "down" or key == "right" then
-    self.cursor = (self.cursor % n) + 1
+    self.cursor = (self.cursor + 1) % (n + 1)
     self.picked_at = Anim.now(); SFX.play("move"); return true
   end
   if key == "return" or key == "kpenter" or key == "space" then self:choose(); return true end
-  -- Mei's own desk (§4.9c), the same key as on the lands screen and the map.
-  if key == "p" then self.app:go("playground"); return true end
+  if key == "p" then self:open_playground(); return true end
   return false
 end
 
@@ -455,24 +565,23 @@ local function inside(r, x, y)
 end
 
 function Categories:mousemoved(x, y)
-  self.hover = inside(Categories.button_rect(Layout.vw, Layout.vh), x, y) or nil
+  if inside(self.back_rect, x, y) then self.hover = "back"; return end
+  self.hover = nil
+  for i = 0, #(self.categories or {}) do
+    if inside(self:card_rect(i), x, y) then self.hover = i end
+  end
 end
 
 function Categories:mousepressed(x, y)
-  if inside(Categories.button_rect(Layout.vw, Layout.vh), x, y) then
-    SFX.play("select")
-    self.app:go("playground")
+  if inside(self.back_rect, x, y) then
+    UI.press("cats:back", self.back_rect, { sfx = false })
+    self.app:back()
     return
   end
-  local rows = self.categories or {}
-  -- The same numbers the draw used. This had its own copy — with a different
-  -- margin, even — so a press was tested against rows that were not where
-  -- the rows were drawn.
-  local m = Categories.metrics(Layout.vw, Layout.vh, rows)
-  local w, rh = m.w, m.rh
-  for i = 1, #rows do
-    local pad, ry = Categories.row_at(m, i)
-    if x >= pad and x <= pad + w and y >= ry and y <= ry + rh then
+  for i = 0, #(self.categories or {}) do
+    if inside(self:card_rect(i), x, y) then
+      -- First click selects, second opens: the lift is the feedback that
+      -- says which one the next click will take.
       if self.cursor ~= i then
         self.cursor = i
         self.picked_at = Anim.now()

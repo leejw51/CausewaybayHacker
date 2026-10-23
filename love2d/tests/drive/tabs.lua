@@ -1,17 +1,24 @@
--- A tab-indented answer, typed out without ever typing a tab.
+-- A tab-indented program in the quiz card, on the real server.
 --
 --   make -C love2d drive SCRIPT=tests/drive/tabs.lua ARGS="--home $(mktemp -d)"
 --
--- The report this exists for: on a Go quest — gofmt indents with tabs — the
--- ANSWER target could not be finished. This editor's newline guesses
--- `tab_width` spaces, the answer wanted a tab, and no key a player could
--- press would make the two agree: the line stayed red at 161 / 333 for ever.
+-- This used to type a Go answer out through the ANSWER drill, because gofmt
+-- indents with tabs and the drill's newline guessed spaces. Quests are picked
+-- now (SPEC §0) and there is no drill, but the tabs did not go anywhere: a GO
+-- quest's quiz program is gofmt's, and the card draws it in a face that
+-- draws a tab as nothing. So what this proves is the card's half of the same
+-- report:
 --
--- So the mode fills a line's indentation itself. What this script proves is
--- exactly that: every character is typed through the real key path, none of
--- them is a tab, and the count reaches the end.
+--   * the program really has tabs in it (or the drive is not testing them);
+--   * every line the card lays out has its tabs as four spaces, and keeps
+--     its indentation when it wraps;
+--   * the four choices are on the screen and apart;
+--   * the right pick goes in at the hole's own indentation and is accepted.
+--
+-- A wallet minted here: a pick is an attempt, and a second run on the same
+-- account would be picking on a cleared node.
 
-local MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+local Layout = require("src.layout")
 local function scene(n) return function(app) return app.scene_name == n end end
 local on_login = scene("login")
 local steps = {}
@@ -21,10 +28,14 @@ local function check(ok, why) if not ok then print("FAIL: " .. why); failed = fa
 
 add({ orient = "landscape" }) add({ resize = { 1280, 720 } }) add({ wait = 0.6 })
 add({ until_ = function(app) return app.scene_name == "login" or app.session.authed end, timeout = 15 })
-add({ text = MNEMONIC, when = on_login }) add({ key = "return", when = on_login })
+add({ key = "n", when = on_login })
+add({ until_ = function(app)
+      return app.session.authed or app.scene.mode == "new_show"
+    end, note = "a phrase and its address", timeout = 20 })
+add({ key = "return", when = on_login })
 add({ until_ = scene("lands"), timeout = 25 })
 add({ until_ = function(app) return app.scene.lands ~= nil end, timeout = 10 })
--- GO, whose answers gofmt writes with tabs.
+-- GO, whose programs gofmt writes with tabs.
 add({ until_ = function(app)
       for i, land in ipairs(app.scene.lands or {}) do
         if land.land == "go" then app.scene.cursor = i; app.scene.land = "go" end
@@ -32,63 +43,90 @@ add({ until_ = function(app)
       return app.scene.land == "go" end, note = "GO land", timeout = 5 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "categories" and app.scene.categories end, timeout = 10 })
+-- BASIC: a program with a hole, not a sheet question.
+add({ until_ = function(app)
+      for i, cat in ipairs(app.scene.categories) do
+        if cat.category == "basic" then app.scene.cursor = i end
+      end
+      local cat = app.scene.categories[app.scene.cursor]
+      return cat and cat.category == "basic" end, note = "GO BASIC", timeout = 5 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "map" and app.scene.nodes end, timeout = 10 })
 add({ until_ = function(app)
       app.scene.cursor = 1; app.scene.at = 1; app.scene.walk = nil; return true end, timeout = 3 })
 add({ key = "return" })
 add({ until_ = function(app) return app.scene_name == "quest" and app.scene.quest end, timeout = 20 })
-add({ wait = 0.5 })
--- **RESET first.** This account is shared with every other drive script, and
--- §4.8 opens a quest on `draft ?? starter` — so a buffer left behind by an
--- earlier run is what ANSWER finds. It then correctly declines to clear it
--- (only an untouched starter is thrown away, never somebody's work), typing
--- appends to that draft, and nothing matches from the first character.
-add({ key = "f6" })
-add({ until_ = function(app)
-      return app.scene.quest and app.scene.editor:text() == app.scene.quest.starter
-    end, note = "the starter is back", timeout = 15 })
--- ANSWER on, through its own button on the band.
--- **The quiz first.** A quest with a quiz keeps its editor locked until the
--- quiz is answered, and every keystroke below would be refused as locked.
+add({ wait = 0.8 })
+
 add({ until_ = function(app)
       local s = app.scene
-      if s:quiz_locked() then s:pick(s.quest.quiz.answer + 1) end
-      return not s:quiz_locked() end, note = "the quiz is answered", timeout = 5 })
-add({ click = function(app) local r = app.scene.answer_rect; return { r.x + r.w / 2, r.y + r.h / 2 } end })
-add({ until_ = function(app) return app.scene.answer_on end, note = "ANSWER on", timeout = 30 })
-add({ until_ = function(app)
-      local s = app.scene
-      check(s.answer_text:find("\t", 1, true) ~= nil,
-        "this quest's answer has no tabs in it — the drive is not testing what it says")
-      print(("answer: %d chars, tabs=%s buffer=%d %q"):format(#s.answer_text,
-        tostring(s.answer_text:find("\t", 1, true) ~= nil),
-        #s.editor:text(), s.editor:text():sub(1, 24)))
-      return true end, timeout = 5 })
--- Typed out through the real key path. Never a tab.
-add({ until_ = function(app)
-      local s = app.scene
-      local tabs_typed = 0
-      for _ = 1, 4000 do
-        s:fill_blanks()
-        local typed = s.editor:text()
-        if typed == s.answer_text then break end
-        if #typed >= #s.answer_text then break end
-        local ch = s.answer_text:sub(#typed + 1, #typed + 1)
-        if ch == "\t" then tabs_typed = tabs_typed + 1 end
-        if ch == "\n" then s:keypressed("return", {}) else s:textinput(ch) end
+      local quiz = s.quest.quiz
+      check(quiz ~= nil, "the GO BASIC quest has no quiz")
+      if not quiz then return true end
+      local program = quiz.program or ""
+      check(program:find("\t", 1, true) ~= nil,
+        "this quest's program has no tabs in it — the drive is not testing what it says")
+      check(s:quiz_locked(), "the quiz is not open")
+      -- Every row the card lays out: no tab survives, and a tab-indented
+      -- line is indented by four spaces a tab, wrapped pieces included.
+      local Quest = require("src.scenes.quest")
+      local Quiz = require("src.quiz")
+      local rows, tabbed = 0, 0
+      for _, line in ipairs(Quiz.program_lines(program)) do
+        local tabs = #(line.text:match("^\t*"))
+        if tabs > 0 then tabbed = tabbed + 1 end
+        for _, piece in ipairs(Quest.code_wrap(line.text, 420)) do
+          rows = rows + 1
+          check(not piece:find("\t", 1, true), ("a tab reached the screen: %q"):format(piece))
+          if tabs > 0 and piece ~= "" then
+            check(piece:sub(1, 4 * tabs) == (" "):rep(4 * tabs),
+              ("%q lost its indentation (%d tabs)"):format(piece, tabs))
+          end
+        end
       end
-      check(tabs_typed == 0, ("the player had to type %d tabs"):format(tabs_typed))
-      check(s.editor:text() == s.answer_text, "typing it out did not land on the answer")
-      return true end, note = "typed out", timeout = 20 })
-add({ wait = 0.4 })
+      print(("tabs: %d program lines with tabs, %d rows laid out"):format(tabbed, rows))
+      check(tabbed > 0, "no line of the program is tab-indented")
+      return true end, note = "the program's tabs", timeout = 5 })
+
+-- The choices, on the screen and apart.
 add({ until_ = function(app)
-      local p = app.scene.answer_prog
-      check(p.done, ("the count does not say done: %d/%d"):format(p.matched, p.total))
-      check(p.wrong == 0, ("%d characters are still wrong"):format(p.wrong))
-      print(("tabs: %d/%d done=%s wrong=%d"):format(p.matched, p.total, tostring(p.done), p.wrong))
+      local s = app.scene
+      if s.choice_hits[s.quest.quiz.answer + 1] then return true end
+      s.brief_scroll = s.brief_scroll + 40
+      return false end, note = "the right choice in view", timeout = 10 })
+add({ wait = 0.2 })
+add({ until_ = function(app)
+      local s = app.scene
+      local hits = {}
+      for i = 1, 4 do if s.choice_hits[i] then hits[#hits + 1] = s.choice_hits[i] end end
+      for i, r in ipairs(hits) do
+        check(r.x >= 0 and r.x + r.w <= Layout.vw, ("choice %d is off the screen"):format(i))
+        for j = i + 1, #hits do
+          local o = hits[j]
+          check(r.x >= o.x + o.w or o.x >= r.x + r.w or r.y >= o.y + o.h or o.y >= r.y + r.h,
+            ("choices %d and %d overlap"):format(i, j))
+        end
+      end
+      return true end, timeout = 3 })
+add({ shot = "T1-go-quiz-tabs.png" })
+
+-- The right pick, by its key.
+add({ text = function(app) return tostring(app.scene.quest.quiz.answer + 1) end })
+add({ wait = 0.35 })
+add({ shot = "T2-go-quiz-right.png" })
+add({ until_ = scene("result"), note = "the verdict screen", timeout = 30 })
+add({ until_ = function(app)
+      local a = app.last_attempt
+      check(a ~= nil and a.verdict == "accepted",
+        "the right pick was not accepted: " .. tostring(a and a.verdict))
       return true end, timeout = 5 })
-add({ shot = "T1-tabs-typed.png" })
-add({ until_ = function() print(("tabs flow: %d failures"):format(failed)); return true end, timeout = 1 })
+add({ until_ = function()
+      if failed > 0 then
+        print(("drive: FAILED — %d check(s)"):format(failed))
+        love.event.quit(1)
+        return true
+      end
+      print("PASS: a Go program's tabs are spaces in the card, and the pick is accepted")
+      return true end, timeout = 2 })
 add({ quit = true })
 return steps
