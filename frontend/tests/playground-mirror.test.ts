@@ -35,7 +35,7 @@ describe("the playground's local mirror", () => {
     for (const fn of ["private writeLocal(", "private restoreLocal("]) {
       const body = SOURCE.slice(SOURCE.indexOf(fn));
       const end = body.indexOf("\n  }");
-      expect(body.slice(0, end)).toContain("if (!key) return;");
+      expect(body.slice(0, end)).toContain("if (!key || !tab) return;");
     }
   });
 
@@ -51,15 +51,28 @@ describe("the playground's local mirror", () => {
     // away in the background all come back to the draft. The address in the
     // key is what keeps another account from seeing it.
     const write = SOURCE.slice(SOURCE.indexOf("private writeLocal("));
-    expect(write.slice(0, write.indexOf("\n  }"))).toContain("localStorage.setItem(");
-    expect(write.slice(0, write.indexOf("\n  }"))).not.toContain("sessionStorage");
+    expect(write.slice(0, write.indexOf("\n  }"))).toContain("localStorage.setItem(key, value)");
     const read = SOURCE.slice(SOURCE.indexOf("private restoreLocal("));
     expect(read.slice(0, read.indexOf("\n  }"))).toContain("localStorage.getItem(key)");
   });
 
-  it("reads sessionStorage only to move an old draft over", () => {
-    const calls = [...SOURCE.matchAll(/sessionStorage\.(\w+)\(/g)].map((m) => m[1]);
-    expect(calls).toEqual(["getItem", "removeItem"]);
+  it("keeps a copy per tab too, and a reload reads that one first", () => {
+    // Two tabs on one account, Rust in one and Go in the other, shared the
+    // account's key; whichever reloaded came back on the other's pad.
+    expect(SOURCE).toMatch(/const TAB_KEY = \(address: string\) =>/);
+    const write = SOURCE.slice(SOURCE.indexOf("private writeLocal("));
+    expect(write.slice(0, write.indexOf("\n  }"))).toContain("sessionStorage.setItem(tab, value)");
+    const read = SOURCE.slice(SOURCE.indexOf("private restoreLocal("));
+    expect(read.slice(0, read.indexOf("\n  }"))).toContain(
+      "sessionStorage.getItem(tab) ?? localStorage.getItem(key)",
+    );
+  });
+
+  it("does not read the tab's own copy as an old draft to move over", () => {
+    // The pre-`localStorage` draft sat in `sessionStorage` under `LOCAL_KEY`.
+    expect(SOURCE).toContain("cwbhacker.playground.tab.");
+    const read = SOURCE.slice(SOURCE.indexOf("private restoreLocal("));
+    expect(read.slice(0, read.indexOf("\n  }"))).toContain("sessionStorage.removeItem(key)");
   });
 
   it("mirrors the server's copy beside the draft, so a reload can tell it moved", () => {

@@ -168,7 +168,7 @@ test("an unsaved draft survives the tab being closed", async ({
   );
   expect(
     await mirror(first, "sessionStorage"),
-    "nothing is kept per tab any more",
+    "the pre-localStorage key is not written; the tab's copy has its own",
   ).toBeNull();
   await first.close();
 
@@ -181,6 +181,40 @@ test("an unsaved draft survives the tab being closed", async ({
   await second.reload();
   await openPlayground(second, ACCOUNT);
   await expect.poll(async () => editorText(second)).toContain(`kept ${RUN}`);
+  await context.close();
+});
+
+test("two tabs on two pads each come back on their own", async ({
+  browser,
+  baseURL,
+  viewport,
+  ready,
+}) => {
+  void ready;
+  // One context: one browser, one localStorage, two tabs.
+  const context = await browser.newContext({ baseURL, viewport });
+  const rust = await context.newPage();
+  await openPlayground(rust, ACCOUNT);
+  await setSource(rust, program("tab one"));
+  const first = await saveNow(rust);
+
+  const other = await context.newPage();
+  await openPlayground(other, ACCOUNT);
+  await clickButton(other, "new");
+  await setSource(other, program("tab two"));
+  const second = await saveNow(other);
+  expect(second).not.toBe(first);
+  // The shared copy now holds the second tab's pad: the last keystroke anywhere.
+  expect((await mirror(rust, "localStorage"))?.id).toBe(second);
+
+  // Each reload comes back on its own tab's pad, not on the last one typed in.
+  await rust.reload();
+  await openPlayground(rust, ACCOUNT);
+  await expect.poll(async () => editorText(rust)).toContain(`tab one ${RUN}`);
+  await other.reload();
+  await openPlayground(other, ACCOUNT);
+  await expect.poll(async () => editorText(other)).toContain(`tab two ${RUN}`);
+  expect(await editorText(rust)).not.toContain("tab two");
   await context.close();
 });
 

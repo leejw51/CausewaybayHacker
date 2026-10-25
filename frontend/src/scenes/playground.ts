@@ -116,11 +116,25 @@ import { deterministicUsername } from "../wallet/username";
  * back in as somebody else does not carry it across.
  *
  * What sharing does mean: two tabs open as the *same* account keep one mirror
- * between them, and the last keystroke is what a reload brings back. The
- * server copy is still the real one, and each tab's own saves still go
- * through `remoteSaved` on the other.
+ * between them, and the last keystroke anywhere is what it holds. That is
+ * only the fallback, though — see `TAB_KEY` for what a reload reads first.
  */
 const LOCAL_KEY = (address: string) => `cwbhacker.playground.${address.toLowerCase()}`;
+
+/**
+ * The same mirror again, in `sessionStorage`: **this tab's own pad**.
+ *
+ * With only the shared key, two tabs on one account — Rust in one, Go in the
+ * other — each wrote it on every keystroke, and whichever reloaded came back
+ * on the *other* tab's pad, id and all. The session store is per tab and
+ * survives a reload, so a tab reads its own copy first and never picks up
+ * another's. Only a tab that has none — new, or thrown away by an iPad and
+ * opened fresh — falls back to `LOCAL_KEY`, the last pad typed in anywhere.
+ *
+ * Not the same string as `LOCAL_KEY`: that one, in `sessionStorage`, is a draft
+ * from before the mirror moved to `localStorage`, and is moved over and removed.
+ */
+const TAB_KEY = (address: string) => `cwbhacker.playground.tab.${address.toLowerCase()}`;
 
 /**
  * The single shared key the mirror used before it was keyed by account.
@@ -1288,18 +1302,28 @@ export class PlaygroundScene implements Scene {
     return address ? LOCAL_KEY(address) : null;
   }
 
+  /** This tab's copy of the mirror; see `TAB_KEY`. */
+  private tabKey(): string | null {
+    const address = this.app.addressLabel;
+    return address ? TAB_KEY(address) : null;
+  }
+
   private writeLocal(): void {
     const key = this.localKey();
-    if (!key) return;
+    const tab = this.tabKey();
+    if (!key || !tab) return;
+    const value = JSON.stringify({
+      ...this.held,
+      dirty: this.dirty,
+      ...(this.held.id && this.baselineKnown ? { saved: this.savedCopy() } : {}),
+    });
     try {
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          ...this.held,
-          dirty: this.dirty,
-          ...(this.held.id && this.baselineKnown ? { saved: this.savedCopy() } : {}),
-        }),
-      );
+      localStorage.setItem(key, value);
+    } catch {
+      /* private browsing, or the store is full: the server copy is still the real one */
+    }
+    try {
+      sessionStorage.setItem(tab, value);
     } catch {
       /* private browsing, or the store is full: the server copy is still the real one */
     }
@@ -1307,11 +1331,13 @@ export class PlaygroundScene implements Scene {
 
   private restoreLocal(): void {
     const key = this.localKey();
-    if (!key) return;
+    const tab = this.tabKey();
+    if (!key || !tab) return;
     try {
       // The unowned, origin-wide key from before this, on the way past.
       localStorage.removeItem(LEGACY_LOCAL_KEY);
-      let raw = localStorage.getItem(key);
+      // This tab's own pad first, so another tab's typing cannot replace it.
+      let raw = sessionStorage.getItem(tab) ?? localStorage.getItem(key);
       if (!raw) {
         // A draft this tab mirrored while the mirror was `sessionStorage`,
         // moved over once rather than dropped on the upgrade.
