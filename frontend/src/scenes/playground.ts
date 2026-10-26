@@ -56,6 +56,7 @@ import {
   COMPUTER_FACE,
   COMPUTER_KEY,
   COMPUTER_NAME,
+  TUBE,
   runMessage,
   getComputer,
   nextComputer,
@@ -68,6 +69,7 @@ import { Coder } from "../ui/agent/coder";
 import {
   CODE_FACE_NAME,
   CODE_FACES,
+  type CodeFace,
   getCodeFace,
   loadCodeFace,
   getTextScale,
@@ -144,6 +146,8 @@ const TAB_KEY = (address: string) => `cwbhacker.playground.tab.${address.toLower
  * would be the bug the per-account key fixed, with a coin toss in front of it.
  */
 const LEGACY_LOCAL_KEY = "cwbhacker.playground";
+/** The monitor CONSOLE borrows when the computer is NORMAL: green phosphor. */
+const CONSOLE_MACHINE = "apple2" as const;
 /** How long after the last keystroke the autosave fires. */
 const AUTOSAVE_AFTER = 2.5;
 
@@ -339,6 +343,60 @@ export function snippetDiffers(
 }
 
 /**
+ * CONSOLE's one line: what the last run came to, the way an old machine says
+ * it — `OK`, or the first error and the line it is on, and nothing more.
+ *
+ * The compiler's own diagnostics first, the first *error* among them, since
+ * warnings come before it as often as not. Without any, the first stderr line
+ * that says `error`, with the line number taken from the `file:line:col`
+ * rustc puts under it and Go puts in front of it.
+ */
+export function consoleLine(run: PlaygroundRun | null, stage: RunStage | "idle"): string {
+  if (stage !== "idle") return t("pg.consoleBusy");
+  if (!run) return t("pg.consoleReady");
+  const lines = run.stderr
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+  const first = (re: RegExp) => lines.find((l) => re.test(l)) ?? lines[0] ?? "";
+  switch (run.outcome) {
+    case "ok":
+      return t("pg.consoleOk", { compile: run.compile_ms, run: run.run_ms });
+    case "timeout":
+      return t("pg.consoleTimeout");
+    case "output_limit":
+      return t("pg.consoleLimit");
+    case "runtime_error":
+      return t("pg.consoleCrash", {
+        code: run.exit_code ?? "?",
+        msg: first(/panic|error|fatal/i),
+      });
+    case "compile_error": {
+      const d = run.diagnostics.find((x) => x.kind === "error") ?? run.diagnostics[0];
+      if (d) {
+        const msg = `${d.code ? d.code + " " : ""}${d.message}`;
+        return d.line === null
+          ? t("pg.consoleErr", { msg })
+          : t("pg.consoleErrAt", { line: d.line, msg });
+      }
+      // Go's lines do not say `error`; they start with the place instead.
+      const at = lines.findIndex((l) => /error|^[\w./-]+\.\w+:\d+:\d+:/i.test(l));
+      const head = lines[Math.max(at, 0)] ?? "";
+      const place = lines
+        .slice(Math.max(at, 0))
+        .map((l) => /[\w./-]+\.\w+:(\d+):\d+/.exec(l))
+        .find((m) => m !== null);
+      // Go's `./main.go:5:2: undefined: x` carries its place in front.
+      const msg = head.replace(/^[\w./-]+\.\w+:\d+:\d+:\s*/, "");
+      return place
+        ? t("pg.consoleErrAt", { line: place[1], msg })
+        : t("pg.consoleErr", { msg: msg || t("pg.didNotCompile") });
+    }
+  }
+}
+
+/**
  * The open scratchpad. `dirty` is mirrored with it: text that never reached the
  * server must be able to say so after a reload, or the next visit would fetch
  * the older server copy over the top of it and the loss would be silent.
@@ -491,6 +549,20 @@ export class PlaygroundScene implements Scene {
    * place in the game where a person sits down to *write*.
    */
   private focus = false;
+
+  /**
+   * CONSOLE: CODE with even the toolbar put away — the pad on an old
+   * computer's monitor, and one line under it for what the last run came to
+   * (`consoleLine`). For writing and nothing else. Not `console`: that name is
+   * the output probe the e2e harness reads.
+   */
+  private zen = false;
+  /**
+   * The face to give back when CONSOLE lent the pad a monitor. Set only when
+   * the computer was NORMAL on the way in: the Apple ][ is put on for the
+   * mode and taken off after it, and neither preference is written.
+   */
+  private lentFace: CodeFace | null = null;
 
   private stage: RunStage | "idle" = "idle";
   /** See `AUTO_RUN_KEY`. */
@@ -860,6 +932,44 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /** CONSOLE on or off; on from the bench goes through CODE. */
+  private async toggleZen(): Promise<void> {
+    if (this.zen) {
+      this.zen = false;
+      this.giveBackMonitor();
+      this.app.chip.blip();
+      return;
+    }
+    this.focus = true;
+    this.zen = true;
+    if (this.coder?.open) this.coder.toggle();
+    this.app.chip.start();
+    setTimeout(() => this.editor?.focus(), 0);
+    if (getComputer() !== "normal") return;
+    // A monitor for the mode, lent: the user's own choice is NORMAL and stays
+    // so in the preferences, and comes back with their face when it ends.
+    const face = getCodeFace();
+    await loadCodeFace(COMPUTER_FACE[CONSOLE_MACHINE]);
+    if (!this.zen || getComputer() !== "normal") return;
+    this.lentFace = face;
+    setCodeFace(COMPUTER_FACE[CONSOLE_MACHINE]);
+    setComputer(CONSOLE_MACHINE);
+    this.app.remeasure();
+    // Warmed up, not booted: the banner is for picking a machine, and this
+    // is a mode somebody toggles while they write.
+    this.retro?.power(CONSOLE_MACHINE, false);
+  }
+
+  /** Undo what `toggleZen` lent, if it lent anything. */
+  private giveBackMonitor(): void {
+    if (this.lentFace === null) return;
+    setCodeFace(this.lentFace);
+    setComputer("normal");
+    this.lentFace = null;
+    this.app.remeasure();
+    this.retro?.power("normal", false);
+  }
+
   /**
    * Which old computer the pad is on (`ui/computer.ts`): its paper, its face,
    * its tube and its room, all at once, with the power-on to show it.
@@ -1203,6 +1313,8 @@ export class PlaygroundScene implements Scene {
     this.overlay?.destroy();
     this.fx?.destroy();
     this.fx = null;
+    this.giveBackMonitor();
+    this.zen = false;
     this.retro?.destroy();
     this.retro = null;
     showComputer(false);
@@ -1222,6 +1334,15 @@ export class PlaygroundScene implements Scene {
     this.land = this.held.lang;
     this.editor = new Editor(this.held.lang, this.held.source, () => this.touched());
     this.editor.onEnter = () => this.autoEnter();
+    // The app keeps ESC away from the scene while the caret is in the editor,
+    // so typing never leaves the screen by accident — and CONSOLE is all
+    // editor. Heard here instead, after CodeMirror (a completion it closed
+    // is `defaultPrevented`), and only for the way out of CONSOLE.
+    this.editor.dom.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape" || !this.zen || ev.defaultPrevented) return;
+      ev.preventDefault();
+      void this.toggleZen();
+    });
     this.overlay = new Overlay(this.app.overlay, this.app.layout, this.editor.dom);
     // The tube straight over the code, under the sparks and the fields.
     this.retro?.destroy();
@@ -1584,7 +1705,8 @@ export class PlaygroundScene implements Scene {
       // top, and scrolling back up after every RUN was the chore.
       this.outputToTop = true;
       const machine = getComputer();
-      if (res.run.outcome !== "ok" && machine !== "normal")
+      // CONSOLE says it in one line of its own, under the glass.
+      if (res.run.outcome !== "ok" && machine !== "normal" && !this.zen)
         this.retro?.say(runMessage(machine, res.run));
       if (res.run.outcome === "ok") this.app.chip.coin();
       // No screen shake here, on purpose *and* because it could not land:
@@ -1931,6 +2053,7 @@ export class PlaygroundScene implements Scene {
         this.coder.panel.hideFields();
         return;
       }
+      if (this.zen) return void this.toggleZen();
       return void this.app.go(new LandsScene(this.app), "back");
     }
     if ((name === "return" || name === "kpenter") && (ev.ctrlKey || ev.metaKey)) {
@@ -2048,6 +2171,7 @@ export class PlaygroundScene implements Scene {
       } else this.coder?.toggle();
       return;
     }
+    if (hit.id === "console") return void this.toggleZen();
     if (hit.id === "code") {
       this.focus = true;
       this.app.chip.select();
@@ -2058,6 +2182,7 @@ export class PlaygroundScene implements Scene {
     }
     if (hit.id === "unfocus") {
       this.focus = false;
+      if (this.zen) void this.toggleZen();
       // The room goes with the page it is drawn on, as on the quest bench:
       // left open behind the framed page it would be a lit AGENT button over
       // a panel nobody can see, and the next press would "open" it again.
@@ -2730,6 +2855,7 @@ export class PlaygroundScene implements Scene {
     // floating over the editor: an element nobody placed this frame keeps the
     // rectangle it had in the framed layout.
     this.searchOverlay?.hide();
+    if (this.zen) return this.drawZen(g, s);
     const fonts = ensureFonts(s);
     const f = fonts.tool;
     const pad = Math.round(6 * s);
@@ -2750,6 +2876,7 @@ export class PlaygroundScene implements Scene {
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
       { id: "agent", label: t("agent.button"), strong: this.coder?.open ?? false },
+      { id: "console", label: t("pg.console") },
       // The editor's own history, as buttons — for a phone, where there is
       // no Ctrl+Z. Client-side only (see `Editor.canUndo`).
       { id: "undo", label: t("quest.undo"), dim: !this.editor?.canUndo },
@@ -2995,6 +3122,94 @@ export class PlaygroundScene implements Scene {
   }
 
   /**
+   * CONSOLE: the monitor, the code on it, and one line.
+   *
+   * RUN and CONSOLE in the corner and nothing else: RUN because a tablet has
+   * no Ctrl+Enter, CONSOLE because it is the way back (as ESC is). Every other
+   * DOM field the bench or CODE places is put away here, or it would stay
+   * floating where it was last placed. The monitor keeps a monitor's shape on
+   * a wide window, with the room showing either side of it.
+   */
+  private drawZen(g: Ctx, s: number): void {
+    const { layout } = this.app;
+    this.tools.hide();
+    this.stdinOverlay?.hide();
+    this.nameOverlay?.hide();
+    this.keyOverlay?.hide();
+    this.coder?.panel.hideFields();
+    this.outputRect = [0, 0, 0, 0];
+    const fonts = ensureFonts(s);
+    const f = fonts.tool;
+    const pad = Math.round(6 * s);
+    const items = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      { id: "console", label: t("pg.console"), strong: true },
+    ];
+    const gapB = Math.round(f.size * 0.5);
+    const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
+    const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
+    const dh = boxes[0][1];
+    this.buttons.row(f, [layout.vw - pad - rowW, pad, rowW + gapB, dh], items, layout.minTouchH());
+
+    // The pad's name on the left of the same strip, quiet.
+    const name = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
+      this.dirty ? `   ${t("pg.unsaved")}` : ""
+    }`;
+    g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
+    const nameW = layout.vw - pad * 4 - rowW;
+    printf(g, f, elide(f, name, nameW), pad * 2, inkCentreY(f, name, pad, dh), nameW, "left");
+
+    const top = pad * 2 + dh;
+    const bodyW = layout.vw - pad * 2;
+    const bodyH = layout.vh - top - pad;
+    const w = Math.min(bodyW, Math.round(bodyH * 1.45));
+    const [gx, gy, gw, gh] = this.screen(g, [Math.round((layout.vw - w) / 2), top, w, bodyH]);
+
+    // The line, along the bottom of the glass, in the tube's own ink: plain
+    // for good news, inverse video for an error, as the machines did it.
+    const code = fonts.codeSm;
+    const say = fonts.code;
+    const lineH = say.height + Math.round(12 * s);
+    const machine = getComputer();
+    const [ir, ig, ib] = machine === "normal" ? [0.8, 0.85, 1] : TUBE[machine].ink;
+    const ink = `rgb(${Math.round(ir * 255)},${Math.round(ig * 255)},${Math.round(ib * 255)})`;
+    const ly = gy + gh - lineH;
+    const text = consoleLine(this.result, this.stage);
+    const bad = this.stage === "idle" && this.result !== null && this.result.outcome !== "ok";
+    const lx = gx + Math.round(8 * s);
+    const lw = gw - Math.round(16 * s);
+    g.save();
+    g.fillStyle = ink;
+    g.globalAlpha = 0.35;
+    g.fillRect(gx + 4, ly, gw - 8, 1);
+    g.globalAlpha = 1;
+    const shown = elide(say, `> ${text}`, lw);
+    // The phosphor's bleed, which the tube's shader gives the code above.
+    g.shadowColor = ink;
+    g.shadowBlur = Math.round(6 * s);
+    if (bad) {
+      g.fillRect(lx - 4, ly + 4, Math.min(lw, width(say, shown)) + 8, lineH - 8);
+      g.shadowBlur = 0;
+      g.fillStyle = "#000";
+    }
+    printf(g, say, shown, lx, inkCentreY(say, shown, ly, lineH), lw, "left");
+    g.restore();
+
+    const editorRect: Rect = [gx, gy, gw, gh - lineH - 2];
+    this.editorRect = editorRect;
+    if (this.editor) {
+      this.overlay?.place(editorRect, code.size);
+      this.retro?.place(editorRect);
+    } else this.overlay?.hide();
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
+  }
+
+  /**
    * What the code sits in: the sunken well, or — on an old computer — that
    * computer's monitor, casing, chin and all. Returns where the editor goes.
    */
@@ -3099,6 +3314,7 @@ export class PlaygroundScene implements Scene {
       // The way out of the crowding, on the screen that is crowded. Never
       // dropped: on a phone it is the only way the editor gets the window.
       { id: "code", label: t("pg.code") },
+      { id: "console", label: t("pg.console") },
       // Never dropped either. Text somebody cannot read is the one fault a
       // narrower screen must not be allowed to introduce, and these two are
       // the narrowest buttons on the row.
