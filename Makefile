@@ -152,7 +152,7 @@ dist_stale = [ ! -f frontend/dist/index.html ] || \
              [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
 
 .PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe test-sync \
-        fmt-check check version package release package-server package-server-verify package-gui package-love tauri tauri-dev tauri-notarize tauri-gatekeeper _desktop_deps _tauri_zip \
+        fmt-check check version package release package-server package-server-verify package-gui package-love tauri tauri-dev tauri-notarize tauri-gatekeeper _desktop_deps _tauri_dist \
         test-love test-e2e smoke fmt lint doctor warm clean clean-home
 
 ##@ Running
@@ -387,7 +387,7 @@ TAURI        := desktop/node_modules/.bin/tauri
 _desktop_deps:
 	@test -x $(TAURI) || ( cd desktop && npm ci --silent )
 
-tauri: _deps _desktop_deps ## the desktop app (Tauri): one binary, server and window in one process, signed, into $(DIST)
+tauri: _deps _desktop_deps ## the desktop app (Tauri): one binary, server and window in one process, signed; the .app and its zip into $(DIST)
 	@test "$$(uname -s)" = "Darwin" || { echo "  'make tauri' is macOS only." >&2; exit 1; }
 	@$(MAKE) -s version >/dev/null
 	@$(MAKE) -s art
@@ -402,12 +402,19 @@ tauri: _deps _desktop_deps ## the desktop app (Tauri): one binary, server and wi
 	cd desktop && env -u APPLE_ID -u APPLE_PASSWORD -u APPLE_TEAM_ID \
 		APPLE_SIGNING_IDENTITY="$$identity" ./node_modules/.bin/tauri build
 	@codesign --verify --deep --strict "$(DESKTOP_APP)" && echo "  signature: valid"
-	@$(MAKE) -s _tauri_zip
-	@echo "  open it with: open \"$(DESKTOP_APP)\""
+	@$(MAKE) -s _tauri_dist
+	@echo "  open it with: open \"$(DIST)/Causewaybay Hacker.app\""
 
-_tauri_zip:
+# The .app itself beside its zip, as the server's staged directory sits
+# beside its tarball: double-click it straight out of dist/. ditto, not cp,
+# so the signature and the stapled ticket come across intact; re-run after
+# notarising, so dist/ holds the stapled copy.
+_tauri_dist:
 	@mkdir -p "$(DIST)"
-	@rm -f "$(DIST)/$(DESKTOP_ZIP)"
+	@rm -rf "$(DIST)/$(DESKTOP_ZIP)" "$(DIST)/Causewaybay Hacker.app"
+	@ditto "$(DESKTOP_APP)" "$(DIST)/Causewaybay Hacker.app"
+	@codesign --verify --deep --strict "$(DIST)/Causewaybay Hacker.app"
+	@echo "  $(DIST)/Causewaybay Hacker.app"
 	@cd "$(DESKTOP_DIR)" && ditto -c -k --sequesterRsrc --keepParent "Causewaybay Hacker.app" "$(abspath $(DIST))/$(DESKTOP_ZIP)"
 	@echo "  $(DIST)/$(DESKTOP_ZIP)  ($$(du -h "$(DIST)/$(DESKTOP_ZIP)" | cut -f1))"
 
@@ -428,7 +435,7 @@ tauri-notarize: ## notarize and staple the built desktop app, and re-zip it (nee
 	@xcrun stapler staple "$(DESKTOP_APP)"
 	@xcrun stapler validate "$(DESKTOP_APP)"
 	@# The zip in dist/ was cut before the ticket existed; cut it again.
-	@$(MAKE) -s _tauri_zip
+	@$(MAKE) -s _tauri_dist
 
 tauri-gatekeeper: ## assess the desktop app the way Finder does
 	@test -d "$(DESKTOP_APP)" || { echo "  no $(DESKTOP_APP); run 'make tauri' first" >&2; exit 1; }
@@ -454,9 +461,10 @@ tauri-dev: _deps _desktop_deps ## the desktop app from the checkout, debug build
 #   CausewaybayHacker-macos.zip the LÖVE client as a double-clickable .app
 #                               (macOS only — see love2d/Makefile)
 #   causewaybay-hacker.love     the same game for anyone with their own LÖVE 11
+#   Causewaybay Hacker.app      the Tauri desktop app: server and window in one
 #   CausewaybayHacker-Desktop-…zip
-#                               the Tauri desktop app: server and window in one
-#                               process (macOS only — `make tauri`)
+#                               process, and the same zipped for download
+#                               (macOS only — `make tauri`)
 #
 # The halves are separate targets because they want different machines: the
 # server tarball is per platform and builds anywhere Rust and Node do, the
