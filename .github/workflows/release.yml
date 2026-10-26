@@ -3,8 +3,8 @@
 #
 # Triggered by pushing a tag like `v0.1.0` to main. The tag must match the
 # version of record — `make version`, which prints the number only once the
-# backend workspace, the CLI crate, the LÖVE key library and the frontend all
-# agree on it. Or manually via workflow_dispatch for a dry run that uploads
+# backend workspace, the CLI crate, the LÖVE key library, the frontend and the
+# desktop app all agree on it. Or manually via workflow_dispatch for a dry run that uploads
 # the artifacts without creating a release.
 #
 #   causewaybay-hacker-server-<version>-<target>.tar.gz   one per platform:
@@ -14,6 +14,9 @@
 #       double-clickable macOS .app, signed, notarised and stapled
 #   causewaybay-hacker-<version>.love                      the same game for
 #       anyone with their own LÖVE 11
+#   CausewaybayHacker-Desktop-<version>-<arch>-apple-darwin.zip   the Tauri
+#       desktop app: server and window in one process, signed, notarised and
+#       stapled
 #   SHA256SUMS
 #
 # The recipe is the Makefiles', not this file's: `make package-server` builds,
@@ -88,7 +91,7 @@ jobs:
           version=$(make version)
           if [ "${{ github.ref_type }}" = "tag" ] && [ "${TAG#v}" != "$version" ]; then
             echo "tag $TAG does not match the version of record $version" >&2
-            echo "bump backend/Cargo.toml, cli/Cargo.toml, love2d/ffi/Cargo.toml and frontend/package.json, or retag" >&2
+            echo "bump backend/Cargo.toml, cli/Cargo.toml, love2d/ffi/Cargo.toml, frontend/package.json and desktop/Cargo.toml, or retag" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -272,10 +275,116 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/cert.p12"
 
+  # -------------------------------------------------------- the desktop app
+  #
+  # The Tauri app: the browser game in a native window, with the server linked
+  # into the same binary. Signed, notarised and stapled the way the LÖVE app
+  # is — `make tauri` signs (Tauri, hardened runtime, the imported Developer
+  # ID), `make tauri-notarize` submits and staples and re-cuts the zip.
+  desktop:
+    name: Desktop app (Tauri, macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: desktop
+
+      - name: Resolve the version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(make version)
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${TAG#v}" != "$version" ]; then
+            echo "tag $TAG does not match the version of record $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
+
+      - name: Import codesigning certificate
+        env:
+          P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "::warning::MACOS_CERTIFICATE_P12_BASE64 not set, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          CERT_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" || true)
+          if [ -n "$CERT_INFO" ]; then
+            CERT_ID=$(echo "$CERT_INFO" | head -1 | awk -F'"' '{print $2}')
+            echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+            echo "Found certificate: $CERT_ID"
+          else
+            echo "::warning::No Developer ID Application certificate found, using ad-hoc signing"
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+          fi
+
+      # Builds the frontend, bundles it and the content packs into the .app,
+      # and signs it with APPLE_SIGNING_IDENTITY. The Apple credentials are
+      # not in this step's environment: notarising is the next one.
+      - name: Build and sign the app
+        run: make tauri
+
+      - name: Notarize and staple
+        if: env.APPLE_SIGNING_IDENTITY != '-'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: make tauri-notarize
+
+      - name: Assess with Gatekeeper
+        run: make tauri-gatekeeper
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-macos-${{ steps.version.outputs.arch }}
+          path: dist/CausewaybayHacker-Desktop-*.zip
+          if-no-files-found: error
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/cert.p12"
+
   # ------------------------------------------------------------ the release
   release:
     name: Create GitHub release
-    needs: [server, gui]
+    needs: [server, gui, desktop]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     permissions:
@@ -305,6 +414,7 @@ jobs:
             | `causewaybay-hacker-server-…-apple-darwin.tar.gz` | the same, for macOS on Apple silicon |
             | `CausewaybayHacker-…-apple-darwin.zip` | the LÖVE desktop client — a double-clickable `.app` with LÖVE inside, signed and notarised |
             | `causewaybay-hacker-….love` | the same game for anyone with their own LÖVE 11 |
+            | `CausewaybayHacker-Desktop-…-apple-darwin.zip` | the desktop app (Tauri) — the web client in a native window with the server inside it; nothing to start first. Signed and notarised |
 
             Verify a download against `SHA256SUMS`, then:
 

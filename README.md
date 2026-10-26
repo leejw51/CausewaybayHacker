@@ -178,11 +178,23 @@ up. `make remote` prints them again.
 ## Release
 
 ```bash
-make package          # every release binary into dist/
+make package          # every release binary into dist/ (server, LÖVE app, desktop app)
 make package-server   # the server tarball: cwbhacker + web client + content packs + cwbh
 make package-gui      # the LÖVE client as a signed macOS .app, and a .love (macOS only)
-make version          # the version, once all four manifests agree on it
+make tauri            # the desktop app (Tauri): server and window in one process
+make version          # the version, once all five manifests agree on it
 ```
+
+`make tauri` builds `desktop/` — the browser game in a native window, with the
+server linked into the same binary rather than run beside it. It serves the
+bundled frontend on `127.0.0.1:5395` (fixed, so the key the page keeps in
+localStorage is still there next launch), imports the bundled packs into the
+same `~/.causewaybayhacker` the browser game uses, and finds the compilers on
+your login shell's PATH even when opened from Finder. Out comes
+`desktop/target/release/bundle/macos/Causewaybay Hacker.app` and a zip of it in
+`dist/`, signed like the LÖVE app (`make tauri-notarize` notarises and staples
+it). `make tauri-dev` runs a debug build from the checkout. The TypeScript land
+uses the global `tsc` (`npm install -g typescript`).
 
 The server tarball unpacks to a directory with `run.sh` in it, which starts
 `cwbhacker` with its own web client and content beside it — nothing else is

@@ -108,13 +108,15 @@ endif
 # How long `start` waits for a port to answer before calling it a failure.
 WAIT_SECS  ?= 90
 
-# The version of record. Four manifests carry one: the backend workspace, the
-# CLI crate, the LÖVE key library and the frontend. `make version` prints it
-# only when all four agree, and the release workflow compares the tag to it.
+# The version of record. Five manifests carry one: the backend workspace, the
+# CLI crate, the LÖVE key library, the frontend and the desktop app (whose
+# tauri.conf.json reads the frontend's). `make version` prints it only when
+# all five agree, and the release workflow compares the tag to it.
 BE_VERSION  := $(shell sed -n 's/^version = "\(.*\)"/\1/p' backend/Cargo.toml | head -1)
 CLI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)
 FFI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' love2d/ffi/Cargo.toml | head -1)
 FE_VERSION  := $(shell sed -n 's/^  "version": "\(.*\)",/\1/p' frontend/package.json | head -1)
+DT_VERSION  := $(shell sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
 VERSION     := $(BE_VERSION)
 
 # Where `make package` puts what it built, and what the archives are named.
@@ -150,7 +152,7 @@ dist_stale = [ ! -f frontend/dist/index.html ] || \
              [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
 
 .PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe test-sync \
-        fmt-check check version package release package-server package-server-verify package-gui package-love \
+        fmt-check check version package release package-server package-server-verify package-gui package-love tauri tauri-dev tauri-notarize tauri-gatekeeper _desktop_deps _tauri_zip \
         test-love test-e2e smoke fmt lint doctor warm clean clean-home
 
 ##@ Running
@@ -335,6 +337,7 @@ smoke: ## drive the live server against PROTOCOL.md §8 (needs `make start`)
 
 fmt: ## format everything
 	cd backend && cargo fmt
+	cd desktop && cargo fmt
 	cd frontend && npm run fmt
 	$(MAKE) -C love2d fmt
 
@@ -348,15 +351,98 @@ fmt-check: ## fail if anything is not formatted (what CI runs)
 	cd backend && cargo fmt --check
 	cd cli && cargo fmt --check
 	cd love2d/ffi && cargo fmt --check
+	cd desktop && cargo fmt --check
 
 check: fmt-check lint test test-love ## everything CI runs on a pull request, in one word
 	$(MAKE) -C cli check
 
 version: ## print the version, once every manifest agrees on it
-	@test "$(BE_VERSION)" = "$(CLI_VERSION)" -a "$(BE_VERSION)" = "$(FFI_VERSION)" -a "$(BE_VERSION)" = "$(FE_VERSION)" || { \
-	  echo "ERROR: the manifests disagree — backend $(BE_VERSION), cli $(CLI_VERSION), love2d/ffi $(FFI_VERSION), frontend $(FE_VERSION)" >&2; \
+	@test "$(BE_VERSION)" = "$(CLI_VERSION)" -a "$(BE_VERSION)" = "$(FFI_VERSION)" -a "$(BE_VERSION)" = "$(FE_VERSION)" -a "$(BE_VERSION)" = "$(DT_VERSION)" || { \
+	  echo "ERROR: the manifests disagree — backend $(BE_VERSION), cli $(CLI_VERSION), love2d/ffi $(FFI_VERSION), frontend $(FE_VERSION), desktop $(DT_VERSION)" >&2; \
 	  exit 1; }
 	@echo "$(VERSION)"
+
+##@ Desktop (Tauri)
+
+# The desktop app is the browser game in a window, with the server inside the
+# same process: desktop/ links backend/core and backend/server as libraries,
+# serves the built frontend on 127.0.0.1:$(DESKTOP_PORT) and points a webview
+# at it. The frontend and the content packs ride in the bundle's Resources, so
+# the .app needs nothing beside it but the compilers the lands use — which it
+# finds on the login shell's PATH, not launchd's (desktop/src/main.rs).
+#
+# Signed like the LÖVE app: `APPLE_SIGNING_IDENTITY` when it is set (the
+# release workflow exports it after importing the certificate), else the first
+# Developer ID in the keychain, else ad-hoc. Tauri signs inside-out with the
+# hardened runtime. Notarising is its own step, `tauri-notarize`, exactly as
+# `make -C love2d notarize` is — so the Apple credentials are kept from the
+# build, or Tauri would try to notarise on its own and an ad-hoc build would
+# fail on it.
+DESKTOP_PORT := 5395
+DESKTOP_DIR  := desktop/target/release/bundle/macos
+DESKTOP_APP  := $(DESKTOP_DIR)/Causewaybay Hacker.app
+DESKTOP_ZIP  := CausewaybayHacker-Desktop-$(VERSION)-$(TARGET).zip
+TAURI        := desktop/node_modules/.bin/tauri
+
+_desktop_deps:
+	@test -x $(TAURI) || ( cd desktop && npm ci --silent )
+
+tauri: _deps _desktop_deps ## the desktop app (Tauri): one binary, server and window in one process, signed, into $(DIST)
+	@test "$$(uname -s)" = "Darwin" || { echo "  'make tauri' is macOS only." >&2; exit 1; }
+	@$(MAKE) -s version >/dev/null
+	@$(MAKE) -s art
+	@$(MAKE) -s _bundle
+	@identity="$${APPLE_SIGNING_IDENTITY:-}"; \
+	if [ -z "$$identity" ] || [ "$$identity" = "-" ]; then \
+		identity=$$(security find-identity -v -p codesigning 2>/dev/null \
+			| grep "Developer ID Application" | head -1 | awk -F'"' '{print $$2}'); \
+	fi; \
+	identity="$${identity:--}"; \
+	echo "  signing with: $$identity"; \
+	cd desktop && env -u APPLE_ID -u APPLE_PASSWORD -u APPLE_TEAM_ID \
+		APPLE_SIGNING_IDENTITY="$$identity" ./node_modules/.bin/tauri build
+	@codesign --verify --deep --strict "$(DESKTOP_APP)" && echo "  signature: valid"
+	@$(MAKE) -s _tauri_zip
+	@echo "  open it with: open \"$(DESKTOP_APP)\""
+
+_tauri_zip:
+	@mkdir -p "$(DIST)"
+	@rm -f "$(DIST)/$(DESKTOP_ZIP)"
+	@cd "$(DESKTOP_DIR)" && ditto -c -k --sequesterRsrc --keepParent "Causewaybay Hacker.app" "$(abspath $(DIST))/$(DESKTOP_ZIP)"
+	@echo "  $(DIST)/$(DESKTOP_ZIP)  ($$(du -h "$(DIST)/$(DESKTOP_ZIP)" | cut -f1))"
+
+tauri-notarize: ## notarize and staple the built desktop app, and re-zip it (needs Apple credentials)
+	@test -d "$(DESKTOP_APP)" || { echo "  no $(DESKTOP_APP); run 'make tauri' first" >&2; exit 1; }
+	@for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do \
+		eval "value=\$$$$name"; \
+		[ -n "$$value" ] || { echo "  $$name is not set; notarising needs all three of APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID." >&2; exit 1; }; \
+	done
+	@codesign -dv --verbose=2 "$(DESKTOP_APP)" 2>&1 | grep -q "Authority=Developer ID Application" || { \
+		echo "  $(DESKTOP_APP) is not signed with a Developer ID; Apple will refuse it." >&2; exit 1; }
+	@echo "  submitting to Apple - this takes minutes, not seconds"
+	@ditto -c -k --sequesterRsrc --keepParent "$(DESKTOP_APP)" "$(DESKTOP_DIR)/notarize.zip"
+	@xcrun notarytool submit "$(DESKTOP_DIR)/notarize.zip" \
+		--apple-id "$$APPLE_ID" --password "$$APPLE_PASSWORD" --team-id "$$APPLE_TEAM_ID" \
+		--wait --timeout 20m
+	@rm -f "$(DESKTOP_DIR)/notarize.zip"
+	@xcrun stapler staple "$(DESKTOP_APP)"
+	@xcrun stapler validate "$(DESKTOP_APP)"
+	@# The zip in dist/ was cut before the ticket existed; cut it again.
+	@$(MAKE) -s _tauri_zip
+
+tauri-gatekeeper: ## assess the desktop app the way Finder does
+	@test -d "$(DESKTOP_APP)" || { echo "  no $(DESKTOP_APP); run 'make tauri' first" >&2; exit 1; }
+	@codesign --verify --deep --strict "$(DESKTOP_APP)" && echo "  signature: valid"
+	@if xcrun stapler validate "$(DESKTOP_APP)" > /dev/null 2>&1; then \
+		echo "  notarised: yes, and stapled"; \
+	else \
+		echo "  notarised: NO - a downloaded copy will be blocked"; \
+	fi
+	@spctl -a -vvv -t open --context context:primary-signature "$(DESKTOP_APP)" 2>&1 | sed 's/^/  /' || true
+
+tauri-dev: _deps _desktop_deps ## the desktop app from the checkout, debug build (uses frontend/dist as it is)
+	@if $(call dist_stale); then $(MAKE) -s _bundle; fi
+	cd desktop && ./node_modules/.bin/tauri dev --no-watch
 
 ##@ Packaging
 
@@ -368,11 +454,14 @@ version: ## print the version, once every manifest agrees on it
 #   CausewaybayHacker-macos.zip the LÖVE client as a double-clickable .app
 #                               (macOS only — see love2d/Makefile)
 #   causewaybay-hacker.love     the same game for anyone with their own LÖVE 11
+#   CausewaybayHacker-Desktop-…zip
+#                               the Tauri desktop app: server and window in one
+#                               process (macOS only — `make tauri`)
 #
 # The halves are separate targets because they want different machines: the
 # server tarball is per platform and builds anywhere Rust and Node do, the
 # app needs macOS. The release workflow runs each where it belongs.
-package: package-server package-gui ## every release binary: the server tarball and the LÖVE client
+package: package-server package-gui tauri ## every release binary: the server tarball, the LÖVE client and the desktop app
 	@echo
 	@echo "  $(DIST)/"
 	@ls -1 $(DIST) | sed 's/^/    /'
@@ -491,6 +580,7 @@ doctor: ## check the toolchains and the server's own view of things
 
 clean: ## drop build output (your progress is untouched)
 	cd backend && cargo clean
+	cd desktop && cargo clean
 	rm -rf frontend/dist frontend/node_modules $(RUN) $(DIST)
 	$(MAKE) -C love2d clean
 
