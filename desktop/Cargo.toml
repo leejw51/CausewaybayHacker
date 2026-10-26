@@ -1,0 +1,40 @@
+# Causewaybay Hacker — the desktop app (Tauri 2).
+#
+# One process: the window, and the server it talks to. The game server from
+# backend/ (core + server) is linked in as a library and serves the built
+# frontend on loopback; the window is a webview pointed at it. Nothing to start
+# first, nothing left running after the window closes.
+#
+# Outside the backend workspace on purpose, like cli/: Tauri pulls in WebKit on
+# Linux and a few hundred crates everywhere, and `cargo test --workspace` in
+# backend/ (what CI runs on every pull request) should not have to build them.
+
+[package]
+name = "cwbhacker-desktop"
+description = "Causewaybay Hacker as a desktop app: the server and the window in one process"
+version = "0.1.3"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+
+[[bin]]
+name = "causewaybay-hacker"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+cwbhacker-core = { path = "../backend/core" }
+cwbhacker-server = { path = "../backend/server" }
+anyhow = "1"
+axum = "0.8"
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "net"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+[profile.release]
+strip = true
+lto = "thin"

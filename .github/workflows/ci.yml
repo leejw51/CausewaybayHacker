@@ -25,7 +25,8 @@
 # cannot start outside a checkout is the kind of break that is otherwise found
 # after a tag; and `package-gui` on macOS once a change has landed on main,
 # because the app needs a macOS runner and a pull request should not pay for
-# one. Both are dry runs of `make package` — the release workflow is where the
+# one. `package-tauri`, the desktop app, follows the same rule as
+# `package-gui`. All are dry runs of `make package` — the release workflow is where the
 # artifacts are signed for real and attached to a release.
 #
 #   browser   one slice of the browser suite: the playground's draft surviving a
@@ -711,5 +712,46 @@ jobs:
           path: |
             dist/*.zip
             dist/*.love
+          if-no-files-found: error
+          retention-days: 7
+
+  # The desktop app, once a change has landed on main — the same rule as the
+  # LÖVE app above, for the same reason. Ad-hoc signed; the release workflow
+  # signs and notarises it for real. Its fmt check runs here rather than in
+  # `backend`, because desktop/ is its own crate outside that workspace.
+  package-tauri:
+    name: Package the desktop app (dry run, Tauri, macOS)
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: desktop
+
+      - run: cd desktop && cargo fmt --check
+      - run: make tauri APPLE_SIGNING_IDENTITY=-
+      - run: make tauri-gatekeeper
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-macos-unsigned
+          path: dist/CausewaybayHacker-Desktop-*.zip
           if-no-files-found: error
           retention-days: 7

@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "cwbhacker"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -334,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "cwbhacker-core"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "base64",
  "chrono",
@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "cwbhacker-runner"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "cwbhacker-core",
  "libc",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "cwbhacker-server"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "axum",
  "base64",
