@@ -77,16 +77,16 @@ local MONO_FILE = "assets/fonts/VT323-Regular.ttf"
 --- and the choice is remembered, so anyone who prefers the terminal face
 --- sets it once.
 ---
---- The twelve after the first three are the web's, in the web's order: three
---- pixel faces that are also interface faces, Comic Mono, Courier New Bold,
---- three home computers, and four outline faces. Every one has a single
+--- The fourteen after the first three are the web's, in the web's order:
+--- three pixel faces that are also interface faces, Comic Mono, Courier New
+--- Bold, three home computers, four outline faces, IBM Plex Mono and Unifont. Every one has a single
 --- advance across ASCII. The ones only a code pane uses are subset to what a
 --- code pane holds, like Iosevka; a glyph a subset lacks is drawn by VT323
 --- and then Unifont behind it.
 A.CODE_FACES = {
   "game", "iosevka", "jetbrains", "dos", "dunggeunmo", "galmuri", "comic",
   "courier", "apple2", "msx", "amiga", "victor", "victorscript", "fantasque",
-  "radon",
+  "radon", "plexmono", "unifont",
 }
 
 --- What to call each on the button. Its own name, not a description.
@@ -106,6 +106,8 @@ A.CODE_FACE_NAME = {
   victorscript = "VICTOR MONO ITALIC",
   fantasque = "FANTASQUE",
   radon = "RADON HANDWRITING",
+  plexmono = "PLEX MONO",
+  unifont = "UNIFONT",
 }
 
 --- Courier New is a **system** face and is never shipped: the one face every
@@ -134,6 +136,9 @@ local CODE_FILE = {
   victorscript = "assets/fonts/VictorMonoItalic-Code.otf",
   fantasque = "assets/fonts/FantasqueSansMono-Code.ttf",
   radon = "assets/fonts/MonaspaceRadon-Code.otf",
+  plexmono = "assets/fonts/IBMPlexMono.ttf",
+  -- The same file that stands behind every face, here at the front.
+  unifont = "assets/fonts/unifont.otf",
 }
 
 --- How big to draw each face, against the size asked for.
@@ -169,6 +174,10 @@ A.CODE_FACE_SCALE = {
   fantasque = 0.9,
   -- Monaspace Radon, the handwritten one: cap 0.73 em, advance 0.62 em.
   radon = 0.77,
+  -- IBM Plex Mono: cap 0.698 em, advance 0.6 em.
+  plexmono = 0.8,
+  -- GNU Unifont: the 8x16 cell of DOS VGA, cap 0.625 em.
+  unifont = 0.85,
 }
 local CODE_SCALE = A.CODE_FACE_SCALE
 
@@ -196,6 +205,7 @@ A.CODE_FACE_WEIGHT.courier = "bold"
 local HINTING = {
   comic = "normal", courier = "normal", victor = "normal",
   victorscript = "normal", fantasque = "normal", radon = "normal",
+  plexmono = "normal",
   galmuri = "light", apple2 = "light", msx = "light", amiga = "light",
 }
 
@@ -207,7 +217,11 @@ local code_face = "iosevka"
 --- put in front of it, so Press Start 2P still stands behind for a glyph the
 --- face lacks — DOS VGA has no `č`, Comic Mono no Hangul — and Unifont behind
 --- both; Neo둥근모 and Galmuri carry Hangul and draw Korean themselves.
-A.UI_FACES = { "game", "dos", "dunggeunmo", "galmuri", "comic" }
+A.UI_FACES = {
+  "game", "dos", "dunggeunmo", "galmuri", "comic", "unifont", "nunito",
+  "atkinson", "dmsans", "geist", "plexsans", "instrument", "grotesk", "lora",
+  "fraunces", "newsreader",
+}
 
 --- What each is called in the toast. Its own name.
 A.UI_FACE_NAME = {
@@ -216,6 +230,17 @@ A.UI_FACE_NAME = {
   dunggeunmo = "DUNGGEUNMO",
   galmuri = "GALMURI",
   comic = "COMIC",
+  unifont = "UNIFONT",
+  nunito = "NUNITO",
+  atkinson = "ATKINSON",
+  dmsans = "DM SANS",
+  geist = "GEIST",
+  plexsans = "PLEX SANS",
+  instrument = "INSTRUMENT",
+  grotesk = "GROTESK",
+  lora = "LORA",
+  fraunces = "FRAUNCES",
+  newsreader = "NEWSREADER",
 }
 
 --- The web's `UI_FACE_SPEC`, measured (cap height and advance of each face
@@ -237,6 +262,32 @@ A.UI_FACE_SPEC = {
   -- Comic Mono: cap 0.715 em, advance 0.545 em.
   comic = { file = "assets/fonts/ComicMono.ttf", pixel = 1.2, body = 0.78,
     hinting = "normal" },
+  -- From FruitNation Messenger, the web's numbers: `body` matched on cap
+  -- height to VT323 (0.56 / cap), `pixel` at Comic Mono's multiple of its cap
+  -- (0.86 / cap). Each outline face is one weight, 400, cut from the variable
+  -- build with fontTools, its Latin and Latin Extended subsets merged.
+  -- GNU Unifont: the 8x16 cell of DOS VGA, and every script in it.
+  unifont = { file = "assets/fonts/unifont.otf", pixel = 1.25, body = 0.9 },
+  -- Nunito Sans: cap 0.705 em, advance 0.553 em.
+  nunito = { file = "assets/fonts/NunitoSans.ttf", pixel = 1.22, body = 0.79, hinting = "normal" },
+  -- Atkinson Hyperlegible Next: cap 0.668 em, advance 0.55 em.
+  atkinson = { file = "assets/fonts/AtkinsonHyperlegibleNext.ttf", pixel = 1.29, body = 0.84, hinting = "normal" },
+  -- DM Sans: cap 0.70 em, advance 0.578 em.
+  dmsans = { file = "assets/fonts/DMSans.ttf", pixel = 1.23, body = 0.8, hinting = "normal" },
+  -- Geist: cap 0.71 em, advance 0.581 em.
+  geist = { file = "assets/fonts/Geist.ttf", pixel = 1.21, body = 0.79, hinting = "normal" },
+  -- IBM Plex Sans: cap 0.698 em, advance 0.568 em.
+  plexsans = { file = "assets/fonts/IBMPlexSans.ttf", pixel = 1.23, body = 0.8, hinting = "normal" },
+  -- Instrument Sans: cap 0.72 em, advance 0.599 em.
+  instrument = { file = "assets/fonts/InstrumentSans.ttf", pixel = 1.19, body = 0.78, hinting = "normal" },
+  -- Space Grotesk: cap 0.70 em, advance 0.612 em.
+  grotesk = { file = "assets/fonts/SpaceGrotesk.ttf", pixel = 1.23, body = 0.8, hinting = "normal" },
+  -- Lora, a serif: cap 0.70 em, advance 0.607 em.
+  lora = { file = "assets/fonts/Lora.ttf", pixel = 1.23, body = 0.8, hinting = "normal" },
+  -- Fraunces, a soft serif: cap 0.70 em, advance 0.686 em.
+  fraunces = { file = "assets/fonts/Fraunces.ttf", pixel = 1.23, body = 0.8, hinting = "normal" },
+  -- Newsreader, a text serif: cap 0.67 em, advance 0.573 em.
+  newsreader = { file = "assets/fonts/Newsreader.ttf", pixel = 1.28, body = 0.84, hinting = "normal" },
 }
 
 local ui_face = "game"
@@ -687,6 +738,7 @@ end
 --- resolution; this client draws on its own pixel grid and then scales.
 local PIXEL_GRID = {
   dos = 16, dunggeunmo = 16, galmuri = 12, apple2 = 8, msx = 8, amiga = 8,
+  unifont = 16,
 }
 A.CODE_FACE_GRID = PIXEL_GRID
 

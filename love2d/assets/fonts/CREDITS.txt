@@ -45,6 +45,31 @@ FantasqueSansMono-Code.ttf Fantasque Sans Mono v1.8.0 (subset), Jany Belluz,
 MonaspaceRadon-Code.otf    Monaspace Radon v1.400 (subset), GitHub Next,
                            https://github.com/githubnext/monaspace  SIL OFL 1.1   Monaspace-OFL.txt
 
+IBMPlexMono.ttf            IBM Plex Mono, IBM, https://github.com/IBM/plex
+                                                SIL OFL 1.1   OFL-ibm-plex-mono.txt
+
+From FruitNation Messenger's font pack, the web's interface faces. Each is
+the Google Fonts build cut to one weight (400) from its variable font with
+fontTools.varLib.instancer, and its Latin and Latin Extended subsets merged
+into one file with fontTools.merge (Nunito Sans has Latin only). Upright only.
+GNU Unifont in that list is unifont.otf above, at the front of the stack.
+
+NunitoSans.ttf             Nunito Sans, The Nunito Sans Project Authors,
+                           https://github.com/Fonthausen/NunitoSans   NunitoSans-LICENSE.txt
+AtkinsonHyperlegibleNext.ttf
+                           Atkinson Hyperlegible Next, Braille Institute of America
+                                                SIL OFL 1.1   atkinson-hyperlegible-next-OFL.txt
+DMSans.ttf                 DM Sans, Colophon Foundry / Indian Type Foundry (opsz 14)
+                                                SIL OFL 1.1   dm-sans-OFL.txt
+Geist.ttf                  Geist, Vercel        SIL OFL 1.1   geist-OFL.txt
+IBMPlexSans.ttf            IBM Plex Sans, IBM   SIL OFL 1.1   ibm-plex-sans-OFL.txt
+InstrumentSans.ttf         Instrument Sans, Rodrigo Fuenzalida / Jordan Egstad
+                                                SIL OFL 1.1   instrument-sans-OFL.txt
+SpaceGrotesk.ttf           Space Grotesk, Florian Karsten   SIL OFL 1.1   OFL-space-grotesk.txt
+Lora.ttf                   Lora, Cyreal         SIL OFL 1.1   lora-OFL.txt
+Fraunces.ttf               Fraunces, Undercase Type (opsz 24)   SIL OFL 1.1   fraunces-OFL.txt
+Newsreader.ttf             Newsreader, Production Type   SIL OFL 1.1   OFL-newsreader.txt
+
 Courier New Bold is not shipped. It is a system face, read at run time from
 /System/Library/Fonts/Supplemental/ on macOS, and VT323 stands in for it on
 a machine without it.

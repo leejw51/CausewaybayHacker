@@ -93,6 +93,18 @@ describe("the files", () => {
       "VictorMono-OFL.txt",
       "FantasqueSansMono-OFL.txt",
       "Monaspace-OFL.txt",
+      "OFL-ibm-plex-mono.txt",
+      "unifont-LICENSE.txt",
+      "NunitoSans-LICENSE.txt",
+      "atkinson-hyperlegible-next-OFL.txt",
+      "dm-sans-OFL.txt",
+      "geist-OFL.txt",
+      "ibm-plex-sans-OFL.txt",
+      "instrument-sans-OFL.txt",
+      "OFL-space-grotesk.txt",
+      "lora-OFL.txt",
+      "fraunces-OFL.txt",
+      "OFL-newsreader.txt",
       "CREDITS.txt",
     ]) {
       expect(existsSync(join(PUBLIC, "fonts", lic)), lic).toBe(true);

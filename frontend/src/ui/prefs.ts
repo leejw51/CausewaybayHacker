@@ -27,6 +27,12 @@ export const AUTO_RUN_KEY = "code.autoRun";
  */
 export const STDERR_KEY = "code.stderr";
 
+/**
+ * SOUND: the chip's sfx and music, off for good once somebody turned them
+ * off. A fact about the person and the room they are in, not the screen.
+ */
+export const SOUND_OFF_KEY = "audio.off";
+
 /** One namespace, so a stray key in devtools is obviously ours. */
 const NS = "cwbhacker.";
 

@@ -37,3 +37,47 @@ MonaspaceRadon-Regular.woff2
                            Monaspace Radon v1.400, GitHub Next,
                            https://github.com/githubnext/monaspace  SIL OFL 1.1   Monaspace-OFL.txt
                            Converted from the release .otf to WOFF2; otherwise unmodified.
+
+---- From FruitNation Messenger ----------------------------------------------
+
+Copied unmodified from FruitNation Messenger's font pack (its CREDITS.txt
+has the same entries). The outline faces are self-hosted Google Fonts builds:
+a Latin and a Latin Extended subset each, upright only.
+
+unifont.woff2              GNU Unifont, Roman Czyborra, Paul Hardy et al.,
+                           https://unifoundry.com/unifont/
+                           SIL OFL 1.1, or GNU GPL 2+ with the Font Embedding Exception
+                                                                unifont-LICENSE.txt
+                           Converted from the release .otf to WOFF2 with fontTools.
+ibm-plex-mono-400-latin.woff2
+ibm-plex-mono-400-latin-ext.woff2
+                           IBM Plex Mono, IBM, https://github.com/IBM/plex
+                                                  SIL OFL 1.1   OFL-ibm-plex-mono.txt
+NunitoSans-Latin.woff2     Nunito Sans (variable weight), The Nunito Sans Project Authors,
+                           https://github.com/Fonthausen/NunitoSans   NunitoSans-LICENSE.txt
+atkinson-hyperlegible-next-latin.woff2
+atkinson-hyperlegible-next-latin-ext.woff2
+                           Atkinson Hyperlegible Next, Braille Institute of America
+                                                  SIL OFL 1.1   atkinson-hyperlegible-next-OFL.txt
+dm-sans-latin.woff2        DM Sans, Colophon Foundry / Indian Type Foundry
+dm-sans-latin-ext.woff2                           SIL OFL 1.1   dm-sans-OFL.txt
+geist-latin.woff2          Geist, Vercel          SIL OFL 1.1   geist-OFL.txt
+geist-latin-ext.woff2
+ibm-plex-sans-latin.woff2  IBM Plex Sans, IBM     SIL OFL 1.1   ibm-plex-sans-OFL.txt
+ibm-plex-sans-latin-ext.woff2
+instrument-sans-latin.woff2
+instrument-sans-latin-ext.woff2
+                           Instrument Sans, Rodrigo Fuenzalida / Jordan Egstad
+                                                  SIL OFL 1.1   instrument-sans-OFL.txt
+space-grotesk-var-latin.woff2
+space-grotesk-var-latin-ext.woff2
+                           Space Grotesk (variable weight), Florian Karsten
+                                                  SIL OFL 1.1   OFL-space-grotesk.txt
+lora-latin.woff2           Lora, Cyreal           SIL OFL 1.1   lora-OFL.txt
+lora-latin-ext.woff2
+fraunces-latin.woff2       Fraunces, Undercase Type   SIL OFL 1.1   fraunces-OFL.txt
+fraunces-latin-ext.woff2
+newsreader-var-latin.woff2
+newsreader-var-latin-ext.woff2
+                           Newsreader (variable weight), Production Type
+                                                  SIL OFL 1.1   OFL-newsreader.txt

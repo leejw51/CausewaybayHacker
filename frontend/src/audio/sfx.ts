@@ -7,10 +7,17 @@
  * "the player cleared a street" into the right id, and the one place that would
  * change if the bank ever gains a sound of its own.
  */
+import { readPref, SOUND_OFF_KEY, writePref } from "../ui/prefs";
 import { createChip, MUSIC, SFX } from "./chip";
 
 export class Chip {
   private readonly chip = createChip();
+
+  constructor() {
+    // The saved choice, before the first cue: a player who silenced the game
+    // must not hear the title screen say so again on the next visit.
+    if (readPref(SOUND_OFF_KEY) === "1" && !this.chip.muted) this.chip.toggleMute();
+  }
 
   /** Safe on every gesture; browsers refuse an AudioContext before one. */
   unlock(): void {
@@ -55,7 +62,9 @@ export class Chip {
     this.cue(which === "stop" ? MUSIC.stop : MUSIC[which]);
   }
   toggleMute(): boolean {
-    return this.chip.toggleMute();
+    const off = this.chip.toggleMute();
+    writePref(SOUND_OFF_KEY, off ? "1" : "0");
+    return off;
   }
   get muted(): boolean {
     return this.chip.muted;

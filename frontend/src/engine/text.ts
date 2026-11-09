@@ -106,7 +106,24 @@ const BODY = () => `${lead()}"VT323","PressStart2P",ui-monospace,monospace,${bac
  * keep a label's height, and ends up narrower; VT323 is a tall narrow one, so
  * a face swapped into the body roles is matched on cap height.
  */
-export const UI_FACES = ["game", "dos", "dunggeunmo", "galmuri", "comic"] as const;
+export const UI_FACES = [
+  "game",
+  "dos",
+  "dunggeunmo",
+  "galmuri",
+  "comic",
+  "unifont",
+  "nunito",
+  "atkinson",
+  "dmsans",
+  "geist",
+  "plexsans",
+  "instrument",
+  "grotesk",
+  "lora",
+  "fraunces",
+  "newsreader",
+] as const;
 export type UiFace = (typeof UI_FACES)[number];
 
 interface UiFaceSpec {
@@ -130,6 +147,32 @@ const UI_FACE_SPEC: Record<UiFace, UiFaceSpec> = {
   galmuri: { family: "Galmuri11", pixel: 1, body: 0.75 },
   // Comic Mono: cap 0.715 em, advance 0.545 em.
   comic: { family: "ComicMono", pixel: 1.2, body: 0.78 },
+  // The faces below came over from FruitNation Messenger. Each is matched
+  // on cap height to VT323 for `body` (0.56 / cap) and set at the same
+  // multiple of its cap as Comic Mono for `pixel` (0.86 / cap): the outline
+  // faces are proportional, so a label in one ends up narrower, not taller.
+  // GNU Unifont: the 8x16 cell of DOS VGA, and every script in it.
+  unifont: { family: "Unifont", pixel: 1.25, body: 0.9 },
+  // Nunito Sans: cap 0.705 em, advance 0.553 em.
+  nunito: { family: "NunitoSans", pixel: 1.22, body: 0.79 },
+  // Atkinson Hyperlegible Next: cap 0.668 em, advance 0.55 em.
+  atkinson: { family: "AtkinsonNext", pixel: 1.29, body: 0.84 },
+  // DM Sans: cap 0.70 em, advance 0.578 em.
+  dmsans: { family: "DMSans", pixel: 1.23, body: 0.8 },
+  // Geist: cap 0.71 em, advance 0.581 em.
+  geist: { family: "Geist", pixel: 1.21, body: 0.79 },
+  // IBM Plex Sans: cap 0.698 em, advance 0.568 em.
+  plexsans: { family: "PlexSans", pixel: 1.23, body: 0.8 },
+  // Instrument Sans: cap 0.72 em, advance 0.599 em.
+  instrument: { family: "InstrumentSans", pixel: 1.19, body: 0.78 },
+  // Space Grotesk: cap 0.70 em, advance 0.612 em.
+  grotesk: { family: "SpaceGrotesk", pixel: 1.23, body: 0.8 },
+  // Lora, a serif: cap 0.70 em, advance 0.607 em.
+  lora: { family: "Lora", pixel: 1.23, body: 0.8 },
+  // Fraunces, a soft serif: cap 0.70 em, advance 0.686 em.
+  fraunces: { family: "Fraunces", pixel: 1.23, body: 0.8 },
+  // Newsreader, a text serif: cap 0.67 em, advance 0.573 em.
+  newsreader: { family: "Newsreader", pixel: 1.28, body: 0.84 },
 };
 
 /** What each is called on the chip and in the toast. Its own name. */
@@ -139,6 +182,17 @@ export const UI_FACE_NAME: Record<UiFace, string> = {
   dunggeunmo: "DUNGGEUNMO",
   galmuri: "GALMURI",
   comic: "COMIC",
+  unifont: "UNIFONT",
+  nunito: "NUNITO",
+  atkinson: "ATKINSON",
+  dmsans: "DM SANS",
+  geist: "GEIST",
+  plexsans: "PLEX SANS",
+  instrument: "INSTRUMENT",
+  grotesk: "GROTESK",
+  lora: "LORA",
+  fraunces: "FRAUNCES",
+  newsreader: "NEWSREADER",
 };
 
 export const UI_FACE_KEY = "ui.face";
@@ -153,7 +207,19 @@ const lead = () => {
  * first use and never before: Galmuri is half a megabyte of Hangul, and a
  * player who never picks it should never pay for it.
  */
-const FACE_FILES: Record<string, string> = {
+interface FaceSubset {
+  file: string;
+  /** A variable face's weight range, as `@font-face` would say it. */
+  weight?: string;
+  /** The code points this file covers, so only the subset a page uses is fetched. */
+  range?: string;
+}
+
+/**
+ * One file, or the Latin and Latin Extended subsets of a Google Fonts build
+ * (Czech is in Latin Extended), each added under the same family.
+ */
+const FACE_FILES: Record<string, string | FaceSubset[]> = {
   DOSVGA: "/fonts/IBM-VGA-8x16.woff",
   NeoDunggeunmo: "/fonts/neodgm.woff2",
   NeoDunggeunmoCode: "/fonts/neodgm_code.woff2",
@@ -167,6 +233,132 @@ const FACE_FILES: Record<string, string> = {
   VictorMonoScript: "/fonts/VictorMono-Italic.woff2",
   FantasqueSansMono: "/fonts/FantasqueSansMono-Regular.woff2",
   MonaspaceRadon: "/fonts/MonaspaceRadon-Regular.woff2",
+  PlexMono: [
+    {
+      file: "/fonts/ibm-plex-mono-400-latin.woff2",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/ibm-plex-mono-400-latin-ext.woff2",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  Unifont: "/fonts/unifont.woff2",
+  NunitoSans: [
+    {
+      file: "/fonts/NunitoSans-Latin.woff2",
+      weight: "200 1000",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+  ],
+  AtkinsonNext: [
+    {
+      file: "/fonts/atkinson-hyperlegible-next-latin.woff2",
+      weight: "400 700",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/atkinson-hyperlegible-next-latin-ext.woff2",
+      weight: "400 700",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  DMSans: [
+    {
+      file: "/fonts/dm-sans-latin.woff2",
+      weight: "100 1000",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/dm-sans-latin-ext.woff2",
+      weight: "100 1000",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  Geist: [
+    {
+      file: "/fonts/geist-latin.woff2",
+      weight: "100 900",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/geist-latin-ext.woff2",
+      weight: "100 900",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  PlexSans: [
+    {
+      file: "/fonts/ibm-plex-sans-latin.woff2",
+      weight: "100 700",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/ibm-plex-sans-latin-ext.woff2",
+      weight: "100 700",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  InstrumentSans: [
+    {
+      file: "/fonts/instrument-sans-latin.woff2",
+      weight: "400 700",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/instrument-sans-latin-ext.woff2",
+      weight: "400 700",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  SpaceGrotesk: [
+    {
+      file: "/fonts/space-grotesk-var-latin.woff2",
+      weight: "300 700",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/space-grotesk-var-latin-ext.woff2",
+      weight: "300 700",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  Lora: [
+    {
+      file: "/fonts/lora-latin.woff2",
+      weight: "400 700",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/lora-latin-ext.woff2",
+      weight: "400 700",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  Fraunces: [
+    {
+      file: "/fonts/fraunces-latin.woff2",
+      weight: "100 900",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/fraunces-latin-ext.woff2",
+      weight: "100 900",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
+  Newsreader: [
+    {
+      file: "/fonts/newsreader-var-latin.woff2",
+      weight: "200 800",
+      range: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    },
+    {
+      file: "/fonts/newsreader-var-latin-ext.woff2",
+      weight: "200 800",
+      range: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF",
+    },
+  ],
 };
 const faceLoads = new Map<string, Promise<boolean>>();
 
@@ -183,9 +375,19 @@ function loadFamily(family: string): Promise<boolean> {
     p = (async () => {
       try {
         if (typeof FontFace === "undefined" || !document.fonts) return false;
-        const face = new FontFace(family, `url(${file})`, { display: "block" });
-        await face.load();
-        document.fonts.add(face);
+        const parts: FaceSubset[] = typeof file === "string" ? [{ file }] : file;
+        const faces = parts.map(
+          (p) =>
+            new FontFace(family, `url(${p.file})`, {
+              display: "block",
+              ...(p.weight ? { weight: p.weight } : {}),
+              ...(p.range ? { unicodeRange: p.range } : {}),
+            }),
+        );
+        // Every subset, not only the one the first word needs: the screen is
+        // measured once, and a Czech word later must not re-lay it out.
+        await Promise.all(faces.map((f) => f.load()));
+        for (const f of faces) document.fonts.add(f);
         return true;
       } catch {
         return false;
@@ -263,6 +465,8 @@ export const CODE_FACES = [
   "victorscript",
   "fantasque",
   "radon",
+  "plexmono",
+  "unifont",
 ] as const;
 export type CodeFace = (typeof CODE_FACES)[number];
 
@@ -304,6 +508,10 @@ export const CODE_FACE_SCALE: Record<CodeFace, number> = {
   fantasque: 0.9,
   // Monaspace Radon, the handwritten one: cap 0.73 em, advance 0.62 em.
   radon: 0.77,
+  // IBM Plex Mono: cap 0.698 em, advance 0.6 em.
+  plexmono: 0.8,
+  // GNU Unifont: the 8x16 cell of DOS VGA, cap 0.625 em.
+  unifont: 0.85,
 };
 
 /** What to call each on the button. Its own name, not a description. */
@@ -323,6 +531,8 @@ export const CODE_FACE_NAME: Record<CodeFace, string> = {
   victorscript: "VICTOR MONO ITALIC",
   fantasque: "FANTASQUE",
   radon: "RADON HANDWRITING",
+  plexmono: "PLEX MONO",
+  unifont: "UNIFONT",
 };
 
 /**
@@ -346,6 +556,8 @@ const CODE_FACE_WEIGHT: Record<CodeFace, string> = {
   victorscript: "normal",
   fantasque: "normal",
   radon: "normal",
+  plexmono: "normal",
+  unifont: "normal",
 };
 
 /** The family each code face is fetched as, for the ones `style.css` lacks. */
@@ -368,6 +580,8 @@ const CODE_FACE_FAMILY: Record<CodeFace, string | null> = {
   victorscript: "VictorMonoScript",
   fantasque: "FantasqueSansMono",
   radon: "MonaspaceRadon",
+  plexmono: "PlexMono",
+  unifont: "Unifont",
 };
 
 let codeFace: CodeFace = "game";
@@ -455,7 +669,9 @@ export function fontStacks(): { pixel: string; body: string; code: string } {
 
 /** Every downloadable face's file, for the test that they are all shipped. */
 export function faceFiles(): string[] {
-  return Object.values(FACE_FILES);
+  return Object.values(FACE_FILES).flatMap((f) =>
+    typeof f === "string" ? [f] : f.map((p) => p.file),
+  );
 }
 
 export type FontName =

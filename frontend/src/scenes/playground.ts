@@ -2791,7 +2791,7 @@ export class PlaygroundScene implements Scene {
   }
 
   /**
-   * The two display toggles, as buttons rather than only as keys.
+   * The display toggles, and SOUND, as buttons rather than only as keys.
    *
    * F1 and F11 have always done this on every screen; a key is not a control
    * on a phone, and this is the screen people reach for on a phone. Each says
@@ -2810,6 +2810,12 @@ export class PlaygroundScene implements Scene {
     const choice = this.app.layout.choice;
     return [
       { id: "fullscreen", label: this.app.isFullscreen() ? t("pg.full") : t("pg.window") },
+      // The chip's sfx and music. Like the others, says the state it is in.
+      {
+        id: "sound",
+        label: this.app.chip.muted ? t("pg.soundOff") : t("pg.soundOn"),
+        strong: !this.app.chip.muted,
+      },
       {
         id: "orient",
         label:
@@ -2833,6 +2839,13 @@ export class PlaygroundScene implements Scene {
     }
     if (id === "orient") {
       this.app.cycleOrientation();
+      return true;
+    }
+    if (id === "sound") {
+      const off = this.app.chip.toggleMute();
+      // Turned on, it says so in its own voice; turned off, it cannot.
+      if (!off) this.app.chip.blip();
+      this.app.say(off ? t("pg.soundOffSay") : t("pg.soundOnSay"));
       return true;
     }
     return false;

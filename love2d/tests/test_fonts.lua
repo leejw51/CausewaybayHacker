@@ -147,9 +147,9 @@ return function()
   end
 
   T.case("every code face has a name, a measured size and a weight", function()
-    T.eq(#Assets.CODE_FACES, 15, "the web's fifteen, in the web's order")
+    T.eq(#Assets.CODE_FACES, 17, "the web's seventeen, in the web's order")
     T.eq(Assets.CODE_FACES[1], "game")
-    T.eq(Assets.CODE_FACES[#Assets.CODE_FACES], "radon")
+    T.eq(Assets.CODE_FACES[#Assets.CODE_FACES], "unifont")
     for _, face in ipairs(Assets.CODE_FACES) do
       T.ok(type(Assets.CODE_FACE_NAME[face]) == "string", face .. " has a name")
       local scale = Assets.CODE_FACE_SCALE[face]
@@ -237,7 +237,7 @@ return function()
 
   T.case("every interface face loads, and still draws every language", function()
     local was = Assets.uiFace()
-    T.eq(#Assets.UI_FACES, 5)
+    T.eq(#Assets.UI_FACES, 16)
     T.eq(Assets.UI_FACES[1], "game", "the game's own face is the default")
     local chars = corpus()
     for _, face in ipairs(Assets.UI_FACES) do
@@ -280,10 +280,10 @@ return function()
 
   T.case("the two choices cycle and wrap, and do not move each other", function()
     local code, ui = Assets.codeFace(), Assets.uiFace()
-    Assets.setCodeFace("radon")
+    Assets.setCodeFace("unifont")
     T.eq(Assets.cycleCodeFace(), "game", "the code cycle wraps")
     T.eq(Assets.cycleCodeFace(), "iosevka")
-    Assets.setUiFace("comic")
+    Assets.setUiFace("newsreader")
     T.eq(Assets.cycleUiFace(), "game", "the interface cycle wraps")
     T.eq(Assets.codeFace(), "iosevka", "and leaves the code face alone")
     Assets.setUiFace("nonsense")

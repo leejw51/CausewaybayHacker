@@ -406,7 +406,10 @@ label, title, display — with Galmuri11 at 24 for paragraphs and the code face
 for code. It is half the width of Press Start 2P, so titles stop wrapping,
 and it carries Hangul itself. **F8** cycles the others behind it: Galmuri11,
 Comic Mono, ARCADE (Press Start 2P, which stays on the logo whatever is
-chosen) and IBM's VGA 8×16. Each is set at its measured multiple of the size
+chosen), IBM's VGA 8×16, GNU Unifont, and ten outline reading faces from
+FruitNation Messenger — Nunito Sans, Atkinson Hyperlegible Next, DM Sans,
+Geist, IBM Plex Sans, Instrument Sans, Space Grotesk, Lora, Fraunces and
+Newsreader. Each is set at its measured multiple of the size
 asked for, the web's `UI_FACE_SPEC` number for number, so a swap keeps a
 label's height rather than looking like a mistake; Press Start 2P stands
 behind whichever is chosen for a glyph it lacks — DOS VGA has no `č`, Comic
