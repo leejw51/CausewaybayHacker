@@ -69,3 +69,38 @@ function reducedMotion(): boolean {
     return false;
   }
 }
+
+/**
+ * A line that rises into place whenever what it says changes: 0 → 1 on an
+ * exponential ease-out (motion.dev), 0.62 s. Draw it `(1 - value) * 14px`
+ * low and at `value` opacity.
+ */
+export class Rise {
+  value = 1;
+  private key: string | null = null;
+  private ctl: { stop(): void } | null = null;
+
+  follow(key: string): number {
+    if (key === this.key) return this.value;
+    const first = this.key === null;
+    this.key = key;
+    this.ctl?.stop();
+    this.ctl = null;
+    if (first || reducedMotion()) {
+      this.value = 1;
+      return 1;
+    }
+    this.value = 0;
+    this.ctl = animate(0, 1, {
+      duration: 0.62,
+      ease: [...EXPO_OUT],
+      onUpdate: (v: number) => {
+        this.value = v;
+      },
+      onComplete: () => {
+        this.ctl = null;
+      },
+    });
+    return this.value;
+  }
+}

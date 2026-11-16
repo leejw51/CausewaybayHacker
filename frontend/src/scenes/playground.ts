@@ -54,11 +54,12 @@ import {
   withFx,
 } from "../ui/chrome";
 import { waveDots, waveLine } from "../ui/wave";
-import { MenuFx, staggered } from "../ui/menufx";
+import { MenuFx, Rise, staggered } from "../ui/menufx";
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
 import { PlayFx } from "../gfx/playfx";
+import { CompileFx } from "../gfx/compilefx";
 import { Popups } from "../ui/popups";
 import { Combo } from "../ui/combo";
 import {
@@ -773,6 +774,13 @@ export class PlaygroundScene implements Scene {
   private fx: CodeFx | null = null;
   /** Light over the whole screen: ripples, flashes, glitches. `gfx/playfx.ts`. */
   private playfx: PlayFx | null = null;
+  /** CONSOLE's compile and run in particles (three.js). `gfx/compilefx.ts`. */
+  private compilefx: CompileFx | null = null;
+  /** The CONSOLE monitor's glass this frame, or null when CONSOLE is not up. */
+  private zenScreen: Rect | null = null;
+  /** CONSOLE's two lines rising in when they change (motion.dev). */
+  private readonly outRise = new Rise();
+  private readonly sayRise = new Rise();
   /** Words over the editor, and the combo badge. `ui/popups.ts`. */
   private pops: Popups | null = null;
   /** The typing combo. `ui/combo.ts`. */
@@ -1603,6 +1611,8 @@ export class PlaygroundScene implements Scene {
     this.fx = null;
     this.playfx?.destroy();
     this.playfx = null;
+    this.compilefx?.destroy();
+    this.compilefx = null;
     this.pops?.destroy();
     this.pops = null;
     this.giveBackMonitor();
@@ -1649,6 +1659,8 @@ export class PlaygroundScene implements Scene {
     this.fx.level = this.fxLevel;
     this.playfx?.destroy();
     this.playfx = new PlayFx(this.app.overlay, this.app.layout);
+    this.compilefx?.destroy();
+    this.compilefx = new CompileFx(this.app.overlay, this.app.layout);
     this.pops?.destroy();
     this.pops = new Popups(this.app.overlay, this.app.layout);
     // The agent's layer goes over the effects, and its fields over that;
@@ -2592,6 +2604,13 @@ export class PlaygroundScene implements Scene {
     const loud = this.fxLevel === "full";
     this.playfx?.setFever(loud ? this.combo.fever() : 0);
     this.playfx?.frame(dt);
+    this.compilefx?.frame(
+      dt,
+      this.fxLevel === "off" ? null : this.zenScreen,
+      this.stage !== "idle",
+      this.stage === "running" || this.stage === "judging",
+      this.result ? (this.result.outcome === "ok" ? "ok" : "bad") : null,
+    );
     this.pops?.combo(
       loud && !this.comboInRail ? shown : null,
       this.combo.count,
@@ -2648,6 +2667,7 @@ export class PlaygroundScene implements Scene {
     // not the one on this screen. (It was carried over — a press on one of
     // its items keeps it open — and the first tap on CODE's MORE closed a
     // menu nobody could see.)
+    this.zenScreen = null;
     if (this.focus !== this.shownFocus) {
       this.shownFocus = this.focus;
       this.moreOpen = false;
@@ -4104,20 +4124,28 @@ export class PlaygroundScene implements Scene {
     g.fillRect(gx + 4, oy, gw - 8, 1);
     g.globalAlpha = 1;
     const shown = elide(say, `> ${text}`, lw);
+    this.zenScreen = [gx, gy, gw, gh];
     // The phosphor's bleed, which the tube's shader gives the code above.
     g.shadowColor = ink;
     g.shadowBlur = Math.round(6 * s);
     if (out) {
-      // What the program printed, above the verdict, in the tube's ink.
+      // What the program printed, above the verdict, in the tube's ink —
+      // rising into place when it changes (motion.dev, exponential out).
       const o = elide(say, out, lw);
-      printf(g, say, o, lx, inkCentreY(say, o, oy, outH), lw, "left");
+      const k = this.outRise.follow(o);
+      g.save();
+      g.globalAlpha *= k;
+      printf(g, say, o, lx, inkCentreY(say, o, oy, outH) + (1 - k) * 14 * s, lw, "left");
+      g.restore();
     }
     if (bad) {
       g.fillRect(lx - 4, ly + 4, Math.min(lw, width(say, shown)) + 8, lineH - 8);
       g.shadowBlur = 0;
       g.fillStyle = "#000";
     }
-    printf(g, say, shown, lx, inkCentreY(say, shown, ly, lineH), lw, "left");
+    const k2 = this.sayRise.follow(shown);
+    g.globalAlpha *= 0.25 + 0.75 * k2;
+    printf(g, say, shown, lx, inkCentreY(say, shown, ly, lineH) + (1 - k2) * 10 * s, lw, "left");
     g.restore();
 
     // A line across the top of the glass, as the machine would print it:
