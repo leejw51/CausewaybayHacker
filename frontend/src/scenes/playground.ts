@@ -4533,16 +4533,35 @@ export class PlaygroundScene implements Scene {
     printf(g, sm, "</>", cx, inkCentreY(sm, "</>", ly, lg), lg, "center");
     cx += lg + pad;
 
+    // The wordmark at seven tenths of the pixel face: full size it was the
+    // loudest thing on a screen whose subject is the code under it.
     const tf = fonts.station;
     const title = t("pg.hudTitle");
+    const tk = 0.7;
     g.save();
-    g.shadowColor = css(Theme.coin, 0.6);
-    g.shadowBlur = Math.round(10 * s);
+    g.shadowColor = css(Theme.coin, 0.5);
+    g.shadowBlur = Math.round(8 * s);
     g.fillStyle = css(Theme.coin);
-    printf(g, tf, title, cx, inkCentreY(tf, title, y, h), w, "left");
+    g.translate(cx, mid);
+    g.scale(tk, tk);
+    printf(g, tf, title, 0, inkCentreY(tf, title, -h / 2 / tk, h / tk), w / tk, "left");
     g.restore();
-    cx += width(tf, title) + pad * 1.5;
+    cx += width(tf, title) * tk + pad * 1.5;
 
+    // What the right side will take — LOG OUT, the wallet, the file, a
+    // little of the pad's name — measured first, so the left side stops
+    // short of it instead of printing through it: on an iPad the streak and
+    // the file name were drawn on top of each other.
+    const fileW = width(sm, `${MAIN_FILE[this.held.lang]}${this.dirty ? " ●" : ""}`);
+    const addrW = app.addressLabel
+      ? width(sm, t("chrome.logout")) +
+        Math.round(16 * s) +
+        Math.round(8 * s) +
+        width(sm, `${app.addressLabel.slice(0, 6)}…${app.addressLabel.slice(-4)}`) +
+        Math.round(16 * s) +
+        Math.round(12 * s)
+      : 0;
+    const limit = x + w - pad - addrW - fileW - Math.round(70 * s);
     const u = app.client.user;
     if (u) {
       const lv = t("pg.hudLevel", { n: u.level });
@@ -4557,7 +4576,8 @@ export class PlaygroundScene implements Scene {
       const base = PlaygroundScene.xpFor(u.level);
       const next = PlaygroundScene.xpFor(u.level + 1);
       const frac = Math.max(0, Math.min(1, (u.xp - base) / Math.max(1, next - base)));
-      const barW = Math.round(170 * s);
+      const lvEnd = cx + bw + Math.round(8 * s);
+      const barW = Math.max(0, Math.min(Math.round(170 * s), limit - lvEnd - Math.round(8 * s)));
       const barH = Math.round(10 * s);
       g.fillStyle = css([0.04, 0.06, 0.18, 1]);
       roundRect(g, cx, mid - barH / 2, barW, barH, barH / 2);
@@ -4572,11 +4592,14 @@ export class PlaygroundScene implements Scene {
       g.stroke();
       cx += barW + Math.round(8 * s);
       const xpText = t("pg.hudXp", { xp: u.xp, next });
-      g.fillStyle = css(Theme.cream, 0.7);
-      printf(g, sm, xpText, cx, inkCentreY(sm, xpText, y, h), w, "left");
-      cx += width(sm, xpText) + pad * 1.5;
+      if (cx + width(sm, xpText) <= limit) {
+        g.fillStyle = css(Theme.cream, 0.7);
+        printf(g, sm, xpText, cx, inkCentreY(sm, xpText, y, h), w, "left");
+        cx += width(sm, xpText) + pad * 1.5;
+      }
     }
-    if (this.dayStreak > 0) {
+    const streakText = t("pg.hudStreak", { n: this.dayStreak });
+    if (this.dayStreak > 0 && cx + Math.round(16 * s) + width(sm, streakText) <= limit) {
       // A small flame, drawn: two drops, orange round gold.
       const fh = Math.round(16 * s);
       const fx = cx + fh * 0.4;
@@ -4591,9 +4614,10 @@ export class PlaygroundScene implements Scene {
       drop(fh / 2, [0.97, 0.6, 0.22, 1]);
       drop(fh / 3.2, Theme.coin);
       cx += fh;
-      const st = t("pg.hudStreak", { n: this.dayStreak });
+      const st = streakText;
       g.fillStyle = css([0.97, 0.6, 0.22, 1]);
       printf(g, sm, st, cx, inkCentreY(sm, st, y, h), w, "left");
+      cx += width(sm, st) + pad;
     }
 
     // From the right: LOG OUT, the wallet, the file.
@@ -4636,9 +4660,11 @@ export class PlaygroundScene implements Scene {
     const pad2 = `${this.heldName()} / `;
     const pw = width(sm, pad2);
     const room = Math.max(0, rx - cx - pad);
-    const shown = elide(sm, pad2, room);
-    g.fillStyle = css(Theme.dim);
-    printf(g, sm, shown, rx - Math.min(pw, room), inkCentreY(sm, shown, y, h), room, "left");
+    if (room >= Math.round(40 * s)) {
+      const shown = elide(sm, pad2, room);
+      g.fillStyle = css(Theme.dim);
+      printf(g, sm, shown, rx - Math.min(pw, room), inkCentreY(sm, shown, y, h), room, "left");
+    }
   }
 
   /** TODAY'S GOALS' height: its label and three goals. */
@@ -5144,7 +5170,14 @@ export class PlaygroundScene implements Scene {
       "left",
     );
     const field: Rect = [cx0 + lw, sy + 3, colW - lw - 6 - infoW, stdinH - 6];
-    if (this.benchIn.finished) this.stdinOverlay?.place(field, fonts.codeSm.size);
+    // The field's type fits its one line: the code's size was taller than
+    // the strip, and a Korean placeholder was cut off at its foot.
+    const stdinPx = Math.min(
+      fonts.codeSm.size,
+      fonts.stationSm.size,
+      Math.round((stdinH - 8) * 0.62),
+    );
+    if (this.benchIn.finished) this.stdinOverlay?.place(field, stdinPx);
     else this.stdinOverlay?.hide();
 
     // The output, top to bottom beside it.
