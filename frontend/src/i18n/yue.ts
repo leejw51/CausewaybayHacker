@@ -75,6 +75,7 @@ export const yue: Partial<Catalogue> = {
   "boot.resuming": "接返你個 session",
 
   "title.press": "撳空白鍵",
+  "title.tagline": "喺香港街頭學九種語言 —— 用真嘅編譯器",
   "title.anyKey": "— 撳邊個掣都得，撳一下都得 —",
   "title.tap": "撳邊度都得",
   "title.footer": "SPACE  開始      F7  語言      F1  畫面方向      F2  CRT      F11  全螢幕",
@@ -250,6 +251,10 @@ export const yue: Partial<Catalogue> = {
   "quest.log": "日誌",
   "quest.hideLog": "收埋日誌",
   "quest.reset": "重設",
+  "quest.stepBrief": "任務",
+  "quest.stepPick": "揀",
+  "quest.stepWrite": "寫",
+  "quest.stepSubmit": "交",
   "quest.undo": "還原",
   "quest.redo": "重做",
   "quest.clearStack": "清走記錄",

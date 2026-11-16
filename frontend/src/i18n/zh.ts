@@ -62,6 +62,7 @@ export const zh: Partial<Catalogue> = {
   "boot.resuming": "正在恢复你的会话",
 
   "title.press": "按空格键",
+  "title.tagline": "在香港街头学九种语言 —— 用真正的编译器",
   "title.anyKey": "— 任意键，点一下也行 —",
   "title.tap": "点屏幕任意位置",
   "title.footer": "SPACE  开始      F7  语言      F1  屏幕方向      F2  CRT      F11  全屏",
@@ -236,6 +237,10 @@ export const zh: Partial<Catalogue> = {
   "quest.log": "日志",
   "quest.hideLog": "隐藏日志",
   "quest.reset": "重置",
+  "quest.stepBrief": "任务",
+  "quest.stepPick": "选择",
+  "quest.stepWrite": "编写",
+  "quest.stepSubmit": "提交",
   "quest.undo": "撤销",
   "quest.redo": "重做",
   "quest.clearStack": "清空记录",

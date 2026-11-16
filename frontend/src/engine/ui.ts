@@ -359,8 +359,8 @@ export function roundBtn(
         : opts.lit || opts.hover
           ? Theme.coin
           : opts.quiet
-            ? Theme.navy
-            : Theme.panel;
+            ? ([0.09, 0.12, 0.3, 1] as RGBA)
+            : ([0.16, 0.2, 0.46, 1] as RGBA);
   const r = Math.min(h / 2, Math.max(6, Math.round(font.size * 0.45)));
   g.save();
   roundRect(g, x + 0.5, y + 0.5, w - 1, h - 1, r);
@@ -374,7 +374,9 @@ export function roundBtn(
   g.fillStyle = "rgba(255,255,255,0.14)";
   g.fillRect(x, y, w, Math.max(1, Math.round(h * 0.12)));
   g.restore();
-  const pale = !opts.face && (opts.quiet || (opts.strong && !opts.hover)) && !opts.dim;
+  // Ink on the gold faces (lit, hovered, a caller's land colour); cream on
+  // every dark one, which is now all the rest.
+  const pale = !opts.face && !opts.lit && !opts.hover && !opts.dim;
   g.fillStyle = css(pale ? Theme.cream : Theme.ink, opts.dim ? 0.5 : 1);
   printf(g, font, label, x, inkCentreY(font, label, y, h), w, "center");
 }

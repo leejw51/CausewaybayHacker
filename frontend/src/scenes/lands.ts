@@ -718,9 +718,17 @@ export class LandsScene implements Scene {
     const fromMascot =
       roomAtBudget - fromFree * lineH - lineH >= Math.round(MASCOT_COMFY * s) ? 1 : 0;
     const extra = Math.min(BLURB_EXTRA, fromFree + fromMascot);
+    // **The mascot before the sentence.** In the landscape grid nine plates
+    // share the column and each is short: two lines of sentence left the crab
+    // no room at all, and a land card without its mascot is the one thing
+    // this screen must not draw. So lines come off the sentence until the
+    // mascot has a sprite's worth of height.
+    let lines = Math.min(BLURB_LINES + extra, fits);
+    while (lines > 0 && inner[3] - recH - lines * lineH - Math.round(8 * s) < Math.round(52 * s))
+      lines--;
     const blurb = capLines(
       wrap(fonts.small, BLURB[land](), inner[2]),
-      Math.min(BLURB_LINES + extra, fits),
+      lines,
       (l) => width(fonts.small, l) <= inner[2],
     );
     const blurbH = blurb.length * fonts.small.height;
@@ -1014,7 +1022,10 @@ export class LandsScene implements Scene {
     // and go" this screen was supposed to have stopped having. Half the width
     // fits two plates of ~285 and still leaves the three category rows more
     // room than they use.
-    const wide = layout.isPortrait() ? 0.46 : LANDS.length > 2 ? 0.5 : 0.34;
+    // Landscape, the redesign's grid: every land on screen at once, four
+    // across and two down, in three fifths of the width; the level panel
+    // keeps the rest.
+    const wide = layout.isPortrait() ? 0.46 : LANDS.length > 2 ? 0.6 : 0.34;
     const f = frame(layout, wide, 0.07);
     const s = f.scale;
     const fonts = ensureFonts(s);
@@ -1060,7 +1071,7 @@ export class LandsScene implements Scene {
       // standing on. The sentence wraps narrower and is cut to fit, which it
       // is built to do.
       const phone = layout.isPhone();
-      const MIN_COL = Math.round((phone ? 150 : 260) * s);
+      const MIN_COL = Math.round((phone ? 150 : layout.isPortrait() ? 260 : 165) * s);
       // The width the heights have to be measured against is decided by the
       // same rule `landGrid` uses, so ask it once for the shape, measure, then
       // ask again for the final geometry. The first call's heights are only
@@ -1079,8 +1090,11 @@ export class LandsScene implements Scene {
         LANDS.length,
         gap,
         MIN_COL,
-        phone ? 0 : this.plateHeight(s, shape.pw, 52),
-        phone ? 0 : this.plateHeight(s, shape.pw),
+        // Landscape takes the fair share too: nine lands are three rows of
+        // three, and every one of them on screen beats a mascot a few pixels
+        // taller with ZIG, LUA and REMIX scrolled out of sight.
+        phone || !layout.isPortrait() ? 0 : this.plateHeight(s, shape.pw, 52),
+        phone || !layout.isPortrait() ? 0 : this.plateHeight(s, shape.pw),
         LANDS.indexOf(this.land),
         // Follow the selection only on the frame it changed on (and on the
         // first frame, when `followed` is still null), never afterwards.
@@ -1346,17 +1360,18 @@ export class LandsScene implements Scene {
         const count = countText(c);
         const cw = width(fonts.stationSm, count);
         const nameFont = fonts.stationSm;
-        const tw = Math.max(0, rx + barW - pad - tx - cw - pad);
+        const tw = Math.max(0, rx + barW - pad - tx);
         const barH = Math.max(3, Math.round(5 * s));
         // What the level is, in a line, when the tile is tall enough for it.
         const blurb = rowH >= nameFont.height + fonts.small.height + barH + Math.round(22 * s);
         const blockH =
-          nameFont.height + (blurb ? fonts.small.height : 0) + barH + Math.round(5 * s);
+          nameFont.height +
+          (blurb ? fonts.small.height : 0) +
+          Math.max(barH, fonts.stationSm.height) +
+          Math.round(5 * s);
         const midY = y + (rowH - blockH) / 2;
         g.fillStyle = css(empty ? Theme.dim : lead ? Theme.coin : Theme.cream);
         printf(g, nameFont, elide(nameFont, catName.toUpperCase(), tw), tx, midY, tw, "left");
-        g.fillStyle = css(empty ? Theme.dim : Theme.coin, 0.9);
-        printf(g, fonts.stationSm, count, rx, midY, barW - pad, "right");
         if (blurb) {
           const line = CAT_LINE[c.category]();
           g.fillStyle = css(Theme.cream, empty ? 0.3 : 0.6);
@@ -1371,7 +1386,18 @@ export class LandsScene implements Scene {
           );
         }
         const by = midY + nameFont.height + (blurb ? fonts.small.height : 0) + Math.round(4 * s);
-        const bw = rx + barW - pad - tx;
+        // The count at the right of the bar's line; the bar takes the rest.
+        g.fillStyle = css(empty ? Theme.dim : Theme.coin, 0.9);
+        printf(
+          g,
+          fonts.stationSm,
+          count,
+          rx,
+          by + barH / 2 - fonts.stationSm.height / 2,
+          barW - pad,
+          "right",
+        );
+        const bw = Math.max(0, rx + barW - pad - tx - cw - pad);
         g.save();
         roundRect(g, tx, by, bw, barH, barH / 2);
         g.fillStyle = css([0.02, 0.03, 0.1, 1], 0.9);
@@ -1445,15 +1471,19 @@ export class LandsScene implements Scene {
         hover: ahov,
         quiet: !ahov,
       });
-      noteBeside(
-        g,
-        fonts.small,
-        this.autoNote ?? t("lands.autoNote"),
-        right[0] + abw + Math.round(12 * s),
-        aby,
-        right[2] - abw - lw - gap - Math.round(24 * s),
-        playH,
-      );
+      // Only where it has room to be a sentence: squeezed between the two
+      // buttons it was "next / uncle…", which said nothing.
+      const noteW = right[2] - abw - lw - gap - Math.round(24 * s);
+      if (noteW >= Math.round(180 * s))
+        noteBeside(
+          g,
+          fonts.small,
+          this.autoNote ?? t("lands.autoNote"),
+          right[0] + abw + Math.round(12 * s),
+          aby,
+          noteW,
+          playH,
+        );
       this.landBtns.add({
         id: "auto",
         rect: [right[0], aby, abw, playH],

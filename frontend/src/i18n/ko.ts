@@ -61,6 +61,7 @@ export const ko: Partial<Catalogue> = {
   "boot.resuming": "세션을 이어받는 중",
 
   "title.press": "스페이스를 누르세요",
+  "title.tagline": "홍콩 거리에서 아홉 가지 언어를 — 진짜 컴파일러로 배우기",
   "title.anyKey": "— 아무 키나, 클릭도 됩니다 —",
   "title.tap": "아무 데나 탭하세요",
   "title.footer": "SPACE  시작      F7  언어      F1  화면 방향      F2  CRT      F11  전체 화면",
@@ -247,6 +248,10 @@ export const ko: Partial<Catalogue> = {
   "quest.log": "로그",
   "quest.hideLog": "로그 숨기기",
   "quest.reset": "초기화",
+  "quest.stepBrief": "브리핑",
+  "quest.stepPick": "고르기",
+  "quest.stepWrite": "작성",
+  "quest.stepSubmit": "제출",
   "quest.undo": "되돌리기",
   "quest.redo": "다시 실행",
   "quest.clearStack": "기록 지우기",

@@ -61,6 +61,7 @@ export const ja: Partial<Catalogue> = {
   "boot.resuming": "セッションを再開しています",
 
   "title.press": "スペースキーを押す",
+  "title.tagline": "香港の街で9つの言語を — 本物のコンパイラで学ぶ",
   "title.anyKey": "— どのキーでも、クリックでも —",
   "title.tap": "どこでもタップ",
   "title.footer": "SPACE  スタート      F7  言語      F1  画面の向き      F2  CRT      F11  全画面",
@@ -246,6 +247,10 @@ export const ja: Partial<Catalogue> = {
   "quest.log": "ログ",
   "quest.hideLog": "ログを隠す",
   "quest.reset": "リセット",
+  "quest.stepBrief": "概要",
+  "quest.stepPick": "選ぶ",
+  "quest.stepWrite": "書く",
+  "quest.stepSubmit": "提出",
   "quest.undo": "元に戻す",
   "quest.redo": "やり直す",
   "quest.clearStack": "履歴を消す",

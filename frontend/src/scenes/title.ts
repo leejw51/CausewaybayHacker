@@ -41,9 +41,9 @@
  * `STORY` on the login screen plays the opening on purpose, as it always did.
  */
 import type { App, Scene } from "../app";
-import { ensureFonts, printf } from "../engine/text";
+import { elide, ensureFonts, printf, width } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, btnPad, clipped, fill, neonPrint, type Ctx, type Rect } from "../engine/ui";
+import { btnBox, btnPad, clipped, neonPrint, roundRect, type Ctx, type Rect } from "../engine/ui";
 import { Buttons, footer, RUST } from "../ui/chrome";
 import { seconds, Tween } from "../engine/motion";
 import { readPref, writePref } from "../ui/prefs";
@@ -215,37 +215,69 @@ export class TitleScene implements Scene {
     );
     g.restore();
 
-    // PRESS SPACE — the words a 16-bit game uses. The line under it is where
-    // the screen admits that it means any of them.
+    // The tagline, in a dark pill under the logo: what the game is, once.
+    const tag = t("title.tagline");
+    const tagY = cy + Math.round(fonts.title.height * 1.35);
+    const tw = Math.min(
+      layout.vw - Math.round(32 * s),
+      width(fonts.small, tag) + Math.round(24 * s),
+    );
+    g.save();
+    g.globalAlpha = Math.min(1, this.logoIn.raw * 2);
+    roundRect(
+      g,
+      (layout.vw - tw) / 2,
+      tagY,
+      tw,
+      fonts.small.height + Math.round(10 * s),
+      Math.round(8 * s),
+    );
+    g.fillStyle = "rgba(11,15,42,0.72)";
+    g.fill();
+    g.fillStyle = css(Theme.coin);
+    printf(
+      g,
+      fonts.small,
+      elide(fonts.small, tag, tw - Math.round(16 * s)),
+      0,
+      tagY + Math.round(5 * s),
+      layout.vw,
+      "center",
+    );
+    g.restore();
+
+    // PRESS SPACE — the words a 16-bit game uses — on a gold key that
+    // breathes slowly. It used to blink at 3.4 Hz; the redesign does not
+    // flicker anywhere, and a slow glow says "here" just as well.
     const promptY = Math.round(layout.vh * (layout.isPortrait() ? 0.63 : 0.66));
     const label = t("title.press");
-    const bw = Math.min(layout.vw - Math.round(40 * s), Math.round(380 * s));
-    const bh = Math.max(layout.minTouchH(), fonts.station.height + Math.round(26 * s));
+    const bw = Math.min(layout.vw - Math.round(40 * s), Math.round(340 * s));
+    const bh = Math.max(layout.minTouchH(), fonts.station.height + Math.round(30 * s));
     const bx = Math.round((layout.vw - bw) / 2);
     const rect: Rect = [bx, promptY, bw, bh];
     const hot = this.buttons.hovered === "start";
-    // Its own plate rather than a `pixBtn`: this is the one control on the one
-    // screen where the word *is* the screen, and a gold-rimmed 16-bit button
-    // around it would make it furniture.
-    const blink = 0.55 + 0.45 * Math.sin(this.t * 3.4);
-    fill(g, Theme.ink, bx, promptY, bw, bh, hot ? 0.92 : 0.72);
-    fill(g, Theme.coin, bx, promptY, bw, Math.round(2 * s), hot ? 1 : blink);
-    fill(
-      g,
-      Theme.coin,
-      bx,
-      promptY + bh - Math.round(2 * s),
-      bw,
-      Math.round(2 * s),
-      hot ? 1 : blink,
-    );
-    g.fillStyle = css(Theme.cream, hot ? 1 : 0.55 + 0.45 * blink);
+    const breathe = 0.5 + 0.5 * Math.sin(this.t * 1.6);
+    const r = Math.round(12 * s);
+    g.save();
+    g.shadowColor = css(Theme.coin, 0.35 + (hot ? 0.4 : 0.3 * breathe));
+    g.shadowBlur = Math.round((14 + (hot ? 16 : 12 * breathe)) * s);
+    const face = g.createLinearGradient(0, promptY, 0, promptY + bh);
+    face.addColorStop(0, "#FFE27A");
+    face.addColorStop(1, "#F8D030");
+    g.fillStyle = face;
+    roundRect(g, bx, promptY, bw, bh, r);
+    g.fill();
+    g.restore();
+    g.fillStyle = "#8A6A00";
+    roundRect(g, bx, promptY + bh - Math.round(4 * s), bw, Math.round(4 * s), Math.round(2 * s));
+    g.fill();
+    g.fillStyle = css(Theme.ink);
     printf(
       g,
       fonts.station,
       label,
       bx,
-      promptY + Math.round((bh - fonts.station.height) / 2),
+      promptY + Math.round((bh - fonts.station.height) / 2) - Math.round(1 * s),
       bw,
       "center",
     );
@@ -266,7 +298,7 @@ export class TitleScene implements Scene {
       // smallest face in the game and dim ink on a dim face at eight pixels is
       // a button with nothing legible in it — which is what a Korean player
       // saw looking for the language they were already in.
-      lit: l.id === locale(),
+      primary: l.id === locale(),
     }));
     // Centred, and measured rather than guessed: six names in six scripts are
     // six different widths, and a row laid out from a fixed left margin sits
@@ -278,7 +310,7 @@ export class TitleScene implements Scene {
     }
     const margin = Math.round(layout.vw * 0.04);
     const rowW = Math.min(layout.vw - margin * 2, total);
-    const langY = promptY + bh + Math.round(46 * s);
+    const langY = promptY + bh + Math.round(40 * s);
     this.langs.row(
       fonts.stationSm,
       [Math.round((layout.vw - rowW) / 2), langY, rowW, bh],

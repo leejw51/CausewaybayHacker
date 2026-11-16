@@ -69,6 +69,7 @@ export const en = {
 
   // -- the title card ------------------------------------------------------
   "title.press": "PRESS SPACE",
+  "title.tagline": "Learn nine languages on the streets of Hong Kong — with real compilers",
   "title.anyKey": "— or any key, or a click —",
   "title.tap": "or tap anywhere",
   "title.footer":
@@ -263,6 +264,10 @@ export const en = {
   "quest.log": "LOG",
   "quest.hideLog": "HIDE LOG",
   "quest.reset": "RESET",
+  "quest.stepBrief": "BRIEF",
+  "quest.stepPick": "PICK",
+  "quest.stepWrite": "WRITE",
+  "quest.stepSubmit": "SUBMIT",
   "quest.undo": "UNDO",
   "quest.redo": "REDO",
   "quest.clearStack": "CLEAR STACK",

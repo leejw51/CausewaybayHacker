@@ -34,6 +34,7 @@ import {
   clipped,
   fill,
   inRect,
+  roundRect,
   well,
   type Ctx,
   type Rect,
@@ -2656,6 +2657,7 @@ export class QuestScene implements Scene {
     );
 
     this.drawToolbar(g, [pad, headerH(layout) + pad + toast, toolW, this.barH]);
+    this.drawSteps(g, s, pad, headerH(layout) + pad + toast, toolW);
 
     // The message bar is *part of the layout*, not an overlay: it used to be
     // painted across the bottom of the body over whatever was there, and with
@@ -2736,10 +2738,7 @@ export class QuestScene implements Scene {
   private joltOffset(s: number): [number, number] {
     if (this.jolt <= 0.001) return [0, 0];
     const k = this.jolt * this.jolt * 18 * s;
-    return [
-      Math.round(Math.sin(this.t * 41.3) * k),
-      Math.round(Math.sin(this.t * 57.9) * k * 0.7),
-    ];
+    return [Math.round(Math.sin(this.t * 41.3) * k), Math.round(Math.sin(this.t * 57.9) * k * 0.7)];
   }
 
   /**
@@ -2769,7 +2768,8 @@ export class QuestScene implements Scene {
         return;
       }
       const u = age / hold;
-      const { scale, alpha } = u < 1 ? zoomIn(u) : u < 1.6 ? { scale: 1, alpha: 1 } : zoomOut((u - 1.6) / 0.6);
+      const { scale, alpha } =
+        u < 1 ? zoomIn(u) : u < 1.6 ? { scale: 1, alpha: 1 } : zoomOut((u - 1.6) / 0.6);
       const font = fonts.title;
       const label = t("quest.sheetCombo", { n: this.sheetCombo.n });
       const cx = this.sheetCombo.x;
@@ -3158,6 +3158,56 @@ export class QuestScene implements Scene {
    * roads and the rest alike: a quest with a quiz has no editor, and nothing
    * is typed. The name is the road it started on.
    */
+  /**
+   * Where the player is in this quest, as the redesign shows it: BRIEF, PICK
+   * (when the quest has a quiz), WRITE (unless it is a cheatsheet, where the
+   * pick is the answer) and SUBMIT, as pills at the right of the toolbar's
+   * first row — done in green, the current one in gold. Drawn only when the
+   * row has room left for it after its buttons.
+   */
+  private drawSteps(g: Ctx, s: number, x: number, y: number, w: number): void {
+    const q = this.quest;
+    if (!q) return;
+    const fonts = ensureFonts(s);
+    const f = fonts.stationSm;
+    const sheet = this.cheatsheet();
+    const steps: string[] = [t("quest.stepBrief")];
+    if (q.quiz) steps.push(t("quest.stepPick"));
+    if (!sheet) steps.push(t("quest.stepWrite"));
+    steps.push(t("quest.stepSubmit"));
+    const busy = this.stage !== "idle";
+    let at = 1;
+    if (q.quiz && !this.quizRight) at = 1;
+    else if (!sheet) at = q.quiz ? 2 : 1;
+    if (busy) at = steps.length - 1;
+    const pillH = f.height + Math.round(6 * s);
+    const gap = Math.round(5 * s);
+    const widths = steps.map((l, i) => width(f, `${i + 1} ${l}`) + Math.round(16 * s));
+    const total = widths.reduce((a, b) => a + b + gap, -gap);
+    const rowItems = this.bar.list().filter((b) => Math.abs(b.rect[1] - y) < 2);
+    const used = rowItems.reduce((m, b) => Math.max(m, b.rect[0] + b.rect[2]), x);
+    let px = x + w - total;
+    if (px < used + Math.round(16 * s)) return;
+    const py = y + Math.max(0, Math.round(((rowItems[0]?.rect[3] ?? pillH) - pillH) / 2));
+    steps.forEach((label, i) => {
+      const done = i < at;
+      const now = i === at;
+      const bw = widths[i];
+      g.save();
+      roundRect(g, px, py, bw, pillH, pillH / 2);
+      g.fillStyle = now
+        ? css(Theme.coin)
+        : done
+          ? css(Theme.admit, 0.22)
+          : css([0.04, 0.06, 0.18, 1], 0.75);
+      g.fill();
+      g.restore();
+      g.fillStyle = now ? css(Theme.ink) : done ? css([0.5, 0.88, 0.63, 1]) : css(Theme.dim);
+      printf(g, f, `${i + 1} ${label}`, px, py + Math.round(3 * s), bw, "center");
+      px += bw + gap;
+    });
+  }
+
   private cheatsheet(): boolean {
     return !!this.quest?.quiz;
   }
@@ -3374,7 +3424,15 @@ export class QuestScene implements Scene {
       if (row.kind === "hole") {
         // The hole is the question: lit, and right where the answer goes.
         const pulse = this.quizRight ? 0.45 : 0.25 + 0.12 * Math.sin(this.t * 4);
-        fill(g, this.quizRight ? Theme.admit : Theme.coin, x + 2, cy, w - 4, fonts.code.height, pulse);
+        fill(
+          g,
+          this.quizRight ? Theme.admit : Theme.coin,
+          x + 2,
+          cy,
+          w - 4,
+          fonts.code.height,
+          pulse,
+        );
         g.fillStyle = css(this.quizRight ? Theme.admit : Theme.coin);
       } else {
         g.fillStyle = css(row.kind === "cut" ? Theme.dim : Theme.grass);
@@ -3556,7 +3614,9 @@ export class QuestScene implements Scene {
       // put the fourth choice under the fold on a ten-line program, and a
       // HACKER program is eighty.
       const twoCol =
-        !!this.quest!.quiz?.program && !this.app.layout.isPortrait() && textW >= Math.round(620 * s);
+        !!this.quest!.quiz?.program &&
+        !this.app.layout.isPortrait() &&
+        textW >= Math.round(620 * s);
       const gutter = Math.round(16 * s);
       const leftW = twoCol ? Math.floor((textW - gutter) * 0.58) : textW;
       let cx = inner[0];
@@ -3636,15 +3696,7 @@ export class QuestScene implements Scene {
       if (tests.hidden_count > 0) {
         // The count only — never the data (SPEC §5.2).
         g.fillStyle = css(Theme.dim);
-        printf(
-          g,
-          fonts.stationSm,
-          tn("quest.hiddenCount", tests.hidden_count),
-          cx,
-          yy,
-          cw,
-          "left",
-        );
+        printf(g, fonts.stationSm, tn("quest.hiddenCount", tests.hidden_count), cx, yy, cw, "left");
         yy += fonts.stationSm.height + Math.round(8 * s);
       }
 
@@ -3667,7 +3719,7 @@ export class QuestScene implements Scene {
           fonts.codeSm.height;
         yy += Math.round(6 * s);
       }
-          yy = Math.max(yy, leftEnd);
+      yy = Math.max(yy, leftEnd);
     });
 
     this.briefOverflow = Math.max(0, yy - top - inner[3]);

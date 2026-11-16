@@ -72,6 +72,7 @@ export const cs: Partial<Catalogue> = {
   "boot.resuming": "obnovuji tvou relaci",
 
   "title.press": "STISKNI MEZERNÍK",
+  "title.tagline": "Nauč se devět jazyků v ulicích Hongkongu — se skutečnými kompilátory",
   "title.anyKey": "— nebo jakoukoli klávesu, nebo klikni —",
   "title.tap": "klepni kamkoli",
   "title.footer":
@@ -261,6 +262,10 @@ export const cs: Partial<Catalogue> = {
   "quest.log": "LOG",
   "quest.hideLog": "SKRÝT LOG",
   "quest.reset": "RESET",
+  "quest.stepBrief": "ZADÁNÍ",
+  "quest.stepPick": "VÝBĚR",
+  "quest.stepWrite": "PSANÍ",
+  "quest.stepSubmit": "ODESLAT",
   "quest.undo": "ZPĚT",
   "quest.redo": "ZNOVU",
   "quest.clearStack": "SMAZAT HISTORII",
