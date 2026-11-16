@@ -81,10 +81,11 @@ test("the redesign: title, lands, map, quest, cleared, record", async ({ page },
     expect(await ids(page)).toEqual(expect.arrayContaining(["next", "map"]));
     await shot("5-cleared");
 
-    // THE RECORD, through the map's menu.
+    // THE RECORD, from the map.
     await clickButton(page, "map");
     await atScreen(page, "map");
-    await clickButton(page, "menu");
+    // On a desktop the bar holds STATS; in the compact bar it is behind MENU.
+    if (!(await ids(page)).includes("aux:stats")) await clickButton(page, "menu");
     await clickButton(page, "aux:stats");
     await expect.poll(async () => sceneNow(page)).toBe("stats");
     await shot("6-record");
