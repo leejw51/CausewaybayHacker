@@ -27,16 +27,18 @@ import { elide, ensureFonts, inkCentreY, printf, width, wrap, type Font } from "
 import { css, Theme } from "../engine/theme";
 import { burstPlan } from "../engine/burst";
 import { remoteSaveAction } from "../net/remote";
+// The playground's buttons are the compact rounded ones, under the names the
+// rest of the game uses for its pixel ones.
 import {
-  BTN_FRAME,
-  btnBox,
-  btnPad,
+  roundBox as btnBox,
+  roundPad as btnPad,
   clipped,
   fill,
   inRect,
-  panel,
-  pixBtn,
-  rowsIn,
+  roundBtn as pixBtn,
+  roundGap,
+  roundRect,
+  roundRowsIn as rowsIn,
   well,
   type Ctx,
   type Rect,
@@ -45,6 +47,11 @@ import { Buttons, footer, frame, header, landColour, titledPanel, landName } fro
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
+import { PlayFx } from "../gfx/playfx";
+import { Popups } from "../ui/popups";
+import { Combo } from "../ui/combo";
+import { clearPlan, comboPlan, shockPlan } from "../engine/burst";
+import type { EditEvent } from "../ui/editor";
 import {
   CODE_THEME_KEY,
   codeWellFace,
@@ -72,12 +79,19 @@ import {
   type CodeFace,
   getCodeFace,
   loadCodeFace,
-  getTextScale,
   setCodeFace,
-  TEXT_SCALE_MAX,
-  TEXT_SCALE_MIN,
 } from "../engine/text";
-import { AUTO_RUN_KEY, STDERR_KEY, readNumberPref, readPref, writePref } from "../ui/prefs";
+import {
+  AUTO_RUN_KEY,
+  CODE_SIZE_KEY,
+  CODE_SIZE_MAX,
+  CODE_SIZE_MIN,
+  CODE_SIZE_STEP,
+  STDERR_KEY,
+  readNumberPref,
+  readPref,
+  writePref,
+} from "../ui/prefs";
 import { Overlay } from "../ui/overlay";
 import { ToolFilter } from "../ui/toolfilter";
 import { clipMessage, copyText, readText } from "../ui/clip";
@@ -397,6 +411,54 @@ export function consoleLine(run: PlaygroundRun | null, stage: RunStage | "idle")
 }
 
 /**
+ * CONSOLE's other line: what the program printed, in one line — the last
+ * non-empty line of stdout, as a terminal leaves it on screen. Empty when
+ * nothing has run, or the run never got as far as running.
+ */
+export function consoleOutput(run: PlaygroundRun | null, stage: RunStage | "idle"): string {
+  if (stage !== "idle" || !run || run.outcome === "compile_error") return "";
+  const lines = run.stdout
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim() !== "");
+  return lines.length ? lines[lines.length - 1] : t("pg.consoleNoOutput");
+}
+
+/** The output banner's word for an outcome: short, loud, a game's. */
+function bannerTitle(o: PlaygroundRun["outcome"]): string {
+  switch (o) {
+    case "ok":
+      return t("pg.fxClear");
+    case "compile_error":
+      return t("pg.fxBuild");
+    case "runtime_error":
+      return t("pg.fxCrash");
+    case "timeout":
+      return t("pg.fxTimeout");
+    case "output_limit":
+      return t("pg.fxFlood");
+  }
+}
+
+/** How many runs the strip under the output remembers. */
+const RECENT_RUNS = 16;
+
+/**
+ * Where a failed run went wrong, for the hit on the line: the line (1-based)
+ * and the compiler's code, from the diagnostics first and the stderr's
+ * `file:line:col` after — the same reading `consoleLine` does.
+ */
+export function errorAt(run: PlaygroundRun): { line: number | null; code: string } {
+  const d = run.diagnostics.find((x) => x.kind === "error") ?? run.diagnostics[0];
+  if (d) return { line: d.line, code: d.code ?? "" };
+  const text = run.stderr.replace(/\x1b\[[0-9;]*m/g, "");
+  const place = /[\w./-]+\.\w+:(\d+):\d+/.exec(text);
+  const code = /error\[(E\d+)\]/.exec(text);
+  return { line: place ? Number(place[1]) : null, code: code ? code[1] : "" };
+}
+
+/**
  * The open scratchpad. `dirty` is mirrored with it: text that never reached the
  * server must be able to say so after a reload, or the next visit would fetch
  * the older server copy over the top of it and the loss would be silent.
@@ -563,10 +625,14 @@ export class PlaygroundScene implements Scene {
    * mode and taken off after it, and neither preference is written.
    */
   private lentFace: CodeFace | null = null;
+  /** Was CODE on when CONSOLE was entered? Leaving CONSOLE goes back there. */
+  private zenFromCode = false;
 
   private stage: RunStage | "idle" = "idle";
   /** See `AUTO_RUN_KEY`. */
   private autoRun = readPref(AUTO_RUN_KEY) !== "off";
+  /** The editor's own size: see `CODE_SIZE_KEY`. */
+  private codeMul = readNumberPref(CODE_SIZE_KEY, 1, CODE_SIZE_MIN, CODE_SIZE_MAX);
   /** See `STDERR_KEY`. */
   private showStderr = readPref(STDERR_KEY) === "on";
   /**
@@ -627,14 +693,26 @@ export class PlaygroundScene implements Scene {
   private t = 0;
   /** The typing effects, over the editor. See `ui/codefx.ts`. */
   private fx: CodeFx | null = null;
+  /** Light over the whole screen: ripples, flashes, glitches. `gfx/playfx.ts`. */
+  private playfx: PlayFx | null = null;
+  /** Words over the editor, and the combo badge. `ui/popups.ts`. */
+  private pops: Popups | null = null;
+  /** The typing combo. `ui/combo.ts`. */
+  private readonly combo = new Combo();
+  /** The outcomes of this visit's runs, oldest first, for the strip under the output. */
+  private runs: PlaygroundRun["outcome"][] = [];
+  /** When the last run's answer arrived (scene time), for the banner's flash. */
+  private answeredAt = -10;
+  /** Whether the run before this one failed: a fix is worth a bigger party. */
+  private lastBad = false;
   /** The old computer's tube over the editor (`gfx/retroscreen.ts`). */
   private retro: RetroScreen | null = null;
   /** The Rust coder: the AI agent that flies over the code (`ui/agent/coder.ts`). */
   private coder: Coder | null = null;
   private readonly benchIn = new Tween(seconds("panel"));
   private readonly listIn = new Tween(seconds("panel"), seconds("stagger"));
-  private readonly buttons = new Buttons();
-  private readonly rows = new Buttons();
+  private readonly buttons = new Buttons(true);
+  private readonly rows = new Buttons(true);
   /** The box at the head of the button band, on the bench and in CODE. */
   private readonly tools = new ToolFilter();
   private offs: Array<() => void> = [];
@@ -893,12 +971,22 @@ export class PlaygroundScene implements Scene {
     this.clipSaid(t("clip.yourCode"), res, "paste");
   }
 
-  /** One step of the text size — every screen's, not just this editor's. */
+  /**
+   * One step of the editor's type size — the editor's alone. The menus keep
+   * the app-wide size (F9 / F10), so a bigger editor is not a smaller one
+   * squeezed between bigger buttons.
+   */
   private sizeFont(dir: 1 | -1): void {
-    // Said by the app, like F9 / F10 — the size is not this screen's news.
-    const next = this.app.sizeText(dir);
-    this.app.say(t("quest.fontSize", { percent: Math.round(getTextScale() * 100) }));
-    if (next !== null) this.app.chip.blip();
+    const before = this.codeMul;
+    const next =
+      Math.round(
+        Math.min(CODE_SIZE_MAX, Math.max(CODE_SIZE_MIN, before + dir * CODE_SIZE_STEP)) * 100,
+      ) / 100;
+    this.app.say(t("quest.fontSize", { percent: Math.round(next * 100) }));
+    if (next === before) return;
+    this.codeMul = next;
+    writePref(CODE_SIZE_KEY, String(next));
+    this.app.chip.blip();
   }
 
   /**
@@ -936,10 +1024,12 @@ export class PlaygroundScene implements Scene {
   private async toggleZen(): Promise<void> {
     if (this.zen) {
       this.zen = false;
+      this.focus = this.zenFromCode;
       this.giveBackMonitor();
       this.app.chip.blip();
       return;
     }
+    this.zenFromCode = this.focus;
     this.focus = true;
     this.zen = true;
     if (this.coder?.open) this.coder.toggle();
@@ -1183,9 +1273,80 @@ export class PlaygroundScene implements Scene {
    * ENTER in the editor, with AUTO-RUN on. A run already out is not
    * interrupted; one more follows it, for the code as it is by then.
    */
+  /** Where a button is on screen this frame, by id: its centre, virtual. */
+  private buttonAt(id: string): [number, number] | null {
+    const b = this.buttons.list().find((x) => x.id === id);
+    return b ? [b.rect[0] + b.rect[2] / 2, b.rect[1] + b.rect[3] / 2] : null;
+  }
+
+  /** RUN was pressed: a ripple and a shockwave from the button. */
+  private launched(): void {
+    const at = this.buttonAt("run");
+    if (!at) return;
+    this.playfx?.launch(at[0], at[1], Theme.coin);
+    this.fx?.play(shockPlan(at[0], at[1], 70, Theme.coin));
+  }
+
+  /**
+   * The answer is in: the screen says it the way a game would. A clean run
+   * flashes green from the output and sweeps gold down the code — and when
+   * it was pressed for, or it fixes the run before it, fireworks go up over
+   * the editor. A failure glitches the editor, shakes it, and puts the hit
+   * on the line that took it. AUTO-RUN, which runs on every ENTER, gets the
+   * light and not the fireworks.
+   */
+  private answered(run: PlaygroundRun, how: "auto" | "press"): void {
+    this.answeredAt = this.t;
+    this.runs = [...this.runs, run.outcome].slice(-RECENT_RUNS);
+    const ed = this.editorRect[2] > 0 ? this.editorRect : null;
+    const out = this.outputRect[2] > 0 ? this.outputRect : ed;
+    const ok = run.outcome === "ok";
+    const fixed = ok && this.lastBad;
+    this.lastBad = !ok;
+    if (ok) {
+      if (out) this.playfx?.clear(out[0] + out[2] / 2, out[1], Theme.admit);
+      if (ed && (how === "press" || fixed)) {
+        this.fx?.play(clearPlan({ x: ed[0], y: ed[1], w: ed[2], h: ed[3] }, fixed));
+        this.pops?.pop(
+          ed[0] + ed[2] / 2,
+          ed[1] + ed[3] * 0.35,
+          fixed ? t("pg.fxFixed") : t("pg.fxClear"),
+          "clear",
+        );
+      }
+      if (out && how === "press")
+        this.pops?.pop(out[0] + out[2] / 2, out[1] + out[3] * 0.45, `${run.run_ms} ms`, "info");
+      return;
+    }
+    this.playfx?.hurt();
+    this.editor?.shake();
+    const where = errorAt(run);
+    const label = `-1 HP${where.code ? `  ${where.code}` : ""}`;
+    const at = where.line !== null ? this.editor?.lineClient(where.line) : null;
+    // Only on the line if the line is on screen; scrolled away, the middle.
+    const v = at ? this.app.layout.toVirtual(at[0], at[1]) : null;
+    const seen =
+      v && ed && v[1] >= ed[1] && v[1] <= ed[1] + ed[3] && v[0] >= ed[0] && v[0] <= ed[0] + ed[2];
+    if (at && seen) this.pops?.popClient(at[0], at[1], label, "hurt");
+    else if (ed) this.pops?.pop(ed[0] + ed[2] / 2, ed[1] + ed[3] / 2, label, "hurt");
+  }
+
+  /** Every edit: the combo counts keys, and a milestone throws a fountain. */
+  private edited(e: EditEvent): void {
+    if (e.kind !== "type" && e.kind !== "enter") return;
+    const m = this.combo.hit(this.t);
+    if (!m) return;
+    const c = this.editor?.caretClient();
+    const v = c ? this.app.layout.toVirtual(c[0], c[1]) : null;
+    if (!v) return;
+    this.fx?.play(comboPlan(v[0], v[1], this.combo.tier() * 2));
+    this.pops?.pop(v[0], v[1] - 24, t("pg.fxCombo", { n: m }), "combo");
+    this.app.chip.blip();
+  }
+
   private autoEnter(): void {
     if (!this.autoRun || this.conflict) return;
-    if (this.stage === "idle") void this.run();
+    if (this.stage === "idle") void this.run("auto");
     else this.runAgain = true;
   }
 
@@ -1210,8 +1371,8 @@ export class PlaygroundScene implements Scene {
   /** The two size buttons, for the bench and for CODE alike. */
   private fontItems(): Array<{ id: string; label: string; dim?: boolean }> {
     return [
-      { id: "fontdown", label: t("quest.fontDown"), dim: getTextScale() <= TEXT_SCALE_MIN + 0.001 },
-      { id: "fontup", label: t("quest.fontUp"), dim: getTextScale() >= TEXT_SCALE_MAX - 0.001 },
+      { id: "fontdown", label: t("quest.fontDown"), dim: this.codeMul <= CODE_SIZE_MIN + 0.001 },
+      { id: "fontup", label: t("quest.fontUp"), dim: this.codeMul >= CODE_SIZE_MAX - 0.001 },
       // Says the face it is **in**, like every other toggle on this screen.
       { id: "face", label: CODE_FACE_NAME[getCodeFace()] },
       // The paper under the code, saying which it is on, like the face.
@@ -1313,6 +1474,10 @@ export class PlaygroundScene implements Scene {
     this.overlay?.destroy();
     this.fx?.destroy();
     this.fx = null;
+    this.playfx?.destroy();
+    this.playfx = null;
+    this.pops?.destroy();
+    this.pops = null;
     this.giveBackMonitor();
     this.zen = false;
     this.retro?.destroy();
@@ -1353,6 +1518,11 @@ export class PlaygroundScene implements Scene {
     this.fx?.destroy();
     this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
     this.fx.attach(this.editor);
+    this.fx.onEdit = (e) => this.edited(e);
+    this.playfx?.destroy();
+    this.playfx = new PlayFx(this.app.overlay, this.app.layout);
+    this.pops?.destroy();
+    this.pops = new Popups(this.app.overlay, this.app.layout);
     // The agent's layer goes over the effects, and its fields over that;
     // the bench's own fields come after and stay on top of everything.
     this.coder?.leave();
@@ -1684,8 +1854,9 @@ export class PlaygroundScene implements Scene {
     }
   }
 
-  private async run(): Promise<PlaygroundRun | null> {
+  private async run(how: "auto" | "press" = "press"): Promise<PlaygroundRun | null> {
     if (this.stage !== "idle") return null;
+    if (how === "press") this.launched();
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
     this.status = "";
@@ -1708,6 +1879,7 @@ export class PlaygroundScene implements Scene {
       // CONSOLE says it in one line of its own, under the glass.
       if (res.run.outcome !== "ok" && machine !== "normal" && !this.zen)
         this.retro?.say(runMessage(machine, res.run));
+      this.answered(res.run, how);
       if (res.run.outcome === "ok") this.app.chip.coin();
       // No screen shake here, on purpose *and* because it could not land:
       // `App.shake` refuses while the overlay has children, and this screen
@@ -2258,6 +2430,12 @@ export class PlaygroundScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     this.fx?.frame(dt);
+    this.combo.tick(this.t);
+    const shown = this.editorRect[2] > 0 ? this.editorRect : null;
+    if (shown) this.playfx?.editor(shown);
+    this.playfx?.setFever(this.combo.fever());
+    this.playfx?.frame(dt);
+    this.pops?.combo(shown, this.combo.count, this.combo.left(this.t), this.combo.tier());
     this.retro?.frame(dt);
     this.coder?.syncRoom();
     this.coder?.update(dt);
@@ -2402,7 +2580,7 @@ export class PlaygroundScene implements Scene {
       inner,
       minH,
     );
-    const buttonsH = rowsN * bh + (rowsN - 1) * Math.round(fonts.button.size * 0.5);
+    const buttonsH = rowsN * bh + (rowsN - 1) * roundGap(fonts.button);
     const titleH = fonts.stationSm.height + Math.round(fonts.stationSm.size * 0.9);
     const h = 14 + titleH + 16 + lines.length * body.height + pad + buttonsH + 16 + pad;
     const x = Math.round((layout.vw - w) / 2);
@@ -2921,7 +3099,7 @@ export class PlaygroundScene implements Scene {
     ]);
     // The filter box heads the first row and the buttons flow on after it.
     const filterW = this.tools.width(f);
-    const lead = filterW + Math.round(f.size * 0.5);
+    const lead = filterW + roundGap(f);
     const rowW = Math.max(lead + f.size * 4, bx - pad * 2);
     const rows = rowsIn(
       f,
@@ -2930,7 +3108,7 @@ export class PlaygroundScene implements Scene {
       layout.minTouchH(),
       lead,
     );
-    const rowGap = Math.round(f.size * 0.5);
+    const rowGap = roundGap(f);
     const bandH = rows * dh + (rows - 1) * rowGap;
     const strip = pad + Math.max(bandH, dh) + Math.round(3 * s) + f.height + Math.round(4 * s);
     fill(g, Theme.ink, 0, 0, layout.vw, strip, 0.82);
@@ -3126,7 +3304,7 @@ export class PlaygroundScene implements Scene {
     const editorRect = this.screen(g, [pad, top, editorW, editorH]);
     this.editorRect = editorRect;
     if (this.editor) {
-      this.overlay?.place(editorRect, fonts.codeSm.size);
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.codeMul);
       this.retro?.place(editorRect);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
@@ -3163,7 +3341,7 @@ export class PlaygroundScene implements Scene {
       },
       { id: "console", label: t("pg.console"), strong: true },
     ];
-    const gapB = Math.round(f.size * 0.5);
+    const gapB = roundGap(f);
     const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
     const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
     const dh = boxes[0][1];
@@ -3188,10 +3366,13 @@ export class PlaygroundScene implements Scene {
     const code = fonts.codeSm;
     const say = fonts.code;
     const lineH = say.height + Math.round(12 * s);
+    const out = consoleOutput(this.result, this.stage);
+    const outH = out ? say.height + Math.round(6 * s) : 0;
     const machine = getComputer();
     const [ir, ig, ib] = machine === "normal" ? [0.8, 0.85, 1] : TUBE[machine].ink;
     const ink = `rgb(${Math.round(ir * 255)},${Math.round(ig * 255)},${Math.round(ib * 255)})`;
     const ly = gy + gh - lineH;
+    const oy = ly - outH;
     const text = consoleLine(this.result, this.stage);
     const bad = this.stage === "idle" && this.result !== null && this.result.outcome !== "ok";
     const lx = gx + Math.round(8 * s);
@@ -3199,12 +3380,17 @@ export class PlaygroundScene implements Scene {
     g.save();
     g.fillStyle = ink;
     g.globalAlpha = 0.35;
-    g.fillRect(gx + 4, ly, gw - 8, 1);
+    g.fillRect(gx + 4, oy, gw - 8, 1);
     g.globalAlpha = 1;
     const shown = elide(say, `> ${text}`, lw);
     // The phosphor's bleed, which the tube's shader gives the code above.
     g.shadowColor = ink;
     g.shadowBlur = Math.round(6 * s);
+    if (out) {
+      // What the program printed, above the verdict, in the tube's ink.
+      const o = elide(say, out, lw);
+      printf(g, say, o, lx, inkCentreY(say, o, oy, outH), lw, "left");
+    }
     if (bad) {
       g.fillRect(lx - 4, ly + 4, Math.min(lw, width(say, shown)) + 8, lineH - 8);
       g.shadowBlur = 0;
@@ -3213,10 +3399,10 @@ export class PlaygroundScene implements Scene {
     printf(g, say, shown, lx, inkCentreY(say, shown, ly, lineH), lw, "left");
     g.restore();
 
-    const editorRect: Rect = [gx, gy, gw, gh - lineH - 2];
+    const editorRect: Rect = [gx, gy, gw, gh - lineH - outH - 2];
     this.editorRect = editorRect;
     if (this.editor) {
-      this.overlay?.place(editorRect, code.size);
+      this.overlay?.place(editorRect, code.size * this.codeMul);
       this.retro?.place(editorRect);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
@@ -3293,7 +3479,7 @@ export class PlaygroundScene implements Scene {
     });
     const langH = langBoxes[0].bh;
     let shownLangs = langBoxes.filter((b) => this.tools.keeps({ id: b.land, label: b.label }));
-    const flowGap = Math.round(bf.size * 0.5);
+    const flowGap = roundGap(bf);
     // The filter box heads the band's first row; the buttons flow after it.
     const filterW = this.tools.width(bf);
     const lead = filterW + flowGap;
@@ -3405,7 +3591,7 @@ export class PlaygroundScene implements Scene {
     const editorRect = this.screen(g, [inner[0], inner[1], colW, editorH]);
     this.editorRect = editorRect;
     if (this.editor && this.benchIn.finished) {
-      this.overlay?.place(editorRect, fonts.codeSm.size);
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.codeMul);
       this.retro?.place(editorRect);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
@@ -3458,21 +3644,8 @@ export class PlaygroundScene implements Scene {
         const [bx, langY] = place(bw);
         const on = this.held.lang === id;
         const hover = this.buttons.hovered === id;
-        if (on) {
-          panel(g, bx, langY, bw, langH, landColour(id));
-          g.fillStyle = css(Theme.ink);
-          printf(
-            g,
-            bf,
-            label,
-            bx,
-            inkCentreY(bf, label, langY + 8, langH - BTN_FRAME),
-            bw,
-            "center",
-          );
-        } else {
-          pixBtn(g, bf, bx, langY, bw, langH, label, { hover, quiet: true });
-        }
+        if (on) pixBtn(g, bf, bx, langY, bw, langH, label, { face: landColour(id) });
+        else pixBtn(g, bf, bx, langY, bw, langH, label, { hover, quiet: true });
         // Painted here, in the land's own colour when it is the live one, so
         // the row says which compiler will run this file. `painted` keeps
         // `Buttons.draw` from putting a plain button over the top of it.
@@ -3505,41 +3678,83 @@ export class PlaygroundScene implements Scene {
     fill(g, Theme.ink, x, y, w, h, 0.78);
     let ty = y + pad;
 
+    // The strip of recent runs along the bottom, one cell a run, newest at
+    // the right: a session's record at a glance, the way a game shows a
+    // streak.
+    const stripH = this.runs.length > 0 ? Math.round(8 * s) : 0;
+    const stripGap = stripH > 0 ? Math.round(5 * s) : 0;
+    if (stripH > 0) {
+      const sy = y + h - pad - stripH;
+      const gap = Math.max(2, Math.round(2 * s));
+      const cw = (w - pad * 2 - gap * (RECENT_RUNS - 1)) / RECENT_RUNS;
+      for (let i = 0; i < RECENT_RUNS; i++) {
+        const o = this.runs[this.runs.length - RECENT_RUNS + i];
+        const cx = x + pad + i * (cw + gap);
+        const col =
+          o === undefined
+            ? Theme.navy
+            : o === "ok"
+              ? Theme.admit
+              : o === "compile_error"
+                ? Theme.red
+                : Theme.coin;
+        g.fillStyle = css(col, o === undefined ? 0.6 : 1);
+        roundRect(g, cx, sy, cw, stripH, Math.round(2 * s));
+        g.fill();
+      }
+    }
+    const bottom = y + h - stripH - stripGap;
+
     const r = this.result;
     if (r) {
       const ok = r.outcome === "ok";
-      fill(g, ok ? Theme.admit : Theme.brick, x, y, w, Math.round(3 * s), 0.9);
-      g.fillStyle = css(ok ? Theme.admit : Theme.red);
+      // The banner: the outcome in the pixel face on a band of its colour,
+      // flashing in when the answer lands and settling to a glow.
+      const age = this.t - this.answeredAt;
+      const flash = Math.max(0, 1 - age / 0.6);
+      const title = bannerTitle(r.outcome);
+      const bandH = fonts.ui.height + Math.round(14 * s);
+      const tint = ok ? Theme.admit : Theme.red;
+      fill(g, tint, x, y, w, bandH, 0.22 + 0.5 * flash);
+      fill(g, tint, x, y, w, Math.round(3 * s), 0.95);
+      g.save();
+      g.shadowColor = css(tint);
+      g.shadowBlur = Math.round((10 + 24 * flash) * s);
+      g.fillStyle = css(ok ? [0.5, 0.95, 0.65, 1] : [1, 0.5, 0.4, 1]);
+      const pop = 1 + 0.25 * flash * flash;
+      g.translate(x + pad, y + bandH / 2);
+      g.scale(pop, pop);
       printf(
         g,
-        fonts.stationSm,
-        OUTCOME[r.outcome](),
-        x + pad,
-        ty + Math.round(3 * s),
-        w - pad * 2,
+        fonts.ui,
+        elide(fonts.ui, title, (w - pad * 2) / pop),
+        0,
+        inkCentreY(fonts.ui, title, -bandH / 2, bandH),
+        (w - pad * 2) / pop,
         "left",
       );
-      g.fillStyle = css(Theme.dim);
+      g.restore();
+      ty = y + bandH + Math.round(4 * s);
       const exit = r.exit_code === null ? "" : t("pg.exit", { code: r.exit_code });
       const timings = t("pg.timings", { compile: r.compile_ms, run: r.run_ms, exit });
-      // **Only on the same line when both fit on it.** The outcome is drawn
-      // left and the timings right against the same baseline, which is one
-      // line as long as the panel is wide. Beside the code it is not, and
-      // `실행됐습니다` and `컴파일 970 ms …` were printed through each other.
-      const together =
-        width(fonts.stationSm, OUTCOME[r.outcome]()) + width(fonts.stationSm, timings) + pad * 3 <=
-        w;
-      if (!together) ty += fonts.stationSm.height + Math.round(2 * s);
-      printf(
-        g,
-        fonts.stationSm,
-        timings,
-        together ? x : x + pad,
-        ty + Math.round(3 * s),
-        w - pad,
-        together ? "right" : "left",
-      );
-      ty += fonts.stationSm.height + Math.round(6 * s);
+      // In the band, on the right, when the title leaves room; under it when
+      // not, so the two never print through each other.
+      const together = width(fonts.ui, title) + width(fonts.stationSm, timings) + pad * 4 <= w;
+      g.fillStyle = css(together ? Theme.cream : Theme.dim, together ? 0.85 : 1);
+      if (together)
+        printf(
+          g,
+          fonts.stationSm,
+          timings,
+          x,
+          inkCentreY(fonts.stationSm, timings, y, bandH),
+          w - pad,
+          "right",
+        );
+      else {
+        printf(g, fonts.stationSm, timings, x + pad, ty, w - pad * 2, "left");
+        ty += fonts.stationSm.height + Math.round(6 * s);
+      }
     } else if (this.status) {
       // Wrapped, and the well starts under however many lines it took. A
       // status that says half a sentence is worse than one that says nothing.
@@ -3552,10 +3767,10 @@ export class PlaygroundScene implements Scene {
       ty += Math.round(4 * s);
     }
 
-    well(g, x, ty, w, Math.max(16, y + h - ty), [0.04, 0.03, 0.1, 0.98]);
-    this.outputRect = [x, ty, w, y + h - ty];
+    well(g, x, ty, w, Math.max(16, bottom - ty), [0.04, 0.03, 0.1, 0.98]);
+    this.outputRect = [x, ty, w, bottom - ty];
     const lineH = fonts.codeSm.height;
-    const room = Math.max(1, Math.floor((y + h - ty - pad * 2) / lineH));
+    const room = Math.max(1, Math.floor((bottom - ty - pad * 2) / lineH));
     const textW = w - pad * 4;
     // **Visual lines, not source lines.** Everything below is wrapped to the
     // panel's width *before* it is counted, so `room`, the scroll and the
@@ -3632,7 +3847,7 @@ export class PlaygroundScene implements Scene {
     const scroll = Math.min(this.outputScroll, this.outputOverflow);
     const end = out.length - scroll;
     const shown = out.slice(Math.max(0, end - room), end);
-    clipped(g, x, ty, w, y + h - ty, () => {
+    clipped(g, x, ty, w, bottom - ty, () => {
       let ly = ty + pad;
       for (const [text, col] of shown) {
         g.fillStyle = css(col);
@@ -3646,7 +3861,7 @@ export class PlaygroundScene implements Scene {
       // Same widget as the quest console's brief scrollbar: a track the full
       // height of the well, a thumb sized and placed by how much is hidden —
       // a panel that can scroll and does not say so is a panel nobody finds.
-      const trackH = y + h - ty;
+      const trackH = bottom - ty;
       const thumbH = Math.max(12, (trackH * trackH) / (trackH + this.outputOverflow * lineH));
       const frac = 1 - scroll / this.outputOverflow;
       fill(g, Theme.ink, x + w - 4, ty, 4, trackH, 0.5);

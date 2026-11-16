@@ -102,6 +102,8 @@ export class CodeFx {
   private carry = 0;
   private kick: ReturnType<typeof setTimeout> | null = null;
   private readonly onPointer = (ev: PointerEvent): void => this.pointed(ev);
+  /** Told of every edit too, after the effects: the playground's combo. */
+  onEdit: ((e: EditEvent) => void) | null = null;
 
   constructor(
     host: HTMLElement,
@@ -176,6 +178,7 @@ export class CodeFx {
   // -- the events ----------------------------------------------------------
 
   private on(e: EditEvent): void {
+    this.onEdit?.(e);
     const cell = this.cell(e.cell);
     switch (e.kind) {
       case "type": {

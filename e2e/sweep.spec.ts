@@ -603,6 +603,12 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
       const el = document.querySelector(".cm-content") as HTMLElement | null;
       return el ? parseFloat(getComputedStyle(el).fontSize) : 0;
     });
+  // The menus do not move with it: A- / A+ here are the editor's alone.
+  const runH = () =>
+    page.evaluate(
+      () => window.__cwbCapture?.buttons().find((b) => b.id === "run")?.rect[3] ?? 0,
+    );
+  const beforeRunH = await runH();
   const beforeFont = await codePx();
   await clickButton(page, "fontup");
   await page.waitForTimeout(500);
@@ -617,9 +623,9 @@ test("3d: playground — write code, run, see the output", async ({ page }) => {
   );
   expect(bigger, "A+ makes the code bigger").toBeGreaterThan(beforeFont);
   expect(smaller, "A- takes it back down").toBeLessThan(bigger);
-  // It is one preference for every screen, so it survives a visit to
-  // another screen and back.
-  expect(await pref(page, "ui.text")).not.toBe("");
+  expect(await runH(), "the menu buttons keep their size").toBe(beforeRunH);
+  // The editor's own preference, not the app-wide text size.
+  expect(await pref(page, "code.size")).not.toBe("");
 
   // The code face, cycled by a button that says which face it is. Measured
   // off the rendered editor: a face button that changes a label and not the

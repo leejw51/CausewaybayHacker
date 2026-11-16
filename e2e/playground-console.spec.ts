@@ -59,13 +59,17 @@ test("CONSOLE puts the pad on a monitor alone, and gives the bench back", async 
   await page.keyboard.type("\n// zen");
   await expect.poll(async () => editorText(page)).toContain("// zen");
 
-  // ESC: back to CODE's toolbar, not out of the screen; the monitor goes back.
+  // ESC: back where CONSOLE was opened from — the bench, not CODE, and not
+  // out of the screen; the monitor goes back.
   await page.keyboard.press("Escape");
-  await expect.poll(async () => ids(page)).toContain("unfocus");
+  await expect.poll(async () => ids(page)).toContain("code");
+  expect(await ids(page)).not.toContain("unfocus");
   expect(await sceneNow(page)).toBe("playground");
   await expect.poll(computer).toBe("normal");
 
-  // And the button again, from CODE, toggles it on and off.
+  // From CODE, the button toggles it on and off, and off is CODE again.
+  await clickButton(page, "code");
+  await expect.poll(async () => ids(page)).toContain("unfocus");
   await clickButton(page, "console");
   await expect.poll(async () => (await ids(page)).sort()).toEqual(["console", "run"]);
   await clickButton(page, "console");
