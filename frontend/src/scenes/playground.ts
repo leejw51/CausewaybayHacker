@@ -533,7 +533,7 @@ type SavedCopy = { source: string; lang: Lang; name: string; stdin: string };
 const SCRATCH = "SCRATCH";
 
 /** The shortest a pressed RUN's compile animation is on screen. */
-const MIN_SHOW_MS = 2000;
+const MIN_SHOW_MS = 1000;
 
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
@@ -2047,7 +2047,7 @@ export class PlaygroundScene implements Scene {
         source,
         ...(this.stdinEl.value ? { stdin: this.stdinEl.value } : {}),
       });
-      // A pressed RUN shows its compile for at least two seconds: a build
+      // A pressed RUN shows its compile for at least one second: a build
       // that is back in 100 ms would otherwise flash the waiting curve and
       // the particles and be gone before they could be seen. AUTO-RUN (every
       // ENTER) does not wait — it is the quick look — and FX OFF never does.
