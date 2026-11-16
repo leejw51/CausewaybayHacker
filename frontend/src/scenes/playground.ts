@@ -685,6 +685,8 @@ export class PlaygroundScene implements Scene {
   private bestMs: number | null = null;
   /** The wide bench's MORE menu, open. */
   private moreOpen = false;
+  /** Which screen the last frame drew (CODE or the bench). */
+  private shownFocus = false;
   /** The wide bench's language menu, open (when the lands are folded to one). */
   private langOpen = false;
   /** This frame's folded language button opens a menu (the wide bench) rather than stepping. */
@@ -2626,6 +2628,14 @@ export class PlaygroundScene implements Scene {
   draw(g: Ctx): void {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
+    // Bench to CODE or back: a MORE menu left open on the screen before is
+    // not the one on this screen. (It was carried over — a press on one of
+    // its items keeps it open — and the first tap on CODE's MORE closed a
+    // menu nobody could see.)
+    if (this.focus !== this.shownFocus) {
+      this.shownFocus = this.focus;
+      this.moreOpen = false;
+    }
     // Set again by `drawRows` when the list is on screen; in CODE it is not,
     // and a press where it used to be must not be taken for the list.
     this.listRect = [0, 0, 0, 0];
@@ -3535,6 +3545,11 @@ export class PlaygroundScene implements Scene {
     const fg = roundGap(f);
     const pad = Math.round(6 * s);
     this.coder?.panel.hideFields();
+    // The bench's drag areas are not on this screen: left set, a press on
+    // MORE (where the bench's output sat on a narrow window) was taken as a
+    // drag of an output nobody could see, and MORE never opened.
+    this.outputRect = [0, 0, 0, 0];
+    this.listRect = [0, 0, 0, 0];
 
     fill(g, [0.04, 0.06, 0.17, 1], 0, 0, vw, vh, 0.94);
     const barH = rowH + pad * 2;
@@ -3637,11 +3652,19 @@ export class PlaygroundScene implements Scene {
       g.fillStyle = css(Theme.ink);
       printf(g, sm, land, x, inkCentreY(sm, land, by + (rowH - lh) / 2, lh), lw, "center");
       x += lw + Math.round(10 * s);
-      for (const item of work) put(item);
       // From the right: MORE, A+, A-, and the level.
       let rx = vw - pad;
       const right = [...sizes, moreItem];
       const rw = right.reduce((a, i) => a + box(i.label)[0] + fg, 0);
+      // The work buttons while they fit before A- (on a zoomed Safari the
+      // bar is narrow and AGENT ran into A-); the rest lead MORE's list.
+      const stop = vw - pad - rw - fg;
+      const spill: typeof work = [];
+      for (const item of work) {
+        if (spill.length === 0 && x + box(item.label)[0] <= stop) put(item);
+        else spill.push(item);
+      }
+      more.unshift(...spill);
       rx -= rw;
       let ix = rx;
       for (const item of right) {
