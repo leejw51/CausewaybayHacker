@@ -53,6 +53,7 @@ import {
   landName,
   withFx,
 } from "../ui/chrome";
+import { waveDots, waveLine } from "../ui/wave";
 import { MenuFx, staggered } from "../ui/menufx";
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
@@ -3754,6 +3755,10 @@ export class PlaygroundScene implements Scene {
     );
     printf(g, sm, chip, sx, inkCentreY(sm, chip, sy + (stripH - ch) / 2, ch), cw, "center");
     sx += cw + Math.round(10 * s);
+    // Compiling or running: a cosine wave along a row of dots while it waits.
+    if (!r && this.stage !== "idle") {
+      sx += waveDots(g, sx, sy + stripH / 2, this.t, Theme.cyan, s) + Math.round(10 * s);
+    }
     const logLabel = `${t("pg.logPanel")} ${this.codeLog ? "▾" : "▴"}`;
     const [lbw, lbh] = box(logLabel);
     const lbx = vw - pad - lbw;
@@ -4916,6 +4921,12 @@ export class PlaygroundScene implements Scene {
     g.fillStyle = css(!r ? Theme.cyan : ok ? [0.5, 0.88, 0.63, 1] : [1, 0.45, 0.35, 1]);
     printf(g, fonts.ui, elide(fonts.ui, title, w - pad * 2), x + pad, cy, w - pad * 2, "left");
     g.restore();
+    if (!r && this.stage !== "idle") {
+      const tx = x + pad + width(fonts.ui, title) + Math.round(10 * s);
+      if (tx + 40 * s < x + w - pad) {
+        waveDots(g, tx, cy + fonts.ui.height * 0.55, this.t, Theme.cyan, s);
+      }
+    }
     cy += fonts.ui.height + Math.round(4 * s);
     let sub = t("pg.readyHint");
     if (r && ok) sub = t("pg.cleanRun");
@@ -5548,6 +5559,13 @@ export class PlaygroundScene implements Scene {
           ? this.stageLabel()
           : t("pg.nothingRun");
       printf(g, fonts.codeSm, line, x + pad * 2, ty + pad, w - pad * 4, "left");
+      // Waiting for the first line: a cosine wave flowing under the stage.
+      if (!r && this.stage !== "idle") {
+        const wy = ty + pad + fonts.codeSm.height * 2.2;
+        if (wy + 12 * s < bottom) {
+          waveLine(g, x + pad * 2, wy, Math.min(w - pad * 4, 360 * s), this.t, Theme.cyan, s);
+        }
+      }
       return;
     }
     // `outputScroll` counts lines back from the tail (0 = live), so the same
@@ -5587,7 +5605,8 @@ export class PlaygroundScene implements Scene {
 
   private stageLabel(): string {
     if (this.stage === "idle") return this.dirty ? t("pg.unsaved") : "";
-    const dots = ".".repeat(1 + (Math.floor(this.t * 3) % 3));
-    return `${this.stage.toUpperCase()}${dots}`;
+    // No ticking dots: the cosine wave beside it is the waiting, and a
+    // label that changes width shoves the wave along with it.
+    return this.stage.toUpperCase();
   }
 }
