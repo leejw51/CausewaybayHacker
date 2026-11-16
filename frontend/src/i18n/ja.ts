@@ -431,6 +431,7 @@ export const ja: Partial<Catalogue> = {
   "pg.sBest": "最速",
   "pg.sStreak": "連続",
   "pg.drive": "DISK ][",
+  "pg.machine": "機種",
   "pg.inUse": "使用中",
   "pg.idleDrive": "待機",
   "pg.exitEsc": "終了  ESC",

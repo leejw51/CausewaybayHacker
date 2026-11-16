@@ -451,6 +451,7 @@ export const en = {
   "pg.sBest": "BEST",
   "pg.sStreak": "STREAK",
   "pg.drive": "DISK ][",
+  "pg.machine": "MACHINE",
   "pg.inUse": "IN USE",
   "pg.idleDrive": "READY",
   "pg.exitEsc": "EXIT  ESC",

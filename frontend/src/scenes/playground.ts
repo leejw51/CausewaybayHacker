@@ -4309,7 +4309,11 @@ export class PlaygroundScene implements Scene {
     const runH = Math.max(this.app.layout.minTouchH(), Math.round(44 * s));
     const exitH = Math.max(this.app.layout.minTouchH(), Math.round(30 * s));
     const slotH = Math.round(52 * s);
-    const machH = Math.max(this.app.layout.minTouchH(), Math.round(32 * s));
+    const machH = Math.max(this.app.layout.minTouchH(), Math.round(30 * s));
+    const machGap = Math.round(4 * s);
+    // The machine section: its label and one full-width key per machine.
+    const machBlock =
+      sm.height + Math.round(6 * s) + MACHINES.length * machH + (MACHINES.length - 1) * machGap;
     const driveH =
       pad +
       sm.height +
@@ -4318,8 +4322,8 @@ export class PlaygroundScene implements Scene {
       Math.round(8 * s) +
       sm.height +
       Math.round(10 * s) +
-      machH +
-      Math.round(10 * s) +
+      machBlock +
+      Math.round(12 * s) +
       runH +
       Math.round(8 * s) +
       exitH +
@@ -4371,20 +4375,23 @@ export class PlaygroundScene implements Scene {
     const st = busy ? t("pg.inUse") : t("pg.idleDrive");
     printf(g, sm, st, x + pad + led + Math.round(6 * s), cy, w, "left");
     cy += sm.height + Math.round(10 * s);
-    // The machine: three keys, the one in use lit. Not while a run is out.
-    const mg = Math.round(4 * s);
-    const mw = (w - pad * 2 - mg * (MACHINES.length - 1)) / MACHINES.length;
+    // MACHINE: one key per computer, full width, the one in use lit and
+    // marked. Not while a run is out.
+    g.fillStyle = "#6A6048";
+    printf(g, sm, t("pg.machine"), x + pad, cy, w, "left");
+    cy += sm.height + Math.round(6 * s);
     const nowM = getComputer();
-    MACHINES.forEach((m, i) => {
+    MACHINES.forEach((m) => {
       this.buttons.add({
         id: `machine:${m}`,
-        label: MACHINE_SHORT[m],
-        rect: [x + pad + i * (mw + mg), cy, mw, machH],
+        label: `${nowM === m ? "● " : ""}${MACHINE_SHORT[m]}`,
+        rect: [x + pad, cy, w - pad * 2, machH],
         strong: nowM === m,
         dim: busy && nowM !== m,
       });
+      cy += machH + machGap;
     });
-    cy += machH + Math.round(10 * s);
+    cy += Math.round(12 * s) - machGap;
     const run = items.find((i) => i.id === "run");
     const exit = items.find((i) => i.id === "console");
     if (run) this.buttons.add({ ...run, rect: [x + pad, cy, w - pad * 2, runH] });

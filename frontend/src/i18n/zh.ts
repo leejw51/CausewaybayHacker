@@ -419,6 +419,7 @@ export const zh: Partial<Catalogue> = {
   "pg.sBest": "最快",
   "pg.sStreak": "连续",
   "pg.drive": "DISK ][",
+  "pg.machine": "机型",
   "pg.inUse": "读写中",
   "pg.idleDrive": "就绪",
   "pg.exitEsc": "退出  ESC",

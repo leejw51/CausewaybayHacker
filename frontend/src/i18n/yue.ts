@@ -434,6 +434,7 @@ export const yue: Partial<Catalogue> = {
   "pg.sBest": "最快",
   "pg.sStreak": "連續",
   "pg.drive": "DISK ][",
+  "pg.machine": "機型",
   "pg.inUse": "讀寫緊",
   "pg.idleDrive": "準備好",
   "pg.exitEsc": "離開  ESC",

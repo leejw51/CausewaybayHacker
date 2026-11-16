@@ -450,6 +450,7 @@ export const cs: Partial<Catalogue> = {
   "pg.sBest": "NEJLEPŠÍ",
   "pg.sStreak": "SÉRIE",
   "pg.drive": "DISK ][",
+  "pg.machine": "POČÍTAČ",
   "pg.inUse": "PRACUJE",
   "pg.idleDrive": "PŘIPRAVEN",
   "pg.exitEsc": "ODEJÍT  ESC",

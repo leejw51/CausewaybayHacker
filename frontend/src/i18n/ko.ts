@@ -432,6 +432,7 @@ export const ko: Partial<Catalogue> = {
   "pg.sBest": "최고",
   "pg.sStreak": "연속",
   "pg.drive": "DISK ][",
+  "pg.machine": "기종",
   "pg.inUse": "사용 중",
   "pg.idleDrive": "대기",
   "pg.exitEsc": "나가기  ESC",
