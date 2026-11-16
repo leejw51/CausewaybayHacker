@@ -56,10 +56,84 @@ export function waveDots(
   return r * 2 + (n - 1) * gap;
 }
 
+/** FNV-1a over the text: the same source, the same curve. */
+export function sourceSeed(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32: a small seeded generator, 0..1. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+interface Layer {
+  /** Cycles across the width, at rest. */
+  f0: number;
+  /** How far the frequency swings, 0..1, and how fast (Hz): the bandwidth. */
+  fDepth: number;
+  fRate: number;
+  /** Height, and its own slow swell. */
+  amp: number;
+  aDepth: number;
+  aRate: number;
+  /** Travel, cycles a second; negative runs the other way. */
+  speed: number;
+  /** The overtone's share and its ratio to the tone. */
+  over: number;
+  ratio: number;
+  phase: number;
+  hue: number;
+  alpha: number;
+  width: number;
+}
+
+const layersFor = new Map<number, Layer[]>();
+
+/** The source's own family of curves, made once per seed. */
+function layers(seed: number): Layer[] {
+  const had = layersFor.get(seed);
+  if (had) return had;
+  const r = seeded(seed);
+  const hueAt = r();
+  const out: Layer[] = [0, 1, 2, 3].map((i) => ({
+    f0: 1.4 + r() * 4.2,
+    fDepth: 0.35 + r() * 0.5,
+    fRate: 0.08 + r() * 0.3,
+    amp: i === 0 ? 1 : 0.5 + r() * 0.5,
+    aDepth: 0.2 + r() * 0.5,
+    aRate: 0.08 + r() * 0.25,
+    speed: (0.35 + r() * 1.1) * (r() < 0.3 ? -1 : 1),
+    over: 0.15 + r() * 0.5,
+    ratio: 1.5 + r() * 1.6,
+    phase: r() * Math.PI * 2,
+    hue: (hueAt + i * 0.23 + r() * 0.1) % 1,
+    alpha: i === 0 ? 0.95 : 0.3 + r() * 0.3,
+    width: i === 0 ? 2.2 : 1.1 + r() * 0.6,
+  }));
+  if (layersFor.size > 32) layersFor.clear();
+  layersFor.set(seed, out);
+  return out;
+}
+
 /**
- * Three cosine waves flowing across `w` at their own speeds, tapering to
- * nothing at both ends, on a neon gradient with a glow — and a bright pulse
- * riding the main one from left to right.
+ * Waiting, as the source's own curves: four layers whose shape comes from
+ * a hash of the code (the same program, the same curves; edit it and they
+ * change), each drifting through its bandwidth — its frequency stretching
+ * and squeezing, its height swelling — on slow seeded cosines, a tone and
+ * an overtone apiece, tapering at both ends, on the neon ramp with a glow,
+ * and a bright bead riding the main one.
  */
 export function waveLine(
   g: Ctx,
@@ -69,55 +143,50 @@ export function waveLine(
   t: number,
   _col: RGBA,
   s: number,
+  seed = 0,
 ): void {
-  const amp = 8 * s;
-  const step = Math.max(2, 3 * s);
-  const grad = g.createLinearGradient(x, 0, x + w, 0);
-  grad.addColorStop(0, css(CYAN));
-  grad.addColorStop(0.5, css(VIOLET));
-  grad.addColorStop(1, css(PINK));
-  const phase = (t / PERIOD) * Math.PI * 2;
-  const yAt = (dx: number, len: number, speed: number, shift: number, a: number) => {
-    const env = Math.sin((dx / w) * Math.PI);
-    return midY + Math.cos((dx / len) * Math.PI * 2 - phase * speed + shift) * a * env;
-  };
-  const layer = (
-    len: number,
-    speed: number,
-    shift: number,
-    a: number,
-    alpha: number,
-    lw: number,
-    glow: number,
-  ) => {
-    g.globalAlpha = alpha;
-    g.strokeStyle = grad;
-    g.lineWidth = lw;
-    g.shadowColor = css(VIOLET, 0.8);
-    g.shadowBlur = glow;
-    g.beginPath();
-    for (let dx = 0; dx <= w; dx += step) {
-      const y = yAt(dx, len, speed, shift, a);
-      if (dx === 0) g.moveTo(x + dx, y);
-      else g.lineTo(x + dx, y);
-    }
-    g.stroke();
+  const amp = 16 * s;
+  const step = Math.max(2, 2.5 * s);
+  const TAU = Math.PI * 2;
+  const ls = layers(seed);
+  const yAt = (l: Layer, dx: number): number => {
+    const u = dx / w;
+    const f = l.f0 * (1 + l.fDepth * Math.sin(TAU * l.fRate * t + l.phase));
+    const a =
+      l.amp * (1 - l.aDepth * 0.5 + l.aDepth * 0.5 * Math.cos(TAU * l.aRate * t + l.phase * 1.7));
+    const ph = TAU * (f * u - l.speed * t) + l.phase;
+    const y = Math.cos(ph) + l.over * Math.cos(ph * l.ratio + l.phase * 0.5);
+    return midY + (y / (1 + l.over)) * a * amp * Math.sin(u * Math.PI);
   };
   g.save();
   g.lineCap = "round";
   g.lineJoin = "round";
-  layer(170 * s, 0.6, 2.1, amp * 0.5, 0.22, Math.max(1, 1.2 * s), 0);
-  layer(90 * s, 1.4, 1.0, amp * 0.65, 0.35, Math.max(1, 1.4 * s), 0);
-  layer(125 * s, 1, 0, amp, 0.95, Math.max(1, 2.2 * s), 12 * s);
+  for (let i = ls.length - 1; i >= 0; i--) {
+    const l = ls[i];
+    const grad = g.createLinearGradient(x, 0, x + w, 0);
+    grad.addColorStop(0, css(ramp(l.hue)));
+    grad.addColorStop(0.5, css(ramp((l.hue + 0.35) % 1)));
+    grad.addColorStop(1, css(ramp((l.hue + 0.7) % 1)));
+    g.globalAlpha = l.alpha;
+    g.strokeStyle = grad;
+    g.lineWidth = Math.max(1, l.width * s);
+    g.shadowColor = css(VIOLET, 0.8);
+    g.shadowBlur = i === 0 ? 12 * s : 0;
+    g.beginPath();
+    for (let dx = 0; dx <= w; dx += step) {
+      const y = yAt(l, dx);
+      if (dx === 0) g.moveTo(x + dx, y);
+      else g.lineTo(x + dx, y);
+    }
+    g.stroke();
+  }
 
-  // The pulse: a bright bead on the main wave, crossing it once a cycle and
-  // a half, its brightness eased in and out at the ends by the same taper.
+  // The bead on the main curve, eased in and out at the ends.
   const u = (((t / (PERIOD * 1.6)) % 1) + 1) % 1;
   const px = u * w;
-  const py = yAt(px, 125 * s, 1, 0, amp);
-  const fade = Math.sin(u * Math.PI);
+  const py = yAt(ls[0], px);
   const col = ramp(u);
-  g.globalAlpha = fade;
+  g.globalAlpha = Math.sin(u * Math.PI);
   g.shadowColor = css(col);
   g.shadowBlur = 18 * s;
   g.fillStyle = css([1, 1, 1, 1]);

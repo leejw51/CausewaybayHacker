@@ -53,7 +53,7 @@ import {
   landName,
   withFx,
 } from "../ui/chrome";
-import { waveDots, waveLine } from "../ui/wave";
+import { sourceSeed, waveDots, waveLine } from "../ui/wave";
 import { MenuFx, Rise, staggered } from "../ui/menufx";
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
@@ -5591,7 +5591,16 @@ export class PlaygroundScene implements Scene {
       if (!r && this.stage !== "idle") {
         const wy = ty + pad + fonts.codeSm.height * 2.2;
         if (wy + 12 * s < bottom) {
-          waveLine(g, x + pad * 2, wy, Math.min(w - pad * 4, 360 * s), this.t, Theme.cyan, s);
+          waveLine(
+            g,
+            x + pad * 2,
+            wy,
+            Math.min(w - pad * 4, 360 * s),
+            this.t,
+            Theme.cyan,
+            s,
+            this.waveSeed(),
+          );
         }
       }
       return;
@@ -5629,6 +5638,14 @@ export class PlaygroundScene implements Scene {
       fill(g, Theme.ink, x + w - 4, ty, 4, trackH, 0.5);
       fill(g, Theme.coin, x + w - 4, ty + (trackH - thumbH) * frac, 4, thumbH);
     }
+  }
+
+  /** The source's hash, for the waiting curve's shape: kept until it changes. */
+  private seedOf: { src: string; seed: number } | null = null;
+  private waveSeed(): number {
+    const src = this.editor?.source ?? this.held.source;
+    if (this.seedOf?.src !== src) this.seedOf = { src, seed: sourceSeed(src) };
+    return this.seedOf.seed;
   }
 
   private stageLabel(): string {
