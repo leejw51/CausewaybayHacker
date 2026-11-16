@@ -34,6 +34,7 @@
     "@scure/bip39": "^2.4.0",
     "codemirror-lang-zig": "^0.1.0",
     "jsqr": "^1.4.0",
+    "motion": "14.9.0",
     "openai": "^7.17.0",
     "qrcode-generator": "^1.5.2",
     "three": "^0.185.1"

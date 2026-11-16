@@ -43,7 +43,17 @@ import {
   type Ctx,
   type Rect,
 } from "../engine/ui";
-import { Buttons, footer, frame, header, landColour, titledPanel, landName } from "../ui/chrome";
+import {
+  Buttons,
+  footer,
+  frame,
+  header,
+  landColour,
+  titledPanel,
+  landName,
+  withFx,
+} from "../ui/chrome";
+import { MenuFx, staggered } from "../ui/menufx";
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
 import { CodeFx } from "../ui/codefx";
@@ -687,6 +697,9 @@ export class PlaygroundScene implements Scene {
   private moreOpen = false;
   /** Which screen the last frame drew (CODE or the bench). */
   private shownFocus = false;
+  /** MORE's tween in and out (motion.dev), in CODE and on the bench. */
+  private readonly codeMenu = new MenuFx();
+  private readonly benchMenu = new MenuFx();
   /** The wide bench's language menu, open (when the lands are folded to one). */
   private langOpen = false;
   /** This frame's folded language button opens a menu (the wide bench) rather than stepping. */
@@ -2635,6 +2648,8 @@ export class PlaygroundScene implements Scene {
     if (this.focus !== this.shownFocus) {
       this.shownFocus = this.focus;
       this.moreOpen = false;
+      this.codeMenu.reset();
+      this.benchMenu.reset();
     }
     // Set again by `drawRows` when the list is on screen; in CODE it is not,
     // and a press where it used to be must not be taken for the list.
@@ -3802,11 +3817,12 @@ export class PlaygroundScene implements Scene {
     // The agent open: its panel takes the right of the window in place of
     // the rail, and the editor keeps the rest. (It used to drop CODE back
     // to the old toolbar, every button of the bench in one long band.)
+    this.codeMenu.follow(this.moreOpen && !filtering);
     const agentOpen = this.coder?.open ?? false;
     if (agentOpen) {
       const panelW = Math.max(Math.round(320 * s), Math.round(vw * 0.36));
       const px = vw - pad - panelW;
-      const menuOpen = this.moreOpen && !filtering;
+      const menuOpen = this.codeMenu.shown && !filtering;
       const edRight = menuOpen
         ? Math.min(px - pad, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
         : px - pad;
@@ -3822,13 +3838,13 @@ export class PlaygroundScene implements Scene {
       if (menuOpen) this.coder?.panel.hideFields();
       this.comboInRail = true;
       this.menuIds = more.map((m) => m.id);
-      if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
+      if (menuOpen) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
       return;
     }
     this.coder?.panel.hideFields();
     // The editor is a DOM field over the canvas: with MORE open it ends
     // before the menu, or it covers the menu's left column.
-    const menuOpen = this.moreOpen && !filtering;
+    const menuOpen = this.codeMenu.shown && !filtering;
     const edRight = menuOpen
       ? Math.min(rx0 - pad, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
       : rx0 - pad;
@@ -3905,7 +3921,7 @@ export class PlaygroundScene implements Scene {
 
     // MORE, open: down the rail and over it, on the canvas.
     this.menuIds = more.map((m) => m.id);
-    if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
+    if (menuOpen) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
   }
   /** CODE's MORE, open: a column of its buttons down the right, over the rail. */
   /** Where CODE's MORE column sits: the editor stops short of its left edge. */
@@ -3951,22 +3967,35 @@ export class PlaygroundScene implements Scene {
       sy,
       pad,
     );
-    g.save();
-    g.shadowColor = "rgba(0,0,0,0.6)";
-    g.shadowBlur = Math.round(16 * s);
-    g.fillStyle = css(Theme.void, 0.97);
-    roundRect(g, px, py, pw, ph, Math.round(8 * s));
-    g.fill();
-    g.restore();
-    g.strokeStyle = css(Theme.cyan, 0.35);
-    roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
-    g.stroke();
+    // From the MORE button's corner, the way iOS opens a menu: the plate
+    // fades in and grows from 92%, the items follow it one after another.
+    const p = this.codeMenu.value;
+    const ox = px + pw;
+    const oy = py;
+    const inert = !this.moreOpen;
+    const k = 0.92 + 0.08 * p;
+    const drop = -8 * s * (1 - p);
+    withFx(g, { alpha: p, k, ox, oy, dy: drop }, () => {
+      g.save();
+      g.shadowColor = "rgba(0,0,0,0.6)";
+      g.shadowBlur = Math.round(16 * s);
+      g.fillStyle = css(Theme.void, 0.97);
+      roundRect(g, px, py, pw, ph, Math.round(8 * s));
+      g.fill();
+      g.restore();
+      g.strokeStyle = css(Theme.cyan, 0.35);
+      roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
+      g.stroke();
+    });
     more.forEach((item, i) => {
       const c = Math.floor(i / perCol);
       const rr = i % perCol;
+      const a = staggered(p, rr + c);
       this.buttons.add({
         ...item,
         rect: [px + mp + c * (itemW + fg), py + mp + rr * step, itemW, rowH],
+        inert,
+        fx: { alpha: a, k, ox, oy, dy: drop - 6 * s * (1 - a) },
       });
     });
   }
@@ -5296,7 +5325,8 @@ export class PlaygroundScene implements Scene {
 
     // MORE, open: a column of its buttons dropped from the button, over the
     // output — on the canvas, where the editor cannot cover it.
-    if (this.moreOpen && moreAt) {
+    this.benchMenu.follow(this.moreOpen && moreAt !== null);
+    if (this.benchMenu.shown && moreAt) {
       const pad = Math.round(6 * s);
       const step = rowH + flowGap;
       const itemW = Math.max(...more.map((m) => box(m.label)[0]), moreAt.mw);
@@ -5307,13 +5337,21 @@ export class PlaygroundScene implements Scene {
       const ph = perCol * step - flowGap + pad * 2;
       const px = Math.max(ox, ix + iw - pw);
       const py = top - Math.round(gap / 2);
-      plate(px, py, pw, ph);
+      // Tweened from the MORE button's corner, as CODE's menu is.
+      const p = this.benchMenu.value;
+      const k = 0.92 + 0.08 * p;
+      const drop = -8 * s * (1 - p);
+      const fxo = px + pw;
+      withFx(g, { alpha: p, k, ox: fxo, oy: py, dy: drop }, () => plate(px, py, pw, ph));
       more.forEach((item, i) => {
         const c = Math.floor(i / perCol);
         const r = i % perCol;
+        const a = staggered(p, r + c);
         this.buttons.add({
           ...item,
           rect: [px + pad + c * (itemW + flowGap), py + pad + r * step, itemW, rowH],
+          inert: !this.moreOpen,
+          fx: { alpha: a, k, ox: fxo, oy: py, dy: drop - 6 * s * (1 - a) },
         });
       });
     }

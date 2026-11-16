@@ -346,6 +346,34 @@ export interface Button {
    * the top of it: the hit box is right, the state is invisible.
    */
   painted?: boolean;
+  /**
+   * Drawn faded and scaled about a point (a menu tweening in or out): alpha,
+   * scale `k` about (ox, oy), and a drop `dy`.
+   */
+  fx?: Fx;
+  /** Drawn but not pressable: a menu on its way out. */
+  inert?: boolean;
+}
+
+export interface Fx {
+  alpha: number;
+  k: number;
+  ox: number;
+  oy: number;
+  dy: number;
+}
+
+/** Draw `paint` faded and scaled by `fx`. */
+export function withFx(g: Ctx, fx: Fx | undefined, paint: () => void): void {
+  if (!fx) return paint();
+  if (fx.alpha <= 0.002) return;
+  g.save();
+  g.globalAlpha *= fx.alpha;
+  g.translate(fx.ox, fx.oy + fx.dy);
+  g.scale(fx.k, fx.k);
+  g.translate(-fx.ox, -fx.oy);
+  paint();
+  g.restore();
 }
 
 export class Buttons {
@@ -413,13 +441,24 @@ export class Buttons {
     const hasPrimary = this.items.some((b) => b.primary);
     for (const b of this.items) {
       if (b.painted) continue;
-      (this.round ? roundBtn : pixBtn)(g, f, b.rect[0], b.rect[1], b.rect[2], b.rect[3], b.label, {
-        hover: this.hovered === b.id,
-        dim: b.dim,
-        lit: b.primary,
-        strong: b.strong,
-        quiet: hasPrimary && !b.primary && !b.strong,
-      });
+      withFx(g, b.fx, () =>
+        (this.round ? roundBtn : pixBtn)(
+          g,
+          f,
+          b.rect[0],
+          b.rect[1],
+          b.rect[2],
+          b.rect[3],
+          b.label,
+          {
+            hover: !b.inert && this.hovered === b.id,
+            dim: b.dim,
+            lit: b.primary,
+            strong: b.strong,
+            quiet: hasPrimary && !b.primary && !b.strong,
+          },
+        ),
+      );
     }
   }
 
@@ -432,11 +471,11 @@ export class Buttons {
    * the scan breaks every time a row re-wraps — which has now cost three runs.
    */
   list(): readonly Button[] {
-    return this.items;
+    return this.items.filter((b) => !b.inert);
   }
 
   hit(x: number, y: number): Button | null {
-    for (const b of this.items) if (!b.dim && inRect(x, y, b.rect)) return b;
+    for (const b of this.items) if (!b.dim && !b.inert && inRect(x, y, b.rect)) return b;
     return null;
   }
 }
