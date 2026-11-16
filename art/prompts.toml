@@ -1883,3 +1883,143 @@ generated = "2026-10-23"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art user interface title signboard, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A single WIDE SHORT horizontal Hong Kong shop sign board seen perfectly flat-on, four times as wide as it is tall, spanning almost the full width of the image: a thick dark ink-black outline, a carved dark red lacquered wooden frame with a thin gold inner trim of even width on all four sides, a small gold stud at each of the four corners, and a flat plain dark brown wooden face filling the whole middle that is completely blank, evenly coloured and empty with absolutely nothing on it. No ornament in the middle of any edge, so it can be stretched. Just the sign board and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
+
+[[asset]]
+name = "ui_badge"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a chunky retro handheld game console seen from the front, deep violet body with a glowing cyan screen showing a tiny pixel city skyline, gold buttons. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_cheatsheet"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a rolled paper scroll half open, cream paper with a few grey ruled lines, tied with a red ribbon. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_verybasic"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a small green seedling with two round leaves sprouting from a brown terracotta pot. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_basic"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a sturdy wooden market crate full of bright oranges, like a Hong Kong fruit stall. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_advanced"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a heavy steel cog wheel with a smaller gold cog meshed into it. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_hacker"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a dark hooded jacket hood seen from the front with a glowing cyan visor of light in the shadow, no face. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "cat_frameworks"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is three stacked building blocks, teal on the bottom, gold in the middle, violet on top, slightly offset. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "step_brief"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a folded paper note with a red wax seal. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "step_pick"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a white pixel-art pointing hand cursor with a dark outline. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "step_write"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a yellow pencil drawn diagonally with a pink-free brown eraser and a sharp graphite tip. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "step_submit"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a small red and white rocket flying upward with an orange flame. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "stat_xp"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a faceted cyan crystal gem shining, with a white glint. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "stat_mistake"
+kind = "sprite"
+aspect = "1:1"
+size = [96, 96]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art game UI icon, ONE object, centred, filling most of the frame, seen flat-on. Bold simple silhouette that stays recognisable when shrunk very small. Chunky hard-edged pixels, thick dark outline all the way round, flat blocks of colour with dithered highlights, no anti-aliasing, no soft gradient, no drop shadow, no glow, NO circular medallion or disc behind the object. Absolutely no text, no letters, no words, no numbers, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered. The object is a small cartoon bug beetle, dark violet shell, six legs, cute and slightly worried. on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every part of the image that is not the object). Nothing in the artwork may be magenta, hot pink, fuchsia or rose — those hues belong to the background alone."""
+
+[[asset]]
+name = "bg_victory"
+kind = "bg"
+aspect = "3:2"
+size = [1152, 768]
+generated = "2026-11-16"
+rerolls = 0
+prompt = """\
+16-bit SNES pixel art painted background in the style of Super Mario World: SATURATED colours, high contrast, strong dark outlines. Victoria Harbour, Hong Kong, at night, seen from the Causeway Bay waterfront: a deep navy sky full of gold and cyan fireworks bursting over the harbour, the lit skyline across the water reflected in rippling water, a few junk boats with red sails, a calm promenade railing in the foreground. Chunky hard-edged pixels, heavy dithering, no anti-aliasing, no soft gradients. The promenade is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""

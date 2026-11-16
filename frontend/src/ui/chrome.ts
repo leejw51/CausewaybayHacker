@@ -21,6 +21,7 @@ import {
   pixBtn,
   roundBox,
   roundBtn,
+  roundRect,
   roundGap,
   roundPad,
   shadowText,
@@ -169,9 +170,9 @@ export function header(g: Ctx, app: App, title: string): void {
   const { layout } = app;
   const s = layout.uiScale();
   const h = headerH(layout);
-  fill(g, Theme.navy, 0, 0, layout.vw, h);
-  fill(g, Theme.coin, 0, h - 3, layout.vw, 3);
-  fill(g, Theme.ink, 0, h - 1, layout.vw, 1);
+  // The HUD: a dark glass bar with a thin line of light under it.
+  fill(g, [0.05, 0.07, 0.2, 1], 0, 0, layout.vw, h, 0.94);
+  fill(g, Theme.cyan, 0, h - 1, layout.vw, 1, 0.3);
   const f = ensureFonts(s).station;
   const ty = Math.round((h - 3 - f.height) / 2);
   const sm = ensureFonts(s).stationSm;
@@ -195,18 +196,42 @@ export function header(g: Ctx, app: App, title: string): void {
   const bx = layout.vw - w - Math.round(6 * s);
   // The title stops short of the address chip rather than running under
   // it: on a phone `RUST · BASIC` and `0x90C2…8Ee9` shared the same pixels.
-  g.fillStyle = css(Theme.cream);
-  clipped(g, 0, 0, Math.max(1, bx - Math.round(6 * s)), h, () =>
-    printf(g, f, title, Math.round(8 * s), ty, layout.vw, "left"),
-  );
+  // A small badge, then the title in gold with a soft glow.
+  const badge = Math.round(h * 0.56);
+  const bx0 = Math.round(8 * s);
+  const by0 = Math.round((h - badge) / 2);
+  const grad = g.createLinearGradient(bx0, by0, bx0 + badge, by0 + badge);
+  grad.addColorStop(0, "#F878A8");
+  grad.addColorStop(1, "#7C4CE0");
+  g.save();
+  g.fillStyle = grad;
+  roundRect(g, bx0, by0, badge, badge, Math.round(badge * 0.25));
+  g.fill();
+  g.restore();
+  const tx = bx0 + badge + Math.round(10 * s);
+  clipped(g, 0, 0, Math.max(1, bx - Math.round(6 * s)), h, () => {
+    g.save();
+    g.shadowColor = css(Theme.coin, 0.55);
+    g.shadowBlur = Math.round(10 * s);
+    g.fillStyle = css(Theme.coin);
+    printf(g, f, title, tx, ty, layout.vw, "left");
+    g.restore();
+  });
 
   app.logoutRect = null;
   if (!app.addressLabel) return;
   const by = Math.round((h - 3 - sm.height) / 2) - Math.round(4 * s);
   const bh = sm.height + Math.round(8 * s);
   const hot = app.logoutHover;
-  fill(g, hot ? Theme.red : Theme.ink, bx, by, w, bh, hot ? 0.95 : 0.5);
-  fill(g, hot ? Theme.coin : Theme.dim, bx, by + bh - 2, w, 2);
+  g.save();
+  roundRect(g, bx, by, w, bh, bh / 2);
+  g.fillStyle = css(hot ? Theme.red : [0.04, 0.06, 0.18, 1], hot ? 0.95 : 0.9);
+  g.fill();
+  g.strokeStyle = css(hot ? Theme.coin : Theme.cyan, 0.35);
+  g.lineWidth = 1;
+  roundRect(g, bx + 0.5, by + 0.5, w - 1, bh - 1, bh / 2);
+  g.stroke();
+  g.restore();
   g.fillStyle = css(hot ? Theme.cream : Theme.cyan);
   printf(g, sm, label, bx, by + Math.round(4 * s), w, "center");
   app.logoutRect = [bx, by, w, bh];
@@ -258,8 +283,8 @@ export function footer(g: Ctx, layout: Layout, hint: string): void {
   const s = layout.uiScale();
   const h = footerH(layout);
   const y = layout.vh - h;
-  fill(g, Theme.ink, 0, y, layout.vw, h, 0.85);
-  fill(g, Theme.wood, 0, y, layout.vw, 2);
+  fill(g, [0.04, 0.06, 0.17, 1], 0, y, layout.vw, h, 0.92);
+  fill(g, Theme.cyan, 0, y, layout.vw, 1, 0.2);
   const full = ensureFonts(s).stationSm;
   const room = layout.vw - Math.round(16 * s);
   let f = full;
@@ -581,13 +606,14 @@ export function titledPanel(
   face: RGBA = Theme.paper,
 ): Rect {
   const [x, y, w, h] = rect;
-  panel(g, x, y, w, h, face);
+  // Glass, with the title as a small label in the accent and a thin rule of
+  // it under the label — not a thick bar of colour across the top.
+  panel(g, x, y, w, h, face === Theme.paper ? [0.06, 0.09, 0.24, 0.9] : face);
   const f = font("stationSm");
   const barH = f.height + Math.round(f.size * 0.9);
-  fill(g, accent, x + 6, y + 8, w - 12, barH);
-  fill(g, Theme.ink, x + 6, y + 8 + barH, w - 12, 1);
-  g.fillStyle = css(Theme.ink);
-  printf(g, f, title, x + 6, y + 8 + Math.round((barH - f.height) / 2), w - 12, "center");
+  fill(g, accent, x + 10, y + 8 + barH - 2, Math.min(w - 20, Math.max(40, width(f, title) + 8)), 2, 0.9);
+  g.fillStyle = css(accent);
+  printf(g, f, title, x + 12, y + 8 + Math.round((barH - f.height) / 2), w - 24, "left");
   const inset = 8;
   return [x + 6 + inset, y + 8 + barH + inset, w - 12 - inset * 2, h - 14 - barH - inset * 2];
 }

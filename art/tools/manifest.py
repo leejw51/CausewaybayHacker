@@ -111,6 +111,14 @@ ORDER = [
     "bg_flat", "bg_night", "sprite_clerk",
     "bg_stats", "bg_stats_p",
     "ui_quiz_card", "ui_quiz_choice", "ui_plaque",
+    # The redesign's new elements (Grok, 2026-11): the HUD badge, a level
+    # tile icon per category, the quest-step icons, two stat icons, and the
+    # backdrop CLEARED is shown over.
+    "ui_badge",
+    "cat_cheatsheet", "cat_verybasic", "cat_basic", "cat_advanced", "cat_hacker", "cat_frameworks",
+    "step_brief", "step_pick", "step_write", "step_submit",
+    "stat_xp", "stat_mistake",
+    "bg_victory",
 ]
 
 # Assets that are not one picture. `walk_mei` is four frames in a row; the

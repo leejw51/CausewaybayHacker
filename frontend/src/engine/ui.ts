@@ -36,7 +36,13 @@ export function roundRect(
   g.closePath();
 }
 
-/** The raised panel: ink edge, gold rim, wood frame, a shadow line, the face. */
+/**
+ * The raised panel, in the redesign's glass: a rounded plate of `face` with a
+ * thin edge of light. The frame it replaces (ink, gold rim, wood) took eight
+ * pixels above the face and six below; callers still lay their content
+ * inside those insets, so the plate fills the whole rect and the insets are
+ * now simply margin.
+ */
 export function panel(
   g: Ctx,
   x: number,
@@ -45,11 +51,22 @@ export function panel(
   h: number,
   face: RGBA = Theme.panel,
 ): void {
-  fill(g, Theme.ink, x, y, w, h);
-  fill(g, Theme.coin, x + 2, y + 2, w - 4, h - 4);
-  fill(g, Theme.wood, x + 4, y + 4, w - 8, h - 8);
-  fill(g, Theme.ink, x + 6, y + 6, w - 12, 2);
-  fill(g, face, x + 6, y + 8, w - 12, h - 14);
+  const r = Math.max(4, Math.min(12, Math.round(Math.min(w, h) * 0.12)));
+  g.save();
+  roundRect(g, x, y, w, h, r);
+  g.fillStyle = css(face);
+  g.fill();
+  // A soft light along the top edge, inside: the glass's only bevel.
+  g.clip();
+  g.fillStyle = "rgba(255,255,255,0.06)";
+  g.fillRect(x, y, w, Math.max(1, Math.round(h * 0.08)));
+  g.restore();
+  g.save();
+  g.strokeStyle = css(Theme.cyan, 0.28);
+  g.lineWidth = 1;
+  roundRect(g, x + 0.5, y + 0.5, w - 1, h - 1, r);
+  g.stroke();
+  g.restore();
 }
 
 /** The sunken well the code and the prompt sit in. */
@@ -61,16 +78,23 @@ export function well(
   h: number,
   face: RGBA = [0.1, 0.08, 0.2, 0.98],
 ): void {
-  fill(g, Theme.ink, x, y, w, h);
-  fill(g, Theme.wood, x + 2, y + 2, w - 4, h - 4);
-  fill(g, face, x + 4, y + 4, w - 8, h - 8);
+  // Sunken, in the glass: a darker rounded plate with a faint edge.
+  const r = Math.max(3, Math.min(10, Math.round(Math.min(w, h) * 0.1)));
+  g.save();
+  roundRect(g, x, y, w, h, r);
+  g.fillStyle = css(face);
+  g.fill();
+  g.strokeStyle = css(Theme.cyan, 0.16);
+  g.lineWidth = 1;
+  roundRect(g, x + 0.5, y + 0.5, w - 1, h - 1, r);
+  g.stroke();
+  g.restore();
 }
 
 /** The status bar across the top of a street. */
 export function bar(g: Ctx, x: number, y: number, w: number, h: number): void {
-  fill(g, Theme.navy, x, y, w, h);
-  fill(g, Theme.coin, x, y + h - 3, w, 3);
-  fill(g, Theme.ink, x, y + h - 1, w, 1);
+  fill(g, [0.06, 0.09, 0.24, 1], x, y, w, h, 0.94);
+  fill(g, Theme.cyan, x, y + h - 1, w, 1, 0.25);
 }
 
 /** `UI.panel`'s frame: eight pixels of it above the face, six below. */
@@ -131,7 +155,10 @@ export function rowsIn(font: Font, labels: string[], w: number, minH = 0, lead =
   return rows;
 }
 
-/** One chunky button. `dim` is shown but out of reach. */
+/**
+ * One button. Drawn rounded, as `roundBtn`, in the box the pixel button was
+ * measured for, so no screen's layout moves; the options are the same.
+ */
 export function pixBtn(
   g: Ctx,
   font: Font,
@@ -142,39 +169,7 @@ export function pixBtn(
   label: string,
   opts: { lit?: boolean; hover?: boolean; dim?: boolean; quiet?: boolean; strong?: boolean } = {},
 ): void {
-  // `quiet` is the other half of a primary action: when one button on a row is
-  // filled, the rest step back to a dark face so the eye has somewhere to go.
-  // A row where every button is the same weight is a row with no answer in it.
-  //
-  // `strong` is a third register, for the one button on a screen that *commits*
-  // to something. It is not louder than the primary — it is a different colour
-  // entirely, because "the thing you press all day" and "the thing you press
-  // when you mean it" must not be two shades of the same idea.
-  const face = opts.dim
-    ? Theme.dim
-    : opts.strong
-      ? opts.hover
-        ? Theme.coin
-        : Theme.admit
-      : opts.lit || opts.hover
-        ? Theme.coin
-        : opts.quiet
-          ? Theme.navy
-          : Theme.panel;
-  panel(g, x, y, w, h, face);
-  const pale = (opts.quiet || (opts.strong && !opts.hover)) && !opts.dim;
-  g.fillStyle = css(pale ? Theme.cream : Theme.ink, opts.dim ? 0.5 : 1);
-  // Centre the label's **ink** inside the panel's inner face.
-  //
-  // Centring the font's nominal box instead put Latin and Hangul at two
-  // different heights in the same row: these faces are Latin-only, a Korean
-  // label is drawn by whatever the browser falls back to, and that face's ink
-  // does not sit where the measured one's does. At 20px the box is 20 tall,
-  // `RUN` inks from 4.8 to 16.0 within it and `실행` from -0.1 to 17.4 — out
-  // over the top edge with the slack all underneath, which is the uneven
-  // padding this fixes.
-  const ty = inkCentreY(font, label, y + 8, h - BTN_FRAME);
-  printf(g, font, label, x, ty, w, "center");
+  roundBtn(g, font, x, y + 2, w, h - 4, label, opts);
 }
 
 /** A five-pointed star with an ink outline: the "every street CLEAR" mark. */
