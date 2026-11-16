@@ -161,8 +161,8 @@ describe("DISK READER", () => {
     expect(hashed.indexOf("return;")).toBeLessThan(hashed.indexOf("await this.fresh()"));
   });
 
-  it("is a button on both the bench and CODE, beside POSTER", () => {
-    expect(SOURCE.match(/id: "poster"/g)?.length).toBe(2);
-    expect(SOURCE.match(/id: "reader"/g)?.length).toBe(2);
+  it("is a button on the bench (its band, and the wide bench's MORE) and CODE (its band, and wide CODE's MORE), beside POSTER", () => {
+    expect(SOURCE.match(/id: "poster"/g)?.length).toBe(4);
+    expect(SOURCE.match(/id: "reader"/g)?.length).toBe(4);
   });
 });

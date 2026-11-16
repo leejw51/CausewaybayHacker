@@ -33,6 +33,14 @@ export const STDERR_KEY = "code.stderr";
  * the size the app-wide setting (F9 / F10) made them.
  */
 export const CODE_SIZE_KEY = "code.size";
+
+/**
+ * How much the playground's effects do: `calm` (the default — feedback, not
+ * a show), `full` (every spark, ripple and firework), or `off`.
+ */
+export const FX_KEY = "code.fx";
+export type FxLevel = "calm" | "full" | "off";
+export const FX_LEVELS: readonly FxLevel[] = ["calm", "full", "off"];
 export const CODE_SIZE_MIN = 0.6;
 export const CODE_SIZE_MAX = 2.5;
 export const CODE_SIZE_STEP = 0.1;

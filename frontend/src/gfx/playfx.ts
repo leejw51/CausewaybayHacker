@@ -9,16 +9,15 @@
  *   * RUN — a ripple of light leaves the button and crosses the screen;
  *   * a clean run — a bloom flash in the run's colour from the output, and a
  *     gold sweep along the editor;
- *   * a failed build — the editor glitches: torn scanline bands in red and
- *     cyan, a shudder of chromatic fringes, a red vignette that breathes out;
- *   * FEVER (a long typing combo) — the screen's edge burns pink and gold,
- *     with sparks running round it.
+ *   * a failed build — a steady red glow on the editor's frame that fades
+ *     out smoothly (no bands, no noise: nothing that flickers);
+ *   * FEVER (a long typing combo, FX FULL only) — the screen's edge glows
+ *     pink and gold, breathing slowly.
  *
  * It only ever *adds* light (premultiplied, nothing opaque), so the editor
  * under it stays readable through every effect, and it draws nothing — not
  * even a clear — once every effect has decayed. Under
- * `prefers-reduced-motion` each effect is a quarter as strong and the glitch
- * does not tear.
+ * `prefers-reduced-motion` each effect is a quarter as strong.
  */
 import {
   Mesh,
@@ -62,10 +61,7 @@ uniform vec3 uRippleCol;
 uniform float uGlitch;     // 0..1
 uniform float uSweep;      // seconds since a clean run, < 0 = none
 uniform float uFever;      // 0..1
-uniform float uTear;       // 0 or 1: reduced motion turns tearing off
 
-float hash(float n) { return fract(sin(n) * 43758.5453123); }
-float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
 void main() {
   vec2 p = gl_FragCoord.xy;
@@ -94,43 +90,31 @@ void main() {
 
   bool inRect = p.x >= uRect.x && p.x <= uRect.z && p.y >= uRect.y && p.y <= uRect.w;
 
-  // -- glitch: torn bands, chromatic fringes, scan noise, inside the editor;
-  //    a red vignette breathing out over the whole screen.
+  // -- a failed run: a steady red glow on the editor's frame, and a little
+  //    red at the screen's corners, fading out smoothly. No noise, no
+  //    bands, nothing that changes from one frame to the next but its
+  //    strength: a failure is information, not a strobe.
   if (uGlitch > 0.001) {
     if (inRect) {
-      float t = floor(uTime * 24.0);
-      float band = floor(p.y / (6.0 * uScale + 14.0 * uScale * hash(t)));
-      float on = step(1.0 - 0.28 * uGlitch, hash(band * 7.13 + t));
-      float shift = (hash(band + t * 3.1) - 0.5) * 60.0 * uScale * uGlitch * uTear;
-      float edge = fract((p.x + shift) / (uRect.z - uRect.x));
-      float stripe = on * (0.35 + 0.65 * step(0.5, fract(edge * 3.0 + hash(band))));
-      vec3 rc = mix(vec3(1.0, 0.12, 0.08), vec3(0.2, 0.9, 1.0), step(0.5, hash(band * 1.7 + t)));
-      col += rc * stripe * 0.55 * uGlitch;
-      a += stripe * 0.32 * uGlitch;
-      float scan = step(0.985, hash2(vec2(floor(p.y / (2.0 * uScale)), t))) * uGlitch;
-      col += vec3(1.0, 0.5, 0.45) * scan;
-      a += scan * 0.4;
-      // the frame itself flickers red
       float fx = min(p.x - uRect.x, uRect.z - p.x);
       float fy = min(p.y - uRect.y, uRect.w - p.y);
-      float rim = exp(-min(fx, fy) / (5.0 * uScale)) * uGlitch;
-      col += vec3(1.0, 0.16, 0.05) * rim * 1.4;
-      a += rim * 0.6;
+      float rim = exp(-min(fx, fy) / (7.0 * uScale)) * uGlitch;
+      col += vec3(1.0, 0.18, 0.08) * rim * 0.7;
+      a += rim * 0.15;
     }
     vec2 q = (p / uRes) - 0.5;
-    float vig = smoothstep(0.42, 0.85, length(q * vec2(uRes.x / uRes.y, 1.0))) * uGlitch;
-    col += vec3(0.85, 0.05, 0.02) * vig * 0.6;
-    a += vig * 0.25;
+    float vig = smoothstep(0.6, 1.0, length(q * vec2(uRes.x / uRes.y, 1.0))) * uGlitch;
+    col += vec3(0.85, 0.05, 0.02) * vig * 0.15;
+    a += vig * 0.04;
   }
 
-  // -- a clean run: a gold light sweeping down the editor, once.
+  // -- a clean run: a soft gold light passing once down the editor.
   if (uSweep >= 0.0 && inRect) {
     float h = uRect.w - uRect.y;
-    float y = uRect.w - uSweep / 0.7 * (h + 120.0 * uScale);
-    float k = exp(-pow((p.y - y) / (26.0 * uScale), 2.0)) * clamp(1.0 - uSweep / 0.9, 0.0, 1.0);
-    float sparkle = step(0.992, hash2(floor(p / (3.0 * uScale)) + floor(uTime * 30.0)));
-    col += vec3(1.0, 0.85, 0.3) * k * (0.55 + sparkle * 2.0);
-    a += k * 0.08;
+    float y = uRect.w - uSweep / 0.9 * (h + 120.0 * uScale);
+    float k = exp(-pow((p.y - y) / (40.0 * uScale), 2.0)) * clamp(1.0 - uSweep / 0.9, 0.0, 1.0);
+    col += vec3(1.0, 0.85, 0.3) * k * 0.25;
+    a += k * 0.04;
   }
 
   // -- FEVER: the screen's edge burns, with sparks running round it.
@@ -138,16 +122,13 @@ void main() {
     float dx = min(p.x, uRes.x - p.x);
     float dy = min(p.y, uRes.y - p.y);
     float e = min(dx, dy);
-    float pulse = 0.65 + 0.35 * sin(uTime * 7.0);
+    float pulse = 0.8 + 0.2 * sin(uTime * 2.0);
     float burn = exp(-e / (18.0 * uScale)) * uFever * pulse;
     // a hue running round the frame: pink to gold
     float around = (p.x + p.y) / (uRes.x + uRes.y) + uTime * 0.35;
     vec3 fc = mix(vec3(1.0, 0.35, 0.65), vec3(1.0, 0.82, 0.2), 0.5 + 0.5 * sin(around * 12.566));
     col += fc * burn * 1.3;
     a += burn * 0.25;
-    float runner = step(0.996, hash2(floor(p / (4.0 * uScale)) + floor(uTime * 20.0))) * exp(-e / (40.0 * uScale)) * uFever;
-    col += vec3(1.0) * runner * 1.5;
-    a += runner * 0.1;
   }
 
   a = clamp(a, 0.0, 0.92);
@@ -158,7 +139,7 @@ void main() {
 /** How long each effect takes to die away, in seconds. */
 const FLASH_LIFE = 0.55;
 const RIPPLE_LIFE = 0.9;
-const GLITCH_LIFE = 0.7;
+const GLITCH_LIFE = 0.8;
 const SWEEP_LIFE = 0.9;
 
 export class PlayFx {
@@ -207,7 +188,6 @@ export class PlayFx {
         uGlitch: { value: 0 },
         uSweep: { value: -1 },
         uFever: { value: 0 },
-        uTear: { value: 1 },
       },
     });
     try {
@@ -261,18 +241,25 @@ export class PlayFx {
     this.mat.uniforms.uRippleCol.value = this.colour(c);
   }
 
-  /** A clean run: a flash from (x, y) and a sweep down the editor. */
-  clear(x: number, y: number, c: RGBA): void {
-    this.flash = 1;
-    this.sweep = 0;
+  /**
+   * A clean run: a flash from (x, y), `strength` 0..1, and — at full
+   * strength only — a sweep down the editor.
+   */
+  clear(x: number, y: number, c: RGBA, strength = 1): void {
+    this.flash = Math.max(0, Math.min(1, strength));
+    if (strength >= 1) this.sweep = 0;
     const [dx, dy] = this.dev(x, y);
     (this.mat.uniforms.uFlashAt.value as Vector2).set(dx, dy);
     this.mat.uniforms.uFlashCol.value = this.colour(c);
   }
 
-  /** A failed build or a crash: the editor glitches. */
-  hurt(): void {
-    this.glitch = 1;
+  /**
+   * A failed build or a crash: the editor glitches, `strength` 0..1 — a
+   * press of RUN gets a short tear, AUTO-RUN (every ENTER, on code still
+   * being written) little more than a red flicker at the frame.
+   */
+  hurt(strength = 1): void {
+    this.glitch = Math.max(this.glitch, Math.max(0, Math.min(1, strength)));
   }
 
   /** How hot the combo is, 0..1: the edge burns toward it. */
@@ -311,7 +298,6 @@ export class PlayFx {
     u.uGlitch.value = this.glitch * k;
     u.uSweep.value = this.sweep;
     u.uFever.value = this.fever * k;
-    u.uTear.value = reducedMotion() ? 0 : 1;
     this.renderer.render(this.scene, this.camera);
     this.drew = true;
   }

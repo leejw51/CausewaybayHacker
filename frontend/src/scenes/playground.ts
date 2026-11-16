@@ -24,7 +24,7 @@
  */
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, inkCentreY, printf, width, wrap, type Font } from "../engine/text";
-import { css, Theme } from "../engine/theme";
+import { css, Theme, type RGBA } from "../engine/theme";
 import { burstPlan } from "../engine/burst";
 import { remoteSaveAction } from "../net/remote";
 // The playground's buttons are the compact rounded ones, under the names the
@@ -50,6 +50,16 @@ import { CodeFx } from "../ui/codefx";
 import { PlayFx } from "../gfx/playfx";
 import { Popups } from "../ui/popups";
 import { Combo } from "../ui/combo";
+import {
+  GOAL_FIXES,
+  GOAL_LANGS,
+  GOAL_RUNS,
+  localStore,
+  readToday,
+  recordRun,
+  streak,
+  type Today,
+} from "../ui/today";
 import { clearPlan, comboPlan, shockPlan } from "../engine/burst";
 import type { EditEvent } from "../ui/editor";
 import {
@@ -84,6 +94,9 @@ import {
 import {
   AUTO_RUN_KEY,
   CODE_SIZE_KEY,
+  FX_KEY,
+  FX_LEVELS,
+  type FxLevel,
   CODE_SIZE_MAX,
   CODE_SIZE_MIN,
   CODE_SIZE_STEP,
@@ -441,6 +454,28 @@ function bannerTitle(o: PlaygroundRun["outcome"]): string {
   }
 }
 
+/** Everything a program printed, on one line: its lines joined by " · ". */
+function oneLine(text: string): string {
+  return text
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "")
+    .join("  ·  ");
+}
+
+/** The save slots' two-letter badges, one per land. */
+const LANG_BADGE: Partial<Record<string, string>> = {
+  rust: "RS",
+  go: "GO",
+  cpp: "C+",
+  python: "PY",
+  pytorch: "PT",
+  typescript: "TS",
+  zig: "ZG",
+  lua: "LU",
+};
+
 /** How many runs the strip under the output remembers. */
 const RECENT_RUNS = 16;
 
@@ -629,6 +664,31 @@ export class PlaygroundScene implements Scene {
   private zenFromCode = false;
 
   private stage: RunStage | "idle" = "idle";
+  /** Today's runs, fixes and languages on this device: TODAY'S GOALS. */
+  private today: Today = readToday(localStore, new Date());
+  /** Days in a row with a run, for the HUD. */
+  private dayStreak = streak(localStore, new Date());
+  /** Drawing the full-screen landscape look this frame. */
+  private wideLook = false;
+  /** What MORE holds this frame: pressing one of these leaves it open. */
+  private menuIds: string[] = [];
+  /** CODE's output-and-input panel, open over the strip. */
+  private codeLog = false;
+  /** The combo is drawn in CODE's rail this frame, not as a badge on the editor. */
+  private comboInRail = false;
+  /** Characters typed this visit, and when (scene time), for KEYS and WPM. */
+  private keysTyped = 0;
+  private typedAt: number[] = [];
+  /** This visit's run record, for CONSOLE's SESSION panel. */
+  private runsN = 0;
+  private clearsN = 0;
+  private bestMs: number | null = null;
+  /** The wide bench's MORE menu, open. */
+  private moreOpen = false;
+  /** The wide bench's language menu, open (when the lands are folded to one). */
+  private langOpen = false;
+  /** This frame's folded language button opens a menu (the wide bench) rather than stepping. */
+  private langMenu = false;
   /** See `AUTO_RUN_KEY`. */
   private autoRun = readPref(AUTO_RUN_KEY) !== "off";
   /** The editor's own size: see `CODE_SIZE_KEY`. */
@@ -705,6 +765,10 @@ export class PlaygroundScene implements Scene {
   private answeredAt = -10;
   /** Whether the run before this one failed: a fix is worth a bigger party. */
   private lastBad = false;
+  /** How much the effects do: see `FX_KEY`. Calm unless somebody chose otherwise. */
+  private fxLevel: FxLevel = FX_LEVELS.includes(readPref(FX_KEY) as FxLevel)
+    ? (readPref(FX_KEY) as FxLevel)
+    : "calm";
   /** The old computer's tube over the editor (`gfx/retroscreen.ts`). */
   private retro: RetroScreen | null = null;
   /** The Rust coder: the AI agent that flies over the code (`ui/agent/coder.ts`). */
@@ -1282,7 +1346,7 @@ export class PlaygroundScene implements Scene {
   /** RUN was pressed: a ripple and a shockwave from the button. */
   private launched(): void {
     const at = this.buttonAt("run");
-    if (!at) return;
+    if (!at || this.fxLevel !== "full") return;
     this.playfx?.launch(at[0], at[1], Theme.coin);
     this.fx?.play(shockPlan(at[0], at[1], 70, Theme.coin));
   }
@@ -1303,6 +1367,25 @@ export class PlaygroundScene implements Scene {
     const ok = run.outcome === "ok";
     const fixed = ok && this.lastBad;
     this.lastBad = !ok;
+    this.today = recordRun(localStore, new Date(), this.held.lang, fixed);
+    this.runsN++;
+    if (ok) {
+      this.clearsN++;
+      this.bestMs = this.bestMs === null ? run.run_ms : Math.min(this.bestMs, run.run_ms);
+    }
+    this.dayStreak = streak(localStore, new Date());
+    if (this.fxLevel === "off") return;
+    if (this.fxLevel === "calm") {
+      // Calm: a soft glow for a clean run, a faint red edge and the marker on
+      // the failing line for a failure. Nothing that moves for its own sake.
+      if (ok) {
+        if (out) this.playfx?.clear(out[0] + out[2] / 2, out[1], Theme.admit, 0.3);
+        return;
+      }
+      this.playfx?.hurt(how === "press" ? 0.3 : 0.12);
+      this.markError(run, ed);
+      return;
+    }
     if (ok) {
       if (out) this.playfx?.clear(out[0] + out[2] / 2, out[1], Theme.admit);
       if (ed && (how === "press" || fixed)) {
@@ -1318,8 +1401,15 @@ export class PlaygroundScene implements Scene {
         this.pops?.pop(out[0] + out[2] / 2, out[1] + out[3] * 0.45, `${run.run_ms} ms`, "info");
       return;
     }
-    this.playfx?.hurt();
-    this.editor?.shake();
+    // A failure is information, not a punishment: a short tear on a press,
+    // a flicker on AUTO-RUN, where half-written code fails every ENTER.
+    this.playfx?.hurt(how === "press" ? 0.7 : 0.3);
+    if (how === "press") this.editor?.shake();
+    this.markError(run, ed);
+  }
+
+  /** "-1 HP" on the line a failed run points at, or the editor's middle. */
+  private markError(run: PlaygroundRun, ed: Rect | null): void {
     const where = errorAt(run);
     const label = `-1 HP${where.code ? `  ${where.code}` : ""}`;
     const at = where.line !== null ? this.editor?.lineClient(where.line) : null;
@@ -1331,11 +1421,30 @@ export class PlaygroundScene implements Scene {
     else if (ed) this.pops?.pop(ed[0] + ed[2] / 2, ed[1] + ed[3] / 2, label, "hurt");
   }
 
+  /** The next FX level: calm, full, off. */
+  private cycleFx(): void {
+    this.fxLevel = FX_LEVELS[(FX_LEVELS.indexOf(this.fxLevel) + 1) % FX_LEVELS.length];
+    writePref(FX_KEY, this.fxLevel);
+    if (this.fx) this.fx.level = this.fxLevel;
+    this.app.chip.blip();
+  }
+
+  /** FX, saying the level it is at, like every toggle on this screen. */
+  private fxItem(): { id: string; label: string; strong?: boolean } {
+    const key =
+      this.fxLevel === "full" ? "pg.fxFull" : this.fxLevel === "off" ? "pg.fxOff" : "pg.fxCalm";
+    return { id: "fx", label: t(key), strong: this.fxLevel === "full" };
+  }
+
   /** Every edit: the combo counts keys, and a milestone throws a fountain. */
   private edited(e: EditEvent): void {
     if (e.kind !== "type" && e.kind !== "enter") return;
+    const n = e.kind === "type" ? e.text.length : 1;
+    this.keysTyped += n;
+    for (let i = 0; i < n && i < 50; i++) this.typedAt.push(this.t);
+    while (this.typedAt.length > 0 && this.t - this.typedAt[0] > 60) this.typedAt.shift();
     const m = this.combo.hit(this.t);
-    if (!m) return;
+    if (!m || this.fxLevel !== "full") return;
     const c = this.editor?.caretClient();
     const v = c ? this.app.layout.toVirtual(c[0], c[1]) : null;
     if (!v) return;
@@ -1519,6 +1628,7 @@ export class PlaygroundScene implements Scene {
     this.fx = new CodeFx(this.app.overlay, this.app.layout, this.app.assets, this.app.chip);
     this.fx.attach(this.editor);
     this.fx.onEdit = (e) => this.edited(e);
+    this.fx.level = this.fxLevel;
     this.playfx?.destroy();
     this.playfx = new PlayFx(this.app.overlay, this.app.layout);
     this.pops?.destroy();
@@ -2332,6 +2442,16 @@ export class PlaygroundScene implements Scene {
       return;
     }
     const hit = this.buttons.hit(x, y) ?? this.rows.hit(x, y);
+    // MORE stays open while its own buttons are pressed (A+ three times is
+    // three presses), and closes on anything else.
+    if (hit?.id === "more") {
+      this.moreOpen = !this.moreOpen;
+      this.langOpen = false;
+      this.app.chip.blip();
+      return;
+    }
+    if (!hit || !this.menuIds.includes(hit.id)) this.moreOpen = false;
+    if (!hit || !isLang(hit.id)) this.langOpen = false;
     if (!hit) return;
     if (this.display(hit.id)) return;
     if (hit.id === "agent") {
@@ -2344,6 +2464,12 @@ export class PlaygroundScene implements Scene {
       return;
     }
     if (hit.id === "console") return void this.toggleZen();
+    if (hit.id === "fx") return this.cycleFx();
+    if (hit.id === "codelog") {
+      this.codeLog = !this.codeLog;
+      this.app.chip.blip();
+      return;
+    }
     if (hit.id === "code") {
       this.focus = true;
       this.app.chip.select();
@@ -2406,6 +2532,12 @@ export class PlaygroundScene implements Scene {
       this.app.chip.blip();
       return;
     }
+    if (hit.id === "tabout" || hit.id === "taberr") {
+      this.showStderr = hit.id === "taberr";
+      writePref(STDERR_KEY, this.showStderr ? "on" : "off");
+      this.app.chip.blip();
+      return;
+    }
     if (hit.id === "stderr") {
       this.showStderr = !this.showStderr;
       writePref(STDERR_KEY, this.showStderr ? "on" : "off");
@@ -2421,7 +2553,13 @@ export class PlaygroundScene implements Scene {
     else if (hit.id === "back") void this.app.go(new LandsScene(this.app), "back");
     else if (isLang(hit.id)) {
       // Folded to the live land, the one button steps through them.
-      if (this.langsFolded && hit.id === this.held.lang) {
+      if (this.langMenu && hit.id === this.held.lang && !this.langOpen) {
+        this.langOpen = true;
+        this.app.chip.blip();
+        return;
+      }
+      this.langOpen = false;
+      if (this.langsFolded && !this.langMenu && hit.id === this.held.lang) {
         this.setLang(LANGS[(LANGS.indexOf(hit.id) + 1) % LANGS.length]);
       } else this.setLang(hit.id);
     } else if (hit.id.startsWith("snip:")) void this.load(hit.id.slice(5));
@@ -2433,9 +2571,15 @@ export class PlaygroundScene implements Scene {
     this.combo.tick(this.t);
     const shown = this.editorRect[2] > 0 ? this.editorRect : null;
     if (shown) this.playfx?.editor(shown);
-    this.playfx?.setFever(this.combo.fever());
+    const loud = this.fxLevel === "full";
+    this.playfx?.setFever(loud ? this.combo.fever() : 0);
     this.playfx?.frame(dt);
-    this.pops?.combo(shown, this.combo.count, this.combo.left(this.t), this.combo.tier());
+    this.pops?.combo(
+      loud && !this.comboInRail ? shown : null,
+      this.combo.count,
+      this.combo.left(this.t),
+      this.combo.tier(),
+    );
     this.retro?.frame(dt);
     this.coder?.syncRoom();
     this.coder?.update(dt);
@@ -2497,6 +2641,16 @@ export class PlaygroundScene implements Scene {
     }
     // The panel is CODE mode's; its fields must not linger over the bench.
     this.coder?.panel.hideFields();
+    this.wideLook = !layout.isPortrait();
+    if (this.wideLook) {
+      this.buttons.reset();
+      this.rows.reset();
+      this.drawWide(g);
+      this.buttons.draw(g, ensureFonts(layout.uiScale()).tool);
+      this.coder?.draw();
+      if (this.conflict) this.drawConflict(g);
+      return;
+    }
     header(g, this.app, t("pg.title", { name: this.heldName().toUpperCase() }));
     // Full-bleed, like the map and the quest screen and for their reason:
     // this is a screen somebody works on, and room to read beats room to
@@ -2711,7 +2865,12 @@ export class PlaygroundScene implements Scene {
     // The code's size, like the bench's buttons: the list holds names, and
     // at the chrome's CJK floor the rule above it took half the panel.
     const body = fonts.tool;
-    const inner = titledPanel(g, rect, t("pg.scratchpads"), Theme.coin);
+    const inner = this.panelFor(
+      g,
+      rect,
+      this.wideLook ? t("pg.saveSlots") : t("pg.scratchpads"),
+      Theme.coin,
+    );
     const pad = Math.round(8 * s);
     const minH = this.app.layout.minTouchH();
     const findH = Math.max(minH, body.height + Math.round(14 * s));
@@ -2806,7 +2965,11 @@ export class PlaygroundScene implements Scene {
   ): void {
     const fonts = ensureFonts(s);
     const pad = Math.round(8 * s);
-    const rowH = Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
+    const wide = this.wideLook;
+    const meta = fonts.stationSm;
+    const rowH = wide
+      ? Math.max(this.app.layout.minTouchH(), body.height + meta.height + Math.round(6 * s))
+      : Math.max(this.app.layout.minTouchH(), body.height + Math.round(14 * s));
     const shown = this.visibleSnippets();
     this.listRect = [x, y, w, Math.max(0, room)];
     this.listOverflow = Math.max(0, shown.length * rowH - room);
@@ -2823,6 +2986,44 @@ export class PlaygroundScene implements Scene {
         const id = `snip:${snip.id}`;
         const open = snip.id === this.held.id;
         const hover = this.rows.hovered === id;
+        if (wide) {
+          // A save slot: a badge in the land's colour, the name, when it was
+          // last touched; the open one outlined in gold.
+          const rr = Math.round(7 * s);
+          if (open || hover) {
+            g.fillStyle = css(open ? Theme.coin : Theme.cream, open ? 0.14 : 0.06);
+            roundRect(g, x, ry + 1, w, rowH - 3, rr);
+            g.fill();
+          }
+          if (open) {
+            g.strokeStyle = css(Theme.coin, 0.55);
+            roundRect(g, x + 0.5, ry + 1.5, w - 1, rowH - 4, rr);
+            g.stroke();
+          }
+          const bs = Math.round(26 * s);
+          const bx = x + Math.round(5 * s);
+          const by = ry + (rowH - bs) / 2;
+          g.fillStyle = css(landColour(snip.lang));
+          roundRect(g, bx, by, bs, bs, Math.round(6 * s));
+          g.fill();
+          const tag = LANG_BADGE[snip.lang] ?? snip.lang.slice(0, 2).toUpperCase();
+          g.fillStyle = css(Theme.ink);
+          printf(g, meta, tag, bx, inkCentreY(meta, tag, by, bs), bs, "center");
+          const tx = bx + bs + Math.round(8 * s);
+          const tw = x + w - tx - Math.round(4 * s);
+          const ny = ry + (rowH - body.height - meta.height) / 2;
+          g.fillStyle = css(open ? Theme.cream : [0.73, 0.7, 0.84, 1]);
+          printf(g, body, elide(body, snip.name, tw), tx, ny, tw, "left");
+          g.fillStyle = css([0.49, 0.47, 0.66, 1]);
+          const when = this.ago(snip.updated_at);
+          printf(g, meta, elide(meta, when, tw), tx, ny + body.height, tw, "left");
+          const top = Math.max(ry, y);
+          const bottom = Math.min(ry + rowH - 2, y + room);
+          if (bottom > top)
+            this.rows.add({ id, rect: [x, top, w, bottom - top], label: snip.name });
+          ry += rowH;
+          continue;
+        }
         fill(g, open ? Theme.navy : Theme.ink, x, ry, w, rowH - 2, open ? 0.95 : 0.5);
         fill(g, landColour(snip.lang), x, ry, Math.round(4 * s), rowH - 2, open || hover ? 1 : 0.5);
         // The language tag owns the right of the row, so the name is measured
@@ -3047,6 +3248,9 @@ export class PlaygroundScene implements Scene {
     // rectangle it had in the framed layout.
     this.searchOverlay?.hide();
     if (this.zen) return this.drawZen(g, s);
+    this.comboInRail = false;
+    if (!layout.isPortrait() && !(this.coder?.open ?? false)) return this.drawCodeWide(g, s);
+    this.menuIds = [];
     const fonts = ensureFonts(s);
     const f = fonts.tool;
     const pad = Math.round(6 * s);
@@ -3313,6 +3517,369 @@ export class PlaygroundScene implements Scene {
   }
 
   /**
+   * CODE, wide, as the design draws it: one slim bar — back to the bench,
+   * the file and its land, the work, the level, the size, MORE — the editor
+   * across the window with a rail beside it (the combo, the code's map, keys
+   * and words a minute), and one line along the foot for the last run, with
+   * LOG ▴ opening its output and STDIN above it.
+   */
+  private drawCodeWide(g: Ctx, s: number): void {
+    const { layout } = this.app;
+    const fonts = ensureFonts(s);
+    const f = fonts.tool;
+    const sm = fonts.stationSm;
+    const { vw, vh } = layout;
+    const minH = layout.minTouchH();
+    const box = (l: string) => btnBox(f, [l], 0, btnPad(f), minH);
+    const rowH = box("M")[1];
+    const fg = roundGap(f);
+    const pad = Math.round(6 * s);
+    this.coder?.panel.hideFields();
+
+    fill(g, [0.04, 0.06, 0.17, 1], 0, 0, vw, vh, 0.94);
+    const barH = rowH + pad * 2;
+    fill(g, [0.06, 0.09, 0.24, 1], 0, 0, vw, barH, 0.97);
+    fill(g, Theme.cyan, 0, barH - 1, vw, 1, 0.22);
+
+    const back = { id: "unfocus", label: t("pg.bench") };
+    const work = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
+        : []),
+      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      { id: "undo", label: "↶", dim: !this.editor?.canUndo },
+      { id: "redo", label: "↷", dim: !this.editor?.canRedo },
+      { id: "console", label: t("pg.console") },
+      { id: "agent", label: `✦ ${t("agent.button")}`, strong: this.coder?.open ?? false },
+    ];
+    const more = [
+      this.autoItem(),
+      this.stderrItem(),
+      this.fxItem(),
+      { id: "new", label: t("pg.new"), dim: this.conflict !== null },
+      { id: "rename", label: t("pg.rename") },
+      ...this.shelfItems(),
+      { id: "copycode", label: t("quest.copyCode") },
+      { id: "pastecode", label: t("quest.paste") },
+      {
+        id: "copyout",
+        label: t("quest.copyOutput"),
+        dim: !this.result && this.log.lines.length === 0,
+      },
+      { id: "copyin", label: t("pg.copyIn"), dim: this.stdinEl.value === "" },
+      { id: "pastein", label: t("pg.pasteIn") },
+      { id: "poster", label: t("pg.poster"), dim: this.postering },
+      { id: "reader", label: t("pg.reader") },
+      ...this.fontItems().slice(2),
+      ...this.displayItems(),
+    ];
+    const sizes = this.fontItems().slice(0, 2);
+    const moreItem = {
+      id: "more",
+      label: `${t("pg.more")} ${this.moreOpen ? "▴" : "▾"}`,
+      strong: this.moreOpen,
+    };
+    const filtering = this.tools.query.trim() !== "";
+    const filterW = this.tools.width(f);
+    let x = pad;
+    const by = pad;
+    const put = (item: {
+      id: string;
+      label: string;
+      dim?: boolean;
+      primary?: boolean;
+      strong?: boolean;
+    }) => {
+      const [bw, bh] = box(item.label);
+      this.buttons.add({ ...item, rect: [x, by, bw, bh] });
+      x += bw + fg;
+    };
+    put(back);
+    this.tools.draw(g, [x, by, filterW, rowH], f);
+    x += filterW + fg;
+    let barBottom = barH;
+    if (filtering) {
+      // Every button a candidate, wrapping under the bar while the box is typed.
+      this.moreOpen = false;
+      this.menuIds = [];
+      const items = this.tools.filter([...work, ...sizes, ...more]);
+      const rows = rowsIn(
+        f,
+        items.map((i) => i.label),
+        vw - x - pad,
+        minH,
+        0,
+      );
+      const h = rows * rowH + (rows - 1) * fg;
+      fill(g, [0.06, 0.09, 0.24, 1], 0, barH, vw, h + pad, 0.97);
+      this.buttons.row(f, [x, by, vw - x - pad, h], items, minH);
+      barBottom = Math.max(barH, by + h + pad);
+    } else {
+      // The file and its land.
+      const file = `${MAIN_FILE[this.held.lang]}${this.dirty ? " ●" : ""}`;
+      g.fillStyle = css(this.dirty ? Theme.coin : Theme.cream);
+      printf(g, sm, file, x, inkCentreY(sm, file, by, rowH), vw, "left");
+      x += width(sm, file) + Math.round(8 * s);
+      const land = t(`pg.${this.held.lang}` as "pg.rust");
+      const lw = width(sm, land) + Math.round(10 * s);
+      const lh = sm.height + Math.round(2 * s);
+      g.fillStyle = css(landColour(this.held.lang));
+      roundRect(g, x, by + (rowH - lh) / 2, lw, lh, Math.round(5 * s));
+      g.fill();
+      g.fillStyle = css(Theme.ink);
+      printf(g, sm, land, x, inkCentreY(sm, land, by + (rowH - lh) / 2, lh), lw, "center");
+      x += lw + Math.round(10 * s);
+      for (const item of work) put(item);
+      // From the right: MORE, A+, A-, and the level.
+      let rx = vw - pad;
+      const right = [...sizes, moreItem];
+      const rw = right.reduce((a, i) => a + box(i.label)[0] + fg, 0);
+      rx -= rw;
+      let ix = rx;
+      for (const item of right) {
+        const [bw, bh] = box(item.label);
+        this.buttons.add({ ...item, rect: [ix, by, bw, bh] });
+        ix += bw + fg;
+      }
+      const u = this.app.client.user;
+      const xpW = Math.round(150 * s);
+      if (u && rx - x > xpW + Math.round(60 * s)) {
+        const lv = t("pg.hudLevel", { n: u.level });
+        const bw = width(sm, lv) + Math.round(10 * s);
+        const bh = sm.height + Math.round(2 * s);
+        const lx = rx - Math.round(10 * s) - xpW - bw - Math.round(6 * s);
+        const mid = by + rowH / 2;
+        g.fillStyle = css(Theme.coin);
+        roundRect(g, lx, mid - bh / 2, bw, bh, Math.round(4 * s));
+        g.fill();
+        g.fillStyle = css(Theme.ink);
+        printf(g, sm, lv, lx, inkCentreY(sm, lv, mid - bh / 2, bh), bw, "center");
+        const base = PlaygroundScene.xpFor(u.level);
+        const next = PlaygroundScene.xpFor(u.level + 1);
+        const frac = Math.max(0, Math.min(1, (u.xp - base) / Math.max(1, next - base)));
+        const bx = lx + bw + Math.round(6 * s);
+        const h8 = Math.round(8 * s);
+        g.fillStyle = css([0.04, 0.06, 0.18, 1]);
+        roundRect(g, bx, mid - h8 / 2, xpW, h8, h8 / 2);
+        g.fill();
+        if (frac > 0) {
+          g.fillStyle = css(Theme.coin);
+          roundRect(g, bx, mid - h8 / 2, Math.max(h8, xpW * frac), h8, h8 / 2);
+          g.fill();
+        }
+      }
+    }
+    if (this.renaming)
+      this.nameOverlay?.place([pad, by, Math.min(vw - pad * 2, Math.round(300 * s)), rowH], f.size);
+    else this.nameOverlay?.hide();
+    if (this.stamping)
+      this.keyOverlay?.place([pad, by, Math.min(vw - pad * 2, Math.round(560 * s)), rowH], f.size);
+    else this.keyOverlay?.hide();
+
+    // The strip along the foot: the last run in one line.
+    const stripH = Math.max(minH, sm.height + Math.round(14 * s));
+    const sy = vh - stripH;
+    fill(g, [0.06, 0.09, 0.24, 1], 0, sy, vw, stripH, 0.97);
+    fill(g, Theme.cyan, 0, sy, vw, 1, 0.22);
+    const r = this.result;
+    let sx = pad * 2;
+    const chip = r
+      ? r.outcome === "ok"
+        ? t("pg.fxClear")
+        : bannerTitle(r.outcome)
+      : this.stage !== "idle"
+        ? this.stageLabel().toUpperCase()
+        : t("pg.ready");
+    const chipCol: RGBA = !r ? Theme.cyan : r.outcome === "ok" ? Theme.admit : Theme.red;
+    const cw = width(sm, chip) + Math.round(12 * s);
+    const ch = sm.height + Math.round(2 * s);
+    g.fillStyle = css(chipCol, 0.25);
+    roundRect(g, sx, sy + (stripH - ch) / 2, cw, ch, Math.round(5 * s));
+    g.fill();
+    g.fillStyle = css(
+      chipCol === Theme.red
+        ? [1, 0.55, 0.45, 1]
+        : chipCol === Theme.admit
+          ? [0.5, 0.88, 0.63, 1]
+          : Theme.cyan,
+    );
+    printf(g, sm, chip, sx, inkCentreY(sm, chip, sy + (stripH - ch) / 2, ch), cw, "center");
+    sx += cw + Math.round(10 * s);
+    const logLabel = `${t("pg.logPanel")} ${this.codeLog ? "▾" : "▴"}`;
+    const [lbw, lbh] = box(logLabel);
+    const lbx = vw - pad - lbw;
+    this.buttons.add({
+      id: "codelog",
+      label: logLabel,
+      rect: [lbx, sy + (stripH - lbh) / 2, lbw, lbh],
+      strong: this.codeLog,
+    });
+    const where = this.caretWhere() ?? "";
+    const timing = r
+      ? `${t("pg.statBuild").toLowerCase()} ${r.compile_ms}ms · ${t("pg.statRun").toLowerCase()} ${r.run_ms}ms · ${where}`
+      : where;
+    const tw = width(sm, timing);
+    g.fillStyle = css(Theme.dim);
+    printf(
+      g,
+      sm,
+      timing,
+      lbx - Math.round(10 * s) - tw,
+      inkCentreY(sm, timing, sy, stripH),
+      tw + 4,
+      "left",
+    );
+    const say = r
+      ? r.outcome === "ok"
+        ? oneLine(r.stdout) || consoleOutput(r, "idle")
+        : consoleLine(r, "idle")
+      : t("pg.consoleReady");
+    const sayW = lbx - Math.round(20 * s) - tw - sx;
+    g.fillStyle = css(r && r.outcome !== "ok" ? [1, 0.6, 0.5, 1] : Theme.cream);
+    printf(
+      g,
+      fonts.codeSm,
+      elide(fonts.codeSm, say, Math.max(0, sayW)),
+      sx,
+      inkCentreY(fonts.codeSm, say, sy, stripH),
+      Math.max(0, sayW),
+      "left",
+    );
+
+    // The rail.
+    const railW = Math.round(150 * s);
+    const top = barBottom + pad;
+    let bottom = sy - pad;
+    const rx0 = vw - pad - railW;
+    // LOG open: output and STDIN in a band above the strip, under editor and rail.
+    if (this.codeLog) {
+      const logH = Math.round((bottom - top) * 0.42);
+      const ly = bottom - logH;
+      const inW = Math.round((vw - pad * 3) * 0.32);
+      this.glass(g, [pad, ly, inW, logH], s);
+      const lab = t("pg.stdin");
+      g.fillStyle = css(Theme.cyan);
+      printf(g, sm, lab, pad + Math.round(8 * s), ly + Math.round(5 * s), inW, "left");
+      const lh2 = sm.height + Math.round(10 * s);
+      this.stdinOverlay?.place([pad + 6, ly + lh2, inW - 12, logH - lh2 - 6], fonts.codeSm.size);
+      this.drawOutput(g, [pad * 2 + inW, ly, vw - pad * 3 - inW, logH], s);
+      bottom = ly - pad;
+    } else {
+      this.stdinOverlay?.hide();
+      this.outputRect = [0, 0, 0, 0];
+    }
+    const editorRect = this.screen(g, [pad, top, rx0 - pad * 2, bottom - top]);
+    this.editorRect = editorRect;
+    if (this.editor) {
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.codeMul);
+      this.retro?.place(editorRect);
+    } else this.overlay?.hide();
+    this.coder?.fly([0, 0, vw, vh]);
+
+    // Combo.
+    this.comboInRail = true;
+    const comboH = Math.round(104 * s);
+    this.glass(g, [rx0, top, railW, comboH], s, Theme.pink, 0.4);
+    const n = this.combo.count;
+    const big = `x${n}`;
+    g.save();
+    if (this.fxLevel === "full" && n > 0) {
+      g.shadowColor = css(Theme.pink);
+      g.shadowBlur = Math.round(12 * s);
+    }
+    g.fillStyle = css(n > 0 ? Theme.pink : Theme.dim);
+    printf(g, fonts.station, big, rx0, top + Math.round(12 * s), railW, "center");
+    g.restore();
+    let cy = top + Math.round(12 * s) + fonts.station.height + Math.round(4 * s);
+    g.fillStyle = css(Theme.cream);
+    printf(g, sm, t("pg.combo"), rx0, cy, railW, "center");
+    cy += sm.height + Math.round(4 * s);
+    const bw2 = railW - Math.round(24 * s);
+    const bh2 = Math.round(5 * s);
+    g.fillStyle = css([0.04, 0.06, 0.18, 1]);
+    roundRect(g, rx0 + Math.round(12 * s), cy, bw2, bh2, bh2 / 2);
+    g.fill();
+    const left = this.combo.left(this.t);
+    if (left > 0) {
+      const gr = g.createLinearGradient(rx0, 0, rx0 + railW, 0);
+      gr.addColorStop(0, "#F878A8");
+      gr.addColorStop(1, "#F8D030");
+      g.fillStyle = gr;
+      roundRect(g, rx0 + Math.round(12 * s), cy, Math.max(bh2, bw2 * left), bh2, bh2 / 2);
+      g.fill();
+    }
+    cy += bh2 + Math.round(4 * s);
+    const nextM = [10, 25, 50, 100, 200].find((m) => m > n) ?? 200;
+    const goal = t("pg.comboNext", { n: nextM });
+    g.fillStyle = css(Theme.dim);
+    printf(g, sm, goal, rx0, cy, railW, "center");
+
+    // Keys and words a minute, at the foot of the rail.
+    const tileH = sm.height * 2 + Math.round(8 * s);
+    const ty = bottom - tileH;
+    const half = (railW - Math.round(4 * s)) / 2;
+    const wpm = Math.round(this.typedAt.length / 5);
+    const tiles: Array<[string, string, RGBA]> = [
+      [t("pg.keys"), String(this.keysTyped), Theme.cyan],
+      [t("pg.wpm"), String(wpm), Theme.coin],
+    ];
+    tiles.forEach(([k, v, col], i) => {
+      const tx = rx0 + i * (half + Math.round(4 * s));
+      this.glass(g, [tx, ty, half, tileH], s, Theme.cyan, 0.12);
+      g.fillStyle = css(Theme.dim);
+      printf(g, sm, k, tx + Math.round(6 * s), ty + Math.round(3 * s), half, "left");
+      g.fillStyle = css(col);
+      printf(g, sm, v, tx + Math.round(6 * s), ty + Math.round(3 * s) + sm.height, half, "left");
+    });
+
+    // The map, between.
+    const my = top + comboH + pad;
+    g.fillStyle = css(Theme.cyan);
+    printf(g, sm, t("pg.map"), rx0 + Math.round(2 * s), my, railW, "left");
+    const mapTop = my + sm.height + Math.round(3 * s);
+    this.drawMinimap(g, [rx0, mapTop, railW, Math.max(20, ty - pad - mapTop)], s);
+
+    // MORE, open: down the rail and over it, on the canvas.
+    this.menuIds = more.map((m) => m.id);
+    if (this.moreOpen && !filtering) {
+      const mp = Math.round(6 * s);
+      const step = rowH + fg;
+      const itemW = Math.max(...more.map((m) => box(m.label)[0]));
+      const room = Math.max(1, Math.floor((sy - barH - mp * 3) / step));
+      const cols = Math.ceil(more.length / room);
+      const perCol = Math.ceil(more.length / cols);
+      const pw = cols * itemW + (cols - 1) * fg + mp * 2;
+      const ph = perCol * step - fg + mp * 2;
+      const px = vw - pad - pw;
+      const py = barH + Math.round(2 * s);
+      g.save();
+      g.shadowColor = "rgba(0,0,0,0.6)";
+      g.shadowBlur = Math.round(16 * s);
+      g.fillStyle = css(Theme.void, 0.97);
+      roundRect(g, px, py, pw, ph, Math.round(8 * s));
+      g.fill();
+      g.restore();
+      g.strokeStyle = css(Theme.cyan, 0.35);
+      roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
+      g.stroke();
+      more.forEach((item, i) => {
+        const c = Math.floor(i / perCol);
+        const rr = i % perCol;
+        this.buttons.add({
+          ...item,
+          rect: [px + mp + c * (itemW + fg), py + mp + rr * step, itemW, rowH],
+        });
+      });
+    }
+  }
+
+  /**
    * CONSOLE: the monitor, the code on it, and one line.
    *
    * RUN and CONSOLE in the corner and nothing else: RUN because a tablet has
@@ -3341,25 +3908,42 @@ export class PlaygroundScene implements Scene {
       },
       { id: "console", label: t("pg.console"), strong: true },
     ];
-    const gapB = roundGap(f);
-    const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
-    const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
-    const dh = boxes[0][1];
-    this.buttons.row(f, [layout.vw - pad - rowW, pad, rowW + gapB, dh], items, layout.minTouchH());
+    // Wide: the monitor takes the window but a column at the right, where a
+    // disk drive holds RUN and EXIT and a SESSION card keeps score. Tall:
+    // RUN and CONSOLE in a strip along the top, the monitor under them.
+    const side = !layout.isPortrait();
+    let gx: number, gy: number, gw: number, gh: number;
+    if (side) {
+      const panelW = Math.round(168 * s);
+      const px = layout.vw - pad - panelW;
+      [gx, gy, gw, gh] = this.screen(g, [pad, pad, px - pad * 2, layout.vh - pad * 2]);
+      this.drawDrive(g, [px, pad, panelW, layout.vh - pad * 2], s, items);
+    } else {
+      const gapB = roundGap(f);
+      const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
+      const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
+      const dh = boxes[0][1];
+      this.buttons.row(
+        f,
+        [layout.vw - pad - rowW, pad, rowW + gapB, dh],
+        items,
+        layout.minTouchH(),
+      );
 
-    // The pad's name on the left of the same strip, quiet.
-    const name = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
-      this.dirty ? `   ${t("pg.unsaved")}` : ""
-    }`;
-    g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
-    const nameW = layout.vw - pad * 4 - rowW;
-    printf(g, f, elide(f, name, nameW), pad * 2, inkCentreY(f, name, pad, dh), nameW, "left");
+      // The pad's name on the left of the same strip, quiet.
+      const name = `${MAIN_FILE[this.held.lang]}   ${this.heldName().toUpperCase()}${
+        this.dirty ? `   ${t("pg.unsaved")}` : ""
+      }`;
+      g.fillStyle = css(this.dirty ? Theme.coin : Theme.dim);
+      const nameW = layout.vw - pad * 4 - rowW;
+      printf(g, f, elide(f, name, nameW), pad * 2, inkCentreY(f, name, pad, dh), nameW, "left");
 
-    const top = pad * 2 + dh;
-    const bodyW = layout.vw - pad * 2;
-    const bodyH = layout.vh - top - pad;
-    const w = Math.min(bodyW, Math.round(bodyH * 1.45));
-    const [gx, gy, gw, gh] = this.screen(g, [Math.round((layout.vw - w) / 2), top, w, bodyH]);
+      const top = pad * 2 + dh;
+      const bodyW = layout.vw - pad * 2;
+      const bodyH = layout.vh - top - pad;
+      const w = Math.min(bodyW, Math.round(bodyH * 1.45));
+      [gx, gy, gw, gh] = this.screen(g, [Math.round((layout.vw - w) / 2), top, w, bodyH]);
+    }
 
     // The line, along the bottom of the glass, in the tube's own ink: plain
     // for good news, inverse video for an error, as the machines did it.
@@ -3399,13 +3983,151 @@ export class PlaygroundScene implements Scene {
     printf(g, say, shown, lx, inkCentreY(say, shown, ly, lineH), lw, "left");
     g.restore();
 
-    const editorRect: Rect = [gx, gy, gw, gh - lineH - outH - 2];
+    // A line across the top of the glass, as the machine would print it:
+    // what is loaded and how big it is.
+    let headH = 0;
+    if (side) {
+      headH = say.height + Math.round(8 * s);
+      const cat = t("pg.catalog", {
+        file: MAIN_FILE[this.held.lang].toUpperCase(),
+        lang: t(`pg.${this.held.lang}` as "pg.rust"),
+      });
+      const bytes = t("pg.bytes", {
+        n: new TextEncoder().encode(this.editor?.source ?? this.held.source).length,
+      });
+      g.save();
+      g.fillStyle = ink;
+      g.globalAlpha = 0.75;
+      g.shadowColor = ink;
+      g.shadowBlur = Math.round(6 * s);
+      printf(g, say, cat, lx, gy + Math.round(4 * s), lw, "left");
+      printf(g, say, bytes, lx, gy + Math.round(4 * s), lw, "right");
+      g.restore();
+    }
+    const editorRect: Rect = [gx, gy + headH, gw, gh - lineH - outH - 2 - headH];
     this.editorRect = editorRect;
     if (this.editor) {
       this.overlay?.place(editorRect, code.size * this.codeMul);
       this.retro?.place(editorRect);
     } else this.overlay?.hide();
     this.coder?.fly([0, 0, layout.vw, layout.vh]);
+  }
+
+  /**
+   * CONSOLE's side column: a disk drive — its slot, a light that is lit while
+   * a run is out, a big RUN key and EXIT — and a SESSION card with this
+   * visit's runs, clears, best time and the day streak. Only RUN and EXIT are
+   * buttons; the card is a scoreboard.
+   */
+  private drawDrive(
+    g: Ctx,
+    rect: Rect,
+    s: number,
+    items: Array<{ id: string; label: string; dim?: boolean; primary?: boolean; strong?: boolean }>,
+  ): void {
+    const [x, y, w, h] = rect;
+    const fonts = ensureFonts(s);
+    const sm = fonts.stationSm;
+    const pad = Math.round(12 * s);
+    const r = Math.round(14 * s);
+    // The drive: a beige case with a lip, as the monitor is.
+    const runH = Math.max(this.app.layout.minTouchH(), Math.round(44 * s));
+    const exitH = Math.max(this.app.layout.minTouchH(), Math.round(30 * s));
+    const slotH = Math.round(52 * s);
+    const driveH =
+      pad +
+      sm.height +
+      Math.round(6 * s) +
+      slotH +
+      Math.round(8 * s) +
+      sm.height +
+      Math.round(10 * s) +
+      runH +
+      Math.round(8 * s) +
+      exitH +
+      pad;
+    const beige = g.createLinearGradient(0, y, 0, y + driveH);
+    beige.addColorStop(0, "#E4D8B6");
+    beige.addColorStop(1, "#CDBF98");
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.5)";
+    g.shadowBlur = Math.round(20 * s);
+    g.fillStyle = beige;
+    roundRect(g, x, y, w, driveH, r);
+    g.fill();
+    g.restore();
+    g.fillStyle = "#A8996F";
+    roundRect(g, x, y + driveH - Math.round(4 * s), w, Math.round(4 * s), Math.round(2 * s));
+    g.fill();
+    let cy = y + pad;
+    g.fillStyle = "#6A6048";
+    printf(g, sm, t("pg.drive"), x + pad, cy, w, "left");
+    cy += sm.height + Math.round(6 * s);
+    g.fillStyle = "#2A2822";
+    roundRect(g, x + pad, cy, w - pad * 2, slotH, Math.round(6 * s));
+    g.fill();
+    g.fillStyle = "#0C0C0A";
+    roundRect(
+      g,
+      x + pad * 2,
+      cy + slotH / 2 - Math.round(3 * s),
+      w - pad * 4,
+      Math.round(6 * s),
+      Math.round(3 * s),
+    );
+    g.fill();
+    cy += slotH + Math.round(8 * s);
+    const busy = this.stage !== "idle";
+    const led = Math.round(9 * s);
+    g.save();
+    g.fillStyle = busy ? "#FF4A2A" : "#5A2A20";
+    if (busy) {
+      g.shadowColor = "#FF4A2A";
+      g.shadowBlur = Math.round(8 * s);
+    }
+    g.beginPath();
+    g.arc(x + pad + led / 2, cy + sm.height / 2, led / 2, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+    g.fillStyle = "#6A6048";
+    const st = busy ? t("pg.inUse") : t("pg.idleDrive");
+    printf(g, sm, st, x + pad + led + Math.round(6 * s), cy, w, "left");
+    cy += sm.height + Math.round(10 * s);
+    const run = items.find((i) => i.id === "run");
+    const exit = items.find((i) => i.id === "console");
+    if (run) this.buttons.add({ ...run, rect: [x + pad, cy, w - pad * 2, runH] });
+    cy += runH + Math.round(8 * s);
+    if (exit)
+      this.buttons.add({
+        ...exit,
+        label: t("pg.exitEsc"),
+        strong: false,
+        rect: [x + pad, cy, w - pad * 2, exitH],
+      });
+
+    // The session card.
+    const sy = y + driveH + Math.round(10 * s);
+    const sh = y + h - sy;
+    if (sh < sm.height * 3) return;
+    this.glass(g, [x, sy, w, sh], s);
+    let ry = sy + Math.round(10 * s);
+    g.fillStyle = css(Theme.cyan);
+    printf(g, sm, t("pg.session"), x + Math.round(10 * s), ry, w, "left");
+    ry += sm.height + Math.round(8 * s);
+    const rows: Array<[string, string, RGBA]> = [
+      [t("pg.sRuns"), String(this.runsN), Theme.cream],
+      [t("pg.sClear"), String(this.clearsN), [0.5, 0.88, 0.63, 1]],
+      [t("pg.sBest"), this.bestMs === null ? "—" : `${this.bestMs}ms`, Theme.coin],
+      [t("pg.sStreak"), String(this.dayStreak), [0.97, 0.6, 0.22, 1]],
+    ];
+    for (const [k, v, col] of rows) {
+      if (ry + sm.height > sy + sh - Math.round(6 * s)) break;
+      g.fillStyle = css(Theme.dim);
+      printf(g, sm, k, x + Math.round(10 * s), ry, w, "left");
+      g.fillStyle = css(col);
+      printf(g, sm, v, x, ry, w - Math.round(10 * s), "right");
+      ry += sm.height + Math.round(6 * s);
+    }
   }
 
   /**
@@ -3448,6 +4170,10 @@ export class PlaygroundScene implements Scene {
     }
 
     const gap = Math.round(8 * s);
+    if (!layout.isPortrait()) return this.drawBenchWide(g, inner, s);
+    this.moreOpen = false;
+    this.langOpen = false;
+    this.langMenu = false;
     // **Wide, the output is a column beside the code**, level with the
     // editor and the input, and the buttons run the full width under all
     // three. Under the band, as it still is when tall, a landscape bench had
@@ -3665,6 +4391,792 @@ export class PlaygroundScene implements Scene {
     }
   }
 
+  // -- the landscape look: the design's HUD, glass and columns ---------------
+
+  /** A glass panel: rounded, dark, a thin edge of light. */
+  private glass(g: Ctx, rect: Rect, s: number, edge: RGBA = Theme.cyan, edgeA = 0.25): void {
+    const [x, y, w, h] = rect;
+    const r = Math.round(10 * s);
+    g.save();
+    g.fillStyle = css([0.06, 0.09, 0.24, 1], 0.88);
+    roundRect(g, x, y, w, h, r);
+    g.fill();
+    g.strokeStyle = css(edge, edgeA);
+    g.lineWidth = 1;
+    roundRect(g, x + 0.5, y + 0.5, w - 1, h - 1, r);
+    g.stroke();
+    g.restore();
+  }
+
+  /** A titled panel: glass with a small cyan label in the landscape look. */
+  private panelFor(g: Ctx, rect: Rect, title: string, accent: RGBA): Rect {
+    if (!this.wideLook) return titledPanel(g, rect, title, accent);
+    const s = this.app.layout.uiScale();
+    const f = ensureFonts(s).stationSm;
+    this.glass(g, rect, s);
+    const pad = Math.round(8 * s);
+    g.fillStyle = css(Theme.cyan);
+    printf(
+      g,
+      f,
+      title.toUpperCase(),
+      rect[0] + pad,
+      rect[1] + Math.round(5 * s),
+      rect[2] - pad * 2,
+      "left",
+    );
+    const head = f.height + Math.round(10 * s);
+    return [rect[0] + pad, rect[1] + head, rect[2] - pad * 2, rect[3] - head - pad];
+  }
+
+  /**
+   * The whole landscape screen, as the design draws it: the room under dark
+   * glass and a faint grid, the HUD across the top, and three columns —
+   * save slots and today's goals; the toolbar, the editor and STDIN; the
+   * result and the battle log.
+   */
+  private drawWide(g: Ctx): void {
+    const { layout } = this.app;
+    const s = layout.uiScale();
+    const fonts = ensureFonts(s);
+    const { vw, vh } = layout;
+    fill(g, [0.04, 0.06, 0.17, 1], 0, 0, vw, vh, 0.88);
+    const glow = (cx: number, cy: number, r: number, col: string) => {
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, col);
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr;
+      g.fillRect(0, 0, vw, vh);
+    };
+    glow(vw * 0.3, 0, vh * 0.9, "rgba(60,36,140,0.4)");
+    glow(vw * 0.9, vh, vh * 0.8, "rgba(15,74,110,0.35)");
+    g.fillStyle = css(Theme.cyan, 0.05);
+    const cell = Math.round(32 * s);
+    for (let x = 0; x < vw; x += cell) g.fillRect(x, 0, 1, vh);
+    for (let y = 0; y < vh; y += cell) g.fillRect(0, y, vw, 1);
+
+    const m = Math.round(6 * s);
+    const hudH = Math.max(Math.round(46 * s), fonts.station.height + Math.round(18 * s));
+    this.drawHud(g, [m, m, vw - m * 2, hudH], s);
+    const top = m * 2 + hudH;
+    const bodyH = vh - top - m;
+    const leftW = Math.round(200 * s);
+    const rightW = Math.round(310 * s);
+    const centreW = vw - m * 4 - leftW - rightW;
+    const goalsH = this.goalsH(s);
+    this.drawList(g, [m, top, leftW, bodyH - goalsH - m], s, false);
+    this.drawGoals(g, [m, top + bodyH - goalsH, leftW, goalsH], s);
+    const cx = m * 2 + leftW;
+    this.drawBenchWide(g, [cx, top, centreW, bodyH], s, [cx + centreW + m, top, rightW, bodyH]);
+  }
+
+  /** Level n starts at this much XP: the server's own curve (`awards.rs`). */
+  private static xpFor(level: number): number {
+    const n = Math.max(1, level) - 1;
+    return (100 * n * (n + 1)) / 2;
+  }
+
+  /** The HUD: the badge, PLAYGROUND, level and XP, the streak; the file, the wallet, LOG OUT. */
+  private drawHud(g: Ctx, rect: Rect, s: number): void {
+    const { app } = this;
+    const [x, y, w, h] = rect;
+    this.glass(g, rect, s);
+    const fonts = ensureFonts(s);
+    const sm = fonts.stationSm;
+    const pad = Math.round(10 * s);
+    const mid = y + h / 2;
+    let cx = x + pad;
+
+    const lg = Math.round(28 * s);
+    const ly = mid - lg / 2;
+    const grad = g.createLinearGradient(cx, ly, cx + lg, ly + lg);
+    grad.addColorStop(0, "#F878A8");
+    grad.addColorStop(1, "#7C4CE0");
+    g.fillStyle = grad;
+    roundRect(g, cx, ly, lg, lg, Math.round(7 * s));
+    g.fill();
+    g.fillStyle = css(Theme.cream);
+    printf(g, sm, "</>", cx, inkCentreY(sm, "</>", ly, lg), lg, "center");
+    cx += lg + pad;
+
+    const tf = fonts.station;
+    const title = t("pg.hudTitle");
+    g.save();
+    g.shadowColor = css(Theme.coin, 0.6);
+    g.shadowBlur = Math.round(10 * s);
+    g.fillStyle = css(Theme.coin);
+    printf(g, tf, title, cx, inkCentreY(tf, title, y, h), w, "left");
+    g.restore();
+    cx += width(tf, title) + pad * 1.5;
+
+    const u = app.client.user;
+    if (u) {
+      const lv = t("pg.hudLevel", { n: u.level });
+      const bw = width(sm, lv) + Math.round(12 * s);
+      const bh = sm.height + Math.round(4 * s);
+      g.fillStyle = css(Theme.coin);
+      roundRect(g, cx, mid - bh / 2, bw, bh, Math.round(5 * s));
+      g.fill();
+      g.fillStyle = css(Theme.ink);
+      printf(g, sm, lv, cx, inkCentreY(sm, lv, mid - bh / 2, bh), bw, "center");
+      cx += bw + Math.round(8 * s);
+      const base = PlaygroundScene.xpFor(u.level);
+      const next = PlaygroundScene.xpFor(u.level + 1);
+      const frac = Math.max(0, Math.min(1, (u.xp - base) / Math.max(1, next - base)));
+      const barW = Math.round(170 * s);
+      const barH = Math.round(10 * s);
+      g.fillStyle = css([0.04, 0.06, 0.18, 1]);
+      roundRect(g, cx, mid - barH / 2, barW, barH, barH / 2);
+      g.fill();
+      if (frac > 0) {
+        g.fillStyle = css(Theme.coin);
+        roundRect(g, cx, mid - barH / 2, Math.max(barH, barW * frac), barH, barH / 2);
+        g.fill();
+      }
+      g.strokeStyle = css(Theme.coin, 0.45);
+      roundRect(g, cx + 0.5, mid - barH / 2 + 0.5, barW - 1, barH - 1, barH / 2);
+      g.stroke();
+      cx += barW + Math.round(8 * s);
+      const xpText = t("pg.hudXp", { xp: u.xp, next });
+      g.fillStyle = css(Theme.cream, 0.7);
+      printf(g, sm, xpText, cx, inkCentreY(sm, xpText, y, h), w, "left");
+      cx += width(sm, xpText) + pad * 1.5;
+    }
+    if (this.dayStreak > 0) {
+      // A small flame, drawn: two drops, orange round gold.
+      const fh = Math.round(16 * s);
+      const fx = cx + fh * 0.4;
+      const drop = (r: number, col: RGBA) => {
+        g.fillStyle = css(col);
+        g.beginPath();
+        g.moveTo(fx, mid - r);
+        g.quadraticCurveTo(fx + r * 0.75, mid, fx, mid + r * 0.6);
+        g.quadraticCurveTo(fx - r * 0.75, mid, fx, mid - r);
+        g.fill();
+      };
+      drop(fh / 2, [0.97, 0.6, 0.22, 1]);
+      drop(fh / 3.2, Theme.coin);
+      cx += fh;
+      const st = t("pg.hudStreak", { n: this.dayStreak });
+      g.fillStyle = css([0.97, 0.6, 0.22, 1]);
+      printf(g, sm, st, cx, inkCentreY(sm, st, y, h), w, "left");
+    }
+
+    // From the right: LOG OUT, the wallet, the file.
+    let rx = x + w - pad;
+    app.logoutRect = null;
+    if (app.addressLabel) {
+      const lo = t("chrome.logout");
+      const lw = width(sm, lo) + Math.round(16 * s);
+      const lh = sm.height + Math.round(8 * s);
+      rx -= lw;
+      const hot = app.logoutHover;
+      if (hot) {
+        g.fillStyle = css(Theme.red, 0.9);
+        roundRect(g, rx, mid - lh / 2, lw, lh, Math.round(6 * s));
+        g.fill();
+      }
+      g.fillStyle = css(hot ? Theme.cream : [0.73, 0.7, 0.84, 1]);
+      printf(g, sm, lo, rx, inkCentreY(sm, lo, mid - lh / 2, lh), lw, "center");
+      app.logoutRect = [rx, mid - lh / 2, lw, lh];
+      rx -= Math.round(8 * s);
+      const a = app.addressLabel;
+      const who = `${a.slice(0, 6)}…${a.slice(-4)}`;
+      const ww = width(sm, who) + Math.round(16 * s);
+      rx -= ww;
+      g.fillStyle = css([0.04, 0.06, 0.18, 1]);
+      roundRect(g, rx, mid - lh / 2, ww, lh, lh / 2);
+      g.fill();
+      g.strokeStyle = css(Theme.cyan, 0.3);
+      roundRect(g, rx + 0.5, mid - lh / 2 + 0.5, ww - 1, lh - 1, lh / 2);
+      g.stroke();
+      g.fillStyle = css(Theme.cyan);
+      printf(g, sm, who, rx, inkCentreY(sm, who, mid - lh / 2, lh), ww, "center");
+      rx -= Math.round(12 * s);
+    }
+    const file = `${MAIN_FILE[this.held.lang]}${this.dirty ? " ●" : ""}`;
+    const fw = width(sm, file);
+    rx -= fw;
+    g.fillStyle = css(this.dirty ? Theme.coin : Theme.cream);
+    printf(g, sm, file, rx, inkCentreY(sm, file, y, h), fw + 4, "left");
+    const pad2 = `${this.heldName()} / `;
+    const pw = width(sm, pad2);
+    const room = Math.max(0, rx - cx - pad);
+    const shown = elide(sm, pad2, room);
+    g.fillStyle = css(Theme.dim);
+    printf(g, sm, shown, rx - Math.min(pw, room), inkCentreY(sm, shown, y, h), room, "left");
+  }
+
+  /** TODAY'S GOALS' height: its label and three goals. */
+  private goalsH(s: number): number {
+    const f = ensureFonts(s).stationSm;
+    return f.height + Math.round(10 * s) + 3 * (f.height + Math.round(14 * s)) + Math.round(6 * s);
+  }
+
+  /** Three goals for today, counted from real runs on this device. */
+  private drawGoals(g: Ctx, rect: Rect, s: number): void {
+    const inner = this.panelFor(g, rect, t("pg.goals"), Theme.coin);
+    const f = ensureFonts(s).stationSm;
+    const d = this.today;
+    const goals: Array<[string, number, number, RGBA]> = [
+      [t("pg.goalRuns", { n: GOAL_RUNS }), d.runs, GOAL_RUNS, Theme.cyan],
+      [t("pg.goalFix"), d.fixes, GOAL_FIXES, Theme.admit],
+      [t("pg.goalLangs", { n: GOAL_LANGS }), d.langs.length, GOAL_LANGS, Theme.pink],
+    ];
+    let y = inner[1];
+    const barH = Math.max(3, Math.round(5 * s));
+    for (const [label, n, of, col] of goals) {
+      const done = n >= of;
+      const count = `${Math.min(n, of)}/${of}`;
+      const cw = width(f, count);
+      g.fillStyle = css(done ? [0.5, 0.88, 0.63, 1] : Theme.cream);
+      printf(g, f, elide(f, label, inner[2] - cw - 8), inner[0], y, inner[2] - cw - 8, "left");
+      g.fillStyle = css(done ? Theme.admit : Theme.coin);
+      printf(g, f, count, inner[0], y, inner[2], "right");
+      const by = y + f.height + Math.round(2 * s);
+      g.fillStyle = css([0.04, 0.06, 0.18, 1]);
+      roundRect(g, inner[0], by, inner[2], barH, barH / 2);
+      g.fill();
+      const frac = Math.min(1, n / of);
+      if (frac > 0) {
+        g.fillStyle = css(done ? Theme.admit : col);
+        roundRect(g, inner[0], by, Math.max(barH, inner[2] * frac), barH, barH / 2);
+        g.fill();
+      }
+      y += f.height + Math.round(14 * s);
+    }
+  }
+
+  /** The code's shape: a bar per line, the caret's line gold, a failed line red. */
+  private drawMinimap(g: Ctx, rect: Rect, s: number): void {
+    const [x, y, w, h] = rect;
+    this.glass(g, rect, s, Theme.cyan, 0.15);
+    const src = this.editor?.source ?? this.held.source;
+    const lines = src.split("\n");
+    const pad = Math.round(6 * s);
+    const step = Math.max(
+      2,
+      Math.min(Math.round(5 * s), (h - pad * 2) / Math.max(1, lines.length)),
+    );
+    const barH = Math.max(1, step * 0.6);
+    const caret = this.caretLine();
+    const bad = this.result && this.result.outcome !== "ok" ? errorAt(this.result).line : null;
+    const maxW = w - pad * 2;
+    for (let i = 0; i < lines.length; i++) {
+      const ly = y + pad + i * step;
+      if (ly > y + h - pad) break;
+      const text = lines[i];
+      const indent = text.length - text.trimStart().length;
+      const len = text.trim().length;
+      if (len === 0) continue;
+      const bx = x + pad + Math.min(maxW * 0.5, indent * 1.2 * s);
+      const bw = Math.max(2, Math.min(maxW - (bx - x - pad), len * 1.2 * s));
+      const n = i + 1;
+      g.fillStyle =
+        n === bad
+          ? css(Theme.red)
+          : n === caret
+            ? css(Theme.coin)
+            : css([0.36, 0.41, 0.72, 1], 0.9);
+      g.fillRect(bx, ly, bw, barH);
+    }
+  }
+
+  /** "edited now", "5m ago", "2h ago", "3d ago". */
+  private ago(iso: string): string {
+    const then = Date.parse(iso);
+    if (!Number.isFinite(then)) return "";
+    const min = Math.max(0, Math.round((Date.now() - then) / 60000));
+    if (min < 1) return t("pg.agoNow");
+    if (min < 60) return t("pg.agoMin", { n: min });
+    if (min < 60 * 24) return t("pg.agoHour", { n: Math.round(min / 60) });
+    return t("pg.agoDay", { n: Math.round(min / (60 * 24)) });
+  }
+
+  /** The caret's line, 1-based, or null without an editor. */
+  private caretLine(): number | null {
+    if (!this.editor) return null;
+    const src = this.editor.source;
+    const pos = Math.min(this.editor.caretPos, src.length);
+    let n = 1;
+    for (let i = 0; i < pos; i++) if (src.charCodeAt(i) === 10) n++;
+    return n;
+  }
+
+  /** "Ln 19 Col 41", for the STDIN strip. */
+  private caretWhere(): string | null {
+    if (!this.editor) return null;
+    const src = this.editor.source;
+    const pos = Math.min(this.editor.caretPos, src.length);
+    const lineStart = src.lastIndexOf("\n", pos - 1) + 1;
+    return t("pg.caretAt", { line: this.caretLine() ?? 1, col: pos - lineStart + 1 });
+  }
+
+  /**
+   * The output column in the landscape look: a result card (the outcome in
+   * the pixel face, what it means in a line, and three stat tiles), then the
+   * battle log with STDOUT / STDERR tabs and COPY, and the recent runs.
+   */
+  private drawOutputWide(g: Ctx, rect: Rect, s: number): void {
+    const [x, y, w, h] = rect;
+    const fonts = ensureFonts(s);
+    const sm = fonts.stationSm;
+    const pad = Math.round(10 * s);
+    const gap = Math.round(6 * s);
+    const r = this.result;
+    const ok = r?.outcome === "ok";
+    const tint: RGBA = !r ? Theme.cyan : ok ? Theme.admit : Theme.red;
+
+    // The card.
+    const tileH = sm.height * 2 + Math.round(8 * s);
+    const cardH = pad + fonts.ui.height + Math.round(4 * s) + sm.height + gap + tileH + pad;
+    this.glass(g, [x, y, w, cardH], s, tint, r ? 0.7 : 0.25);
+    if (r) {
+      const gr = g.createLinearGradient(0, y, 0, y + cardH);
+      gr.addColorStop(0, css(tint, 0.26));
+      gr.addColorStop(1, css(tint, 0.02));
+      g.fillStyle = gr;
+      roundRect(g, x + 1, y + 1, w - 2, cardH - 2, Math.round(10 * s));
+      g.fill();
+    }
+    let cy = y + pad;
+    const title = r
+      ? bannerTitle(r.outcome)
+      : this.stage !== "idle"
+        ? this.stageLabel().toUpperCase()
+        : t("pg.ready");
+    g.save();
+    g.shadowColor = css(tint, 0.8);
+    g.shadowBlur = Math.round(10 * s);
+    g.fillStyle = css(!r ? Theme.cyan : ok ? [0.5, 0.88, 0.63, 1] : [1, 0.45, 0.35, 1]);
+    printf(g, fonts.ui, elide(fonts.ui, title, w - pad * 2), x + pad, cy, w - pad * 2, "left");
+    g.restore();
+    cy += fonts.ui.height + Math.round(4 * s);
+    let sub = t("pg.readyHint");
+    if (r && ok) sub = t("pg.cleanRun");
+    else if (r) {
+      const line = consoleLine(r, "idle");
+      sub = line;
+    }
+    g.fillStyle = css(Theme.cream, 0.9);
+    printf(g, sm, elide(sm, sub, w - pad * 2), x + pad, cy, w - pad * 2, "left");
+    cy += sm.height + gap;
+    const tiles: Array<[string, string, RGBA]> = [
+      [t("pg.statBuild"), r ? `${r.compile_ms}ms` : "—", Theme.cyan],
+      [t("pg.statRun"), r && r.outcome !== "compile_error" ? `${r.run_ms}ms` : "—", Theme.pink],
+      [t("pg.statExit"), r && r.exit_code !== null ? String(r.exit_code) : "—", Theme.coin],
+    ];
+    const tw = (w - pad * 2 - gap * 2) / 3;
+    tiles.forEach(([k, v, col], i) => {
+      const tx = x + pad + i * (tw + gap);
+      g.fillStyle = css([0.04, 0.06, 0.18, 1], 0.75);
+      roundRect(g, tx, cy, tw, tileH, Math.round(6 * s));
+      g.fill();
+      g.fillStyle = css(Theme.dim);
+      printf(g, sm, k, tx + Math.round(6 * s), cy + Math.round(3 * s), tw, "left");
+      g.fillStyle = css(col);
+      printf(g, sm, v, tx + Math.round(6 * s), cy + Math.round(3 * s) + sm.height, tw, "left");
+    });
+
+    // The battle log.
+    const ly = y + cardH + gap;
+    const lh = h - cardH - gap;
+    this.glass(g, [x, ly, w, lh], s);
+    const headH = Math.max(this.app.layout.minTouchH(), sm.height + Math.round(12 * s));
+    const lbl = t("pg.battleLog");
+    g.fillStyle = css(Theme.cyan);
+    printf(g, sm, lbl, x + pad, inkCentreY(sm, lbl, ly, headH), w, "left");
+    let tx = x + pad + width(sm, lbl) + Math.round(10 * s);
+    const tab = (id: string, label: string, on: boolean) => {
+      const bw = width(sm, label) + Math.round(12 * s);
+      const bh = sm.height + Math.round(4 * s);
+      const by = ly + (headH - bh) / 2;
+      if (on) {
+        g.fillStyle = css([0.16, 0.2, 0.47, 1]);
+        roundRect(g, tx, by, bw, bh, Math.round(5 * s));
+        g.fill();
+      }
+      g.fillStyle = css(on ? Theme.cream : Theme.dim);
+      printf(g, sm, label, tx, inkCentreY(sm, label, by, bh), bw, "center");
+      this.buttons.add({ id, rect: [tx, by, bw, bh], label, painted: true });
+      tx += bw + Math.round(4 * s);
+    };
+    tab("tabout", t("pg.tabStdout"), !this.showStderr);
+    tab("taberr", t("pg.tabStderr"), this.showStderr);
+    const copy = t("pg.copy");
+    const cw = width(sm, copy) + Math.round(12 * s);
+    const bh = sm.height + Math.round(4 * s);
+    const hover = this.buttons.hovered === "copyout";
+    g.fillStyle = css(hover ? Theme.coin : Theme.dim);
+    printf(
+      g,
+      sm,
+      copy,
+      x + w - pad - cw,
+      inkCentreY(sm, copy, ly + (headH - bh) / 2, bh),
+      cw,
+      "center",
+    );
+    this.buttons.add({
+      id: "copyout",
+      rect: [x + w - pad - cw, ly + (headH - bh) / 2, cw, bh],
+      label: copy,
+      painted: true,
+    });
+    g.fillStyle = css(Theme.cream, 0.08);
+    g.fillRect(x + 1, ly + headH, w - 2, 1);
+
+    // The recent runs, along its foot.
+    const runsH = sm.height + Math.round(22 * s);
+    const ry = ly + lh - runsH;
+    g.fillStyle = css(Theme.cream, 0.08);
+    g.fillRect(x + 1, ry, w - 2, 1);
+    const rl = t("pg.recentRuns");
+    g.fillStyle = css(Theme.cyan);
+    printf(g, sm, rl, x + pad, ry + Math.round(3 * s), w, "left");
+    const cellGap = Math.max(2, Math.round(3 * s));
+    const cellW = (w - pad * 2 - cellGap * (RECENT_RUNS - 1)) / RECENT_RUNS;
+    const cellY = ry + sm.height + Math.round(5 * s);
+    const cellH = Math.round(12 * s);
+    for (let i = 0; i < RECENT_RUNS; i++) {
+      const o = this.runs[this.runs.length - RECENT_RUNS + i];
+      const col =
+        o === undefined
+          ? ([0.16, 0.2, 0.47, 1] as RGBA)
+          : o === "ok"
+            ? Theme.admit
+            : o === "compile_error"
+              ? Theme.red
+              : Theme.coin;
+      g.fillStyle = css(col, o === undefined ? 0.5 : 1);
+      roundRect(g, x + pad + i * (cellW + cellGap), cellY, cellW, cellH, Math.round(3 * s));
+      g.fill();
+    }
+
+    this.drawLog(g, x + 1, ly + headH + 1, w - 2, ry - 1, s);
+  }
+
+  /** The buttons a wide bench keeps behind MORE: everything but the work itself. */
+  private moreItems(): Array<{ id: string; label: string; dim?: boolean; strong?: boolean }> {
+    return [
+      this.stderrItem(),
+      this.fxItem(),
+      ...this.fontItems(),
+      { id: "poster", label: t("pg.poster"), dim: this.postering },
+      { id: "reader", label: t("pg.reader") },
+      ...this.displayItems(),
+      { id: "back", label: t("pg.maps") },
+    ];
+  }
+
+  /**
+   * The wide bench, as the design has it: one toolbar across the top — the
+   * work on the left, the languages and MORE on the right — then the editor
+   * the full height of what is left beside the output, which runs top to
+   * bottom too, and a one-line STDIN under the editor.
+   *
+   * Everything a person reaches for while writing is on the toolbar; the
+   * settings and the trips elsewhere are behind MORE, which drops over the
+   * output column — canvas, so nothing it draws hides under the editor.
+   * While the filter is typed, every button is a candidate again and the bar
+   * wraps, as it always has.
+   */
+  private drawBenchWide(g: Ctx, inner: Rect, s: number, outRect?: Rect): void {
+    const { layout } = this.app;
+    const fonts = ensureFonts(s);
+    const bf = fonts.tool;
+    const gap = Math.round(8 * s);
+    const flowGap = roundGap(bf);
+    const minH = layout.minTouchH();
+    // `outRect`: the full-screen look, where the output is a column of its
+    // own and the toolbar sits in a glass strip of its own.
+    const glassy = outRect !== undefined;
+    const tpad = glassy ? Math.round(5 * s) : 0;
+    const [cx0, cy0, cw0, ch0] = inner;
+    const ix = cx0 + tpad;
+    const iy = cy0 + tpad;
+    const iw = cw0 - tpad * 2;
+    const box = (label: string) => btnBox(bf, [label], 0, btnPad(bf), minH);
+    const rowH = box("M")[1];
+
+    const core = [
+      {
+        id: "run",
+        label: this.stage === "idle" ? t("pg.run") : "…",
+        dim: this.stage !== "idle",
+        primary: this.stage === "idle",
+      },
+      this.autoItem(),
+      ...(this.app.client.canFormat(this.land)
+        ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
+        : []),
+      { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
+      { id: "code", label: t("pg.code") },
+      { id: "console", label: t("pg.console") },
+      { id: "agent", label: t("agent.button") },
+    ];
+    let more = this.moreItems();
+    const moreItem = {
+      id: "more",
+      label: `${t("pg.more")} ${this.moreOpen ? "▴" : "▾"}`,
+      strong: this.moreOpen,
+    };
+    const langs = LANGS.map((land) => ({ land, label: t(`pg.${land}` as "pg.rust") }));
+    const filterW = this.tools.width(bf);
+    const lead = filterW + flowGap;
+    const filtering = this.tools.query.trim() !== "";
+    const widthOf = (labels: string[]) => labels.reduce((a, l) => a + box(l)[0] + flowGap, 0);
+
+    // Spill the toolbar's less-used buttons into MORE until it fits on one
+    // row beside the folded language and MORE itself: AGENT first, then
+    // FORMAT, CONSOLE and CODE. RUN, AUTO-RUN and SAVE always stay.
+    {
+      const fixedRight = widthOf([`${t(`pg.${this.held.lang}` as "pg.rust")} ▾`, moreItem.label]);
+      const spill = ["agent", "format", "console", "code"];
+      for (const id of spill) {
+        if (lead + widthOf(core.map((c) => c.label)) + fixedRight <= iw) break;
+        const i = core.findIndex((c) => c.id === id);
+        if (i >= 0) more = [core.splice(i, 1)[0], ...more];
+      }
+    }
+    this.menuIds = more.map((m) => m.id);
+
+    let toolbarH = rowH;
+    const placeRow = (y: number) => {
+      // Left: the work. Right: the languages and MORE, flush to the edge.
+      const leftW = lead + widthOf(core.map((c) => c.label));
+      let shown = langs;
+      this.langsFolded = false;
+      const rightW = () => widthOf([...shown.map((l) => l.label), moreItem.label]);
+      if (leftW + rightW() > iw) {
+        // Folded to the live one, which opens the list of them.
+        shown = langs
+          .filter((l) => l.land === this.held.lang)
+          .map((l) => ({ ...l, label: `${l.label} ${this.langOpen ? "▴" : "▾"}` }));
+        this.langsFolded = true;
+      }
+      let cx = ix + lead;
+      for (const item of core) {
+        const [bw, bh] = box(item.label);
+        this.buttons.add({ ...item, rect: [cx, y, bw, bh] });
+        cx += bw + flowGap;
+      }
+      let rx = ix + iw - rightW() + flowGap;
+      for (const { land: id, label } of shown) {
+        const [bw, bh] = box(label);
+        const on = this.held.lang === id;
+        const hover = this.buttons.hovered === id;
+        if (on) pixBtn(g, bf, rx, y, bw, bh, label, { face: landColour(id) });
+        else pixBtn(g, bf, rx, y, bw, bh, label, { hover, quiet: true });
+        this.buttons.add({ id, rect: [rx, y, bw, bh], label, painted: true });
+        rx += bw + flowGap;
+      }
+      const [mw, mh] = box(moreItem.label);
+      this.buttons.add({ ...moreItem, rect: [rx, y, mw, mh] });
+      return { mx: rx, mw };
+    };
+
+    let moreAt: { mx: number; mw: number } | null = null;
+    this.langMenu = false;
+    if (glassy && !filtering) this.glass(g, [cx0, cy0, cw0, rowH + tpad * 2], s);
+    if (filtering) {
+      // Every button, filtered, wrapping: the box can find anything.
+      this.moreOpen = false;
+      const items = this.tools.filter([...core, ...more]);
+      const shownLangs = langs.filter((b) => this.tools.keeps({ id: b.land, label: b.label }));
+      const all = [...items.map((i) => i.label), ...shownLangs.map((l) => l.label)];
+      const rows = rowsIn(bf, all, iw, minH, lead);
+      toolbarH = rows * rowH + (rows - 1) * flowGap;
+      if (glassy) this.glass(g, [cx0, cy0, cw0, toolbarH + tpad * 2], s);
+      let cx = ix + lead;
+      let cy = iy;
+      const place = (bw: number): [number, number] => {
+        if (cx > ix && cx + bw > ix + iw) {
+          cx = ix;
+          cy += rowH + flowGap;
+        }
+        const at: [number, number] = [cx, cy];
+        cx += bw + flowGap;
+        return at;
+      };
+      for (const item of items) {
+        const [bw, bh] = box(item.label);
+        const [bx, by] = place(bw);
+        this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
+      }
+      for (const { land: id, label } of shownLangs) {
+        const [bw, bh] = box(label);
+        const [bx, by] = place(bw);
+        pixBtn(g, bf, bx, by, bw, bh, label, {
+          face: this.held.lang === id ? landColour(id) : undefined,
+          quiet: true,
+        });
+        this.buttons.add({ id, rect: [bx, by, bw, bh], label, painted: true });
+      }
+    } else {
+      moreAt = placeRow(iy);
+      this.langMenu = this.langsFolded;
+      if (!this.langsFolded) this.langOpen = false;
+    }
+    if (this.benchIn.finished) this.tools.draw(g, [ix, iy, filterW, rowH], bf);
+    else this.tools.hide();
+
+    // Renaming or stamping: the field over the toolbar, where the work is.
+    if (glassy) {
+      const fh = Math.max(minH, fonts.button.height + 12);
+      const fr: Rect = [ix, iy, Math.min(iw, Math.round(320 * s)), fh];
+      if (this.renaming) this.nameOverlay?.place(fr, fonts.button.size);
+      else this.nameOverlay?.hide();
+      if (this.stamping) this.keyOverlay?.place([ix, iy, iw, fh], fonts.button.size);
+      else this.keyOverlay?.hide();
+    }
+
+    // The columns under the bar.
+    const mgap = glassy ? Math.round(6 * s) : gap;
+    const top = cy0 + toolbarH + tpad * 2 + mgap;
+    const bottom = cy0 + ch0;
+    const outW = glassy ? 0 : Math.round(cw0 * 0.36);
+    const colW = glassy ? cw0 : cw0 - outW - gap;
+    const stdinH = Math.max(minH, fonts.codeSm.height + Math.round(12 * s));
+    const editorH = Math.max(60, bottom - top - stdinH - mgap);
+    // The minimap: the code's shape in a strip beside it, the caret's line
+    // lit, and the line a failed build points at in red.
+    const miniW = glassy ? Math.round(58 * s) : 0;
+    if (glassy) this.drawMinimap(g, [cx0 + colW - miniW, top, miniW, editorH], s);
+    const editorRect = this.screen(g, [
+      cx0,
+      top,
+      colW - (miniW ? miniW + Math.round(4 * s) : 0),
+      editorH,
+    ]);
+    this.editorRect = editorRect;
+    if (this.editor && this.benchIn.finished) {
+      this.overlay?.place(editorRect, fonts.codeSm.size * this.codeMul);
+      this.retro?.place(editorRect);
+    } else this.overlay?.hide();
+    this.coder?.fly([0, 0, layout.vw, layout.vh]);
+
+    // STDIN, one line: its label in the well's left end, the field after it.
+    const sy = top + editorH + mgap;
+    if (glassy) this.glass(g, [cx0, sy, colW, stdinH], s);
+    else well(g, cx0, sy, colW, stdinH, [0.06, 0.05, 0.14, 0.98]);
+    // Glassy, the strip's right end says where the caret is and holds A-/A+.
+    let infoW = 0;
+    if (glassy) {
+      let rx = cx0 + colW - Math.round(6 * s);
+      for (const item of [...this.fontItems().slice(0, 2)].reverse()) {
+        const [bw, bh] = box(item.label);
+        rx -= bw;
+        this.buttons.add({ ...item, rect: [rx, sy + Math.round((stdinH - bh) / 2), bw, bh] });
+        rx -= flowGap;
+      }
+      const where = this.caretWhere();
+      if (where) {
+        const tw = width(fonts.stationSm, where);
+        rx -= tw + Math.round(6 * s);
+        g.fillStyle = css(Theme.dim);
+        printf(
+          g,
+          fonts.stationSm,
+          where,
+          rx,
+          inkCentreY(fonts.stationSm, where, sy, stdinH),
+          tw + 4,
+          "left",
+        );
+      }
+      infoW = cx0 + colW - rx + Math.round(6 * s);
+    }
+    const label = t("pg.stdin");
+    const lw = width(fonts.stationSm, label) + Math.round(16 * s);
+    g.fillStyle = css(Theme.cyan, 0.85);
+    printf(
+      g,
+      fonts.stationSm,
+      label,
+      cx0 + Math.round(8 * s),
+      inkCentreY(fonts.stationSm, label, sy, stdinH),
+      lw,
+      "left",
+    );
+    const field: Rect = [cx0 + lw, sy + 3, colW - lw - 6 - infoW, stdinH - 6];
+    if (this.benchIn.finished) this.stdinOverlay?.place(field, fonts.codeSm.size);
+    else this.stdinOverlay?.hide();
+
+    // The output, top to bottom beside it.
+    const ox = glassy ? outRect[0] : cx0 + colW + gap;
+    if (glassy) this.drawOutputWide(g, outRect, s);
+    else this.drawOutput(g, [ox, top, outW, bottom - top], s);
+
+    // A dropped menu's plate, over the output column.
+    const plate = (px: number, py: number, pw: number, ph: number) => {
+      g.save();
+      g.shadowColor = "rgba(0,0,0,0.6)";
+      g.shadowBlur = Math.round(16 * s);
+      g.fillStyle = css(Theme.void, 0.97);
+      roundRect(g, px, py, pw, ph, Math.round(8 * s));
+      g.fill();
+      g.restore();
+      g.strokeStyle = css(Theme.cyan, 0.35);
+      g.lineWidth = 1;
+      roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
+      g.stroke();
+    };
+
+    // The languages, open: each in its land's colour, the live one lit.
+    if (this.langOpen && this.langMenu && moreAt) {
+      const pad = Math.round(6 * s);
+      const step = rowH + flowGap;
+      const itemW = Math.max(...langs.map((l) => box(l.label)[0]));
+      const pw = itemW + pad * 2;
+      const ph = langs.length * step - flowGap + pad * 2;
+      const px = Math.max(ox, moreAt.mx - flowGap - pw);
+      const py = top - Math.round(gap / 2);
+      plate(px, py, pw, ph);
+      langs.forEach(({ land: id, label }, i) => {
+        const by = py + pad + i * step;
+        const on = this.held.lang === id;
+        const hover = this.buttons.hovered === id;
+        pixBtn(
+          g,
+          bf,
+          px + pad,
+          by,
+          itemW,
+          rowH,
+          label,
+          on ? { face: landColour(id) } : { hover, quiet: true },
+        );
+        // Ahead of the toolbar's own button in the hit order: the menu is on top.
+        this.buttons.add({ id, rect: [px + pad, by, itemW, rowH], label, painted: true });
+      });
+    }
+
+    // MORE, open: a column of its buttons dropped from the button, over the
+    // output — on the canvas, where the editor cannot cover it.
+    if (this.moreOpen && moreAt) {
+      const pad = Math.round(6 * s);
+      const step = rowH + flowGap;
+      const itemW = Math.max(...more.map((m) => box(m.label)[0]), moreAt.mw);
+      const room = Math.max(1, Math.floor((bottom - top - pad * 2 + flowGap) / step));
+      const cols = Math.ceil(more.length / room);
+      const perCol = Math.ceil(more.length / cols);
+      const pw = cols * itemW + (cols - 1) * flowGap + pad * 2;
+      const ph = perCol * step - flowGap + pad * 2;
+      const px = Math.max(ox, ix + iw - pw);
+      const py = top - Math.round(gap / 2);
+      plate(px, py, pw, ph);
+      more.forEach((item, i) => {
+        const c = Math.floor(i / perCol);
+        const r = i % perCol;
+        this.buttons.add({
+          ...item,
+          rect: [px + pad + c * (itemW + flowGap), py + pad + r * step, itemW, rowH],
+        });
+      });
+    }
+  }
+
   /** What the program printed, and what the compiler thought of it. */
   private drawOutput(g: Ctx, rect: Rect, s: number): void {
     const [x, y, w, h] = rect;
@@ -3711,7 +5223,9 @@ export class PlaygroundScene implements Scene {
       // The banner: the outcome in the pixel face on a band of its colour,
       // flashing in when the answer lands and settling to a glow.
       const age = this.t - this.answeredAt;
-      const flash = Math.max(0, 1 - age / 0.6);
+      const flash =
+        Math.max(0, 1 - age / 0.6) *
+        (this.fxLevel === "full" ? 1 : this.fxLevel === "calm" ? 0.35 : 0);
       const title = bannerTitle(r.outcome);
       const bandH = fonts.ui.height + Math.round(14 * s);
       const tint = ok ? Theme.admit : Theme.red;
@@ -3767,6 +5281,17 @@ export class PlaygroundScene implements Scene {
       ty += Math.round(4 * s);
     }
 
+    this.drawLog(g, x, ty, w, bottom, s);
+  }
+
+  /**
+   * The log itself: what the program printed and what the compiler said,
+   * in a well from `ty` to `bottom`, scrolled by `outputScroll`.
+   */
+  private drawLog(g: Ctx, x: number, ty: number, w: number, bottom: number, s: number): void {
+    const fonts = ensureFonts(s);
+    const pad = Math.round(6 * s);
+    const r = this.result;
     well(g, x, ty, w, Math.max(16, bottom - ty), [0.04, 0.03, 0.1, 0.98]);
     this.outputRect = [x, ty, w, bottom - ty];
     const lineH = fonts.codeSm.height;
