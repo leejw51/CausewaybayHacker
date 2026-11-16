@@ -700,6 +700,8 @@ export class PlaygroundScene implements Scene {
   /** MORE's tween in and out (motion.dev), in CODE and on the bench. */
   private readonly codeMenu = new MenuFx();
   private readonly benchMenu = new MenuFx();
+  /** The agent's panel in CODE, sliding in from the right and out again. */
+  private readonly agentFx = new MenuFx();
   /** The wide bench's language menu, open (when the lands are folded to one). */
   private langOpen = false;
   /** This frame's folded language button opens a menu (the wide bench) rather than stepping. */
@@ -2650,6 +2652,7 @@ export class PlaygroundScene implements Scene {
       this.moreOpen = false;
       this.codeMenu.reset();
       this.benchMenu.reset();
+      this.agentFx.reset();
     }
     // Set again by `drawRows` when the list is on screen; in CODE it is not,
     // and a press where it used to be must not be taken for the list.
@@ -3818,14 +3821,19 @@ export class PlaygroundScene implements Scene {
     // the rail, and the editor keeps the rest. (It used to drop CODE back
     // to the old toolbar, every button of the bench in one long band.)
     this.codeMenu.follow(this.moreOpen && !filtering);
-    const agentOpen = this.coder?.open ?? false;
-    if (agentOpen) {
+    // In and out like an iOS sheet (motion.dev): the panel slides from the
+    // right edge and fades in, the editor narrows with it; on the way out
+    // the reverse, quicker. Its text fields wait until it has settled.
+    this.agentFx.follow(this.coder?.open ?? false);
+    if (this.agentFx.shown) {
+      const p = this.agentFx.value;
       const panelW = Math.max(Math.round(320 * s), Math.round(vw * 0.36));
       const px = vw - pad - panelW;
       const menuOpen = this.codeMenu.shown && !filtering;
+      const along = rx0 - pad + (px - rx0) * p;
       const edRight = menuOpen
-        ? Math.min(px - pad, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
-        : px - pad;
+        ? Math.min(along, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
+        : along;
       const er = this.screen(g, [pad, top, edRight - pad, bottom - top]);
       this.editorRect = er;
       if (this.editor) {
@@ -3833,9 +3841,12 @@ export class PlaygroundScene implements Scene {
         this.retro?.place(er);
       } else this.overlay?.hide();
       this.coder?.fly([0, 0, vw, vh]);
-      this.coder?.drawPanel(g, [px, top, panelW, bottom - top], s);
-      // The panel's DOM fields would sit over the open menu too.
-      if (menuOpen) this.coder?.panel.hideFields();
+      withFx(g, { alpha: p, k: 1, ox: px, oy: top, dy: 0, dx: Math.max(0, along + pad - px) }, () =>
+        this.coder?.drawPanel(g, [px, top, panelW, bottom - top], s),
+      );
+      // The panel's DOM fields would sit over the open menu too, and they
+      // cannot fade: they show once the panel is in place.
+      if (menuOpen || p < 0.98 || !(this.coder?.open ?? false)) this.coder?.panel.hideFields();
       this.comboInRail = true;
       this.menuIds = more.map((m) => m.id);
       if (menuOpen) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);

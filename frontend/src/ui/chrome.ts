@@ -361,6 +361,8 @@ export interface Fx {
   ox: number;
   oy: number;
   dy: number;
+  /** A slide sideways (a panel coming in from the edge). */
+  dx?: number;
 }
 
 /** Draw `paint` faded and scaled by `fx`. */
@@ -369,7 +371,7 @@ export function withFx(g: Ctx, fx: Fx | undefined, paint: () => void): void {
   if (fx.alpha <= 0.002) return;
   g.save();
   g.globalAlpha *= fx.alpha;
-  g.translate(fx.ox, fx.oy + fx.dy);
+  g.translate(fx.ox + (fx.dx ?? 0), fx.oy + fx.dy);
   g.scale(fx.k, fx.k);
   g.translate(-fx.ox, -fx.oy);
   paint();
