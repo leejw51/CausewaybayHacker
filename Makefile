@@ -3,7 +3,7 @@
 #   make          what you can do
 #   make start    bring the servers up in the background
 #   make stop     put them down again
-#   make package  every release binary into dist/ (server tarball, LÖVE app)
+#   make package  every release binary into dist/ (server tarball, desktop app)
 #
 # `start` runs the servers detached, with their pids in .run/ and their output
 # in .run/*.log, so a terminal that started them can be closed and another one
@@ -108,13 +108,12 @@ endif
 # How long `start` waits for a port to answer before calling it a failure.
 WAIT_SECS  ?= 90
 
-# The version of record. Five manifests carry one: the backend workspace, the
-# CLI crate, the LÖVE key library, the frontend and the desktop app (whose
-# tauri.conf.json reads the frontend's). `make version` prints it only when
-# all five agree, and the release workflow compares the tag to it.
+# The version of record. Four manifests carry one: the backend workspace, the
+# CLI crate, the frontend and the desktop app (whose tauri.conf.json reads the
+# frontend's). `make version` prints it only when all four agree, and the
+# release workflow compares the tag to it.
 BE_VERSION  := $(shell sed -n 's/^version = "\(.*\)"/\1/p' backend/Cargo.toml | head -1)
 CLI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' cli/Cargo.toml | head -1)
-FFI_VERSION := $(shell sed -n 's/^version = "\(.*\)"/\1/p' love2d/ffi/Cargo.toml | head -1)
 FE_VERSION  := $(shell sed -n 's/^  "version": "\(.*\)",/\1/p' frontend/package.json | head -1)
 DT_VERSION  := $(shell sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
 VERSION     := $(BE_VERSION)
@@ -151,9 +150,9 @@ DIST_SRC := frontend/src frontend/public frontend/index.html \
 dist_stale = [ ! -f frontend/dist/index.html ] || \
              [ -n "$$(find $(DIST_SRC) -newer frontend/dist/index.html 2>/dev/null | head -1)" ]
 
-.PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle gui serve web build test test-all test-all-list test-be test-fe test-sync \
-        fmt-check check version package release package-server package-server-verify package-gui package-love tauri tauri-dev tauri-notarize tauri-gatekeeper _desktop_deps _tauri_dist \
-        test-love test-e2e smoke fmt lint doctor warm clean clean-home
+.PHONY: help dev start stop restart status logs remote art rebuild _deps _bundle serve web build test test-all test-all-list test-be test-fe test-sync \
+        fmt-check check version package release package-server package-server-verify tauri tauri-dev tauri-notarize tauri-gatekeeper _desktop_deps _tauri_dist \
+        test-e2e smoke fmt lint doctor warm clean clean-home
 
 ##@ Running
 
@@ -240,18 +239,6 @@ remote: ## the addresses a phone or another machine can use
 logs: ## follow both logs (ctrl-C to stop following; the servers stay up)
 	@tail -f $(RUN)/backend.log $(RUN)/web.log
 
-gui: ## play in the LÖVE desktop client (fetches LÖVE and builds the key library if needed)
-	@# The client needs three things and each fails differently if it is missing,
-	@# so check them here rather than let the player meet three separate errors.
-	@if ! $(call held,$(BACK_PORT),cwbhacker); then \
-	  echo "the server is not up — starting it first"; $(MAKE) -s start; fi
-	@test -f love2d/ffi/target/release/libcwbh_ffi.dylib \
-	  || { echo "building the key library…"; $(MAKE) -s -C love2d ffi; }
-	@command -v love >/dev/null || test -d love2d/build/love.app \
-	  || { echo "fetching LÖVE…"; $(MAKE) -s -C love2d love-bin; }
-	@echo "  connecting to ws://127.0.0.1:$(BACK_PORT)/ws  (CWBH_SERVER overrides)"
-	CWBH_SERVER=ws://127.0.0.1:$(BACK_PORT)/ws $(MAKE) -s -C love2d run
-
 serve: ## the backend in the foreground, for a stack trace
 	cd backend && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) cargo run -p cwbhacker -- serve --bind $(BIND):$(BACK_PORT)
 
@@ -307,18 +294,14 @@ test-all-list: ## what test-all would run, and why anything would not
 # because the same vectors are asserted in each. Running two of the three and
 # calling it `test` is how they would drift.
 #
-# The LÖVE suite is headless and needs `luajit`, not a LÖVE binary or a window.
-#
 # `test-sync` is the one browser suite in `test`: it starts its own server, so
 # it needs no `make start` and no wallet — only a Chromium (`npx playwright
 # install chromium` in e2e/, which it does for you).
-test: test-be test-fe test-love test-sync ## the Rust, TypeScript, LÖVE and playground-sync suites (see test-all)
+test: test-be test-fe test-sync ## the Rust, TypeScript and playground-sync suites (see test-all)
 test-be: ## the Rust suite (add ARGS="-- --ignored" for the content check)
 	cd backend && cargo test --workspace $(ARGS)
 test-fe: ## the TypeScript suite
 	cd frontend && npm test
-test-love: ## the LÖVE client, headless
-	$(MAKE) -C love2d test-headless
 test-sync: ## playwright: the playground draft survives, and a save on one device reaches another (starts its own server)
 	cd frontend && npm run build:e2e
 	cd backend && cargo build -p cwbhacker
@@ -339,26 +322,22 @@ fmt: ## format everything
 	cd backend && cargo fmt
 	cd desktop && cargo fmt
 	cd frontend && npm run fmt
-	$(MAKE) -C love2d fmt
 
-lint: ## clippy (backend, cli, key library), tsc, and the LÖVE layering check
+lint: ## clippy (backend, cli) and tsc
 	cd backend && cargo clippy --all-targets --workspace -- -D warnings
-	cd love2d/ffi && cargo clippy --all-targets -- -D warnings
 	cd frontend && npm run lint
-	$(MAKE) -C love2d lint
 
 fmt-check: ## fail if anything is not formatted (what CI runs)
 	cd backend && cargo fmt --check
 	cd cli && cargo fmt --check
-	cd love2d/ffi && cargo fmt --check
 	cd desktop && cargo fmt --check
 
-check: fmt-check lint test test-love ## everything CI runs on a pull request, in one word
+check: fmt-check lint test ## everything CI runs on a pull request, in one word
 	$(MAKE) -C cli check
 
 version: ## print the version, once every manifest agrees on it
-	@test "$(BE_VERSION)" = "$(CLI_VERSION)" -a "$(BE_VERSION)" = "$(FFI_VERSION)" -a "$(BE_VERSION)" = "$(FE_VERSION)" -a "$(BE_VERSION)" = "$(DT_VERSION)" || { \
-	  echo "ERROR: the manifests disagree — backend $(BE_VERSION), cli $(CLI_VERSION), love2d/ffi $(FFI_VERSION), frontend $(FE_VERSION), desktop $(DT_VERSION)" >&2; \
+	@test "$(BE_VERSION)" = "$(CLI_VERSION)" -a "$(BE_VERSION)" = "$(FE_VERSION)" -a "$(BE_VERSION)" = "$(DT_VERSION)" || { \
+	  echo "ERROR: the manifests disagree — backend $(BE_VERSION), cli $(CLI_VERSION), frontend $(FE_VERSION), desktop $(DT_VERSION)" >&2; \
 	  exit 1; }
 	@echo "$(VERSION)"
 
@@ -371,11 +350,11 @@ version: ## print the version, once every manifest agrees on it
 # the .app needs nothing beside it but the compilers the lands use — which it
 # finds on the login shell's PATH, not launchd's (desktop/src/main.rs).
 #
-# Signed like the LÖVE app: `APPLE_SIGNING_IDENTITY` when it is set (the
+# Signed with `APPLE_SIGNING_IDENTITY` when it is set (the
 # release workflow exports it after importing the certificate), else the first
 # Developer ID in the keychain, else ad-hoc. Tauri signs inside-out with the
-# hardened runtime. Notarising is its own step, `tauri-notarize`, exactly as
-# `make -C love2d notarize` is — so the Apple credentials are kept from the
+# hardened runtime. Notarising is its own step, `tauri-notarize`, so the
+# Apple credentials are kept from the
 # build, or Tauri would try to notarise on its own and an ad-hoc build would
 # fail on it.
 DESKTOP_PORT := 5395
@@ -458,9 +437,6 @@ tauri-dev: _deps _desktop_deps ## the desktop app from the checkout, debug build
 #   $(SERVER_PKG).tar.gz        the server: cwbhacker (BE) with the built
 #                               frontend (FE) and the content packs beside it,
 #                               plus the cwbh terminal client and a run script
-#   CausewaybayHacker-macos.zip the LÖVE client as a double-clickable .app
-#                               (macOS only — see love2d/Makefile)
-#   causewaybay-hacker.love     the same game for anyone with their own LÖVE 11
 #   Causewaybay Hacker.app      the Tauri desktop app: server and window in one
 #   CausewaybayHacker-Desktop-…zip
 #                               process, and the same zipped for download
@@ -469,7 +445,7 @@ tauri-dev: _deps _desktop_deps ## the desktop app from the checkout, debug build
 # The halves are separate targets because they want different machines: the
 # server tarball is per platform and builds anywhere Rust and Node do, the
 # app needs macOS. The release workflow runs each where it belongs.
-package: package-server package-gui tauri ## every release binary: the server tarball, the LÖVE client and the desktop app
+package: package-server tauri ## every release binary: the server tarball and the desktop app
 	@echo
 	@echo "  $(DIST)/"
 	@ls -1 $(DIST) | sed 's/^/    /'
@@ -530,21 +506,6 @@ package-server-verify:
 	rm -rf "$$home"; \
 	echo "  the packaged server serves the page and imports every pack"
 
-package-gui: ## the LÖVE client: a macOS .app (signed) and a .love, into $(DIST)
-	@$(MAKE) -s version >/dev/null
-	@$(MAKE) -C love2d app $(if $(SKIP_SMOKE),SKIP_SMOKE=1,)
-	@mkdir -p "$(DIST)"
-	@cp love2d/build/CausewaybayHacker-macos.zip "$(DIST)/CausewaybayHacker-$(VERSION)-$(TARGET).zip"
-	@cp love2d/build/causewaybay-hacker.love "$(DIST)/causewaybay-hacker-$(VERSION).love"
-	@echo "  $(DIST)/CausewaybayHacker-$(VERSION)-$(TARGET).zip"
-	@echo "  $(DIST)/causewaybay-hacker-$(VERSION).love"
-
-package-love: ## just the .love archive (any platform with zip)
-	@$(MAKE) -C love2d love-file
-	@mkdir -p "$(DIST)"
-	@cp love2d/build/causewaybay-hacker.love "$(DIST)/causewaybay-hacker-$(VERSION).love"
-	@echo "  $(DIST)/causewaybay-hacker-$(VERSION).love"
-
 warm: ## build the crate shelf the FRAMEWORKS road links against (needs the network once)
 	@test -x $(BACK_BIN) || ( cd backend && $(BACK_BUILD) -p cwbhacker 2>&1 | tail -3 ) || exit 1
 	CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) warm
@@ -579,10 +540,9 @@ doctor: ## check the toolchains and the server's own view of things
 	@command -v zig   >/dev/null && echo "zig         $$(zig version)" \
 	  || echo "MISSING: zig    — needed for the zig land: zig 0.16.0 (brew install zig, or the tarball on PATH)"
 	@command -v luajit >/dev/null && echo "luajit      $$(luajit -v 2>&1 | head -1)" \
-	  || echo "MISSING: luajit — needed for the lua land and the LÖVE suite (brew install luajit); plain lua will not do"
+	  || echo "MISSING: luajit — needed for the lua land (brew install luajit); plain lua will not do"
 	@command -v stylua >/dev/null && echo "stylua      $$(stylua --version)" \
 	  || echo "no stylua on PATH — optional; the lua land has no fmt without it"
-	@command -v love  >/dev/null && love --version    || echo "no love on PATH — 'make -C love2d love-bin' fetches it"
 	@test -x $(BACK_BIN) && CAUSEWAYBAY_HACKER_HOME=$(HOME_DIR) $(BACK_BIN) doctor \
 	  || echo "backend not built yet — 'make start' or 'cd backend && cargo build'"
 
@@ -590,7 +550,6 @@ clean: ## drop build output (your progress is untouched)
 	cd backend && cargo clean
 	cd desktop && cargo clean
 	rm -rf frontend/dist frontend/node_modules $(RUN) $(DIST)
-	$(MAKE) -C love2d clean
 
 clean-home: ## DELETE every user's code, attempts and progress in $(HOME_DIR)
 	@echo "This deletes $(HOME_DIR): every user, every attempt, every cleared node."

@@ -1,4 +1,0 @@
-build/
-ffi/target/
-*.love
-.DS_Store

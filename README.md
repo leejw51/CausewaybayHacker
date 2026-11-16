@@ -49,8 +49,7 @@ the pinned crate shelf on the FRAMEWORKS road, Go through
 `go build`/`go test`, C++ through the system `c++` (clang or gcc, `-std=c++20`),
 Python through `py_compile` and then `python3 -I`, TypeScript through a strict
 `tsc` and then `node`, Zig through `zig build-exe -O Debug` with every safety
-check on, Lua through `luajit` — the interpreter the LÖVE client itself runs
-on — on your machine, against hidden tests. There is no pretend-verdict — and
+check on, Lua through `luajit` — on your machine, against hidden tests. There is no pretend-verdict — and
 no running a TypeScript program `tsc` has rejected.
 
 **Your mistakes are the curriculum.** Every attempt is kept — the source, the
@@ -78,9 +77,8 @@ machine and sent to nobody but the provider**, or Ollama on your own computer
 with no key at all; the server never calls a model. Every
 scratchpad has its own chatroom — messages and generated pictures — kept in
 the pad's folder and searchable by keyword and by meaning. It calls a model
-only when you press something. **The desktop client has the same coder**, the
-same five providers and the same room, over a streaming HTTP client in the key
-library (LÖVE brings no TLS of its own). See `docs/agent.md`.
+only when you press something. The desktop app is the same client, so it has
+the same coder. See `docs/agent.md`.
 
 Everything lives in `~/.causewaybayhacker`: your code, your attempts, the
 database, the build caches.
@@ -178,11 +176,10 @@ up. `make remote` prints them again.
 ## Release
 
 ```bash
-make package          # every release binary into dist/ (server, LÖVE app, desktop app)
+make package          # every release binary into dist/ (server, desktop app)
 make package-server   # the server tarball: cwbhacker + web client + content packs + cwbh
-make package-gui      # the LÖVE client as a signed macOS .app, and a .love (macOS only)
 make tauri            # the desktop app (Tauri): server and window in one process
-make version          # the version, once all five manifests agree on it
+make version          # the version, once all four manifests agree on it
 ```
 
 `make tauri` builds `desktop/` — the browser game in a native window, with the
@@ -192,7 +189,7 @@ localStorage is still there next launch), imports the bundled packs into the
 same `~/.causewaybayhacker` the browser game uses, and finds the compilers on
 your login shell's PATH even when opened from Finder. Out comes
 `desktop/target/release/bundle/macos/Causewaybay Hacker.app` and a zip of it in
-`dist/`, signed like the LÖVE app (`make tauri-notarize` notarises and staples
+`dist/`, signed (`make tauri-notarize` notarises and staples
 it). `make tauri-dev` runs a debug build from the checkout. The TypeScript land
 uses the global `tsc` (`npm install -g typescript`).
 
@@ -200,10 +197,9 @@ The server tarball unpacks to a directory with `run.sh` in it, which starts
 `cwbhacker` with its own web client and content beside it — nothing else is
 needed on the machine. Both halves check themselves on the way out: the staged
 server is started from outside the checkout and has to serve the page and
-import every pack; the app bundle is started and has to find its own key
-library.
+import every pack.
 
-CI (`.github/workflows/ci.yml`) runs the backend, CLI, frontend, LÖVE and
+CI (`.github/workflows/ci.yml`) runs the backend, CLI, frontend and
 content suites on every push and pull request, and dry-runs the packaging.
 Pushing a tag `vX.Y.Z` that matches `make version` runs the release workflow,
 which builds the server for Linux (x86_64, aarch64) and macOS, signs and

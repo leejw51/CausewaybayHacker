@@ -11,22 +11,14 @@
 #             the C++ format tests need, has to be added by hand.
 #   cli       the terminal client, its own crate with its own conformance suite.
 #   frontend  tsc, vitest, and the production build the server ships.
-#   love2d    the LÖVE client: the key library (Rust), the headless suite under
-#             LuaJIT (no window — the layout cases skip themselves and say so),
-#             and the .love archive, checked for every module and painting.
-#   love2d-window
-#             the same client with a window, under Xvfb: the layout and scene
-#             cases, and the type sweep — every type step in both orientations
-#             through a real RUN against the server built from this checkout.
 #   content   the slow gate: every reference solution is accepted and no starter
 #             is, and every §7.1 mistake fixture still compiles to what it claims.
 #
 # Two more only build: `package-server` on every run, because a tarball that
 # cannot start outside a checkout is the kind of break that is otherwise found
-# after a tag; and `package-gui` on macOS once a change has landed on main,
-# because the app needs a macOS runner and a pull request should not pay for
-# one. `package-tauri`, the desktop app, follows the same rule as
-# `package-gui`. All are dry runs of `make package` — the release workflow is where the
+# after a tag; and `package-tauri`, the desktop app, on macOS once a change has
+# landed on main, because the app needs a macOS runner and a pull request
+# should not pay for one. Both are dry runs of `make package` — the release workflow is where the
 # artifacts are signed for real and attached to a release.
 #
 #   browser   one slice of the browser suite: the playground's draft surviving a
@@ -126,7 +118,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Cheap, and it is the number a tag will later be compared against: the
-      # four manifests (backend, cli, love2d/ffi, frontend) have to agree.
+      # four manifests (backend, cli, frontend, desktop) have to agree.
       - name: Every manifest agrees on one version
         run: make version
 
@@ -210,8 +202,8 @@ jobs:
 
       # Zig Land is the eighth land (runner/src/zig.rs) and Lua Land the
       # ninth (runner/src/lua.rs). `zig` is pinned to the version the packs
-      # were verified on; `luajit` is Ubuntu's, which is the LuaJIT 2.1 the
-      # LÖVE client already tests under. Neither is a plain `lua`.
+      # were verified on; `luajit` is Ubuntu's LuaJIT 2.1, the one the Lua
+      # packs were verified on. Neither is a plain `lua`.
       - uses: mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
@@ -317,155 +309,6 @@ jobs:
             e2e/test-results
           retention-days: 7
 
-  love2d:
-    name: LÖVE client (key library, headless suite, archive)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: love2d/ffi
-
-      # LÖVE embeds LuaJIT, so LuaJIT is what the client runs on. Testing
-      # against plain Lua would test a language the client never uses — and
-      # could not, since only LuaJIT has the `ffi` module the key library
-      # needs.
-      - name: Install LuaJIT
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends luajit zip rsync
-
-      - run: cd love2d/ffi && cargo fmt --check
-      - run: cd love2d/ffi && cargo clippy --all-targets -- -D warnings
-      # Listed separately so a Rust build failure does not read as a Lua
-      # test failure. `test-headless` loads the library `ffi` just built.
-      - run: make -C love2d ffi
-      - run: make -C love2d ffi-test
-      - run: make -C love2d lint
-      - run: make -C love2d test-headless
-      # The archive a release ships, checked for every module and painting.
-      - run: make -C love2d love-file
-
-  # The LÖVE client with a window — the layout and scene cases the headless
-  # job has to skip, and the type sweep: every type step in both orientations
-  # through lands → categories → map → quest, with a real RUN against a real
-  # server and the geometry asserted. Ubuntu's `love` package is 11.5, the
-  # version the client is written for; Xvfb is the window server the runner
-  # does not have, and SDL's dummy audio driver stands in for the sound card
-  # it does not have either. The server is the one built from this checkout,
-  # started on a temporary home with the content packs imported.
-  love2d-window:
-    name: LÖVE client (windowed suite and type sweep, under Xvfb)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-
-      # The sweep RUNs a program in every land, so the server needs Go to
-      # compile the Go one, and `c++` and `python3` for the other two.
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
-
-      # The runner also hands programs to `c++` and `python3`. The compiler is
-      # the image's own (pinned above by expectation, checked here); Python
-      # is installed to the version the fixtures were captured with; and
-      # clang-format is the one piece the image does not carry, needed by
-      # the C++ `code.format` tests.
-      - name: Check the image's C++ compiler and install clang-format
-        run: |
-          c++ --version | head -1
-          c++ --version | head -1 | grep -F "$CXX_EXPECTED"
-          sudo apt-get update -q && sudo apt-get install -y -q clang-format
-          clang-format --version
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: |
-            backend
-            love2d/ffi
-
-      - name: Install LÖVE, LuaJIT and Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends love luajit xvfb zip rsync
-          love --version
-
-      - run: make -C love2d ffi
-      - run: cd backend && cargo build -p cwbhacker
-
-      - name: Start the server
-        run: |
-          home=$(mktemp -d)
-          echo "CWBH_HOME=$home" >> "$GITHUB_ENV"
-          nohup backend/target/debug/cwbhacker serve --bind 127.0.0.1:5390 \
-            --home "$home" --content content --strict-content \
-            > "$home/server.log" 2>&1 &
-          # No frontend build here, so `/` is a 404 by design; `/art/` is
-          # served from the checkout and is what says the server is up.
-          for _ in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:5390/art/manifest.json >/dev/null 2>&1 && break
-            sleep 0.5
-          done
-          curl -fsS http://127.0.0.1:5390/art/manifest.json >/dev/null || { cat "$home/server.log"; exit 1; }
-          grep -q "content imported" "$home/server.log" || { cat "$home/server.log"; exit 1; }
-
-      - name: The suite, with a window
-        env:
-          SDL_AUDIODRIVER: dummy
-        run: xvfb-run -a -s "-screen 0 1280x800x24" make -C love2d test
-
-      - name: The type sweep, against the server
-        env:
-          SDL_AUDIODRIVER: dummy
-          CWBH_SERVER: ws://127.0.0.1:5390/ws
-        run: >
-          xvfb-run -a -s "-screen 0 1280x1000x24"
-          make -C love2d drive SCRIPT=tests/drive/typesweep.lua ARGS="--home $(mktemp -d)"
-
-      - name: The story and title drives
-        env:
-          SDL_AUDIODRIVER: dummy
-          CWBH_SERVER: ws://127.0.0.1:5390/ws
-        run: |
-          home=$(mktemp -d)
-          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
-          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/story.lua ARGS="--home $home"
-          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/loginerror.lua ARGS="--home $(mktemp -d)"
-          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/pgcode.lua ARGS="--home $(mktemp -d)"
-          # A save from another device (a second session inside the drive):
-          # a clean pad takes it, a dirty one asks, T and K do what they say.
-          xvfb-run -a make -C love2d drive SCRIPT=tests/drive/pgsync.lua ARGS="--home $(mktemp -d)"
-
-      - name: Server log
-        if: always()
-        run: tail -50 "$CWBH_HOME/server.log" || true
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: love2d-screens
-          path: ~/.local/share/love/causewaybay-hacker/*.png
-          if-no-files-found: ignore
-          retention-days: 7
-
   content:
     name: Content (solutions, starters, mistake fixtures)
     runs-on: ubuntu-24.04
@@ -534,8 +377,8 @@ jobs:
 
       # Zig Land is the eighth land (runner/src/zig.rs) and Lua Land the
       # ninth (runner/src/lua.rs). `zig` is pinned to the version the packs
-      # were verified on; `luajit` is Ubuntu's, which is the LuaJIT 2.1 the
-      # LÖVE client already tests under. Neither is a plain `lua`.
+      # were verified on; `luajit` is Ubuntu's LuaJIT 2.1, the one the Lua
+      # packs were verified on. Neither is a plain `lua`.
       - uses: mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
@@ -681,42 +524,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # The LÖVE app, once a change has landed on main. macOS only, because that
-  # is what the bundle is, and not on pull requests, because a macOS runner is
-  # the expensive one. Ad-hoc signed — the release workflow does it for real.
-  package-gui:
-    name: Package the LÖVE app (dry run, macOS)
-    if: github.event_name != 'pull_request'
-    runs-on: macos-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: love2d/ffi
-
-      # The smoke test starts the bundle and waits for a frame, and a runner
-      # has no window server to draw into. `verify-archive` still runs and
-      # catches the missing-module class of fault deterministically.
-      - run: make package-gui SKIP_SMOKE=1
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: love2d-macos-unsigned
-          path: |
-            dist/*.zip
-            dist/*.love
-          if-no-files-found: error
-          retention-days: 7
-
-  # The desktop app, once a change has landed on main — the same rule as the
-  # LÖVE app above, for the same reason. Ad-hoc signed; the release workflow
+  # The desktop app, once a change has landed on main: macOS only, and not on
+  # pull requests, because a macOS runner is the expensive one. Ad-hoc signed; the release workflow
   # signs and notarises it for real. Its fmt check runs here rather than in
   # `backend`, because desktop/ is its own crate outside that workspace.
   package-tauri:

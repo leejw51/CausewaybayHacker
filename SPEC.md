@@ -30,7 +30,7 @@ Skynet's plan all along — and takes it back one street at a time.
   `zig`, `lua`, `remix`. The player picks one; the others are still there.
   `zig` and `lua` are two more toolchains of their own — `zig build-exe -O
   Debug`, where every safety check is on and a panic names itself, and
-  `luajit`, the interpreter the LÖVE client runs on — with `zig:` and `lua:`
+  `luajit` (LuaJIT 2.1, not a plain `lua`) — with `zig:` and `lua:`
   mistake codes made from the message's shape as `cpp:` ones are. `pytorch` is
   Python with `torch`: the same interpreter, the same `main.py`, the same
   stdio harness and the same `py:` mistake codes — what differs is what a
@@ -187,8 +187,8 @@ still get a clean close.
 One row per player in `user_position`: `land`, an optional `category`, an
 optional `quest_id`. **The server owns it.** A client stores the session and
 nothing else durable — logging out and back in restores the land, the category
-and the stage, and so does opening the other client, because the browser and
-the LÖVE desktop client talk to one server and therefore share one place.
+and the stage, and so does opening another client, because the browser, the
+desktop app and `cwbh` talk to one server and therefore share one place.
 
 Nothing new is asked of a client to keep it current. The server already
 receives every move as a request: `world.map` names the land and category the
@@ -214,62 +214,6 @@ Handed to the client by `auth.login` and `auth.resume` (PROTOCOL §4.3, §4.4),
 and written into `progress.json` as `position` so the file and the game never
 disagree. An account that stopped playing before this existed has no row, and
 the file falls back to the last quest its `attempts` trail names.
-
-### 1.1 The LÖVE client's own store
-
-`~/.causewaybayhacker` is the **server's**. The LÖVE desktop client is a
-separate program that may be talking to a server on another machine, so it
-keeps its own state in `~/.causewaybaylove2d` — `0700` directory, `0600` files,
-append-only JSONL, state derived by replaying the log.
-
-Resolved in the same precedence order `CausewaybayWallet` uses, because a
-family of programs that each invent their own is a family nobody can script:
-
-1. `--home <PATH>`
-2. the `CWBH_LOVE2D_HOME` environment variable
-3. `~/.causewaybaylove2d`
-
-The name follows the wallet's shape — `.causewaybay` plus the component — and
-it was once `.causewaybayhackerlove2d`. **A store found at the old path is
-migrated once and the old directory left alone**, the same way the first
-version migrated out of LÖVE's own save directory. Somebody is playing with a
-session and a cleared map in there; a rename that silently starts them fresh
-would be a self-inflicted version of the thing this project warns players
-about.
-
-The JSONL rules, in full, so this section does not depend on another document:
-
-* One compact JSON object per line, UTF-8, `\n` terminated, no trailing spaces.
-* **Append-only.** State is derived by replaying every line in order; later
-  records supersede earlier ones. A crash can at worst lose the last, partial
-  line — and an append that finds the previous line unterminated **starts a
-  fresh one**, so a torn write costs that line and not the next one too.
-* Every record carries `schema` (currently `1`), `kind`, and an RFC3339 UTC
-  timestamp.
-* A malformed or unparsable line is **skipped with a warning** rather than
-  aborting the replay. A line whose `schema` is greater than the reader's is
-  skipped.
-* Removing something — forgetting a session — is a record (`session.clear`),
-  not an edit to an earlier line.
-
-These are `CausewaybayWallet`'s conventions, and its `rustcli/core/src/store.rs`
-is the reference implementation if a detail is ever in doubt.
-
-It holds only what a client owns: the session token, the chosen server, the
-orientation and fullscreen pins, the code-size step, and where each map was
-left. **No key
-material, ever** — not the mnemonic, not the private key, not the seed.
-
-**The token is stored per server.** A session token is minted by one server
-and means nothing to another; a client that keeps one token and points it at a
-new address will send a stranger's credential and be told `unauthorized` for
-reasons the player cannot see. Key it by the server URL.
-
-**Attempts are never deleted by the server.** They are the training data for
-§7. `hacker prune` (a CLI subcommand) is the only thing that removes them, and
-only when the user asks.
-
----
 
 ## 2. The database
 
@@ -637,13 +581,7 @@ and skips straight to the last arrow.
 > written only by the wallet module, read only by it, and never returned by
 > any export. The cost is stated plainly: any script running on the origin can
 > read that slot, so the web client's custody is the browser profile's.
->
-> The LÖVE client does the same on its own terms: the secret as typed (the
-> library never hands a derived key back across the ABI) goes into one
-> `key-<address>` file, 0600 in the 0700 home, outside the append-only log
-> (`love2d/src/store.lua` `save_key`/`load_key`/`clear_key`), from an accepted
-> login until logout. A launch with no session, or a token the server has
-> forgotten, signs in again with it (`Session:login_with_kept`).
+
 
 ### 3.2 Challenge–response
 
@@ -978,9 +916,7 @@ luajit -b main.lua main.luac      # the compile phase: a syntax error ⇒ compil
 luajit main.lua                   # the run, per case, stdio harness
 ```
 
-`runner/src/lua.rs`. **LuaJIT, and only LuaJIT** — the interpreter the LÖVE
-client runs on, so a program that works on the desk works on the dragon —
-and it is a Lua 5.1 with LuaJIT's extensions, which is not Lua 5.4:
+`runner/src/lua.rs`. **LuaJIT, and only LuaJIT** — and it is a Lua 5.1 with LuaJIT's extensions, which is not Lua 5.4:
 `print(6 / 2)` is `3` here and `3.0` there, `//` does not parse here,
 `table.unpack` does not exist here. A pack verified on one is wrong on the
 other, so the runner does not fall back from one to the other:
@@ -1105,7 +1041,7 @@ spinner. The final verdict arrives as the response to the original request.
 
 > **[`PROTOCOL.md`](PROTOCOL.md) is the authority for the wire.** This section
 > is the summary; where the two differ, `PROTOCOL.md` is right. Every client —
-> the browser, the LÖVE desktop client, the smoke harness — implements it, and
+> the browser (and the desktop app, which is the browser client), `cwbh`, the smoke harness — implements it, and
 > its §8 conformance checklist is what "the client works" means.
 
 WebSocket at `ws://127.0.0.1:5390/ws`. Text frames. One JSON object per frame.
@@ -1467,9 +1403,6 @@ backend/            Rust workspace
   runner/           compile + run, rust, go, cpp, python, typescript, zig and lua, limits and streaming
   server/           axum, the websocket, the message catalogue, static files
   cli/              `cwbhacker`: serve, import, prune, doctor
-love2d/             LÖVE 11.5 desktop client, same protocol
-  src/              scenes, layout, the websocket and JSON in Lua
-  ffi/              a small Rust cdylib: bip39/bip32/secp256k1 for LuaJIT
 frontend/           vite + ts + three.js
   src/engine/       layout, text, ui, input, assets, particles  (ported)
   src/net/          the websocket client, typed against §6
@@ -1499,7 +1432,6 @@ Ownership, so two people do not edit one file:
 | --- | --- |
 | `backend/**` | BE |
 | `frontend/**` | FE |
-| `love2d/**` | L2D |
 | `content/**`, `docs/**`, `SPEC.md`, `README.md` | PM |
 | `tests/**`, `e2e/**`, `backend/*/tests/**` | QA |
 

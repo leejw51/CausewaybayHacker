@@ -6,7 +6,7 @@ write one so it reads as though the quest had been written in that language,
 rather than converted into it.
 
 The interface is a separate job and is already done. `frontend/src/i18n/*.ts`
-and `love2d/src/lang/*.lua` hold every label and message the client writes
+holds every label and message the client writes
 itself. **Read your language's UI catalogue before you start**: its header
 comment fixes the words for land, quest, brief, hint, cleared, submit, run and
 compile, and a translation that calls a land something else than the button
