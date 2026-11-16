@@ -3783,7 +3783,11 @@ export class PlaygroundScene implements Scene {
     if (agentOpen) {
       const panelW = Math.max(Math.round(320 * s), Math.round(vw * 0.36));
       const px = vw - pad - panelW;
-      const er = this.screen(g, [pad, top, px - pad * 2, bottom - top]);
+      const menuOpen = this.moreOpen && !filtering;
+      const edRight = menuOpen
+        ? Math.min(px - pad, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
+        : px - pad;
+      const er = this.screen(g, [pad, top, edRight - pad, bottom - top]);
       this.editorRect = er;
       if (this.editor) {
         this.overlay?.place(er, fonts.codeSm.size * this.codeMul);
@@ -3791,13 +3795,21 @@ export class PlaygroundScene implements Scene {
       } else this.overlay?.hide();
       this.coder?.fly([0, 0, vw, vh]);
       this.coder?.drawPanel(g, [px, top, panelW, bottom - top], s);
+      // The panel's DOM fields would sit over the open menu too.
+      if (menuOpen) this.coder?.panel.hideFields();
       this.comboInRail = true;
       this.menuIds = more.map((m) => m.id);
       if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
       return;
     }
     this.coder?.panel.hideFields();
-    const editorRect = this.screen(g, [pad, top, rx0 - pad * 2, bottom - top]);
+    // The editor is a DOM field over the canvas: with MORE open it ends
+    // before the menu, or it covers the menu's left column.
+    const menuOpen = this.moreOpen && !filtering;
+    const edRight = menuOpen
+      ? Math.min(rx0 - pad, this.codeMoreBox(s, more, rowH, fg, barH, sy, pad).px - pad)
+      : rx0 - pad;
+    const editorRect = this.screen(g, [pad, top, edRight - pad, bottom - top]);
     this.editorRect = editorRect;
     if (this.editor) {
       this.overlay?.place(editorRect, fonts.codeSm.size * this.codeMul);
@@ -3873,16 +3885,16 @@ export class PlaygroundScene implements Scene {
     if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
   }
   /** CODE's MORE, open: a column of its buttons down the right, over the rail. */
-  private drawCodeMore(
-    g: Ctx,
+  /** Where CODE's MORE column sits: the editor stops short of its left edge. */
+  private codeMoreBox(
     s: number,
-    more: Array<{ id: string; label: string; dim?: boolean; strong?: boolean }>,
+    more: Array<{ label: string }>,
     rowH: number,
     fg: number,
     barH: number,
     sy: number,
     pad: number,
-  ): void {
+  ) {
     const { vw } = this.app.layout;
     const f = ensureFonts(s).tool;
     const box = (l: string) => btnBox(f, [l], 0, btnPad(f), this.app.layout.minTouchH());
@@ -3894,8 +3906,28 @@ export class PlaygroundScene implements Scene {
     const perCol = Math.ceil(more.length / cols);
     const pw = cols * itemW + (cols - 1) * fg + mp * 2;
     const ph = perCol * step - fg + mp * 2;
-    const px = vw - pad - pw;
-    const py = barH + Math.round(2 * s);
+    return { px: vw - pad - pw, py: barH + Math.round(2 * s), pw, ph, mp, step, itemW, perCol };
+  }
+
+  private drawCodeMore(
+    g: Ctx,
+    s: number,
+    more: Array<{ id: string; label: string; dim?: boolean; strong?: boolean }>,
+    rowH: number,
+    fg: number,
+    barH: number,
+    sy: number,
+    pad: number,
+  ): void {
+    const { px, py, pw, ph, mp, step, itemW, perCol } = this.codeMoreBox(
+      s,
+      more,
+      rowH,
+      fg,
+      barH,
+      sy,
+      pad,
+    );
     g.save();
     g.shadowColor = "rgba(0,0,0,0.6)";
     g.shadowBlur = Math.round(16 * s);
