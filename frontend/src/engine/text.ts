@@ -851,7 +851,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     // (`Buttons.row`, `rowsIn`) rather than by a fixed count.
     // Buttons in the body face, as the redesign draws them: Press Start 2P at
     // 20 made every button a headline and cut labels to "CHEATSHE…".
-    button: make(B(24 * s), body),
+    button: make(B(20 * s), body),
     stamp: make(P(24 * s), pixel),
     help: make(B(32 * s), body),
     // The toolbars over the two code screens, at the code's own size and in

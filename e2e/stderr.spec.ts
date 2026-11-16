@@ -13,15 +13,19 @@ import {
   clickButton,
   freshAccount,
   login,
+  reveal,
   sceneNow,
   test,
 } from "./fixtures";
 
-const button = (page: Page) =>
-  page.evaluate(() => {
+const button = async (page: Page) => {
+  // Behind MORE on a wide bench: opened, as a player would to read it.
+  await reveal(page, "stderr");
+  return page.evaluate(() => {
     const b = window.__cwbCapture!.buttons().find((b) => b.id === "stderr");
     return b ? { label: b.label, client: b.client } : null;
   });
+};
 const pref = (page: Page) =>
   page.evaluate(() => localStorage.getItem("cwbhacker.code.stderr"));
 

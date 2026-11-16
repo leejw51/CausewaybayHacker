@@ -10,6 +10,7 @@ import {
   clickButton,
   freshAccount,
   login,
+  reveal,
   sceneNow,
   test,
 } from "./fixtures";
@@ -20,12 +21,15 @@ const pref = (page: Page) =>
   page.evaluate(() => localStorage.getItem("cwbhacker.code.theme"));
 const attr = (page: Page) =>
   page.evaluate(() => document.documentElement.dataset.codeTheme ?? null);
-const label = (page: Page) =>
-  page.evaluate(
+const label = async (page: Page) => {
+  // Behind MORE on a wide bench: opened, as a player would to read it.
+  await reveal(page, "theme");
+  return page.evaluate(
     () =>
       window.__cwbCapture!.buttons().find((b) => b.id === "theme")?.label ??
       null,
   );
+};
 const editorBg = (page: Page) =>
   page.evaluate(
     () => getComputedStyle(document.querySelector(".cwb-editor")!).backgroundColor,

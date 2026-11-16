@@ -102,7 +102,7 @@ async function scrolls(page: Page, r: Box): Promise<void> {
 }
 
 for (const mode of ["framed", "code"] as const) {
-  test(`the playground's output scrolls (${mode}), beside the code when wide`, async ({
+  test(`the playground's output scrolls (${mode})`, async ({
     page,
   }, info) => {
     await login(page, freshAccount());
@@ -112,12 +112,22 @@ for (const mode of ["framed", "code"] as const) {
       .poll(() => sceneNow(page), { timeout: 30_000 })
       .toBe("playground");
     if (mode === "code") await clickButton(page, "code");
+    const wide = info.project.name === "landscape";
+    // Wide CODE keeps the run to one line along the foot; LOG opens the whole
+    // of it, in a band under the editor. Opened before the run, so the band
+    // is what the run streams into.
+    const band = mode === "code" && wide;
+    if (band) await clickButton(page, "codelog");
     const r = await runBroken(page);
     if (SHOTS)
       await page.screenshot({
         path: `${SHOTS}/pg-${mode}-${info.project.name}.png`,
       });
-    placed(page, r, info.project.name === "landscape");
+    if (band) {
+      const vp = page.viewportSize()!;
+      expect(r[1]).toBeGreaterThan(vp.height * 0.4);
+      expect(r[2]).toBeGreaterThan(vp.width * 0.4);
+    } else placed(page, r, wide);
     await scrolls(page, r);
   });
 }

@@ -12,6 +12,7 @@ import {
   clickButton,
   freshAccount,
   login,
+  reveal,
   sceneNow,
   test,
 } from "./fixtures";
@@ -22,12 +23,15 @@ const attr = (page: Page) =>
   page.evaluate(() => document.documentElement.dataset.computer ?? null);
 const pref = (page: Page) =>
   page.evaluate(() => localStorage.getItem("cwbhacker.pg.computer"));
-const label = (page: Page) =>
-  page.evaluate(
+const label = async (page: Page) => {
+  // Behind MORE on a wide bench: opened, as a player would to read it.
+  await reveal(page, "computer");
+  return page.evaluate(
     () =>
       window.__cwbCapture!.buttons().find((b) => b.id === "computer")?.label ??
       null,
   );
+};
 const editorBg = (page: Page) =>
   page.evaluate(
     () =>

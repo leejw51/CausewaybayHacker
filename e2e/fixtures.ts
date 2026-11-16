@@ -274,6 +274,9 @@ export async function clickButton(
   timeout = 30_000,
 ): Promise<void> {
   const deadline = Date.now() + timeout;
+  // Opened MORE once already: a button the toolbar keeps behind its menu is
+  // reached the way a player reaches it, not pressed where it is not drawn.
+  let openedMore = false;
   for (;;) {
     const found = await page.evaluate((wanted) => {
       const api = window.__cwbCapture;
@@ -311,6 +314,18 @@ export async function clickButton(
         return;
       }
     }
+    // The playground's toolbars keep their less-used buttons behind MORE
+    // (and drop more of them there on a narrow window). Not on screen, but
+    // MORE is: open it and look again — once, and never for MORE itself.
+    if (!found.at && !openedMore && id !== "more" && found.ids.includes("more")) {
+      openedMore = true;
+      const more = await page.evaluate(() => window.__cwbCapture?.buttonAt("more") ?? null);
+      if (more) {
+        await page.mouse.click(more[0], more[1]);
+        await page.waitForTimeout(250);
+        continue;
+      }
+    }
     if (Date.now() > deadline)
       throw new Error(
         `no button \`${id}\` on this screen. The scene offers: ` +
@@ -319,6 +334,25 @@ export async function clickButton(
       );
     await page.waitForTimeout(250);
   }
+}
+
+/**
+ * Make sure `id` is on screen: when it is not, but a MORE menu is, open MORE
+ * (the playground keeps its settings there) — what a player does to see it.
+ * Returns whether the button is there afterwards.
+ */
+export async function reveal(page: Page, id: string): Promise<boolean> {
+  const ids = (): Promise<string[]> =>
+    page.evaluate(() => (window.__cwbCapture?.buttons() ?? []).map((b) => b.id));
+  let now = await ids();
+  if (now.includes(id)) return true;
+  if (!now.includes("more")) return false;
+  const at = await page.evaluate(() => window.__cwbCapture?.buttonAt("more") ?? null);
+  if (!at) return false;
+  await page.mouse.click(at[0], at[1]);
+  await page.waitForTimeout(250);
+  now = await ids();
+  return now.includes(id);
 }
 
 /** Type into the seed field and submit it the way the scene expects. */
