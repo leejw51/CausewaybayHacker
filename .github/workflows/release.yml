@@ -295,6 +295,8 @@ jobs:
             | `causewaybay-hacker-server-…-linux-gnu.tar.gz` | the server for Linux (x86_64 and aarch64): `cwbhacker` with the web client and the content packs beside it, the `cwbh` terminal client, and `run.sh` |
             | `causewaybay-hacker-server-…-apple-darwin.tar.gz` | the same, for macOS on Apple silicon |
             | `CausewaybayHacker-Desktop-…-apple-darwin.zip` | the desktop app (Tauri) — the web client in a native window with the server inside it; nothing to start first. Signed and notarised |
+            | `CausewaybayHacker-Desktop-…-x86_64-linux.deb` / `.AppImage`, `…-arm64-linux.deb` / `.AppImage` | the desktop app for Linux (x86_64, arm64); unsigned |
+            | `CausewaybayHacker-Desktop-…-x86_64-windows-setup.exe` / `.msi`, `…-arm64-windows-setup.exe` | the desktop app for Windows (x86_64, ARM64); unsigned |
 
             Verify a download against `SHA256SUMS`, then:
 

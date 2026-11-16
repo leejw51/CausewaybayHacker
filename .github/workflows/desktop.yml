@@ -6,12 +6,15 @@
 # Linux or Windows bundle from a Mac:
 #
 #   linux-x86_64     ubuntu-22.04   .deb and .AppImage
+#   linux-arm64      ubuntu-24.04-arm .deb and .AppImage
 #   windows-x86_64   windows-latest NSIS setup .exe and .msi
 #   windows-arm64    windows-11-arm NSIS setup .exe (WiX has no ARM64 MSI)
 #
 # Every bundle carries the built web client and the content packs, as the
 # macOS app does; the compilers the lands use are the player's own, found on
-# PATH. Unsigned: the artifacts are for testing and for the release to pick up.
+# PATH. Unsigned. On a tag, the `release` job attaches every installer to that
+# tag's GitHub release (made by release.yml), under one naming scheme, and
+# adds them to its SHA256SUMS.
 
 name: Desktop
 
@@ -47,6 +50,10 @@ jobs:
           - name: linux-x86_64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
             bundles: deb,appimage
           - name: windows-x86_64
             os: windows-latest
@@ -111,3 +118,55 @@ jobs:
             desktop/target/${{ matrix.target }}/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14
+
+  # A tag's installers onto its release. release.yml makes the release; this
+  # waits for it, renames each file to CausewaybayHacker-Desktop-<version>-
+  # <arch>-<os>.<ext> (the macOS zip's scheme), uploads them, and rewrites
+  # SHA256SUMS to cover them too.
+  release:
+    name: Attach to the release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: built
+
+      - name: Name them
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          mkdir -p up
+          put() { src=$(find built -path "$1" -type f | head -1); [ -n "$src" ] && cp "$src" "up/$2"; }
+          put "*linux-x86_64*/*.deb"        "CausewaybayHacker-Desktop-$v-x86_64-linux.deb"
+          put "*linux-x86_64*/*.AppImage"   "CausewaybayHacker-Desktop-$v-x86_64-linux.AppImage"
+          put "*linux-arm64*/*.deb"         "CausewaybayHacker-Desktop-$v-arm64-linux.deb"
+          put "*linux-arm64*/*.AppImage"    "CausewaybayHacker-Desktop-$v-arm64-linux.AppImage"
+          put "*windows-x86_64*/*.exe"      "CausewaybayHacker-Desktop-$v-x86_64-windows-setup.exe"
+          put "*windows-x86_64*/*.msi"      "CausewaybayHacker-Desktop-$v-x86_64-windows.msi"
+          put "*windows-arm64*/*.exe"       "CausewaybayHacker-Desktop-$v-arm64-windows-setup.exe"
+          ls -l up
+
+      - name: Wait for the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 90); do
+            gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 && exit 0
+            sleep 20
+          done
+          echo "no release for $GITHUB_REF_NAME after 30 minutes" >&2
+          exit 1
+
+      - name: Upload, and cover them in SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" up/* -R "$GITHUB_REPOSITORY" --clobber
+          gh release download "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" -p SHA256SUMS -D sums || true
+          touch sums/SHA256SUMS
+          (cd up && sha256sum *) >> sums/SHA256SUMS
+          sort -u -k2 sums/SHA256SUMS -o sums/SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" sums/SHA256SUMS -R "$GITHUB_REPOSITORY" --clobber
