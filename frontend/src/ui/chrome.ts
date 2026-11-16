@@ -200,14 +200,23 @@ export function header(g: Ctx, app: App, title: string): void {
   const badge = Math.round(h * 0.56);
   const bx0 = Math.round(8 * s);
   const by0 = Math.round((h - badge) / 2);
-  const grad = g.createLinearGradient(bx0, by0, bx0 + badge, by0 + badge);
-  grad.addColorStop(0, "#F878A8");
-  grad.addColorStop(1, "#7C4CE0");
-  g.save();
-  g.fillStyle = grad;
-  roundRect(g, bx0, by0, badge, badge, Math.round(badge * 0.25));
-  g.fill();
-  g.restore();
+  // The Grok badge when it has arrived; a gradient tile until then.
+  const art = app.assets?.picture("ui_badge") ?? null;
+  if (art) {
+    g.save();
+    g.imageSmoothingEnabled = false;
+    g.drawImage(art, bx0, by0, badge, badge);
+    g.restore();
+  } else {
+    const grad = g.createLinearGradient(bx0, by0, bx0 + badge, by0 + badge);
+    grad.addColorStop(0, "#F878A8");
+    grad.addColorStop(1, "#7C4CE0");
+    g.save();
+    g.fillStyle = grad;
+    roundRect(g, bx0, by0, badge, badge, Math.round(badge * 0.25));
+    g.fill();
+    g.restore();
+  }
   const tx = bx0 + badge + Math.round(10 * s);
   clipped(g, 0, 0, Math.max(1, bx - Math.round(6 * s)), h, () => {
     g.save();
@@ -611,7 +620,15 @@ export function titledPanel(
   panel(g, x, y, w, h, face === Theme.paper ? [0.06, 0.09, 0.24, 0.9] : face);
   const f = font("stationSm");
   const barH = f.height + Math.round(f.size * 0.9);
-  fill(g, accent, x + 10, y + 8 + barH - 2, Math.min(w - 20, Math.max(40, width(f, title) + 8)), 2, 0.9);
+  fill(
+    g,
+    accent,
+    x + 10,
+    y + 8 + barH - 2,
+    Math.min(w - 20, Math.max(40, width(f, title) + 8)),
+    2,
+    0.9,
+  );
   g.fillStyle = css(accent);
   printf(g, f, title, x + 12, y + 8 + Math.round((barH - f.height) / 2), w - 24, "left");
   const inset = 8;

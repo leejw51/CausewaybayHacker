@@ -360,6 +360,22 @@ export class ResultScene implements Scene {
     const { layout } = this.app;
     this.app.clear(g, Theme.void);
     const ok = this.passed;
+    // A pass is shown over the harbour's fireworks, under dark glass so the
+    // panels read; a failure keeps the plain night.
+    const victory = ok
+      ? (this.app.assets?.picture("bg_victory", layout.isPortrait()) ?? null)
+      : null;
+    if (victory) {
+      const k = Math.max(layout.vw / victory.naturalWidth, layout.vh / victory.naturalHeight);
+      const vw = victory.naturalWidth * k;
+      const vh = victory.naturalHeight * k;
+      g.save();
+      g.imageSmoothingEnabled = false;
+      g.drawImage(victory, (layout.vw - vw) / 2, (layout.vh - vh) / 2, vw, vh);
+      g.restore();
+      g.fillStyle = "rgba(11,15,42,0.55)";
+      g.fillRect(0, 0, layout.vw, layout.vh);
+    }
     const accent = landColour(this.land);
     const s = layout.uiScale();
     const fonts = ensureFonts(s);

@@ -10,7 +10,17 @@
 import type { App, Scene } from "../app";
 import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
-import { btnBox, btnPad, clipped, fill, inRect, pixBtn, type Ctx, type Rect } from "../engine/ui";
+import {
+  btnBox,
+  btnPad,
+  clipped,
+  fill,
+  inRect,
+  pixBtn,
+  roundRect,
+  type Ctx,
+  type Rect,
+} from "../engine/ui";
 import {
   arriving,
   Buttons,
@@ -401,6 +411,17 @@ function noteBeside(
     ly += font.height;
   }
 }
+
+/** Each level's Grok icon (art/cat_*.png), for the level tiles. */
+const CAT_ICON: Partial<Record<string, string>> = {
+  cheatsheet: "cat_cheatsheet",
+  cheatsheet_advanced: "cat_cheatsheet",
+  verybasic: "cat_verybasic",
+  basic: "cat_basic",
+  advanced: "cat_advanced",
+  hacker: "cat_hacker",
+  frameworks: "cat_frameworks",
+};
 
 export class LandsScene implements Scene {
   readonly name = "lands";
@@ -1267,21 +1288,6 @@ export class LandsScene implements Scene {
             ? t("lands.empty")
             : `${c.cleared}/${c.total}  ★${c.stars}`;
       };
-      const countW = Math.max(0, ...cats.map((c) => width(fonts.stationSm, countText(c))));
-      const nameW = Math.max(
-        0,
-        ...cats.map((c) => width(fonts.button, t(`map.${c.category}` as "map.basic"))),
-      );
-      // A little wider than the words' column: the emblem's window starts at
-      // the gutter and fades in over its first fifty pixels, so the count
-      // may end a few pixels short of it where a sentence may not. At the
-      // design size "ADVANCED" plus "0/17  ★0" missed the words' column by
-      // nine pixels, which is the whole reason the rows disagreed.
-      const colTw = Math.max(
-        Math.round(120 * s),
-        Math.round((col.rows[0]?.[2] ?? right[2]) * 0.58) - Math.round(8 * s) - Math.round(16 * s),
-      );
-      const inlineAll = nameW + countW + Math.round(8 * s) <= colTw;
 
       cats.forEach((c, ci) => {
         // Where this road goes: one column, or two abreast on a short one.
@@ -1300,170 +1306,82 @@ export class LandsScene implements Scene {
         const rx = rowX + slide;
         const accent = landColour(this.land);
 
-        fill(g, empty ? Theme.dim : Theme.navy, rx, y, barW, rowH, empty ? 0.35 : 0.9);
-        // The two sheet roads lead the roads and are framed like the tile
-        // above them: the drill for the live coding test is the second main
-        // thing here.
+        // A level tile, as the redesign draws it: rounded glass, the level's
+        // Grok icon on the left, its name in the land's light, the count on
+        // the right and a progress bar along the foot. The sheet roads lead
+        // in gold; the one under the cursor lifts in the land's colour.
         const lead = isSheet(c.category) && !empty;
-        if (lead) {
-          fill(g, Theme.coin, rx, y, barW, rowH, 0.35 + 0.65 * lit);
-          fill(g, Theme.navy, rx + 2, y + 2, barW - 4, rowH - 4, 0.97);
+        const r = Math.round(9 * s);
+        g.save();
+        roundRect(g, rx, y + 1, barW, rowH - 2, r);
+        g.fillStyle = css([0.04, 0.06, 0.18, 1], empty ? 0.45 : 0.82);
+        g.fill();
+        if (lit > 0.01) {
+          g.fillStyle = css(accent, 0.14 * lit);
+          g.fill();
         }
-        // The lit face is the land's own colour at a whisper, so hovering GO
-        // and hovering RUST do not feel like the same screen.
-        if (lit > 0.01) fill(g, accent, rx, y, barW, rowH, 0.18 * lit);
-        // A thick bar down the leading edge, which is the thing that actually
-        // reads as "this row is under the cursor" at a glance.
-        fill(g, accent, rx, y, Math.round(4 * s), rowH, 0.35 + 0.65 * lit);
-        fill(g, empty ? Theme.dim : Theme.coin, rx, y + rowH - 3, barW, 3, empty ? 0.4 : 1);
-        // The cleared bar: the map's own progress, read straight off the server.
-        if (c.total > 0) {
-          fill(g, Theme.admit, rx, y + rowH - 3, Math.round((barW * c.cleared) / c.total), 3);
-        }
-
-        // The emblem band. DESIGN composed these 3:1 with a quiet left quarter
-        // and the pipeline then cropped to the ink, so the ink fills the cell:
-        // it is drawn from the manifest `box`, inset, and it owns the right of
-        // the row while the words own the left.
-        //
-        // **At its own aspect.** It used to take the scale from the row height
-        // and then clamp the *width* to 44% of the row with the height left
-        // alone, which is not a fit, it is a squash: `emblem_rust_basic`'s ink
-        // is 384x114 (3.37:1) and it was drawn at 322x145 (2.22:1) — 66% of its
-        // correct width, most visible on the tram, which came out tall and
-        // narrow instead of long and low.
-        //
-        // The fix is the one the LÖVE client arrived at on the same art rather
-        // than DESIGN's §2.4 (`k = min(bandH/inkH, 0.44*barW/inkW)`, a smaller
-        // emblem that fits inside 44%): the band is drawn at **row height**, in
-        // its own proportions, anchored to the right, and clipped to the column
-        // the words do not own — with a fade on its leading edge so a band
-        // wider than the room it has cuts into the row instead of ending in a
-        // vertical line. §2.4's version keeps the whole picture but shrinks it
-        // to about two thirds of the row's height, and these are 3:1 bands: the
-        // thing worth protecting is how tall the objects on them are, not how
-        // many of them are on screen. The words' column is a floor, so the
-        // blurb cannot be starved by an emblem that happens to be wide.
-        const art = this.app.assets?.picture(`emblem_${this.land}_${c.category}`);
-        const abox = this.app.assets?.box.get(`emblem_${this.land}_${c.category}`);
-        const gutter = Math.round(barW * 0.58);
-        let textW = barW;
-        if (art && !empty) {
-          const inset = Math.round(8 * s);
-          const bandH = rowH - inset * 2;
-          const inkW = abox ? abox.maxx - abox.minx : art.naturalWidth;
-          const inkH = abox ? abox.maxy - abox.miny : art.naturalHeight;
-          const winX = rx + gutter;
-          const winW = barW - gutter - inset;
-          // Row height, with a bound on how far the band may run past its own
-          // window. Unbounded it is right where the row is long and low — which
-          // is the landscape case, and it is what the LÖVE client sees — and
-          // wrong in a tall portrait row, where filling a 194px height with a
-          // 3.37:1 band means six hundred pixels of picture in a column two
-          // hundred and fifty wide and everything but the last object cropped
-          // away. `OVERHANG` is the most of itself a band may hide: past that
-          // it stops growing, keeps its proportions, and stands on the bottom
-          // of the row rather than filling it.
-          const k = Math.min(
-            bandH / Math.max(1, inkH),
-            (winW * EMBLEM_OVERHANG) / Math.max(1, inkW),
-          );
-          const bw = inkW * k;
-          const bh = inkH * k;
-          const bx = rx + barW - bw - inset;
-          const by = y + inset + (bandH - bh);
-          if (winW > Math.round(24 * s)) {
-            clipped(g, winX, y + inset, winW, bandH, () => {
-              g.save();
-              g.globalAlpha = 0.55 + 0.45 * lit;
-              if (abox) {
-                g.drawImage(art, abox.minx, abox.miny, inkW, inkH, bx, by, bw, bh);
-              } else {
-                g.drawImage(art, bx, by, bw, bh);
-              }
-              g.restore();
-              const fx = Math.max(bx, winX);
-              const fw = Math.min(Math.round(52 * s), Math.max(1, Math.round(bw * 0.35)));
-              const grad = g.createLinearGradient(fx, 0, fx + fw, 0);
-              grad.addColorStop(0, css(Theme.navy, 0.95));
-              grad.addColorStop(1, css(Theme.navy, 0));
-              g.fillStyle = grad;
-              g.fillRect(fx, by, fw, bh);
-            });
-          }
-          textW = gutter - inset;
-        }
-
-        const tx = rx + Math.round(14 * s);
-        const tw = Math.min(
-          barW - Math.round(20 * s),
-          Math.max(Math.round(120 * s), textW - Math.round(28 * s)),
+        g.strokeStyle = css(
+          lead ? Theme.coin : lit > 0.01 ? accent : Theme.cream,
+          lead ? 0.55 + 0.4 * lit : lit > 0.01 ? 0.4 + 0.5 * lit : 0.1,
         );
-        const lineH = fonts.small.height;
-        // Centred in a row cut down to its name, so the name is not stood on
-        // the row's bottom edge; and below the button face's height, said in
-        // the small one, elided, rather than over the road under it.
-        const nameFont =
-          rowH >= fonts.button.height + Math.round(4 * s) ? fonts.button : fonts.stationSm;
-        const titleY =
-          y + Math.max(0, Math.min(Math.round(12 * s), Math.round((rowH - nameFont.height) / 2)));
-        // The name and the count share a line only while both fit: "POKROČILÉ"
-        // ran into its "0/17" in Czech, so the count drops under the name
-        // when the two would touch.
+        g.lineWidth = lit > 0.01 ? 1.5 : 1;
+        roundRect(g, rx + 0.5, y + 1.5, barW - 1, rowH - 3, r);
+        g.stroke();
+        g.restore();
+
+        const pad = Math.round(8 * s);
+        const bw0 = (from: number) => Math.max(0, rx + barW - pad - from);
+        const icon = this.app.assets?.picture(CAT_ICON[c.category] ?? "cat_basic") ?? null;
+        const iconS = Math.max(0, Math.min(rowH - pad * 2, Math.round(40 * s)));
+        let tx = rx + pad;
+        if (icon && iconS >= Math.round(16 * s)) {
+          g.save();
+          g.imageSmoothingEnabled = false;
+          g.globalAlpha = empty ? 0.4 : 1;
+          g.drawImage(icon, tx, y + (rowH - iconS) / 2, iconS, iconS);
+          g.restore();
+          tx += iconS + pad;
+        }
         const catName = t(`map.${c.category}` as "map.basic");
         const count = countText(c);
-        // The count goes under the name when the two would touch — but only
-        // when the row is tall enough to hold a second line. In a short row
-        // (a phone held sideways, three roads and two buttons in four hundred
-        // pixels) there is no second line, and a count drawn into one is a
-        // count cut in half by the road underneath. The bar along the row
-        // still says how far along it is.
-        const twoLines = rowH >= fonts.button.height + fonts.stationSm.height + Math.round(20 * s);
-        const countBelow = !inlineAll && twoLines;
-        const showCount = inlineAll || twoLines;
+        const cw = width(fonts.stationSm, count);
+        const nameFont = fonts.stationSm;
+        const tw = Math.max(0, rx + barW - pad - tx - cw - pad);
+        const barH = Math.max(3, Math.round(5 * s));
+        // What the level is, in a line, when the tile is tall enough for it.
+        const blurb = rowH >= nameFont.height + fonts.small.height + barH + Math.round(22 * s);
+        const blockH =
+          nameFont.height + (blurb ? fonts.small.height : 0) + barH + Math.round(5 * s);
+        const midY = y + (rowH - blockH) / 2;
         g.fillStyle = css(empty ? Theme.dim : lead ? Theme.coin : Theme.cream);
-        printf(g, nameFont, elide(nameFont, catName, tw), tx, titleY, tw, "left");
-        // What the road is, from the bible. Only when the row is tall enough
-        // to hold it — in a short portrait window the count is what matters.
-        const lineY =
-          titleY +
-          fonts.button.height +
-          Math.round(6 * s) +
-          (countBelow ? fonts.stationSm.height : 0);
-        // Only the lines that fit inside the row. In portrait the text column
-        // is narrow and this wraps to four; a row that let the fourth spill
-        // over its own bottom edge was the first thing the eye found.
-        const fits = Math.floor((y + rowH - Math.round(10 * s) - lineY) / lineH);
-        if (fits >= 1) {
-          const all = wrap(fonts.small, CAT_LINE[c.category](), tw);
-          const use = all.slice(0, fits);
-          if (all.length > use.length && use.length > 0) {
-            use[use.length - 1] = use[use.length - 1].replace(/.{0,2}$/u, "…");
-          }
-          g.fillStyle = css(Theme.cream, empty ? 0.3 : 0.55 + 0.35 * lit);
-          let ly = lineY;
-          for (const line of use) {
-            printf(g, fonts.small, line, tx, ly, tw, "left");
-            ly += lineH;
-          }
-        }
-        // Under the title, not across the row: the right of the row belongs to
-        // the emblem now, and a count floating over it read as a caption for
-        // the picture rather than as the score for the road.
-        if (showCount) {
-          g.fillStyle = css(empty ? Theme.dim : Theme.coin);
+        printf(g, nameFont, elide(nameFont, catName.toUpperCase(), tw), tx, midY, tw, "left");
+        g.fillStyle = css(empty ? Theme.dim : Theme.coin, 0.9);
+        printf(g, fonts.stationSm, count, rx, midY, barW - pad, "right");
+        if (blurb) {
+          const line = CAT_LINE[c.category]();
+          g.fillStyle = css(Theme.cream, empty ? 0.3 : 0.6);
           printf(
             g,
-            fonts.stationSm,
-            count,
-            tx + Math.round(4 * s),
-            titleY + Math.round(2 * s) + (countBelow ? fonts.button.height + Math.round(2 * s) : 0),
-            // Inline, right-aligned in the shared column — the same right
-            // edge for every row, whether or not this one has an emblem.
-            countBelow ? tw : colTw,
-            countBelow ? "left" : "right",
+            fonts.small,
+            elide(fonts.small, line, bw0(tx)),
+            tx,
+            midY + nameFont.height,
+            bw0(tx),
+            "left",
           );
         }
+        const by = midY + nameFont.height + (blurb ? fonts.small.height : 0) + Math.round(4 * s);
+        const bw = rx + barW - pad - tx;
+        g.save();
+        roundRect(g, tx, by, bw, barH, barH / 2);
+        g.fillStyle = css([0.02, 0.03, 0.1, 1], 0.9);
+        g.fill();
+        if (c.total > 0 && c.cleared > 0) {
+          roundRect(g, tx, by, Math.max(barH, (bw * c.cleared) / c.total), barH, barH / 2);
+          g.fillStyle = css(c.cleared >= c.total ? Theme.admit : accent);
+          g.fill();
+        }
+        g.restore();
         // The chevron that says a row is a door. It only exists while the row
         // is lit, and it nudges with the same value the row slides on.
         if (lit > 0.02 && !empty) {
