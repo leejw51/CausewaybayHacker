@@ -492,6 +492,7 @@ export const en = {
   "pg.consoleCrash": "CRASH exit {code}: {msg}",
   "pg.consoleTimeout": "TIMEOUT: the program ran too long",
   "pg.consoleLimit": "OUTPUT LIMIT: the program printed too much",
+  "pg.back": "BACK",
   "pg.maps": "MAPS",
   "pg.rust": "RUST",
   "pg.go": "GO",

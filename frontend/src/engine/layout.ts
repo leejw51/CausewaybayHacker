@@ -16,6 +16,7 @@
  * the renderer are all computed from `vw`/`vh` rather than being constants.
  */
 import { Theme } from "./theme";
+import { setRoomy } from "./text";
 
 /** How far past the design size the canvas may grow before it letterboxes. */
 const MAX_STRETCH = 1.5;
@@ -307,6 +308,9 @@ export class Layout {
       this.canvas.width = ww;
       this.canvas.height = wh;
     }
+    // The type's register follows the real size of a virtual pixel: compact
+    // where there is room, the larger sizes on a phone (`setRoomy`).
+    setRoomy(this.cssScale >= 0.7);
     return changed;
   }
 

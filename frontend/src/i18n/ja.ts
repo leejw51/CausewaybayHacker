@@ -472,6 +472,7 @@ export const ja: Partial<Catalogue> = {
   "pg.consoleCrash": "異常終了 {code}: {msg}",
   "pg.consoleTimeout": "タイムアウト: 実行が長すぎます",
   "pg.consoleLimit": "出力上限: 出力が多すぎます",
+  "pg.back": "戻る",
   "pg.maps": "マップ",
   "pg.rust": "RUST",
   "pg.go": "GO",

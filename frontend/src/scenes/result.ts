@@ -457,7 +457,14 @@ export class ResultScene implements Scene {
       // Sized to the word, not to the column. The cloth between the sprite's
       // two tails is about two thirds of its width, so a banner cut to the
       // column leaves the word hanging off both ends of its own ribbon.
-      const rw = Math.min(left[2], width(wordFont, this.verdictWord()) / 0.6 + 24);
+      // And tall enough for it: a short Korean word made a narrow ribbon
+      // whose cloth was lower than the Hangul is tall, and the word stood
+      // out of it top and bottom.
+      const tallFor = wordFont.height * 2.1 * (ribbon.naturalWidth / ribbon.naturalHeight);
+      const rw = Math.min(
+        left[2],
+        Math.max(width(wordFont, this.verdictWord()) / 0.6 + 24, tallFor),
+      );
       const rh = (rw * ribbon.naturalHeight) / ribbon.naturalWidth;
       g.drawImage(ribbon, left[0] + (left[2] - rw) / 2, y + wordFont.height / 2 - rh / 2, rw, rh);
     }

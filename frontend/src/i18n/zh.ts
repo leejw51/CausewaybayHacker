@@ -460,6 +460,7 @@ export const zh: Partial<Catalogue> = {
   "pg.consoleCrash": "崩溃 退出码 {code}: {msg}",
   "pg.consoleTimeout": "超时: 运行时间过长",
   "pg.consoleLimit": "输出上限: 输出过多",
+  "pg.back": "返回",
   "pg.maps": "地图",
   "pg.rust": "RUST",
   "pg.go": "GO",

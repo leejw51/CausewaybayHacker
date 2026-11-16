@@ -473,6 +473,7 @@ export const ko: Partial<Catalogue> = {
   "pg.consoleCrash": "비정상 종료 {code}: {msg}",
   "pg.consoleTimeout": "시간 초과: 너무 오래 실행됨",
   "pg.consoleLimit": "출력 한도: 너무 많이 출력함",
+  "pg.back": "뒤로",
   "pg.maps": "지도",
   "pg.rust": "RUST",
   "pg.go": "GO",

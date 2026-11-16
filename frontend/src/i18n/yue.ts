@@ -475,6 +475,7 @@ export const yue: Partial<Catalogue> = {
   "pg.consoleCrash": "當機 退出碼 {code}: {msg}",
   "pg.consoleTimeout": "超時: 執行得太耐",
   "pg.consoleLimit": "輸出上限: 輸出太多",
+  "pg.back": "返回",
   "pg.maps": "地圖",
   "pg.rust": "RUST",
   "pg.go": "GO",
