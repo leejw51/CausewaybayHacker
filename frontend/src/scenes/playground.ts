@@ -3784,7 +3784,7 @@ export class PlaygroundScene implements Scene {
 
     // Combo.
     this.comboInRail = true;
-    const comboH = Math.round(104 * s);
+    const comboH = Math.round(84 * s);
     this.glass(g, [rx0, top, railW, comboH], s, Theme.pink, 0.4);
     const n = this.combo.count;
     const big = `x${n}`;
@@ -4865,7 +4865,6 @@ export class PlaygroundScene implements Scene {
       { id: "poster", label: t("pg.poster"), dim: this.postering },
       { id: "reader", label: t("pg.reader") },
       ...this.displayItems(),
-      { id: "back", label: t("pg.maps") },
     ];
   }
 
@@ -4900,6 +4899,9 @@ export class PlaygroundScene implements Scene {
     const rowH = box("M")[1];
 
     const core = [
+      // The way out, first and always on the bar: behind MORE it was a
+      // screen with no visible way back to the maps.
+      { id: "back", label: t("pg.maps") },
       {
         id: "run",
         label: this.stage === "idle" ? t("pg.run") : "…",
@@ -4958,6 +4960,17 @@ export class PlaygroundScene implements Scene {
       let cx = ix + lead;
       for (const item of core) {
         const [bw, bh] = box(item.label);
+        // RUN is the screen's one action: on a soft gold glow, so it is found
+        // first rather than between MAPS and the green AUTO-RUN.
+        if (item.id === "run") {
+          g.save();
+          g.shadowColor = css(Theme.coin, 0.55);
+          g.shadowBlur = Math.round(14 * s);
+          g.fillStyle = css(Theme.coin, 0.35);
+          roundRect(g, cx + 2, y + 3, bw - 4, bh - 6, Math.round(8 * s));
+          g.fill();
+          g.restore();
+        }
         this.buttons.add({ ...item, rect: [cx, y, bw, bh] });
         cx += bw + flowGap;
       }

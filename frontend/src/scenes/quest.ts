@@ -3030,6 +3030,9 @@ export class QuestScene implements Scene {
     // mode exists to escape.
     const steps = editControls(this.edit, this.editBusy || this.inTurn);
     const items = this.tools.filter([
+      // The way out of the quest, here too: DONE only returns to the quest
+      // page, and a writer who wants the map should not need two presses.
+      { id: "back", label: t("quest.backToMap") },
       {
         id: "run",
         label: this.stage === "idle" ? t("quest.run") : "…",
