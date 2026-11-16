@@ -78,7 +78,43 @@ function seeded(seed: number): () => number {
   };
 }
 
+/** An integer hash to 0..1. */
+function hash01(seed: number, i: number): number {
+  let h = (seed ^ Math.imul(i, 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/**
+ * Smooth value noise, -1..1: random heights at the integers, joined by a
+ * cosine — never periodic, never a corner.
+ */
+function noise(seed: number, x: number): number {
+  const i = Math.floor(x);
+  const f = x - i;
+  const k = (1 - Math.cos(Math.PI * f)) / 2;
+  const a = hash01(seed, i);
+  const b = hash01(seed, i + 1);
+  return (a + (b - a) * k) * 2 - 1;
+}
+
+/** Two octaves of it: big slow wanders with a little quicker detail. */
+function wander(seed: number, x: number): number {
+  return noise(seed, x) * 0.7 + noise(seed ^ 0x5bd1e995, x * 2.3) * 0.3;
+}
+
+/** Now and then a surge, 0..1: a smooth bump, rare and at no fixed time. */
+function surge(seed: number, t: number): number {
+  const n = noise(seed ^ 0x27d4eb2f, t * 0.45);
+  return Math.max(0, (n - 0.45) / 0.55) ** 2;
+}
+
 interface Layer {
+  /** Seeds for this layer's own noise. */
+  nf: number;
+  na: number;
+  nc: number;
   /** Cycles across the width, at rest. */
   f0: number;
   /** How far the frequency swings, 0..1, and how fast (Hz): the bandwidth. */
@@ -108,6 +144,9 @@ function layers(seed: number): Layer[] {
   const r = seeded(seed);
   const hueAt = r();
   const out: Layer[] = [0, 1, 2, 3].map((i) => ({
+    nf: (seed + i * 7919) >>> 0,
+    na: (seed + i * 104729 + 1) >>> 0,
+    nc: (seed + i * 1299709 + 2) >>> 0,
     f0: 1.4 + r() * 4.2,
     fDepth: 0.35 + r() * 0.5,
     fRate: 0.08 + r() * 0.3,
@@ -145,18 +184,35 @@ export function waveLine(
   s: number,
   seed = 0,
 ): void {
-  const amp = 16 * s;
+  const amp = 22 * s;
   const step = Math.max(2, 2.5 * s);
   const TAU = Math.PI * 2;
   const ls = layers(seed);
+  // Two packets of energy travelling the curve at their own speeds: where
+  // one passes, the curve stands up.
+  const pk = [0, 1].map((k) => {
+    const sp = 0.07 + hash01(seed, 40 + k) * 0.16;
+    const c = (((hash01(seed, 50 + k) + t * sp * (k === 0 ? 1 : -1)) % 1) + 1) % 1;
+    return { c, wid: 0.08 + hash01(seed, 60 + k) * 0.1 };
+  });
+  const burst = surge(seed, t);
   const yAt = (l: Layer, dx: number): number => {
     const u = dx / w;
-    const f = l.f0 * (1 + l.fDepth * Math.sin(TAU * l.fRate * t + l.phase));
-    const a =
-      l.amp * (1 - l.aDepth * 0.5 + l.aDepth * 0.5 * Math.cos(TAU * l.aRate * t + l.phase * 1.7));
-    const ph = TAU * (f * u - l.speed * t) + l.phase;
+    // The bandwidth wanders, not cycles: the frequency is scaled by
+    // e^(noise), about 0.4x to 3x, and a surge widens it further.
+    const f = l.f0 * Math.exp(1.0 * wander(l.nf, t * l.fRate * 4) + burst * 0.8);
+    const a = l.amp * Math.max(0.15, 0.75 + 0.55 * wander(l.na, t * l.aRate * 3) + burst * 0.6);
+    // A chirp: tighter at one end of the line than the other, which end
+    // and how much wandering too.
+    const chirp = wander(l.nc, t * 0.2) * 1.6;
+    const ph = TAU * (f * (u + chirp * u * u * 0.5) - l.speed * t) + l.phase;
     const y = Math.cos(ph) + l.over * Math.cos(ph * l.ratio + l.phase * 0.5);
-    return midY + (y / (1 + l.over)) * a * amp * Math.sin(u * Math.PI);
+    let env = Math.sin(u * Math.PI) * 0.45;
+    for (const p of pk) {
+      const dd = Math.min(Math.abs(u - p.c), 1 - Math.abs(u - p.c)) / p.wid;
+      env += Math.exp(-dd * dd) * 0.9 * Math.sin(u * Math.PI);
+    }
+    return midY + (y / (1 + l.over)) * a * amp * env;
   };
   g.save();
   g.lineCap = "round";
