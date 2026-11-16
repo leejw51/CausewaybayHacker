@@ -420,6 +420,38 @@ interface Fill {
  */
 const SHEET_STREAK = new Map<string, number>();
 
+export type QuestStep = "brief" | "pick" | "write" | "submit";
+
+const STEP_LABEL = {
+  brief: "quest.stepBrief",
+  pick: "quest.stepPick",
+  write: "quest.stepWrite",
+  submit: "quest.stepSubmit",
+} as const;
+
+/**
+ * The steps a quest walks through, and which one the player is on: BRIEF,
+ * PICK when it has a quiz, WRITE unless it is a cheatsheet (where the pick is
+ * the answer), SUBMIT. The brief is always behind them — it is read, not
+ * done — so the first live step is the one after it: PICK until the right
+ * line is chosen, then WRITE; SUBMIT while a run is out.
+ */
+export function questSteps(
+  hasQuiz: boolean,
+  sheet: boolean,
+  quizRight: boolean,
+  busy: boolean,
+): { steps: QuestStep[]; at: number } {
+  const steps: QuestStep[] = ["brief"];
+  if (hasQuiz) steps.push("pick");
+  if (!sheet) steps.push("write");
+  steps.push("submit");
+  let at = 1;
+  if (hasQuiz && quizRight && !sheet) at = 2;
+  if (busy) at = steps.length - 1;
+  return { steps, at };
+}
+
 export class QuestScene implements Scene {
   readonly name = "quest";
   readonly mood = "quest" as const;
@@ -3170,16 +3202,9 @@ export class QuestScene implements Scene {
     if (!q) return;
     const fonts = ensureFonts(s);
     const f = fonts.stationSm;
-    const sheet = this.cheatsheet();
-    const steps: string[] = [t("quest.stepBrief")];
-    if (q.quiz) steps.push(t("quest.stepPick"));
-    if (!sheet) steps.push(t("quest.stepWrite"));
-    steps.push(t("quest.stepSubmit"));
-    const busy = this.stage !== "idle";
-    let at = 1;
-    if (q.quiz && !this.quizRight) at = 1;
-    else if (!sheet) at = q.quiz ? 2 : 1;
-    if (busy) at = steps.length - 1;
+    const plan = questSteps(!!q.quiz, this.cheatsheet(), this.quizRight, this.stage !== "idle");
+    const steps = plan.steps.map((k) => t(STEP_LABEL[k]));
+    const at = plan.at;
     const pillH = f.height + Math.round(6 * s);
     const gap = Math.round(5 * s);
     const widths = steps.map((l, i) => width(f, `${i + 1} ${l}`) + Math.round(16 * s));

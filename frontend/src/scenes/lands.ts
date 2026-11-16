@@ -413,7 +413,7 @@ function noteBeside(
 }
 
 /** Each level's Grok icon (art/cat_*.png), for the level tiles. */
-const CAT_ICON: Partial<Record<string, string>> = {
+export const CAT_ICON: Partial<Record<string, string>> = {
   cheatsheet: "cat_cheatsheet",
   cheatsheet_advanced: "cat_cheatsheet",
   verybasic: "cat_verybasic",
