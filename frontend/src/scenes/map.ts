@@ -709,6 +709,9 @@ export class MapScene implements Scene {
     // was a stamp.
     if (phone) {
       return [
+        // The way back to every land, as a button: ESC does it, and a player
+        // who does not know that had MENU → MAPS, two presses, to find it.
+        { id: "lands", label: t("map.allMapsShort"), lit: false, group: 0 },
         { id: "menu", label: t("map.menu"), lit: false, group: 0 },
         ...roadsOf(this.land).map((c) => ({
           id: `cat:${c}`,
@@ -1045,7 +1048,8 @@ export class MapScene implements Scene {
       // On a phone MENU opens the sheet; everywhere else it is ALL MAPS.
       if (this.compact()) this.sheetOpen = true;
       else void this.app.go(new LandsScene(this.app), "back");
-    } else if (id === "close") this.sheetOpen = false;
+    } else if (id === "lands") void this.app.go(new LandsScene(this.app), "back");
+    else if (id === "close") this.sheetOpen = false;
     else if (id === "find") this.findEl.focus();
     else if (id === "auto") void this.autoSelect();
     else if (id === "zoom:in") this.zoomAt(1.5);

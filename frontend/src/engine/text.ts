@@ -827,15 +827,19 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   const spec = UI_FACE_SPEC[uiFace];
   const P = (n: number) => (spec.family ? Math.round(at(n) * spec.pixel) : at(snap8(n)));
   const B = (n: number) => (spec.family ? Math.round(at(n) * spec.body) : at(n));
+  // The redesign's sizes: every chrome role a step smaller than it was, so
+  // the interface stops crowding the content — the pixel face at 16 where
+  // it snapped to 24, the body face at 18, the toolbars at 19. The code
+  // roles are unchanged: the editor has its own A- / A+.
   fonts = {
-    title: make(P(40 * s), pixel),
-    subtitle: make(B(40 * s), body),
-    ui: make(P(20 * s), pixel),
-    small: make(B(30 * s), body),
+    title: make(P(32 * s), pixel),
+    subtitle: make(B(32 * s), body),
+    ui: make(P(16 * s), pixel),
+    small: make(B(24 * s), body),
     code: make(28 * s * faceScale, code, faceWeight),
     codeSm: make(22 * s * faceScale, code, faceWeight),
-    bubble: make(B(30 * s), body),
-    station: make(P(20 * s), pixel),
+    bubble: make(B(24 * s), body),
+    station: make(P(16 * s), pixel),
     // The small chrome face — panel titles, the footer key bar, captions, the
     // quest toolbar — is VT323 at 20 rather than Press Start 2P at 8, and the
     // swap is free: the two have the *same advance width* (8 virtual px), so
@@ -843,7 +847,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     // syllable goes 7.2 -> 18.1. Eight-pixel Press Start 2P was the least
     // readable thing in the game and the labels of the controls were written
     // in it.
-    stationSm: make(B(20 * s), body),
+    stationSm: make(B(18 * s), body),
     // 20 rather than 16: a control whose label you cannot read at arm's
     // length is not a control. Press Start 2P is on an eight-pixel grid, so
     // this lands on 16 or 24 depending on the scale rather than anywhere in
@@ -851,15 +855,15 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     // (`Buttons.row`, `rowsIn`) rather than by a fixed count.
     // Buttons in the body face, as the redesign draws them: Press Start 2P at
     // 20 made every button a headline and cut labels to "CHEATSHE…".
-    button: make(B(20 * s), body),
+    button: make(B(18 * s), body),
     stamp: make(P(24 * s), pixel),
-    help: make(B(32 * s), body),
+    help: make(B(26 * s), body),
     // The toolbars over the two code screens, at the code's own size and in
     // the interface's body face. **Not through the CJK floor**: the floor is
     // what put a Korean label at twice the height of the code under it, and
     // a band of twenty such labels was eating the screen it is the tools for.
     // Hangul at 22 is what the code pane already shows in its comments.
-    tool: make(22 * s * (spec.family ? spec.body : 1), body),
+    tool: make(19 * s * (spec.family ? spec.body : 1), body),
   };
   return fonts;
 }
