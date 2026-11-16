@@ -301,9 +301,8 @@ export class CompileFx {
         const r = Math.hypot(x - cx, y - cy);
         this.motes.push(this.mote("in", x, y, r, Math.atan2(y - cy, x - cx), d));
       }
-      this.ring(0, 1.0);
     }
-    if (this.busy && !busy && outcome) this.burst(outcome === "bad", cx, cy, d, calm);
+    if (this.busy && !busy && outcome) this.settle(outcome === "bad", cx, cy);
     this.busy = busy;
     const beat = (1 - Math.cos((this.t / PERIOD) * Math.PI * 2)) / 2;
 
@@ -323,7 +322,6 @@ export class CompileFx {
         m.lane = 0.7 + Math.random() * 0.6;
         this.motes.push(m);
       }
-      if (this.stageT % 0.9 < dt) this.ring(0, 1.2);
     }
 
     // Move.
@@ -458,10 +456,6 @@ export class CompileFx {
     };
   }
 
-  private ring(kind: number, life: number): void {
-    this.rings.push({ age: 0, life, kind });
-  }
-
   /** A mote let go: it flies off and fades as a spark (or falls as an ember). */
   private scatter(m: Mote, cx: number, cy: number, bad: boolean): void {
     m.mode = bad ? "ember" : "spark";
@@ -473,24 +467,13 @@ export class CompileFx {
     m.col = pick(bad ? EMBERS : SPARKS);
   }
 
-  private burst(bad: boolean, cx: number, cy: number, d: number, calm: number): void {
+  /**
+   * The run is over: no big bang, no burst, no ring — the motes let go and
+   * drift off fading, and the score says the rest. A failure leaves a
+   * faint red at the glass's edge, a hint and not an alarm.
+   */
+  private settle(bad: boolean, cx: number, cy: number): void {
     for (const m of this.motes) this.scatter(m, cx, cy, bad);
-    // Not a big bang: a handful of sparks — the score is the news.
-    const n = Math.round((bad ? 36 : 60) * calm);
-    for (let i = 0; i < n && this.motes.length < MAX; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = (bad ? 30 + Math.random() * 90 : 40 + Math.random() * 120) * d;
-      const m = this.mote(bad ? "ember" : "spark", cx, cy, 0, a, d);
-      m.vx = Math.cos(a) * sp;
-      m.vy = Math.sin(a) * sp * (bad ? 0.6 : 1);
-      m.life = 1.5 + Math.random() * 1.1;
-      m.size = (bad ? 1 + Math.random() * 2.4 : 2 + Math.random() * 3.2) * d;
-      m.col = pick(bad ? EMBERS : SPARKS);
-      this.motes.push(m);
-    }
-    this.ring(bad ? 2 : 1, 1.2);
-    // A red edge that is a hint, not an alarm; a clean run's core simply
-    // fades out as the particles drift away.
     if (bad) this.red = 0.5;
   }
 

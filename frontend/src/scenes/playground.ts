@@ -1154,7 +1154,7 @@ export class PlaygroundScene implements Scene {
     this.app.remeasure();
     // Warmed up, not booted: the banner is for picking a machine, and this
     // is a mode somebody toggles while they write.
-    this.retro?.power(CONSOLE_MACHINE, false);
+    this.retro?.power(CONSOLE_MACHINE, false, true);
   }
 
   /** Undo what `toggleZen` lent, if it lent anything. */
@@ -1164,7 +1164,7 @@ export class PlaygroundScene implements Scene {
     setComputer("normal");
     this.lentFace = null;
     this.app.remeasure();
-    this.retro?.power("normal", false);
+    this.retro?.power("normal", false, true);
   }
 
   /**
@@ -1389,7 +1389,9 @@ export class PlaygroundScene implements Scene {
   /** RUN was pressed: a ripple and a shockwave from the button. */
   private launched(): void {
     const at = this.buttonAt("run");
-    if (!at || this.fxLevel !== "full") return;
+    // Not in CONSOLE: its compile has its own quiet particles, and a ring
+    // of light across the whole screen there was a big bang.
+    if (!at || this.fxLevel !== "full" || this.zen) return;
     this.playfx?.launch(at[0], at[1], Theme.coin);
     this.fx?.play(shockPlan(at[0], at[1], 70, Theme.coin));
   }

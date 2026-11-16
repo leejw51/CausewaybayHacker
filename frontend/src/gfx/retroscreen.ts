@@ -436,17 +436,24 @@ export class RetroScreen {
    * which is for the moment the machine is picked; arriving at the screen
    * with one already picked only warms the tube up.
    */
-  power(next: Computer, boot: boolean): void {
+  power(next: Computer, boot: boolean, instant = false): void {
     if (!this.ok) return;
     if (next === "normal") {
-      if (this.machine && this.phase !== "off") this.go("cooling");
+      if (!this.machine || this.phase === "off") return;
+      // Instant: straight off, no cool-down — CONSOLE's own fade covers it.
+      if (instant) {
+        this.go("off");
+        this.machine = null;
+      } else this.go("cooling");
       return;
     }
     this.machine = next;
     this.alert = null;
     this.tune(TUBE[next]);
     this.booting = boot && !reducedMotion();
-    this.go(reducedMotion() ? "revealing" : "warming");
+    // Instant: straight on, no warm-up glow — CONSOLE's fade covers it, and
+    // a tube warming every time CONSOLE opened was a blink.
+    this.go(instant ? "on" : reducedMotion() ? "revealing" : "warming");
   }
 
   /** Put the machine's own error over the code for a few seconds. */
