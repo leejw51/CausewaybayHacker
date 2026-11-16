@@ -3249,7 +3249,7 @@ export class PlaygroundScene implements Scene {
     this.searchOverlay?.hide();
     if (this.zen) return this.drawZen(g, s);
     this.comboInRail = false;
-    if (!layout.isPortrait() && !(this.coder?.open ?? false)) return this.drawCodeWide(g, s);
+    if (!layout.isPortrait()) return this.drawCodeWide(g, s);
     this.menuIds = [];
     const fonts = ensureFonts(s);
     const f = fonts.tool;
@@ -3553,8 +3553,10 @@ export class PlaygroundScene implements Scene {
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
       { id: "save", label: this.dirty ? t("pg.saveDirty") : t("pg.save") },
-      { id: "undo", label: "↶", dim: !this.editor?.canUndo },
-      { id: "redo", label: "↷", dim: !this.editor?.canRedo },
+      // Words, not ↶ ↷: those glyphs are in no face on an iPad and the
+      // buttons came out blank.
+      { id: "undo", label: t("quest.undo"), dim: !this.editor?.canUndo },
+      { id: "redo", label: t("quest.redo"), dim: !this.editor?.canRedo },
       { id: "console", label: t("pg.console") },
       { id: "agent", label: `✦ ${t("agent.button")}`, strong: this.coder?.open ?? false },
     ];
@@ -3774,6 +3776,27 @@ export class PlaygroundScene implements Scene {
       this.stdinOverlay?.hide();
       this.outputRect = [0, 0, 0, 0];
     }
+    // The agent open: its panel takes the right of the window in place of
+    // the rail, and the editor keeps the rest. (It used to drop CODE back
+    // to the old toolbar, every button of the bench in one long band.)
+    const agentOpen = this.coder?.open ?? false;
+    if (agentOpen) {
+      const panelW = Math.max(Math.round(320 * s), Math.round(vw * 0.36));
+      const px = vw - pad - panelW;
+      const er = this.screen(g, [pad, top, px - pad * 2, bottom - top]);
+      this.editorRect = er;
+      if (this.editor) {
+        this.overlay?.place(er, fonts.codeSm.size * this.codeMul);
+        this.retro?.place(er);
+      } else this.overlay?.hide();
+      this.coder?.fly([0, 0, vw, vh]);
+      this.coder?.drawPanel(g, [px, top, panelW, bottom - top], s);
+      this.comboInRail = true;
+      this.menuIds = more.map((m) => m.id);
+      if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
+      return;
+    }
+    this.coder?.panel.hideFields();
     const editorRect = this.screen(g, [pad, top, rx0 - pad * 2, bottom - top]);
     this.editorRect = editorRect;
     if (this.editor) {
@@ -3847,36 +3870,50 @@ export class PlaygroundScene implements Scene {
 
     // MORE, open: down the rail and over it, on the canvas.
     this.menuIds = more.map((m) => m.id);
-    if (this.moreOpen && !filtering) {
-      const mp = Math.round(6 * s);
-      const step = rowH + fg;
-      const itemW = Math.max(...more.map((m) => box(m.label)[0]));
-      const room = Math.max(1, Math.floor((sy - barH - mp * 3) / step));
-      const cols = Math.ceil(more.length / room);
-      const perCol = Math.ceil(more.length / cols);
-      const pw = cols * itemW + (cols - 1) * fg + mp * 2;
-      const ph = perCol * step - fg + mp * 2;
-      const px = vw - pad - pw;
-      const py = barH + Math.round(2 * s);
-      g.save();
-      g.shadowColor = "rgba(0,0,0,0.6)";
-      g.shadowBlur = Math.round(16 * s);
-      g.fillStyle = css(Theme.void, 0.97);
-      roundRect(g, px, py, pw, ph, Math.round(8 * s));
-      g.fill();
-      g.restore();
-      g.strokeStyle = css(Theme.cyan, 0.35);
-      roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
-      g.stroke();
-      more.forEach((item, i) => {
-        const c = Math.floor(i / perCol);
-        const rr = i % perCol;
-        this.buttons.add({
-          ...item,
-          rect: [px + mp + c * (itemW + fg), py + mp + rr * step, itemW, rowH],
-        });
+    if (this.moreOpen && !filtering) this.drawCodeMore(g, s, more, rowH, fg, barH, sy, pad);
+  }
+  /** CODE's MORE, open: a column of its buttons down the right, over the rail. */
+  private drawCodeMore(
+    g: Ctx,
+    s: number,
+    more: Array<{ id: string; label: string; dim?: boolean; strong?: boolean }>,
+    rowH: number,
+    fg: number,
+    barH: number,
+    sy: number,
+    pad: number,
+  ): void {
+    const { vw } = this.app.layout;
+    const f = ensureFonts(s).tool;
+    const box = (l: string) => btnBox(f, [l], 0, btnPad(f), this.app.layout.minTouchH());
+    const mp = Math.round(6 * s);
+    const step = rowH + fg;
+    const itemW = Math.max(...more.map((m) => box(m.label)[0]));
+    const room = Math.max(1, Math.floor((sy - barH - mp * 3) / step));
+    const cols = Math.ceil(more.length / room);
+    const perCol = Math.ceil(more.length / cols);
+    const pw = cols * itemW + (cols - 1) * fg + mp * 2;
+    const ph = perCol * step - fg + mp * 2;
+    const px = vw - pad - pw;
+    const py = barH + Math.round(2 * s);
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.6)";
+    g.shadowBlur = Math.round(16 * s);
+    g.fillStyle = css(Theme.void, 0.97);
+    roundRect(g, px, py, pw, ph, Math.round(8 * s));
+    g.fill();
+    g.restore();
+    g.strokeStyle = css(Theme.cyan, 0.35);
+    roundRect(g, px + 0.5, py + 0.5, pw - 1, ph - 1, Math.round(8 * s));
+    g.stroke();
+    more.forEach((item, i) => {
+      const c = Math.floor(i / perCol);
+      const rr = i % perCol;
+      this.buttons.add({
+        ...item,
+        rect: [px + mp + c * (itemW + fg), py + mp + rr * step, itemW, rowH],
       });
-    }
+    });
   }
 
   /**
@@ -4598,27 +4635,8 @@ export class PlaygroundScene implements Scene {
         cx += width(sm, xpText) + pad * 1.5;
       }
     }
-    const streakText = t("pg.hudStreak", { n: this.dayStreak });
-    if (this.dayStreak > 0 && cx + Math.round(16 * s) + width(sm, streakText) <= limit) {
-      // A small flame, drawn: two drops, orange round gold.
-      const fh = Math.round(16 * s);
-      const fx = cx + fh * 0.4;
-      const drop = (r: number, col: RGBA) => {
-        g.fillStyle = css(col);
-        g.beginPath();
-        g.moveTo(fx, mid - r);
-        g.quadraticCurveTo(fx + r * 0.75, mid, fx, mid + r * 0.6);
-        g.quadraticCurveTo(fx - r * 0.75, mid, fx, mid - r);
-        g.fill();
-      };
-      drop(fh / 2, [0.97, 0.6, 0.22, 1]);
-      drop(fh / 3.2, Theme.coin);
-      cx += fh;
-      const st = streakText;
-      g.fillStyle = css([0.97, 0.6, 0.22, 1]);
-      printf(g, sm, st, cx, inkCentreY(sm, st, y, h), w, "left");
-      cx += width(sm, st) + pad;
-    }
+    // The streak is not on the bar: it is in TODAY'S GOALS and CONSOLE's
+    // session card, and here it was one more thing crowding the file name.
 
     // From the right: LOG OUT, the wallet, the file.
     let rx = x + w - pad;
