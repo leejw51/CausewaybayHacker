@@ -10,7 +10,7 @@
  */
 import { css, Theme, TRACK_COL, type RGBA } from "../engine/theme";
 import type { Land } from "../net/protocol";
-import { bodyFontAt, ensureFonts, font, printf, width, type Font } from "../engine/text";
+import { bodyFontAt, cjkFloor, ensureFonts, font, printf, width, type Font } from "../engine/text";
 import {
   btnBox,
   btnPad,
@@ -665,7 +665,9 @@ export function keyRows(
   let dy = y;
   for (const [k, v] of rows) {
     printf(g, f, k, x, dy, off, "left");
-    dy += printf(g, f, v, x + off, dy, limit - off, "left") * f.height;
+    // A CJK line inks taller than its nominal height; give it the room.
+    dy +=
+      printf(g, f, v, x + off, dy, limit - off, "left") * f.height * (cjkFloor() > 0 ? 1.25 : 1);
   }
   return dy - y;
 }

@@ -8,7 +8,7 @@
  * later would otherwise read as the game growing a new limb.
  */
 import type { App, Scene } from "../app";
-import { elide, ensureFonts, printf, width, wrap } from "../engine/text";
+import { cjkFloor, elide, ensureFonts, printf, width, wrap } from "../engine/text";
 import { css, Theme } from "../engine/theme";
 import {
   btnBox,
@@ -43,7 +43,9 @@ import {
 } from "../net/protocol";
 import { MapScene } from "./map";
 import { PlaygroundScene } from "./playground";
-import { LOCALES, locale, nextLocale, setLocale, t } from "../i18n";
+import { LOCALES, locale, setLocale, t } from "../i18n";
+import { CODE_THEME_KEY, getCodeTheme, nextCodeTheme, setCodeTheme } from "../ui/codetheme";
+import { writePref } from "../ui/prefs";
 
 type Lands = Responses["world.lands"]["lands"];
 
@@ -440,6 +442,8 @@ export class LandsScene implements Scene {
   /** Replaces the AUTO SELECT hint while it is working, or when there is
    *  nothing to send them to. Cleared on the next click. */
   private autoNote: string | null = null;
+  /** The language list, dropped open above the settings row. */
+  private langOpen = false;
   private autoBusy = false;
   /**
    * How lit each row is, 0..1, eased per frame rather than switched.
@@ -910,6 +914,7 @@ export class LandsScene implements Scene {
     }
     if (phase !== "down") return;
     const hit = this.landBtns.hit(x, y) ?? this.catBtns.hit(x, y);
+    if (!hit || (hit.id !== "lang" && !hit.id.startsWith("locale:"))) this.langOpen = false;
     if (hit) this.press(hit.id);
   }
 
@@ -928,8 +933,30 @@ export class LandsScene implements Scene {
       void this.app.go(new PlaygroundScene(this.app), "forward");
       return;
     }
+    // The settings row: each of these used to be a function key only (F7,
+    // F1) or not on this screen at all, and a key is not a control.
     if (id === "lang") {
-      void setLocale(nextLocale());
+      this.langOpen = !this.langOpen;
+      this.app.chip.blip();
+      return;
+    }
+    if (id.startsWith("locale:")) {
+      this.langOpen = false;
+      void setLocale(id.slice(7) as ReturnType<typeof locale>);
+      this.app.chip.select();
+      return;
+    }
+    if (id === "orient") {
+      this.app.cycleOrientation();
+      this.app.chip.blip();
+      return;
+    }
+    if (id === "theme") {
+      const next = nextCodeTheme();
+      setCodeTheme(next);
+      writePref(CODE_THEME_KEY, next);
+      this.app.remeasure();
+      this.app.chip.blip();
       return;
     }
     if (id.startsWith("cat:")) {
@@ -1363,13 +1390,19 @@ export class LandsScene implements Scene {
         const tw = Math.max(0, rx + barW - pad - tx);
         const barH = Math.max(3, Math.round(5 * s));
         // What the level is, in a line, when the tile is tall enough for it.
-        const blurb = rowH >= nameFont.height + fonts.small.height + barH + Math.round(22 * s);
+        // A CJK line inks taller than its nominal height (the fallback face's
+        // ascent), so the room it needs is measured with a margin, and the
+        // whole block is never set above the tile's own top edge.
+        const lineRoom = (h: number) => Math.round(h * (cjkFloor() > 0 ? 1.35 : 1.1));
+        const blurb =
+          rowH >=
+          lineRoom(nameFont.height) + lineRoom(fonts.small.height) + barH + Math.round(16 * s);
         const blockH =
           nameFont.height +
           (blurb ? fonts.small.height : 0) +
           Math.max(barH, fonts.stationSm.height) +
           Math.round(5 * s);
-        const midY = y + (rowH - blockH) / 2;
+        const midY = Math.max(y + Math.round(4 * s), y + (rowH - blockH) / 2);
         g.fillStyle = css(empty ? Theme.dim : lead ? Theme.coin : Theme.cream);
         printf(g, nameFont, elide(nameFont, catName.toUpperCase(), tw), tx, midY, tw, "left");
         if (blurb) {
@@ -1448,15 +1481,28 @@ export class LandsScene implements Scene {
       // the login card's button, on the screen a player comes back to
       // between every map. Sized to the widest language name so it does not
       // change width as it cycles, and capped so AUTO SELECT keeps its own.
-      const langLabel = LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH";
-      const [lwRaw] = btnBox(
-        fonts.button,
-        LOCALES.map((l) => l.label),
-        0,
-        btnPad(fonts.button),
-        layout.minTouchH(),
+      // AUTO SELECT, then the settings row: the language (a list, not a
+      // cycle), the screen's orientation and the code theme, each saying the
+      // state it is in.
+      const langLabel = `${LOCALES.find((l) => l.id === locale())?.label ?? "ENGLISH"} ${this.langOpen ? "▴" : "▾"}`;
+      const choice = layout.choice;
+      const orientLabel =
+        choice === null
+          ? t("pg.orientAuto")
+          : choice === "portrait"
+            ? t("pg.orientPort")
+            : t("pg.orientLand");
+      const themeLabel = t(getCodeTheme() === "light" ? "code.themeLight" : "code.themeDark");
+      const sgap = Math.round(6 * s);
+      const settings = [
+        { id: "lang", label: langLabel },
+        { id: "orient", label: orientLabel },
+        { id: "theme", label: themeLabel },
+      ];
+      const sw = settings.map(
+        (b) => btnBox(fonts.button, [b.label], 0, btnPad(fonts.button), layout.minTouchH())[0],
       );
-      const lw = Math.min(lwRaw, Math.round(right[2] * 0.36));
+      const lw = sw.reduce((a, b) => a + b + sgap, 0);
       const [aw] = btnBox(
         fonts.button,
         [t("lands.autoSelect")],
@@ -1464,7 +1510,7 @@ export class LandsScene implements Scene {
         btnPad(fonts.button),
         layout.minTouchH(),
       );
-      const abw = Math.max(aw, Math.round(right[2] * 0.4));
+      const abw = Math.min(Math.max(aw, Math.round(right[2] * 0.3)), right[2] - lw);
       const aby = col.buttons[1];
       const ahov = this.landBtns.hovered === "auto";
       pixBtn(g, fonts.button, right[0], aby, abw, playH, t("lands.autoSelect"), {
@@ -1474,7 +1520,7 @@ export class LandsScene implements Scene {
       // Only where it has room to be a sentence: squeezed between the two
       // buttons it was "next / uncle…", which said nothing.
       const noteW = right[2] - abw - lw - gap - Math.round(24 * s);
-      if (noteW >= Math.round(180 * s))
+      if (noteW >= Math.round(260 * s))
         noteBeside(
           g,
           fonts.small,
@@ -1489,10 +1535,52 @@ export class LandsScene implements Scene {
         rect: [right[0], aby, abw, playH],
         label: t("lands.autoSelect"),
       });
-      const lbx = right[0] + right[2] - lw;
-      const lhov = this.landBtns.hovered === "lang";
-      pixBtn(g, fonts.button, lbx, aby, lw, playH, langLabel, { hover: lhov, quiet: !lhov });
-      this.landBtns.add({ id: "lang", rect: [lbx, aby, lw, playH], label: langLabel });
+      let sx = right[0] + right[2] - lw + sgap;
+      settings.forEach((b, i) => {
+        const hov = this.landBtns.hovered === b.id;
+        const lit = b.id === "lang" && this.langOpen;
+        pixBtn(g, fonts.button, sx, aby, sw[i], playH, b.label, {
+          hover: hov,
+          quiet: !hov && !lit,
+          lit,
+        });
+        this.landBtns.add({ id: b.id, rect: [sx, aby, sw[i], playH], label: b.label });
+        sx += sw[i] + sgap;
+      });
+      // The language list, open: six names in their own scripts, dropped up
+      // over the panel, the one in use lit. Ahead of the level tiles in the
+      // hit order (landBtns is asked first), so it takes the press.
+      if (this.langOpen) {
+        const lbx = right[0] + right[2] - lw + sgap;
+        const iw = Math.max(
+          sw[0],
+          ...LOCALES.map(
+            (l) => btnBox(fonts.button, [l.label], 0, btnPad(fonts.button), layout.minTouchH())[0],
+          ),
+        );
+        const step = playH + sgap;
+        const pad = Math.round(6 * s);
+        const ph = LOCALES.length * step - sgap + pad * 2;
+        const py = aby - sgap - ph;
+        g.save();
+        g.shadowColor = "rgba(0,0,0,0.6)";
+        g.shadowBlur = Math.round(16 * s);
+        g.fillStyle = css(Theme.void, 0.97);
+        roundRect(g, lbx, py, iw + pad * 2, ph, Math.round(8 * s));
+        g.fill();
+        g.restore();
+        LOCALES.forEach((l, i) => {
+          const id = `locale:${l.id}`;
+          const by = py + pad + i * step;
+          const on = l.id === locale();
+          const hov = this.landBtns.hovered === id;
+          pixBtn(g, fonts.button, lbx + pad, by, iw, playH, l.label, {
+            lit: on || hov,
+            quiet: !on && !hov,
+          });
+          this.landBtns.add({ id, rect: [lbx + pad, by, iw, playH], label: l.label });
+        });
+      }
 
       if (this.error) {
         g.fillStyle = css(Theme.red);

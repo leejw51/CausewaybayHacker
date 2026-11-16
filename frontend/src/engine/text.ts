@@ -717,7 +717,10 @@ function snap8(n: number): number {
  * in two or three glyphs what English says in eight characters, so a 24px
  * Korean button label is still narrower than its 16px English original.
  */
-const CJK_FLOOR = 24;
+// The redesign's smaller interface took the Latin roles to 16–19; at 24 the
+// floor then made every Korean label half again the size of its English one
+// and the screen read as shouting. 18 is the body face's own new size.
+const CJK_FLOOR = 18;
 
 /** Virtual px of the floor, or 0 when the active language is a Latin one. */
 let floorPx = 0;
@@ -728,7 +731,35 @@ let floorPx = 0;
  * that needs the floor.
  */
 export function setCjkFloor(on: boolean): void {
-  const px = on ? CJK_FLOOR : 0;
+  cjkOn = on;
+  applyFloor();
+}
+
+/** Whether a CJK language is on; the floor's size also depends on `roomy`. */
+let cjkOn = false;
+
+/**
+ * Whether the screen is roomy: a virtual pixel is at least 0.7 of a CSS
+ * pixel, a desktop or a tablet. On a phone the whole 720-wide canvas is
+ * squeezed into four hundred CSS pixels and the redesign's compact sizes
+ * came out at eight or nine real pixels, unreadable — so there the interface
+ * keeps the larger sizes it had, and CJK its floor of 24. Set by `Layout`.
+ */
+let roomy = true;
+export function setRoomy(on: boolean): void {
+  if (on === roomy) return;
+  roomy = on;
+  applyFloor();
+  remeasure();
+}
+
+/** How much larger the chrome roles are drawn on a cramped screen. */
+function crampedK(): number {
+  return roomy ? 1 : 1.25;
+}
+
+function applyFloor(): void {
+  const px = cjkOn ? (roomy ? CJK_FLOOR : 24) : 0;
   if (px === floorPx) return;
   floorPx = px;
   remeasure();
@@ -803,7 +834,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   // The active CJK family is part of the key. Without it, switching language
   // hands back the record built for the previous one and every Korean string
   // on screen is measured — and drawn — in a stack that cannot render it.
-  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}\n${codeFace}\n${uiFace}`;
+  const key = `${Math.round(s * 100)}\n${cjk}\n${floorPx}\n${codeFace}\n${uiFace}\n${roomy}`;
   if (key === scaleKey && fonts) return fonts;
   scaleKey = key;
   widths = new Map();
@@ -825,8 +856,16 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
   // game's own pair keeps Press Start 2P's eight-pixel grid; the others are
   // set at their measured multiple of it (`UI_FACE_SPEC`), whole pixels.
   const spec = UI_FACE_SPEC[uiFace];
-  const P = (n: number) => (spec.family ? Math.round(at(n) * spec.pixel) : at(snap8(n)));
-  const B = (n: number) => (spec.family ? Math.round(at(n) * spec.body) : at(n));
+  const P = (n: number) => {
+    const m = n * crampedK();
+    return spec.family ? Math.round(at(m) * spec.pixel) : at(snap8(m));
+  };
+  // A Hangul, kana or hanzi glyph at a given size fills its em box; VT323's
+  // Latin capitals fill about half of theirs. So a CJK label at the Latin
+  // size reads as half again bigger — the body face's roles come down by a
+  // fifth while a CJK language is on (never below the floor).
+  const cj = (floorPx > 0 ? 0.82 : 1) * crampedK();
+  const B = (n: number) => (spec.family ? Math.round(at(n * cj) * spec.body) : at(n * cj));
   // The redesign's sizes: every chrome role a step smaller than it was, so
   // the interface stops crowding the content — the pixel face at 16 where
   // it snapped to 24, the body face at 18, the toolbars at 19. The code
@@ -863,7 +902,7 @@ export function ensureFonts(scale: number): Record<FontName, Font> {
     // what put a Korean label at twice the height of the code under it, and
     // a band of twenty such labels was eating the screen it is the tools for.
     // Hangul at 22 is what the code pane already shows in its comments.
-    tool: make(19 * s * (spec.family ? spec.body : 1), body),
+    tool: make(19 * s * cj * (spec.family ? spec.body : 1), body),
   };
   return fonts;
 }

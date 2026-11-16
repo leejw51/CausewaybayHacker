@@ -4224,6 +4224,9 @@ export class PlaygroundScene implements Scene {
     // until the editor has its share, last-listed first. Nothing is lost:
     // CODE carries the display toggles and is one tap away, and ESC is MAPS.
     const core = [
+      // The way back, never dropped: on a phone the optional buttons go
+      // first when the bench is crowded, and the way out must not be one.
+      { id: "back", label: t("pg.maps") },
       {
         id: "run",
         label: this.stage === "idle" ? t("pg.run") : "…",
@@ -4250,7 +4253,6 @@ export class PlaygroundScene implements Scene {
       { id: "poster", label: t("pg.poster"), dim: this.postering },
       { id: "reader", label: t("pg.reader") },
       ...this.displayItems(),
-      { id: "back", label: t("pg.maps") },
     ];
     // Five code lines. Below that the editor is a label rather than a place
     // to write, and the bench is better off one button shorter.
@@ -4486,6 +4488,38 @@ export class PlaygroundScene implements Scene {
     const pad = Math.round(10 * s);
     const mid = y + h / 2;
     let cx = x + pad;
+
+    // BACK, first thing on the bar and drawn as one: an arrow and the word,
+    // on a pill. MAPS in the toolbar was the same door and nobody read it as
+    // the way out; ESC was the only other, and nobody is told about ESC.
+    {
+      const label = t("pg.back");
+      const bh = Math.max(this.app.layout.minTouchH(), sm.height + Math.round(10 * s));
+      const aw = Math.round(10 * s);
+      const bw = width(sm, label) + aw + Math.round(26 * s);
+      const by = mid - bh / 2;
+      const hot = this.buttons.hovered === "back";
+      g.save();
+      roundRect(g, cx, by, bw, bh, bh / 2);
+      g.fillStyle = css(hot ? Theme.coin : [0.16, 0.2, 0.46, 1]);
+      g.fill();
+      g.strokeStyle = css(Theme.cream, hot ? 0.6 : 0.25);
+      g.lineWidth = 1;
+      roundRect(g, cx + 0.5, by + 0.5, bw - 1, bh - 1, bh / 2);
+      g.stroke();
+      const ax = cx + Math.round(12 * s);
+      g.fillStyle = css(hot ? Theme.ink : Theme.cream);
+      g.beginPath();
+      g.moveTo(ax, mid);
+      g.lineTo(ax + aw, mid - aw * 0.75);
+      g.lineTo(ax + aw, mid + aw * 0.75);
+      g.closePath();
+      g.fill();
+      printf(g, sm, label, ax + aw + Math.round(6 * s), inkCentreY(sm, label, by, bh), bw, "left");
+      g.restore();
+      this.buttons.add({ id: "back", label, rect: [cx, by, bw, bh], painted: true });
+      cx += bw + pad;
+    }
 
     const lg = Math.round(28 * s);
     const ly = mid - lg / 2;
@@ -4899,9 +4933,6 @@ export class PlaygroundScene implements Scene {
     const rowH = box("M")[1];
 
     const core = [
-      // The way out, first and always on the bar: behind MORE it was a
-      // screen with no visible way back to the maps.
-      { id: "back", label: t("pg.maps") },
       {
         id: "run",
         label: this.stage === "idle" ? t("pg.run") : "…",

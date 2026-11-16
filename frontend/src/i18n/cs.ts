@@ -491,6 +491,7 @@ export const cs: Partial<Catalogue> = {
   "pg.consoleCrash": "PÁD kód {code}: {msg}",
   "pg.consoleTimeout": "ČASOVÝ LIMIT: program běžel příliš dlouho",
   "pg.consoleLimit": "LIMIT VÝSTUPU: program vypsal příliš mnoho",
+  "pg.back": "ZPĚT",
   "pg.maps": "MAPY",
   "pg.rust": "RUST",
   "pg.go": "GO",
