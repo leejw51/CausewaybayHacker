@@ -8,6 +8,7 @@
  * and what makes logging out a matter of dropping two references rather than
  * hunting for caches.
  */
+import { cubicBezier } from "motion";
 import { Layout, type Orientation } from "./engine/layout";
 import { Input, loveKey } from "./engine/input";
 import { Assets } from "./engine/assets";
@@ -143,6 +144,13 @@ export type Direction = "forward" | "back" | "none";
  * a 16-bit game does when you step into a door, and the map's nodes are doors.
  */
 type TransitionKind = "slide" | "iris";
+
+/** A screen change's travel: iOS's own push curve, fast out and a long settle. */
+const SCENE_EASE = cubicBezier(0.32, 0.72, 0, 1);
+/** The old screen going: an exponential ease-in. */
+const FADE_OUT = cubicBezier(0.7, 0, 0.84, 0);
+/** The new one arriving: an exponential ease-out. */
+const FADE_IN = cubicBezier(0.16, 1, 0.3, 1);
 
 interface Modal {
   title: string;
@@ -515,12 +523,17 @@ export class App {
       const shown = this.mapLayerScene;
       shown?.draw(g);
     } else if (this.transition && this.outgoing) {
-      // Both screens travel on the same expo curve, so the pair moves as one
-      // object rather than as two things that happen to be sliding.
-      const t = this.transition.inOut;
+      // iOS's push, on motion.dev's curves: the old screen fades out as it
+      // drifts a quarter of the way aside and sinks back a little; the new
+      // one fades in from a short way off and settles. Driven by the game's
+      // own clock (`tick`), so a capture at a fixed step stays repeatable.
+      const raw = this.transition.raw;
+      const t = SCENE_EASE(raw);
       const away = this.direction === "back" ? layout.vw : -layout.vw;
-      this.drawShifted(this.outgoing, away * t);
-      this.drawShifted(this.scene, -away * (1 - t));
+      const outA = 1 - FADE_OUT(Math.min(1, raw * 1.6));
+      const inA = FADE_IN(Math.max(0, (raw - 0.12) / 0.88));
+      this.drawShifted(this.outgoing, away * 0.25 * t, outA, 1 - 0.04 * t);
+      this.drawShifted(this.scene, -away * 0.3 * (1 - t), inA, 0.97 + 0.03 * t);
     } else {
       this.scene?.draw(g);
     }
@@ -691,11 +704,15 @@ export class App {
     g.restore();
   }
 
-  private drawShifted(scene: Scene | null, dx: number): void {
-    if (!scene) return;
+  private drawShifted(scene: Scene | null, dx: number, alpha = 1, k = 1): void {
+    if (!scene || alpha <= 0.002) return;
     const g = this.g;
+    const { vw, vh } = this.layout;
     g.save();
-    g.translate(Math.round(dx), 0);
+    g.globalAlpha *= alpha;
+    g.translate(Math.round(dx) + vw / 2, vh / 2);
+    g.scale(k, k);
+    g.translate(-vw / 2, -vh / 2);
     scene.draw(g);
     g.restore();
   }
