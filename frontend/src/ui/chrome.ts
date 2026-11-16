@@ -19,6 +19,10 @@ import {
   inRect,
   panel,
   pixBtn,
+  roundBox,
+  roundBtn,
+  roundGap,
+  roundPad,
   shadowText,
   star,
   type Ctx,
@@ -314,6 +318,9 @@ export class Buttons {
   private readonly items: Button[] = [];
   hovered: string | null = null;
 
+  /** `round`: compact rounded buttons (`roundBtn`) rather than pixel ones. */
+  constructor(readonly round = false) {}
+
   reset(): void {
     this.items.length = 0;
   }
@@ -338,15 +345,17 @@ export class Buttons {
     lead = 0,
   ): void {
     const [x, y, w] = rect;
-    const gap = Math.round(f.size * 0.5);
+    const gap = this.round ? roundGap(f) : Math.round(f.size * 0.5);
+    const box = this.round ? roundBox : btnBox;
+    const padW = this.round ? roundPad(f) : btnPad(f);
     // The same first-line offset `rowsIn` is told about, or the two disagree.
     let cx = x + lead;
     let cy = y;
     // With a lead the first line is already one button tall even if nothing
     // fits on it, or a first button that wraps lands on the filter box.
-    let lineH = lead > 0 ? btnBox(f, [], 0, 0, minH)[1] : 0;
+    let lineH = lead > 0 ? box(f, [], 0, 0, minH)[1] : 0;
     for (const item of labels) {
-      const [bw, bh] = btnBox(f, [item.label], 0, btnPad(f), minH);
+      const [bw, bh] = box(f, [item.label], 0, padW, minH);
       if (cx > x && cx + bw > x + w) {
         cx = x;
         cy += lineH + gap;
@@ -370,7 +379,7 @@ export class Buttons {
     const hasPrimary = this.items.some((b) => b.primary);
     for (const b of this.items) {
       if (b.painted) continue;
-      pixBtn(g, f, b.rect[0], b.rect[1], b.rect[2], b.rect[3], b.label, {
+      (this.round ? roundBtn : pixBtn)(g, f, b.rect[0], b.rect[1], b.rect[2], b.rect[3], b.label, {
         hover: this.hovered === b.id,
         dim: b.dim,
         lit: b.primary,

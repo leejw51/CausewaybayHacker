@@ -28,6 +28,24 @@ export const AUTO_RUN_KEY = "code.autoRun";
 export const STDERR_KEY = "code.stderr";
 
 /**
+ * The playground editor's own type size, as a multiple of the code's size.
+ * Its A- / A+ move this and nothing else: the menus around the editor stay
+ * the size the app-wide setting (F9 / F10) made them.
+ */
+export const CODE_SIZE_KEY = "code.size";
+
+/**
+ * How much the playground's effects do: `calm` (the default — feedback, not
+ * a show), `full` (every spark, ripple and firework), or `off`.
+ */
+export const FX_KEY = "code.fx";
+export type FxLevel = "calm" | "full" | "off";
+export const FX_LEVELS: readonly FxLevel[] = ["calm", "full", "off"];
+export const CODE_SIZE_MIN = 0.6;
+export const CODE_SIZE_MAX = 2.5;
+export const CODE_SIZE_STEP = 0.1;
+
+/**
  * SOUND: the chip's sfx and music, off for good once somebody turned them
  * off. A fact about the person and the room they are in, not the screen.
  */

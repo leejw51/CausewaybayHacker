@@ -102,6 +102,18 @@ export class CodeFx {
   private carry = 0;
   private kick: ReturnType<typeof setTimeout> | null = null;
   private readonly onPointer = (ev: PointerEvent): void => this.pointed(ev);
+  /**
+   * How much of it to play. `full` is everything above; `calm` is what
+   * `prefers-reduced-motion` gets — no smear, no pointer trail, no kick, a
+   * quarter of the sparks — and `off` is nothing at all. The playground's FX
+   * button sets it; the quest screen leaves it full.
+   */
+  level: "full" | "calm" | "off" = "full";
+  private get still(): boolean {
+    return reducedMotion() || this.level !== "full";
+  }
+  /** Told of every edit too, after the effects: the playground's combo. */
+  onEdit: ((e: EditEvent) => void) | null = null;
 
   constructor(
     host: HTMLElement,
@@ -145,7 +157,8 @@ export class CodeFx {
 
   /** Throw a plan of your own — the quest screen's ANSWER-mode sparks. */
   play(plan: Plan): void {
-    const p = reducedMotion() ? trim(plan, 0.25) : plan;
+    if (this.level === "off") return;
+    const p = this.still ? trim(plan, 0.25) : plan;
     if (this.gl) this.gl.play(p);
     else this.flat?.add(p, this.now);
   }
@@ -176,6 +189,7 @@ export class CodeFx {
   // -- the events ----------------------------------------------------------
 
   private on(e: EditEvent): void {
+    this.onEdit?.(e);
     const cell = this.cell(e.cell);
     switch (e.kind) {
       case "type": {
@@ -254,7 +268,7 @@ export class CodeFx {
     const t = this.now;
     const gap = this.movedAt < 0 ? MOVE_GAP : Math.min(MOVE_GAP, Math.max(0.04, t - this.movedAt));
     this.movedAt = t;
-    if (reducedMotion()) return;
+    if (this.still) return;
     const dist = Math.hypot(to[0] - from[0], to[1] - from[1]);
     const smear = smearFor(from, to, cell, dist / gap);
     if (this.gl) this.gl.smear(smear);
@@ -270,7 +284,7 @@ export class CodeFx {
    */
   private kickEditor(): void {
     const dom = this.editor?.dom;
-    if (!dom) return;
+    if (!dom || this.still) return;
     dom.classList.remove("cwb-kick");
     // Off and on in one frame does not restart a CSS animation; the reflow
     // between does.
@@ -295,7 +309,7 @@ export class CodeFx {
    * spent every `TRAIL_STEP` virtual pixels, placed along the segment.
    */
   private pointed(ev: PointerEvent): void {
-    if (reducedMotion()) return;
+    if (this.still) return;
     const v = this.layout.toVirtual(ev.clientX, ev.clientY);
     if (!v) return;
     const t = this.now;

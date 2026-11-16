@@ -582,3 +582,152 @@ body {
 .cwb-hidden {
   display: none !important;
 }
+
+/* -- The playground as a game ------------------------------------------------
+   `gfx/playfx.ts`'s light layer, on the codefx fade; `ui/popups.ts`'s words
+   and combo badge, over the editor and untouchable. */
+.cwb-playfx {
+  z-index: 6;
+}
+.cwb-pop,
+.cwb-combo {
+  pointer-events: none !important;
+  z-index: 8;
+  font-family: "PressStart2P", monospace;
+  white-space: nowrap;
+}
+.cwb-pop {
+  transform: translate(-50%, -50%);
+  font-size: 13px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  animation: cwb-pop 1.5s cubic-bezier(0.2, 0.9, 0.3, 1) 1 forwards;
+}
+.cwb-pop-hurt {
+  background: #d82800;
+  color: #fcecc8;
+  box-shadow: 0 0 18px 2px rgba(216, 40, 0, 0.75);
+}
+.cwb-pop-xp {
+  color: #f8d030;
+  font-size: 15px;
+  text-shadow: 0 0 10px rgba(248, 208, 48, 0.9), 0 2px 0 #5a4300;
+}
+.cwb-pop-clear {
+  color: #7ee0a0;
+  font-size: 22px;
+  text-shadow: 0 0 14px rgba(0, 168, 68, 0.95), 0 3px 0 #003a18;
+  animation-duration: 1.2s;
+}
+.cwb-pop-combo {
+  color: #f878a8;
+  font-size: 18px;
+  text-shadow: 0 0 14px rgba(248, 120, 168, 0.95), 0 3px 0 #4a0a26;
+}
+.cwb-pop-info {
+  color: #50d8f8;
+  text-shadow: 0 0 10px rgba(80, 216, 248, 0.8);
+}
+@keyframes cwb-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  22% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(0.9);
+  }
+}
+
+.cwb-combo {
+  transform: translate(calc(-100% - 12px), 10px);
+  min-width: 74px;
+  padding: 7px 9px 8px;
+  border-radius: 10px;
+  text-align: center;
+  background: rgba(13, 18, 54, 0.82);
+  border: 1px solid rgba(248, 120, 168, 0.45);
+  box-shadow: 0 0 18px rgba(248, 120, 168, 0.25);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.cwb-combo.cwb-on {
+  opacity: 1;
+}
+.cwb-combo-n {
+  font-size: 20px;
+  color: #f878a8;
+  text-shadow: 0 0 12px rgba(248, 120, 168, 0.9);
+}
+.cwb-combo-n.cwb-kick {
+  animation: cwb-combo-kick 0.18s ease-out 1;
+}
+.cwb-combo-l {
+  margin-top: 5px;
+  font-size: 7px;
+  color: #fcecc8;
+  letter-spacing: 1px;
+}
+.cwb-combo-t {
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(10, 15, 46, 0.9);
+  overflow: hidden;
+}
+.cwb-combo-b {
+  height: 4px;
+  background: linear-gradient(90deg, #f878a8, #f8d030);
+}
+.cwb-combo[data-tier="2"] {
+  border-color: rgba(248, 208, 48, 0.7);
+  box-shadow: 0 0 26px rgba(248, 208, 48, 0.4);
+}
+.cwb-combo[data-tier="2"] .cwb-combo-n,
+.cwb-combo[data-tier="3"] .cwb-combo-n,
+.cwb-combo[data-tier="4"] .cwb-combo-n {
+  color: #f8d030;
+  text-shadow: 0 0 14px rgba(248, 208, 48, 1), 0 0 30px rgba(248, 120, 168, 0.8);
+}
+.cwb-combo[data-tier="3"],
+.cwb-combo[data-tier="4"] {
+  border-color: #f8d030;
+  animation: cwb-fever 0.5s ease-in-out infinite alternate;
+}
+@keyframes cwb-combo-kick {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes cwb-fever {
+  0% {
+    box-shadow: 0 0 18px rgba(248, 120, 168, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 34px rgba(248, 208, 48, 0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cwb-pop {
+    animation-duration: 0.9s;
+  }
+  .cwb-combo-n.cwb-kick,
+  .cwb-combo[data-tier="3"],
+  .cwb-combo[data-tier="4"] {
+    animation: none;
+  }
+}

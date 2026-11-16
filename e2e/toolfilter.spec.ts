@@ -94,7 +94,14 @@ test("the filter narrows the menu buttons on the practice page and the playgroun
   // The playground, code page.
   await clickButton(page, "code");
   await page.waitForTimeout(1200);
-  const code = await ids(page);
+  // Wide, COPY CODE lives behind MORE; a filter still finds it either way.
+  let code = await ids(page);
+  if (!code.includes("copycode") && code.includes("more")) {
+    await clickButton(page, "more");
+    await page.waitForTimeout(300);
+    code = await ids(page);
+    await clickButton(page, "more");
+  }
   expect(code).toContain("copycode");
   const pastes = await narrow(page, "paste");
   expect(pastes).toEqual(expect.arrayContaining(["pastecode", "pastein"]));

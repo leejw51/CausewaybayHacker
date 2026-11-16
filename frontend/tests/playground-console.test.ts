@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { consoleLine } from "../src/scenes/playground";
+import { consoleLine, consoleOutput } from "../src/scenes/playground";
 import type { PlaygroundRun } from "../src/net/protocol";
 
 /**
@@ -115,5 +115,18 @@ describe("the CONSOLE screen", () => {
     for (const fn of ["private async toggleZen(", "private giveBackMonitor("]) {
       expect(body(fn)).not.toContain("writePref");
     }
+  });
+});
+
+describe("CONSOLE's output line", () => {
+  it("shows the last line the program printed", () => {
+    expect(consoleOutput(run({ stdout: "hello\nworld\n\n" }), "idle")).toBe("world");
+  });
+
+  it("says when nothing was printed, and stays empty when nothing ran", () => {
+    expect(consoleOutput(run({}), "idle")).toBe("(no output)");
+    expect(consoleOutput(null, "idle")).toBe("");
+    expect(consoleOutput(run({ stdout: "x" }), "compiling")).toBe("");
+    expect(consoleOutput(run({ outcome: "compile_error" }), "idle")).toBe("");
   });
 });

@@ -1757,6 +1757,14 @@ export class Editor {
     return c ? [c.left, (c.top + c.bottom) / 2] : null;
   }
 
+  /** The end of a line (1-based) on the page, or null off the end of the doc. */
+  lineClient(line: number): [number, number] | null {
+    const doc = this.view.state.doc;
+    if (line < 1 || line > doc.lines) return null;
+    const c = this.view.coordsAtPos(doc.line(line).to);
+    return c ? [c.left + 40, (c.top + c.bottom) / 2] : null;
+  }
+
   /** Where the caret is on the page, for an effect thrown at it. */
   caretClient(): [number, number] | null {
     const c = this.view.coordsAtPos(this.view.state.selection.main.head);

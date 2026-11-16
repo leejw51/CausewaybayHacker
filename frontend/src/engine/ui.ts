@@ -287,3 +287,99 @@ export function clipped(g: Ctx, x: number, y: number, w: number, h: number, body
 }
 
 export { print, printf };
+
+/**
+ * The compact, rounded button: the playground's toolbars. The pixel button's
+ * bevel takes 20 pixels of height and a font and a quarter of width around
+ * every label; across a band of a dozen tools that is a band of air. This is
+ * the same label in a pill: a few pixels of rim, rounded corners, the same
+ * colour registers as `pixBtn` so a row still says which button is primary.
+ */
+export const ROUND_FRAME = 10;
+
+export function roundPad(font: Font): number {
+  return Math.round(font.size * 0.8);
+}
+
+export function roundBox(
+  font: Font,
+  labels: string[],
+  minW = 0,
+  padW = 0,
+  minH = 0,
+): [number, number] {
+  let w = 0;
+  for (const label of labels) w = Math.max(w, width(font, label));
+  return [Math.max(minW, w + padW), Math.max(minH, font.height + ROUND_FRAME)];
+}
+
+/** The gap between two rounded buttons on a row. */
+export function roundGap(font: Font): number {
+  return Math.max(3, Math.round(font.size * 0.3));
+}
+
+/** `rowsIn`, for rounded buttons. */
+export function roundRowsIn(font: Font, labels: string[], w: number, minH = 0, lead = 0): number {
+  const gap = roundGap(font);
+  let x = lead;
+  let rows = 1;
+  for (const label of labels) {
+    const [bw] = roundBox(font, [label], 0, roundPad(font), minH);
+    if (x > 0 && x + bw > w) {
+      rows++;
+      x = 0;
+    }
+    x += bw + gap;
+  }
+  return rows;
+}
+
+/** One rounded button; the options mean what they mean to `pixBtn`. */
+export function roundBtn(
+  g: Ctx,
+  font: Font,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  label: string,
+  opts: {
+    lit?: boolean;
+    hover?: boolean;
+    dim?: boolean;
+    quiet?: boolean;
+    strong?: boolean;
+    /** A face of the caller's own — a land's colour — with ink on it. */
+    face?: RGBA;
+  } = {},
+): void {
+  const face = opts.face
+    ? opts.face
+    : opts.dim
+      ? Theme.dim
+      : opts.strong
+        ? opts.hover
+          ? Theme.coin
+          : Theme.admit
+        : opts.lit || opts.hover
+          ? Theme.coin
+          : opts.quiet
+            ? Theme.navy
+            : Theme.panel;
+  const r = Math.min(h / 2, Math.max(6, Math.round(font.size * 0.45)));
+  g.save();
+  roundRect(g, x + 0.5, y + 0.5, w - 1, h - 1, r);
+  g.fillStyle = css(face, opts.dim ? 0.55 : 1);
+  g.fill();
+  g.lineWidth = 1.5;
+  g.strokeStyle = css(opts.hover ? Theme.cream : Theme.ink, opts.hover ? 0.9 : 0.75);
+  g.stroke();
+  // A thin light along the top edge, inside: the pill's only bevel.
+  g.clip();
+  g.fillStyle = "rgba(255,255,255,0.14)";
+  g.fillRect(x, y, w, Math.max(1, Math.round(h * 0.12)));
+  g.restore();
+  const pale = !opts.face && (opts.quiet || (opts.strong && !opts.hover)) && !opts.dim;
+  g.fillStyle = css(pale ? Theme.cream : Theme.ink, opts.dim ? 0.5 : 1);
+  printf(g, font, label, x, inkCentreY(font, label, y, h), w, "center");
+}
