@@ -4570,20 +4570,12 @@ export class PlaygroundScene implements Scene {
     printf(g, sm, "</>", cx, inkCentreY(sm, "</>", ly, lg), lg, "center");
     cx += lg + pad;
 
-    // The wordmark at seven tenths of the pixel face: full size it was the
-    // loudest thing on a screen whose subject is the code under it.
-    const tf = fonts.station;
+    // The name in the bar's own small type, gold: a big pixel wordmark
+    // was the loudest thing on a screen whose subject is the code.
     const title = t("pg.hudTitle");
-    const tk = 0.7;
-    g.save();
-    g.shadowColor = css(Theme.coin, 0.5);
-    g.shadowBlur = Math.round(8 * s);
     g.fillStyle = css(Theme.coin);
-    g.translate(cx, mid);
-    g.scale(tk, tk);
-    printf(g, tf, title, 0, inkCentreY(tf, title, -h / 2 / tk, h / tk), w / tk, "left");
-    g.restore();
-    cx += width(tf, title) * tk + pad * 1.5;
+    printf(g, sm, title, cx, inkCentreY(sm, title, y, h), w, "left");
+    cx += width(sm, title) + pad;
 
     // What the right side will take — LOG OUT, the wallet, the file, a
     // little of the pad's name — measured first, so the left side stops
