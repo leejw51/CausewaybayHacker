@@ -54,6 +54,7 @@ import {
   withFx,
 } from "../ui/chrome";
 import { sourceSeed, waveDots, waveLine } from "../ui/wave";
+import { ScorePop, veiled } from "../ui/scorepop";
 import { MenuFx, Rise, staggered } from "../ui/menufx";
 import { seconds, Tween } from "../engine/motion";
 import { CODE_FACE_KEY, Editor, MAIN_FILE } from "../ui/editor";
@@ -531,6 +532,9 @@ type SavedCopy = { source: string; lang: Lang; name: string; stdin: string };
  */
 const SCRATCH = "SCRATCH";
 
+/** The shortest a pressed RUN's compile animation is on screen. */
+const MIN_SHOW_MS = 2000;
+
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
   readonly mood = "lands" as const;
@@ -778,11 +782,15 @@ export class PlaygroundScene implements Scene {
   private compilefx: CompileFx | null = null;
   /** The CONSOLE monitor's glass this frame, or null when CONSOLE is not up. */
   private zenScreen: Rect | null = null;
+  /** The last frame's glass, for a score that lands between frames. */
+  private lastZen: Rect | null = null;
   /** CONSOLE's two lines rising in when they change (motion.dev). */
   private readonly outRise = new Rise();
   private readonly sayRise = new Rise();
   /** Words over the editor, and the combo badge. `ui/popups.ts`. */
   private pops: Popups | null = null;
+  /** CONSOLE's "+1 HP" / "-1 HP" (motion.dev). */
+  private score: ScorePop | null = null;
   /** The typing combo. `ui/combo.ts`. */
   private readonly combo = new Combo();
   /** The outcomes of this visit's runs, oldest first, for the strip under the output. */
@@ -1110,8 +1118,17 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /**
+   * CONSOLE on or off, behind a veil that comes up on an exponential ease-in
+   * and lifts on an exponential ease-out (motion.dev): the editor moving and
+   * the tube changing happen while nobody can see them, so nothing blinks.
+   */
+  private toggleZen(): Promise<void> {
+    return veiled(this.app.overlay, () => this.switchZen());
+  }
+
   /** CONSOLE on or off; on from the bench goes through CODE. */
-  private async toggleZen(): Promise<void> {
+  private async switchZen(): Promise<void> {
     if (this.zen) {
       this.zen = false;
       this.focus = this.zenFromCode;
@@ -1401,6 +1418,20 @@ export class PlaygroundScene implements Scene {
     }
     this.dayStreak = streak(localStore, new Date());
     if (this.fxLevel === "off") return;
+    // CONSOLE keeps it to a game's score over the core: "+1 HP" (+2 for a
+    // fix) with the time it took, or "-1 HP" with the error's code. No
+    // flash, no sparks over the editor, no shake: the particles settling is
+    // the rest of it.
+    if (this.zen) {
+      const z = this.zenScreen ?? this.lastZen;
+      if (z) {
+        const [cx, cy] = this.app.layout.toClient(z[0] + z[2] / 2, z[1] + z[3] * 0.4);
+        const r = this.app.overlay.getBoundingClientRect();
+        const note = ok ? `${run.run_ms} ms` : (errorAt(run).code ?? "");
+        this.score?.pop(cx - r.left, cy - r.top, ok, fixed ? 2 : 1, note);
+      }
+      return;
+    }
     if (this.fxLevel === "calm") {
       // Calm: a soft glow for a clean run, a faint red edge and the marker on
       // the failing line for a failure. Nothing that moves for its own sake.
@@ -1615,6 +1646,8 @@ export class PlaygroundScene implements Scene {
     this.compilefx = null;
     this.pops?.destroy();
     this.pops = null;
+    this.score?.destroy();
+    this.score = null;
     this.giveBackMonitor();
     this.zen = false;
     this.retro?.destroy();
@@ -1663,6 +1696,8 @@ export class PlaygroundScene implements Scene {
     this.compilefx = new CompileFx(this.app.overlay, this.app.layout);
     this.pops?.destroy();
     this.pops = new Popups(this.app.overlay, this.app.layout);
+    this.score?.destroy();
+    this.score = new ScorePop(this.app.overlay);
     // The agent's layer goes over the effects, and its fields over that;
     // the bench's own fields come after and stay on top of everything.
     this.coder?.leave();
@@ -2005,12 +2040,21 @@ export class PlaygroundScene implements Scene {
     this.log = new LogBuffer("");
     this.stage = "queued";
     this.app.chip.select();
+    const startedAt = performance.now();
     try {
       const res = await this.app.client.request("playground.run", {
         lang: this.held.lang,
         source,
         ...(this.stdinEl.value ? { stdin: this.stdinEl.value } : {}),
       });
+      // A pressed RUN shows its compile for at least two seconds: a build
+      // that is back in 100 ms would otherwise flash the waiting curve and
+      // the particles and be gone before they could be seen. AUTO-RUN (every
+      // ENTER) does not wait — it is the quick look — and FX OFF never does.
+      const held = MIN_SHOW_MS - (performance.now() - startedAt);
+      if (how === "press" && this.fxLevel !== "off" && held > 0) {
+        await new Promise((r) => setTimeout(r, held));
+      }
       this.result = res.run;
       // The log streamed in pinned to its tail; the answer is read from the
       // top, and scrolling back up after every RUN was the chore.
@@ -4125,6 +4169,7 @@ export class PlaygroundScene implements Scene {
     g.globalAlpha = 1;
     const shown = elide(say, `> ${text}`, lw);
     this.zenScreen = [gx, gy, gw, gh];
+    this.lastZen = this.zenScreen;
     // The phosphor's bleed, which the tube's shader gives the code above.
     g.shadowColor = ink;
     g.shadowBlur = Math.round(6 * s);

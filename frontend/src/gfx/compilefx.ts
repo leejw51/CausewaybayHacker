@@ -465,8 +465,9 @@ export class CompileFx {
   /** A mote let go: it flies off and fades as a spark (or falls as an ember). */
   private scatter(m: Mote, cx: number, cy: number, bad: boolean): void {
     m.mode = bad ? "ember" : "spark";
-    m.vx = (m.x - cx) * (bad ? 1.2 : 3);
-    m.vy = (m.y - cy) * (bad ? 1.2 : 3);
+    // Let go gently: drifting off, not thrown.
+    m.vx = (m.x - cx) * (bad ? 0.5 : 0.8);
+    m.vy = (m.y - cy) * (bad ? 0.5 : 0.8);
     m.age = 0;
     m.life = 1.2 + Math.random() * 0.8;
     m.col = pick(bad ? EMBERS : SPARKS);
@@ -474,10 +475,11 @@ export class CompileFx {
 
   private burst(bad: boolean, cx: number, cy: number, d: number, calm: number): void {
     for (const m of this.motes) this.scatter(m, cx, cy, bad);
-    const n = Math.round((bad ? 420 : 700) * calm);
+    // Not a big bang: a handful of sparks — the score is the news.
+    const n = Math.round((bad ? 36 : 60) * calm);
     for (let i = 0; i < n && this.motes.length < MAX; i++) {
       const a = Math.random() * Math.PI * 2;
-      const sp = (bad ? 60 + Math.random() * 200 : 70 + Math.random() * 300) * d;
+      const sp = (bad ? 30 + Math.random() * 90 : 40 + Math.random() * 120) * d;
       const m = this.mote(bad ? "ember" : "spark", cx, cy, 0, a, d);
       m.vx = Math.cos(a) * sp;
       m.vy = Math.sin(a) * sp * (bad ? 0.6 : 1);
@@ -486,10 +488,10 @@ export class CompileFx {
       m.col = pick(bad ? EMBERS : SPARKS);
       this.motes.push(m);
     }
-    this.ring(bad ? 2 : 1, 1.4);
-    if (bad) this.red = 1;
-    // The hit: the core flares white and dies away (it decays while idle).
-    else this.energy = 1;
+    this.ring(bad ? 2 : 1, 1.2);
+    // A red edge that is a hint, not an alarm; a clean run's core simply
+    // fades out as the particles drift away.
+    if (bad) this.red = 0.5;
   }
 
   private look(m: Mote, busy: boolean, running: boolean): [number, number, number, number] {
