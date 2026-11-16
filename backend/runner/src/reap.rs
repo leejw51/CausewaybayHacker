@@ -156,11 +156,9 @@ impl Tracker {
             let mut stopped = 0usize;
             for row in matching(&table, &self.seen) {
                 if row.pgid != self.root {
-                    // SAFETY: a signal to a pid whose identity we verified
-                    // against its start time, owned by this user.
-                    unsafe {
-                        libc::kill(row.pid, libc::SIGSTOP);
-                    }
+                    // A pid whose identity was verified against its start
+                    // time, owned by this user.
+                    signal(row.pid, Sig::Stop);
                     stopped += 1;
                 }
             }
@@ -200,9 +198,7 @@ impl Tracker {
                 // SIGKILL, not SIGTERM: these are the ones that were already
                 // given the grace, or never had a claim to it. It is delivered
                 // to a stopped process, so freezing them first costs nothing.
-                unsafe {
-                    libc::kill(row.pid, libc::SIGKILL);
-                }
+                signal(row.pid, Sig::Kill);
                 killed += 1;
             }
             std::thread::sleep(Duration::from_millis(20));
@@ -214,14 +210,41 @@ impl Tracker {
             // pid has since been recycled, which is why it is the one signal
             // worth sending unverified.
             for pid in self.seen.keys() {
-                unsafe {
-                    libc::kill(*pid, libc::SIGCONT);
-                }
+                signal(*pid, Sig::Cont);
             }
         }
         killed
     }
 }
+
+/// The three signals the sweep sends.
+#[derive(Clone, Copy)]
+enum Sig {
+    Stop,
+    Kill,
+    Cont,
+}
+
+/// Send `sig` to `pid`. Unix only: elsewhere there is no process table to
+/// have matched a pid against (`sample_table` answers `None`), so nothing
+/// reaches here with a pid to signal, and this is a no-op that lets the
+/// runner compile — the desktop app on Windows.
+#[cfg(unix)]
+fn signal(pid: i32, sig: Sig) {
+    let s = match sig {
+        Sig::Stop => libc::SIGSTOP,
+        Sig::Kill => libc::SIGKILL,
+        Sig::Cont => libc::SIGCONT,
+    };
+    // SAFETY: a signal to a pid whose identity was verified against its
+    // start time (or, for SIGCONT, one that is harmless if it was not).
+    unsafe {
+        libc::kill(pid, s);
+    }
+}
+
+#[cfg(not(unix))]
+fn signal(_pid: i32, _sig: Sig) {}
 
 /// The rows of a table whose pid **and start time** match something we
 /// recorded. The start time is the whole point: a pid on its own is a promise
