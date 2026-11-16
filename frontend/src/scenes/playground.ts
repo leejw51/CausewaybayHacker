@@ -83,6 +83,8 @@ import {
   setCodeTheme,
 } from "../ui/codetheme";
 import {
+  COMPUTERS,
+  type Computer,
   COMPUTER_FACE,
   COMPUTER_KEY,
   COMPUTER_NAME,
@@ -188,6 +190,20 @@ const TAB_KEY = (address: string) => `cwbhacker.playground.tab.${address.toLower
 const LEGACY_LOCAL_KEY = "cwbhacker.playground";
 /** The monitor CONSOLE borrows when the computer is NORMAL: green phosphor. */
 const CONSOLE_MACHINE = "apple2" as const;
+/** The machine CONSOLE lends when the pad's own computer is NORMAL. */
+const CONSOLE_MACHINE_KEY = "pg.consoleMachine";
+/** The machines' names as short as a key cap. */
+const MACHINE_SHORT: Record<"apple2" | "msx" | "amiga", string> = {
+  apple2: "APPLE ][",
+  msx: "MSX",
+  amiga: "AMIGA",
+};
+type Machine = Exclude<Computer, "normal">;
+const MACHINES = COMPUTERS.filter((c): c is Machine => c !== "normal");
+function consoleMachine(): Machine {
+  const v = readPref(CONSOLE_MACHINE_KEY);
+  return MACHINES.includes(v as Machine) ? (v as Machine) : CONSOLE_MACHINE;
+}
 /** How long after the last keystroke the autosave fires. */
 const AUTOSAVE_AFTER = 2.5;
 
@@ -1146,15 +1162,41 @@ export class PlaygroundScene implements Scene {
     // A monitor for the mode, lent: the user's own choice is NORMAL and stays
     // so in the preferences, and comes back with their face when it ends.
     const face = getCodeFace();
-    await loadCodeFace(COMPUTER_FACE[CONSOLE_MACHINE]);
+    const lend = consoleMachine();
+    await loadCodeFace(COMPUTER_FACE[lend]);
     if (!this.zen || getComputer() !== "normal") return;
     this.lentFace = face;
-    setCodeFace(COMPUTER_FACE[CONSOLE_MACHINE]);
-    setComputer(CONSOLE_MACHINE);
+    setCodeFace(COMPUTER_FACE[lend]);
+    setComputer(lend);
     this.app.remeasure();
     // Warmed up, not booted: the banner is for picking a machine, and this
     // is a mode somebody toggles while they write.
-    this.retro?.power(CONSOLE_MACHINE, false, true);
+    this.retro?.power(lend, false, true);
+  }
+
+  /**
+   * CONSOLE's own machine picker: APPLE ][, MSX, AMIGA, changed behind the
+   * veil. On a lent monitor (the pad's computer is NORMAL) it is CONSOLE's
+   * choice, remembered for next time; on the pad's own machine it is the
+   * pad's computer, as MORE's COMPUTER sets it.
+   */
+  private pickZenMachine(m: Machine): Promise<void> {
+    if (getComputer() === m) return Promise.resolve();
+    return veiled(this.app.overlay, async () => {
+      const face = COMPUTER_FACE[m];
+      await loadCodeFace(face);
+      if (!this.zen) return;
+      setCodeFace(face);
+      if (this.lentFace !== null) writePref(CONSOLE_MACHINE_KEY, m);
+      else {
+        writePref(CODE_FACE_KEY, face);
+        writePref(COMPUTER_KEY, m);
+      }
+      setComputer(m);
+      this.app.remeasure();
+      this.retro?.power(m, false, true);
+      this.app.chip.blip();
+    });
   }
 
   /** Undo what `toggleZen` lent, if it lent anything. */
@@ -2592,6 +2634,16 @@ export class PlaygroundScene implements Scene {
     }
     if (hit.id === "computer") {
       void this.cycleComputer();
+      return;
+    }
+    if (hit.id.startsWith("machine:")) {
+      void this.pickZenMachine(hit.id.slice(8) as Machine);
+      return;
+    }
+    if (hit.id === "zenMachine") {
+      const now = getComputer();
+      const at = MACHINES.indexOf(now as Machine);
+      void this.pickZenMachine(MACHINES[(at + 1) % MACHINES.length]);
       return;
     }
     if (hit.id === "fontdown" || hit.id === "fontup") {
@@ -4110,6 +4162,17 @@ export class PlaygroundScene implements Scene {
         primary: this.stage === "idle",
       },
       { id: "console", label: t("pg.console"), strong: true },
+      ...(layout.isPortrait()
+        ? [
+            {
+              id: "zenMachine",
+              label:
+                MACHINE_SHORT[
+                  (getComputer() === "normal" ? consoleMachine() : getComputer()) as Machine
+                ],
+            },
+          ]
+        : []),
     ];
     // Wide: the monitor takes the window but a column at the right, where a
     // disk drive holds RUN and EXIT and a SESSION card keeps score. Tall:
@@ -4246,6 +4309,7 @@ export class PlaygroundScene implements Scene {
     const runH = Math.max(this.app.layout.minTouchH(), Math.round(44 * s));
     const exitH = Math.max(this.app.layout.minTouchH(), Math.round(30 * s));
     const slotH = Math.round(52 * s);
+    const machH = Math.max(this.app.layout.minTouchH(), Math.round(32 * s));
     const driveH =
       pad +
       sm.height +
@@ -4253,6 +4317,8 @@ export class PlaygroundScene implements Scene {
       slotH +
       Math.round(8 * s) +
       sm.height +
+      Math.round(10 * s) +
+      machH +
       Math.round(10 * s) +
       runH +
       Math.round(8 * s) +
@@ -4305,6 +4371,20 @@ export class PlaygroundScene implements Scene {
     const st = busy ? t("pg.inUse") : t("pg.idleDrive");
     printf(g, sm, st, x + pad + led + Math.round(6 * s), cy, w, "left");
     cy += sm.height + Math.round(10 * s);
+    // The machine: three keys, the one in use lit. Not while a run is out.
+    const mg = Math.round(4 * s);
+    const mw = (w - pad * 2 - mg * (MACHINES.length - 1)) / MACHINES.length;
+    const nowM = getComputer();
+    MACHINES.forEach((m, i) => {
+      this.buttons.add({
+        id: `machine:${m}`,
+        label: MACHINE_SHORT[m],
+        rect: [x + pad + i * (mw + mg), cy, mw, machH],
+        strong: nowM === m,
+        dim: busy && nowM !== m,
+      });
+    });
+    cy += machH + Math.round(10 * s);
     const run = items.find((i) => i.id === "run");
     const exit = items.find((i) => i.id === "console");
     if (run) this.buttons.add({ ...run, rect: [x + pad, cy, w - pad * 2, runH] });

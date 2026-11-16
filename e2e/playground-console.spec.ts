@@ -25,6 +25,11 @@ async function ids(page: import("@playwright/test").Page): Promise<string[]> {
   return page.evaluate(() => (window.__cwbCapture?.buttons() ?? []).map((b) => b.id));
 }
 
+/** CONSOLE's own keys, RUN and CONSOLE: its machine picker counted apart. */
+async function keys(page: import("@playwright/test").Page): Promise<string[]> {
+  return (await ids(page)).filter((id) => !id.startsWith("machine:") && id !== "zenMachine");
+}
+
 test("CONSOLE puts the pad on a monitor alone, and gives the bench back", async ({
   page,
 }, info) => {
@@ -41,7 +46,7 @@ test("CONSOLE puts the pad on a monitor alone, and gives the bench back", async 
   expect(await computer()).toBe("normal");
 
   await clickButton(page, "console");
-  await expect.poll(async () => (await ids(page)).sort()).toEqual(["console", "run"]);
+  await expect.poll(async () => (await keys(page)).sort()).toEqual(["console", "run"]);
   await expect(page.locator(".cm-content")).toBeVisible();
   // The monitor is lent for the mode, the face with it.
   await expect.poll(computer).toBe("apple2");
@@ -71,7 +76,7 @@ test("CONSOLE puts the pad on a monitor alone, and gives the bench back", async 
   await clickButton(page, "code");
   await expect.poll(async () => ids(page)).toContain("unfocus");
   await clickButton(page, "console");
-  await expect.poll(async () => (await ids(page)).sort()).toEqual(["console", "run"]);
+  await expect.poll(async () => (await keys(page)).sort()).toEqual(["console", "run"]);
   await clickButton(page, "console");
   await expect.poll(async () => ids(page)).toContain("unfocus");
   await expect.poll(computer).toBe("normal");
@@ -105,7 +110,7 @@ test("the line under the glass says OK, or the error and its line", async ({
   await clickButton(page, "playground");
   await expect.poll(async () => sceneNow(page), { timeout: 30_000 }).toBe("playground");
   await clickButton(page, "console");
-  await expect.poll(async () => (await ids(page)).sort()).toEqual(["console", "run"]);
+  await expect.poll(async () => (await keys(page)).sort()).toEqual(["console", "run"]);
   await page.waitForTimeout(1_500);
   await page.screenshot({ path: info.outputPath("1-ready.png") });
 
@@ -136,4 +141,28 @@ test("the line under the glass says OK, or the error and its line", async ({
   await page.waitForTimeout(1_000);
   await page.screenshot({ path: info.outputPath("3-ok.png") });
   await context.close();
+});
+
+test("CONSOLE picks its machine — APPLE ][, MSX, AMIGA — and keeps it", async ({
+  page,
+}, info) => {
+  await login(page, ACCOUNT);
+  await atScreen(page, "lands");
+  await clickButton(page, "playground");
+  await expect.poll(async () => sceneNow(page), { timeout: 30_000 }).toBe("playground");
+  const computer = () =>
+    page.evaluate(() => document.documentElement.dataset.computer ?? "normal");
+  await clickButton(page, "console");
+  await expect.poll(computer).toBe("apple2");
+  // Landscape: three keys on the drive. Portrait: one key that steps.
+  const pick = info.project.name === "landscape" ? "machine:msx" : "zenMachine";
+  await clickButton(page, pick);
+  await expect.poll(computer).toBe("msx");
+  await clickButton(page, info.project.name === "landscape" ? "machine:amiga" : "zenMachine");
+  await expect.poll(computer).toBe("amiga");
+  // Out: the pad's own computer (NORMAL) comes back; in again: AMIGA, kept.
+  await clickButton(page, "console");
+  await expect.poll(computer).toBe("normal");
+  await clickButton(page, "console");
+  await expect.poll(computer).toBe("amiga");
 });
