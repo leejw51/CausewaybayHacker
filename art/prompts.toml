@@ -1884,6 +1884,10 @@ rerolls = 0
 prompt = """\
 16-bit SNES pixel art user interface title signboard, centred, on a completely solid flat magenta background (pure magenta RGB 255 0 255 filling every single part of the image that is not the subject). The subject is one solid unbroken shape with no magenta anywhere inside its outline. Nothing in the artwork itself may be magenta, hot pink, fuchsia or rose. A single WIDE SHORT horizontal Hong Kong shop sign board seen perfectly flat-on, four times as wide as it is tall, spanning almost the full width of the image: a thick dark ink-black outline, a carved dark red lacquered wooden frame with a thin gold inner trim of even width on all four sides, a small gold stud at each of the four corners, and a flat plain dark brown wooden face filling the whole middle that is completely blank, evenly coloured and empty with absolutely nothing on it. No ornament in the middle of any edge, so it can be stretched. Just the sign board and nothing else. Chunky hard-edged pixels, bold dark outline all the way round, flat cel shading with dithered highlights, saturated Super Mario World and Wonder Boy candy colours, no anti-aliasing, no soft gradient, no drop shadow, no glow. Absolutely no text, no letters, no words, no numbers, no digits, no symbols, no writing anywhere. Painted 16-bit console game sprite, not 3D rendered, not photographic."""
 
+# ui_badge is no longer this prompt's output: since 2026-11-17 it is the
+# app icon's tile (`app_icon`, below) scaled to 96 px with binary alpha, so
+# the header, the browser tab and the Dock all show the same coder. The
+# prompt is kept for the record; re-rolling it would undo that.
 [[asset]]
 name = "ui_badge"
 kind = "sprite"
