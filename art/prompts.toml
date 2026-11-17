@@ -2023,3 +2023,18 @@ generated = "2026-11-16"
 rerolls = 0
 prompt = """\
 16-bit SNES pixel art painted background in the style of Super Mario World: SATURATED colours, high contrast, strong dark outlines. Victoria Harbour, Hong Kong, at night, seen from the Causeway Bay waterfront: a deep navy sky full of gold and cyan fireworks bursting over the harbour, the lit skyline across the water reflected in rippling water, a few junk boats with red sails, a calm promenade railing in the foreground. Chunky hard-edged pixels, heavy dithering, no anti-aliasing, no soft gradients. The promenade is flat and level and runs unbroken across the bottom fifth of the frame. Absolutely no text, no letters, no words, no numbers, no writing or lettering anywhere. Painted 16-bit console game art, not 3D rendered, not photographic."""
+
+# The desktop app's icon. Full bleed and opaque, never keyed: it is not a
+# sprite. desktop/icons/ is made from it by cutting the macOS tile (an 824
+# body on a 1024 canvas, radius 185, a thin cyan rim) and scaling to every
+# size tauri.conf.json lists, plus icon.icns (iconutil) and icon.ico.
+# desktop/icons/icon-1024.png is that tile at full size.
+[[asset]]
+name = "app_icon"
+kind = "icon"
+aspect = "1:1"
+size = [1024, 1024]
+generated = "2026-11-17"
+rerolls = 1
+prompt = """\
+16-bit SNES pixel art app icon, square, full bleed, TRUE PIXEL ART with large visible square pixels, limited palette, thick dark outlines, flat blocks of colour, hard stepped edges. ONE big simple central subject filling most of the frame, a SIMPLE uncluttered background, bold silhouette that reads instantly when shrunk to a tiny size. Friendly and cheerful, not creepy. NOT 3D rendered, NOT photographic, NO soft gradients. Absolutely no text, no letters, no words, no numbers, no code, no writing anywhere. A cute chibi coder character's head and shoulders, spiky black hair, orange hoodie, big confident grin, chunky headphones, face lit cyan by a screen below, on a plain deep indigo background with a few small neon squares in cyan and gold."""
