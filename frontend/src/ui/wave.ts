@@ -173,6 +173,11 @@ function layers(seed: number): Layer[] {
  * and squeezing, its height swelling — on slow seeded cosines, a tone and
  * an overtone apiece, tapering at both ends, on the neon ramp with a glow,
  * and a bright bead riding the main one.
+ *
+ * The shape is drawn in cycles per width, so a line stretched across a wide
+ * well passes `density` (its width over the 360-unit line it was tuned at)
+ * to keep the same texture rather than flattening into long lazy swells;
+ * `height` scales the swing for a well with the room for it.
  */
 export function waveLine(
   g: Ctx,
@@ -183,8 +188,10 @@ export function waveLine(
   _col: RGBA,
   s: number,
   seed = 0,
+  density = 1,
+  height = 1,
 ): void {
-  const amp = 22 * s;
+  const amp = 22 * s * height;
   const step = Math.max(2, 2.5 * s);
   const TAU = Math.PI * 2;
   const ls = layers(seed);
@@ -193,14 +200,14 @@ export function waveLine(
   const pk = [0, 1].map((k) => {
     const sp = 0.07 + hash01(seed, 40 + k) * 0.16;
     const c = (((hash01(seed, 50 + k) + t * sp * (k === 0 ? 1 : -1)) % 1) + 1) % 1;
-    return { c, wid: 0.08 + hash01(seed, 60 + k) * 0.1 };
+    return { c, wid: (0.08 + hash01(seed, 60 + k) * 0.1) / Math.max(1, Math.sqrt(density)) };
   });
   const burst = surge(seed, t);
   const yAt = (l: Layer, dx: number): number => {
     const u = dx / w;
     // The bandwidth wanders, not cycles: the frequency is scaled by
     // e^(noise), about 0.4x to 3x, and a surge widens it further.
-    const f = l.f0 * Math.exp(1.0 * wander(l.nf, t * l.fRate * 4) + burst * 0.8);
+    const f = l.f0 * density * Math.exp(1.0 * wander(l.nf, t * l.fRate * 4) + burst * 0.8);
     const a = l.amp * Math.max(0.15, 0.75 + 0.55 * wander(l.na, t * l.aRate * 3) + burst * 0.6);
     // A chirp: tighter at one end of the line than the other, which end
     // and how much wandering too.

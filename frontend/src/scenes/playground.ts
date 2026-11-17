@@ -3408,7 +3408,7 @@ export class PlaygroundScene implements Scene {
     const items = this.tools.filter([
       {
         id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
+        label: t("pg.run"),
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
@@ -3697,7 +3697,7 @@ export class PlaygroundScene implements Scene {
     const work = [
       {
         id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
+        label: t("pg.run"),
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
@@ -4157,7 +4157,7 @@ export class PlaygroundScene implements Scene {
     const items = [
       {
         id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
+        label: t("pg.run"),
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
@@ -4528,7 +4528,7 @@ export class PlaygroundScene implements Scene {
       { id: "back", label: t("pg.maps") },
       {
         id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
+        label: t("pg.run"),
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
@@ -5239,7 +5239,7 @@ export class PlaygroundScene implements Scene {
     const core = [
       {
         id: "run",
-        label: this.stage === "idle" ? t("pg.run") : "…",
+        label: t("pg.run"),
         dim: this.stage !== "idle",
         primary: this.stage === "idle",
       },
@@ -5723,18 +5723,44 @@ export class PlaygroundScene implements Scene {
       printf(g, fonts.codeSm, line, x + pad * 2, ty + pad, w - pad * 4, "left");
       // Waiting for the first line: a cosine wave flowing under the stage.
       if (!r && this.stage !== "idle") {
-        const wy = ty + pad + fonts.codeSm.height * 2.2;
-        if (wy + 12 * s < bottom) {
-          waveLine(
-            g,
-            x + pad * 2,
-            wy,
-            Math.min(w - pad * 4, 360 * s),
-            this.t,
-            Theme.cyan,
-            s,
-            this.waveSeed(),
-          );
+        const top = ty + pad + fonts.codeSm.height * 1.4;
+        if (this.app.layout.isPortrait()) {
+          // Held upright the well is wide and tall and holds nothing else:
+          // the wave runs its whole width, centred in the room under the
+          // label, its texture kept (density) and its swing grown to suit.
+          const ww = w - pad * 4;
+          const room = bottom - top - pad;
+          if (room > 24 * s && ww > 0) {
+            const height = Math.max(1, Math.min(2.2, room / (130 * s)));
+            clipped(g, x, top, w, bottom - top, () =>
+              waveLine(
+                g,
+                x + pad * 2,
+                top + room / 2,
+                ww,
+                this.t,
+                Theme.cyan,
+                s,
+                this.waveSeed(),
+                Math.max(1, ww / (360 * s)),
+                height,
+              ),
+            );
+          }
+        } else {
+          const wy = ty + pad + fonts.codeSm.height * 2.2;
+          if (wy + 12 * s < bottom) {
+            waveLine(
+              g,
+              x + pad * 2,
+              wy,
+              Math.min(w - pad * 4, 360 * s),
+              this.t,
+              Theme.cyan,
+              s,
+              this.waveSeed(),
+            );
+          }
         }
       }
       return;

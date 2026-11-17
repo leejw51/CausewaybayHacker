@@ -642,7 +642,12 @@ export class AiScene implements Scene {
       const pad = Math.round(12 * s);
       const inner2 = w - pad * 2 - Math.round(5 * s);
       const lines = wrap(fonts.station, why.toUpperCase(), inner2);
-      const bandH = pad * 2 + lines.length * fonts.station.height;
+      // The label sits on its own line above the reason: placed at a fixed
+      // offset it was taller than the gap it was given, and the reason's
+      // first line was printed over it.
+      const labelY = y + Math.round(4 * s);
+      const textY = labelY + fonts.stationSm.height + Math.round(4 * s);
+      const bandH = textY - y + lines.length * fonts.station.height + pad;
       // It arrives: the band grows down from the head of the panel on the
       // house curve, so a new `why` is something that was *said* rather than
       // something that was always there.
@@ -651,17 +656,9 @@ export class AiScene implements Scene {
         fill(g, Theme.ink, x, y, w, bandH, 0.7);
         fill(g, Theme.coin, x, y, Math.round(5 * s), bandH);
         g.fillStyle = css(Theme.dim);
-        printf(
-          g,
-          fonts.stationSm,
-          T("ai.whyThisOne"),
-          x + pad,
-          y + Math.round(4 * s),
-          inner2,
-          "left",
-        );
+        printf(g, fonts.stationSm, T("ai.whyThisOne"), x + pad, labelY, inner2, "left");
         g.fillStyle = css(Theme.coin);
-        let ly = y + pad + Math.round(6 * s);
+        let ly = textY;
         for (const line of lines) {
           printf(g, fonts.station, line, x + pad, ly, inner2, "left");
           ly += fonts.station.height;

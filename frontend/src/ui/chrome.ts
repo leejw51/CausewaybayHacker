@@ -10,7 +10,16 @@
  */
 import { css, Theme, TRACK_COL, type RGBA } from "../engine/theme";
 import type { Land } from "../net/protocol";
-import { bodyFontAt, cjkFloor, ensureFonts, font, printf, width, type Font } from "../engine/text";
+import {
+  bodyFontAt,
+  cjkFloor,
+  elide,
+  ensureFonts,
+  font,
+  printf,
+  width,
+  type Font,
+} from "../engine/text";
 import {
   btnBox,
   btnPad,
@@ -218,12 +227,17 @@ export function header(g: Ctx, app: App, title: string): void {
     g.restore();
   }
   const tx = bx0 + badge + Math.round(10 * s);
-  clipped(g, 0, 0, Math.max(1, bx - Math.round(6 * s)), h, () => {
+  const titleEnd = Math.max(1, bx - Math.round(6 * s));
+  // Held upright the title can run out of room before the chip: it ends
+  // in an ellipsis, not cut through a glyph (`SCRATCH 2026-` read as a
+  // broken date).
+  const shown = elide(f, title, Math.max(0, titleEnd - tx));
+  clipped(g, 0, 0, titleEnd, h, () => {
     g.save();
     g.shadowColor = css(Theme.coin, 0.55);
     g.shadowBlur = Math.round(10 * s);
     g.fillStyle = css(Theme.coin);
-    printf(g, f, title, tx, ty, layout.vw, "left");
+    printf(g, f, shown, tx, ty, layout.vw, "left");
     g.restore();
   });
 
