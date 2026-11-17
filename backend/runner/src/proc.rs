@@ -318,6 +318,10 @@ pub fn run(
             cancelled = true;
             mark_fired();
             stop_and_kill(&mut tracker, pid);
+            // Off unix `kill_group` is a no-op, and `wait` would sit out the
+            // program — a STOP that does not stop. On unix the group is
+            // already gone and this is an ignored error.
+            let _ = child.kill();
             break child.wait().ok();
         }
         let over = match running_since {

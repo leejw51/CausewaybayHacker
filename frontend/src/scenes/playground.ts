@@ -471,6 +471,25 @@ export function consoleOutput(run: PlaygroundRun | null, stage: RunStage | "idle
   return lines.length ? lines[lines.length - 1] : t("pg.consoleNoOutput");
 }
 
+/**
+ * The box a toolbar item is laid out in: its own label's, or the widest of
+ * the labels it can wear (`fit`), so a button that changes its word in
+ * place keeps one size and the row after it does not move.
+ */
+function fitBox(
+  box: (label: string) => [number, number],
+  item: { label: string; fit?: string[] },
+): [number, number] {
+  return fitLabels(item)
+    .map(box)
+    .reduce((a, b) => (b[0] > a[0] ? b : a));
+}
+
+/** The labels an item is measured by: `fit` when it has one. */
+function fitLabels(item: { label: string; fit?: string[] }): string[] {
+  return item.fit ?? [item.label];
+}
+
 /** The output banner's word for an outcome: short, loud, a game's. */
 function bannerTitle(o: PlaygroundRun["outcome"]): string {
   switch (o) {
@@ -753,6 +772,8 @@ export class PlaygroundScene implements Scene {
    * comes back, so RUN is not offered again until then.
    */
   private stopping = false;
+  /** How the run that is out was started: only a pressed one offers STOP. */
+  private runHow: "auto" | "press" = "press";
   /** When RUN was last pressed: a double tap lands on the same rect, and the
    *  second tap is not a STOP. */
   private runPressedAt = 0;
@@ -1579,22 +1600,40 @@ export class PlaygroundScene implements Scene {
    * RUN, or STOP while a run is out — one button in one place, so the thumb
    * that started it can end it. Every toolbar takes this one item.
    */
-  private runItem(): { id: string; label: string; dim?: boolean; primary?: boolean } {
+  private runItem(): {
+    id: string;
+    label: string;
+    dim?: boolean;
+    primary?: boolean;
+    fit: string[];
+  } {
     const idle = this.stage === "idle";
+    // STOP is offered only for a run somebody pressed for. An AUTO-RUN goes
+    // out on every ENTER (and AUTO-RUN is on by default), so a STOP in its
+    // place would turn the RUN press that follows an ENTER into a kill of the
+    // run it meant to start; during one, RUN stays RUN and queues.
+    const stoppable = !idle && this.runHow === "press";
     return {
       id: "run",
-      label: idle ? t("pg.run") : this.stopping ? t("pg.stopping") : t("pg.stop"),
-      dim: this.stopping,
+      label: !stoppable ? t("pg.run") : this.stopping ? t("pg.stopping") : t("pg.stop"),
+      dim: this.stopping || (!idle && !stoppable),
       primary: idle,
+      // One box for all three, or every press would move the ten buttons
+      // after it — the reflow v0.1.8 took the "…" label away to stop.
+      fit: [t("pg.run"), t("pg.stop"), t("pg.stopping")],
     };
   }
 
-  /** The RUN button and Ctrl+Enter: run when idle, stop when not. */
+  /**
+   * The RUN button: run when idle; STOP while a pressed run is out; during
+   * an AUTO-RUN, run again once it is back (as ENTER does).
+   */
   private runOrStop(): void {
     if (this.stage === "idle") {
       this.runPressedAt = performance.now();
       void this.run();
-    } else this.stop();
+    } else if (this.runHow === "press") this.stop();
+    else if (!this.stopping) this.runAgain = true;
   }
 
   /**
@@ -1602,7 +1641,7 @@ export class PlaygroundScene implements Scene {
    * `outcome: "cancelled"`, and that answer — not this one — ends the wait.
    */
   private stop(): void {
-    if (this.stage === "idle" || this.stopping) return;
+    if (this.stage === "idle" || this.stopping || this.runHow !== "press") return;
     if (performance.now() - this.runPressedAt < STOP_GUARD_MS) return;
     this.stopping = true;
     // An ENTER queued behind the run would start it again the moment it
@@ -1616,7 +1655,8 @@ export class PlaygroundScene implements Scene {
   }
 
   private autoEnter(): void {
-    if (!this.autoRun || this.conflict) return;
+    // Not while a STOP is on its way: a queued re-run would undo it.
+    if (!this.autoRun || this.conflict || this.stopping) return;
     if (this.stage === "idle") void this.run("auto");
     else this.runAgain = true;
   }
@@ -2136,6 +2176,7 @@ export class PlaygroundScene implements Scene {
 
   private async run(how: "auto" | "press" = "press"): Promise<PlaygroundRun | null> {
     if (this.stage !== "idle") return null;
+    this.runHow = how;
     if (how === "press") this.launched();
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
@@ -2523,7 +2564,9 @@ export class PlaygroundScene implements Scene {
     }
     if ((name === "return" || name === "kpenter") && (ev.ctrlKey || ev.metaKey)) {
       ev.preventDefault();
-      this.runOrStop();
+      // Run only. A chord typed out of habit while a run is out must not end
+      // it; STOP is the button.
+      void this.run();
     }
     if (name === "s" && (ev.ctrlKey || ev.metaKey)) {
       ev.preventDefault();
@@ -3810,7 +3853,7 @@ export class PlaygroundScene implements Scene {
       primary?: boolean;
       strong?: boolean;
     }) => {
-      const [bw, bh] = box(item.label);
+      const [bw, bh] = fitBox(box, item);
       this.buttons.add({ ...item, rect: [x, by, bw, bh] });
       x += bw + fg;
     };
@@ -3858,14 +3901,14 @@ export class PlaygroundScene implements Scene {
       const stop = vw - pad - rw - fg;
       const spill: typeof work = [];
       for (const item of work) {
-        if (spill.length === 0 && x + box(item.label)[0] <= stop) put(item);
+        if (spill.length === 0 && x + fitBox(box, item)[0] <= stop) put(item);
         else spill.push(item);
       }
       more.unshift(...spill);
       rx -= rw;
       let ix = rx;
       for (const item of right) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         this.buttons.add({ ...item, rect: [ix, by, bw, bh] });
         ix += bw + fg;
       }
@@ -3968,7 +4011,9 @@ export class PlaygroundScene implements Scene {
         : consoleLine(r, "idle")
       : t("pg.consoleReady");
     const sayW = lbx - Math.round(20 * s) - tw - sx;
-    g.fillStyle = css(r && r.outcome !== "ok" ? [1, 0.6, 0.5, 1] : Theme.cream);
+    g.fillStyle = css(
+      r && r.outcome !== "ok" && r.outcome !== "cancelled" ? [1, 0.6, 0.5, 1] : Theme.cream,
+    );
     printf(
       g,
       fonts.codeSm,
@@ -4242,7 +4287,7 @@ export class PlaygroundScene implements Scene {
       this.drawDrive(g, [px, pad, panelW, layout.vh - pad * 2], s, items);
     } else {
       const gapB = roundGap(f);
-      const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
+      const boxes = items.map((i) => btnBox(f, fitLabels(i), 0, btnPad(f), layout.minTouchH()));
       const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
       const dh = boxes[0][1];
       this.buttons.row(
@@ -4280,7 +4325,12 @@ export class PlaygroundScene implements Scene {
     const ly = gy + gh - lineH;
     const oy = ly - outH;
     const text = consoleLine(this.result, this.stage);
-    const bad = this.stage === "idle" && this.result !== null && this.result.outcome !== "ok";
+    // A STOP is not drawn as an error: the player's own hand, not the code.
+    const bad =
+      this.stage === "idle" &&
+      this.result !== null &&
+      this.result.outcome !== "ok" &&
+      this.result.outcome !== "cancelled";
     const lx = gx + Math.round(8 * s);
     const lw = gw - Math.round(16 * s);
     g.save();
@@ -4714,7 +4764,7 @@ export class PlaygroundScene implements Scene {
         return at;
       };
       for (const item of actions) {
-        const [bw, bh] = btnBox(bf, [item.label], 0, btnPad(bf), layout.minTouchH());
+        const [bw, bh] = btnBox(bf, fitLabels(item), 0, btnPad(bf), layout.minTouchH());
         const [bx, by] = place(bw);
         this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
       }
@@ -5341,7 +5391,7 @@ export class PlaygroundScene implements Scene {
       }
       let cx = ix + lead;
       for (const item of core) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         // RUN is the screen's one action: on a soft gold glow, so it is found
         // first rather than between MAPS and the green AUTO-RUN.
         if (item.id === "run") {
@@ -5395,7 +5445,7 @@ export class PlaygroundScene implements Scene {
         return at;
       };
       for (const item of items) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         const [bx, by] = place(bw);
         this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
       }
@@ -5460,7 +5510,7 @@ export class PlaygroundScene implements Scene {
     if (glassy) {
       let rx = cx0 + colW - Math.round(6 * s);
       for (const item of [...this.fontItems().slice(0, 2)].reverse()) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         rx -= bw;
         this.buttons.add({ ...item, rect: [rx, sy + Math.round((stdinH - bh) / 2), bw, bh] });
         rx -= flowGap;

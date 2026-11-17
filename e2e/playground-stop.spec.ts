@@ -52,6 +52,10 @@ async function toPlayground(page: Page): Promise<void> {
 
 const runLabel = (page: Page) =>
   page.evaluate(() => window.__cwbCapture!.buttons().find((b) => b.id === "run")?.label ?? null);
+const runWidth = (page: Page) =>
+  page.evaluate(
+    () => window.__cwbCapture!.buttons().find((b) => b.id === "run")?.client[2] ?? null,
+  );
 
 test("STOP ends a playground run, and RUN works after it", async ({ page }) => {
   const frames: Array<Record<string, unknown>> = [];
@@ -71,6 +75,7 @@ test("STOP ends a playground run, and RUN works after it", async ({ page }) => {
   await toPlayground(page);
   await page.waitForTimeout(1000);
   await setSource(page, SLEEPER);
+  const idleW = await runWidth(page);
   await pressWhenStill(page, "run");
 
   // Into the nap: its first line has streamed back.
@@ -86,6 +91,7 @@ test("STOP ends a playground run, and RUN works after it", async ({ page }) => {
     )
     .toBe(true);
   expect(await runLabel(page), "RUN says STOP while the run is out").toBe("STOP");
+  expect(await runWidth(page), "and keeps its size, so the toolbar does not reflow").toBe(idleW);
   await page.screenshot({ path: `${SHOTS}/${test.info().project.name}-1-running.png` });
 
   const t0 = Date.now();

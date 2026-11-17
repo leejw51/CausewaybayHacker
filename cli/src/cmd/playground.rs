@@ -4,8 +4,8 @@
 //! Nothing here is scored, and that has to be true of the *language* as well
 //! as the data: §4.9c says a playground run *"is not recorded and does not
 //! feed the curriculum"*, and it is also where somebody deliberately writes
-//! something broken to see what the compiler says. So the five outcomes are
-//! described rather than judged — the words "wrong", "failed" and "verdict"
+//! something broken to see what the compiler says. So the outcomes (five,
+//! and `cancelled` for a STOP) are described rather than judged — the words "wrong", "failed" and "verdict"
 //! do not appear in this file.
 //!
 //! **Two of the five messages are undocumented.** §4.9c writes up

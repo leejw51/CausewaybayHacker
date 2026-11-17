@@ -290,6 +290,49 @@ async fn stop_ends_a_playground_run_and_the_next_one_runs() {
     server.handle.abort();
 }
 
+/// STOP during the compile: the compiler is killed (or never started) and the
+/// program never runs — not a line of its output, and no diagnosis of a
+/// compiler stopped mid-thought.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stop_during_the_compile_never_runs_the_program() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+
+    // Straight behind the run: it lands while `rustc` is still working.
+    let run_id = client
+        .send(
+            "playground.run",
+            json!({ "lang": "rust", "source": SLEEPER, "stdin": "" }),
+        )
+        .await;
+    let stop_id = client.send("run.cancel", json!({})).await;
+    let stop = client.wait(&stop_id).await;
+    assert_eq!(stop["payload"]["stopping"].as_bool(), Some(true), "{stop}");
+
+    let reply = client.wait(&run_id).await;
+    let run = &reply["payload"]["run"];
+    assert_eq!(run["outcome"].as_str(), Some("cancelled"), "{reply}");
+    assert_eq!(
+        run["stdout"].as_str(),
+        Some(""),
+        "the program never ran: {run}"
+    );
+    assert!(run["diagnostics"].as_array().unwrap().is_empty(), "{run}");
+    assert!(
+        !client
+            .events
+            .iter()
+            .any(|e| e["type"] == "run.log" && e["payload"]["stream"] == "stdout"),
+        "nothing streamed from a program that never started"
+    );
+
+    // And the next run is a whole one.
+    let next = client.play(HELLO, "").await;
+    assert_eq!(next["outcome"].as_str(), Some("ok"), "{next}");
+    server.handle.abort();
+}
+
 fn table_counts(server: &Server) -> (i64, i64, i64, i64, i64) {
     let conn = server.store.conn();
     let one = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
