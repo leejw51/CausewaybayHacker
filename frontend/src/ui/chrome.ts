@@ -418,6 +418,9 @@ export class Buttons {
       dim?: boolean;
       primary?: boolean;
       strong?: boolean;
+      /** Every label this button can wear: it is sized for the widest, so
+       *  a RUN that turns STOP does not reflow the row under the finger. */
+      fit?: string[];
     }>,
     minH = 0,
     lead = 0,
@@ -433,7 +436,7 @@ export class Buttons {
     // fits on it, or a first button that wraps lands on the filter box.
     let lineH = lead > 0 ? box(f, [], 0, 0, minH)[1] : 0;
     for (const item of labels) {
-      const [bw, bh] = box(f, [item.label], 0, padW, minH);
+      const [bw, bh] = box(f, item.fit ?? [item.label], 0, padW, minH);
       if (cx > x && cx + bw > x + w) {
         cx = x;
         cy += lineH + gap;

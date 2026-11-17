@@ -9,6 +9,10 @@
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// The cancel flag of the playground run holding a connection's execution
+/// slot, if one does (`run.cancel`).
+type CancelSlot = Arc<Mutex<Option<Arc<AtomicBool>>>>;
 use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
@@ -209,6 +213,10 @@ async fn connection(mut socket: WebSocket, state: Shared) {
     // §3.2: one in-flight `quest.submit` per connection. Per connection, not
     // per user — the same wallet in two windows gets two slots.
     let in_flight = Arc::new(AtomicBool::new(false));
+    // The STOP for what holds that slot, when it is a playground run
+    // (`run.cancel`): a fresh flag per execution, never reused, so a cancel
+    // that arrives late cannot reach the next run.
+    let cancel_slot: CancelSlot = Arc::new(Mutex::new(None));
     // §2.2: reusing an `id` that is still in flight is `bad_request`.
     let live_ids: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
     // What this connection is allowed to ask for, and how fast (`limits.rs`).
@@ -246,6 +254,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
                     connection_id,
                     &mut session,
                     &in_flight,
+                    &cancel_slot,
                     &live_ids,
                     &allowance,
                     &tx,
@@ -314,6 +323,7 @@ async fn dispatch(
     connection_id: u64,
     session: &mut Session,
     in_flight: &Arc<AtomicBool>,
+    cancel_slot: &CancelSlot,
     live_ids: &Arc<Mutex<HashSet<String>>>,
     allowance: &Arc<ConnectionLimits>,
     tx: &Out,
@@ -453,12 +463,34 @@ async fn dispatch(
         return Next::Continue;
     }
 
+    // STOP (PROTOCOL `run.cancel`): answered at once and off the slot it is
+    // about, since the whole point is that the slot is taken. It says whether
+    // there was a playground run to stop; the run itself then answers its
+    // own `playground.run` with `outcome: "cancelled"` once the child is
+    // gone, and that reply — not this one — is what frees the slot.
+    if kind == "run.cancel" {
+        let stopping = match cancel_slot.lock().unwrap().as_ref() {
+            Some(flag) => {
+                flag.store(true, Ordering::SeqCst);
+                true
+            }
+            None => false,
+        };
+        release(live_ids, &id);
+        send(
+            tx,
+            ServerFrame::ok(id, &kind, serde_json::json!({ "stopping": stopping })),
+        );
+        return Next::Continue;
+    }
+
     if let Some(execution) = Execution::for_kind(&kind) {
         execute_async(
             state,
             connection_id,
             session,
             in_flight,
+            cancel_slot,
             live_ids,
             tx,
             id,
@@ -619,6 +651,7 @@ fn execute_async(
     connection_id: u64,
     session: &Session,
     in_flight: &Arc<AtomicBool>,
+    cancel_slot: &CancelSlot,
     live_ids: &Arc<Mutex<HashSet<String>>>,
     tx: &Out,
     id: Option<String>,
@@ -680,9 +713,20 @@ fn execute_async(
         return;
     };
 
+    // Only a playground run can be stopped. A quest RUN or SUBMIT is an
+    // attempt that is recorded and judged (§4.9b), and half of one is not a
+    // thing the curriculum should hold; `run.cancel` during one answers
+    // `stopping: false` and the submit runs to its own end.
+    let cancel = matches!(execution, Execution::Playground).then(|| {
+        let flag = Arc::new(AtomicBool::new(false));
+        *cancel_slot.lock().unwrap() = Some(flag.clone());
+        flag
+    });
+
     let state = state.clone();
     let tx = tx.clone();
     let flag = in_flight.clone();
+    let cancel_slot = cancel_slot.clone();
     let live_ids = live_ids.clone();
     tokio::spawn(async move {
         // The compiler blocks for seconds; it does not belong on an async
@@ -694,11 +738,17 @@ fn execute_async(
                 Execution::Quest(mode) => {
                     submit::run(&state, &address, connection_id, mode, &payload, &tx)
                 }
-                Execution::Playground => playground::run(&state, &address, &payload, &tx),
+                Execution::Playground => {
+                    playground::run(&state, &address, &payload, &tx, cancel.unwrap_or_default())
+                }
             })
             .await
         };
         drop(pass);
+        // Off the slot before the slot is given back, so a `run.cancel` read
+        // between the two cannot find this run's flag and report a stop for
+        // a run that has already ended.
+        *cancel_slot.lock().unwrap() = None;
         flag.store(false, Ordering::SeqCst);
         release(&live_ids, &id);
         let frame = match result {

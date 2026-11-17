@@ -4,8 +4,8 @@
 //! Nothing here is scored, and that has to be true of the *language* as well
 //! as the data: §4.9c says a playground run *"is not recorded and does not
 //! feed the curriculum"*, and it is also where somebody deliberately writes
-//! something broken to see what the compiler says. So the five outcomes are
-//! described rather than judged — the words "wrong", "failed" and "verdict"
+//! something broken to see what the compiler says. So the outcomes (five,
+//! and `cancelled` for a STOP) are described rather than judged — the words "wrong", "failed" and "verdict"
 //! do not appear in this file.
 //!
 //! **Two of the five messages are undocumented.** §4.9c writes up
@@ -81,6 +81,9 @@ pub async fn run(ctx: &Ctx, file: &Path, stdin_file: Option<&Path>) -> Result<()
         "runtime_error" => paint.yellow("stopped early"),
         "timeout" => paint.yellow("took too long"),
         "output_limit" => paint.yellow("printed too much"),
+        // `run.cancel` from another client on the same connection cannot
+        // happen here, but the server may say it, so it is named.
+        "cancelled" => paint.dim("stopped"),
         other => paint.yellow(other),
     };
     println!(

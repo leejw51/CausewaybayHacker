@@ -67,7 +67,7 @@ at 768×960 found what is left.
 | D1 ✅ | FE | **Installable web app.** *(done 2026-11-17: manifest, Apple meta, safe-area insets for the notch and the home indicator, an offline-page service worker that caches none of the game; iPhone and iPad alike)* A `manifest.webmanifest` (name, the coder icons already in `public/icons/`, `display: standalone`, indigo theme colour) so Add to Home Screen opens full screen with no Safari bar. | Launched from the iPad home screen, the game fills the screen and keeps its login |
 | D2 | FE | **Panels sized to what they hold, upright.** RESULT's THE RUN, STATS' drill and log, and AI MODE's coach are each a tall empty well when there is little in them. | At 768×960 no panel is more than half empty; the space goes to the panel that has content |
 | D3 | FE | **The map on a 4:5 screen.** Upright on an iPad the map is a narrow column with wide dead gutters. | The map uses ≥ 80 % of the width at 768×960 |
-| D4 | FE | **A busy RUN that can be stopped.** While compiling or running, RUN is dimmed and there is no way out but the time limit. | A STOP in its place ends the run; the next RUN works |
+| D4 ✅ | FE | **A busy RUN that can be stopped.** *(done 2026-11-17: `run.cancel`, RUN turns STOP, a stopped run is not a failure — `docs/decisions.md`)* While compiling or running, RUN is dimmed and there is no way out but the time limit. | A STOP in its place ends the run; the next RUN works |
 | D5 | QA | **An iPad project in e2e.** 768×960, touch, Korean, next to `landscape` and `portrait`. | `npx playwright test --project=ipad` runs the sweep and saves its shots |
 
 ### Release and tooling

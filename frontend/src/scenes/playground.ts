@@ -355,6 +355,7 @@ const EN_OUTCOME: Record<PlaygroundRun["outcome"], string> = {
   runtime_error: tEn("pg.stopped"),
   timeout: tEn("pg.timedOut"),
   output_limit: tEn("pg.tooMuch"),
+  cancelled: tEn("pg.cancelled"),
 };
 
 const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
@@ -363,6 +364,7 @@ const OUTCOME: Record<PlaygroundRun["outcome"], () => string> = {
   runtime_error: () => t("pg.stopped"),
   timeout: () => t("pg.timedOut"),
   output_limit: () => t("pg.tooMuch"),
+  cancelled: () => t("pg.cancelled"),
 };
 
 /**
@@ -421,6 +423,8 @@ export function consoleLine(run: PlaygroundRun | null, stage: RunStage | "idle")
       return t("pg.consoleOk", { compile: run.compile_ms, run: run.run_ms });
     case "timeout":
       return t("pg.consoleTimeout");
+    case "cancelled":
+      return t("pg.consoleStopped");
     case "output_limit":
       return t("pg.consoleLimit");
     case "runtime_error":
@@ -467,6 +471,25 @@ export function consoleOutput(run: PlaygroundRun | null, stage: RunStage | "idle
   return lines.length ? lines[lines.length - 1] : t("pg.consoleNoOutput");
 }
 
+/**
+ * The box a toolbar item is laid out in: its own label's, or the widest of
+ * the labels it can wear (`fit`), so a button that changes its word in
+ * place keeps one size and the row after it does not move.
+ */
+function fitBox(
+  box: (label: string) => [number, number],
+  item: { label: string; fit?: string[] },
+): [number, number] {
+  return fitLabels(item)
+    .map(box)
+    .reduce((a, b) => (b[0] > a[0] ? b : a));
+}
+
+/** The labels an item is measured by: `fit` when it has one. */
+function fitLabels(item: { label: string; fit?: string[] }): string[] {
+  return item.fit ?? [item.label];
+}
+
 /** The output banner's word for an outcome: short, loud, a game's. */
 function bannerTitle(o: PlaygroundRun["outcome"]): string {
   switch (o) {
@@ -480,6 +503,8 @@ function bannerTitle(o: PlaygroundRun["outcome"]): string {
       return t("pg.fxTimeout");
     case "output_limit":
       return t("pg.fxFlood");
+    case "cancelled":
+      return t("pg.fxStopped");
   }
 }
 
@@ -550,6 +575,8 @@ const SCRATCH = "SCRATCH";
 
 /** The shortest a pressed RUN's compile animation is on screen. */
 const MIN_SHOW_MS = 1000;
+/** A press on the RUN button this soon after RUN is a double tap, not STOP. */
+const STOP_GUARD_MS = 400;
 
 export class PlaygroundScene implements Scene {
   readonly name = "playground";
@@ -739,6 +766,17 @@ export class PlaygroundScene implements Scene {
    * the answer on screen is for the code on screen and not for a line ago.
    */
   private runAgain = false;
+  /**
+   * STOP was pressed and the run has not answered yet (`run.cancel`): the
+   * server is killing it, and the slot is free only when `playground.run`
+   * comes back, so RUN is not offered again until then.
+   */
+  private stopping = false;
+  /** How the run that is out was started: only a pressed one offers STOP. */
+  private runHow: "auto" | "press" = "press";
+  /** When RUN was last pressed: a double tap lands on the same rect, and the
+   *  second tap is not a STOP. */
+  private runPressedAt = 0;
   private attemptId: string | null = null;
   private log = new LogBuffer("");
   private result: PlaygroundRun | null = null;
@@ -1448,6 +1486,10 @@ export class PlaygroundScene implements Scene {
    */
   private answered(run: PlaygroundRun, how: "auto" | "press"): void {
     this.answeredAt = this.t;
+    // STOP is the player's own hand, not the code's verdict: it is not a
+    // run on today's count, not a failure to fix, not -1 HP, and nothing
+    // glitches or shakes for it. The banner and the line say STOPPED.
+    if (run.outcome === "cancelled") return;
     this.runs = [...this.runs, run.outcome].slice(-RECENT_RUNS);
     const ed = this.editorRect[2] > 0 ? this.editorRect : null;
     const out = this.outputRect[2] > 0 ? this.outputRect : ed;
@@ -1554,8 +1596,67 @@ export class PlaygroundScene implements Scene {
     this.app.chip.blip();
   }
 
+  /**
+   * RUN, or STOP while a run is out — one button in one place, so the thumb
+   * that started it can end it. Every toolbar takes this one item.
+   */
+  private runItem(): {
+    id: string;
+    label: string;
+    dim?: boolean;
+    primary?: boolean;
+    fit: string[];
+  } {
+    const idle = this.stage === "idle";
+    // STOP is offered only for a run somebody pressed for. An AUTO-RUN goes
+    // out on every ENTER (and AUTO-RUN is on by default), so a STOP in its
+    // place would turn the RUN press that follows an ENTER into a kill of the
+    // run it meant to start; during one, RUN stays RUN and queues.
+    const stoppable = !idle && this.runHow === "press";
+    return {
+      id: "run",
+      label: !stoppable ? t("pg.run") : this.stopping ? t("pg.stopping") : t("pg.stop"),
+      dim: this.stopping || (!idle && !stoppable),
+      primary: idle,
+      // One box for all three, or every press would move the ten buttons
+      // after it — the reflow v0.1.8 took the "…" label away to stop.
+      fit: [t("pg.run"), t("pg.stop"), t("pg.stopping")],
+    };
+  }
+
+  /**
+   * The RUN button: run when idle; STOP while a pressed run is out; during
+   * an AUTO-RUN, run again once it is back (as ENTER does).
+   */
+  private runOrStop(): void {
+    if (this.stage === "idle") {
+      this.runPressedAt = performance.now();
+      void this.run();
+    } else if (this.runHow === "press") this.stop();
+    else if (!this.stopping) this.runAgain = true;
+  }
+
+  /**
+   * STOP (PROTOCOL `run.cancel`). The run then answers its own request with
+   * `outcome: "cancelled"`, and that answer — not this one — ends the wait.
+   */
+  private stop(): void {
+    if (this.stage === "idle" || this.stopping || this.runHow !== "press") return;
+    if (performance.now() - this.runPressedAt < STOP_GUARD_MS) return;
+    this.stopping = true;
+    // An ENTER queued behind the run would start it again the moment it
+    // stopped, which is the opposite of what STOP asked for.
+    this.runAgain = false;
+    this.app.chip.blip();
+    this.app.client.request("run.cancel", {}).catch(() => {
+      // Nothing to undo: if the ask never arrived the run ends on its own
+      // clock, as it would have without a STOP.
+    });
+  }
+
   private autoEnter(): void {
-    if (!this.autoRun || this.conflict) return;
+    // Not while a STOP is on its way: a queued re-run would undo it.
+    if (!this.autoRun || this.conflict || this.stopping) return;
     if (this.stage === "idle") void this.run("auto");
     else this.runAgain = true;
   }
@@ -2075,6 +2176,7 @@ export class PlaygroundScene implements Scene {
 
   private async run(how: "auto" | "press" = "press"): Promise<PlaygroundRun | null> {
     if (this.stage !== "idle") return null;
+    this.runHow = how;
     if (how === "press") this.launched();
     const source = this.editor?.source ?? this.held.source;
     this.held.source = source;
@@ -2095,8 +2197,9 @@ export class PlaygroundScene implements Scene {
       // that is back in 100 ms would otherwise flash the waiting curve and
       // the particles and be gone before they could be seen. AUTO-RUN (every
       // ENTER) does not wait — it is the quick look — and FX OFF never does.
+      const stopped = res.run.outcome === "cancelled";
       const held = MIN_SHOW_MS - (performance.now() - startedAt);
-      if (how === "press" && this.fxLevel !== "off" && held > 0) {
+      if (how === "press" && !stopped && this.fxLevel !== "off" && held > 0) {
         await new Promise((r) => setTimeout(r, held));
       }
       this.result = res.run;
@@ -2109,6 +2212,8 @@ export class PlaygroundScene implements Scene {
         this.retro?.say(runMessage(machine, res.run));
       this.answered(res.run, how);
       if (res.run.outcome === "ok") this.app.chip.coin();
+      // Stopped on purpose: not a failure, so not the failure sound.
+      else if (stopped) this.app.chip.select();
       // No screen shake here, on purpose *and* because it could not land:
       // `App.shake` refuses while the overlay has children, and this screen
       // always has two. A failed compile in a scratchpad is also not a failure
@@ -2124,6 +2229,7 @@ export class PlaygroundScene implements Scene {
       this.app.chip.fail();
     } finally {
       this.stage = "idle";
+      this.stopping = false;
     }
     if (this.runAgain) {
       this.runAgain = false;
@@ -2458,6 +2564,8 @@ export class PlaygroundScene implements Scene {
     }
     if ((name === "return" || name === "kpenter") && (ev.ctrlKey || ev.metaKey)) {
       ev.preventDefault();
+      // Run only. A chord typed out of habit while a run is out must not end
+      // it; STOP is the button.
       void this.run();
     }
     if (name === "s" && (ev.ctrlKey || ev.metaKey)) {
@@ -2672,7 +2780,7 @@ export class PlaygroundScene implements Scene {
       this.app.chip.blip();
       return;
     }
-    if (hit.id === "run") void this.run();
+    if (hit.id === "run") this.runOrStop();
     else if (hit.id === "format") void this.format();
     else if (hit.id === "save") void this.save();
     else if (hit.id === "new") void this.fresh();
@@ -2707,7 +2815,12 @@ export class PlaygroundScene implements Scene {
       this.fxLevel === "off" ? null : this.zenScreen,
       this.stage !== "idle",
       this.stage === "running" || this.stage === "judging",
-      this.result ? (this.result.outcome === "ok" ? "ok" : "bad") : null,
+      // A STOP settles quietly: no burst either way.
+      this.result && this.result.outcome !== "cancelled"
+        ? this.result.outcome === "ok"
+          ? "ok"
+          : "bad"
+        : null,
     );
     this.pops?.combo(
       loud && !this.comboInRail ? shown : null,
@@ -3406,12 +3519,7 @@ export class PlaygroundScene implements Scene {
     const bx = layout.vw - pad - dw;
 
     const items = this.tools.filter([
-      {
-        id: "run",
-        label: t("pg.run"),
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
+      this.runItem(),
       this.autoItem(),
       this.stderrItem(),
       ...(this.app.client.canFormat(this.land)
@@ -3695,12 +3803,7 @@ export class PlaygroundScene implements Scene {
 
     const back = { id: "unfocus", label: t("pg.bench") };
     const work = [
-      {
-        id: "run",
-        label: t("pg.run"),
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
+      this.runItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
         : []),
@@ -3750,7 +3853,7 @@ export class PlaygroundScene implements Scene {
       primary?: boolean;
       strong?: boolean;
     }) => {
-      const [bw, bh] = box(item.label);
+      const [bw, bh] = fitBox(box, item);
       this.buttons.add({ ...item, rect: [x, by, bw, bh] });
       x += bw + fg;
     };
@@ -3798,14 +3901,14 @@ export class PlaygroundScene implements Scene {
       const stop = vw - pad - rw - fg;
       const spill: typeof work = [];
       for (const item of work) {
-        if (spill.length === 0 && x + box(item.label)[0] <= stop) put(item);
+        if (spill.length === 0 && x + fitBox(box, item)[0] <= stop) put(item);
         else spill.push(item);
       }
       more.unshift(...spill);
       rx -= rw;
       let ix = rx;
       for (const item of right) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         this.buttons.add({ ...item, rect: [ix, by, bw, bh] });
         ix += bw + fg;
       }
@@ -3858,7 +3961,8 @@ export class PlaygroundScene implements Scene {
       : this.stage !== "idle"
         ? this.stageLabel().toUpperCase()
         : t("pg.ready");
-    const chipCol: RGBA = !r ? Theme.cyan : r.outcome === "ok" ? Theme.admit : Theme.red;
+    const chipCol: RGBA =
+      !r || r.outcome === "cancelled" ? Theme.cyan : r.outcome === "ok" ? Theme.admit : Theme.red;
     const cw = width(sm, chip) + Math.round(12 * s);
     const ch = sm.height + Math.round(2 * s);
     g.fillStyle = css(chipCol, 0.25);
@@ -3907,7 +4011,9 @@ export class PlaygroundScene implements Scene {
         : consoleLine(r, "idle")
       : t("pg.consoleReady");
     const sayW = lbx - Math.round(20 * s) - tw - sx;
-    g.fillStyle = css(r && r.outcome !== "ok" ? [1, 0.6, 0.5, 1] : Theme.cream);
+    g.fillStyle = css(
+      r && r.outcome !== "ok" && r.outcome !== "cancelled" ? [1, 0.6, 0.5, 1] : Theme.cream,
+    );
     printf(
       g,
       fonts.codeSm,
@@ -4155,12 +4261,7 @@ export class PlaygroundScene implements Scene {
     const f = fonts.tool;
     const pad = Math.round(6 * s);
     const items = [
-      {
-        id: "run",
-        label: t("pg.run"),
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
+      this.runItem(),
       { id: "console", label: t("pg.console"), strong: true },
       ...(layout.isPortrait()
         ? [
@@ -4186,7 +4287,7 @@ export class PlaygroundScene implements Scene {
       this.drawDrive(g, [px, pad, panelW, layout.vh - pad * 2], s, items);
     } else {
       const gapB = roundGap(f);
-      const boxes = items.map((i) => btnBox(f, [i.label], 0, btnPad(f), layout.minTouchH()));
+      const boxes = items.map((i) => btnBox(f, fitLabels(i), 0, btnPad(f), layout.minTouchH()));
       const rowW = boxes.reduce((a, [w]) => a + w + gapB, 0);
       const dh = boxes[0][1];
       this.buttons.row(
@@ -4224,7 +4325,12 @@ export class PlaygroundScene implements Scene {
     const ly = gy + gh - lineH;
     const oy = ly - outH;
     const text = consoleLine(this.result, this.stage);
-    const bad = this.stage === "idle" && this.result !== null && this.result.outcome !== "ok";
+    // A STOP is not drawn as an error: the player's own hand, not the code.
+    const bad =
+      this.stage === "idle" &&
+      this.result !== null &&
+      this.result.outcome !== "ok" &&
+      this.result.outcome !== "cancelled";
     const lx = gx + Math.round(8 * s);
     const lw = gw - Math.round(16 * s);
     g.save();
@@ -4526,12 +4632,7 @@ export class PlaygroundScene implements Scene {
       // The way back, never dropped: on a phone the optional buttons go
       // first when the bench is crowded, and the way out must not be one.
       { id: "back", label: t("pg.maps") },
-      {
-        id: "run",
-        label: t("pg.run"),
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
+      this.runItem(),
       this.autoItem(),
       this.stderrItem(),
       ...(this.app.client.canFormat(this.land)
@@ -4663,7 +4764,7 @@ export class PlaygroundScene implements Scene {
         return at;
       };
       for (const item of actions) {
-        const [bw, bh] = btnBox(bf, [item.label], 0, btnPad(bf), layout.minTouchH());
+        const [bw, bh] = btnBox(bf, fitLabels(item), 0, btnPad(bf), layout.minTouchH());
         const [bx, by] = place(bw);
         this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
       }
@@ -5057,7 +5158,8 @@ export class PlaygroundScene implements Scene {
     const gap = Math.round(6 * s);
     const r = this.result;
     const ok = r?.outcome === "ok";
-    const tint: RGBA = !r ? Theme.cyan : ok ? Theme.admit : Theme.red;
+    const neutral = !r || r.outcome === "cancelled";
+    const tint: RGBA = neutral ? Theme.cyan : ok ? Theme.admit : Theme.red;
 
     // The card.
     const tileH = sm.height * 2 + Math.round(8 * s);
@@ -5080,7 +5182,7 @@ export class PlaygroundScene implements Scene {
     g.save();
     g.shadowColor = css(tint, 0.8);
     g.shadowBlur = Math.round(10 * s);
-    g.fillStyle = css(!r ? Theme.cyan : ok ? [0.5, 0.88, 0.63, 1] : [1, 0.45, 0.35, 1]);
+    g.fillStyle = css(neutral ? Theme.cyan : ok ? [0.5, 0.88, 0.63, 1] : [1, 0.45, 0.35, 1]);
     printf(g, fonts.ui, elide(fonts.ui, title, w - pad * 2), x + pad, cy, w - pad * 2, "left");
     g.restore();
     if (!r && this.stage !== "idle") {
@@ -5237,12 +5339,7 @@ export class PlaygroundScene implements Scene {
     const rowH = box("M")[1];
 
     const core = [
-      {
-        id: "run",
-        label: t("pg.run"),
-        dim: this.stage !== "idle",
-        primary: this.stage === "idle",
-      },
+      this.runItem(),
       this.autoItem(),
       ...(this.app.client.canFormat(this.land)
         ? [{ id: "format", label: t("pg.format"), dim: this.formatting }]
@@ -5294,7 +5391,7 @@ export class PlaygroundScene implements Scene {
       }
       let cx = ix + lead;
       for (const item of core) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         // RUN is the screen's one action: on a soft gold glow, so it is found
         // first rather than between MAPS and the green AUTO-RUN.
         if (item.id === "run") {
@@ -5348,7 +5445,7 @@ export class PlaygroundScene implements Scene {
         return at;
       };
       for (const item of items) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         const [bx, by] = place(bw);
         this.buttons.add({ ...item, rect: [bx, by, bw, bh] });
       }
@@ -5413,7 +5510,7 @@ export class PlaygroundScene implements Scene {
     if (glassy) {
       let rx = cx0 + colW - Math.round(6 * s);
       for (const item of [...this.fontItems().slice(0, 2)].reverse()) {
-        const [bw, bh] = box(item.label);
+        const [bw, bh] = fitBox(box, item);
         rx -= bw;
         this.buttons.add({ ...item, rect: [rx, sy + Math.round((stdinH - bh) / 2), bw, bh] });
         rx -= flowGap;
@@ -5592,13 +5689,15 @@ export class PlaygroundScene implements Scene {
         (this.fxLevel === "full" ? 1 : this.fxLevel === "calm" ? 0.35 : 0);
       const title = bannerTitle(r.outcome);
       const bandH = fonts.ui.height + Math.round(14 * s);
-      const tint = ok ? Theme.admit : Theme.red;
+      // STOP is neither: the player's own hand, in the neutral cyan.
+      const stopped = r.outcome === "cancelled";
+      const tint = ok ? Theme.admit : stopped ? Theme.cyan : Theme.red;
       fill(g, tint, x, y, w, bandH, 0.22 + 0.5 * flash);
       fill(g, tint, x, y, w, Math.round(3 * s), 0.95);
       g.save();
       g.shadowColor = css(tint);
       g.shadowBlur = Math.round((10 + 24 * flash) * s);
-      g.fillStyle = css(ok ? [0.5, 0.95, 0.65, 1] : [1, 0.5, 0.4, 1]);
+      g.fillStyle = css(ok ? [0.5, 0.95, 0.65, 1] : stopped ? Theme.cyan : [1, 0.5, 0.4, 1]);
       const pop = 1 + 0.25 * flash * flash;
       g.translate(x + pad, y + bandH / 2);
       g.scale(pop, pop);
