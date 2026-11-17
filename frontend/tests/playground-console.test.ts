@@ -74,6 +74,12 @@ describe("CONSOLE's one line", () => {
     expect(consoleLine(run({ outcome: "output_limit" }), "idle")).toMatch(/^OUTPUT LIMIT/);
   });
 
+  it("says a STOP was the player's, and keeps what it had printed", () => {
+    const r = run({ outcome: "cancelled", exit_code: null, stdout: "before the nap\n" });
+    expect(consoleLine(r, "idle")).toBe("BREAK: you stopped it");
+    expect(consoleOutput(r, "idle")).toBe("before the nap");
+  });
+
   it("never comes out as more than one line", () => {
     const r = run({ outcome: "compile_error", stderr: "error: a\nb\nc" });
     expect(consoleLine(r, "idle")).not.toContain("\n");

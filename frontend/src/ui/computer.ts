@@ -135,7 +135,7 @@ export const TUBE: Record<Exclude<Computer, "normal">, Tube> = {
     paper: [0, 85 / 255, 170 / 255],
     ink: [1, 1, 1],
     cols: 64,
-    scan: 0.10,
+    scan: 0.1,
     scanPx: 2,
     mask: 0.04,
     bloom: 0.45,
@@ -147,20 +147,25 @@ export const TUBE: Record<Exclude<Computer, "normal">, Tube> = {
 };
 
 /** How a run ended, as each machine would have said so. */
-export type Outcome = "compile_error" | "runtime_error" | "timeout" | "output_limit";
+export type Outcome = "compile_error" | "runtime_error" | "timeout" | "output_limit" | "cancelled";
 
+// `cancelled` is STOP: what each machine printed for its own break key —
+// Ctrl-C on the Apple ][ and the MSX's CTRL+STOP stop BASIC mid-line, and
+// the Amiga's CLI answers Ctrl-C with `***Break`.
 export const SAYS: Record<Exclude<Computer, "normal">, Record<Outcome, string[]>> = {
   apple2: {
     compile_error: ["?SYNTAX ERROR"],
     runtime_error: ["?ILLEGAL QUANTITY ERROR"],
     timeout: ["BREAK IN 10"],
     output_limit: ["?OUT OF MEMORY ERROR"],
+    cancelled: ["BREAK IN 10"],
   },
   msx: {
     compile_error: ["Syntax error in 10"],
     runtime_error: ["Illegal function call in 10"],
     timeout: ["Break in 10"],
     output_limit: ["Out of memory"],
+    cancelled: ["Break in 10"],
   },
   amiga: {
     compile_error: [
@@ -179,6 +184,7 @@ export const SAYS: Record<Exclude<Computer, "normal">, Record<Outcome, string[]>
       "Not enough memory.    Press left mouse button to continue.",
       "Guru Meditation #81000005.0000BEEF",
     ],
+    cancelled: ["***Break"],
   },
 };
 

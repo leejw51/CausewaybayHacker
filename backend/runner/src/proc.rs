@@ -88,6 +88,76 @@ pub struct Outcome {
     /// the process group, plus anything a clean exit left behind. Zero for the
     /// overwhelming majority of attempts.
     pub strays_killed: usize,
+    /// Stopped because the player asked (`run.cancel`), not by any limit:
+    /// killed the way a timeout is, or never spawned at all when the ask came
+    /// before it. See `cancel_on`.
+    pub cancelled: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Cancel: STOP while a run is out (PROTOCOL `run.cancel`).
+//
+// The flag rides on the thread rather than through `Limits` or `Submission`,
+// because a submission is compiled and run on the one thread that called
+// `runner::run` (every language module waits for its children here, in
+// `run`), and nineteen `Limits` literals would otherwise each have to carry
+// it. The server's executions run on pooled `spawn_blocking` threads, so the
+// flag is set by a guard that takes it off again however the run ends —
+// including a panic — or a stale flag would stop the next connection's run
+// on the same thread.
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    static CANCEL: std::cell::RefCell<Option<Arc<AtomicBool>>> =
+        const { std::cell::RefCell::new(None) };
+    static CANCEL_FIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// While this lives, every child `run` starts or waits for on this thread
+/// stops when `flag` is set. Dropping it takes the flag off the thread.
+#[must_use = "the flag is only watched while the guard lives"]
+pub struct CancelGuard {
+    // Not `Send`: the flag is on *this* thread, and a guard dropped on
+    // another would clear the wrong one.
+    _not_send: std::marker::PhantomData<*const ()>,
+}
+
+/// Watch `flag` for the rest of this thread's work until the guard drops.
+pub fn cancel_on(flag: Arc<AtomicBool>) -> CancelGuard {
+    CANCEL.with(|c| *c.borrow_mut() = Some(flag));
+    CANCEL_FIRED.with(|f| f.set(false));
+    CancelGuard {
+        _not_send: std::marker::PhantomData,
+    }
+}
+
+impl CancelGuard {
+    /// Whether a child was actually stopped (or not started) for the flag —
+    /// the fact, from here, as against the flag having been set after the
+    /// last child had already finished, which stopped nothing.
+    pub fn fired(&self) -> bool {
+        CANCEL_FIRED.with(|f| f.get())
+    }
+}
+
+impl Drop for CancelGuard {
+    fn drop(&mut self) {
+        CANCEL.with(|c| *c.borrow_mut() = None);
+        CANCEL_FIRED.with(|f| f.set(false));
+    }
+}
+
+/// Whether the flag this thread is watching has been set.
+fn cancel_requested() -> bool {
+    CANCEL.with(|c| {
+        c.borrow()
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::SeqCst))
+    })
+}
+
+fn mark_fired() {
+    CANCEL_FIRED.with(|f| f.set(true));
 }
 
 impl Outcome {
@@ -157,6 +227,17 @@ pub fn run(
         }
     }
 
+    // Asked to stop before this child exists: do not start it. This is what
+    // keeps a STOP pressed during the compile from going on to run the
+    // binary — the compile is killed, and the run never begins.
+    if cancel_requested() {
+        mark_fired();
+        return Ok(Outcome {
+            cancelled: true,
+            ..Outcome::default()
+        });
+    }
+
     let started = Instant::now();
     let mut child = command.spawn()?;
     let pid = child.id() as i32;
@@ -205,6 +286,7 @@ pub fn run(
     let mut tracker = Tracker::new(pid);
 
     let mut timed_out = false;
+    let mut cancelled = false;
     // When the program first ran, as against when it was spawned: see
     // `EXEC_HOLD_MAX`. `None` until the child has consumed any CPU at all.
     let mut running_since: Option<Instant> = None;
@@ -227,6 +309,14 @@ pub fn run(
         if overflow.load(Ordering::Relaxed) {
             // The cap is enforced the moment it is crossed, not after the
             // child has finished writing a gigabyte into memory.
+            stop_and_kill(&mut tracker, pid);
+            break child.wait().ok();
+        }
+        if cancel_requested() {
+            // The player pressed STOP: the same kill as a timeout (SIGTERM,
+            // grace, SIGKILL, then the strays), told apart only in the record.
+            cancelled = true;
+            mark_fired();
             stop_and_kill(&mut tracker, pid);
             break child.wait().ok();
         }
@@ -304,6 +394,7 @@ pub fn run(
         held_ms: held.as_millis() as u64,
         stdout_produced: produced.load(Ordering::Relaxed),
         strays_killed,
+        cancelled,
     })
 }
 

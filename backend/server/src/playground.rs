@@ -1,7 +1,7 @@
 //! The playground (PROTOCOL §4.9c): free code, run it, and a scratchpad that
 //! follows the player between clients.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -31,6 +31,7 @@ pub fn run(
     _address: &str,
     payload: &serde_json::Value,
     out: &Out,
+    cancel: Arc<AtomicBool>,
 ) -> Result<serde_json::Value> {
     let lang = str_field(payload, "lang")?;
     let source = str_field(payload, "source")?;
@@ -103,8 +104,36 @@ pub fn run(
             Event::Log { stream, chunk } => events.log(&stream, &chunk),
         }),
     };
-    let report = cwbhacker_runner::run(&submission);
+    // STOP (`run.cancel`): watched for exactly as long as the runner runs, on
+    // this pooled thread, and taken off it however the run ends.
+    let stopped = {
+        let guard = cwbhacker_runner::proc::cancel_on(cancel);
+        let report = cwbhacker_runner::run(&submission);
+        (report, guard.fired())
+    };
+    let (report, stopped) = stopped;
     state.running.fetch_sub(1, Ordering::SeqCst);
+
+    // Stopped by the player: whatever the half-run compiler or program left
+    // in its pipes is not a diagnosis — a compiler killed mid-thought prints
+    // nothing useful, and a program stopped by SIGTERM did not "crash". The
+    // output it had already printed is kept, since that is what the player
+    // was watching when they pressed STOP.
+    if stopped {
+        return Ok(json!({
+            "run": {
+                "attempt_id": attempt_id,
+                "lang": lang,
+                "outcome": "cancelled",
+                "compile_ms": report.compile_ms,
+                "run_ms": report.run_ms,
+                "exit_code": serde_json::Value::Null,
+                "stdout": report.stdout,
+                "stderr": "",
+                "diagnostics": [],
+            }
+        }));
+    }
 
     // -----------------------------------------------------------------
     // Nothing is recorded. No `attempts` row, no `mistakes` row, nothing

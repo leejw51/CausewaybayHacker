@@ -182,6 +182,9 @@ A connection never goes back to ANONYMOUS. To change user, open a new one.
   wallet open in two windows gets two slots, and the server serialises the
   compiler behind them.
 * Every other request may be pipelined freely.
+* `run.cancel` (§4.9c) is answered at once even while the slot is taken —
+  stopping what holds the slot is its whole purpose. The slot is free again
+  when the stopped run sends its own reply, not when `run.cancel` is answered.
 * The server processes requests concurrently and replies as they finish (§2.2).
 
 ### 3.3 Errors
@@ -638,6 +641,30 @@ somebody *deliberately* writes something broken to see what the compiler says,
 which is the last thing that should be counted against them.
 
 The limits in SPEC §5.3 apply unchanged — the playground is the same runner.
+
+**STOP.** A playground run can be ended before its clock does:
+
+```json
+→ run.cancel  payload: { }
+← payload: { "stopping": true }          // false: no playground run was out
+```
+
+`run.cancel` names nothing: it stops whatever playground run holds this
+connection's slot (§3.2), and is answered at once. The run is killed the way
+a timeout is — SIGTERM, the §5.3 grace, SIGKILL, then any strays — whether it
+is still compiling (and then it is never run) or already running. Its own
+`playground.run` request then answers with `outcome: "cancelled"`, the stdout
+it had printed by then, an empty `stderr` and no `diagnostics` (a compiler
+killed mid-thought diagnoses nothing). That reply, not the `run.cancel` one,
+frees the slot, so a client keeps RUN unavailable until it arrives.
+
+A cancel is bound to the run it was sent during: one with nothing out answers
+`stopping: false` and reaches nothing later, and one that lands after the run
+has finished stops nothing and the run keeps its real outcome. Only the
+playground can be stopped. A `quest.run` or `quest.submit` is an attempt that
+is recorded and judged (§4.9b), and half of one is not something the
+curriculum should hold, so `run.cancel` during one answers `stopping: false`
+and the attempt runs to its own end.
 
 **A Rust pad has the crate shelf.** When the machine has built it (`cwbhacker
 warm`, SPEC §5.1), a `lang: "rust"` run is built by cargo against every crate
@@ -1482,7 +1509,8 @@ cleared" — re-solving a cleared quest reports `verdict: "accepted"` with
 type PlaygroundRun = {
   attempt_id: string;                    // for correlating the stream only
   lang: "rust" | "go" | "cpp" | "python" | "pytorch" | "typescript" | "zig" | "lua";
-  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
+  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit"
+         | "cancelled";                  // STOP, §4.9c: stdout kept, no diagnostics
   compile_ms: number; run_ms: number;
   exit_code: number | null;
   stdout: string;                        // what it printed, capped

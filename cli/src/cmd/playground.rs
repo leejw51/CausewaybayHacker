@@ -81,6 +81,9 @@ pub async fn run(ctx: &Ctx, file: &Path, stdin_file: Option<&Path>) -> Result<()
         "runtime_error" => paint.yellow("stopped early"),
         "timeout" => paint.yellow("took too long"),
         "output_limit" => paint.yellow("printed too much"),
+        // `run.cancel` from another client on the same connection cannot
+        // happen here, but the server may say it, so it is named.
+        "cancelled" => paint.dim("stopped"),
         other => paint.yellow(other),
     };
     println!(

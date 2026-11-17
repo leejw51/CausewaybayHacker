@@ -571,7 +571,9 @@ export interface PlaygroundRun {
   /** Minted so the stream can be correlated; never stored. */
   attempt_id: string;
   lang: Lang;
-  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit";
+  /** `cancelled`: the player pressed STOP (`run.cancel`); `stdout` is what
+   *  it had printed by then, and there are no diagnostics. */
+  outcome: "ok" | "compile_error" | "runtime_error" | "timeout" | "output_limit" | "cancelled";
   compile_ms: number;
   run_ms: number;
   exit_code: number | null;
@@ -711,6 +713,9 @@ export interface Requests {
   // §4.9d. Never recorded: formatting is not an attempt at the problem.
   "code.format": { lang: Lang; source: string };
   "playground.run": { lang: Lang; source: string; stdin?: string };
+  // STOP: ends this connection's playground run; that run then answers
+  // with `outcome: "cancelled"`. Nothing to stop answers `stopping: false`.
+  "run.cancel": Record<string, never>;
   "playground.save": { id?: string; name?: string; lang: Lang; source: string; stdin?: string };
   "playground.list": Record<string, never>;
   "playground.load": { id: string };
@@ -816,6 +821,7 @@ export interface Responses {
    */
   "code.format": { source: string; changed: boolean; problem?: string };
   "playground.run": { run: PlaygroundRun };
+  "run.cancel": { stopping: boolean };
   "playground.save": { snippet: Snippet };
   /** `limit`: how many pads the shelf holds; absent from an older server. */
   "playground.list": { snippets: SnippetBrief[]; limit?: number };

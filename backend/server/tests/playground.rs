@@ -106,6 +106,48 @@ impl Client {
         }
     }
 
+    /// Send without waiting for the answer, for a request another one has to
+    /// overtake (STOP while a run is out). Returns the id to `wait` on.
+    async fn send(&mut self, kind: &str, payload: Value) -> String {
+        self.next_id += 1;
+        let id = format!("c-{}", self.next_id);
+        self.socket
+            .send(Message::text(
+                json!({ "v": 1, "id": id, "type": kind, "payload": payload }).to_string(),
+            ))
+            .await
+            .unwrap();
+        id
+    }
+
+    /// The answer to `id`, keeping every other frame as an event — including
+    /// answers to other ids, which a test that sent two looks for there.
+    async fn wait(&mut self, id: &str) -> Value {
+        if let Some(i) = self
+            .events
+            .iter()
+            .position(|e| e["id"].as_str() == Some(id))
+        {
+            return self.events.remove(i);
+        }
+        loop {
+            let message =
+                tokio::time::timeout(std::time::Duration::from_secs(180), self.socket.next())
+                    .await
+                    .expect("answered")
+                    .expect("open")
+                    .expect("readable");
+            let Message::Text(text) = message else {
+                continue;
+            };
+            let value: Value = serde_json::from_str(&text).unwrap();
+            if value["id"].as_str() == Some(id) {
+                return value;
+            }
+            self.events.push(value);
+        }
+    }
+
     async fn ok(&mut self, kind: &str, payload: Value) -> Value {
         let frame = self.call(kind, payload).await;
         assert_eq!(
@@ -154,6 +196,98 @@ impl Client {
         .await["run"]
             .clone()
     }
+}
+
+/// Prints a line, then sleeps for most of the five-second run clock.
+const SLEEPER: &str = "use std::io::Write;\n\
+fn main() {\n\
+    println!(\"before the nap\");\n\
+    std::io::stdout().flush().unwrap();\n\
+    std::thread::sleep(std::time::Duration::from_secs(4));\n\
+    println!(\"after the nap\");\n\
+}\n";
+
+/// STOP (`run.cancel`): the run ends at once, says `cancelled`, keeps what it
+/// had printed, records nothing — and the next RUN works. A cancel with
+/// nothing out says so and reaches nothing later.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stop_ends_a_playground_run_and_the_next_one_runs() {
+    let server = start().await;
+    let mut client = Client::connect(server.port).await;
+    client.login(ALICE_KEY).await;
+    let before = table_counts(&server);
+
+    // Nothing out: nothing to stop.
+    let idle = client.ok("run.cancel", json!({})).await;
+    assert_eq!(idle["stopping"].as_bool(), Some(false), "{idle}");
+
+    let run_id = client
+        .send(
+            "playground.run",
+            json!({ "lang": "rust", "source": SLEEPER, "stdin": "" }),
+        )
+        .await;
+    // Past the compile and into the nap: the first line has streamed.
+    let t_wait = std::time::Instant::now();
+    loop {
+        assert!(
+            t_wait.elapsed() < std::time::Duration::from_secs(120),
+            "the program never printed its first line"
+        );
+        let printed = client.events.iter().any(|e| {
+            e["type"] == "run.log"
+                && e["payload"]["stream"] == "stdout"
+                && e["payload"]["chunk"]
+                    .as_str()
+                    .is_some_and(|c| c.contains("before the nap"))
+        });
+        if printed {
+            break;
+        }
+        let message =
+            tokio::time::timeout(std::time::Duration::from_secs(120), client.socket.next())
+                .await
+                .expect("streamed")
+                .expect("open")
+                .expect("readable");
+        if let Message::Text(text) = message {
+            client.events.push(serde_json::from_str(&text).unwrap());
+        }
+    }
+
+    let t_stop = std::time::Instant::now();
+    let stop = client.ok("run.cancel", json!({})).await;
+    assert_eq!(stop["stopping"].as_bool(), Some(true), "{stop}");
+    let reply = client.wait(&run_id).await;
+    let stopped_in = t_stop.elapsed();
+    assert_eq!(reply["type"].as_str(), Some("playground.run.ok"), "{reply}");
+    let run = &reply["payload"]["run"];
+    assert_eq!(run["outcome"].as_str(), Some("cancelled"), "{run}");
+    assert!(
+        run["stdout"].as_str().unwrap().contains("before the nap"),
+        "what it had printed is kept: {run}"
+    );
+    assert!(
+        !run["stdout"].as_str().unwrap().contains("after the nap"),
+        "and it did not get to finish: {run}"
+    );
+    assert!(run["diagnostics"].as_array().unwrap().is_empty(), "{run}");
+    assert!(
+        stopped_in < std::time::Duration::from_secs(3),
+        "stopped in {stopped_in:?}, not at once"
+    );
+
+    // The slot is free and the stale cancel reaches nothing: the next RUN runs.
+    let next = client.play(HELLO, "").await;
+    assert_eq!(next["outcome"].as_str(), Some("ok"), "{next}");
+    assert_eq!(next["stdout"].as_str(), Some("hello, playground\n"));
+
+    assert_eq!(
+        table_counts(&server),
+        before,
+        "a stopped run recorded something"
+    );
+    server.handle.abort();
 }
 
 fn table_counts(server: &Server) -> (i64, i64, i64, i64, i64) {

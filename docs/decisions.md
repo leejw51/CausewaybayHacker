@@ -7957,3 +7957,56 @@ string. Mobile Safari on the iPad simulator
 lifts every touch at `(0, 0)`; `app.ts` now uses the finger's last position
 for such a lift, or nothing that fires on the up and checks it is still on its
 button — the list's tap, BACKUP, POSTER — ever fired there.
+
+## 2026-11-17 — STOP: a playground run can be ended, `run.cancel`
+
+PLAN.md M5 ticket D4. While a playground run compiled or ran, RUN was dimmed
+and the only way out was the five-second clock — or sixty for a compile. On an
+iPad, where the game is played, that is a long wait for a run started by
+mistake or a loop written by mistake.
+
+**The wire.** One new request, `run.cancel` (PROTOCOL §4.9c), with no payload:
+it stops whatever playground run holds the connection's execution slot and is
+answered at once with `{ stopping }`. The run's own `playground.run` reply then
+comes back with a sixth outcome, `cancelled`, carrying the stdout printed so
+far, an empty stderr and no diagnostics. That reply, not the cancel's, frees
+the slot — PROTOCOL §3.2 says so — so the client shows STOPPING… and keeps RUN
+unavailable until it arrives.
+
+**Only the playground.** A quest RUN or SUBMIT is an attempt that is recorded
+and judged (§4.9b); half of one is not a thing the curriculum should hold, and
+"cancelled" is not a verdict the drills could use. `run.cancel` during one
+answers `stopping: false`. If quest runs ever want a STOP, it is a separate
+decision about what such an attempt records.
+
+**The runner: a flag on the thread, not in `Limits`.** A submission is compiled
+and run on the one thread that calls `runner::run`, and every language module
+waits for its children in `proc::run`. So `proc::cancel_on(flag)` puts the flag
+on the thread and returns a guard; `proc::run` refuses to spawn when it is set
+(a STOP during the compile never runs the binary) and, in its wait loop, kills
+on it exactly as it kills on a timeout — SIGTERM, the grace, SIGKILL, the
+strays. Nineteen `Limits` literals did not each have to learn about it. The
+server's executions run on pooled `spawn_blocking` threads, so the guard takes
+the flag off the thread when it drops, panic included, and the server makes a
+**fresh flag per execution**, held in a per-connection slot and cleared before
+the execution slot is given back: a cancel that arrives late reaches nothing.
+
+**"Cancelled" is what `proc` did, not what was asked.** The guard reports
+`fired()` only when a child was actually stopped or not started for the flag.
+A cancel that lands after the last child finished stopped nothing, and the run
+keeps its real outcome.
+
+**The client.** RUN becomes STOP while a run is out, in the same place on every
+toolbar (one `runItem()` replaces five copies) and on Ctrl+Enter; a second tap
+within 400 ms of RUN is taken as a double tap, not a STOP. A stopped run is not
+a failure: it is not counted on today's runs, costs no HP in CONSOLE, does not
+glitch or shake, plays no failure sound, settles the compile particles quietly,
+and its banner is STOPPED in the neutral cyan rather than red. An ENTER queued
+behind the run by AUTO-RUN is dropped, or it would start the run STOP just
+ended. CONSOLE's machines say what their own break key printed: `BREAK IN 10`
+on the Apple ][, `Break in 10` on the MSX, `***Break` on the Amiga.
+
+Tests: `runner/tests/cancel.rs` (mid-run, before spawn, a dropped guard, a late
+cancel), `server/tests/playground.rs`
+(`stop_ends_a_playground_run_and_the_next_one_runs`), and
+`e2e/playground-stop.spec.ts` in both orientations.
