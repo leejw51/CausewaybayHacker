@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Causewaybay Hacker — offline</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b1030; color: #fcecc8;
+        font: 18px/1.5 ui-monospace, Menlo, monospace; }
+      main { min-height: 100%; display: grid; place-items: center; text-align: center;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+      h1 { color: #f8c838; font-size: 22px; letter-spacing: 0.08em; margin: 16px 0 8px; }
+      p { color: #b8b0d8; margin: 0 0 20px; max-width: 32em; }
+      img { width: 96px; height: 96px; image-rendering: pixelated; border-radius: 22px; }
+      button { font: inherit; color: #0b1030; background: #f8c838; border: 0;
+        border-radius: 10px; padding: 10px 22px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <img src="/icons/icon-192.png" alt="" />
+        <h1>THE SERVER IS NOT ANSWERING</h1>
+        <p>The game compiles and judges on its server, so it needs it to be up.
+          Start it (<code>make start</code>), or check the device is on the same
+          network or tailnet, then try again.</p>
+        <button onclick="location.reload()">TRY AGAIN</button>
+      </div>
+    </main>
+  </body>
+</html>
