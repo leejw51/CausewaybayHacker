@@ -15,58 +15,73 @@ database would then be a *second* home for the same state, and the two would
 drift. What we lift from those repos is the **engine layer** — the virtual
 canvas, the pixel font, the particles, the art manifest — not the core.
 
-## Milestone 1 — the vertical slice (everything else is blocked on this)
+## Where it stands — v0.1.8 (2026-11-17)
 
-One path, end to end, proven with a real player sitting in front of it:
+Milestones 1–4 shipped, and a good deal past them:
 
-```
-login with a mnemonic → RUST land → BASIC category → map with 3 nodes
-→ pick node 1 → editor → submit → server runs rustc → verdict streams back
-→ node stamped CLEARED and still cleared after a restart
-→ the failed attempt shows up in stats.mistakes
-```
+* **Nine lands, 1117 quests:** RUST, GO, C++, PYTHON, PYTORCH, TYPESCRIPT,
+  REMIX, ZIG, LUA. Every land has VERY BASIC, BASIC, ADVANCED, HACKER and the
+  two CHEATSHEET roads; RUST alone has FRAMEWORKS on a pinned crate shelf. Every
+  quest is translated (`content/i18n/`).
+* **The game:** XP and levels, stars, combo, badges, boss nodes, AUTO SELECT,
+  the drill, spaced review and AI mode, search (BM25 + meaning, fused).
+* **The playground:** 1000 pads synced across devices; CODE, CONSOLE (APPLE ][,
+  MSX, AMIGA), AGENT, POSTER and DISK READER; the waiting wave; motion.dev
+  transitions; both orientations on every screen.
+* **Shipping:** `v*` tags build server tarballs for macOS and Linux and the
+  desktop app for macOS (signed, notarised), Linux and Windows, attached to a
+  GitHub release.
 
-Nothing in that list is optional and nothing outside it is in milestone 1. Three
-quests, one land, one category. No Go, no search, no AI mode, no three.js
-parallax, no badges.
+The old milestone text lives in git (`git show 56f2be0:PLAN.md`).
 
-The slice is what proves the wire format, the auth, the runner, the persistence
-and the orientation handling all at once. Until it runs, parallel content work
-is guesswork.
+## Milestone 5 — finish the job: the interview gaps, the iPad, the release path
 
-**Definition of done for M1:** `make dev` starts the server and the frontend;
-a human logs in with a mnemonic, clears a quest, kills the server, restarts it,
-reloads the page and the quest is still cleared; `make test` is green.
+Three streams, all parallel. Each ticket has an owner, the work, and the line
+that says it is done. Take the lowest number in your stream first.
 
-## Milestone 2 — breadth
+### Content — the interview gaps (`docs/coverage.md` §5)
 
-Once the slice holds, these are genuinely parallel:
+The runner has had the `cargo` and `gotest` harnesses (`backend/runner/src/`)
+for a while, and no quest uses them: all 1117 are `harness = "stdio"`. That
+was §5's item 1, "worth more than the other three together", and it is now
+only content.
 
-| stream | work |
-| --- | --- |
-| BE | the Go runner; search (BM25 → semantic → unified); mistake taxonomy in full; drills |
-| FE | the three.js map proper; land/category select; search, stats and AI screens; both orientations on all of them; the 16-bit polish — stamps, ribbons, confetti, chip audio |
-| PM | the content: 6 packs, ~20 quests each; the story beats; the art manifest |
-| QA | the §9 test list, all eight; e2e in both orientations; the content CI that runs every reference solution |
+| # | owner | ticket | done when |
+| --- | --- | --- | --- |
+| C1 | PM | **A test that runs.** Quests in RUST and GO where the player writes the test, judged by `cargo test` / `go test`: a table test, a failing case caught, a helper under test. | ≥ 6 per land on the ADVANCED road, each reference solution passing and each starter failing in CI (SPEC §9.4) |
+| C2 | PM | **Kruskal.** Union-find and sorting are both in the packs; put them together. | HACKER node 35 in every language land, same question in each |
+| C3 | PM | **Segment tree with lazy propagation:** range update, range query. | HACKER node 36 in every language land; the tests time out a naive O(n·q) |
+| C4 | PM | **KMP / Z-function.** | HACKER node 37 in every language land; the tests time out a naive O(n·m) |
+| C5 | PM | **Bit-mask DP** over subsets (assignment, TSP on n ≤ 16). | HACKER node 38 in every language land |
+| C6 | PM | Translate C1–C5 into every locale. | `content/i18n/` complete; the i18n check is green |
+| C7 | PM | Rewrite `docs/coverage.md` §5 once C1–C5 land. | §5 lists only what is still missing |
 
-## Milestone 3 — the game
+### iPad and portrait — the device the game is actually played on
 
-Badges, levels, XP, combo and the clear-fanfare. The HackerRank-style timed
-`hacker` category with its countdown. Boss nodes at the end of each map. The
-Skynet framing: each cleared street is a skill taken back.
+The game is tested from an iPad over the tailnet, held upright. v0.1.8 fixed
+the playground's waiting wave, the AI coach card and the header title; a sweep
+at 768×960 found what is left.
 
-## Milestone 4 — two more lands, and the quests in the player's language
+| # | owner | ticket | done when |
+| --- | --- | --- | --- |
+| D1 | FE | **Installable web app.** A `manifest.webmanifest` (name, the coder icons already in `public/icons/`, `display: standalone`, indigo theme colour) so Add to Home Screen opens full screen with no Safari bar. | Launched from the iPad home screen, the game fills the screen and keeps its login |
+| D2 | FE | **Panels sized to what they hold, upright.** RESULT's THE RUN, STATS' drill and log, and AI MODE's coach are each a tall empty well when there is little in them. | At 768×960 no panel is more than half empty; the space goes to the panel that has content |
+| D3 | FE | **The map on a 4:5 screen.** Upright on an iPad the map is a narrow column with wide dead gutters. | The map uses ≥ 80 % of the width at 768×960 |
+| D4 | FE | **A busy RUN that can be stopped.** While compiling or running, RUN is dimmed and there is no way out but the time limit. | A STOP in its place ends the run; the next RUN works |
+| D5 | QA | **An iPad project in e2e.** 768×960, touch, Korean, next to `landscape` and `portrait`. | `npx playwright test --project=ipad` runs the sweep and saves its shots |
 
-`cpp` and `python`, each with the same three roads and the same quest counts
-as the first two (18 / 17 / 34, boss last), and the hacker road the same 34
-interview problems so one interview can be sat in any land. The runner
-grows two stdio-only toolchains (`c++ -std=c++20`, `py_compile` then
-`python3 -I`), the §7.1 taxonomy grows `cpp:` and `py:` columns without a
-single new kind, and the mistake fixtures are captured from the real
-compilers as before. Alongside: quest text translated per locale under
-`content/i18n/`, served by `quest.get`/`world.map` on a `locale`, so the
-brief a Korean player reads is Korean and not "in English, sorry". The
-interface catalogues are unchanged; the content is what moves.
+### Release and tooling
+
+| # | owner | ticket | done when |
+| --- | --- | --- | --- |
+| R1 | BE | **`make tauri` on an external volume.** Bundling fails with `Failed to create app icon: Operation not permitted` when `desktop/target` is on `/Volumes/…`. | `make tauri` puts the target on the internal disk (or works around the copy) and passes from this checkout |
+| R2 | QA | **The sweep is green again.** `sweep.spec.ts` 3b waits for an editor on a quest (quests are picked now, SPEC §0); 3d expects the face cycle to come back to VT323 and gets PlexMono. | `npx playwright test sweep.spec.ts` passes in both orientations |
+| R3 | BE | **One command for a release.** Bump every manifest, tag, push, and rebuild the local server, instead of eight files by hand. | `make bump V=0.1.9` then `make release-push`; `make version` agrees |
+| R4 | QA | **`make test-all` in CI on the tag.** A release is cut only from a tree whose whole suite passed. | The Release workflow needs `test-all` before it builds |
+
+**Definition of done for M5:** C1–C5 are playable in every land they name, the
+iPad home-screen app opens full screen with no half-empty panel, and a release
+is `make bump` + `make release-push` with a green suite behind it.
 
 ---
 
@@ -106,3 +121,5 @@ Rules they all work under:
 | Quest content rots — a quest whose own solution no longer compiles | CI runs every reference solution through the real runner (SPEC §9.4) |
 | ONNX embedder pulls a large runtime and wants to download a model | it is off by default behind a cargo feature; the built-in `hashed` embedder is the one that ships |
 | Four agents, one tree | disjoint directory ownership, a frozen contract, and M1 before any fan-out |
+| A fix that only reaches the source, not the server the player tests on | every change ends with `make rebuild` (frontend) or `make restart` (backend), so :5390 always runs the tree |
+| Harness quests (C1) are slow: `cargo test` builds a crate per submit | the crate shelf is warmed once per machine (`cwbhacker warm`), and the runner streams `compiling` |
