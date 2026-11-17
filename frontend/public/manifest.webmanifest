@@ -1,0 +1,17 @@
+{
+  "name": "Causewaybay Hacker",
+  "short_name": "CWB Hacker",
+  "description": "A 16-bit coding trainer set in Causeway Bay.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1030",
+  "theme_color": "#0b1030",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

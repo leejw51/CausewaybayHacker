@@ -69,4 +69,23 @@ async function main(): Promise<void> {
   }
 }
 
+/**
+ * The service worker (`public/sw.js`): what makes the page installable, and
+ * an offline page in place of the browser's error when the server is down.
+ * It caches none of the game. Only in a built page — the dev server's module
+ * graph is not something to put a worker in front of — and only where the
+ * browser allows one at all: https, or localhost (the desktop app). Over the
+ * tailnet's plain http it is simply not registered, and Add to Home Screen
+ * still opens full screen from the manifest.
+ */
+function registerWorker(): void {
+  if (!import.meta.env.PROD || !window.isSecureContext || !("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((e) => {
+      console.warn("[causewaybay hacker] no service worker:", e);
+    });
+  });
+}
+
+registerWorker();
 void main();
