@@ -11,6 +11,53 @@
  */
 import { expect, test } from "@playwright/test";
 
+test("the game re-fits a grown window even when no event says so", async ({
+  page,
+}) => {
+  // Every size event suppressed: no `resize`, no `orientationchange`, no
+  // ResizeObserver. On an iPad, Safari opened from another app was measured
+  // at a fraction of the screen and none of them arrived afterwards; the
+  // game stayed boxed in the middle at both stretch caps.
+  await page.addInitScript(() => {
+    const add = window.addEventListener.bind(window);
+    window.addEventListener = ((type: string, ...rest: unknown[]) => {
+      if (type === "resize" || type === "orientationchange") return;
+      return (add as (...a: unknown[]) => void)(type, ...rest);
+    }) as typeof window.addEventListener;
+    // @ts-expect-error: the observer the app would use is taken away.
+    delete window.ResizeObserver;
+  });
+  await page.setViewportSize({ width: 260, height: 465 });
+  await page.goto("/");
+  await page.waitForFunction(
+    () => (document.getElementById("game") as HTMLCanvasElement)?.width > 100,
+  );
+  await page.waitForTimeout(500);
+  await page.setViewportSize({ width: 750, height: 930 });
+  const sizes = () =>
+    page.evaluate(() => {
+      const c = document.getElementById("game") as HTMLCanvasElement;
+      const r = c.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      return {
+        backing: [c.width, c.height],
+        shown: [Math.round(r.width * dpr), Math.round(r.height * dpr)],
+      };
+    });
+  await expect
+    .poll(
+      async () => {
+        const s = await sizes();
+        return s.backing[0] === s.shown[0] && s.backing[1] === s.shown[1];
+      },
+      {
+        timeout: 5_000,
+        message: "the backing store followed the grown window",
+      },
+    )
+    .toBe(true);
+});
+
 test("the canvas follows its own size when the safe area changes", async ({
   page,
 }) => {

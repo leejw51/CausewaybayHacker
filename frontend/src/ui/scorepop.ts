@@ -23,8 +23,36 @@ function reduced(): boolean {
   }
 }
 
-/** Run `change` behind a veil over `host`. A second call while one runs just changes. */
-export async function veiled(host: HTMLElement, change: () => unknown): Promise<void> {
+/**
+ * `p`, or nothing after `ms`: whichever comes first. A rejection counts as
+ * done — the caller only needs to know it may go on.
+ */
+function settle(p: unknown, ms: number): Promise<void> {
+  return Promise.race([
+    Promise.resolve(p).then(
+      () => undefined,
+      () => undefined,
+    ),
+    new Promise<void>((r) => setTimeout(r, ms)),
+  ]);
+}
+
+/**
+ * Run `change` behind a veil over `host`. A second call while one runs just
+ * changes.
+ *
+ * **The veil always lifts.** Every wait is bounded: the fades, the frames,
+ * and `change` itself (`limitMs`). Opened from the iPad home screen, CONSOLE
+ * came up as a black screen — the veil was up and one of those waits never
+ * came back (a font that never arrived, an animation that never reported
+ * it was done), so it never lifted. Now the screen is shown after the limit
+ * whatever is still pending; a change that finishes later still lands.
+ */
+export async function veiled(
+  host: HTMLElement,
+  change: () => unknown,
+  limitMs = 3000,
+): Promise<void> {
   if (veiling || reduced()) {
     await change();
     return;
@@ -35,11 +63,11 @@ export async function veiled(host: HTMLElement, change: () => unknown): Promise<
   el.style.opacity = "0";
   host.appendChild(el);
   try {
-    await animate(el, { opacity: [0, 1] }, { duration: 0.18, ease: [...EXPO_IN] });
-    await change();
+    await settle(animate(el, { opacity: [0, 1] }, { duration: 0.18, ease: [...EXPO_IN] }), 500);
+    await settle(change(), limitMs);
     // Two frames for the new screen to lay itself out under the veil.
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await animate(el, { opacity: [1, 0] }, { duration: 0.34, ease: [...EXPO_OUT] });
+    await settle(new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))), 200);
+    await settle(animate(el, { opacity: [1, 0] }, { duration: 0.34, ease: [...EXPO_OUT] }), 700);
   } finally {
     el.remove();
     veiling = false;

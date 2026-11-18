@@ -108,6 +108,27 @@ describe("the virtual canvas", () => {
     expect([l.ox, l.oy]).toEqual([0, 0]);
   });
 
+  it("fills a big window rather than boxing a whole-number scale in it", () => {
+    // An iPad whose Safari page is zoomed out to 50%: 2064x2544 CSS pixels at
+    // dpr 2. A fit of 1.99 snapped to 1x stopped at the 1.5x cap (1080x1920)
+    // and drew a box in the middle of the screen; the exact fit fills it.
+    const l = measured(2064, 2544, 2, true);
+    expect(l.mode).toBe("portrait");
+    const shownW = (l.vw * l.scale) / 2;
+    const shownH = (l.vh * l.scale) / 2;
+    expect(shownW).toBeGreaterThan(2064 * 0.97);
+    expect(shownH).toBeGreaterThan(2544 * 0.97);
+    expect(l.vw).toBeGreaterThanOrEqual(Theme.portW);
+    expect(l.vh).toBeGreaterThanOrEqual(Theme.portH - 2);
+  });
+
+  it("keeps the whole-number scale where it already fills most of the window", () => {
+    // 1920x1080: a fit of 1.5 snaps to 1x and the 1.5x canvas fills it all.
+    const l = measured(1920, 1080);
+    expect(l.scale).toBe(1);
+    expect([l.vw, l.vh]).toEqual([1920, 1080]);
+  });
+
   it("caps the device pixel ratio at 2", () => {
     // A phone at dpr 3 would otherwise render nine times the pixels for a
     // difference nobody can see on pixel art.
