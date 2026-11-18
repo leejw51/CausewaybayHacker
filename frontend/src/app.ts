@@ -298,6 +298,15 @@ export class App {
     addEventListener("resize", () => this.measure());
     addEventListener("orientationchange", () => this.measure());
     document.addEventListener("fullscreenchange", () => this.measure());
+    // The canvas's own size, too, not only the window's. Opened from the
+    // home screen, iOS settles the safe-area insets after launch (and again
+    // on a turn): the layers move and shrink by CSS alone and no `resize`
+    // fires, so the backing store kept the old size — the game was squashed
+    // by CSS, and the editor, the fields and every tap were placed against
+    // a canvas that was no longer where it was drawn.
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => this.measure()).observe(this.canvas);
+    }
     addEventListener("blur", () => this.input.releaseAll());
     this.wirePointer();
     this.wireKeys();
