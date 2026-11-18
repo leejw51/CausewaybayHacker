@@ -281,10 +281,37 @@ export class Layout {
     // counted them would draw everything at half size and then letterbox it.
     // The device scale is that fit with the pixel ratio put back.
     const fit = Math.min(cw / bw, ch / bh);
-    const cssScale = fit >= 2 ? Math.floor(fit) : fit >= 1 ? 1 : Math.max(0.35, fit);
-    const scale = cssScale * dpr;
-    const vw = Math.min(Math.floor(ww / scale), Math.floor(bw * MAX_STRETCH));
-    const vh = Math.min(Math.floor(wh / scale), Math.floor(bh * MAX_STRETCH));
+    const capW = Math.floor(bw * MAX_STRETCH);
+    const capH = Math.floor(bh * MAX_STRETCH);
+    const at = (css: number) => {
+      const sc = css * dpr;
+      return {
+        css,
+        sc,
+        vw: Math.min(Math.floor(ww / sc), capW),
+        vh: Math.min(Math.floor(wh / sc), capH),
+      };
+    };
+    // Whole multiples keep pixel art crisp, so a fit of 1.9 draws at 1x —
+    // unless that leaves most of the window empty. The canvas only grows to
+    // 1.5x the design, so on a big window (an iPad whose page is zoomed out
+    // to 50% reports 2064 CSS pixels across) a 1x canvas stopped at 1080x1920
+    // and sat boxed in the middle with 40% of the screen in use. So, in
+    // order, the first that covers 80% of the window: the whole multiple;
+    // the grown (1.5x) canvas scaled up until it meets an edge, which keeps
+    // the bigger playfield; and the exact fit, which always fills.
+    const snapped = fit >= 2 ? Math.floor(fit) : fit >= 1 ? 1 : Math.max(0.35, fit);
+    let pick = at(snapped);
+    const covers = (p: typeof pick) =>
+      (Math.min(ww, p.vw * p.sc) * Math.min(wh, p.vh * p.sc)) / (ww * wh);
+    if (fit >= 1 && covers(pick) < 0.8) {
+      const grown = at(Math.min(fit, Math.max(snapped, Math.min(cw / capW, ch / capH))));
+      pick = covers(grown) >= 0.8 ? grown : at(fit);
+    }
+    const cssScale = pick.css;
+    const scale = pick.sc;
+    const vw = pick.vw;
+    const vh = pick.vh;
 
     // The backing store is compared too, not just the last measurement: a
     // window that happens to be exactly the design size matches the defaults
