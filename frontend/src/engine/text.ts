@@ -361,6 +361,8 @@ const FACE_FILES: Record<string, string | FaceSubset[]> = {
   ],
 };
 const faceLoads = new Map<string, Promise<boolean>>();
+/** How long a face may take to download before it counts as not coming. */
+const FACE_LOAD_LIMIT_MS = 6000;
 
 /**
  * Fetch one family and add it to the document, once. Resolves false rather
@@ -386,7 +388,17 @@ function loadFamily(family: string): Promise<boolean> {
         );
         // Every subset, not only the one the first word needs: the screen is
         // measured once, and a Czech word later must not re-lay it out.
-        await Promise.all(faces.map((f) => f.load()));
+        // Bounded: a load that never answers is a failure like any other, or
+        // whatever waits on it — CONSOLE's veil — waits for ever.
+        const loaded = await Promise.race([
+          Promise.all(faces.map((f) => f.load())).then(() => true),
+          new Promise<false>((r) => setTimeout(() => r(false), FACE_LOAD_LIMIT_MS)),
+        ]);
+        if (!loaded) {
+          // Not remembered as failed for good: the next ask tries again.
+          faceLoads.delete(family);
+          return false;
+        }
         for (const f of faces) document.fonts.add(f);
         return true;
       } catch {
