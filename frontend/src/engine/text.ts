@@ -567,7 +567,10 @@ const CODE_FACE_FAMILY: Record<CodeFace, string | null> = {
   jetbrains: null,
   dos: "DOSVGA",
   dunggeunmo: "NeoDunggeunmoCode",
-  galmuri: "GalmuriMono11",
+  // Galmuri11 itself, the face the interface is set in, not GalmuriMono11:
+  // asked for by name. Its Latin is proportional, so columns do not line up
+  // the way a monospaced face's do; that is the trade it was chosen with.
+  galmuri: "Galmuri11",
   comic: "ComicMono",
   // A system face, never fetched: Courier behind it for a machine without it.
   courier: null,
