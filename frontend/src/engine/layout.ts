@@ -67,6 +67,9 @@ export class Layout {
   cssScale = 1;
   /** The canvas's height in CSS pixels, as last measured. */
   cssH = Infinity;
+  /** Its width, likewise: with `cssH` and `dpr`, what `stale` compares. */
+  private cssW = Infinity;
+  private dpr = 0;
   /** Where the virtual canvas sits inside the window, in device pixels. */
   ox = 0;
   oy = 0;
@@ -297,6 +300,8 @@ export class Layout {
     this.scale = scale;
     this.cssScale = cssScale;
     this.cssH = ch;
+    this.cssW = cw;
+    this.dpr = dpr;
     this.vw = vw;
     this.vh = vh;
     this.dw = ww;
@@ -312,6 +317,25 @@ export class Layout {
     // where there is room, the larger sizes on a phone (`setRoomy`).
     setRoomy(this.cssScale >= 0.7);
     return changed;
+  }
+
+  /**
+   * Whether the canvas is no longer the size it was last measured at.
+   *
+   * Checked every frame, because the events cannot be trusted to say so.
+   * On an iPad, Safari opened from another app was measured while it was
+   * still coming up at a fraction of the screen, and neither the `resize`
+   * nor the `ResizeObserver` that should have followed arrived: the game
+   * stayed boxed at that tiny fit, both stretch caps reached, in the middle
+   * of a full-size window. Two layout reads a frame cost nothing beside that.
+   */
+  stale(): boolean {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    return (
+      Math.max(1, this.canvas.clientWidth) !== this.cssW ||
+      Math.max(1, this.canvas.clientHeight) !== this.cssH ||
+      dpr !== this.dpr
+    );
   }
 
   /** Put the context into virtual coordinates for a frame. */

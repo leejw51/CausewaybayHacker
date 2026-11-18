@@ -362,6 +362,9 @@ export class App {
     const frame = (t: number) => {
       this.raf = requestAnimationFrame(frame);
       if (this.frozen) return;
+      // The size the events missed (`Layout.stale`): a frame never draws at
+      // a fit the canvas has already left.
+      if (this.layout.stale()) this.measure();
       // Clamped: a tab that was in the background for a minute must not hand
       // the scene a sixty-second `dt` and teleport everything.
       const dt = Math.min(0.05, (t - this.last) / 1000);
