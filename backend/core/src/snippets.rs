@@ -197,9 +197,10 @@ pub fn save(
                 )));
             }
             let id = ids::snippet_id();
-            // `S20261119`: the day, short enough for the pad list's narrow rail —
-            // `scratch 2026-11-19` ran into the edge of it on an iPad.
-            let name = name.unwrap_or_else(|| format!("S{}", now[..10].replace('-', "")));
+            // `261119`: the day as YYMMDD, short enough for the pad list's
+            // narrow rail — `scratch 2026-11-19` ran into the edge of it on
+            // an iPad.
+            let name = name.unwrap_or_else(|| now[2..10].replace('-', ""));
             conn.execute(
                 "INSERT INTO snippets
                      (id, address, name, lang, source, stdin, created_at, updated_at)
