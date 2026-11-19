@@ -1124,6 +1124,17 @@ export class PlaygroundScene implements Scene {
   }
 
   /**
+   * The filter box, unless the name or key field is up: those are placed over
+   * the toolbar, often on the very spot the box is, and the box's input sits
+   * above them — RENAME on an iPad opened a field with FILTER over its first
+   * letters, and a tap there typed into the filter instead.
+   */
+  private drawTools(g: Ctx, rect: Rect, f: Font): void {
+    if (this.renaming || this.stamping) this.tools.hide();
+    else this.tools.draw(g, rect, f);
+  }
+
+  /**
    * One step of the editor's type size — the editor's alone. The menus keep
    * the app-wide size (F9 / F10), so a bigger editor is not a smaller one
    * squeezed between bigger buttons.
@@ -3574,7 +3585,7 @@ export class PlaygroundScene implements Scene {
     fill(g, Theme.dim, 0, strip, layout.vw, 1, 0.5);
     this.buttons.row(f, [pad, pad, rowW, bandH], items, layout.minTouchH(), lead);
     this.buttons.add({ id: "unfocus", rect: [bx, pad, dw, dh], label: done });
-    this.tools.draw(g, [pad, pad, filterW, dh], f);
+    this.drawTools(g, [pad, pad, filterW, dh], f);
 
     // Which pad, in which language, and whether it is safe on the server —
     // the three things the framed screen says in its title that a person
@@ -3858,7 +3869,7 @@ export class PlaygroundScene implements Scene {
       x += bw + fg;
     };
     put(back);
-    this.tools.draw(g, [x, by, filterW, rowH], f);
+    this.drawTools(g, [x, by, filterW, rowH], f);
     x += filterW + fg;
     let barBottom = barH;
     if (filtering) {
@@ -4749,7 +4760,7 @@ export class PlaygroundScene implements Scene {
     else this.stdinOverlay?.hide();
 
     const rowY = stdinY + stdinRoom + gap;
-    if (this.benchIn.finished) this.tools.draw(g, [inner[0], rowY, filterW, langH], bf);
+    if (this.benchIn.finished) this.drawTools(g, [inner[0], rowY, filterW, langH], bf);
     else this.tools.hide();
     {
       let cx = inner[0] + lead;
@@ -5463,7 +5474,7 @@ export class PlaygroundScene implements Scene {
       this.langMenu = this.langsFolded;
       if (!this.langsFolded) this.langOpen = false;
     }
-    if (this.benchIn.finished) this.tools.draw(g, [ix, iy, filterW, rowH], bf);
+    if (this.benchIn.finished) this.drawTools(g, [ix, iy, filterW, rowH], bf);
     else this.tools.hide();
 
     // Renaming or stamping: the field over the toolbar, where the work is.

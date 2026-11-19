@@ -689,7 +689,7 @@ the browser and in the LÖVE client.
 ← payload: { "snippet": Snippet }
 ```
 
-`id` omitted creates one; `name` omitted on create is assigned from the date.
+`id` omitted creates one; `name` omitted on create is assigned from the date, as `S20261119`.
 `playground.save` is what a client calls on an autosave timer, so it must be
 cheap and idempotent: saving identical content returns the same
 `updated_at` rather than churning a new version.
