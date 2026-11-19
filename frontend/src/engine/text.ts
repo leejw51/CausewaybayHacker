@@ -365,6 +365,56 @@ const faceLoads = new Map<string, Promise<boolean>>();
 const FACE_LOAD_LIMIT_MS = 6000;
 
 /**
+ * One font file as a `FontFace`, its bytes fetched by `fetch` and parsed from
+ * memory — **not** `new FontFace(family, "url(...)")`.
+ *
+ * On an iPad, opened from the home screen, WebKit's own font loader never
+ * answers a `url()` source: `load()` neither resolves nor rejects, in the
+ * same app where Safari's tab loads it at once. Every face then waited out
+ * its time limit and was switched to without ever being added, so the face
+ * button took six seconds and changed nothing. `fetch` is the request every
+ * other byte of the game rides in on, and a face built from an
+ * `ArrayBuffer` has nothing left to download.
+ *
+ * Resolves null rather than throwing — a missing face is cosmetic — and gives
+ * up after `limitMs`, so nothing that waits on it waits for ever.
+ */
+export async function faceFromFile(
+  family: string,
+  file: string,
+  descriptors: FontFaceDescriptors = {},
+  limitMs = FACE_LOAD_LIMIT_MS,
+): Promise<FontFace | null> {
+  if (typeof FontFace === "undefined" || typeof document === "undefined" || !document.fonts) {
+    return null;
+  }
+  const ctl = typeof AbortController === "undefined" ? null : new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<null>((r) => {
+    timer = setTimeout(() => {
+      ctl?.abort();
+      r(null);
+    }, limitMs);
+  });
+  const work = (async (): Promise<FontFace | null> => {
+    try {
+      const res = await fetch(file, ctl ? { signal: ctl.signal } : undefined);
+      if (!res.ok) return null;
+      const face = new FontFace(family, await res.arrayBuffer(), descriptors);
+      await face.load();
+      return face;
+    } catch {
+      return null;
+    }
+  })();
+  try {
+    return await Promise.race([work, limit]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Fetch one family and add it to the document, once. Resolves false rather
  * than throwing: a face that will not download is a cosmetic failure, and the
  * stack behind it still draws every word.
@@ -375,35 +425,25 @@ function loadFamily(family: string): Promise<boolean> {
   let p = faceLoads.get(family);
   if (!p) {
     p = (async () => {
-      try {
-        if (typeof FontFace === "undefined" || !document.fonts) return false;
-        const parts: FaceSubset[] = typeof file === "string" ? [{ file }] : file;
-        const faces = parts.map(
-          (p) =>
-            new FontFace(family, `url(${p.file})`, {
-              display: "block",
-              ...(p.weight ? { weight: p.weight } : {}),
-              ...(p.range ? { unicodeRange: p.range } : {}),
-            }),
-        );
-        // Every subset, not only the one the first word needs: the screen is
-        // measured once, and a Czech word later must not re-lay it out.
-        // Bounded: a load that never answers is a failure like any other, or
-        // whatever waits on it — CONSOLE's veil — waits for ever.
-        const loaded = await Promise.race([
-          Promise.all(faces.map((f) => f.load())).then(() => true),
-          new Promise<false>((r) => setTimeout(() => r(false), FACE_LOAD_LIMIT_MS)),
-        ]);
-        if (!loaded) {
-          // Not remembered as failed for good: the next ask tries again.
-          faceLoads.delete(family);
-          return false;
-        }
-        for (const f of faces) document.fonts.add(f);
-        return true;
-      } catch {
+      const parts: FaceSubset[] = typeof file === "string" ? [{ file }] : file;
+      // Every subset, not only the one the first word needs: the screen is
+      // measured once, and a Czech word later must not re-lay it out.
+      const faces = await Promise.all(
+        parts.map((part) =>
+          faceFromFile(family, part.file, {
+            display: "block",
+            ...(part.weight ? { weight: part.weight } : {}),
+            ...(part.range ? { unicodeRange: part.range } : {}),
+          }),
+        ),
+      );
+      if (faces.some((f) => !f)) {
+        // Not remembered as failed for good: the next ask tries again.
+        faceLoads.delete(family);
         return false;
       }
+      for (const f of faces) document.fonts.add(f!);
+      return true;
     })();
     faceLoads.set(family, p);
   }

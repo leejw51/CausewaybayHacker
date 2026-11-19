@@ -49,7 +49,7 @@
  * stack that cannot yet supply it means every panel is measured against the
  * fallback and then jumps when the real font lands.
  */
-import { remeasure, setCjkFamily, setCjkFloor } from "../engine/text";
+import { faceFromFile, remeasure, setCjkFamily, setCjkFloor } from "../engine/text";
 import { readEnumPref, writePref } from "../ui/prefs";
 import { en } from "./en";
 import { ko } from "./ko";
@@ -277,19 +277,15 @@ async function loadFont(info: LocaleInfo): Promise<boolean> {
   if (!info.font) return false;
   const { family, file } = info.font;
   if (loaded.has(family)) return true;
-  try {
-    if (typeof FontFace === "undefined" || !document.fonts) return false;
-    const face = new FontFace(family, `url(${file})`, { display: "swap" });
-    await face.load();
-    document.fonts.add(face);
-    loaded.add(family);
-    return true;
-  } catch {
-    // A face that will not download is a cosmetic failure: the system CJK
-    // stack behind it still renders the words. It must not stop somebody
-    // changing language.
-    return false;
-  }
+  // Fetched as bytes (`faceFromFile`): the home-screen iPad app never
+  // answers a `url()` face. A face that will not download is a cosmetic
+  // failure — the system CJK stack behind it still renders the words — and
+  // must not stop somebody changing language. 6 MB of CJK: a long limit.
+  const face = await faceFromFile(family, file, { display: "swap" }, 60_000);
+  if (!face) return false;
+  document.fonts.add(face);
+  loaded.add(family);
+  return true;
 }
 
 /**
