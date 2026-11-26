@@ -1,8 +1,9 @@
 # Causewaybay Hacker — the desktop app (Tauri 2).
 #
 # One process: the window, and the server it talks to. The game server from
-# backend/ (core + server) is linked in as a library and serves the built
-# frontend on loopback; the window is a webview pointed at it. Nothing to start
+# backend/ (core + server) is linked in as a library and listens on a random
+# loopback port; the window shows the built frontend from the webview's own
+# origin and talks to it there. Nothing to start
 # first, nothing left running after the window closes.
 #
 # Outside the backend workspace on purpose, like cli/: Tauri pulls in WebKit on
@@ -31,7 +32,8 @@ anyhow = "1"
 axum = "0.8"
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "net"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 

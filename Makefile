@@ -345,8 +345,10 @@ version: ## print the version, once every manifest agrees on it
 
 # The desktop app is the browser game in a window, with the server inside the
 # same process: desktop/ links backend/core and backend/server as libraries,
-# serves the built frontend on 127.0.0.1:$(DESKTOP_PORT) and points a webview
-# at it. The frontend and the content packs ride in the bundle's Resources, so
+# listens on a loopback port the OS picks every launch, and shows the built
+# frontend from the webview's own origin (so the key in localStorage outlives
+# the port). The frontend is built into the binary and the content packs ride
+# in the bundle's Resources, so
 # the .app needs nothing beside it but the compilers the lands use — which it
 # finds on the login shell's PATH, not launchd's (desktop/src/main.rs).
 #
@@ -357,7 +359,6 @@ version: ## print the version, once every manifest agrees on it
 # Apple credentials are kept from the
 # build, or Tauri would try to notarise on its own and an ad-hoc build would
 # fail on it.
-DESKTOP_PORT := 5395
 DESKTOP_DIR  := desktop/target/release/bundle/macos
 DESKTOP_APP  := $(DESKTOP_DIR)/Causewaybay Hacker.app
 DESKTOP_ZIP  := CausewaybayHacker-Desktop-$(VERSION)-$(TARGET).zip

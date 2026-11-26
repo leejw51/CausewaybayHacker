@@ -135,6 +135,7 @@ async fn start(home: &std::path::Path, content_src: &std::path::Path) -> Server 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let config = cwbhacker_server::Config {
+        app_origins: Vec::new(),
         bind: listener.local_addr().unwrap(),
         static_dir: None,
         art_dir: None,
@@ -965,6 +966,115 @@ async fn a_foreign_origin_cannot_open_the_socket() {
     server.handle.abort();
 }
 
+/// The desktop app's page is the webview's own (`tauri://localhost`) and its
+/// server is on a random loopback port, so the socket is cross-origin. The
+/// app names its origin in `Config::app_origins`; `cwbhacker serve` names
+/// none and keeps refusing it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_desktop_webview_opens_the_socket_only_on_the_desktop_server() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    let open = |port: u16, origin: &str| {
+        let mut request = format!("ws://127.0.0.1:{port}/ws")
+            .into_client_request()
+            .unwrap();
+        request
+            .headers_mut()
+            .insert("Origin", origin.parse().unwrap());
+        tokio_tungstenite::connect_async(request)
+    };
+    let status = |err: tokio_tungstenite::tungstenite::Error| match err {
+        tokio_tungstenite::tungstenite::Error::Http(response) => response.status().as_u16(),
+        other => panic!("expected an HTTP refusal, got {other:?}"),
+    };
+
+    // `cwbhacker serve`: no app origins.
+    let tmp = tempfile::tempdir().unwrap();
+    let src = content_src(tmp.path());
+    let plain = start(&tmp.path().join("home"), &src).await;
+    let err = open(plain.port, "tauri://localhost")
+        .await
+        .expect_err("the plain server refuses the app origin");
+    assert_eq!(status(err), 403);
+
+    // The desktop app's server, on port 0 like the app's.
+    let store = Arc::new(Store::open(&tmp.path().join("home2")).expect("store"));
+    {
+        let conn = store.conn();
+        content::import_dir(&conn, store.home(), &src).expect("import");
+    }
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let config = cwbhacker_server::Config {
+        app_origins: vec!["tauri://localhost".into(), "http://tauri.localhost".into()],
+        bind: listener.local_addr().unwrap(),
+        static_dir: None,
+        art_dir: None,
+    };
+    let app = cwbhacker_server::router(cwbhacker_server::build_state(store, &config));
+    let handle = tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let (socket, _) = open(port, "tauri://localhost")
+        .await
+        .expect("the macOS/Linux webview opens the socket");
+    // A working socket, not merely an upgraded one: it answers a ping.
+    let mut app_page = Client {
+        socket,
+        next_id: 0,
+        events: Vec::new(),
+    };
+    assert!(app_page.ok("ping", json!({})).await["t"].is_string());
+    open(port, "http://tauri.localhost")
+        .await
+        .expect("the Windows webview opens the socket");
+    for foreign in [
+        "http://evil.example",
+        "tauri://evil.example",
+        "tauri://localhost.evil.example",
+        "null",
+    ] {
+        let err = open(port, foreign)
+            .await
+            .expect_err("a foreign page is still refused");
+        assert_eq!(status(err), 403, "{foreign}");
+    }
+
+    // Photos are drawn into a canvas, so the app origin gets CORS on plain
+    // HTTP too; any other origin gets none.
+    let cors = |origin: &'static str| async move {
+        let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        stream
+            .write_all(
+                format!(
+                    "GET /healthz HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: {origin}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let mut out = String::new();
+        stream.read_to_string(&mut out).await.unwrap();
+        out.lines().find_map(|l| {
+            l.to_ascii_lowercase()
+                .strip_prefix("access-control-allow-origin:")
+                .map(|v| v.trim().to_string())
+        })
+    };
+    assert_eq!(
+        cors("tauri://localhost").await.as_deref(),
+        Some("tauri://localhost")
+    );
+    assert_eq!(cors("http://evil.example").await, None);
+
+    handle.abort();
+    plain.handle.abort();
+}
+
 /// A rebuild has to reach a browser on a plain reload: the page names the
 /// bundle and is `no-cache`; the hashed assets under `/assets/` never change
 /// at a given path and are kept for a year.
@@ -990,6 +1100,7 @@ async fn the_page_is_revalidated_and_the_hashed_assets_are_kept() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let config = cwbhacker_server::Config {
+        app_origins: Vec::new(),
         bind: listener.local_addr().unwrap(),
         static_dir: Some(dist),
         art_dir: None,

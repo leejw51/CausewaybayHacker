@@ -2,7 +2,9 @@
 //!
 //! One port: the websocket at `/ws`, the art at `/art/…`, the chatroom's
 //! photos at `/photos/…` and the built frontend at `/`. One port means no
-//! CORS and nothing to configure.
+//! CORS and nothing to configure — except for the desktop app, whose page is
+//! the webview's own (`tauri://localhost`) and whose server is on a random
+//! port: `Config::app_origins` lets that one origin in, and nothing else.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -33,14 +35,17 @@ pub struct Config {
     pub static_dir: Option<PathBuf>,
     /// `frontend/dist/art` once built, `frontend/public/art` before that.
     pub art_dir: Option<PathBuf>,
+    /// Page origins let in besides the server's own and loopback's
+    /// (`ws::origin_allowed`), matched exactly: the desktop app's webview
+    /// (`tauri://localhost`, `http://tauri.localhost` on Windows). Empty for
+    /// `cwbhacker serve`, which has no such page and must keep refusing them.
+    pub app_origins: Vec<String>,
 }
 
 pub fn build_state(store: Arc<Store>, config: &Config) -> Shared {
-    Arc::new(AppState::new(
-        store,
-        config.art_dir.clone(),
-        config.static_dir.clone(),
-    ))
+    let mut state = AppState::new(store, config.art_dir.clone(), config.static_dir.clone());
+    state.app_origins = config.app_origins.clone();
+    Arc::new(state)
 }
 
 pub fn router(state: Shared) -> Router {
@@ -67,6 +72,10 @@ pub fn router(state: Shared) -> Router {
 
     router
         .layer(axum::middleware::from_fn(cache_policy))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            app_origin_cors,
+        ))
         .with_state(state)
 }
 
@@ -100,6 +109,31 @@ async fn cache_policy(
                 "no-cache"
             }),
         );
+    }
+    response
+}
+
+/// The desktop app's page is on another origin than this server, so the
+/// photos it draws into a canvas need `Access-Control-Allow-Origin`, or the
+/// canvas is tainted. Only for the origins in `app_origins`, echoed back one at
+/// a time; any other page gets no CORS header, as before.
+async fn app_origin_cors(
+    axum::extract::State(state): axum::extract::State<Shared>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::http::{header, HeaderValue};
+    let origin = request
+        .headers()
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+        .filter(|o| state.app_origins.iter().any(|a| a == o))
+        .and_then(|o| HeaderValue::from_str(o).ok());
+    let mut response = next.run(request).await;
+    if let Some(origin) = origin {
+        let headers = response.headers_mut();
+        headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+        headers.append(header::VARY, HeaderValue::from_static("origin"));
     }
     response
 }

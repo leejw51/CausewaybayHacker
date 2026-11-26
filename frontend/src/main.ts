@@ -9,7 +9,7 @@
  */
 import { App } from "./app";
 import { Client } from "./net/client";
-import { chooseTransport } from "./net/endpoint";
+import { chooseTransport, serverBase } from "./net/endpoint";
 import { BootScene } from "./scenes/boot";
 import { preferredLocale, setLocale, t } from "./i18n";
 
@@ -74,12 +74,15 @@ async function main(): Promise<void> {
  * an offline page in place of the browser's error when the server is down.
  * It caches none of the game. Only in a built page — the dev server's module
  * graph is not something to put a worker in front of — and only where the
- * browser allows one at all: https, or localhost (the desktop app). Over the
+ * browser allows one at all: https, or localhost. Over the
  * tailnet's plain http it is simply not registered, and Add to Home Screen
  * still opens full screen from the manifest.
  */
 function registerWorker(): void {
   if (!import.meta.env.PROD || !window.isSecureContext || !("serviceWorker" in navigator)) return;
+  // The desktop app's page is the webview's own, already installed, with no
+  // server behind its origin to put a worker in front of.
+  if (serverBase()) return;
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((e) => {
       console.warn("[causewaybay hacker] no service worker:", e);

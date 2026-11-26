@@ -17,6 +17,7 @@ import type { App } from "../../app";
 import type { Lang } from "../../net/protocol";
 import type { ChatMessage } from "../../net/protocol";
 import { WireError } from "../../net/client";
+import { serverUrl } from "../../net/endpoint";
 import { ensureFonts, printf, wrap, width } from "../../engine/text";
 import { css, Theme, type RGBA } from "../../engine/theme";
 import { fill, type Ctx, type Rect } from "../../engine/ui";
@@ -1505,7 +1506,7 @@ function itemOf(m: ChatMessage): Item {
     id: m.id,
     role: m.role,
     text: m.text,
-    photoUrl: m.photo_url,
+    photoUrl: m.photo_url === null ? null : serverUrl(m.photo_url),
     at: m.created_at,
     edited: m.edited,
   };

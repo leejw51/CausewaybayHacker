@@ -27,6 +27,7 @@ fn state(root: &std::path::Path) -> cwbhacker_server::Shared {
         users::upsert(&conn, ALICE).unwrap();
     }
     let config = cwbhacker_server::Config {
+        app_origins: Vec::new(),
         bind: "127.0.0.1:0".parse().unwrap(),
         static_dir: None,
         art_dir: None,

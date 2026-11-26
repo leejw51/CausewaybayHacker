@@ -183,9 +183,11 @@ make version          # the version, once all four manifests agree on it
 ```
 
 `make tauri` builds `desktop/` — the browser game in a native window, with the
-server linked into the same binary rather than run beside it. It serves the
-bundled frontend on `127.0.0.1:5395` (fixed, so the key the page keeps in
-localStorage is still there next launch), imports the bundled packs into the
+server linked into the same binary rather than run beside it. The server
+listens on a random loopback port, new every launch; the page is the webview's
+own (`tauri://localhost`), a fixed origin, so the key it keeps in localStorage
+is still there next launch. (Up to v0.1.13 the page lived on `127.0.0.1:5395`;
+the first launch after that carries the key over, once.) It imports the bundled packs into the
 same `~/.causewaybayhacker` the browser game uses, and finds the compilers on
 your login shell's PATH even when opened from Finder. Out comes
 `desktop/target/release/bundle/macos/Causewaybay Hacker.app` and a zip of it in

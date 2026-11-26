@@ -81,9 +81,16 @@ impl Drop for Seat {
 ///     address it was reached on — loopback, a LAN IP, a tailnet IP.
 ///   * `Origin`'s host is loopback, on any port: allowed. That is the vite
 ///     dev server on 5291 talking to the game server on 5390.
+///   * `Origin` is exactly one of `app_origins`: allowed. That is the
+///     desktop app's own webview (`tauri://localhost`), which the server
+///     passes in; `cwbhacker serve` passes none. No web page can claim that
+///     origin, and the server still only listens on loopback there.
 ///   * anything else, including `Origin: null`: refused.
-pub fn origin_allowed(origin: Option<&str>, host: Option<&str>) -> bool {
+pub fn origin_allowed(origin: Option<&str>, host: Option<&str>, app_origins: &[String]) -> bool {
     let Some(origin) = origin else { return true };
+    if app_origins.iter().any(|a| a == origin) {
+        return true;
+    }
     let Some(authority) = origin
         .strip_prefix("http://")
         .or_else(|| origin.strip_prefix("https://"))
@@ -118,7 +125,7 @@ pub async fn upgrade(
 ) -> Response {
     let origin = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok());
     let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
-    if !origin_allowed(origin, host) {
+    if !origin_allowed(origin, host, &state.app_origins) {
         tracing::warn!(
             origin = origin.unwrap_or("-"),
             host = host.unwrap_or("-"),
@@ -766,7 +773,53 @@ fn execute_async(
 
 #[cfg(test)]
 mod origin_tests {
-    use super::origin_allowed;
+    /// The rules as `cwbhacker serve` applies them: no app origins.
+    fn origin_allowed(origin: Option<&str>, host: Option<&str>) -> bool {
+        super::origin_allowed(origin, host, &[])
+    }
+
+    fn desktop() -> Vec<String> {
+        vec!["tauri://localhost".into(), "http://tauri.localhost".into()]
+    }
+
+    #[test]
+    fn the_desktop_webview_is_allowed_only_when_the_server_names_it() {
+        let app = desktop();
+        for origin in ["tauri://localhost", "http://tauri.localhost"] {
+            assert!(super::origin_allowed(
+                Some(origin),
+                Some("127.0.0.1:61234"),
+                &app
+            ));
+            // `cwbhacker serve` names none, so it still refuses them.
+            assert!(!origin_allowed(Some(origin), Some("127.0.0.1:5390")));
+        }
+    }
+
+    #[test]
+    fn an_app_origin_matches_exactly_not_by_prefix() {
+        let app = desktop();
+        for origin in [
+            "tauri://localhost.evil.example",
+            "tauri://evil.example",
+            "tauri://localhost:1",
+            "TAURI://LOCALHOST",
+            "http://tauri.localhost.evil.example",
+            "null",
+        ] {
+            assert!(
+                !super::origin_allowed(Some(origin), Some("127.0.0.1:61234"), &app),
+                "{origin} was let in"
+            );
+        }
+        // The app origins add to the rules; they do not replace them.
+        assert!(super::origin_allowed(None, None, &app));
+        assert!(!super::origin_allowed(
+            Some("http://evil.example"),
+            Some("127.0.0.1:61234"),
+            &app
+        ));
+    }
 
     #[test]
     fn no_origin_is_a_native_client() {

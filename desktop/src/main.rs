@@ -2,19 +2,28 @@
 //! process.
 //!
 //! The server is the same library `cwbhacker serve` runs (backend/server),
-//! started on a thread of its own on loopback. The window opens on a splash
-//! page at once, and is pointed at the server the moment it listens. The page
-//! derives its websocket from `location` (frontend/src/net/endpoint.ts), so the
-//! web bundle runs here unchanged: same frontend, same home, same progress as
-//! the browser game.
+//! started on a thread of its own, on loopback, on **a port the OS picks**
+//! every launch. The page is not served by it: the window loads the bundled
+//! frontend from the webview's own origin (`tauri://localhost`, or
+//! `http://tauri.localhost` on Windows), and is told the server's address
+//! before any of its scripts run (`window.__CWBH_SERVER__`, read by
+//! frontend/src/net/endpoint.ts). So:
 //!
-//! The port is fixed, not ephemeral. The page keeps the player's key, prefs and
-//! drafts in localStorage, which is per origin; a new port every launch would
-//! be a new origin, and the player would come back to an empty wallet.
+//!   * the origin is fixed, and with it localStorage — the player's key,
+//!     prefs and drafts survive a relaunch even though the port does not;
+//!   * nothing else on the machine has to keep a port free for us, and a
+//!     second copy of the server (`make start`) never collides;
+//!   * the server lets exactly those webview origins open the socket
+//!     (`Config::app_origins`); `cwbhacker serve` lets in none of them.
+//!
+//! Up to v0.1.13 the page was served by the server on the fixed
+//! `http://127.0.0.1:5395`, so that is where an existing player's key is.
+//! The first launch of this version moves it: see `migrate`.
 
 // No console window behind the game on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::BTreeMap;
 use std::io::IsTerminal;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -23,41 +32,56 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use cwbhacker_core::{auth, content, paths, Store};
 
-/// One above the browser game's 5390, so `make start` and the app can run side
-/// by side. `CWBH_DESKTOP_PORT` moves it.
-const PORT: u16 = 5395;
+/// The origins the webview gives the bundled page: macOS and Linux, then
+/// Windows (WebView2 serves custom protocols over http).
+const APP_ORIGINS: [&str; 2] = ["tauri://localhost", "http://tauri.localhost"];
+
+/// Where v0.1.13 and before served the page, and so where an existing
+/// player's localStorage lives.
+const OLD_PORT: u16 = 5395;
+
+/// In the home once the old origin's localStorage has been carried over, so
+/// it is done once.
+const MIGRATED: &str = "desktop-origin.migrated";
 
 fn main() {
     fix_path();
 
     tauri::Builder::default()
-        // A second launch would find the port taken and fall back to another
-        // origin — another localStorage, so no key. Raise the first instead.
+        // One server and one window per player; a second launch raises the
+        // first rather than starting another.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
+            for label in ["main", "migrate"] {
+                if let Some(w) = app.get_webview_window(label) {
+                    let _ = w.unminimize();
+                    let _ = w.set_focus();
+                }
             }
         }))
         .setup(|app| {
-            let window =
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                    .title("Causewaybay Hacker")
-                    .inner_size(1600.0, 900.0)
-                    .min_inner_size(960.0, 600.0)
-                    .center()
-                    .build()?;
-            let dirs = Dirs::find(app.handle());
+            let handle = app.handle().clone();
+            // Bound here, before any window, so the page can be told the port
+            // up front. Connections that arrive while the packs import wait in
+            // the backlog; the page's client simply sees a slow open.
+            let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+                .context("binding a loopback port for the server")?;
+            let server = format!("http://{}", listener.local_addr()?);
+
+            let migration = migrate::begin(&handle);
+            if migration.is_none() {
+                open_main(&handle, &server, None)?;
+            }
+            let dirs = Dirs::find(&handle);
             std::thread::Builder::new()
                 .name("server".into())
                 .spawn(move || {
-                    if let Err(e) = run_server(dirs, &window) {
+                    if let Err(e) = run(dirs, listener, server, migration, &handle) {
                         tracing::error!("{e:#}");
-                        show_error(&window, &format!("{e:#}"));
+                        show_error(&handle, &format!("{e:#}"));
                     }
                 })?;
             Ok(())
@@ -66,28 +90,67 @@ fn main() {
         .expect("running the desktop app");
 }
 
-/// The built frontend and the content packs: bundled beside the executable in
-/// an installed app, or the checkout's own when run from it (`tauri dev`, or a
-/// bare `cargo run`).
+/// The game's window, on the bundled page, told where its server is — and,
+/// on the launch that migrates, handed the old origin's localStorage to seed
+/// its own with.
+fn open_main(
+    app: &AppHandle,
+    server: &str,
+    seed: Option<&BTreeMap<String, String>>,
+) -> tauri::Result<WebviewWindow> {
+    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("Causewaybay Hacker")
+        .inner_size(1600.0, 900.0)
+        .min_inner_size(960.0, 600.0)
+        .center()
+        .initialization_script(init_script(server, seed))
+        .build()
+}
+
+/// The script the webview runs before the page's own, on every load.
+///
+/// The seed only fills keys the new origin does not have yet, and only once
+/// (a flag in the new origin's own storage), so a reload — or a player who
+/// has already signed in again here — is never overwritten.
+fn init_script(server: &str, seed: Option<&BTreeMap<String, String>>) -> String {
+    let server = serde_json::to_string(server).expect("a string serialises");
+    let mut script = format!("window.__CWBH_SERVER__ = {server};\n");
+    if let Some(seed) = seed.filter(|s| !s.is_empty()) {
+        let seed = serde_json::to_string(seed).expect("a map of strings serialises");
+        script.push_str(&format!(
+            "(function (seed) {{\n\
+             \x20 try {{\n\
+             \x20   var done = \"cwbhacker.desktop.migrated\";\n\
+             \x20   if (localStorage.getItem(done)) return;\n\
+             \x20   Object.keys(seed).forEach(function (k) {{\n\
+             \x20     if (localStorage.getItem(k) === null) localStorage.setItem(k, seed[k]);\n\
+             \x20   }});\n\
+             \x20   localStorage.setItem(done, \"1\");\n\
+             \x20 }} catch (e) {{ console.warn(\"[causewaybay hacker] migration:\", e); }}\n\
+             }})({seed});\n"
+        ));
+    }
+    script
+}
+
+/// The content packs: bundled beside the executable in an installed app, or
+/// the checkout's own when run from it (`tauri dev`, or a bare `cargo run`).
+/// The frontend is not here: it is built into the binary (`frontendDist`).
 struct Dirs {
-    web: PathBuf,
     content: PathBuf,
 }
 
 impl Dirs {
-    fn find(app: &tauri::AppHandle) -> Dirs {
+    fn find(app: &AppHandle) -> Dirs {
         if let Ok(res) = app.path().resource_dir() {
-            if res.join("web/index.html").is_file() && res.join("content").is_dir() {
+            if res.join("content").is_dir() {
                 return Dirs {
-                    web: res.join("web"),
                     content: res.join("content"),
                 };
             }
         }
-        let root = repo_root();
         Dirs {
-            web: root.join("frontend/dist"),
-            content: root.join("content"),
+            content: repo_root().join("content"),
         }
     }
 }
@@ -111,22 +174,43 @@ fn repo_root() -> PathBuf {
     PathBuf::from(".")
 }
 
-/// What `cwbhacker serve` does before it listens, then the listening. Returns
-/// only if something failed; otherwise it serves until the process exits.
-fn run_server(dirs: Dirs, window: &WebviewWindow) -> Result<()> {
+/// What `cwbhacker serve` does before it listens, then the listening, on the
+/// listener `setup` bound. With a migration under way, the main window opens
+/// once the old page has handed its storage over. Returns only if something
+/// failed; otherwise it serves until the process exits.
+fn run(
+    dirs: Dirs,
+    listener: std::net::TcpListener,
+    server: String,
+    migration: Option<migrate::Pending>,
+    app: &AppHandle,
+) -> Result<()> {
     let home = paths::resolve_home(None)
         .map_err(|e| anyhow::anyhow!("{e}"))
         .context("resolving the home directory")?;
     paths::ensure_dir(&home.join("logs")).map_err(|e| anyhow::anyhow!("{e}"))?;
     init_logging(&home);
-    tracing::info!(web = %dirs.web.display(), content = %dirs.content.display(), "desktop starting");
+    tracing::info!(content = %dirs.content.display(), "desktop starting");
     tracing::info!(path = %std::env::var("PATH").unwrap_or_default(), "toolchain PATH");
 
-    if !dirs.web.join("index.html").is_file() {
-        anyhow::bail!(
-            "no frontend at {}\nbuild it first: make tauri (or cd frontend && npm run build)",
-            dirs.web.display()
-        );
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("starting the tokio runtime")?;
+
+    if let Some(pending) = migration {
+        let seed = runtime.block_on(pending.finish());
+        let carried = seed.as_ref().map_or(0, BTreeMap::len);
+        open_main(app, &server, seed.as_ref())?;
+        if let Some(w) = app.get_webview_window("migrate") {
+            let _ = w.close();
+        }
+        if seed.is_some() {
+            let _ = std::fs::write(home.join(MIGRATED), format!("{carried} keys\n"));
+            tracing::info!(keys = carried, "old origin's localStorage carried over");
+        } else {
+            tracing::warn!("the old page did not answer; will try again next launch");
+        }
     }
 
     let store = Arc::new(Store::open(&home).map_err(|e| anyhow::anyhow!("{e}"))?);
@@ -155,46 +239,160 @@ fn run_server(dirs: Dirs, window: &WebviewWindow) -> Result<()> {
         }
     }
 
-    let port = std::env::var("CWBH_DESKTOP_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(PORT);
     let config = cwbhacker_server::Config {
-        bind: SocketAddr::from((Ipv4Addr::LOCALHOST, port)),
-        art_dir: Some(dirs.web.join("art")).filter(|d| d.is_dir()),
-        static_dir: Some(dirs.web),
+        bind: listener.local_addr()?,
+        static_dir: None,
+        art_dir: None,
+        app_origins: APP_ORIGINS.iter().map(|o| o.to_string()).collect(),
     };
-    let app = cwbhacker_server::router(cwbhacker_server::build_state(store, &config));
+    let router = cwbhacker_server::router(cwbhacker_server::build_state(store, &config));
 
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("starting the tokio runtime")?;
     runtime.block_on(async move {
-        let listener = match tokio::net::TcpListener::bind(config.bind).await {
-            Ok(l) => l,
-            Err(e) => {
-                // Something that is not us holds the port. Play on, but on
-                // another origin: the key saved under this one is not here.
-                tracing::warn!(bind = %config.bind, "port taken ({e}); using any free one");
-                tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?
-            }
-        };
-        let local = listener.local_addr()?;
-        tracing::info!(%local, "serving");
-        let url: tauri::Url = format!("http://{local}/").parse()?;
-        window.navigate(url)?;
-        axum::serve(listener, app).await?;
+        listener.set_nonblocking(true)?;
+        let listener = tokio::net::TcpListener::from_std(listener)?;
+        tracing::info!(local = %config.bind, "serving");
+        axum::serve(listener, router).await?;
         Ok(())
     })
 }
 
-fn show_error(window: &WebviewWindow, message: &str) {
-    let text = format!("{message:?}"); // a JS string literal, quotes and all
-    let _ = window.eval(format!(
-        "document.getElementById('msg').textContent='THE SERVER DID NOT START';\
-         document.getElementById('err').textContent={text};"
-    ));
+/// Carrying an existing player's localStorage from the old origin
+/// (`http://127.0.0.1:5395`, where v0.1.13 and before served the page) to the
+/// webview's own.
+///
+/// One origin cannot read another's storage, so the old origin has to be
+/// asked: for one launch, a page is served on 5395 again — under a random
+/// path, so nothing else on the machine can feed it a seed — and the window
+/// opens on it. It posts every key it has back here; the main window then
+/// opens with them as its seed (`init_script`). The old origin's storage is
+/// left as it was. Once it has answered, `MIGRATED` in the home says so and
+/// this never runs again; if 5395 is busy, or the page never answers, the
+/// game opens without a seed and the next launch tries again.
+mod migrate {
+    use super::*;
+    use axum::extract::{DefaultBodyLimit, Path as UrlPath, State};
+    use axum::response::Html;
+    use axum::routing::{get, post};
+    use tokio::sync::{mpsc, oneshot};
+
+    pub struct Pending {
+        listener: std::net::TcpListener,
+        token: String,
+    }
+
+    /// Whether to migrate on this launch, and if so the window on the old
+    /// origin, already loading. `None` means open the game straight away.
+    pub fn begin(app: &AppHandle) -> Option<Pending> {
+        let home = paths::resolve_home(None).ok()?;
+        if home.join(MIGRATED).exists() {
+            return None;
+        }
+        // Taken means another program has it, and no page of ours can be
+        // served there: nothing to move this time.
+        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, OLD_PORT)).ok()?;
+        let token = cwbhacker_core::ids::photo_token();
+        let url: tauri::Url = format!("http://127.0.0.1:{OLD_PORT}/{token}/")
+            .parse()
+            .ok()?;
+        WebviewWindowBuilder::new(app, "migrate", WebviewUrl::External(url))
+            .title("Causewaybay Hacker")
+            .inner_size(1600.0, 900.0)
+            .center()
+            .build()
+            .ok()?;
+        Some(Pending { listener, token })
+    }
+
+    impl Pending {
+        /// Serve the export page until it answers, or ten seconds pass. The
+        /// old port is let go of either way.
+        pub async fn finish(self) -> Option<BTreeMap<String, String>> {
+            let (tx, mut rx) = mpsc::channel::<BTreeMap<String, String>>(1);
+            let (stop, stopped) = oneshot::channel::<()>();
+            let app = axum::Router::new()
+                .route("/{token}/", get(page))
+                .route("/{token}/export", post(export))
+                .layer(DefaultBodyLimit::max(32 << 20))
+                .with_state((self.token, tx));
+            self.listener.set_nonblocking(true).ok()?;
+            let listener = tokio::net::TcpListener::from_std(self.listener).ok()?;
+            let server = tokio::spawn(async move {
+                let _ = axum::serve(listener, app)
+                    .with_graceful_shutdown(async {
+                        let _ = stopped.await;
+                    })
+                    .await;
+            });
+            let seed = tokio::time::timeout(Duration::from_secs(10), rx.recv())
+                .await
+                .ok()
+                .flatten();
+            let _ = stop.send(());
+            let _ = tokio::time::timeout(Duration::from_secs(2), server).await;
+            seed
+        }
+    }
+
+    type Shared = (String, mpsc::Sender<BTreeMap<String, String>>);
+
+    async fn page(
+        State((token, _)): State<Shared>,
+        UrlPath(asked): UrlPath<String>,
+    ) -> Result<Html<&'static str>, axum::http::StatusCode> {
+        if asked != token {
+            return Err(axum::http::StatusCode::NOT_FOUND);
+        }
+        Ok(Html(PAGE))
+    }
+
+    async fn export(
+        State((token, tx)): State<Shared>,
+        UrlPath(asked): UrlPath<String>,
+        axum::Json(storage): axum::Json<BTreeMap<String, String>>,
+    ) -> axum::http::StatusCode {
+        if asked != token {
+            return axum::http::StatusCode::NOT_FOUND;
+        }
+        let _ = tx.try_send(storage);
+        axum::http::StatusCode::NO_CONTENT
+    }
+
+    /// Reads every key of this origin's localStorage and posts it back.
+    pub(super) const PAGE: &str = r#"<!doctype html>
+<html><head><meta charset="utf-8"><title>Causewaybay Hacker</title>
+<style>html,body{margin:0;height:100%;background:#0b0d17;color:#e8d48b;
+font:16px/1.4 ui-monospace,Menlo,monospace;display:grid;place-items:center}
+#msg{letter-spacing:.15em}</style></head>
+<body><div id="msg">MOVING YOUR SAVED KEY…</div>
+<script>
+var out = {};
+try {
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    out[k] = localStorage.getItem(k);
+  }
+} catch (e) {}
+fetch("export", { method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify(out) });
+</script></body></html>
+"#;
+}
+
+/// Said on whichever window is up: the game's, or the migration's.
+fn show_error(app: &AppHandle, message: &str) {
+    let text = serde_json::to_string(message).unwrap_or_else(|_| "\"\"".into());
+    let script = format!(
+        "document.body.innerHTML='';\
+         var d=document.createElement('pre');\
+         d.style.cssText='margin:2em;color:#ff7a7a;background:#0b0d17;white-space:pre-wrap;font:16px ui-monospace,Menlo,monospace';\
+         d.textContent='THE SERVER DID NOT START\\n\\n'+{text};\
+         document.body.appendChild(d);"
+    );
+    for label in ["main", "migrate"] {
+        if let Some(w) = app.get_webview_window(label) {
+            let _ = w.eval(&script);
+        }
+    }
 }
 
 fn init_logging(home: &Path) {
@@ -340,4 +538,34 @@ fn game_python_bin(user_home: &str) -> Option<String> {
         .into_iter()
         .find(|d| d.join("python3").is_file())
         .map(|d| d.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Values a JS string literal could trip on if they were pasted in raw.
+    fn awkward() -> BTreeMap<String, String> {
+        BTreeMap::from([
+            ("cwbhacker.key".to_string(), "a\"b\\c\nd\u{2028}e</script>".to_string()),
+            ("kept".to_string(), "old".to_string()),
+        ])
+    }
+
+    #[test]
+    fn the_page_is_always_told_its_server() {
+        let bare = init_script("http://127.0.0.1:61234", None);
+        assert_eq!(bare, "window.__CWBH_SERVER__ = \"http://127.0.0.1:61234\";\n");
+        // An empty seed is no seed: nothing to run, nothing to get wrong.
+        assert_eq!(init_script("http://127.0.0.1:61234", Some(&BTreeMap::new())), bare);
+    }
+
+    #[test]
+    fn the_seed_goes_in_as_json_not_as_source() {
+        let script = init_script("http://127.0.0.1:61234", Some(&awkward()));
+        assert!(script.starts_with("window.__CWBH_SERVER__ = \"http://127.0.0.1:61234\";\n"));
+        assert!(script.contains(r#""a\"b\\c\nd"#), "{script}");
+        // `cargo test -- --nocapture` shows it, to run under node.
+        println!("<<<SCRIPT\n{script}SCRIPT>>>");
+    }
 }

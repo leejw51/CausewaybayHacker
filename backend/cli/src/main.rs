@@ -264,6 +264,7 @@ fn serve(
         dist.is_dir().then_some(dist)
     });
     let config = cwbhacker_server::Config {
+        app_origins: Vec::new(),
         bind,
         art_dir: cwbhacker_server::pick_art_dir(&root),
         static_dir,

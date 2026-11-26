@@ -119,6 +119,7 @@ async fn start(home: &std::path::Path, content_src: &std::path::Path) -> u16 {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let config = cwbhacker_server::Config {
+        app_origins: Vec::new(),
         bind: listener.local_addr().unwrap(),
         static_dir: None,
         art_dir: None,

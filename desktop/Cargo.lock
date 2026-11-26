@@ -737,6 +737,7 @@ dependencies = [
  "axum",
  "cwbhacker-core",
  "cwbhacker-server",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",

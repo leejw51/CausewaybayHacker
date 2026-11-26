@@ -76,6 +76,9 @@ pub struct AppState {
     pub formatters: Arc<Gate>,
     /// Sockets open right now, against `limits::MAX_CONNECTIONS`.
     pub connections: AtomicUsize,
+    /// `Config::app_origins`: page origins let through `ws::origin_allowed`
+    /// on top of its own rules. Empty unless the desktop app set them.
+    pub app_origins: Vec<String>,
     next_connection: AtomicU64,
 }
 
@@ -117,6 +120,7 @@ impl AppState {
             executions: Gate::new(limits::MAX_CONCURRENT_EXECUTIONS),
             formatters: Gate::new(limits::MAX_CONCURRENT_FORMATS),
             connections: AtomicUsize::new(0),
+            app_origins: Vec::new(),
             next_connection: AtomicU64::new(1),
         }
     }

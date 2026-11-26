@@ -45,6 +45,7 @@ import {
   type Provider,
 } from "../../ai/prefs";
 import { listModels } from "../../ai/providers";
+import { serverBase } from "../../net/endpoint";
 
 export interface Item {
   role: "user" | "agent" | "tool" | "tip";
@@ -667,6 +668,10 @@ export class Panel {
     if (hit !== undefined) return hit;
     const img = new Image();
     img.decoding = "async";
+    // On the desktop app the photo is on the server's origin, not the page's;
+    // asked for with CORS (the server answers it for the app), it does not
+    // taint the canvas it is drawn into.
+    if (serverBase() && /^https?:/.test(url)) img.crossOrigin = "anonymous";
     img.onerror = () => this.photos.set(url, null);
     img.src = url;
     this.photos.set(url, img);
